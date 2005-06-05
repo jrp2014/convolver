@@ -11,6 +11,9 @@
 #ifndef __CCONVOLVER_H_
 #define __CCONVOLVER_H_
 
+// Pull in Common DX classes
+#include "Common\dxstdafx.h"
+
 #include "resource.h"
 #include <mediaobj.h>       // The IMediaObject header from the DirectX SDK.
 #include "wmpservices.h"    // The header containing the WMP interface definitions.
@@ -18,10 +21,13 @@
 const DWORD UNITS = 10000000;  // 1 sec = 1 * UNITS
 const DWORD MAXSTRING = 1024;
 
+const MAX_FILTER_SIZE = 100000000; // Max impulse size.  1024 might be a better choice
+
 // registry location for preferences
 const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
 const TCHAR kszPrefsDelayTime[] = _T("DelayTime");
 const TCHAR kszPrefsWetmix[] = _T("Wetmix");
+const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -34,11 +40,15 @@ DEFINE_GUID(CLSID_Convolver, 0xe68732fa, 0x624d, 0x40b4, 0x91, 0x7c, 0xde, 0x6b,
 interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver : IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE get_delay(DWORD *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_delay(DWORD newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_wetmix(double *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_wetmix(double newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_filterfilename(TCHAR* *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_filterfilename(TCHAR* newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_filterformat(WAVEFORMATEX *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_filterformat(WAVEFORMATEX newVal) = 0;
 
 };
 
@@ -75,11 +85,14 @@ END_COM_MAP()
     void    FinalRelease();
 
     // IConvolver methods
-    STDMETHOD(get_delay)(DWORD *pVal);
-    STDMETHOD(put_delay)(DWORD newVal);
-
 	STDMETHOD(get_wetmix)(double *pVal);
 	STDMETHOD(put_wetmix)(double newVal);
+
+	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
+	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
+
+	STDMETHOD(get_filterformat)(WAVEFORMATEX *pVal);
+	STDMETHOD(put_filterformat)(WAVEFORMATEX newVal);
 
 
     // IMediaObject methods
@@ -228,13 +241,25 @@ private:
 	double					m_fWetMix;			// percentage of effect
 	double					m_fDryMix;			// percentage of dry signal
 
+	TCHAR					m_szFilterFileName[MAX_PATH];
+	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
+	float  **m_ppfloatFilter;					// h(channel, n)
+	float  **m_ppfloatSampleBuffer;				// xi(channel, n)
+	float  *m_pfloatSampleBufferChannelCopy;
+	float  **m_ppfloatOutputBuffer;				// y(channel, n)
 
-    DWORD					m_dwDelayTime;		// Delay time
+	long  m_cFilterLength;						// Filter size in samples
+	long  m_c2xPaddedFilterLength;				// 2^n, padded with zeros for radix 2 FFT
+	long  m_nSampleBufferIndex;					// placeholder
+
+//    DWORD					m_dwDelayTime;		// Delay time
     BOOL                    m_bEnabled;         // TRUE if enabled
 
-	DWORD  m_cbDelayBuffer;   // Count of bytes in delay buffer size.
-	BYTE*  m_pbDelayPointer;  // Movable pointer to delay buffer.
-	BYTE*  m_pbDelayBuffer;   // Pointer to the head of the delay buffer.
+//	long  m_cbDelayBuffer;						// Count of bytes in delay buffer
+//	BYTE*  m_pbDelayPointer;					// Movable pointer to delay buffer
+//	BYTE*  m_pbDelayBuffer;						// Movable pointer to the head of the delay buffer
+//	int	   m_iDelayOffset;						// Pointer into the delay buffer
+
 };
 
 #endif //__CCONVOLVER_H_

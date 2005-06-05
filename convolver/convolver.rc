@@ -96,10 +96,12 @@ IDD_CONVOLVERPROPPAGE DIALOGEX 0, 0, 147, 122
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    LTEXT           "Delay time (0-2000)",IDC_DELAYLABEL,11,13,104,10
-    EDITTEXT        IDC_DELAYTIME,11,30,54,12,ES_AUTOHSCROLL
     LTEXT           "Effect Level (%)",IDC_MIXLABEL,11,49,54,8
     EDITTEXT        IDC_WETMIX,11,64,40,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Get filter ...",IDC_GETFILTER,9,92,50,14
+    LTEXT           "",IDC_FILTERFILELABEL,63,94,82,11,SS_NOPREFIX | 
+                    SS_CENTERIMAGE | SS_PATHELLIPSIS,WS_EX_CLIENTEDGE
+    LTEXT           "",IDC_STATUS,11,110,133,8
 END
 
 
@@ -117,7 +119,6 @@ BEGIN
     IDS_TITLEPROPPAGE       "Convolver Plug-in Sample"
     IDS_HELPFILEPROPPAGE    "Help File Name"
     IDS_DOCSTRINGPROPPAGE   "Convolver Settings"
-    IDS_DELAYRANGEERROR     "You must enter a value between 0 and 2000 (milliseconds)"
 END
 
 #endif    // English (U.S.) resources

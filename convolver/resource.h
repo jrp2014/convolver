@@ -13,11 +13,11 @@
 #define IDR_CONVOLVERPROPPAGE           107
 #define IDD_CONVOLVERPROPPAGE           108
 #define IDS_SCALERANGEERROR             109
-#define IDS_DELAYRANGEERROR             109
-#define IDC_DELAYTIME                   201
 #define IDC_MIXLABEL                    202
 #define IDC_WETMIX                      203
-#define IDC_DELAYLABEL                  65535
+#define IDC_GETFILTER                   205
+#define IDC_FILTERFILELABEL             206
+#define IDC_STATUS                      207
 
 // Next default values for new objects
 // 
@@ -25,7 +25,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        204
 #define _APS_NEXT_COMMAND_VALUE         32768
-#define _APS_NEXT_CONTROL_VALUE         204
+#define _APS_NEXT_CONTROL_VALUE         209
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

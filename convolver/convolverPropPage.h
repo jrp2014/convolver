@@ -41,21 +41,22 @@ END_COM_MAP()
 
 BEGIN_MSG_MAP(CConvolverPropPage)
 	COMMAND_HANDLER(IDC_WETMIX, EN_CHANGE, OnEnChangeWetmix)
+	COMMAND_HANDLER(IDC_GETFILTER, BN_CLICKED, OnBnClickedGetfilter)
 	CHAIN_MSG_MAP(IPropertyPageImpl<CConvolverPropPage>)
-	COMMAND_HANDLER(IDC_DELAYTIME, EN_CHANGE, OnChangeDelay)
 	MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
 END_MSG_MAP()
 
     STDMETHOD(SetObjects)(ULONG nObjects, IUnknown** ppUnk);
     STDMETHOD(Apply)(void);
 
-	LRESULT (OnChangeDelay)(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled);
 	LRESULT (OnInitDialog)(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
 private:
     CComPtr<IConvolver> m_spConvolver;  // pointer to plug-in interface
+
 public:
 	LRESULT OnEnChangeWetmix(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnBnClickedGetfilter(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 #endif // __CCONVOLVERPROPPAGE_H_
