@@ -11,8 +11,15 @@
 #ifndef __CCONVOLVER_H_
 #define __CCONVOLVER_H_
 
+#if defined(DEBUG) | defined(_DEBUG)
+#include <crtdbg.h>
+#endif
+
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
+
+// FFT routines
+#include <fftsg_h.h>
 
 #include "resource.h"
 #include <mediaobj.h>       // The IMediaObject header from the DirectX SDK.
@@ -228,6 +235,8 @@ private:
 
 	void FillBufferWithSilence(WAVEFORMATEX *pWfex);
 
+	void cmult(DLReal * A,const DLReal * B, DLReal * C,const int N);  // Complex multiplication
+
     DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
     DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
@@ -243,6 +252,11 @@ private:
 
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
+
+#if defined(DEBUG) | defined(_DEBUG)
+	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
+#endif
+
 	float  **m_ppfloatFilter;					// h(channel, n)
 	float  **m_ppfloatSampleBuffer;				// xi(channel, n)
 	float  *m_pfloatSampleBufferChannelCopy;

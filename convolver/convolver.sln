@@ -3,6 +3,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolver", "convolver.vcpr
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "generate_test_IRs", "generate_test_IRs\generate_test_IRs.vcproj", "{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -13,6 +17,10 @@ Global
 		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Debug.Build.0 = Debug|Win32
 		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.ActiveCfg = Release|Win32
 		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.Build.0 = Release|Win32
+		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Debug.ActiveCfg = Debug|Win32
+		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Debug.Build.0 = Debug|Win32
+		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Release.ActiveCfg = Release|Win32
+		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

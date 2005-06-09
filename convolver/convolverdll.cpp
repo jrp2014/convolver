@@ -82,9 +82,11 @@ STDAPI DllRegisterServer(void)
     bstrDescription.LoadString(IDS_DESCRIPTION);
 
     // Describe the type of data handled by the plug-in
-    DMO_PARTIAL_MEDIATYPE mt = { 0 };
-    mt.type = MEDIATYPE_Audio;
-    mt.subtype = MEDIASUBTYPE_PCM;
+    DMO_PARTIAL_MEDIATYPE mt[2] = { 0, 0 };
+    mt[0].type = MEDIATYPE_Audio;
+    mt[0].subtype = MEDIASUBTYPE_PCM;
+    mt[1].type = MEDIATYPE_Audio;
+	mt[1].subtype = MEDIASUBTYPE_IEEE_FLOAT;
 
     // Register the plug-in with WMP
     hr = spRegistrar->WMPRegisterPlayerPlugin(
@@ -93,8 +95,8 @@ STDAPI DllRegisterServer(void)
                     NULL,               // path to app that uninstalls the plug-in
                     1,                  // DirectShow priority for this plug-in
                     WMP_PLUGINTYPE_DSP, // Plug-in type
-                    CLSID_Convolver,// Class ID of plug-in
-                    1,                  // No. media types supported by plug-in
+                    CLSID_Convolver,	// Class ID of plug-in
+                    2,                  // No. media types supported by plug-in
                     &mt);               // Array of media types supported by plug-in
 
     if (FAILED(hr))

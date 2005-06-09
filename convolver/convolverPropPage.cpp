@@ -217,8 +217,6 @@ LRESULT CConvolverPropPage::OnEnChangeWetmix(WORD wNotifyCode, WORD wID, HWND hW
 
 LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
 {
-	HRESULT hr = 0;
-
 	TCHAR szFilterFileName[MAX_PATH]	= TEXT("");
 	TCHAR szFilterPath[MAX_PATH]		= TEXT("");
 
