@@ -14,12 +14,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		return 1;
 	}
 
-	CHAR strTmp[2*(sizeof(10)+1)]; // SIZE equals (2*(sizeof(tstr)+1)). This ensures enough
-	// room for the multibyte characters if they are two
-	// bytes long and a terminating null character.
+
 
 
 #ifdef UNICODE 
+	CHAR strTmp[2*(sizeof(10)+1)];	// SIZE equals (2*(sizeof(tstr)+1)). This ensures enough
+									// room for the multibyte characters if they are two
+									// bytes long and a terminating null character.
 
 	wcstombs(strTmp, (const wchar_t *) argv[1], sizeof(strTmp)); 
 	int nSamplesPerSec =  atoi(strTmp);

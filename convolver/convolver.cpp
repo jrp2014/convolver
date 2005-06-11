@@ -16,6 +16,41 @@
 #include <ks.h>         // required for WAVEFORMATEXTENSIBLE
 #include <ksmedia.h>
 
+
+/* Complex multiplication */
+void CConvolver::cmult(DLReal * A,const DLReal * B, DLReal * C,const int N)
+{
+	int R;
+	int I;
+	DLReal T1;
+	DLReal T2;
+
+	// a[2*k] = R[k], 0<=k<n/2
+	// a[2*k+1] = I[k], 0<k<n/2
+	// a[1] = R[n/2]
+
+	// R[R[a] + I[a]) * (R[b]+I[b]] = R[a]R[b] - I[a]I[b]
+	// I[R[a] + I[a]) * (R[b]+I[b]] = R[a]I[b] + I[a]R[b]
+
+	// 0<k<n/2
+	//								  A[R]*B[R]      - A[I]*B[I]
+	// R[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k]   - a[2*k+1]b[2*k+1]
+	//								  A[R]*B[I]      + A{I]*B[R]
+	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
+
+	C[0] = A[0] * B[0];
+	C[1] = A[1] * B[1];
+	for (R = 2,I = 3;R < N;R += 2,I += 2)
+	{
+		//C[R] = A[R]*B[R] - A[I]*B[I];
+		//C[I] = A[R]*B[I] + A[I]*B[R];
+		T1 = A[R] * B[R];
+		T2 = A[I] * B[I];
+		C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
+		C[R] = T1 - T2;
+	} 
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // CConvolver::CConvolver
 //
@@ -653,20 +688,22 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		SAFE_DELETE(pFilterWave);
 		return hr;
 	}
-	m_WfexFilterFormat.cbSize = pFilterWave->GetFormat()->cbSize;
-	m_WfexFilterFormat.nAvgBytesPerSec = pFilterWave->GetFormat()->nAvgBytesPerSec;
-	m_WfexFilterFormat.nBlockAlign = pFilterWave->GetFormat()->nBlockAlign;
-	m_WfexFilterFormat.nChannels = pFilterWave->GetFormat()->nChannels;
-	m_WfexFilterFormat.nSamplesPerSec= pFilterWave->GetFormat()->nSamplesPerSec;
-	m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
-	m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
+
+	m_WfexFilterFormat = *pFilterWave->GetFormat();
+	//m_WfexFilterFormat.cbSize = pFilterWave->GetFormat()->cbSize;
+	//m_WfexFilterFormat.nAvgBytesPerSec = pFilterWave->GetFormat()->nAvgBytesPerSec;
+	//m_WfexFilterFormat.nBlockAlign = pFilterWave->GetFormat()->nBlockAlign;
+	//m_WfexFilterFormat.nChannels = pFilterWave->GetFormat()->nChannels;
+	//m_WfexFilterFormat.nSamplesPerSec= pFilterWave->GetFormat()->nSamplesPerSec;
+	//m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
+	//m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
 
 	int nChannels = m_WfexFilterFormat.nChannels;
 	m_cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
 
 	// Check that the filter has the same number of channels and sample rate as the input
-	if ( (pWave->nChannels != pFilterWave->GetFormat()->nChannels) ||
-		(pWave->nSamplesPerSec != pFilterWave->GetFormat()->nSamplesPerSec))
+	if ((pWave->nChannels != m_WfexFilterFormat.nChannels) ||
+		(pWave->nSamplesPerSec != m_WfexFilterFormat.nSamplesPerSec))
 	{
 		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 		pFilterWave->Close();
@@ -790,7 +827,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		{
 			int k = swprintf(sFormat, TEXT("%i,"), j);
 			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.6f"), m_ppfloatFilter[j][i]);
+			k += swprintf(sFormat + k, TEXT("%.3f "), m_ppfloatFilter[j][i]);
 			OutputDebugString(sFormat);
 		}
 	}
@@ -1561,6 +1598,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 			{
 				for (int nc = 0; nc < pWave->nChannels; nc++)
 				{
+
 					// Get the input sample and convert it to a float
 					float inputSample = *pfloatInputData++;
 
@@ -1569,8 +1607,19 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 					// Mix the processed signal with the dry signal.
 					// This does not actually work because of the convolution delay (ie, m_ppfloatSampleBuffer[][i] doesn't correspond to m_ppfloatOutputBuffer[][i])
 					// So set the effect to 0 in the properties tab to get the proper convolved result
-					float outputSample = (m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] * m_fDryMix ) +
-						(m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex] * m_fWetMix);
+					//float outputSample = (inputSample * m_fDryMix ) + (m_ppfloatOutputBuffer[nc][(m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2) % m_c2xPaddedFilterLength] * m_fWetMix);
+					float outputSample = (m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] * m_fDryMix ) + (m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex] * m_fWetMix);
+
+					if (abs(m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] - m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex]) > 0.00001)
+					{
+						OutputDebugString(TEXT("\n"));
+						TCHAR sFormat[100];
+						int k = swprintf(sFormat, TEXT("%i,"), dwBlocksToProcess);
+						k += swprintf(sFormat + k, TEXT("%i: "), m_nSampleBufferIndex);
+						k += swprintf(sFormat + k, TEXT("%.4g "), m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2]);
+						k += swprintf(sFormat + k, TEXT("%.4g"), m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex]);
+						OutputDebugString(sFormat);
+					}
 
 					// Write to output buffer.
 					*pfloatOutputData++ = outputSample;
@@ -1588,6 +1637,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 #endif
 				}
 
+				//if (m_nSampleBufferIndex % (m_c2xPaddedFilterLength / 2) == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
 				if (m_nSampleBufferIndex == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
 				{	
 					// Got a sample xi length Nh, so calculate m_ppfloatOutputBuffer
@@ -1615,12 +1665,16 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 						rdft(m_c2xPaddedFilterLength, OouraRBackward, m_ppfloatOutputBuffer[nc]); // take the Inverse DFT
 
 						// scale
-						for (int j = 0; j < m_c2xPaddedFilterLength / 2; j++)  // No need to scale second half, as going to discard that
+						for (int j = 0; j < m_c2xPaddedFilterLength; j++)  // TODO: No need to scale second half of circ buffer, as going to discard that
 							m_ppfloatOutputBuffer[nc][j] *= 2.0 / (double) m_c2xPaddedFilterLength;
 
-						// move overlap block x i to previous block x i-1
+						//// move overlap block x i to previous block x i-1
 						for (int j = 0; j < m_c2xPaddedFilterLength / 2; j++)
 							m_ppfloatSampleBuffer[nc][j + m_c2xPaddedFilterLength / 2] = m_ppfloatSampleBuffer[nc][j];
+						//if (m_nSampleBufferIndex == m_c2xPaddedFilterLength - 1)
+						//	m_nSampleBufferIndex = 0;
+						//else
+						//	m_nSampleBufferIndex++;
 					}
 					m_nSampleBufferIndex = 0;
 				}
@@ -1764,38 +1818,4 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 
 	// media type is valid
 	return S_OK;
-}
-
-/* Complex multiplication */
-void CConvolver::cmult(DLReal * A,const DLReal * B, DLReal * C,const int N)
-{
-	int R;
-	int I;
-	DLReal T1;
-	DLReal T2;
-
-	// a[2*k] = R[k], 0<=k<n/2
-	// a[2*k+1] = I[k], 0<k<n/2
-	// a[1] = R[n/2]
-
-	// R[R[a] + I[a]) * (R[b]+I[b]] = R[a]R[b] - I[a]I[b]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = R[a]I[b] + I[a]R[b]
-
-	// 0<k<n/2
-	//								  A[R]*B[R]      - A[I]*B[I]
-	// R[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k]   - a[2*k+1]b[2*k+1]
-	//								  A[R]*B[I]      + A{I]*B[R]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
-
-	C[0] = A[0] * B[0];
-	C[1] = A[1] * B[1];
-	for (R = 2,I = 3;R < N;R += 2,I += 2)
-	{
-		//C[R] = A[R]*B[R] - A[I]*B[I];
-		//C[I] = A[R]*B[I] + A[I]*B[R];
-		T1 = A[R] * B[R];
-		T2 = A[I] * B[I];
-		C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
-		C[R] = T1 - T2;
-	} 
 }

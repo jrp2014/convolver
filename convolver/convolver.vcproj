@@ -166,6 +166,12 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
+				RelativePath=".\CircularBuffer.h">
+			</File>
+			<File
+				RelativePath=".\CircularBuffer.inl">
+			</File>
+			<File
 				RelativePath=".\convolver.h">
 			</File>
 			<File
