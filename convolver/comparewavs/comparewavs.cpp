@@ -8,7 +8,6 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 
 	HRESULT hr = S_OK;
-	WAVEFORMATEX wfx;
 
 	if (argc != 6)
 	{
@@ -86,8 +85,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	CWaveFile* WavDiff = new CWaveFile;
-	wfx = *WavF1->GetFormat();
-	if (FAILED(hr = WavDiff->Open(argv[5], &wfx, WAVEFILE_WRITE)))
+	if (FAILED(hr = WavDiff->Open(argv[5], WavF1->GetFormat(), WAVEFILE_WRITE)))
 	{
 		_tprintf(TEXT("Failed to open %s for writing\n"), argv[5]);
 		goto exit;
@@ -112,7 +110,10 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	DWORD dwSizeRead = 0;
 
-	switch (wfx.wFormatTag)
+	WavF1->ResetFile();
+	WavF2->ResetFile();
+
+	switch (WavF1->GetFormat()->wFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
 		_tprintf(TEXT("PCM WAV format not supported\n"));
@@ -121,17 +122,19 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	case WAVE_FORMAT_IEEE_FLOAT:
 		{
-			switch (wfx.wBitsPerSample)
+			switch (WavF1->GetFormat()->wBitsPerSample)
 			{
 			case sizeof(float) * 8: //32
 				{
 					DWORD dwSampleSize = sizeof(float);
 					UINT nSizeWrote = 0;
-					float fSample1, fSample2, fSampleDiff;
+					float fSample1 = 0;
+					float fSample2 = 0;
+					float fSampleDiff = 0;
 
-					for (unsigned int block=0; block < min(nSkipBlocks1, WavF1->GetSize() / wfx.nBlockAlign); block++)
+					for (unsigned int block=0; block < min(nSkipBlocks1, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign); block++)
 					{
-						for (unsigned int channel=0; channel < wfx.nChannels; channel++)
+						for (unsigned int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF1->Read((BYTE*)&fSample1, dwSampleSize, &dwSizeRead)))
 							{
@@ -141,9 +144,9 @@ int _tmain(int argc, _TCHAR* argv[])
 						}
 					}
 
-					for (unsigned int block=0; block < min(nSkipBlocks2, WavF1->GetSize() / wfx.nBlockAlign); block++)
+					for (unsigned int block=0; block < min(nSkipBlocks2, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign); block++)
 					{
-						for (unsigned int channel=0; channel < wfx.nChannels; channel++)
+						for (unsigned int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF2->Read((BYTE*)&fSample2, dwSampleSize, &dwSizeRead)))
 							{
@@ -153,9 +156,9 @@ int _tmain(int argc, _TCHAR* argv[])
 						}
 					}
 
-					for (unsigned int block=max(nSkipBlocks1,nSkipBlocks2); block < WavF1->GetSize() / wfx.nBlockAlign; block++)
+					for (unsigned int block=max(nSkipBlocks1, nSkipBlocks2); block < WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign; block++)
 					{
-						for (unsigned int channel=0; channel < wfx.nChannels; channel++)
+						for (unsigned int channel=0; channel <WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF1->Read((BYTE*)&fSample1, dwSampleSize, &dwSizeRead)))
 							{
@@ -163,9 +166,9 @@ int _tmain(int argc, _TCHAR* argv[])
 								goto exit;
 							}
 
-							if (hr = FAILED(WavF1->Read((BYTE*)&fSample2, dwSampleSize, &dwSizeRead)))
+							if (hr = FAILED(WavF2->Read((BYTE*)&fSample2, dwSampleSize, &dwSizeRead)))
 							{
-								_tprintf(TEXT("Failed to read sample from %s\n"), argv[2]);
+								_tprintf(TEXT("Failed to read sample from %s\n"), argv[3]);
 								goto exit;
 							}
 
@@ -173,11 +176,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
 							if (FAILED(hr = WavDiff->Write(dwSampleSize, (BYTE *)&fSampleDiff, &nSizeWrote)))
 							{
-								_tprintf(TEXT("Failed to write sample to %s\n"), argv[3]);
+								_tprintf(TEXT("Failed to write sample to %s\n"), argv[5]);
 								goto exit;
 							};
-							if (abs(fSampleDiff) > 0.5)
-								_tprintf(TEXT("%i %i %.3g %.3g %.6g\n"), block, channel, fSample1, fSample2, fSampleDiff);
+
+#ifdef _DEBUG
+							_tprintf(TEXT("%i,%i, %.6g, %.6g, %.6g\n"), block, channel, fSample1, fSample2, fSampleDiff);
+#endif
 						}
 					}
 				}
@@ -196,10 +201,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 exit:
+	if (hr)
+		_tprintf(TEXT("Error code: 0x%x\n"), hr);
+
 	SAFE_DELETE(WavF1);
 	SAFE_DELETE(WavF2);
 	SAFE_DELETE(WavDiff);
-
 	return hr;
 }
 
