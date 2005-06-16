@@ -11,19 +11,18 @@
 #ifndef __CCONVOLVER_H_
 #define __CCONVOLVER_H_
 
-#if defined(DEBUG) | defined(_DEBUG)
-#include <crtdbg.h>
-#endif
+#include "resource.h"
+#include <mediaobj.h>       // The IMediaObject header from the DirectX SDK.
+#include "wmpservices.h"    // The header containing the WMP interface definitions.
 
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#include "SampleBuffer.h"
+#include "convolution.h"
+
 // FFT routines
 #include <fftsg_h.h>
-
-#include "resource.h"
-#include <mediaobj.h>       // The IMediaObject header from the DirectX SDK.
-#include "wmpservices.h"    // The header containing the WMP interface definitions.
 
 const DWORD UNITS = 10000000;  // 1 sec = 1 * UNITS
 const DWORD MAXSTRING = 1024;
@@ -235,8 +234,6 @@ private:
 
 	void FillBufferWithSilence(WAVEFORMATEX *pWfex);
 
-	void cmult(DLReal * A,const DLReal * B, DLReal * C,const int N);  // Complex multiplication
-
     DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
     DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
@@ -257,14 +254,14 @@ private:
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
 
-	float  **m_ppfloatFilter;					// h(channel, n)
-	float  **m_ppfloatSampleBuffer;				// xi(channel, n)
-	float  *m_pfloatSampleBufferChannelCopy;
-	float  **m_ppfloatOutputBuffer;				// y(channel, n)
+	CSampleBuffer<float> *m_filter;
+	CSampleBuffer<float> *m_samples;
+	CSampleBuffer<float> *m_output;
+	CConvolution<float>	*m_Convolution;			// Polymorphic processing class
 
-	long  m_cFilterLength;						// Filter size in samples
-	long  m_c2xPaddedFilterLength;				// 2^n, padded with zeros for radix 2 FFT
-	long  m_nSampleBufferIndex;					// placeholder
+	unsigned int  m_cFilterLength;						// Filter size in samples
+	unsigned int  m_c2xPaddedFilterLength;				// 2^n, padded with zeros for radix 2 FFT
+	unsigned int  m_nSampleBufferIndex;					// placeholder
 
 //    DWORD					m_dwDelayTime;		// Delay time
     BOOL                    m_bEnabled;         // TRUE if enabled

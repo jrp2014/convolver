@@ -16,41 +16,6 @@
 #include <ks.h>         // required for WAVEFORMATEXTENSIBLE
 #include <ksmedia.h>
 
-
-/* Complex multiplication */
-void CConvolver::cmult(DLReal * A,const DLReal * B, DLReal * C,const int N)
-{
-	int R;
-	int I;
-	DLReal T1;
-	DLReal T2;
-
-	// a[2*k] = R[k], 0<=k<n/2
-	// a[2*k+1] = I[k], 0<k<n/2
-	// a[1] = R[n/2]
-
-	// R[R[a] + I[a]) * (R[b]+I[b]] = R[a]R[b] - I[a]I[b]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = R[a]I[b] + I[a]R[b]
-
-	// 0<k<n/2
-	//								  A[R]*B[R]      - A[I]*B[I]
-	// R[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k]   - a[2*k+1]b[2*k+1]
-	//								  A[R]*B[I]      + A{I]*B[R]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
-
-	C[0] = A[0] * B[0];
-	C[1] = A[1] * B[1];
-	for (R = 2,I = 3;R < N;R += 2,I += 2)
-	{
-		//C[R] = A[R]*B[R] - A[I]*B[I];
-		//C[I] = A[R]*B[I] + A[I]*B[R];
-		T1 = A[R] * B[R];
-		T2 = A[I] * B[I];
-		C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
-		C[R] = T1 - T2;
-	} 
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // CConvolver::CConvolver
 //
@@ -70,7 +35,11 @@ CConvolver::CConvolver()
 	m_rtTimestamp = 0;
 	m_bEnabled = TRUE;
 
-	m_ppfloatFilter = NULL;
+	m_filter = NULL;
+	m_samples = NULL;
+	m_output = NULL;
+	m_Convolution=NULL;
+
 	m_cFilterLength = 0;
 	m_nSampleBufferIndex = 0;
 
@@ -672,12 +641,12 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	}
 
 	// Test whether a buffer exists.
-	if (m_ppfloatFilter)
+	if (m_filter)
 	{
 		// A buffer already exists.
 		// Delete the delay buffer.
-		delete m_ppfloatFilter;
-		m_ppfloatFilter = NULL;
+		delete m_filter;
+		m_filter = NULL;
 	}
 
 	// Load the wave file
@@ -689,16 +658,14 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return hr;
 	}
 
-	m_WfexFilterFormat = *pFilterWave->GetFormat();
-	//m_WfexFilterFormat.cbSize = pFilterWave->GetFormat()->cbSize;
-	//m_WfexFilterFormat.nAvgBytesPerSec = pFilterWave->GetFormat()->nAvgBytesPerSec;
-	//m_WfexFilterFormat.nBlockAlign = pFilterWave->GetFormat()->nBlockAlign;
-	//m_WfexFilterFormat.nChannels = pFilterWave->GetFormat()->nChannels;
-	//m_WfexFilterFormat.nSamplesPerSec= pFilterWave->GetFormat()->nSamplesPerSec;
-	//m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
-	//m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
+	m_WfexFilterFormat.cbSize = pFilterWave->GetFormat()->cbSize;
+	m_WfexFilterFormat.nAvgBytesPerSec = pFilterWave->GetFormat()->nAvgBytesPerSec;
+	m_WfexFilterFormat.nBlockAlign = pFilterWave->GetFormat()->nBlockAlign;
+	m_WfexFilterFormat.nChannels = pFilterWave->GetFormat()->nChannels;
+	m_WfexFilterFormat.nSamplesPerSec= pFilterWave->GetFormat()->nSamplesPerSec;
+	m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
+	m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
 
-	int nChannels = m_WfexFilterFormat.nChannels;
 	m_cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
 
 	// Check that the filter has the same number of channels and sample rate as the input
@@ -731,6 +698,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	DWORD dwSizeToRead = m_WfexFilterFormat.wBitsPerSample / 8;  // in bytes
 	DWORD dwSizeRead = 0;
 
+	// Setup the filter
 	switch (m_WfexFilterFormat.wFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
@@ -747,28 +715,22 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 			{
 				assert(dwSizeToRead == sizeof(float));
 
-				// Filter length is 2 x Nh. Must be power of 2 for this FFT package.
+				// Filter length is 2 x Nh. Must be power of 2 for the Ooura FFT package.
 				// Eg, if m_cFilterLength = Nh = 6, m_c2xPaddedFilterLength = 16 
 				for(m_c2xPaddedFilterLength = 1; m_c2xPaddedFilterLength < 2 * m_cFilterLength; m_c2xPaddedFilterLength *= 2);
 
 
-				// Initialise the Filter and the Sample buffer with which it will be multiplied
-				m_ppfloatFilter = (float**) new float[nChannels];
-				m_ppfloatSampleBuffer = (float**) new float[nChannels];
-				m_pfloatSampleBufferChannelCopy = new float[m_c2xPaddedFilterLength]; 
-				m_ppfloatOutputBuffer = (float**) new float[nChannels];
-				for(int i = 0; i < nChannels; i++)
-				{
-					m_ppfloatFilter[i] = new float[m_c2xPaddedFilterLength];
-					m_ppfloatSampleBuffer[i] = new float[m_c2xPaddedFilterLength];
-					m_ppfloatOutputBuffer[i] = new float[m_c2xPaddedFilterLength];
-				}
+				// Initialise the Filter and the various sample buffers that will be used during processing
+				m_filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				m_samples = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				m_output = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
 
-				for (int j=0; j < m_cFilterLength; j++)
+				// Read the filter file
+				for (unsigned int j=0; j != m_cFilterLength; j++)
 				{
-					for (int i=0; i < nChannels; i++)
+					for (unsigned int i=0; i !=  m_WfexFilterFormat.nChannels; i++)
 					{
-						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_ppfloatFilter[i][j], dwSizeToRead, &dwSizeRead)))
+						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_filter->channels[i].samples[j], dwSizeToRead, &dwSizeRead)))
 						{
 							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 							SAFE_DELETE(pFilterWave);
@@ -781,26 +743,13 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 							delete pFilterWave;
 							return E_FAIL;
 						}
-						m_ppfloatSampleBuffer[i][j] = 0.0;
-						m_ppfloatOutputBuffer[i][j] = 0.0;
 					} // for i
 				} // for j
 
-				// Pad the filter
-				for (int j=m_cFilterLength; j < m_c2xPaddedFilterLength; j++)
-				{
-					for (int i=0; i < nChannels; i++)
-					{
-						m_ppfloatFilter[i][j] = 0.0;
-						m_ppfloatSampleBuffer[i][j] = 0.0;
-						m_ppfloatOutputBuffer[i][j] = 0.0;
-					}
-				}
-
 				// Now create a FFT of the filter
-				for (int i=0; i < nChannels; i++)
+				for (unsigned int i=0; i != m_WfexFilterFormat.nChannels; i++)
 				{
-					rdft(m_c2xPaddedFilterLength, OouraRForward, m_ppfloatFilter[i]);		
+					rdft(m_c2xPaddedFilterLength, OouraRForward, m_filter->channels[i].samples);		
 				}
 
 			}  // case
@@ -819,15 +768,15 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	delete pFilterWave;
 
 #if defined(DEBUG) | defined(_DEBUG)
-	OutputDebugString(TEXT("FFT m_ppfloatFilter:\n"));
+	OutputDebugString(TEXT("FFT m_filter:\n"));
 	TCHAR sFormat[100];
-	for (int i=0; i<m_c2xPaddedFilterLength; i++)
+	for (unsigned int i=0; i != m_c2xPaddedFilterLength; i++)
 	{
-		for (int j=0; j < nChannels; j++) 
+		for (unsigned int j=0; j != m_WfexFilterFormat.nChannels; j++) 
 		{
-			int k = swprintf(sFormat, TEXT("%i,"), j);
+			unsigned int k = swprintf(sFormat, TEXT("%i,"), j);
 			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.3f "), m_ppfloatFilter[j][i]);
+			k += swprintf(sFormat + k, TEXT("%.3f "), m_filter->channels[j].samples[i]);
 			OutputDebugString(sFormat);
 		}
 	}
@@ -840,6 +789,53 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return DXTRACE_ERR_MSGBOX(TEXT("Failed to open trace file for writing"), hr);
 	}
 #endif
+
+	// Pick the correct version of the processing class
+	
+	// Note: for 8 and 16-bit samples, we assume the container is the same size as
+	// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+	// structure to determine the valid bits per sample.
+
+	switch (pWave->wFormatTag)
+	{
+	case WAVE_FORMAT_PCM:
+		switch (pWave->wBitsPerSample)
+		{
+		case 8:
+			m_Convolution = new Cconvolution_pcm8<float>(m_c2xPaddedFilterLength);
+			break;
+
+		case 16:
+			m_Convolution = new Cconvolution_pcm16<float>(m_c2xPaddedFilterLength);
+			break;
+
+		default:  // Unprocessable PCM
+			return E_FAIL;
+			break;
+		}
+		break;
+
+	case WAVE_FORMAT_IEEE_FLOAT:
+		switch (pWave->wBitsPerSample)
+		{
+		case 32:
+			m_Convolution = new Cconvolution_ieeefloat<float>(m_c2xPaddedFilterLength);
+			break;
+
+		default:  // Unprocessable IEEE float
+			return E_NOTIMPL;
+			break;
+		}
+		break;
+
+	default: // Not PCM or IEEE Float
+		// return no. bytes actually copied to output buffer
+		return E_FAIL;
+		break;
+	}
+
+
+
 
 	//// Fill the buffer with values representing silence.
 	//FillBufferWithSilence(pWave);
@@ -862,38 +858,38 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_rtTimestamp = 0;
 
 	// Test whether a buffer exists.
-	if (m_ppfloatFilter)
+	if (m_filter)
 	{
-		delete m_ppfloatFilter;
-		m_ppfloatFilter = NULL;
+		delete m_filter;
+		m_filter = NULL;
 	}
 	m_cFilterLength = 0;
 	m_c2xPaddedFilterLength = 0;
 
-	if (m_ppfloatOutputBuffer)
+	if (m_output)
 	{
-		delete m_ppfloatOutputBuffer;
-		m_ppfloatOutputBuffer = NULL;
+		delete m_output;
+		m_output = NULL;
 
 	}
 
-	if (m_ppfloatSampleBuffer)
+	if (m_samples)
 	{
-		delete m_ppfloatSampleBuffer;
-		m_ppfloatSampleBuffer = NULL;
+		delete m_samples;
+		m_samples = NULL;
 	}
 	m_nSampleBufferIndex = 0;
-
-	if (m_pfloatSampleBufferChannelCopy)
-	{
-		delete m_pfloatSampleBufferChannelCopy;
-		m_pfloatSampleBufferChannelCopy = NULL;
-	}
 
 #if defined(DEBUG) | defined(_DEBUG)
 	if (m_CWaveFileTrace)
 		SAFE_DELETE(m_CWaveFileTrace);
 #endif
+
+	if(m_Convolution)
+	{
+		delete m_Convolution;
+		m_Convolution = NULL;
+	}
 
 	return S_OK;
 }
@@ -1295,404 +1291,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
 
-	// Note: for 8 and 16-bit samples, we assume the container is the same size as
-	// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-	// structure to determine the valid bits per sample.
-
-	switch (pWave->wFormatTag)
-	{
-	case WAVE_FORMAT_PCM:
-		switch (pWave->wBitsPerSample)
-		{
-		case 8:
-			{
-				// return no. bytes actually copied to output buffer
-				*cbBytesProcessed = dwBlocksToProcess * sizeof(BYTE) * pWave->nChannels;
-
-				// Cross-check
-				DWORD cbBytesActuallyProcessed = 0;
-
-				while (dwBlocksToProcess--)
-				{
-					for (int nc = 0; nc < pWave->nChannels; nc++)
-					{
-						// Get the input sample and normalize to -128 .. 127
-						int inputSample = (*pbInputData++) - 128;
-
-						m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex] = inputSample; // Channels are interleaved
-
-						// Mix the processed signal with the dry signal.
-						// This does not actually work because of the convolution delay (ie, m_ppfloatSampleBuffer[][i] doesn't correspond to m_ppfloatOutputBuffer[][i])
-						// So set the effect to 0 in the properties tab to get the proper convolved result
-						int outputSample = (int)((m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] * m_fDryMix ) +
-							(m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex] * m_fWetMix)); // skip circular artefacts
-
-						// Truncate if exceeded full scale.
-						if (outputSample > 127)
-							outputSample = 127;
-						if (outputSample < -128)
-							outputSample = -128;
-
-						// Convert back to 0..255 and write to output buffer.
-						*pbOutputData++ = (BYTE)(outputSample + 128);
-
-						cbBytesActuallyProcessed += sizeof(BYTE);
+	m_Convolution->doConvolution(pbInputData,pbOutputData,pWave->nChannels,m_filter,m_samples,m_output,dwBlocksToProcess,m_fWetMix,m_fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-						UINT nSizeWrote;
-						HRESULT hr;
-						BYTE noutputSample = outputSample;
-						if (FAILED(hr = m_CWaveFileTrace->Write(sizeof(BYTE), &noutputSample, &nSizeWrote)))
-						{
-							SAFE_DELETE( m_CWaveFileTrace );
-							return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
-						}
-#endif
-					}
-
-					if (m_nSampleBufferIndex == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
-					{	
-						// Got a sample xi length Nh, so calculate m_ppfloatOutputBuffer
-						for (int nc = 0; nc < pWave->nChannels; nc++)
-						{
-							// Copy the sample buffer, as the rdft routine overwrites it
-							for (int j = 0; j < m_c2xPaddedFilterLength; j++)
-								m_pfloatSampleBufferChannelCopy[j] = m_ppfloatSampleBuffer[nc][j];
-
-							//  rdft(n, 1, a):
-							//        n              :data length (int)
-							//                        n >= 2, n = power of 2
-							//        a[0...n-1]     :input data
-							//                        output data
-							//                                a[2*k] = R[k], 0<=k<n/2
-							//                                a[2*k+1] = I[k], 0<k<n/2
-							//                                a[1] = R[n/2]
-							rdft(m_c2xPaddedFilterLength, OouraRForward, m_pfloatSampleBufferChannelCopy);  // get DFT of m_ppfloatSampleBuffer
-							// Multiply point by point the complex Yi(m) =Xi(m)Hz(m). m_ppfloatFilter (Hz(m)) is already calculated (in AllocateStreamingResources)
-							cmult(m_pfloatSampleBufferChannelCopy, m_ppfloatFilter[nc], m_ppfloatOutputBuffer[nc], m_c2xPaddedFilterLength);
-							//get back the yi
-							rdft(m_c2xPaddedFilterLength, OouraRBackward, m_ppfloatOutputBuffer[nc]); // take the Inverse DFT
-							// scale
-							for (int j = m_c2xPaddedFilterLength; j < m_c2xPaddedFilterLength / 2; j++)  // No need to scale second half, as going to discard that
-								m_ppfloatOutputBuffer[nc][j] *= 2.0 / (double) m_c2xPaddedFilterLength;
-
-							// move overlap block x i to previous block x i-1
-							for (int j = 0; j < m_c2xPaddedFilterLength / 2; j++)
-								m_ppfloatSampleBuffer[nc][j + m_c2xPaddedFilterLength / 2] = m_ppfloatSampleBuffer[nc][j];
-						}
-						m_nSampleBufferIndex = 0;
-					}
-					else
-						m_nSampleBufferIndex++;
-				} // while
-
-				assert (*cbBytesProcessed == cbBytesActuallyProcessed);
-			}
-			break;
-
-		case 16:
-			{
-				// return no. bytes to be copied to output buffer
-				*cbBytesProcessed = dwBlocksToProcess * sizeof(INT16) * pWave->nChannels;
-
-				// Cross-check
-				DWORD cbBytesActuallyProcessed = 0;
-
-				// 16-bit sound is -32768..32767 with 0 == silence
-				INT16   *pwInputData = (INT16 *) pbInputData;
-				INT16   *pwOutputData = (INT16 *) pbOutputData;
-
-				while (dwBlocksToProcess--)
-				{
-					for (int nc = 0; nc < pWave->nChannels; nc++)
-					{
-						// Get the input sample and convert it to a float
-						float inputSample = *pwInputData++;
-
-						m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex] = inputSample; // Channels are interleaved
-
-						// Mix the processed signal with the dry signal.
-						// This does not actually work because of the convolution delay (ie, m_ppfloatSampleBuffer[][i] doesn't correspond to m_ppfloatOutputBuffer[][i])
-						// So set the effect to 0 in the properties tab to get the proper convolved result
-						int outputSample = (int)((m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] * m_fDryMix ) +
-							(m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex] * m_fWetMix));
-
-						// Truncate if exceeded full scale.
-						if (outputSample > 32767)
-							outputSample = 32767;
-						if (outputSample < -32768)
-							outputSample = -32768;
-
-						// Write to output buffer.
-						*pwOutputData++ = outputSample;
-						cbBytesActuallyProcessed += sizeof(INT16);
-#if defined(DEBUG) | defined(_DEBUG)
-						UINT nSizeWrote;
-						HRESULT hr;
-						INT16 noutputSample = outputSample;
-						if (FAILED(hr = m_CWaveFileTrace->Write(sizeof(INT16), (BYTE *)&noutputSample, &nSizeWrote)))
-						{
-							SAFE_DELETE( m_CWaveFileTrace );
-							return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
-						}
-#endif
-					}
-
-					if (m_nSampleBufferIndex == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
-					{	
-						// Got a sample xi length Nh, so calculate m_ppfloatOutputBuffer
-						for (int nc = 0; nc < pWave->nChannels; nc++)
-						{
-							// Copy the sample buffer, as the rdft routine overwrites it
-							for (int j = 0; j < m_c2xPaddedFilterLength; j++)
-								m_pfloatSampleBufferChannelCopy[j] = m_ppfloatSampleBuffer[nc][j];
-
-							//  rdft(n, 1, a):
-							//        n              :data length (int)
-							//                        n >= 2, n = power of 2
-							//        a[0...n-1]     :input data
-							//                        output data
-							//                                a[2*k] = R[k], 0<=k<n/2
-							//                                a[2*k+1] = I[k], 0<k<n/2
-							//                                a[1] = R[n/2]
-							rdft(m_c2xPaddedFilterLength, OouraRForward, m_pfloatSampleBufferChannelCopy);  // get DFT of m_ppfloatSampleBuffer
-							// Multiply point by point the complex Yi(m) =Xi(m)Hz(m). m_ppfloatFilter (Hz(m)) is already calculated (in AllocateStreamingResources)
-							cmult(m_pfloatSampleBufferChannelCopy, m_ppfloatFilter[nc], m_ppfloatOutputBuffer[nc], m_c2xPaddedFilterLength);
-							//get back the yi
-							rdft(m_c2xPaddedFilterLength, OouraRBackward, m_ppfloatOutputBuffer[nc]); // take the Inverse DFT
-							// scale
-							for (int j =0; j < m_c2xPaddedFilterLength / 2; j++)  // No need to scale first half, as going to discard that
-								m_ppfloatOutputBuffer[nc][j] *= 2.0 / (double) m_c2xPaddedFilterLength;
-
-							// move overlap block x i to previous block x i-1
-							for (int j = 0; j < m_c2xPaddedFilterLength / 2; j++)
-								m_ppfloatSampleBuffer[nc][j + m_c2xPaddedFilterLength / 2] = m_ppfloatSampleBuffer[nc][j];
-						}
-						m_nSampleBufferIndex = 0;
-					}
-					else
-						m_nSampleBufferIndex++;
-				} // while
-
-				assert (*cbBytesProcessed == cbBytesActuallyProcessed);
-			}
-			break;
-
-			//case 24:
-			//    {
-			//        // return no. bytes actually copied to output buffer
-			//        *cbBytesProcessed = dwSamplesToProcess * 3;
-
-			//        WAVEFORMATEXTENSIBLE *pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-
-			//        while (dwSamplesToProcess--)
-			//        {
-			//            // Get the input sample
-			//            int i = (char) pbInputData[2];
-			//            i = (i << 8) | pbInputData[1];
-
-			//            int iClip = 0;
-			//            switch (pWaveXT->Samples.wValidBitsPerSample)
-			//            {
-			//            case 16:
-			//                iClip = (1 << 15);
-			//                break;
-			//            case 20:
-			//                i = (i << 4) | (pbInputData[0] >> 4);
-			//                iClip = (1 << 19);
-			//                break;
-			//            case 24:
-			//                i = (i << 8) | pbInputData[0];
-			//                iClip = (1 << 23);
-			//                break;
-			//            }
-
-			//            pbInputData += 3;
-
-			//            // Apply scale factor to sample
-			//            i = int( ((double) i) * m_dwDelayTime );
-			//        
-			//            // Truncate if exceeded full scale.
-			//            if (i > (iClip - 1))
-			//                i = iClip - 1;
-			//            if (i < -iClip)
-			//                i = -iClip;
-
-			//            // Write to output buffer.
-			//            *pbOutputData++ = i & 0xFF;
-			//            *pbOutputData++ = (i >> 8) & 0xFF;
-			//            *pbOutputData++ = (i >> 16) & 0xFF;
-			//        }
-			//    }
-			//    break;
-
-			//case 32:
-			//    {
-			//        // return no. bytes actually copied to output buffer
-			//        *cbBytesProcessed = dwSamplesToProcess * sizeof(long);
-
-			//        long   *plInputData = (long *) pbInputData;
-			//        long   *plOutputData = (long *) pbOutputData;
-
-			//        WAVEFORMATEXTENSIBLE *pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-
-			//        while (dwSamplesToProcess--)
-			//        {
-			//            // Get the input sample
-			//            int i = *plInputData++;
-
-			//            int iClip = 0;
-			//            switch (pWaveXT->Samples.wValidBitsPerSample)
-			//            {
-			//            case 16:
-			//                i >>= 16;
-			//                iClip = (1 << 15);
-			//                break;
-			//            case 20:
-			//                i >>= 12;
-			//                iClip = (1 << 19);
-			//                break;
-			//            case 24:
-			//                i >>= 8;
-			//                iClip = (1 << 23);
-			//                break;
-			//            case 32:
-			//                iClip = (1 << 31);
-			//                break;
-			//            }
-
-			//            // Apply scale factor to sample
-			//            double f = ((double) i) * m_dwDelayTime;
-			//        
-			//            // Truncate if exceeded full scale.
-			//            if (f > (iClip - 1))
-			//                f = iClip - 1;
-			//            if (f < -iClip)
-			//                f = -iClip;
-
-			//            // Write to output buffer.
-			//            *plOutputData++ = (int) f;
-			//        }
-			//    }
-			//    break;
-
-		default:  // Unprocessable PCM
-			// return no. bytes actually copied to output buffer
-			*cbBytesProcessed = 0;
-			return E_FAIL;
-			break;
-		}
-		break;
-
-	case WAVE_FORMAT_IEEE_FLOAT:
-		{
-			// return no. bytes to be copied to output buffer
-			*cbBytesProcessed = dwBlocksToProcess * sizeof(float) * pWave->nChannels;
-
-			// Cross-check
-			DWORD cbBytesActuallyProcessed = 0;
-
-			float   *pfloatInputData = (float *) pbInputData;
-			float   *pfloatOutputData = (float *) pbOutputData;
-
-			while (dwBlocksToProcess--)
-			{
-				for (int nc = 0; nc < pWave->nChannels; nc++)
-				{
-
-					// Get the input sample and convert it to a float
-					float inputSample = *pfloatInputData++;
-
-					m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex] = inputSample; // Channels are interleaved
-
-					// Mix the processed signal with the dry signal.
-					// This does not actually work because of the convolution delay (ie, m_ppfloatSampleBuffer[][i] doesn't correspond to m_ppfloatOutputBuffer[][i])
-					// So set the effect to 0 in the properties tab to get the proper convolved result
-					//float outputSample = (inputSample * m_fDryMix ) + (m_ppfloatOutputBuffer[nc][(m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2) % m_c2xPaddedFilterLength] * m_fWetMix);
-					float outputSample = (m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] * m_fDryMix ) + (m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex] * m_fWetMix);
-
-					if (abs(m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2] - m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex]) > 0.00001)
-					{
-						OutputDebugString(TEXT("\n"));
-						TCHAR sFormat[100];
-						int k = swprintf(sFormat, TEXT("%i,"), dwBlocksToProcess);
-						k += swprintf(sFormat + k, TEXT("%i: "), m_nSampleBufferIndex);
-						k += swprintf(sFormat + k, TEXT("%.4g "), m_ppfloatSampleBuffer[nc][m_nSampleBufferIndex + m_c2xPaddedFilterLength / 2]);
-						k += swprintf(sFormat + k, TEXT("%.4g"), m_ppfloatOutputBuffer[nc][m_nSampleBufferIndex]);
-						OutputDebugString(sFormat);
-					}
-
-					// Write to output buffer.
-					*pfloatOutputData++ = outputSample;
-					cbBytesActuallyProcessed += sizeof(float);
-#if defined(DEBUG) | defined(_DEBUG)
-					// This does not quite work, because AllocateStreamingResources seems to be called (twice!) after IEEE float playback, which rewrites the file
-					// It is not clear why this happens, as it does not occur after PCM playback
-					UINT nSizeWrote;
-					HRESULT hr = S_OK;
-					if (FAILED(hr = m_CWaveFileTrace->Write(sizeof(float), (BYTE *)&outputSample, &nSizeWrote)))
-					{
-						SAFE_DELETE( m_CWaveFileTrace );
-						return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
-					}
-#endif
-				}
-
-				//if (m_nSampleBufferIndex % (m_c2xPaddedFilterLength / 2) == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
-				if (m_nSampleBufferIndex == m_c2xPaddedFilterLength / 2 - 1) //  m_c2xPaddedFilterLength Nh is a power of 2
-				{	
-					// Got a sample xi length Nh, so calculate m_ppfloatOutputBuffer
-					for (int nc = 0; nc < pWave->nChannels; nc++)
-					{
-						// Copy the sample buffer, as the rdft routine overwrites it
-						for (int j = 0; j < m_c2xPaddedFilterLength; j++)
-							m_pfloatSampleBufferChannelCopy[j] = m_ppfloatSampleBuffer[nc][j];
-
-						//  rdft(n, 1, a):
-						//        n              :data length (int)
-						//                        n >= 2, n = power of 2
-						//        a[0...n-1]     :input data
-						//                        output data
-						//                                a[2*k] = R[k], 0<=k<n/2
-						//                                a[2*k+1] = I[k], 0<k<n/2
-						//                                a[1] = R[n/2]
-
-						rdft(m_c2xPaddedFilterLength, OouraRForward, m_pfloatSampleBufferChannelCopy);  // get DFT of m_ppfloatSampleBuffer
-
-						// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  m_ppfloatFilter (Hz(m)) is already calculated (in AllocateStreamingResources)
-						cmult(m_pfloatSampleBufferChannelCopy, m_ppfloatFilter[nc], m_ppfloatOutputBuffer[nc], m_c2xPaddedFilterLength);
-
-						//get back the yi
-						rdft(m_c2xPaddedFilterLength, OouraRBackward, m_ppfloatOutputBuffer[nc]); // take the Inverse DFT
-
-						// scale
-						for (int j = 0; j < m_c2xPaddedFilterLength; j++)  // TODO: No need to scale second half of circ buffer, as going to discard that
-							m_ppfloatOutputBuffer[nc][j] *= 2.0 / (double) m_c2xPaddedFilterLength;
-
-						//// move overlap block x i to previous block x i-1
-						for (int j = 0; j < m_c2xPaddedFilterLength / 2; j++)
-							m_ppfloatSampleBuffer[nc][j + m_c2xPaddedFilterLength / 2] = m_ppfloatSampleBuffer[nc][j];
-						//if (m_nSampleBufferIndex == m_c2xPaddedFilterLength - 1)
-						//	m_nSampleBufferIndex = 0;
-						//else
-						//	m_nSampleBufferIndex++;
-					}
-					m_nSampleBufferIndex = 0;
-				}
-				else
-					m_nSampleBufferIndex++;
-			} // while
-
-			assert (*cbBytesProcessed == cbBytesActuallyProcessed);
-		}
-		break;
-
-	default: // Not PCM or IEEE Float
-		// return no. bytes actually copied to output buffer
-		*cbBytesProcessed = 0;
-		return E_FAIL;
-		break;
-	}
-
+					, m_CWaveFileTrace
+#endif	
+					);
 	return S_OK;
 }
 
