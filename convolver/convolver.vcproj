@@ -131,6 +131,12 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
+				RelativePath=".\containerBuffer.cpp">
+			</File>
+			<File
+				RelativePath=".\containerBufferInst.cpp">
+			</File>
+			<File
 				RelativePath=".\convolution.cpp">
 			</File>
 			<File
@@ -150,12 +156,6 @@
 			</File>
 			<File
 				RelativePath=".\fft\fftsg_h.cpp">
-			</File>
-			<File
-				RelativePath=".\SampleBuffer.cpp">
-			</File>
-			<File
-				RelativePath=".\SampleBufferInst.cpp">
 			</File>
 			<File
 				RelativePath=".\StdAfx.cpp">
@@ -184,6 +184,9 @@
 				RelativePath=".\CircularBuffer.inl">
 			</File>
 			<File
+				RelativePath=".\containerBuffer.h">
+			</File>
+			<File
 				RelativePath=".\convolution.h">
 			</File>
 			<File
@@ -197,9 +200,6 @@
 			</File>
 			<File
 				RelativePath=".\resource.h">
-			</File>
-			<File
-				RelativePath=".\SampleBuffer.h">
 			</File>
 			<File
 				RelativePath=".\StdAfx.h">
