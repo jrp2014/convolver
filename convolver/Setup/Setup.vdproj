@@ -15,20 +15,14 @@
     {
         "Entry"
         {
-        "MsmKey" = "8:_0DEB0F37E8476D5988C04815559A009E"
-        "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
+        "MsmKey" = "8:_18E4600133B84AA49A049AAB5A30A8B0"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
         "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_4DE326AEA0E95584AEA2DAADB8C90DF7"
-        "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -41,18 +35,6 @@
         {
         "MsmKey" = "8:_A7460ECC78F94D8EAB09A9786E7D14F1"
         "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_AE685B89943C2378F904569866C00C62"
-        "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_CB1D77DF6DEF3FA0B37E66679F3B6A54"
-        "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -125,10 +107,10 @@
         }
         "File"
         {
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_0DEB0F37E8476D5988C04815559A009E"
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_18E4600133B84AA49A049AAB5A30A8B0"
             {
-            "SourcePath" = "8:comdlg32.dll"
-            "TargetName" = "8:comdlg32.dll"
+            "SourcePath" = "8:..\\Common\\directx.ico"
+            "TargetName" = "8:directx.ico"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
             "Condition" = "8:"
@@ -142,33 +124,13 @@
             "PackageAs" = "3:1"
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{A582A373-4685-4296-BEFE-614B80A702C3}:_4DE326AEA0E95584AEA2DAADB8C90DF7"
             {
             "SourcePath" = "8:DSOUND.dll"
             "TargetName" = "8:DSOUND.dll"
-            "Tag" = "8:"
-            "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_AE685B89943C2378F904569866C00C62"
-            {
-            "SourcePath" = "8:msdmo.dll"
-            "TargetName" = "8:msdmo.dll"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
             "Condition" = "8:"
@@ -260,13 +222,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{42520239-7968-4A50-8DDA-34F7C004528F}"
-        "PackageCode" = "8:{8E2F3E94-4BC3-4D82-814F-01695AE6AF46}"
+        "ProductCode" = "8:{AF83E262-6E84-4B31-9A5E-31866A5781D4}"
+        "PackageCode" = "8:{26E9D66D-C77E-4817-A894-6FCD53CB2633}"
         "UpgradeCode" = "8:{EDF9D203-D536-4C29-8458-F35365B2622C}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.5"
+        "ProductVersion" = "8:1.6"
         "Manufacturer" = "8:John Pavel"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net/"
@@ -276,7 +238,7 @@
         "Keywords" = "8:DSP plugin plug-in convolution FIR"
         "ARPCOMMENTS" = "8:DSP plug-in for Windows Media Player that will read an impulse response (wave file) and convolves it with the input stream."
         "ARPURLINFOABOUT" = "8:http://convolver.sourceforge.net/"
-        "ARPPRODUCTICON" = "8:"
+        "ARPPRODUCTICON" = "8:_18E4600133B84AA49A049AAB5A30A8B0"
         "ARPIconIndex" = "3:0"
         "SearchPath" = "8:"
         "UseSystemSearchPath" = "11:TRUE"
@@ -847,7 +809,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_4C94A9836CCB4BB49ECC674459D6DE0B"
             {
-            "SourcePath" = "8:..\\Debug\\convolver.dll"
+            "SourcePath" = "8:..\\Release\\convolver.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
@@ -903,7 +865,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_A7460ECC78F94D8EAB09A9786E7D14F1"
             {
-            "SourcePath" = "8:..\\generate_test_IRs\\Debug\\generate_test_IRs.exe"
+            "SourcePath" = "8:..\\generate_test_IRs\\Release\\generate_test_IRs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
@@ -987,7 +949,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_F7FCA00A4B8A44B4A45378A81A561F51"
             {
-            "SourcePath" = "8:..\\comparewavs\\Debug\\comparewavs.exe"
+            "SourcePath" = "8:..\\comparewavs\\Release\\comparewavs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"

@@ -263,14 +263,7 @@ private:
 	unsigned int  m_c2xPaddedFilterLength;				// 2^n, padded with zeros for radix 2 FFT
 	unsigned int  m_nContainerBufferIndex;					// placeholder
 
-//    DWORD					m_dwDelayTime;		// Delay time
     BOOL                    m_bEnabled;         // TRUE if enabled
-
-//	long  m_cbDelayBuffer;						// Count of bytes in delay buffer
-//	BYTE*  m_pbDelayPointer;					// Movable pointer to delay buffer
-//	BYTE*  m_pbDelayBuffer;						// Movable pointer to the head of the delay buffer
-//	int	   m_iDelayOffset;						// Pointer into the delay buffer
-
 };
 
 #endif //__CCONVOLVER_H_

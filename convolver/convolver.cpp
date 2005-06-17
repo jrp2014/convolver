@@ -809,15 +809,68 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 			m_Convolution = new Cconvolution_pcm16<float>(m_c2xPaddedFilterLength);
 			break;
 
+		case 24:
+			{
+				WAVEFORMATEXTENSIBLE* PWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+				switch (PWaveXT->Samples.wValidBitsPerSample)
+				{
+				case 16:
+					m_Convolution = new Cconvolution_pcm24<float,16>(m_c2xPaddedFilterLength);
+					break;
+
+				case 20:
+					m_Convolution = new Cconvolution_pcm24<float,20>(m_c2xPaddedFilterLength);
+					break;
+
+				case 24:
+					m_Convolution = new Cconvolution_pcm24<float,24>(m_c2xPaddedFilterLength);
+					break;
+
+				default:
+					return E_FAIL;
+				}
+			}
+			break;
+
+		case 32:
+			{
+				WAVEFORMATEXTENSIBLE* PWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+				switch (PWaveXT->Samples.wValidBitsPerSample)
+				{
+				case 16:
+					m_Convolution = new Cconvolution_pcm32<float,16>(m_c2xPaddedFilterLength);
+					break;
+
+				case 20:
+					m_Convolution = new Cconvolution_pcm32<float,20>(m_c2xPaddedFilterLength);
+					break;
+
+				case 24:
+					m_Convolution = new Cconvolution_pcm32<float,24>(m_c2xPaddedFilterLength);
+					break;
+
+				case 32:
+					m_Convolution = new Cconvolution_pcm32<float,32>(m_c2xPaddedFilterLength);
+					break;
+
+				default:
+					return E_FAIL;
+				}
+			}
+			break;
+
 		default:  // Unprocessable PCM
 			return E_FAIL;
-			break;
 		}
 		break;
 
 	case WAVE_FORMAT_IEEE_FLOAT:
 		switch (pWave->wBitsPerSample)
 		{
+		case 24:
+			return E_NOTIMPL;
+			break;
+
 		case 32:
 			m_Convolution = new Cconvolution_ieeefloat<float>(m_c2xPaddedFilterLength);
 			break;
@@ -829,9 +882,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		break;
 
 	default: // Not PCM or IEEE Float
-		// return no. bytes actually copied to output buffer
-		return E_FAIL;
-		break;
+		return E_NOTIMPL;
 	}
 
 

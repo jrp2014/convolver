@@ -14,7 +14,7 @@
 			OutputDirectory="Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="2"
-			UseOfATL="1"
+			UseOfATL="0"
 			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
@@ -67,7 +67,7 @@
 			OutputDirectory="Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="2"
-			UseOfATL="1"
+			UseOfATL="0"
 			CharacterSet="1"
 			WholeProgramOptimization="TRUE">
 			<Tool
@@ -77,10 +77,14 @@
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				OmitFramePointers="TRUE"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="TRUE"
+				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories=".\fft"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL"
+				StringPooling="TRUE"
+				RuntimeLibrary="2"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
@@ -95,7 +99,7 @@
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
 				LinkDLL="TRUE"
 				ModuleDefinitionFile="convolver.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="FALSE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -155,9 +159,6 @@
 				RelativePath=".\convolverPropPage.cpp">
 			</File>
 			<File
-				RelativePath=".\fft\fftsg_h.cpp">
-			</File>
-			<File
 				RelativePath=".\StdAfx.cpp">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -178,12 +179,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
-				RelativePath=".\CircularBuffer.h">
-			</File>
-			<File
-				RelativePath=".\CircularBuffer.inl">
-			</File>
-			<File
 				RelativePath=".\containerBuffer.h">
 			</File>
 			<File
@@ -194,9 +189,6 @@
 			</File>
 			<File
 				RelativePath=".\convolverPropPage.h">
-			</File>
-			<File
-				RelativePath=".\fft\fftsg_h.h">
 			</File>
 			<File
 				RelativePath=".\resource.h">
@@ -272,6 +264,16 @@
 			</File>
 			<File
 				RelativePath=".\Common\DXUTsound.h">
+			</File>
+		</Filter>
+		<Filter
+			Name="fft"
+			Filter="">
+			<File
+				RelativePath=".\fft\fftsg_h.cpp">
+			</File>
+			<File
+				RelativePath=".\fft\fftsg_h.h">
 			</File>
 		</Filter>
 	</Files>
