@@ -1,8 +1,25 @@
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
 /////////////////////////////////////////////////////////////////////////////
 //
 // convolver.cpp : Implementation of CConvolver
-//
-// Copyright (c) Microsoft Corporation. All rights reserved.
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +43,9 @@ CConvolver::CConvolver()
 {
 	m_fWetMix = 0.50;  // default to 50 percent wet
 	m_fDryMix = 0.50;  // default to 50 percent dry
+	
+	m_fAttenuation_db = 0; // default attenuation
+
 	m_szFilterFileName[0] = 0;
 	::ZeroMemory(&m_WfexFilterFormat, sizeof(m_WfexFilterFormat));
 
@@ -85,9 +105,18 @@ HRESULT CConvolver::FinalConstruct()
 		if (ERROR_SUCCESS == lResult)
 		{
 			// Convert the DWORD to a double.
-			m_fWetMix = (double)dwValue / 100;
+			m_fWetMix = static_cast<double>(dwValue) / 100.0;
 			// Calculate the dry mix value.
 			m_fDryMix = 1.0 - m_fWetMix;
+		}
+
+		// Read the attenuation value from the registry. 
+		lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			// Convert the DWORD to a double.
+			m_fAttenuation_db = decode_Attenuationdb(dwValue);
+
 		}
 
 		// Read the filter file name from the registry. 
@@ -565,6 +594,7 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 	DWORD dwInputStreamIndex,
 	REFERENCE_TIME *prtMaxLatency)
 {
+	// TODO: work out how to use this, when partitioned convoltion implemented
 	return E_NOTIMPL; // Not dealing with latency in this plug-in.
 }
 
@@ -606,6 +636,7 @@ STDMETHODIMP CConvolver::Flush( void )
 
 STDMETHODIMP CConvolver::Discontinuity(DWORD dwInputStreamIndex)
 {
+	// TODO:: Check that this is enough
 	return S_OK;
 }
 
@@ -908,39 +939,32 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
 
-	// Test whether a buffer exists.
-	if (m_filter)
-	{
-		delete m_filter;
-		m_filter = NULL;
-	}
+
+	delete m_filter;
+	m_filter = NULL;
+
 	m_cFilterLength = 0;
 	m_c2xPaddedFilterLength = 0;
 
-	if (m_output)
-	{
-		delete m_output;
-		m_output = NULL;
+	delete m_output;
+	m_output = NULL;
 
-	}
+	delete m_containers;
+	m_containers = NULL;
 
-	if (m_containers)
-	{
-		delete m_containers;
-		m_containers = NULL;
-	}
 	m_nContainerBufferIndex = 0;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	if (m_CWaveFileTrace)
 		SAFE_DELETE(m_CWaveFileTrace);
+
+	 _CrtMemDumpAllObjectsSince( NULL );
+
+	_CrtDumpMemoryLeaks();
 #endif
 
-	if(m_Convolution)
-	{
-		delete m_Convolution;
-		m_Convolution = NULL;
-	}
+	delete m_Convolution;
+	m_Convolution = NULL;
 
 	return S_OK;
 }
@@ -951,8 +975,7 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 // Implementation of IMediaObject::GetInputStatus
 /////////////////////////////////////////////////////////////////////////////
 
-STDMETHODIMP CConvolver::GetInputStatus( 
-										DWORD dwInputStreamIndex,
+STDMETHODIMP CConvolver::GetInputStatus(DWORD dwInputStreamIndex,
 										DWORD *pdwFlags)
 { 
 	if ( 0 != dwInputStreamIndex )
@@ -983,8 +1006,7 @@ STDMETHODIMP CConvolver::GetInputStatus(
 // Implementation of IMediaObject::ProcessInput
 /////////////////////////////////////////////////////////////////////////////
 
-STDMETHODIMP CConvolver::ProcessInput( 
-									  DWORD dwInputStreamIndex,
+STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 									  IMediaBuffer *pBuffer,
 									  DWORD dwFlags,
 									  REFERENCE_TIME rtTimestamp,
@@ -1041,8 +1063,7 @@ STDMETHODIMP CConvolver::ProcessInput(
 // Implementation of IMediaObject::ProcessOutput
 /////////////////////////////////////////////////////////////////////////////
 
-STDMETHODIMP CConvolver::ProcessOutput( 
-									   DWORD dwFlags,
+STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 									   DWORD cOutputBufferCount,
 									   DMO_OUTPUT_DATA_BUFFER *pOutputBuffers,
 									   DWORD *pdwStatus)
@@ -1266,6 +1287,27 @@ STDMETHODIMP CConvolver::put_wetmix(double newVal)
 	return S_OK;
 }
 
+// Property get to retrieve the wet mix value by using the public interface.
+STDMETHODIMP CConvolver::get_attenuation(double *pVal)
+{
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_fAttenuation_db;
+
+	return S_OK;
+}
+
+// Property put to store the wet mix value by using the public interface.
+STDMETHODIMP CConvolver::put_attenuation(double newVal)
+{
+	m_fAttenuation_db = newVal;
+
+	return S_OK;
+}
+
 // Property get to retrieve the filter filename by using the public interface.
 STDMETHODIMP CConvolver::get_filterfilename(TCHAR *pVal[])
 {
@@ -1342,11 +1384,19 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Calculate the number of blocks to process.  A block contains the Containers for all channels
 	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
 
-	m_Convolution->doConvolution(pbInputData,pbOutputData,pWave->nChannels,m_filter,m_containers,m_output,dwBlocksToProcess,m_fWetMix,m_fDryMix
+	m_Convolution->doConvolution(pbInputData,pbOutputData,
+		pWave->nChannels,
+		m_filter,
+		m_containers,
+		m_output,
+		dwBlocksToProcess,
+		m_fAttenuation_db,
+		m_fWetMix,
+		m_fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-					, m_CWaveFileTrace
+		, m_CWaveFileTrace
 #endif	
-					);
+		);
 	return S_OK;
 }
 

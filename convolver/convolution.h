@@ -1,4 +1,22 @@
 #pragma once
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
@@ -12,37 +30,46 @@ template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(unsigned int n2xContainers);
-	~CConvolution(void);
+	CConvolution(unsigned int n2xSampleSize);
+	~CConvolution(void);  // TODO: should this be here?
 
-	DWORD doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
-		const unsigned int nChannels,
-		const CContainerBuffer<FFT_type>* Filter,
-		CContainerBuffer<FFT_type>* ContainerBuffer,
-		CContainerBuffer<FFT_type>* OutputBuffer,
-		DWORD dwBlocksToProcess,
-		const double WetMix,
-		const double DryMix
+	DWORD // Returns number of bytes processed
+	doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
+				const unsigned int nChannels,
+				const CContainerBuffer<FFT_type>* filter,
+				CContainerBuffer<FFT_type>* inputBuffer,
+				CContainerBuffer<FFT_type>* outputBuffer,
+				DWORD dwBlocksToProcess,
+				const double fAttenuation_db,
+				const double fWetMix,
+				const double fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-		, CWaveFile* CWaveFileTrace
+				, CWaveFile* CWaveFileTrace
 #endif	
-		);  // Returns bytes processed
+				);
 
 private:
+
 	CChannelBuffer<FFT_type>* m_SampleBufferChannelCopy;
 
-	unsigned int m_n2xSampleSize;
-	unsigned int m_nSampleBufferLength;
-	unsigned int m_nSampleBufferIndex;
+	DWORD m_n2xContainerSize;
+	DWORD m_nContainerSize;
+	DWORD m_nInputBufferIndex;
 
-	// Complex array multiplication -- ordering specific to the Ooura routines
+	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C,const int N);
+
+	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample)
+	{
+		return fAttenuation_db == 0 ? sample : 
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(-fAttenuation_db / 20.0L)));
+	}
 
 protected:
 	// Pure virtual functions that convert from a the container type, to the FFT type
-	virtual FFT_type get_sample(const BYTE* Container) const = 0;						// converts Container into a value of the right type
-	virtual BYTE normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
-	virtual BYTE* next_container(BYTE* Container) const = 0;								// used to move the buffer pointer on
+	virtual FFT_type get_sample(const BYTE* container) const = 0;						// converts container into a value of the right type
+	virtual DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
+	virtual BYTE* next_container(BYTE* container) const = 0;								// used to move the buffer pointer on
 };
 
 
@@ -55,21 +82,23 @@ public:
 	Cconvolution_ieeefloat(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
 
 private:
-	FFT_type get_sample(const BYTE* Container) const
+	FFT_type get_sample(const BYTE* container) const
 	{
-		return *(FFT_type *)Container;
+		//return *(FFT_type *)container;
+		return *reinterpret_cast<const FFT_type *>(container);
 	};	// TODO: find a cleaner way to do this
 
-	BYTE normalize_sample(BYTE* dstContainer, double srcSample) const 
+	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
 	{ 
 		float fsrcSample = static_cast<float>(srcSample);
-		dstContainer = (BYTE*)(&fsrcSample);
+		//dstContainer = (BYTE*)(&fsrcSample);
+		dstContainer = reinterpret_cast<BYTE*>(&fsrcSample);
 		return sizeof(float);
 	};
 
-	BYTE* next_container(BYTE* Container) const 
+	BYTE* next_container(BYTE* container) const 
 	{ 
-		return Container + sizeof(float);
+		return container + sizeof(float);
 	};
 };
 
@@ -82,12 +111,12 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* Container) const
+	FFT_type get_sample(const BYTE* container) const
 	{
-		return static_cast<FFT_type>(*Container - 128);
+		return static_cast<FFT_type>(*container - 128);
 	};
 
-	BYTE normalize_sample(BYTE* dstContainer, double srcSample) const
+	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   // Truncate if exceeded full scale.
 		if (srcSample > 127)
 			srcSample = 127;
@@ -97,9 +126,9 @@ private:
 		return 1; // ie, 1 byte
 	};
 
-	BYTE* next_container(BYTE* Container) const 
+	BYTE* next_container(BYTE* container) const 
 	{ 
-		return Container + sizeof(BYTE);
+		return container + sizeof(BYTE);
 	};
 };
 
@@ -112,25 +141,26 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* Container) const 
+	FFT_type get_sample(const BYTE* container) const 
 	{ 
-		return static_cast<FFT_type>(*(INT16*)Container);
+		return static_cast<FFT_type>(*reinterpret_cast<const INT16*>(container));
 	}; 	// TODO: find a cleaner way to do this
 
-	BYTE normalize_sample(BYTE* dstContainer, double srcSample) const
+	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   // Truncate if exceeded full scale.
 		if (srcSample > 32767)
 			srcSample = 32767;
 		else
 			if (srcSample < -32768)
 				srcSample = -32768;
-		*(INT16 *)dstContainer = static_cast<INT16>(srcSample);
+		// *(INT16 *)dstContainer = static_cast<INT16>(srcSample);
+		*reinterpret_cast<INT16 *>(dstContainer) = static_cast<INT16>(srcSample);
 		return sizeof(INT16);  // ie, 2 bytes consumed
 	};
 
-	BYTE* next_container(BYTE* Container) const
+	BYTE* next_container(BYTE* container) const
 	{
-		return Container + sizeof(INT16);
+		return container + sizeof(INT16);
 	};
 };
 
@@ -143,25 +173,25 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* Container) const
+	FFT_type get_sample(const BYTE* container) const
 	{
-		int i = (char) Container[2];
-		i = ( i << 8 ) | Container[1];
+		int i = (char) container[2];
+		i = ( i << 8 ) | container[1];
 		switch (validBits)
 		{
 		case 16:
 			break;
 		case 20:
-			i = (i << 4) | (Container[0] >> 4);
+			i = (i << 4) | (container[0] >> 4);
 			break;
 		case 24:
-			i = (i << 8) | Container[0];
+			i = (i << 8) | container[0];
 			break;
 		};
-		return static_cast<FFT_type>(*Container);
-	}; 	// TODO: find a cleaner way to do this
+		return static_cast<FFT_type>(i);
+	};
 
-	BYTE normalize_sample(BYTE* dstContainer, double srcSample) const
+	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
 		int iClip = 0;
 		switch (validBits)
@@ -194,9 +224,9 @@ private:
 		return 3; // ie, 3 bytes processed
 	};
 
-	BYTE* next_container(BYTE* Container) const 
+	BYTE* next_container(BYTE* container) const 
 	{
-		return Container + 3; // 3 bytes = 24 bits
+		return container + 3; // 3 bytes = 24 bits
 	}; 
 };
 
@@ -210,9 +240,9 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* Container) const
+	FFT_type get_sample(const BYTE* container) const
 	{
-		int i = *(INT32*)Container;
+		INT32 i = *reinterpret_cast<const INT32*>(container);
 		switch (validBits)
 		{
 		case 16:
@@ -230,9 +260,9 @@ private:
 		return static_cast<FFT_type>(i);
 	}; 
 
-	BYTE normalize_sample(BYTE* dstContainer, double srcSample) const
+	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
-		int iClip = 0;
+		INT32 iClip = 0;
 		switch (validBits)
 		{
 		case 16:
@@ -256,12 +286,12 @@ private:
 			if (srcSample < -iClip)
 				srcSample = static_cast<double>(-iClip);
 
-		*(INT32 *)dstContainer = static_cast<INT32>(srcSample);
+		*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
 		return 4;  // ie, 4 bytes processed
 	};
 
-	BYTE* next_container(BYTE* Container) const 
+	BYTE* next_container(BYTE* container) const 
 	{
-		return Container + 4;  // 4 bytes = 32 bits
+		return container + 4;  // 4 bytes = 32 bits
 	};  
 };

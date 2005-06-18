@@ -276,6 +276,9 @@
 				RelativePath=".\fft\fftsg_h.h">
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\gpl.txt">
+		</File>
 	</Files>
 	<Globals>
 		<Global

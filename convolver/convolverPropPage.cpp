@@ -1,8 +1,25 @@
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
 /////////////////////////////////////////////////////////////////////////////
 //
 // CConvolverPropPage.cpp : Implementation of the property page for CConvolver
-//
-// Copyright (c) Microsoft Corporation. All rights reserved.
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -37,25 +54,25 @@ CConvolverPropPage::~CConvolverPropPage()
 
 STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 {
-    // find our plug-in object, if it was passed in
-    for (DWORD i = 0; i < nObjects; i++)
-    {
-	    CComPtr<IConvolver> pPlugin;
+	// find our plug-in object, if it was passed in
+	for (DWORD i = 0; i < nObjects; i++)
+	{
+		CComPtr<IConvolver> pPlugin;
 
-        IUnknown    *pUnknown = ppUnk[i];
-        if (pUnknown)
-        {
-            HRESULT hr = pUnknown->QueryInterface(__uuidof(IConvolver), (void**)&pPlugin); // Get a pointer to the plug-in.
-            if ((SUCCEEDED(hr)) && (pPlugin))
-            {
-                // save plug-in interface
-                m_spConvolver = pPlugin;
-                break;
-            }
-        }
-    }
+		IUnknown    *pUnknown = ppUnk[i];
+		if (pUnknown)
+		{
+			HRESULT hr = pUnknown->QueryInterface(__uuidof(IConvolver), (void**)&pPlugin); // Get a pointer to the plug-in.
+			if ((SUCCEEDED(hr)) && (pPlugin))
+			{
+				// save plug-in interface
+				m_spConvolver = pPlugin;
+				break;
+			}
+		}
+	}
 
-    return S_OK;
+	return S_OK;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -65,55 +82,61 @@ STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 STDMETHODIMP CConvolverPropPage::Apply(void)
 {
 	TCHAR   szStr[MAXSTRING] = { 0 };
-	DWORD   dwDelayTime = 1000;  // Initialize the delay time.
+	DWORD   dwAttenuation = MAX_ATTENUATION;  // Initialize the attenuation. (equivaluent to 0 as DWORD is an unsigned long)
+	double	fAttenuation = 0.0;	// Initialize a double for the attenuation
 	DWORD   dwWetmix = 50;       // Initialize a DWORD for effect level.
 	double  fWetmix = 0.50;      // Initialize a double for effect level.
-	TCHAR szFilterFileName[MAX_PATH]	= TEXT("");
-                  
- // atio does not work with Unicode
+	TCHAR szFilterFileName[MAX_PATH]	= { 0 };
+
+	// Get the attenuatoin value from the dialog box.
+	GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
+	// atof does not work with Unicode
 #ifdef UNICODE 
 	CHAR strTmp[2*(sizeof(szStr)+1)]; // SIZE equals (2*(sizeof(tstr)+1)). This ensures enough
-                       // room for the multibyte characters if they are two
-                       // bytes long and a terminating null character.
-    wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-    dwDelayTime = atoi(strTmp); 
+	// room for the multibyte characters if they are two
+	// bytes long and a terminating null character.
+	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
+	fAttenuation = atof(strTmp); 
 #else 
-	dwDelayTime = atoi(szStr);
+	fAttenuation = atof(szStr);
 #endif 
+
+	// Make sure attenuation value is valid
+	if ((-fAttenuation > MAX_ATTENUATION) || (fAttenuation > MAX_ATTENUATION))
+	{
+		if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+		{
+			MessageBox(szStr);
+		}
+		return E_FAIL;
+	}
+	else
+		dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
 
 	// Get the effects level value from the dialog box.
 	GetDlgItemText(IDC_WETMIX, szStr, sizeof(szStr) / sizeof(szStr[0]));
 #ifdef UNICODE 
 	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-    dwWetmix = atoi(strTmp); 
+	dwWetmix = static_cast<DWORD>(atof(strTmp)); 
 #else 
-	dwWetmix = atoi(szStr);
+	dwWetmix = static_cast<DWORD>(atof(szStr));
 #endif 
 
 	// Make sure wet mix value is valid.
-	if ((dwWetmix < 0) || (dwWetmix > 100))
+	if (dwWetmix > 100)
 	{
 		if (::LoadString(_Module.GetResourceInstance(), IDS_MIXRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
 		{
 			MessageBox(szStr);
 		}
-
 		return E_FAIL;
 	}
-
-	// Get the filter file name from the dialog box.
-	GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
+	else
+		fWetmix = static_cast<double>(dwWetmix) / 100.0L;
 
 	// update the registry
 	CRegKey key;
 	LONG    lResult;
-
-	// Write the delay time value to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
-	{
-		lResult = key.SetDWORDValue( kszPrefsDelayTime, dwDelayTime );
-	}
 
 	// Write the wet mix value to the registry.
 	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
@@ -122,20 +145,28 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		lResult = key.SetDWORDValue( kszPrefsWetmix, dwWetmix );
 	}
 
+	// Write the attenuation value to the registry.
+	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		lResult = key.SetDWORDValue( kszPrefsAttenuation, dwAttenuation );
+	}
+
 	// Write the filter filename to the registry.
 	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
 	if (ERROR_SUCCESS == lResult)
 	{
+		// Get the filter file name from the dialog box.
+		GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
+
 		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
 	}
 
 	// update the plug-in
 	if (m_spConvolver)
 	{
-		// Convert the wet mix value from DWORD to double.
-		fWetmix = (double)dwWetmix / 100;
 		m_spConvolver->put_wetmix(fWetmix);
-
+		m_spConvolver->put_attenuation(fAttenuation);
 		m_spConvolver->put_filterfilename(szFilterFileName);
 	}
 
@@ -152,6 +183,8 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 {
 	DWORD  dwWetmix = 50;         // Default wet mix DWORD.
 	double fWetmix =  0.50;       // Default wet mix double.
+	DWORD  dwAttenuation = MAX_ATTENUATION * 100;	  // Default attenuation DWORD (offset, as DWORD unsigned)
+	double fAttenuation = 0.0;	  // Default attenuation double
 	TCHAR*  szFilterFileName	= TEXT("");
 
 
@@ -160,8 +193,11 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	{
 		m_spConvolver->get_wetmix(&fWetmix);
 		// Convert wet mix from double to DWORD.
-		dwWetmix = (DWORD)(fWetmix * 100);
-		
+		dwWetmix = static_cast<DWORD>(fWetmix * 100);
+
+		m_spConvolver->get_attenuation(&fAttenuation);
+		dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
+
 		m_spConvolver->get_filterfilename(&szFilterFileName);
 		SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 	}	
@@ -180,6 +216,14 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 			if (ERROR_SUCCESS == lResult)
 			{
 				dwWetmix = dwValue;
+			}
+
+			// Read the attenuation value.
+			lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue );
+			if (ERROR_SUCCESS == lResult)
+			{
+				dwAttenuation = dwValue;
+				fAttenuation = m_spConvolver->decode_Attenuationdb(dwAttenuation);
 			}
 
 			TCHAR szValue[MAX_PATH]	= TEXT("");
@@ -201,6 +245,9 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	_stprintf(szStr, _T("%u"), dwWetmix);
 	SetDlgItemText(IDC_WETMIX, szStr);
 
+	// Display the attenuation.
+	_stprintf(szStr, _T("%.1f"), fAttenuation);
+	SetDlgItemText(IDC_ATTENUATION, szStr);
 
 	return 0;
 }
@@ -209,7 +256,7 @@ LRESULT CConvolverPropPage::OnEnChangeWetmix(WORD wNotifyCode, WORD wID, HWND hW
 {
 
 	SetDirty(TRUE); // Enable Apply.
-	
+
 	return 0;
 }
 
@@ -242,4 +289,11 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	SetDirty(TRUE);
 
 	return ERROR_SUCCESS;
+}
+
+LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	SetDirty(True);
+
+	return 0;
 }
