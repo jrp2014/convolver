@@ -135,12 +135,6 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath=".\containerBuffer.cpp">
-			</File>
-			<File
-				RelativePath=".\containerBufferInst.cpp">
-			</File>
-			<File
 				RelativePath=".\convolution.cpp">
 			</File>
 			<File
@@ -157,6 +151,12 @@
 			</File>
 			<File
 				RelativePath=".\convolverPropPage.cpp">
+			</File>
+			<File
+				RelativePath=".\samplebuffer.cpp">
+			</File>
+			<File
+				RelativePath=".\samplebufferInst.cpp">
 			</File>
 			<File
 				RelativePath=".\StdAfx.cpp">
@@ -179,9 +179,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
-				RelativePath=".\containerBuffer.h">
-			</File>
-			<File
 				RelativePath=".\convolution.h">
 			</File>
 			<File
@@ -192,6 +189,9 @@
 			</File>
 			<File
 				RelativePath=".\resource.h">
+			</File>
+			<File
+				RelativePath=".\samplebuffer.h">
 			</File>
 			<File
 				RelativePath=".\StdAfx.h">

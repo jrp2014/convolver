@@ -35,7 +35,7 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
-#include "containerBuffer.h"
+#include "sampleBuffer.h"
 #include "convolution.h"
 
 // FFT routines
@@ -296,14 +296,14 @@ private:
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
 
-	CContainerBuffer<float> *m_filter;
-	CContainerBuffer<float> *m_containers;
-	CContainerBuffer<float> *m_output;
-	CConvolution<float>	*m_Convolution;			// Polymorphic processing class
+	CSampleBuffer<float>	*m_filter;
+	CSampleBuffer<float>	*m_samples;
+	CSampleBuffer<float>	*m_output;
+	CConvolution<float>		*m_Convolution;			// Polymorphic processing class
 
-	unsigned int  m_cFilterLength;						// Filter size in containers
-	unsigned int  m_c2xPaddedFilterLength;				// 2^n, padded with zeros for radix 2 FFT
-	unsigned int  m_nContainerBufferIndex;					// placeholder
+	DWORD					m_cFilterLength;			// Filter size in containers
+	DWORD					m_c2xPaddedFilterLength;	// 2^n, padded with zeros for radix 2 FFT
+	DWORD					m_nSampleBufferIndex;		// placeholder
 
     BOOL                    m_bEnabled;         // TRUE if enabled
 };

@@ -20,12 +20,10 @@
 #include  "convolution.h"
 
 // CConvolution Constructor
-template <typename FFT_type>CConvolution<FFT_type>::CConvolution(unsigned int m_n2xContainerSize) : m_n2xContainerSize(m_n2xContainerSize)
+template <typename FFT_type>CConvolution<FFT_type>::CConvolution(const DWORD n2xSampleSize) : m_n2xSampleSize(n2xSampleSize), m_nSampleSize(n2xSampleSize/2), m_nInputBufferIndex(0)
 {
-	m_SampleBufferChannelCopy = new CChannelBuffer<FFT_type>(m_n2xContainerSize);  // Need only one copy channel
-	assert(m_n2xContainerSize % 2 == 0);
-	m_nContainerSize = m_n2xContainerSize / 2; // TODO: Check that it really is divisible by 2	
-	m_nInputBufferIndex = 0;
+	assert(m_n2xSampleSize % 2 == 0);
+	m_SampleBufferChannelCopy = new CChannelBuffer<FFT_type>(m_n2xSampleSize);  // Need only one copy channel
 };
 // CConvolution Destructor
 template <typename FFT_type>CConvolution<FFT_type>::~CConvolution(void)
@@ -36,10 +34,10 @@ template <typename FFT_type>CConvolution<FFT_type>::~CConvolution(void)
 template <typename FFT_type>
 DWORD
 CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
-											   const unsigned int nChannels,
-											   const CContainerBuffer<FFT_type>* filter,
-											   CContainerBuffer<FFT_type>* inputBuffer,
-											   CContainerBuffer<FFT_type>* outputBuffer,
+											   const unsigned short nChannels,
+											   const CSampleBuffer<FFT_type>* filter,
+											   CSampleBuffer<FFT_type>* inputBuffer,
+											   CSampleBuffer<FFT_type>* outputBuffer,
 											   DWORD dwBlocksToProcess,
 											   const double fAttenuation_db,
 											   const double fWetMix,
@@ -52,42 +50,52 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 	// Cross-check
 	DWORD cbBytesActuallyProcessed = 0;
 
-	BYTE* pbSampleBufferPointer = const_cast<BYTE*>(pbInputData);
-	BYTE* pbOutputDataPointer = pbOutputData;
+	BYTE* pb_inputDataPointer = const_cast<BYTE*>(pbInputData);
+	BYTE* pb_outputDataPointer = pbOutputData;
 
 	while (dwBlocksToProcess--)
 	{
-		for (unsigned int nChannel = 0; nChannel != nChannels; nChannel++)
+		for (unsigned short nChannel = 0; nChannel != nChannels; nChannel++)
 		{
 
 			// Get the input sample and convert it to a FFT_type (eg, float)
-			inputBuffer->channels[nChannel].containers[m_nInputBufferIndex] = attenuated_sample(fAttenuation_db, get_sample(pbSampleBufferPointer)); // Channels are interleaved
-			pbSampleBufferPointer = next_container(pbSampleBufferPointer); // TODO: a case for a smart pointer?
+			inputBuffer->channels[nChannel].samples[m_nInputBufferIndex] = attenuated_sample(fAttenuation_db, get_sample(pb_inputDataPointer)); // Channels are interleaved
+			pb_inputDataPointer += m_nSampleSize;
 
 			// Mix the processed signal with the dry signal.
-			double outputSample = (inputBuffer->channels[nChannel].containers[m_nInputBufferIndex + m_nContainerSize] * fDryMix ) + 
-				(outputBuffer->channels[nChannel].containers[m_nInputBufferIndex] * fWetMix);
+			double outputSample = (inputBuffer->channels[nChannel].samples[m_nInputBufferIndex + m_nSampleSize] * fDryMix ) + 
+				(outputBuffer->channels[nChannel].samples[m_nInputBufferIndex] * fWetMix);
 
 #if defined(DEBUG) | defined(_DEBUG)
+#if defined(DIRAC_DELTA_FUNCTIONS)
 			// Only for testing with perfect Dirac Delta filters
-			if (abs(outputBuffer->channels[nChannel].containers[m_nInputBufferIndex] - 
-				inputBuffer->channels[nChannel].containers[m_nInputBufferIndex + m_nContainerSize]) >
-				abs(inputBuffer->channels[nChannel].containers[m_nInputBufferIndex + m_nContainerSize]) * 0.01)
+			if (abs(outputBuffer->channels[nChannel].samples[m_nInputBufferIndex] - 
+				inputBuffer->channels[nChannel].samples[m_nInputBufferIndex + m_nSampleSize]) >
+				abs(inputBuffer->channels[nChannel].samples[m_nInputBufferIndex + m_nSampleSize]) * 0.01)
 			{
 				OutputDebugString(TEXT("\n"));
 				TCHAR sFormat[100];
 				int k = swprintf(sFormat, TEXT("%i,"), dwBlocksToProcess);
 				k += swprintf(sFormat + k, TEXT("%i, "), m_nInputBufferIndex);
-				k += swprintf(sFormat + k, TEXT("%.4g, "), inputBuffer->channels[nChannel].containers[(m_nInputBufferIndex + m_nContainerSize) % m_n2xContainerSize]);
-				k += swprintf(sFormat + k, TEXT("%.4g, "), outputBuffer->channels[nChannel].containers[m_nInputBufferIndex % m_n2xContainerSize]);
-				k += swprintf(sFormat + k, TEXT("%.6g"), outputBuffer->channels[nChannel].containers[m_nInputBufferIndex] - 
-					inputBuffer->channels[nChannel].containers[m_nInputBufferIndex + m_nContainerSize]);
+				k += swprintf(sFormat + k, TEXT("%.4g, "), inputBuffer->channels[nChannel].samples[(m_nInputBufferIndex + m_nSampleSize) % m_n2xSampleSize]);
+				k += swprintf(sFormat + k, TEXT("%.4g, "), outputBuffer->channels[nChannel].samples[m_nInputBufferIndex % m_n2xSampleSize]);
+				k += swprintf(sFormat + k, TEXT("%.6g"), outputBuffer->channels[nChannel].samples[m_nInputBufferIndex] - 
+					inputBuffer->channels[nChannel].samples[m_nInputBufferIndex + m_nSampleSize]);
 				OutputDebugString(sFormat);
 			}
 #endif
+#endif
 			// Write to output buffer.
-			cbBytesActuallyProcessed += normalize_sample(pbOutputDataPointer, outputSample);
-			pbOutputDataPointer = next_container(pbOutputDataPointer);
+#if defined(DEBUG) | defined(_DEBUG)
+			DWORD sample_size = normalize_sample(pb_outputDataPointer, outputSample);
+			assert(sample_size == m_nSampleSize);
+			cbBytesActuallyProcessed += m_nSampleSize;
+
+#else
+			cbBytesActuallyProcessed += normalize_sample(pb_outputDataPointer, outputSample);
+#endif
+			pb_outputDataPointer += m_nSampleSize;
+
 
 #if defined(DEBUG) | defined(_DEBUG)
 			// This does not quite work, because AllocateStreamingResources seems to be called (twice!) after IEEE FFT_type playback, which rewrites the file
@@ -102,15 +110,15 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 #endif
 		}
 
-		if (m_nInputBufferIndex == m_nContainerSize - 1) // Got a full container
+		if (m_nInputBufferIndex == m_nSampleSize - 1) // Got a full sample
 		{	
-			// Got a container xi length Nh, so calculate outputBuffer
-			for (unsigned int nChannel = 0; nChannel != nChannels; nChannel++)
+			// Got a sample xi length Nh, so calculate outputBuffer
+			for (unsigned short nChannel = 0; nChannel != nChannels; nChannel++)
 			{
-				// Copy the container buffer, as the rdft routine overwrites it
+				// Copy the sample buffer, as the rdft routine overwrites it
 				// TODO: replace by a copy assignment operator in the inputBuffer class
-				for (unsigned int j = 0; j != m_n2xContainerSize; j++)
-					m_SampleBufferChannelCopy->containers[j] = inputBuffer->channels[nChannel].containers[j];
+				for (unsigned int j = 0; j != m_n2xSampleSize; j++)
+					m_SampleBufferChannelCopy->samples[j] = inputBuffer->channels[nChannel].samples[j];
 				//*m_SampleBufferChannelCopy = inputBuffer->channels[nChannel];
 
 				//  rdft(n, 1, a):
@@ -123,22 +131,22 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 				//                                a[1] = R[n/2]
 
 				// Calculate the Xi(m)
-				rdft(m_n2xContainerSize, OouraRForward, m_SampleBufferChannelCopy->containers);  // get DFT of inputBuffer
+				rdft(m_n2xSampleSize, OouraRForward, m_SampleBufferChannelCopy->samples);  // get DFT of inputBuffer
 
 				// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  filter (Hz(m)) is already calculated (in AllocateStreamingResources)
-				cmult(m_SampleBufferChannelCopy->containers, filter->channels[nChannel].containers, outputBuffer->channels[nChannel].containers, m_n2xContainerSize);
+				cmult(m_SampleBufferChannelCopy->samples, filter->channels[nChannel].samples, outputBuffer->channels[nChannel].samples, m_n2xSampleSize);
 
 				//get back the yi
-				rdft(m_n2xContainerSize, OouraRBackward, outputBuffer->channels[nChannel].containers); // take the Inverse DFT
+				rdft(m_n2xSampleSize, OouraRBackward, outputBuffer->channels[nChannel].samples); // take the Inverse DFT
 
 				// scale
-				for (unsigned int j = 0; j != m_nContainerSize; j++)  // No need to scale second half of output buffer, as going to discard that
-					outputBuffer->channels[nChannel].containers[j] *= static_cast<FFT_type>(2.0 / (double) m_n2xContainerSize);
+				for (unsigned int j = 0; j != m_nSampleSize; j++)  // No need to scale second half of output buffer, as going to discard that
+					outputBuffer->channels[nChannel].samples[j] *= static_cast<FFT_type>(2.0 / (double) m_n2xSampleSize);
 
 				// move overlap block x i to previous block x i-1
 				// TODO: To avoid this copy (ie, make inputBuffer circular), would need to have a filter that was aligned
-				for (unsigned int j = 0; j < m_nContainerSize; j++)
-					inputBuffer->channels[nChannel].containers[j + m_nContainerSize] = inputBuffer->channels[nChannel].containers[j]; // TODO: MemCpy
+				for (unsigned int j = 0; j < m_nSampleSize; j++)
+					inputBuffer->channels[nChannel].samples[j + m_nSampleSize] = inputBuffer->channels[nChannel].samples[j]; // TODO: MemCpy
 			}
 			m_nInputBufferIndex = 0;
 		}

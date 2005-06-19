@@ -56,12 +56,12 @@ CConvolver::CConvolver()
 	m_bEnabled = TRUE;
 
 	m_filter = NULL;
-	m_containers = NULL;
+	m_samples = NULL;
 	m_output = NULL;
 	m_Convolution=NULL;
 
 	m_cFilterLength = 0;
-	m_nContainerBufferIndex = 0;
+	m_nSampleBufferIndex = 0;
 
 	::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
 	::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
@@ -526,7 +526,7 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 		return DMO_E_TYPE_NOT_SET;
 	}
 
-	// Return the input container size, in bytes.
+	// Return the input sample size, in bytes.
 	*pcbSize = m_mtInput.lSampleSize;
 
 	// This plug-in doesn't perform lookahead. Return zero.
@@ -572,7 +572,7 @@ STDMETHODIMP CConvolver::GetOutputSizeInfo(
 		return DMO_E_TYPE_NOT_SET;
 	}
 
-	// Return the output container size, in bytes.
+	// Return the output sample size, in bytes.
 	*pcbSize = m_mtOutput.lSampleSize;
 
 	// Get the pointer to the output format structure.
@@ -697,9 +697,9 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
 	m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
 
-	m_cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in containers (Nh)
+	m_cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
 
-	// Check that the filter has the same number of channels and container rate as the input
+	// Check that the filter has the same number of channels and sample rate as the input
 	if ((pWave->nChannels != m_WfexFilterFormat.nChannels) ||
 		(pWave->nSamplesPerSec != m_WfexFilterFormat.nSamplesPerSec))
 	{
@@ -751,17 +751,17 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				for(m_c2xPaddedFilterLength = 1; m_c2xPaddedFilterLength < 2 * m_cFilterLength; m_c2xPaddedFilterLength *= 2);
 
 
-				// Initialise the Filter and the various container buffers that will be used during processing
-				m_filter = new CContainerBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
-				m_containers = new CContainerBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
-				m_output = new CContainerBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				// Initialise the Filter and the various sample buffers that will be used during processing
+				m_filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				m_samples = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				m_output = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
 
 				// Read the filter file
 				for (unsigned int j=0; j != m_cFilterLength; j++)
 				{
 					for (unsigned int i=0; i !=  m_WfexFilterFormat.nChannels; i++)
 					{
-						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_filter->channels[i].containers[j], dwSizeToRead, &dwSizeRead)))
+						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_filter->channels[i].samples[j], dwSizeToRead, &dwSizeRead)))
 						{
 							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 							SAFE_DELETE(pFilterWave);
@@ -780,13 +780,13 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				// Now create a FFT of the filter
 				for (unsigned int i=0; i != m_WfexFilterFormat.nChannels; i++)
 				{
-					rdft(m_c2xPaddedFilterLength, OouraRForward, m_filter->channels[i].containers);		
+					rdft(m_c2xPaddedFilterLength, OouraRForward, m_filter->channels[i].samples);		
 				}
 
 			}  // case
 			break;
 		default:
-			return E_NOTIMPL; // Unsupported it container size
+			return E_NOTIMPL; // Unsupported it sample size
 		}
 		break;
 
@@ -807,7 +807,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		{
 			unsigned int k = swprintf(sFormat, TEXT("%i,"), j);
 			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.3f "), m_filter->channels[j].containers[i]);
+			k += swprintf(sFormat + k, TEXT("%.3f "), m_filter->channels[j].samples[i]);
 			OutputDebugString(sFormat);
 		}
 	}
@@ -823,9 +823,9 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 	// Pick the correct version of the processing class
 	
-	// Note: for 8 and 16-bit containers, we assume the container is the same size as
-	// the containers. For > 16-bit containers, we need to use the WAVEFORMATEXTENSIBLE
-	// structure to determine the valid bits per container.
+	// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+	// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+	// structure to determine the valid bits per sample.
 
 	switch (pWave->wFormatTag)
 	{
@@ -949,10 +949,10 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	delete m_output;
 	m_output = NULL;
 
-	delete m_containers;
-	m_containers = NULL;
+	delete m_samples;
+	m_samples = NULL;
 
-	m_nContainerBufferIndex = 0;
+	m_nSampleBufferIndex = 0;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	if (m_CWaveFileTrace)
@@ -1381,13 +1381,13 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 		return E_UNEXPECTED;
 	}
 
-	// Calculate the number of blocks to process.  A block contains the Containers for all channels
+	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
 
 	m_Convolution->doConvolution(pbInputData,pbOutputData,
 		pWave->nChannels,
 		m_filter,
-		m_containers,
+		m_samples,
 		m_output,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
@@ -1429,7 +1429,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 		return DMO_E_TYPE_NOT_ACCEPTED;
 	}
 
-	// make sure this is a supported container size
+	// make sure this is a supported sample size
 	if ((8  != pWave->wBitsPerSample) &&
 		(16 != pWave->wBitsPerSample) &&
 		(24 != pWave->wBitsPerSample) &&
@@ -1443,7 +1443,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 	{
 	case WAVE_FORMAT_PCM:
 
-		// make sure container size is 8 or 16-bit
+		// make sure sample size is 8 or 16-bit
 		if ((8  != pWave->wBitsPerSample) &&
 			(16 != pWave->wBitsPerSample))
 		{
@@ -1467,7 +1467,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 				return DMO_E_TYPE_NOT_ACCEPTED;
 			}
 
-			// for 8 or 16-bit, the container and container size must match
+			// for 8 or 16-bit, the sample and sample size must match
 			if ((8  == pWave->wBitsPerSample) ||
 				(16 == pWave->wBitsPerSample))
 			{
@@ -1478,8 +1478,8 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 			}
 			else 
 			{
-				// for any other container size, make sure the valid
-				// bits per container is a value we support
+				// for any other sample size, make sure the valid
+				// bits per sample is a value we support
 				if ((16 != pWaveXT->Samples.wValidBitsPerSample) &&
 					(20 != pWaveXT->Samples.wValidBitsPerSample) &&
 					(24 != pWaveXT->Samples.wValidBitsPerSample) &&

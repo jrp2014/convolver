@@ -21,7 +21,7 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
-#include ".\containerBuffer.h"
+#include ".\sampleBuffer.h"
 
 // FFT routines
 #include <fftsg_h.h>
@@ -30,15 +30,15 @@ template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(unsigned int n2xSampleSize);
-	~CConvolution(void);  // TODO: should this be here?
+	CConvolution(const DWORD n2xSampleSize);
+	~CConvolution(void);  // TODO: should this be public?
 
 	DWORD // Returns number of bytes processed
 	doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
-				const unsigned int nChannels,
-				const CContainerBuffer<FFT_type>* filter,
-				CContainerBuffer<FFT_type>* inputBuffer,
-				CContainerBuffer<FFT_type>* outputBuffer,
+				const unsigned short nChannels,
+				const CSampleBuffer<FFT_type>* filter,
+				CSampleBuffer<FFT_type>* inputBuffer,
+				CSampleBuffer<FFT_type>* outputBuffer,
 				DWORD dwBlocksToProcess,
 				const double fAttenuation_db,
 				const double fWetMix,
@@ -52,8 +52,8 @@ private:
 
 	CChannelBuffer<FFT_type>* m_SampleBufferChannelCopy;
 
-	DWORD m_n2xContainerSize;
-	DWORD m_nContainerSize;
+	DWORD const m_n2xSampleSize;	// TODO: Not needed as a property of the filter
+	DWORD const m_nSampleSize;    // TODO: Not needed as a property of the filter
 	DWORD m_nInputBufferIndex;
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
@@ -62,19 +62,18 @@ private:
 	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample)
 	{
 		return fAttenuation_db == 0 ? sample : 
-			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(-fAttenuation_db / 20.0L)));
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
 	}
 
 protected:
-	// Pure virtual functions that convert from a the container type, to the FFT type
-	virtual FFT_type get_sample(const BYTE* container) const = 0;						// converts container into a value of the right type
+	// Pure virtual functions that convert from a the sample type, to the FFT type
+	virtual FFT_type get_sample(const BYTE* container) const = 0;						// converts sample into a value of the right type
 	virtual DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
-	virtual BYTE* next_container(BYTE* container) const = 0;								// used to move the buffer pointer on
 };
 
 
 
-// Specializations with the appropriate functions for accessing the container buffer
+// Specializations with the appropriate functions for accessing the sample buffer
 template <typename FFT_type>
 class Cconvolution_ieeefloat : public CConvolution<FFT_type>
 {
@@ -91,14 +90,9 @@ private:
 	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
 	{ 
 		float fsrcSample = static_cast<float>(srcSample);
-		//dstContainer = (BYTE*)(&fsrcSample);
+		//dstSample = (BYTE*)(&fsrcSample);
 		dstContainer = reinterpret_cast<BYTE*>(&fsrcSample);
 		return sizeof(float);
-	};
-
-	BYTE* next_container(BYTE* container) const 
-	{ 
-		return container + sizeof(float);
 	};
 };
 
@@ -125,11 +119,6 @@ private:
 		*dstContainer = static_cast<BYTE>(srcSample + 128);
 		return 1; // ie, 1 byte
 	};
-
-	BYTE* next_container(BYTE* container) const 
-	{ 
-		return container + sizeof(BYTE);
-	};
 };
 
 // 16-bit sound is -32768..32767 with 0 == silence
@@ -153,14 +142,9 @@ private:
 		else
 			if (srcSample < -32768)
 				srcSample = -32768;
-		// *(INT16 *)dstContainer = static_cast<INT16>(srcSample);
-		*reinterpret_cast<INT16 *>(dstContainer) = static_cast<INT16>(srcSample);
+		// *(INT16 *)dstSample = static_cast<INT16>(srcSample);
+		*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
 		return sizeof(INT16);  // ie, 2 bytes consumed
-	};
-
-	BYTE* next_container(BYTE* container) const
-	{
-		return container + sizeof(INT16);
 	};
 };
 
@@ -223,11 +207,6 @@ private:
 
 		return 3; // ie, 3 bytes processed
 	};
-
-	BYTE* next_container(BYTE* container) const 
-	{
-		return container + 3; // 3 bytes = 24 bits
-	}; 
 };
 
 
@@ -289,9 +268,4 @@ private:
 		*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
 		return 4;  // ie, 4 bytes processed
 	};
-
-	BYTE* next_container(BYTE* container) const 
-	{
-		return container + 4;  // 4 bytes = 32 bits
-	};  
 };
