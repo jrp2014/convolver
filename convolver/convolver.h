@@ -297,8 +297,8 @@ private:
 #endif
 
 	CSampleBuffer<float>	*m_filter;
-	CSampleBuffer<float>	*m_samples;
-	CSampleBuffer<float>	*m_output;
+	CSampleBuffer<float>	*m_inputBuffer;
+	CSampleBuffer<float>	*m_outputBuffer;
 	CConvolution<float>		*m_Convolution;			// Polymorphic processing class
 
 	DWORD					m_cFilterLength;			// Filter size in containers

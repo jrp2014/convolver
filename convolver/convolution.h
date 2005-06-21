@@ -30,30 +30,34 @@ template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(const DWORD n2xSampleSize);
+	CConvolution(const unsigned short nSampleSize, const unsigned short nChannels, const DWORD n2xFilterLength);
 	~CConvolution(void);  // TODO: should this be public?
 
 	DWORD // Returns number of bytes processed
-	doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
-				const unsigned short nChannels,
-				const CSampleBuffer<FFT_type>* filter,
-				CSampleBuffer<FFT_type>* inputBuffer,
-				CSampleBuffer<FFT_type>* outputBuffer,
-				DWORD dwBlocksToProcess,
-				const double fAttenuation_db,
-				const double fWetMix,
-				const double fDryMix
+		doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
+		const unsigned short nChannels,
+		const CSampleBuffer<FFT_type>* filter,
+		CSampleBuffer<FFT_type>* inputBuffer,
+		CSampleBuffer<FFT_type>* outputBuffer,
+		DWORD dwBlocksToProcess,
+		const double fAttenuation_db,
+		const double fWetMix,
+		const double fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-				, CWaveFile* CWaveFileTrace
+		, CWaveFile* CWaveFileTrace
 #endif	
-				);
+		);
+protected:
+
+	DWORD const m_nSampleSize;
 
 private:
 
-	CChannelBuffer<FFT_type>* m_SampleBufferChannelCopy;
+	CSampleBuffer<FFT_type>* m_InputBufferChannelCopy;
 
-	DWORD const m_n2xSampleSize;	// TODO: Not needed as a property of the filter
-	DWORD const m_nSampleSize;    // TODO: Not needed as a property of the filter
+	const unsigned short m_nChannels; // TODO: Not really needed as a property of the filter
+	DWORD const m_n2xFilterLength;	// TODO: Not really needed as a property of the filter
+	DWORD const m_nFilterLength;	// TODO: Not really needed as a property of the filter
 	DWORD m_nInputBufferIndex;
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
@@ -62,7 +66,7 @@ private:
 	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample)
 	{
 		return fAttenuation_db == 0 ? sample : 
-			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
+		static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
 	}
 
 protected:
@@ -78,7 +82,7 @@ template <typename FFT_type>
 class Cconvolution_ieeefloat : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_ieeefloat(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
+	Cconvolution_ieeefloat(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(float), nChannels, n2xFilterLength){};
 
 private:
 	FFT_type get_sample(const BYTE* container) const
@@ -92,7 +96,7 @@ private:
 		float fsrcSample = static_cast<float>(srcSample);
 		//dstSample = (BYTE*)(&fsrcSample);
 		dstContainer = reinterpret_cast<BYTE*>(&fsrcSample);
-		return sizeof(float);
+		return m_nSampleSize;
 	};
 };
 
@@ -101,7 +105,7 @@ template <typename FFT_type>
 class Cconvolution_pcm8 : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_pcm8(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
+	Cconvolution_pcm8(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(BYTE), nChannels, n2xFilterLength){};
 
 private:
 
@@ -117,7 +121,7 @@ private:
 		if (srcSample < -128)
 			srcSample = -128;
 		*dstContainer = static_cast<BYTE>(srcSample + 128);
-		return 1; // ie, 1 byte
+		return m_nSampleSize; // ie, 1 byte
 	};
 };
 
@@ -126,7 +130,7 @@ template <typename FFT_type>
 class Cconvolution_pcm16 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm16(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
+	Cconvolution_pcm16(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(INT16), nChannels, n2xFilterLength){};
 
 private:
 
@@ -144,7 +148,7 @@ private:
 				srcSample = -32768;
 		// *(INT16 *)dstSample = static_cast<INT16>(srcSample);
 		*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
-		return sizeof(INT16);  // ie, 2 bytes consumed
+		return m_nSampleSize;  // ie, 2 bytes consumed
 	};
 };
 
@@ -153,7 +157,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm24 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm24(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
+	Cconvolution_pcm24(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(3 /* Bytes */, nChannels, n2xFilterLength){};
 
 private:
 
@@ -205,7 +209,7 @@ private:
 		dstContainer[1] = static_cast<BYTE>((i >>  8) & 0xff);
 		dstContainer[2] = static_cast<BYTE>((i >> 16) & 0xff);
 
-		return 3; // ie, 3 bytes processed
+		return m_nSampleSize; // ie, 3 bytes processed
 	};
 };
 
@@ -215,7 +219,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm32 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm32(unsigned int n2xSampleSize) : CConvolution<FFT_type>(n2xSampleSize){};
+	Cconvolution_pcm32(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(INT32), nChannels, n2xFilterLength){};
 
 private:
 
@@ -266,6 +270,6 @@ private:
 				srcSample = static_cast<double>(-iClip);
 
 		*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
-		return 4;  // ie, 4 bytes processed
+		return m_nSampleSize;  // ie, 4 bytes processed
 	};
 };
