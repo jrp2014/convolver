@@ -23,22 +23,25 @@
 
 #include ".\sampleBuffer.h"
 
+#include ".\waveformat.h"
+
 // FFT routines
 #include <fftsg_h.h>
+
+// Loki Factory routines
+#include <Factory.h>
+using namespace Loki;
+
 
 template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(const unsigned short nSampleSize, const unsigned short nChannels, const DWORD n2xFilterLength);
+	CConvolution(const size_t nSampleSize, const CSampleBuffer<FFT_type>* Filter);
 	~CConvolution(void);  // TODO: should this be public?
 
 	DWORD // Returns number of bytes processed
 		doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
-		const unsigned short nChannels,
-		const CSampleBuffer<FFT_type>* filter,
-		CSampleBuffer<FFT_type>* inputBuffer,
-		CSampleBuffer<FFT_type>* outputBuffer,
 		DWORD dwBlocksToProcess,
 		const double fAttenuation_db,
 		const double fWetMix,
@@ -49,16 +52,19 @@ public:
 		);
 protected:
 
-	DWORD const m_nSampleSize;
+	size_t const m_nSampleSize;							// 8, 16, 20, 24, 32 or 64 bits
 
 private:
 
-	CSampleBuffer<FFT_type>* m_InputBufferChannelCopy;
+	CSampleBuffer<FFT_type>*	m_Filter;
+	CSampleBuffer<FFT_type>*	m_InputBuffer;
+	CSampleBuffer<FFT_type>*	m_OutputBuffer;
+	CSampleBuffer<FFT_type>*	m_InputBufferChannelCopy;	
 
-	const unsigned short m_nChannels; // TODO: Not really needed as a property of the filter
-	DWORD const m_n2xFilterLength;	// TODO: Not really needed as a property of the filter
-	DWORD const m_nFilterLength;	// TODO: Not really needed as a property of the filter
-	DWORD m_nInputBufferIndex;
+	WORD						m_nChannels;
+	DWORD const					m_n2xFilterLength;		// 2 x Filter size in containers (2^n, padded with zeros for radix 2 FFT)
+	DWORD const					m_nFilterLength;		// Filter size in containers
+	DWORD						m_nInputBufferIndex;	// placeholder
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C,const int N);
@@ -82,7 +88,7 @@ template <typename FFT_type>
 class Cconvolution_ieeefloat : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_ieeefloat(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(float), nChannels, n2xFilterLength){};
+	Cconvolution_ieeefloat(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(float), Filter){};
 
 private:
 	FFT_type get_sample(const BYTE* container) const
@@ -105,7 +111,7 @@ template <typename FFT_type>
 class Cconvolution_pcm8 : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_pcm8(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(BYTE), nChannels, n2xFilterLength){};
+	Cconvolution_pcm8(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(BYTE), Filter){};
 
 private:
 
@@ -130,7 +136,7 @@ template <typename FFT_type>
 class Cconvolution_pcm16 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm16(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(INT16), nChannels, n2xFilterLength){};
+	Cconvolution_pcm16(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT16), Filter){};
 
 private:
 
@@ -157,7 +163,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm24 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm24(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(3 /* Bytes */, nChannels, n2xFilterLength){};
+	Cconvolution_pcm24(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(3 /* Bytes */, Filter){};
 
 private:
 
@@ -219,7 +225,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm32 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm32(const unsigned short nChannels, const DWORD n2xFilterLength) : CConvolution<FFT_type>(sizeof(INT32), nChannels, n2xFilterLength){};
+	Cconvolution_pcm32(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT32), Filter){};
 
 private:
 

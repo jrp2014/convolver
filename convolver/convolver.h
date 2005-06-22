@@ -296,14 +296,8 @@ private:
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
 
-	CSampleBuffer<float>	*m_filter;
-	CSampleBuffer<float>	*m_inputBuffer;
-	CSampleBuffer<float>	*m_outputBuffer;
 	CConvolution<float>		*m_Convolution;			// Polymorphic processing class
-
-	DWORD					m_cFilterLength;			// Filter size in containers
-	DWORD					m_c2xPaddedFilterLength;	// 2^n, padded with zeros for radix 2 FFT
-	DWORD					m_nSampleBufferIndex;		// placeholder
+	CSampleBuffer<float>	*m_Filter;				// The filter to be applied
 
     BOOL                    m_bEnabled;         // TRUE if enabled
 };

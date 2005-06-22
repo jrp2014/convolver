@@ -55,13 +55,7 @@ CConvolver::CConvolver()
 	m_rtTimestamp = 0;
 	m_bEnabled = TRUE;
 
-	m_filter = NULL;
-	m_inputBuffer = NULL;
-	m_outputBuffer = NULL;
 	m_Convolution=NULL;
-
-	m_cFilterLength = 0;
-	m_nSampleBufferIndex = 0;
 
 	::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
 	::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
@@ -663,6 +657,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	// Allocate any buffers need to process the stream.
 
 	HRESULT hr = S_OK;
+	DWORD c2xPaddedFilterLength;
 
 	// Get a pointer to the WAVEFORMATEX structure.
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
@@ -672,12 +667,12 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	}
 
 	// Test whether a buffer exists.
-	if (m_filter)
+	if (m_Filter)
 	{
 		// A buffer already exists.
 		// Delete the delay buffer.
-		delete m_filter;
-		m_filter = NULL;
+		delete m_Filter;
+		m_Filter = NULL;
 	}
 
 	// Load the wave file
@@ -697,7 +692,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
 	m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
 
-	m_cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
+	DWORD cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
 
 	// Check that the filter has the same number of channels and sample rate as the input
 	if ((pWave->nChannels != m_WfexFilterFormat.nChannels) ||
@@ -710,7 +705,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	}
 
 	// Check that the filter is not too big
-	if ( m_cFilterLength > MAX_FILTER_SIZE )
+	if ( cFilterLength > MAX_FILTER_SIZE )
 	{
 		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 		pFilterWave->Close();
@@ -718,7 +713,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return E_OUTOFMEMORY;
 	}
 	// .. or too small
-	if ( m_cFilterLength < 2 )
+	if ( cFilterLength < 2 )
 	{
 		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 		pFilterWave->Close();
@@ -747,21 +742,19 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				assert(dwSizeToRead == sizeof(float));
 
 				// Filter length is 2 x Nh. Must be power of 2 for the Ooura FFT package.
-				// Eg, if m_cFilterLength = Nh = 6, m_c2xPaddedFilterLength = 16 
-				for(m_c2xPaddedFilterLength = 1; m_c2xPaddedFilterLength < 2 * m_cFilterLength; m_c2xPaddedFilterLength *= 2);
+				// Eg, if m_cFilterLength = Nh = 6, m_c2xPaddedFilterLength = 16
+				for(c2xPaddedFilterLength = 1; c2xPaddedFilterLength < 2 * cFilterLength; c2xPaddedFilterLength *= 2);
 
 
 				// Initialise the Filter and the various sample buffers that will be used during processing
-				m_filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
-				m_inputBuffer = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
-				m_outputBuffer = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+				m_Filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
 
 				// Read the filter file
-				for (DWORD j=0; j != m_cFilterLength; j++)
+				for (DWORD j=0; j != cFilterLength; j++)
 				{
 					for (unsigned short i=0; i !=  m_WfexFilterFormat.nChannels; i++)
 					{
-						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_filter->samples[i][j], dwSizeToRead, &dwSizeRead)))
+						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_Filter->samples[i][j], dwSizeToRead, &dwSizeRead)))
 						{
 							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 							SAFE_DELETE(pFilterWave);
@@ -780,7 +773,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				// Now create a FFT of the filter
 				for (unsigned short i=0; i != m_WfexFilterFormat.nChannels; i++)
 				{
-					rdft(m_c2xPaddedFilterLength, OouraRForward, m_filter->samples[i]);		
+					rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[i]);		
 				}
 
 			}  // case
@@ -800,15 +793,15 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 #if defined(DEBUG) | defined(_DEBUG)
 #if defined (UNDEFINED)
-	OutputDebugString(TEXT("FFT m_filter:\n"));
+	OutputDebugString(TEXT("FFT m_Filter:\n"));
 	TCHAR sFormat[100];
-	for (unsigned int i=0; i != m_c2xPaddedFilterLength; i++)
+	for (unsigned int i=0; i != c2xPaddedFilterLength; i++)
 	{
 		for (unsigned int j=0; j != m_WfexFilterFormat.nChannels; j++) 
 		{
 			unsigned int k = swprintf(sFormat, TEXT("%i,"), j);
 			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.3f "), m_filter->samples[j][i]);
+			k += swprintf(sFormat + k, TEXT("%.3f "), m_Filter->samples[j][i]);
 			OutputDebugString(sFormat);
 		}
 	}
@@ -829,17 +822,18 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
 	// structure to determine the valid bits per sample.
 
+	// TODO: build this into the Factory class
 	switch (pWave->wFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
 		switch (pWave->wBitsPerSample)
 		{
 		case 8:
-			m_Convolution = new Cconvolution_pcm8<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+			m_Convolution = new Cconvolution_pcm8<float>(pWave, m_Filter);
 			break;
 
 		case 16:
-			m_Convolution = new Cconvolution_pcm16<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+			m_Convolution = new Cconvolution_pcm16<float>(pWave, m_Filter);
 			break;
 
 		case 24:
@@ -848,15 +842,15 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				switch (PWaveXT->Samples.wValidBitsPerSample)
 				{
 				case 16:
-					m_Convolution = new Cconvolution_pcm24<float,16>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm24<float,16>(pWave, m_Filter);
 					break;
 
 				case 20:
-					m_Convolution = new Cconvolution_pcm24<float,20>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm24<float,20>(pWave, m_Filter);
 					break;
 
 				case 24:
-					m_Convolution = new Cconvolution_pcm24<float,24>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm24<float,24>(pWave, m_Filter);
 					break;
 
 				default:
@@ -871,19 +865,19 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				switch (PWaveXT->Samples.wValidBitsPerSample)
 				{
 				case 16:
-					m_Convolution = new Cconvolution_pcm32<float,16>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm32<float,16>(pWave, m_Filter);
 					break;
 
 				case 20:
-					m_Convolution = new Cconvolution_pcm32<float,20>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm32<float,20>(pWave, m_Filter);
 					break;
 
 				case 24:
-					m_Convolution = new Cconvolution_pcm32<float,24>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm32<float,24>(pWave, m_Filter);
 					break;
 
 				case 32:
-					m_Convolution = new Cconvolution_pcm32<float,32>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+					m_Convolution = new Cconvolution_pcm32<float,32>(pWave, m_Filter);
 					break;
 
 				default:
@@ -905,7 +899,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 			break;
 
 		case 32:
-			m_Convolution = new Cconvolution_ieeefloat<float>(m_WfexFilterFormat.nChannels, m_c2xPaddedFilterLength);
+			m_Convolution = new Cconvolution_ieeefloat<float>(pWave, m_Filter);
 			break;
 
 		default:  // Unprocessable IEEE float
@@ -942,19 +936,8 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_rtTimestamp = 0;
 
 
-	delete m_filter;
-	m_filter = NULL;
-
-	m_cFilterLength = 0;
-	m_c2xPaddedFilterLength = 0;
-
-	delete m_outputBuffer;
-	m_outputBuffer = NULL;
-
-	delete m_inputBuffer;
-	m_inputBuffer = NULL;
-
-	m_nSampleBufferIndex = 0;
+	delete m_Filter;
+	m_Filter = NULL;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	if (m_CWaveFileTrace)
@@ -967,6 +950,9 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 
 	delete m_Convolution;
 	m_Convolution = NULL;
+
+	delete m_Filter;
+	m_Filter = NULL;
 
 	return S_OK;
 }
@@ -1386,11 +1372,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
 
-	m_Convolution->doConvolution(pbInputData,pbOutputData,
-		pWave->nChannels,
-		m_filter,
-		m_inputBuffer,
-		m_outputBuffer,
+	m_Convolution->doConvolution(pbInputData, pbOutputData,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
 		m_fWetMix,

@@ -32,12 +32,12 @@ class CSampleBuffer
 {
 public:
 
-	unsigned short nChannels;	// number of channels
-	DWORD nSamples;  // length of the buffer
+	WORD nChannels;				// number of channels
+	DWORD nSamples;				// length of each channel buffer
 
-	T** samples;		// 2d nChannels x nSamples array holding samples
+	T** samples;				// 2d nChannels x nSamples array holding samples
 
-	CSampleBuffer(const unsigned short Channels, const DWORD Samples);
+	CSampleBuffer(const WORD Channels, const DWORD Samples);
 	~CSampleBuffer(void);
 
 	CSampleBuffer(const CSampleBuffer& sb);				// copy constructor
