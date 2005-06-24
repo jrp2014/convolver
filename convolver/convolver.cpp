@@ -56,6 +56,7 @@ CConvolver::CConvolver()
 	m_bEnabled = TRUE;
 
 	m_Convolution=NULL;
+	m_Filter = NULL;
 
 	::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
 	::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
@@ -657,7 +658,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	// Allocate any buffers need to process the stream.
 
 	HRESULT hr = S_OK;
-	DWORD c2xPaddedFilterLength;
+	DWORD c2xPaddedFilterLength = 0; // The length of the filter
 
 	// Get a pointer to the WAVEFORMATEX structure.
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
@@ -742,7 +743,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				assert(dwSizeToRead == sizeof(float));
 
 				// Filter length is 2 x Nh. Must be power of 2 for the Ooura FFT package.
-				// Eg, if m_cFilterLength = Nh = 6, m_c2xPaddedFilterLength = 16
+				// Eg, if m_cFilterLength = Nh = 6, c2xPaddedFilterLength = 16
 				for(c2xPaddedFilterLength = 1; c2xPaddedFilterLength < 2 * cFilterLength; c2xPaddedFilterLength *= 2);
 
 
@@ -1024,6 +1025,12 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 	if (FAILED(hr))
 	{
 		return hr;
+	}
+
+	// Need an input buffer that is at least as long as the filter (Nh)
+	if (cbInputLength / (m_WfexFilterFormat.nBlockAlign / m_WfexFilterFormat.nChannels) <= m_Filter->nSamples)
+	{
+		return S_FALSE;
 	}
 
 	// Hold on to the buffer using a smart pointer.
