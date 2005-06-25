@@ -38,12 +38,14 @@ public:
 
 	// invalid for compressible audio types
 	// See http://msdn.microsoft.com/library/default.asp?url=/library/en-us/multimed/htm/_win32_waveformatextensible_str.asp
-	//bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2);
+//	bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2);
 };
 
-	//bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2);
+	//bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2)
 	//{
 	//	return (wf1.wFormatTag == wf1.wFormatTag && 
 	//		wf1.nChannels < wf1.nChannels &&
 	//		wf1.wValidBitsPerSample < wf1.wBitsPerSample);
 	//};
+
+	typedef WaveFormat WaveFormat_t;

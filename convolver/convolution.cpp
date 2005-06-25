@@ -22,8 +22,13 @@
 // CConvolution Constructor
 // Note that Filter.nSamples is the padded filter size
 template <typename FFT_type>
-CConvolution<FFT_type>::CConvolution(const size_t nSampleSize, const CSampleBuffer<FFT_type>* Filter) :
-	m_nSampleSize(nSampleSize), m_nChannels(Filter->nChannels), m_n2xFilterLength(Filter->nSamples), m_nFilterLength(Filter->nSamples/2), m_nInputBufferIndex(0)
+CConvolution<FFT_type>::CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter) :
+m_nSampleSize(nSampleSize), 
+m_nChannels(Filter->nChannels), 
+m_n2xFilterLength(Filter->nSamples), 
+m_nFilterLength(Filter->nSamples/2), 
+m_nInputBufferIndex(0), 
+m_Filter(Filter)
 {
 	assert(m_n2xFilterLength % 2 == 0);
 

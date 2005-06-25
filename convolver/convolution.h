@@ -23,22 +23,16 @@
 
 #include ".\sampleBuffer.h"
 
-#include ".\waveformat.h"
-
 // FFT routines
 #include <fftsg_h.h>
-
-// Loki Factory routines
-#include <Factory.h>
-using namespace Loki;
-
 
 template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(const size_t nSampleSize, const CSampleBuffer<FFT_type>* Filter);
+	CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter);
 	~CConvolution(void);  // TODO: should this be public?
+
 
 	DWORD // Returns number of bytes processed
 		doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
@@ -52,24 +46,24 @@ public:
 		);
 protected:
 
-	size_t const m_nSampleSize;							// 8, 16, 20, 24, 32 or 64 bits
+	DWORD const m_nSampleSize;							// 8, 16, 20, 24, 32 or 64 bits
 
 private:
 
-	CSampleBuffer<FFT_type>*	m_Filter;
-	CSampleBuffer<FFT_type>*	m_InputBuffer;
-	CSampleBuffer<FFT_type>*	m_OutputBuffer;
-	CSampleBuffer<FFT_type>*	m_InputBufferChannelCopy;	
+	const CSampleBuffer<FFT_type>*	const m_Filter;
+	const CSampleBuffer<FFT_type>*	m_InputBuffer;
+	const CSampleBuffer<FFT_type>*	m_OutputBuffer;
+	const CSampleBuffer<FFT_type>*	m_InputBufferChannelCopy;	
 
-	WORD						m_nChannels;
-	DWORD const					m_n2xFilterLength;		// 2 x Filter size in containers (2^n, padded with zeros for radix 2 FFT)
-	DWORD const					m_nFilterLength;		// Filter size in containers
+	const WORD					m_nChannels;
+	const DWORD					m_n2xFilterLength;		// 2 x Filter size in containers (2^n, padded with zeros for radix 2 FFT)
+	const DWORD					m_nFilterLength;		// Filter size in containers
 	DWORD						m_nInputBufferIndex;	// placeholder
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
-	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C,const int N);
+	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C, const int N);
 
-	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample)
+	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
 	{
 		return fAttenuation_db == 0 ? sample : 
 		static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
@@ -80,7 +74,6 @@ protected:
 	virtual FFT_type get_sample(const BYTE* container) const = 0;						// converts sample into a value of the right type
 	virtual DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
 };
-
 
 
 // Specializations with the appropriate functions for accessing the sample buffer

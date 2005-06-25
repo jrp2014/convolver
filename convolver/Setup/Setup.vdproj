@@ -39,12 +39,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_4DE326AEA0E95584AEA2DAADB8C90DF7"
-        "OwnerKey" = "8:_F7FCA00A4B8A44B4A45378A81A561F51"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_A7460ECC78F94D8EAB09A9786E7D14F1"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -59,12 +53,6 @@
         {
         "MsmKey" = "8:_CB1D77DF6DEF3FA0B37E66679F3B6A54"
         "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_CB1D77DF6DEF3FA0B37E66679F3B6A54"
-        "OwnerKey" = "8:_F7FCA00A4B8A44B4A45378A81A561F51"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -287,7 +275,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
         "ProductCode" = "8:{7FCC9B30-A266-4DEA-AB30-E4655E125964}"
-        "PackageCode" = "8:{7D81B470-D196-4AE5-AFAF-22D86B3ADD70}"
+        "PackageCode" = "8:{CFA6F16F-B4F2-4810-827A-99FAD7F180FC}"
         "UpgradeCode" = "8:{EDF9D203-D536-4C29-8458-F35365B2622C}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
@@ -890,7 +878,7 @@
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
-            "ProjectOutputGroupRegister" = "3:1"
+            "ProjectOutputGroupRegister" = "3:4"
             "OutputConfiguration" = "8:"
             "OutputGroupCanonicalName" = "8:Built"
             "OutputProjectGuid" = "8:{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"

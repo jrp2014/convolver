@@ -197,9 +197,6 @@
 				RelativePath=".\StdAfx.h">
 			</File>
 			<File
-				RelativePath=".\waveformat.h">
-			</File>
-			<File
 				RelativePath=".\wmpservices.h">
 			</File>
 		</Filter>
@@ -277,79 +274,6 @@
 			</File>
 			<File
 				RelativePath=".\fft\fftsg_h.h">
-			</File>
-		</Filter>
-		<Filter
-			Name="loki"
-			Filter="">
-			<File
-				RelativePath=".\loki\AbstractFactory.h">
-			</File>
-			<File
-				RelativePath=".\loki\AssocVector.h">
-			</File>
-			<File
-				RelativePath=".\loki\EmptyType.h">
-			</File>
-			<File
-				RelativePath=".\loki\Factory.h">
-			</File>
-			<File
-				RelativePath=".\loki\Functor.h">
-			</File>
-			<File
-				RelativePath=".\loki\HierarchyGenerators.h">
-			</File>
-			<File
-				RelativePath=".\loki\LokiTypeInfo.h">
-			</File>
-			<File
-				RelativePath=".\loki\MinMax.h">
-			</File>
-			<File
-				RelativePath=".\loki\MultiMethods.h">
-			</File>
-			<File
-				RelativePath=".\loki\NullType.h">
-			</File>
-			<File
-				RelativePath=".\loki\Singleton.cpp">
-			</File>
-			<File
-				RelativePath=".\loki\Singleton.h">
-			</File>
-			<File
-				RelativePath=".\loki\SmallObj.cpp">
-			</File>
-			<File
-				RelativePath=".\loki\SmallObj.h">
-			</File>
-			<File
-				RelativePath=".\loki\SmartPtr.h">
-			</File>
-			<File
-				RelativePath=".\loki\static_check.h">
-			</File>
-			<File
-				RelativePath=".\loki\Threads.h">
-			</File>
-			<File
-				RelativePath=".\loki\Typelist.h">
-			</File>
-			<File
-				RelativePath=".\loki\TypeManip.h">
-			</File>
-			<File
-				RelativePath=".\loki\TypeTraits.h">
-			</File>
-			<File
-				RelativePath=".\loki\Variant.h">
-			</File>
-			<File
-				RelativePath=".\loki\VC_Alignment.h">
-			</File>
-			<File
-				RelativePath=".\loki\Visitor.h">
 			</File>
 		</Filter>
 		<File
