@@ -43,7 +43,7 @@ CConvolver::CConvolver()
 {
 	m_fWetMix = 0.50;  // default to 50 percent wet
 	m_fDryMix = 0.50;  // default to 50 percent dry
-	
+
 	m_fAttenuation_db = 0; // default attenuation
 
 	m_szFilterFileName[0] = 0;
@@ -726,7 +726,19 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	DWORD dwSizeRead = 0;
 
 	// Setup the filter
-	switch (m_WfexFilterFormat.wFormatTag)
+	WORD wFilterFormatTag = m_WfexFilterFormat.wFormatTag;
+	if (wFilterFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	{
+		WAVEFORMATEXTENSIBLE* pFilterWaveXT = (WAVEFORMATEXTENSIBLE *) pFilterWave->GetFormat();
+		if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+			wFilterFormatTag = WAVE_FORMAT_PCM;
+		else
+			if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+				wFilterFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+			else
+				return E_INVALIDARG;
+	}
+	switch (wFilterFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
 		return E_NOTIMPL; // TODO: Unimplemented filter type
@@ -753,9 +765,9 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 				// Read the filter file
 				for (DWORD j=0; j != cFilterLength; j++)
 				{
-					for (unsigned short i=0; i !=  m_WfexFilterFormat.nChannels; i++)
+					for (unsigned short nChannel=0; nChannel !=  m_WfexFilterFormat.nChannels; nChannel++)
 					{
-						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_Filter->samples[i][j], dwSizeToRead, &dwSizeRead)))
+						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_Filter->samples[nChannel][j], dwSizeToRead, &dwSizeRead)))
 						{
 							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 							SAFE_DELETE(pFilterWave);
@@ -768,13 +780,13 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 							delete pFilterWave;
 							return E_FAIL;
 						}
-					} // for i
+					} // for nChannel
 				} // for j
 
 				// Now create a FFT of the filter
-				for (unsigned short i=0; i != m_WfexFilterFormat.nChannels; i++)
+				for (unsigned short nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++)
 				{
-					rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[i]);		
+					rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[nChannel]);		
 				}
 
 			}  // case
@@ -798,11 +810,11 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	TCHAR sFormat[100];
 	for (unsigned int i=0; i != c2xPaddedFilterLength; i++)
 	{
-		for (unsigned int j=0; j != m_WfexFilterFormat.nChannels; j++) 
+		for (unsigned int nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++) 
 		{
-			unsigned int k = swprintf(sFormat, TEXT("%i,"), j);
+			unsigned int k = swprintf(sFormat, TEXT("%i,"), nChannel);
 			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.3f "), m_Filter->samples[j][i]);
+			k += swprintf(sFormat + k, TEXT("%.3f "), m_Filter->samples[nChannel][i]);
 			OutputDebugString(sFormat);
 		}
 	}
@@ -818,17 +830,37 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 #endif
 
 	// Pick the correct version of the processing class
-	
-	// Note: for 8 and 16-bit samples, we assume the sample is the same size as
-	// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-	// structure to determine the valid bits per sample.
 
-	// TODO: build this into the Factory class
-	switch (pWave->wFormatTag)
+	// TODO: build this into the Factory class.  (Probably more trouble than it is worth)
+
+	// Note that this allows multi-channel and high-resolution WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT.
+	// Strictly speaking these should be WAVE_FORMAT_EXTENSIBLE, if we want to avoid ambiguity.
+	// The code below assumes that for WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT, wBitsPerSample is the container size.
+	// The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
+	// while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
+	// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+
+	WORD wFormatTag = pWave->wFormatTag;
+	WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	{
+		if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+			wFormatTag = WAVE_FORMAT_PCM;
+		else
+			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+			else
+				return E_INVALIDARG;
+	}
+
+	switch (wFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
 		switch (pWave->wBitsPerSample)
 		{
+			// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+			// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+			// structure to determine the valid bits per sample.
 		case 8:
 			m_Convolution = new Cconvolution_pcm8<float>(pWave, m_Filter);
 			break;
@@ -839,8 +871,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 		case 24:
 			{
-				WAVEFORMATEXTENSIBLE* PWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-				switch (PWaveXT->Samples.wValidBitsPerSample)
+				switch (pWaveXT->Samples.wValidBitsPerSample)
 				{
 				case 16:
 					m_Convolution = new Cconvolution_pcm24<float,16>(pWave, m_Filter);
@@ -855,15 +886,14 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 					break;
 
 				default:
-					return E_FAIL;
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 				}
 			}
 			break;
 
 		case 32:
 			{
-				WAVEFORMATEXTENSIBLE* PWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-				switch (PWaveXT->Samples.wValidBitsPerSample)
+				switch (pWaveXT->Samples.wValidBitsPerSample)
 				{
 				case 16:
 					m_Convolution = new Cconvolution_pcm32<float,16>(pWave, m_Filter);
@@ -882,39 +912,32 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 					break;
 
 				default:
-					return E_FAIL;
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 				}
 			}
 			break;
 
 		default:  // Unprocessable PCM
-			return E_FAIL;
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 		}
 		break;
 
 	case WAVE_FORMAT_IEEE_FLOAT:
 		switch (pWave->wBitsPerSample)
 		{
-		case 24:
-			return E_NOTIMPL;
-			break;
-
 		case 32:
 			m_Convolution = new Cconvolution_ieeefloat<float>(pWave, m_Filter);
 			break;
 
 		default:  // Unprocessable IEEE float
-			return E_NOTIMPL;
-			break;
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+			//break;
 		}
 		break;
 
 	default: // Not PCM or IEEE Float
-		return E_NOTIMPL;
+		return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 	}
-
-
-
 
 	//// Fill the buffer with values representing silence.
 	//FillBufferWithSilence(pWave);
@@ -944,7 +967,7 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	if (m_CWaveFileTrace)
 		SAFE_DELETE(m_CWaveFileTrace);
 
-	 _CrtMemDumpAllObjectsSince( NULL );
+	_CrtMemDumpAllObjectsSince( NULL );
 
 	_CrtDumpMemoryLeaks();
 #endif
@@ -1420,7 +1443,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 		return DMO_E_TYPE_NOT_ACCEPTED;
 	}
 
-	// make sure this is a supported sample size
+	// make sure this is a supported container size
 	if ((8  != pWave->wBitsPerSample) &&
 		(16 != pWave->wBitsPerSample) &&
 		(24 != pWave->wBitsPerSample) &&
@@ -1440,45 +1463,89 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 		{
 			return DMO_E_TYPE_NOT_ACCEPTED;
 		}
+
+		// channel-to-speaker specification for WAVE_FORMAT_PCM is undefined for the case of nChannels > 2
+		// But let it through
+		// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+		if (pWave->nChannels > 2)
+		{
+			//return DMO_E_TYPE_NOT_ACCEPTED;
+		}
 		break;
 
 	case WAVE_FORMAT_IEEE_FLOAT:
+		// make sure sample size is 32-bit
+		// TODO: 24-bit?
+		if ((32 != pWave->wBitsPerSample))
+		{
+			return DMO_E_TYPE_NOT_ACCEPTED;
+		}
+
+		// channel-to-speaker specification for WAVE_FORMAT_IEEE_FLOAT is undefined for the case of nChannels > 2
+		// But let it through
+		// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+		if (pWave->nChannels > 2)
+		{
+			//return DMO_E_TYPE_NOT_ACCEPTED;
+		}
 		break;
 
 	case WAVE_FORMAT_EXTENSIBLE:
 		{
 			WAVEFORMATEXTENSIBLE *pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
 
-			// make sure the wave format extensible has the fields we require
-			if (((KSDATAFORMAT_SUBTYPE_PCM != pWaveXT->SubFormat) &&
-				(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT != pWaveXT->SubFormat)) ||
-				(0 == pWaveXT->Samples.wSamplesPerBlock) ||
-				(pWaveXT->Samples.wValidBitsPerSample > pWave->wBitsPerSample))
+			if(pWaveXT->Format.cbSize >= 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
 			{
 				return DMO_E_TYPE_NOT_ACCEPTED;
 			}
 
-			// for 8 or 16-bit, the sample and sample size must match
-			if ((8  == pWave->wBitsPerSample) ||
-				(16 == pWave->wBitsPerSample))
+			if(pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 			{
-				if (pWave->wBitsPerSample != pWaveXT->Samples.wValidBitsPerSample)
+				// make sure the wave format extensible has the fields we require
+				if ((0 == pWaveXT->Samples.wSamplesPerBlock) ||
+					(pWaveXT->Samples.wValidBitsPerSample > pWave->wBitsPerSample) ||
+					(pWaveXT->Format.cbSize != 22))
 				{
 					return DMO_E_TYPE_NOT_ACCEPTED;
 				}
-			}
-			else 
-			{
-				// for any other sample size, make sure the valid
-				// bits per sample is a value we support
-				if ((16 != pWaveXT->Samples.wValidBitsPerSample) &&
-					(20 != pWaveXT->Samples.wValidBitsPerSample) &&
-					(24 != pWaveXT->Samples.wValidBitsPerSample) &&
-					(32 != pWaveXT->Samples.wValidBitsPerSample))
+
+				// for 8 or 16-bit, the container and sample size must match
+				if ((8  == pWave->wBitsPerSample) ||
+					(16 == pWave->wBitsPerSample))
 				{
-					return DMO_E_TYPE_NOT_ACCEPTED;
+					if (pWave->wBitsPerSample != pWaveXT->Samples.wValidBitsPerSample)
+					{
+						return DMO_E_TYPE_NOT_ACCEPTED;
+					}
+				}
+				else 
+				{
+					// for any other container size, make sure the valid
+					// bits per sample is a value we support
+					if ((16 != pWaveXT->Samples.wValidBitsPerSample) &&
+						(20 != pWaveXT->Samples.wValidBitsPerSample) &&
+						(24 != pWaveXT->Samples.wValidBitsPerSample) &&
+						(32 != pWaveXT->Samples.wValidBitsPerSample))
+					{
+						return DMO_E_TYPE_NOT_ACCEPTED;
+					}
 				}
 			}
+			else
+				if(pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+				{
+					{
+						// TODO: What about 24-bit samples?  Do they exist?
+						if ((32 != pWave->wBitsPerSample) ||
+							(32 != pWaveXT->Samples.wValidBitsPerSample)  ||
+							(pWaveXT->Format.cbSize != 22))
+						{
+							return DMO_E_TYPE_NOT_ACCEPTED;
+						}
+					}
+				}
+				else // Not a recognised SubFormat
+					return DMO_E_TYPE_NOT_ACCEPTED;
 		}
 		break;
 

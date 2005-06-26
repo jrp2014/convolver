@@ -36,6 +36,7 @@ public:
 	DWORD nSamples;				// length of each channel buffer
 
 	T** samples;				// 2d nChannels x nSamples array holding samples
+								// TODO: tried this with a vector<T*>, but cpu usage high (in debug)
 
 	CSampleBuffer(const WORD Channels, const DWORD Samples);
 	~CSampleBuffer(void);

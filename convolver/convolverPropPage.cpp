@@ -75,6 +75,29 @@ STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 	return S_OK;
 }
 
+STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
+{
+	HRESULT hr = S_OK;
+
+	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
+
+	// Load the wave file
+	CWaveFile* pFilterWave = new CWaveFile();
+	if( FAILED(hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ ) ) )
+	{
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
+	}
+	else
+	{
+		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
+		std::string description = waveFormatDescription(pFilterWave->GetFormat(), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
+		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
+	}
+	SAFE_DELETE(pFilterWave);
+
+	return hr;
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::Apply
 //
@@ -199,7 +222,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
 
 		m_spConvolver->get_filterfilename(&szFilterFileName);
-		SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 	}	
 	else // otherwise read from registry
 	{
@@ -227,7 +249,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 			}
 
 			TCHAR szValue[MAX_PATH]	= TEXT("");
-			ULONG ulMaxPath				= MAX_PATH;
+			ULONG ulMaxPath			= MAX_PATH;
 
 			// Read the filter filename value.
 			lResult = key.QueryStringValue(kszPrefsFilterFileName, szValue, &ulMaxPath );
@@ -238,6 +260,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		}
 	}
 
+	DisplayFilterFormat(szFilterFileName);
 
 	TCHAR   szStr[MAXSTRING];
 
@@ -266,6 +289,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 {
 	TCHAR szFilterFileName[MAX_PATH]	= TEXT("");
 	TCHAR szFilterPath[MAX_PATH]		= TEXT("");
+	HRESULT hr = ERROR_SUCCESS;
 
 	// Setup the OPENFILENAME structure
 	OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
@@ -286,6 +310,8 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
+	DisplayFilterFormat(szFilterFileName);
+
 	SetDirty(TRUE);
 
 	return ERROR_SUCCESS;
@@ -297,3 +323,4 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 
 	return 0;
 }
+

@@ -24,10 +24,10 @@ template <typename T>
 CSampleBuffer<T>::CSampleBuffer(const WORD Channels, const DWORD Samples) : nChannels(Channels), nSamples(Samples)
 {
 	samples = new T*[nChannels];
-	for (WORD i = 0; i != nChannels; i++)
+	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
 	{
-		samples[i] = new T[nSamples];
-		ZeroMemory(samples[i], sizeof(T) * nSamples);
+		samples[nChannel] = new T[nSamples];
+		ZeroMemory(samples[nChannel], sizeof(T) * nSamples);
 	}
 };
 
@@ -35,9 +35,9 @@ template <typename T>
 CSampleBuffer<T>::~CSampleBuffer(void)
 {
 
-	for (WORD i = 0; i != nChannels; i++)
+	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
 	{
-		delete [] samples[i];
+		delete [] samples[nChannel];
 	}
 
 	delete [] samples;
@@ -47,11 +47,11 @@ template <typename T>
 CSampleBuffer<T>::CSampleBuffer(const CSampleBuffer& sb) : nChannels(sb.nChannels), nSamples(sb.nSamples) // copy constructor
 {
 	samples = new T*[nChannels];
-	for (WORD i = 0; i != nChannels; i++)
+	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
 	{
-		samples[i] = new T[nSamples];
+		samples[nChannel] = new T[nSamples];
 		for (DWORD j = 0; j != nSamples; j++)
-			samples[i][j] = sb.samples[i][j];
+			samples[nChannel][j] = sb.samples[nChannel][j];
 	}
 };
 
@@ -66,11 +66,11 @@ CSampleBuffer<T>& CSampleBuffer<T>::operator= (const CSampleBuffer& sb) // copy 
 		nSamples = sb.nSamples;
 
 		samples = new T*[nChannels];
-		for (WORD i = 0; i != nChannels; i++)
+		for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
 		{
-			samples[i] = new T[nSamples];
+			samples[nChannel] = new T[nSamples];
 			for (DWORD j = 0; j != nSamples; j++)
-				samples[i][j] = sb.samples[i][j];
+				samples[nChannel][j] = sb.samples[nChannel][j];
 		}
 	}
 	return *this;

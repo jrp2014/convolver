@@ -17,35 +17,14 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#include <mmreg.h>
+#include "Common\dxstdafx.h"
 
-class WaveFormat
-{
-public:
-	const WORD  wFormatTag; 
-    const WORD  nChannels;
-	const WORD  wBitsPerSample;
-	const WORD  wValidBitsPerSample;
+#include <ks.h>
+#include <ksmedia.h>
 
-	~WaveFormat(void);
-	WaveFormat(WAVEFORMATEX* pWave): 
-		wFormatTag(pWave->wFormatTag),
-		nChannels(pWave->nChannels),
-		wBitsPerSample(wBitsPerSample),
-		wValidBitsPerSample(((WAVEFORMATEXTENSIBLE *)pWave)->Samples.wValidBitsPerSample)
-	{	};
+#include <string>
+#include <sstream>
+#include <iomanip>
 
 
-	// invalid for compressible audio types
-	// See http://msdn.microsoft.com/library/default.asp?url=/library/en-us/multimed/htm/_win32_waveformatextensible_str.asp
-//	bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2);
-};
-
-	//bool WaveFormat::operator<(WaveFormat& wf1, WaveFormat& wf2)
-	//{
-	//	return (wf1.wFormatTag == wf1.wFormatTag && 
-	//		wf1.nChannels < wf1.nChannels &&
-	//		wf1.wValidBitsPerSample < wf1.wBitsPerSample);
-	//};
-
-	typedef WaveFormat WaveFormat_t;
+std::string waveFormatDescription(const WAVEFORMATEX* w, const DWORD samples, const char* prefix);

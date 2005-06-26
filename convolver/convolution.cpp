@@ -150,7 +150,7 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 				for (DWORD nSample = 0; nSample != m_nFilterLength; nSample++)  // No need to scale second half of output buffer, as going to discard that
 					m_OutputBuffer->samples[nChannel][nSample] *= static_cast<FFT_type>(2.0 / (double) m_n2xFilterLength);
 
-				// move overlap block x i to previous block x i-1
+				// move overlap block x i to previous block x i-1, hence overlap-save
 				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned
 				for (DWORD nSample = 0; nSample != m_nFilterLength; nSample++)
 					m_InputBuffer->samples[nChannel][nSample + m_nFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy

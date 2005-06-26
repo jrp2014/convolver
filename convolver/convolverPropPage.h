@@ -69,6 +69,8 @@ END_MSG_MAP()
 
 	LRESULT (OnInitDialog)(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
+	STDMETHOD(DisplayFilterFormat)(TCHAR* szFilterFileName);
+
 private:
     CComPtr<IConvolver> m_spConvolver;  // pointer to plug-in interface
 

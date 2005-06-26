@@ -173,6 +173,9 @@
 						UsePrecompiledHeader="1"/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\waveformat.cpp">
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -195,6 +198,9 @@
 			</File>
 			<File
 				RelativePath=".\StdAfx.h">
+			</File>
+			<File
+				RelativePath=".\waveformat.h">
 			</File>
 			<File
 				RelativePath=".\wmpservices.h">

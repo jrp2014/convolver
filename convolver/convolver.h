@@ -35,6 +35,7 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#include "waveformat.h"
 #include "sampleBuffer.h"
 #include "convolution.h"
 
