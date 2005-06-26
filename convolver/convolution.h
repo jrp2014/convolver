@@ -21,6 +21,10 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#if defined(DEBUG) | defined(_DEBUG)
+#include "debugStream.h"
+#endif
+
 #include ".\sampleBuffer.h"
 
 // FFT routines
@@ -31,11 +35,10 @@ class CConvolution
 {
 public:
 	CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter);
-	~CConvolution(void);  // TODO: should this be public?
+	virtual ~CConvolution(void);
 
-
-	DWORD // Returns number of bytes processed
-		doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
+	// Returns number of bytes processed
+	DWORD doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
 		DWORD dwBlocksToProcess,
 		const double fAttenuation_db,
 		const double fWetMix,
@@ -63,7 +66,7 @@ private:
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C, const int N);
 
-	FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
 	{
 		return fAttenuation_db == 0 ? sample : 
 		static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
@@ -71,8 +74,8 @@ private:
 
 protected:
 	// Pure virtual functions that convert from a the sample type, to the FFT type
-	virtual FFT_type get_sample(const BYTE* container) const = 0;						// converts sample into a value of the right type
-	virtual DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
+	virtual const FFT_type get_sample(const BYTE* container) const = 0;						// converts sample into a value of the right type
+	virtual const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
 };
 
 
@@ -84,13 +87,13 @@ public:
 	Cconvolution_ieeefloat(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(float), Filter){};
 
 private:
-	FFT_type get_sample(const BYTE* container) const
+	const FFT_type get_sample(const BYTE* container) const
 	{
 		//return *(FFT_type *)container;
 		return *reinterpret_cast<const FFT_type *>(container);
 	};	// TODO: find a cleaner way to do this
 
-	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
+	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
 	{ 
 		float fsrcSample = static_cast<float>(srcSample);
 		//dstSample = (BYTE*)(&fsrcSample);
@@ -108,12 +111,12 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* container) const
+	const FFT_type get_sample(const BYTE* container) const
 	{
 		return static_cast<FFT_type>(*container - 128);
 	};
 
-	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
+	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   // Truncate if exceeded full scale.
 		if (srcSample > 127)
 			srcSample = 127;
@@ -133,12 +136,12 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* container) const 
+	const FFT_type get_sample(const BYTE* container) const 
 	{ 
 		return static_cast<FFT_type>(*reinterpret_cast<const INT16*>(container));
 	}; 	// TODO: find a cleaner way to do this
 
-	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
+	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   // Truncate if exceeded full scale.
 		if (srcSample > 32767)
 			srcSample = 32767;
@@ -160,7 +163,7 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* container) const
+	const FFT_type get_sample(const BYTE* container) const
 	{
 		int i = (char) container[2];
 		i = ( i << 8 ) | container[1];
@@ -178,7 +181,7 @@ private:
 		return static_cast<FFT_type>(i);
 	};
 
-	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
+	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
 		int iClip = 0;
 		switch (validBits)
@@ -222,7 +225,7 @@ public:
 
 private:
 
-	FFT_type get_sample(const BYTE* container) const
+	const FFT_type get_sample(const BYTE* container) const
 	{
 		INT32 i = *reinterpret_cast<const INT32*>(container);
 		switch (validBits)
@@ -242,7 +245,7 @@ private:
 		return static_cast<FFT_type>(i);
 	}; 
 
-	DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
+	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
 		INT32 iClip = 0;
 		switch (validBits)

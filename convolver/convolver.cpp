@@ -92,6 +92,11 @@ HRESULT CConvolver::FinalConstruct()
 	LONG    lResult;
 	DWORD   dwValue;
 
+#if defined(DEBUG) | defined(_DEBUG)
+	debugstream.sink (apDebugSinkWindows::sOnly);
+	apDebugSinkWindows::sOnly.showHeader (true);
+#endif
+
 	lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
 	if (ERROR_SUCCESS == lResult)
 	{
@@ -805,21 +810,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	delete pFilterWave;
 
 #if defined(DEBUG) | defined(_DEBUG)
-#if defined (UNDEFINED)
-	OutputDebugString(TEXT("FFT m_Filter:\n"));
-	TCHAR sFormat[100];
-	for (unsigned int i=0; i != c2xPaddedFilterLength; i++)
-	{
-		for (unsigned int nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++) 
-		{
-			unsigned int k = swprintf(sFormat, TEXT("%i,"), nChannel);
-			k += swprintf(sFormat + k, TEXT("%i: "), i);
-			k += swprintf(sFormat + k, TEXT("%.3f "), m_Filter->samples[nChannel][i]);
-			OutputDebugString(sFormat);
-		}
-	}
-	OutputDebugString(TEXT("\n"));
-#endif
+	cdebug << waveFormatDescription(&m_WfexFilterFormat, cFilterLength, "FFT Filter:") << std::endl;
 
 	m_CWaveFileTrace = new CWaveFile;
 	if (FAILED(hr = m_CWaveFileTrace->Open(TEXT("c:\\temp\\Trace.wav"), pWave, WAVEFILE_WRITE)))

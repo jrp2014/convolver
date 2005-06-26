@@ -77,7 +77,7 @@ STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 
 STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 {
-	HRESULT hr = S_OK;
+	HRESULT hr = ERROR_SUCCESS;
 
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
@@ -310,7 +310,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
-	DisplayFilterFormat(szFilterFileName);
+	hr = DisplayFilterFormat(szFilterFileName);
 
 	SetDirty(TRUE);
 

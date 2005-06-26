@@ -35,8 +35,11 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#if defined(DEBUG) | defined(_DEBUG)
+#include "debugStream.h"
+#endif
 #include "waveformat.h"
-#include "sampleBuffer.h"
+#include "samplebuffer.h"
 #include "convolution.h"
 
 // FFT routines

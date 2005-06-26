@@ -40,9 +40,9 @@ m_Filter(Filter)
 // CConvolution Destructor
 template <typename FFT_type>CConvolution<FFT_type>::~CConvolution(void)
 {
-	delete m_InputBuffer;
-	delete m_OutputBuffer;
 	delete m_InputBufferChannelCopy;
+	delete m_OutputBuffer;
+	delete m_InputBuffer;
 }
 
 template <typename FFT_type>
@@ -83,15 +83,12 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 				m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength]) >
 				abs(m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength]) * 0.01)
 			{
-				OutputDebugString(TEXT("\n"));
-				TCHAR sFormat[100];
-				int k = swprintf(sFormat, TEXT("%i,"), dwBlocksToProcess);
-				k += swprintf(sFormat + k, TEXT("%i, "), m_nInputBufferIndex);
-				k += swprintf(sFormat + k, TEXT("%.4g, "), m_InputBuffer->samples[nChannel][(m_nInputBufferIndex + m_nFilterLength) % m_n2xFilterLength]);
-				k += swprintf(sFormat + k, TEXT("%.4g, "), m_OutputBuffer->samples[nChannel][m_nInputBufferIndex % m_n2xFilterLength]);
-				k += swprintf(sFormat + k, TEXT("%.6g"), m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] - 
-					m_InputBuffer->samples[m_nInputBufferIndex + m_nFilterLength]);
-				OutputDebugString(sFormat);
+				cdebug 
+					<< dwBlocksToProcess << ","
+					<< m_nInputBufferIndex << ","
+					<< m_InputBuffer->samples[nChannel][(m_nInputBufferIndex + m_nFilterLength) % m_n2xFilterLength]) << ", "
+					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex % m_n2xFilterLength]) << ","
+					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] - m_InputBuffer->samples[m_nInputBufferIndex + m_nFilterLength] << std::endl;
 			}
 #endif
 #endif
@@ -150,7 +147,7 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 				for (DWORD nSample = 0; nSample != m_nFilterLength; nSample++)  // No need to scale second half of output buffer, as going to discard that
 					m_OutputBuffer->samples[nChannel][nSample] *= static_cast<FFT_type>(2.0 / (double) m_n2xFilterLength);
 
-				// move overlap block x i to previous block x i-1, hence overlap-save
+				// move overlap block x i to previous block x i-1, hence the overlap-save method
 				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned
 				for (DWORD nSample = 0; nSample != m_nFilterLength; nSample++)
 					m_InputBuffer->samples[nChannel][nSample + m_nFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy

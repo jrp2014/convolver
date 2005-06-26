@@ -25,7 +25,7 @@
 //#include <vector>
 //
 // for ZeroMemory, etc
-#include <Windows.h>
+#include <windows.h>
 
 template <typename T> // T will normally be float, or perhaps double, depending on the DFT routines used
 class CSampleBuffer
