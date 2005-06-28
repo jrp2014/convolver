@@ -39,6 +39,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_4DE326AEA0E95584AEA2DAADB8C90DF7"
+        "OwnerKey" = "8:_F7FCA00A4B8A44B4A45378A81A561F51"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_A7460ECC78F94D8EAB09A9786E7D14F1"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -53,6 +59,12 @@
         {
         "MsmKey" = "8:_CB1D77DF6DEF3FA0B37E66679F3B6A54"
         "OwnerKey" = "8:_4C94A9836CCB4BB49ECC674459D6DE0B"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_CB1D77DF6DEF3FA0B37E66679F3B6A54"
+        "OwnerKey" = "8:_F7FCA00A4B8A44B4A45378A81A561F51"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -274,13 +286,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{7FCC9B30-A266-4DEA-AB30-E4655E125964}"
-        "PackageCode" = "8:{CFA6F16F-B4F2-4810-827A-99FAD7F180FC}"
+        "ProductCode" = "8:{0C96C4B3-6C16-4FCF-9369-9244487475F5}"
+        "PackageCode" = "8:{B8E859ED-3CC1-4AC1-B870-6C2E4EF95A8A}"
         "UpgradeCode" = "8:{EDF9D203-D536-4C29-8458-F35365B2622C}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.7"
+        "ProductVersion" = "8:1.10"
         "Manufacturer" = "8:John Pavel"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net/"
