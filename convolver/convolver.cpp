@@ -672,23 +672,44 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return E_FAIL;
 	}
 
-	LoadFilter(pWave);
+	// Set m_Filter and m_WfexFilterFormat
+	hr = LoadFilter();
+	if (FAILED(hr))
+	{
+		return hr;
+	};
+
+	// Check that the filter has the same number of channels and sample rate as the input
+	if ((pWave->nChannels != m_WfexFilterFormat.nChannels) ||
+		(pWave->nSamplesPerSec != m_WfexFilterFormat.nSamplesPerSec))
+		goto cleanup;
+
+	hr = SelectConvolution(pWave);
+	if (FAILED(hr))
+		goto cleanup;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	m_CWaveFileTrace = new CWaveFile;
 	if (FAILED(hr = m_CWaveFileTrace->Open(TEXT("c:\\temp\\Trace.wav"), pWave, WAVEFILE_WRITE)))
 	{
 		SAFE_DELETE( m_CWaveFileTrace );
+		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
+		delete m_Filter;
+		m_Filter = NULL;
 		return DXTRACE_ERR_MSGBOX(TEXT("Failed to open trace file for writing"), hr);
 	}
 #endif
 
-	SelectConvolution(pWave);
+	// TODO: Fill the buffer with values representing silence.
+	// FillBufferWithSilence(pWave);
 
-	//// Fill the buffer with values representing silence.
-	//FillBufferWithSilence(pWave);
+	return hr;
 
-	return S_OK;
+cleanup:
+		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
+		delete m_Filter;
+		m_Filter = NULL;
+		return hr;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1114,6 +1135,57 @@ STDMETHODIMP CConvolver::put_filterformat(WAVEFORMATEX newVal)
 	return S_OK;
 }
 
+// Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
+STDMETHODIMP CConvolver::calculate_optimum_attenuation()
+{
+	HRESULT hr = S_OK;
+	
+	hr = LoadFilter();
+	if (FAILED(hr))
+		return hr;
+
+	const WORD SAMPLES = 100;
+
+	BYTE* inputSamples = new BYTE[m_Filter->nChannels * m_Filter->nSamples * SAMPLES];
+	BYTE* outputSamples = new BYTE[m_Filter->nChannels * m_Filter->nSamples * SAMPLES];
+
+	// Seed the random-number generator with current time so that
+	// the numbers will be different every time we run.
+	srand( (unsigned)time( NULL ) );
+
+	for(WORD nChannels = 0; nChannels != m_Filter->nChannels; nChannels++)
+		for(DWORD nSamples = 0; nSamples != m_Filter->nSamples * SAMPLES; nSamples++)
+		{
+			inputSamples[nSamples * m_Filter->nChannels + nChannels] = static_cast<BYTE>((rand() * 255L) / RAND_MAX);
+			outputSamples[nSamples * m_Filter->nChannels + nChannels] = 0;
+		}
+
+	CConvolution<float>* c = new Cconvolution_pcm8<float>(m_Filter);
+	c->doConvolution(inputSamples, outputSamples, m_Filter->nSamples * SAMPLES, 1.0L, 1.0L, 0.0L
+#if defined(DEBUG) | defined(_DEBUG)
+		, m_CWaveFileTrace
+#endif
+		);
+
+	// Now find the largest output sample
+	BYTE max_sample = 0;
+	for(WORD nChannels = 0; nChannels != m_Filter->nChannels; nChannels++)
+		for(DWORD nSamples = 0; nSamples != m_Filter->nSamples * SAMPLES; nSamples++)
+			if (outputSamples[nSamples * m_Filter->nChannels + nChannels] > max_sample)
+				max_sample = outputSamples[nSamples * m_Filter->nChannels + nChannels];
+
+	//pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)
+	// 10 ^ (fAttenuation_db / 20) = max  (8-bit sound is 0..255 with 128 == silence)
+	m_fAttenuation_db = static_cast<double>(log(abs(max_sample - 128) * 20.0L));
+
+
+	delete c;
+	delete outputSamples;
+	delete inputSamples;
+
+	return hr;
+}
+
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolver::DoProcessOutput
@@ -1328,7 +1400,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 	return S_OK;
 }
 
-HRESULT CConvolver::LoadFilter(const WAVEFORMATEX *pWave)
+HRESULT CConvolver::LoadFilter()
 {
 	HRESULT hr = S_OK;
 
@@ -1359,16 +1431,6 @@ HRESULT CConvolver::LoadFilter(const WAVEFORMATEX *pWave)
 	m_WfexFilterFormat.nSamplesPerSec= pFilterWave->GetFormat()->nSamplesPerSec;
 	m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
 	m_WfexFilterFormat.wFormatTag= pFilterWave->GetFormat()->wFormatTag;
-
-	// Check that the filter has the same number of channels and sample rate as the input
-	if ((pWave->nChannels != m_WfexFilterFormat.nChannels) ||
-		(pWave->nSamplesPerSec != m_WfexFilterFormat.nSamplesPerSec))
-	{
-		ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
-		pFilterWave->Close();
-		SAFE_DELETE(pFilterWave);
-		return E_NOTIMPL;
-	}
 
 	DWORD cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
 
@@ -1437,7 +1499,8 @@ HRESULT CConvolver::LoadFilter(const WAVEFORMATEX *pWave)
 				{
 					for (unsigned short nChannel=0; nChannel !=  m_WfexFilterFormat.nChannels; nChannel++)
 					{
-						if (hr = FAILED(pFilterWave->Read((BYTE*)&m_Filter->samples[nChannel][j], dwSizeToRead, &dwSizeRead)))
+						hr = pFilterWave->Read((BYTE*)&m_Filter->samples[nChannel][j], dwSizeToRead, &dwSizeRead);
+						if (FAILED(hr))
 						{
 							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
 							SAFE_DELETE(pFilterWave);

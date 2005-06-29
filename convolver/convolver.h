@@ -35,6 +35,8 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#include <time.h>
+
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugStream.h"
 #endif
@@ -130,6 +132,8 @@ END_COM_MAP()
 
 	STDMETHOD(get_attenuation)(double *pVal);
 	STDMETHOD(put_attenuation)(double newVal);
+
+	STDMETHOD (calculate_optimum_attenuation)();
 
     // IMediaObject methods
     STDMETHOD( GetStreamCount )( 
@@ -277,6 +281,8 @@ private:
 	//void FillBufferWithSilence(WAVEFORMATEX *pWfex); // TODO: Remove or make this do something useful
 
 
+
+
     DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
     DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
@@ -294,12 +300,12 @@ private:
 	double					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 
 	CConvolution<float>*	m_Convolution;			// Polymorphic processing class
-	HRESULT CConvolver::SelectConvolution(const WAVEFORMATEX *pWave);
+	HRESULT SelectConvolution(const WAVEFORMATEX *pWave);
 
 	CSampleBuffer<float>*	m_Filter;				// The filter to be applied
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
-	HRESULT LoadFilter(const WAVEFORMATEX *pWave);
+	HRESULT LoadFilter();
 
 #if defined(DEBUG) | defined(_DEBUG)
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
