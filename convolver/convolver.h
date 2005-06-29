@@ -276,6 +276,7 @@ private:
 
 	//void FillBufferWithSilence(WAVEFORMATEX *pWfex); // TODO: Remove or make this do something useful
 
+
     DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
     DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
@@ -292,16 +293,19 @@ private:
 
 	double					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 
+	CConvolution<float>*	m_Convolution;			// Polymorphic processing class
+	HRESULT CConvolver::SelectConvolution(const WAVEFORMATEX *pWave);
 
+	CSampleBuffer<float>*	m_Filter;				// The filter to be applied
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
+	HRESULT LoadFilter(const WAVEFORMATEX *pWave);
 
 #if defined(DEBUG) | defined(_DEBUG)
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
 
-	CConvolution<float>		*m_Convolution;			// Polymorphic processing class
-	CSampleBuffer<float>	*m_Filter;				// The filter to be applied
+
 
     BOOL                    m_bEnabled;         // TRUE if enabled
 };

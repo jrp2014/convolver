@@ -20,13 +20,12 @@
 #include  "convolution.h"
 
 // CConvolution Constructor
-// Note that Filter.nSamples is the padded filter size
 template <typename FFT_type>
 CConvolution<FFT_type>::CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter) :
 m_nSampleSize(nSampleSize), 
 m_nChannels(Filter->nChannels), 
-m_n2xFilterLength(Filter->nSamples), 
-m_nFilterLength(Filter->nSamples/2), 
+m_n2xFilterLength(Filter->nSamples),	// 2 x Nh, the padded filter size
+m_nFilterLength(Filter->nSamples / 2),	// Nh
 m_nInputBufferIndex(0), 
 m_Filter(Filter)
 {
@@ -93,14 +92,14 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 #endif
 #endif
 			// Write to output buffer.
-			cbBytesActuallyProcessed += normalize_sample(pbOutputDataPointer, outputSample);
 #if defined(DEBUG) | defined(_DEBUG)
 			DWORD samplesize = normalize_sample(pbOutputDataPointer, outputSample);
 			assert(samplesize == m_nSampleSize);
-			pbOutputDataPointer += m_nSampleSize;
+			cbBytesActuallyProcessed += samplesize;
 #else
-			pbOutputDataPointer += normalize_sample(pbOutputDataPointer, outputSample);
+			cbBytesActuallyProcessed += normalize_sample(pbOutputDataPointer, outputSample);
 #endif
+			pbOutputDataPointer += m_nSampleSize;
 
 #if defined(DEBUG) | defined(_DEBUG)
 			// This does not quite work, because AllocateStreamingResources seems to be called (twice!) after IEEE FFT_type playback, which rewrites the file

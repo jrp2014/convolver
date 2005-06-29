@@ -84,7 +84,7 @@ template <typename FFT_type>
 class Cconvolution_ieeefloat : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_ieeefloat(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(float), Filter){};
+	Cconvolution_ieeefloat(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(float), Filter){};
 
 private:
 	const FFT_type get_sample(const BYTE* container) const
@@ -107,7 +107,7 @@ template <typename FFT_type>
 class Cconvolution_pcm8 : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_pcm8(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(BYTE), Filter){};
+	Cconvolution_pcm8(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(BYTE), Filter){};
 
 private:
 
@@ -132,7 +132,7 @@ template <typename FFT_type>
 class Cconvolution_pcm16 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm16(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT16), Filter){};
+	Cconvolution_pcm16(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT16), Filter){};
 
 private:
 
@@ -159,7 +159,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm24 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm24(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(3 /* Bytes */, Filter){};
+	Cconvolution_pcm24(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(3 /* Bytes */, Filter){};
 
 private:
 
@@ -221,7 +221,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm32 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm32(WAVEFORMATEX* pWave, const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT32), Filter){};
+	Cconvolution_pcm32(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT32), Filter){};
 
 private:
 
