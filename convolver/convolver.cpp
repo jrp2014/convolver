@@ -1136,7 +1136,7 @@ STDMETHODIMP CConvolver::put_filterformat(WAVEFORMATEX newVal)
 }
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
-STDMETHODIMP CConvolver::calculate_optimum_attenuation()
+STDMETHODIMP CConvolver::calculateOptimumAttenuation()
 {
 	HRESULT hr = S_OK;
 	

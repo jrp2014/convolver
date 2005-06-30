@@ -98,6 +98,28 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	return hr;
 }
 
+STDMETHODIMP CConvolverPropPage::CalculateOptiumumAttenuation()
+{
+	HRESULT hr = m_spConvolver->calculateOptimumAttenuation();
+	if (FAILED(hr))
+		return hr;
+
+	double	fAttenuation = 0.0;
+	hr = m_spConvolver->get_attenuation(&fAttenuation);
+	if (FAILED(hr))
+		return hr;
+
+	// Display the attenuation.
+	TCHAR   szStr[MAXSTRING] = { 0 };
+	_stprintf(szStr, _T("%.1f"), fAttenuation);
+	SetDlgItemText(IDC_ATTENUATION, szStr);
+
+	SetDirty(TRUE);
+
+	return hr;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::Apply
 //
@@ -105,13 +127,13 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 STDMETHODIMP CConvolverPropPage::Apply(void)
 {
 	TCHAR   szStr[MAXSTRING] = { 0 };
-	DWORD   dwAttenuation = MAX_ATTENUATION;  // Initialize the attenuation. (equivaluent to 0 as DWORD is an unsigned long)
 	double	fAttenuation = 0.0;	// Initialize a double for the attenuation
+	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
 	DWORD   dwWetmix = 50;       // Initialize a DWORD for effect level.
 	double  fWetmix = 0.50;      // Initialize a double for effect level.
 	TCHAR szFilterFileName[MAX_PATH]	= { 0 };
 
-	// Get the attenuatoin value from the dialog box.
+	// Get the attenuation value from the dialog box.
 	GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
 	// atof does not work with Unicode
 #ifdef UNICODE 
@@ -185,6 +207,13 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
 	}
 
+	// Write the Calculate Optimum Attenuation value to the registry.
+	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		lResult = key.SetDWORDValue( kszPrefsCalculateOptimumAttenuation, IsDlgButtonChecked(IDC_CHECKCALCULATEOPTIMUMATTENUATION) );
+	}
+
 	// update the plug-in
 	if (m_spConvolver)
 	{
@@ -204,12 +233,14 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	DWORD  dwWetmix = 50;         // Default wet mix DWORD.
-	double fWetmix =  0.50;       // Default wet mix double.
-	DWORD  dwAttenuation = MAX_ATTENUATION * 100;	  // Default attenuation DWORD (offset, as DWORD unsigned)
-	double fAttenuation = 0.0;	  // Default attenuation double
+	DWORD  dwWetmix				= 50;						// Default wet mix DWORD.
+	double fWetmix				=  0.50;					// Default wet mix double.
+	DWORD  dwAttenuation		= MAX_ATTENUATION * 100;	// Default attenuation DWORD (offset, as DWORD unsigned)
+	double fAttenuation			= 0.0;						// Default attenuation double
 	TCHAR*  szFilterFileName	= TEXT("");
-
+	CRegKey key;
+	LONG    lResult = 0;
+	DWORD   dwValue = 0;
 
 	// read from plug-in if it is available
 	if (m_spConvolver)
@@ -225,14 +256,9 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	}	
 	else // otherwise read from registry
 	{
-		CRegKey key;
-		LONG    lResult;
-
 		lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
 		if (ERROR_SUCCESS == lResult)
 		{
-			DWORD   dwValue = 0;
-
 			// Read the wet mix value.
 			lResult = key.QueryDWORDValue(kszPrefsWetmix, dwValue );
 			if (ERROR_SUCCESS == lResult)
@@ -257,6 +283,18 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 			{
 				_tcsncpy(szFilterFileName, szValue, ulMaxPath);
 			}
+		}
+	}
+
+	// Set the Calculate Optiumum Attenuation checkbox
+	lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
+	if (ERROR_SUCCESS == lResult)
+	{
+		DWORD bCalculateOptimumAttenuation = 0;
+		lResult = key.QueryDWORDValue(kszPrefsCalculateOptimumAttenuation, bCalculateOptimumAttenuation);
+		if (ERROR_SUCCESS == lResult)
+		{
+			CheckDlgButton(IDC_CHECKCALCULATEOPTIMUMATTENUATION, bCalculateOptimumAttenuation);
 		}
 	}
 
@@ -324,3 +362,14 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 	return 0;
 }
 
+
+LRESULT CConvolverPropPage::OnBnClickedCheckcalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+
+	if ( IsDlgButtonChecked(IDC_CHECKCALCULATEOPTIMUMATTENUATION) )
+	{
+		SetDirty(True);
+	}
+
+	return 0;
+}

@@ -20,6 +20,7 @@
 #define IDC_FILTERFILELABEL             206
 #define IDC_STATUS                      207
 #define IDC_ATTENUATION                 208
+#define IDC_CHECKCALCULATEOPTIMUMATTENUATION 213
 
 // Next default values for new objects
 // 
@@ -27,7 +28,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        204
 #define _APS_NEXT_COMMAND_VALUE         32768
-#define _APS_NEXT_CONTROL_VALUE         213
+#define _APS_NEXT_CONTROL_VALUE         214
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

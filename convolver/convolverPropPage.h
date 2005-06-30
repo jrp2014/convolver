@@ -60,6 +60,7 @@ BEGIN_MSG_MAP(CConvolverPropPage)
 	COMMAND_HANDLER(IDC_WETMIX, EN_CHANGE, OnEnChangeWetmix)
 	COMMAND_HANDLER(IDC_GETFILTER, BN_CLICKED, OnBnClickedGetfilter)
 	COMMAND_HANDLER(IDC_ATTENUATION, EN_CHANGE, OnEnChangeAttenuation)
+	COMMAND_HANDLER(IDC_CHECKCALCULATEOPTIMUMATTENUATION, BN_CLICKED, OnBnClickedCheckcalculateoptimumattenuation)
 	CHAIN_MSG_MAP(IPropertyPageImpl<CConvolverPropPage>)
 	MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
 END_MSG_MAP()
@@ -70,6 +71,7 @@ END_MSG_MAP()
 	LRESULT (OnInitDialog)(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
 	STDMETHOD(DisplayFilterFormat)(TCHAR* szFilterFileName);
+	STDMETHOD(CalculateOptiumumAttenuation)();
 
 private:
     CComPtr<IConvolver> m_spConvolver;  // pointer to plug-in interface
@@ -78,6 +80,7 @@ public:
 	LRESULT OnEnChangeWetmix(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnBnClickedGetfilter(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnBnClickedCheckcalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 #endif // __CCONVOLVERPROPPAGE_H_
