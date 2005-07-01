@@ -49,7 +49,7 @@ public:
 		);
 protected:
 
-	DWORD const m_nSampleSize;							// 8, 16, 20, 24, 32 or 64 bits
+	DWORD const m_nContainerSize;							// 8, 16, 24, or 32 bits (64 not implemented)
 
 private:
 
@@ -95,10 +95,9 @@ private:
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
 	{ 
-		float fsrcSample = static_cast<float>(srcSample);
-		//dstSample = (BYTE*)(&fsrcSample);
-		dstContainer = reinterpret_cast<BYTE*>(&fsrcSample);
-		return m_nSampleSize;
+		//*((float *) dstContainer) = (float) srcSample;
+		* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
+		return m_nContainerSize;
 	};
 };
 
@@ -123,7 +122,7 @@ private:
 		if (srcSample < -128)
 			srcSample = -128;
 		*dstContainer = static_cast<BYTE>(srcSample + 128);
-		return m_nSampleSize; // ie, 1 byte
+		return m_nContainerSize; // ie, 1 byte
 	};
 };
 
@@ -150,7 +149,7 @@ private:
 				srcSample = -32768;
 		// *(INT16 *)dstSample = static_cast<INT16>(srcSample);
 		*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
-		return m_nSampleSize;  // ie, 2 bytes consumed
+		return m_nContainerSize;  // ie, 2 bytes consumed
 	};
 };
 
@@ -211,7 +210,7 @@ private:
 		dstContainer[1] = static_cast<BYTE>((i >>  8) & 0xff);
 		dstContainer[2] = static_cast<BYTE>((i >> 16) & 0xff);
 
-		return m_nSampleSize; // ie, 3 bytes processed
+		return m_nContainerSize; // ie, 3 bytes processed
 	};
 };
 
@@ -270,8 +269,7 @@ private:
 		else
 			if (srcSample < -iClip)
 				srcSample = static_cast<double>(-iClip);
-
 		*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
-		return m_nSampleSize;  // ie, 4 bytes processed
+		return m_nContainerSize;  // ie, 4 bytes processed
 	};
 };

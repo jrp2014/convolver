@@ -58,7 +58,6 @@ const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
 const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsWetmix[] = _T("Wetmix");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
-const TCHAR kszPrefsCalculateOptimumAttenuation[] = _T("CalculateOptimumAttenuation");
 
 /////////////////////////////////////////////////////////////////////////////
 // IConvolver
@@ -86,7 +85,7 @@ public:
 	virtual double	decode_Attenuationdb(const DWORD dwValue) = 0;
 	virtual DWORD	encode_Attenuationdb(const double fValue) = 0;
 
-	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation() = 0;
+	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation(double& fAttenuation) = 0;
 
 };
 
@@ -135,7 +134,7 @@ END_COM_MAP()
 	STDMETHOD(get_attenuation)(double *pVal);
 	STDMETHOD(put_attenuation)(double newVal);
 
-	STDMETHOD (calculateOptimumAttenuation)();
+	STDMETHOD (calculateOptimumAttenuation)(double& fAttenuation);
 
     // IMediaObject methods
     STDMETHOD( GetStreamCount )( 

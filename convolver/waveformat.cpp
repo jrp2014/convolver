@@ -31,6 +31,8 @@
 //
 //};
 
+// TODO: put the strings in this file into the resource file for internationalisation
+
 const std::string channelDescription(const WAVEFORMATEX* w)
 {
 	if (w->wFormatTag == WAVE_FORMAT_EXTENSIBLE)

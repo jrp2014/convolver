@@ -90,6 +90,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	else
 	{
 		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
+		// TODO: internationalisation of Filter:
 		std::string description = waveFormatDescription(pFilterWave->GetFormat(), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
 		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
 	}
@@ -97,28 +98,6 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 
 	return hr;
 }
-
-STDMETHODIMP CConvolverPropPage::CalculateOptiumumAttenuation()
-{
-	HRESULT hr = m_spConvolver->calculateOptimumAttenuation();
-	if (FAILED(hr))
-		return hr;
-
-	double	fAttenuation = 0.0;
-	hr = m_spConvolver->get_attenuation(&fAttenuation);
-	if (FAILED(hr))
-		return hr;
-
-	// Display the attenuation.
-	TCHAR   szStr[MAXSTRING] = { 0 };
-	_stprintf(szStr, _T("%.1f"), fAttenuation);
-	SetDlgItemText(IDC_ATTENUATION, szStr);
-
-	SetDirty(TRUE);
-
-	return hr;
-}
-
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::Apply
@@ -207,13 +186,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
 	}
 
-	// Write the Calculate Optimum Attenuation value to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
-	{
-		lResult = key.SetDWORDValue( kszPrefsCalculateOptimumAttenuation, IsDlgButtonChecked(IDC_CHECKCALCULATEOPTIMUMATTENUATION) );
-	}
-
 	// update the plug-in
 	if (m_spConvolver)
 	{
@@ -286,18 +258,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		}
 	}
 
-	// Set the Calculate Optiumum Attenuation checkbox
-	lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
-	if (ERROR_SUCCESS == lResult)
-	{
-		DWORD bCalculateOptimumAttenuation = 0;
-		lResult = key.QueryDWORDValue(kszPrefsCalculateOptimumAttenuation, bCalculateOptimumAttenuation);
-		if (ERROR_SUCCESS == lResult)
-		{
-			CheckDlgButton(IDC_CHECKCALCULATEOPTIMUMATTENUATION, bCalculateOptimumAttenuation);
-		}
-	}
-
 	DisplayFilterFormat(szFilterFileName);
 
 	TCHAR   szStr[MAXSTRING];
@@ -362,14 +322,19 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 	return 0;
 }
 
-
-LRESULT CConvolverPropPage::OnBnClickedCheckcalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
+	double	fAttenuation = 0;
+	HRESULT hr = m_spConvolver->calculateOptimumAttenuation(fAttenuation);
+	if (FAILED(hr))
+		return hr;
 
-	if ( IsDlgButtonChecked(IDC_CHECKCALCULATEOPTIMUMATTENUATION) )
-	{
-		SetDirty(True);
-	}
+	// Display the attenuation.
+	TCHAR   szStr[MAXSTRING] = { 0 };
+	_stprintf(szStr, _T("%.1f"), fAttenuation);
+	SetDlgItemText(IDC_ATTENUATION, szStr);
 
-	return 0;
+	SetDirty(TRUE);
+
+	return hr;
 }

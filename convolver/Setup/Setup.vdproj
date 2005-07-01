@@ -21,7 +21,7 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_18E4600133B84AA49A049AAB5A30A8B0"
+        "MsmKey" = "8:_468AF7ED6845460994DE8FC6E3B82DD2"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -151,10 +151,10 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_18E4600133B84AA49A049AAB5A30A8B0"
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_468AF7ED6845460994DE8FC6E3B82DD2"
             {
-            "SourcePath" = "8:..\\Common\\directx.ico"
-            "TargetName" = "8:directx.ico"
+            "SourcePath" = "8:multichan.ico"
+            "TargetName" = "8:multichan.ico"
             "Tag" = "8:"
             "Folder" = "8:_1F77F3BD12604778AE582788BE0DCE04"
             "Condition" = "8:"
@@ -286,13 +286,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{0C96C4B3-6C16-4FCF-9369-9244487475F5}"
-        "PackageCode" = "8:{B8E859ED-3CC1-4AC1-B870-6C2E4EF95A8A}"
+        "ProductCode" = "8:{B693C01E-AA8D-4A31-B9DC-364E74B3B7C6}"
+        "PackageCode" = "8:{DB400310-DB16-4C55-95DA-6C92C1DD41A5}"
         "UpgradeCode" = "8:{EDF9D203-D536-4C29-8458-F35365B2622C}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.10"
+        "ProductVersion" = "8:1.11"
         "Manufacturer" = "8:John Pavel"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net/"
@@ -302,7 +302,7 @@
         "Keywords" = "8:DSP plugin plug-in convolution FIR"
         "ARPCOMMENTS" = "8:DSP plug-in for Windows Media Player that will read an impulse response (wave file) and convolves it with the input stream."
         "ARPURLINFOABOUT" = "8:http://convolver.sourceforge.net/"
-        "ARPPRODUCTICON" = "8:_18E4600133B84AA49A049AAB5A30A8B0"
+        "ARPPRODUCTICON" = "8:_468AF7ED6845460994DE8FC6E3B82DD2"
         "ARPIconIndex" = "3:0"
         "SearchPath" = "8:"
         "UseSystemSearchPath" = "11:TRUE"

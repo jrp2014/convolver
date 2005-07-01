@@ -1136,48 +1136,84 @@ STDMETHODIMP CConvolver::put_filterformat(WAVEFORMATEX newVal)
 }
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
-STDMETHODIMP CConvolver::calculateOptimumAttenuation()
+STDMETHODIMP CConvolver::calculateOptimumAttenuation(double& fAttenuation)
 {
 	HRESULT hr = S_OK;
-	
+
 	hr = LoadFilter();
 	if (FAILED(hr))
 		return hr;
 
-	const WORD SAMPLES = 100;
+	const WORD SAMPLES = 10; // length of the test sample, in filter lengths
+	const DWORD nBufferLength = m_Filter->nChannels * m_Filter->nSamples * SAMPLES;
+	const DWORD cBufferLength = nBufferLength * sizeof(float);
 
-	BYTE* inputSamples = new BYTE[m_Filter->nChannels * m_Filter->nSamples * SAMPLES];
-	BYTE* outputSamples = new BYTE[m_Filter->nChannels * m_Filter->nSamples * SAMPLES];
+
+	BYTE* inputSamples = new BYTE[cBufferLength];
+	BYTE* outputSamples = new BYTE[cBufferLength];
+	float* pfInputSample = NULL;
+	float* pfOutputSample = NULL;
 
 	// Seed the random-number generator with current time so that
 	// the numbers will be different every time we run.
 	srand( (unsigned)time( NULL ) );
 
-	for(WORD nChannels = 0; nChannels != m_Filter->nChannels; nChannels++)
-		for(DWORD nSamples = 0; nSamples != m_Filter->nSamples * SAMPLES; nSamples++)
+	CConvolution<float>* c = new Cconvolution_ieeefloat<float>(m_Filter);
+
+	bool again = TRUE;
+	float maxSample = 0;
+
+	do
+	{
+		pfInputSample = reinterpret_cast<float *>(inputSamples);
+		pfOutputSample = reinterpret_cast<float *>(outputSamples);
+
+		for(DWORD i = 0; i!= nBufferLength; i++)
 		{
-			inputSamples[nSamples * m_Filter->nChannels + nChannels] = static_cast<BYTE>((rand() * 255L) / RAND_MAX);
-			outputSamples[nSamples * m_Filter->nChannels + nChannels] = 0;
+			*pfInputSample = (2.0f * rand() - RAND_MAX) / RAND_MAX; // -1..1
+			*pfOutputSample = 0;  // silence
+			pfInputSample++;
+			pfOutputSample++;
 		}
 
-	CConvolution<float>* c = new Cconvolution_pcm8<float>(m_Filter);
-	c->doConvolution(inputSamples, outputSamples, m_Filter->nSamples * SAMPLES, 1.0L, 1.0L, 0.0L
+		c->doConvolution(inputSamples, outputSamples,
+			/* dwBlocksToProcess */ m_Filter->nSamples * SAMPLES,
+			/* fAttenuation_db */ 0,
+			/* fWetMix,*/ 1.0L,
+			/* fDryMix */ 0.0L
 #if defined(DEBUG) | defined(_DEBUG)
-		, m_CWaveFileTrace
+			, m_CWaveFileTrace
 #endif
-		);
+			);
 
-	// Now find the largest output sample
-	BYTE max_sample = 0;
-	for(WORD nChannels = 0; nChannels != m_Filter->nChannels; nChannels++)
-		for(DWORD nSamples = 0; nSamples != m_Filter->nSamples * SAMPLES; nSamples++)
-			if (outputSamples[nSamples * m_Filter->nChannels + nChannels] > max_sample)
-				max_sample = outputSamples[nSamples * m_Filter->nChannels + nChannels];
+		// Scan the output buffer for larger output samples
+		again = FALSE;
+		pfOutputSample = reinterpret_cast<float *>(outputSamples);
+		for(DWORD i = 0; i!= nBufferLength; i++)
+		{
+			if (abs(*pfOutputSample) > abs(maxSample))
+			{
+				maxSample = *pfOutputSample;
+				again = TRUE; // Keep convolving until find no larger output samples
+			}
+			pfOutputSample++;
+		}
 
-	//pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)
-	// 10 ^ (fAttenuation_db / 20) = max  (8-bit sound is 0..255 with 128 == silence)
-	m_fAttenuation_db = static_cast<double>(log(abs(max_sample - 128) * 20.0L));
+	} while (again);
 
+	// maxSample 0..1
+	// 10 ^ (fAttenuation_db / 20) = 1
+	// Limit fAttenuation to +/-MAX_ATTENUATION dB
+	fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
+
+	if (fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = MAX_ATTENUATION;
+	}
+	else if (-fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = -1.0L * MAX_ATTENUATION;
+	}
 
 	delete c;
 	delete outputSamples;

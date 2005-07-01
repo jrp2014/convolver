@@ -21,8 +21,8 @@
 
 // CConvolution Constructor
 template <typename FFT_type>
-CConvolution<FFT_type>::CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter) :
-m_nSampleSize(nSampleSize), 
+CConvolution<FFT_type>::CConvolution(const DWORD nContainerSize, const CSampleBuffer<FFT_type>* Filter) :
+m_nContainerSize(nContainerSize), 
 m_nChannels(Filter->nChannels), 
 m_n2xFilterLength(Filter->nSamples),	// 2 x Nh, the padded filter size
 m_nFilterLength(Filter->nSamples / 2),	// Nh
@@ -59,6 +59,7 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 	// Cross-check
 	DWORD cbBytesActuallyProcessed = 0;
 
+	double outputSample = 0;
 	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
 	BYTE* pbOutputDataPointer = pbOutputData;
 
@@ -66,13 +67,12 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 	{
 		for (unsigned short nChannel = 0; nChannel != m_nChannels; nChannel++)
 		{
-
 			// Get the input sample and convert it to a FFT_type (eg, float)
 			m_InputBuffer->samples[nChannel][m_nInputBufferIndex] = attenuated_sample(fAttenuation_db, get_sample(pbInputDataPointer)); // Channels are interleaved
-			pbInputDataPointer += m_nSampleSize;
+			pbInputDataPointer += m_nContainerSize;
 
 			// Mix the processed signal with the dry signal (which lags by a filterlength)
-			double outputSample = (m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength] * fDryMix ) + 
+			outputSample = (m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength] * fDryMix ) + 
 				(m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] * fWetMix);
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -85,31 +85,34 @@ CConvolution<typename FFT_type>::doConvolution(const BYTE* pbInputData, BYTE* pb
 				cdebug 
 					<< dwBlocksToProcess << ","
 					<< m_nInputBufferIndex << ","
-					<< m_InputBuffer->samples[nChannel][(m_nInputBufferIndex + m_nFilterLength) % m_n2xFilterLength]) << ", "
-					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex % m_n2xFilterLength]) << ","
-					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] - m_InputBuffer->samples[m_nInputBufferIndex + m_nFilterLength] << std::endl;
+					<< m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength] << ", "
+					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] << ","
+					<< m_OutputBuffer->samples[nChannel][m_nInputBufferIndex] - m_InputBuffer->samples[nChannel][m_nInputBufferIndex + m_nFilterLength] << std::endl;
 			}
 #endif
 #endif
 			// Write to output buffer.
 #if defined(DEBUG) | defined(_DEBUG)
-			DWORD samplesize = normalize_sample(pbOutputDataPointer, outputSample);
-			assert(samplesize == m_nSampleSize);
-			cbBytesActuallyProcessed += samplesize;
+			DWORD containerSize = normalize_sample(pbOutputDataPointer, outputSample);
+			assert(containerSize == m_nContainerSize);
+			cbBytesActuallyProcessed += containerSize;
 #else
 			cbBytesActuallyProcessed += normalize_sample(pbOutputDataPointer, outputSample);
 #endif
-			pbOutputDataPointer += m_nSampleSize;
+			pbOutputDataPointer += m_nContainerSize;
 
 #if defined(DEBUG) | defined(_DEBUG)
-			// This does not quite work, because AllocateStreamingResources seems to be called (twice!) after IEEE FFT_type playback, which rewrites the file
-			// It is not clear why this happens, as it does not occur after PCM playback
-			UINT nSizeWrote;
-			HRESULT hr = S_OK;
-			if (FAILED(hr = CWaveFileTrace->Write(sizeof(FFT_type), (BYTE *)&outputSample, &nSizeWrote)))
+			if (CWaveFileTrace)
 			{
-				SAFE_DELETE( CWaveFileTrace );
-				return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
+				// This does not quite work, because AllocateStreamingResources seems to be called (twice!) after IEEE FFT_type playback, which rewrites the file
+				// It is not clear why this happens, as it does not occur after PCM playback
+				UINT nSizeWrote;
+				HRESULT hr = S_OK;
+				if (FAILED(hr = CWaveFileTrace->Write(sizeof(FFT_type), (BYTE *)&outputSample, &nSizeWrote)))
+				{
+					SAFE_DELETE( CWaveFileTrace );
+					return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
+				}
 			}
 #endif
 		}
