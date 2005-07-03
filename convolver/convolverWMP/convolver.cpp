@@ -1044,8 +1044,11 @@ STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 	}
 
 	// Return the property page's class ID
+#ifdef DMO
+	*(pPages->pElems) = CLSID_ConvolverPropPageDMO;
+#else
 	*(pPages->pElems) = CLSID_ConvolverPropPage;
-
+#endif
 	return S_OK;
 }
 // Property get to retrieve the wet mix value by using the public interface.

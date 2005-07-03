@@ -50,7 +50,6 @@ CConvolverPropPage::~CConvolverPropPage()
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::SetObjects
 //
-
 STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 {
 	// find our plug-in object, if it was passed in

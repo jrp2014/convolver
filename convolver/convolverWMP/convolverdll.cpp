@@ -36,10 +36,12 @@ CComModule _Module;
 BEGIN_OBJECT_MAP(ObjectMap)
 #ifdef DMO
 OBJECT_ENTRY(CLSID_ConvolverDMO, CConvolver)
+OBJECT_ENTRY(CLSID_ConvolverPropPageDMO, CConvolverPropPage)
 #else
 OBJECT_ENTRY(CLSID_Convolver, CConvolver)
-#endif
 OBJECT_ENTRY(CLSID_ConvolverPropPage, CConvolverPropPage)
+#endif
+
 END_OBJECT_MAP()
 
 /////////////////////////////////////////////////////////////////////////////

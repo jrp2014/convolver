@@ -28,10 +28,9 @@
 #ifndef __CCONVOLVER_H_
 #define __CCONVOLVER_H_
 
-#include ".\config.h"
-
 #include "resource.h"
 #include <mediaobj.h>       // The IMediaObject header from the DirectX SDK.
+
 #ifndef DMO
 #include "wmpservices.h"    // The header containing the WMP interface definitions.
 #endif
@@ -44,6 +43,7 @@
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugStream.h"
 #endif
+
 #include "waveformat.h"
 #include "convolution\convolution.h"
 
