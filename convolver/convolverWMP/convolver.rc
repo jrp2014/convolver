@@ -1,0 +1,173 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,11,0,0
+ PRODUCTVERSION 1,11,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Convolver"
+            VALUE "FileDescription", "Convolver Module"
+            VALUE "FileVersion", "1, 11, 0, 0"
+            VALUE "InternalName", "Convolver"
+            VALUE "LegalCopyright", "Copyright GPL 2005"
+            VALUE "LegalTrademarks", "GPL"
+            VALUE "OriginalFilename", "convolver.dll"
+            VALUE "ProductName", "Convolver Module"
+            VALUE "ProductVersion", "1, 11, 0, 0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// REGISTRY
+//
+
+IDR_CONVOLVER           REGISTRY                "convolver.rgs"
+IDR_CONVOLVERPROPPAGE   REGISTRY                "convolverPropPage.rgs"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_CONVOLVERPROPPAGE DIALOGEX 0, 0, 213, 122
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+FONT 8, "MS Shell Dlg", 0, 0, 0x0
+BEGIN
+    LTEXT           "Effect Level (%):",IDC_MIXLABEL,4,41,56,8
+    EDITTEXT        IDC_WETMIX,65,38,24,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Get filter ...",IDC_GETFILTER,4,0,50,14
+    CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
+                    SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
+                    WS_GROUP,65,2,146,11,WS_EX_CLIENTEDGE
+    LTEXT           "",IDC_STATUS,3,56,206,63,SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "Attenuation (dB):",IDC_STATIC,4,22,57,8
+    EDITTEXT        IDC_ATTENUATION,65,19,24,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Calculate optimum attenuation",
+                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,94,19,102,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_PROJNAME            "Convolver"
+    IDS_MIXRANGEERROR       "You must enter an effect level between 0 and 100 (%)"
+    IDS_FRIENDLYNAME        "Convolver plug-in"
+    IDS_DESCRIPTION         "Convolver DSP plug-in for Windows Media Player"
+    IDS_TITLEPROPPAGE       "Convolver DSP Plug-in"
+    IDS_HELPFILEPROPPAGE    "Help File Name"
+    IDS_DOCSTRINGPROPPAGE   "Convolver Settings"
+    IDS_ATTENUATIONRANGEERROR "Attenuation must be between -20 and +20 (dB)"
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.K.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENG)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+#endif    // English (U.K.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

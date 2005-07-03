@@ -1,8 +1,4 @@
 Microsoft Visual Studio Solution File, Format Version 8.00
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolver", "convolver.vcproj", "{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"
-	ProjectSection(ProjectDependencies) = postProject
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "generate_test_IRs", "generate_test_IRs\generate_test_IRs.vcproj", "{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}"
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
@@ -11,7 +7,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "comparewavs", "comparewavs\
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Setup", "Setup\Setup.vdproj", "{C56ABFD0-1683-4EE3-A9B4-33FE760E0E3F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverWMP", "convolverWMP\convolverWMP.vcproj", "{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverDMO", "convolverDMO\convolverDMO.vcproj", "{0EF23A7A-5B0C-4110-AEF2-988FCE204AFF}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverDS", "convolverDS\convolverDS.vcproj", "{0C2CB9D2-427C-49D8-933A-374FA5D155A9}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Setup", "Setup\Setup.vdproj", "{F1B6A301-8DCE-432E-831A-95F7BF4BA1DF}"
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
@@ -19,21 +27,29 @@ Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
 		Release = Release
+		Description = Convolution
 	EndGlobalSection
 	GlobalSection(ProjectConfiguration) = postSolution
-		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Debug.ActiveCfg = Debug|Win32
-		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Debug.Build.0 = Debug|Win32
-		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.ActiveCfg = Release|Win32
-		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.Build.0 = Release|Win32
 		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Debug.ActiveCfg = Debug|Win32
 		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Release.ActiveCfg = Release|Win32
 		{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}.Release.Build.0 = Release|Win32
 		{27FA09AC-9D9D-4474-BB9A-5F2C8E0D1860}.Debug.ActiveCfg = Debug|Win32
 		{27FA09AC-9D9D-4474-BB9A-5F2C8E0D1860}.Release.ActiveCfg = Release|Win32
 		{27FA09AC-9D9D-4474-BB9A-5F2C8E0D1860}.Release.Build.0 = Release|Win32
-		{C56ABFD0-1683-4EE3-A9B4-33FE760E0E3F}.Debug.ActiveCfg = Debug
-		{C56ABFD0-1683-4EE3-A9B4-33FE760E0E3F}.Release.ActiveCfg = Release
-		{C56ABFD0-1683-4EE3-A9B4-33FE760E0E3F}.Release.Build.0 = Release
+		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Debug.ActiveCfg = Debug|Win32
+		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Debug.Build.0 = Debug|Win32
+		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.ActiveCfg = Release|Win32
+		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.Build.0 = Release|Win32
+		{0EF23A7A-5B0C-4110-AEF2-988FCE204AFF}.Debug.ActiveCfg = Debug|Win32
+		{0EF23A7A-5B0C-4110-AEF2-988FCE204AFF}.Debug.Build.0 = Debug|Win32
+		{0EF23A7A-5B0C-4110-AEF2-988FCE204AFF}.Release.ActiveCfg = Release|Win32
+		{0EF23A7A-5B0C-4110-AEF2-988FCE204AFF}.Release.Build.0 = Release|Win32
+		{0C2CB9D2-427C-49D8-933A-374FA5D155A9}.Debug.ActiveCfg = Debug|Win32
+		{0C2CB9D2-427C-49D8-933A-374FA5D155A9}.Debug.Build.0 = Debug|Win32
+		{0C2CB9D2-427C-49D8-933A-374FA5D155A9}.Release.ActiveCfg = Release|Win32
+		{0C2CB9D2-427C-49D8-933A-374FA5D155A9}.Release.Build.0 = Release|Win32
+		{F1B6A301-8DCE-432E-831A-95F7BF4BA1DF}.Debug.ActiveCfg = Debug
+		{F1B6A301-8DCE-432E-831A-95F7BF4BA1DF}.Release.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

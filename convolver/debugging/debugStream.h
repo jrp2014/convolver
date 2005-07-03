@@ -30,7 +30,7 @@
 //
 //  General-purpose debug stream, like std::cout
 
-#include "..\stdafx.h"
+#include "convolverWMP\StdAfx.h"
 
 #include <ostream>
 #include <fstream>

@@ -1,0 +1,23 @@
+HKCR
+{
+	ConvolverDMO.CConvolverPropPage.1 = s 'CConvolverPropPage Class'
+	{
+		CLSID = s '{A87DA8E0-F517-4a13-A184-A5E573CB2EB5}'
+	}
+	ConvolverDMO.CConvolverPropPage = s 'CConvolverPropPage Class'
+	{
+		CLSID = s '{A87DA8E0-F517-4a13-A184-A5E573CB2EB5}'
+		CurVer = s 'ConvolverDMO.CConvolverPropPage.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {A87DA8E0-F517-4a13-A184-A5E573CB2EB5} = s 'CConvolverPropPage Class'
+		{
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Both'
+			}
+		}
+	}
+}
