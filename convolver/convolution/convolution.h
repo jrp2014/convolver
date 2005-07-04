@@ -35,11 +35,16 @@ class CConvolution
 {
 public:
 	CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter,
-				const DWORD nInputBufferIndex = 0);					// TODO: for use with partioned convolution
+		const DWORD nInputBufferIndex = 0);					// TODO: for use with partioned convolution
 	virtual ~CConvolution(void);
 
-	// Returns number of bytes processed
-	DWORD doConvolution(const BYTE* pbInputData, BYTE* pbOutputData,
+	// This version of the convolution routine works on input data that is not necessarily a whole number of filter lengths long
+	// It means that the initial filter length of output is just silence, until we have picked up a filter length of input, which
+	// can then be convolved.  It ought to be possible to arrange to feed the convolution routine to in buffers that are a
+	// multiple of the filter length long, but the would appear to require more fiddling with IMediaObject::GetInputSizeInfo, or
+	// allocating our own output buffers, etc.
+	// Returns number of bytes processed (== number of output bytes, too)
+	DWORD doConvolutionWithLag(const BYTE* pbInputData, BYTE* pbOutputData,
 		DWORD dwBlocksToProcess,
 		const double fAttenuation_db,
 		const double fWetMix,
@@ -48,6 +53,21 @@ public:
 		, CWaveFile* CWaveFileTrace
 #endif	
 		);
+
+
+	// This version of the convolution routine works on input data that is a whole number of filter lengths long
+	// It means that the output does not need to lag
+	// Returns number of bytes processed  (== number of output bytes, too)
+	DWORD doConvolutionInPlace(const BYTE* pbInputData, BYTE* pbOutputData,
+		DWORD dwBlocksToProcess,
+		const double fAttenuation_db,
+		const double fWetMix,
+		const double fDryMix
+#if defined(DEBUG) | defined(_DEBUG)
+		, CWaveFile* CWaveFileTrace
+#endif	
+		);
+
 protected:
 
 	DWORD const m_nContainerSize;							// 8, 16, 24, or 32 bits (64 not implemented)
@@ -96,9 +116,9 @@ private:
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const 
 	{ 
-		//*((float *) dstContainer) = (float) srcSample;
-		* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
-		return m_nContainerSize;
+		*((float *) dstContainer) = (float) srcSample;
+		//* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
+		return sizeof(float);
 	};
 };
 
@@ -123,7 +143,7 @@ private:
 		if (srcSample < -128)
 			srcSample = -128;
 		*dstContainer = static_cast<BYTE>(srcSample + 128);
-		return m_nContainerSize; // ie, 1 byte
+		return sizeof(BYTE); // ie, 1 byte
 	};
 };
 
@@ -148,9 +168,9 @@ private:
 		else
 			if (srcSample < -32768)
 				srcSample = -32768;
-		// *(INT16 *)dstSample = static_cast<INT16>(srcSample);
-		*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
-		return m_nContainerSize;  // ie, 2 bytes consumed
+		*(INT16 *)dstContainer = (INT16)(srcSample);
+		//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
+		return sizeof(INT16);  // ie, 2 bytes produced
 	};
 };
 
@@ -211,7 +231,7 @@ private:
 		dstContainer[1] = static_cast<BYTE>((i >>  8) & 0xff);
 		dstContainer[2] = static_cast<BYTE>((i >> 16) & 0xff);
 
-		return m_nContainerSize; // ie, 3 bytes processed
+		return 3; // ie, 3 bytes generated
 	};
 };
 
@@ -270,7 +290,8 @@ private:
 		else
 			if (srcSample < -iClip)
 				srcSample = static_cast<double>(-iClip);
-		*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
-		return m_nContainerSize;  // ie, 4 bytes processed
+		*(INT32 *)dstContainer = (INT32) srcSample;
+		//*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
+		return sizeof(INT32);  // ie, 4 bytes generated
 	};
 };

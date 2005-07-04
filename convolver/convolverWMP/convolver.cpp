@@ -129,6 +129,19 @@ HRESULT CConvolver::FinalConstruct()
 		{
 			_tcsncpy(m_szFilterFileName, szValue, ulMaxPath);
 		}
+		else
+			m_szFilterFileName[0] = 0;
+
+		//// TODO: Could try to load the filter at the outset, but
+		//// -- What happens if it is null, as it will be before we have chosen a filter?
+		//// -- What happens if we change formats in mid-flight?
+		//// so do it in AllocateStreamingResources, for now
+		//if (m_szFilterFileName == TEXT(""))
+		//{
+		//	HRESULT hr = LoadFilter();
+		//	if ( FAILED(hr))
+		//		return hr;
+		//}
 	}
 
 	return S_OK;
@@ -684,7 +697,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		(pWave->nSamplesPerSec != m_WfexFilterFormat.nSamplesPerSec))
 		goto cleanup;
 
-	hr = SelectConvolution(pWave);
+	hr = SelectConvolution(pWave); // Sets m_Convolution 
 	if (FAILED(hr))
 		goto cleanup;
 
@@ -815,12 +828,6 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 	if (FAILED(hr))
 	{
 		return hr;
-	}
-
-	// Need an input buffer that is at least as long as the filter (Nh)
-	if (cbInputLength / (m_WfexFilterFormat.nBlockAlign / m_WfexFilterFormat.nChannels) <= m_Filter->nSamples)
-	{
-		return S_FALSE;
 	}
 
 	// Hold on to the buffer using a smart pointer.
@@ -1033,24 +1040,32 @@ STDMETHODIMP CConvolver::GetEnable( BOOL *pfEnable )
 
 STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 {
-	// Only one property page is required for the plug-in.
-	pPages->cElems = 1;
-	pPages->pElems = (GUID *) (CoTaskMemAlloc(sizeof(GUID)));
+	const unsigned CPROPPAGES = 2;
+    GUID *pGUID = (GUID*) CoTaskMemAlloc( CPROPPAGES * sizeof(GUID) );
 
-	// Make sure memory is allocated for pPages->pElems
-	if (NULL == pPages->pElems)
-	{
-		return E_OUTOFMEMORY;
-	}
+    pPages->cElems = 0;
+    pPages->pElems = NULL;
 
-	// Return the property page's class ID
+    if( NULL == pGUID )
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    // Fill the array of property pages now
 #ifdef DMO
-	*(pPages->pElems) = CLSID_ConvolverPropPageDMO;
+	pGUID[0] = CLSID_ConvolverPropPageDMO;
+    pGUID[1] = CLSID_ConvolverPropPageDMO;
 #else
-	*(pPages->pElems) = CLSID_ConvolverPropPage;
+    pGUID[0] = CLSID_ConvolverPropPage;
+    pGUID[1] = CLSID_ConvolverPropPage;
 #endif
-	return S_OK;
+
+    //Fill the structure and return
+    pPages->cElems = CPROPPAGES;
+    pPages->pElems = pGUID;
+    return S_OK;
 }
+
 // Property get to retrieve the wet mix value by using the public interface.
 STDMETHODIMP CConvolver::get_wetmix(double *pVal)
 {
@@ -1179,7 +1194,8 @@ STDMETHODIMP CConvolver::calculateOptimumAttenuation(double& fAttenuation)
 			pfOutputSample++;
 		}
 
-		c->doConvolution(inputSamples, outputSamples,
+		// Can use the InPlace version of the convolution routine as have a buffer that is a multiple of the filter size in length to process
+		c->doConvolutionInPlace(inputSamples, outputSamples,
 			/* dwBlocksToProcess */ m_Filter->nSamples * SAMPLES,
 			/* fAttenuation_db */ 0,
 			/* fWetMix,*/ 1.0L,
@@ -1259,7 +1275,10 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
 
-	m_Convolution->doConvolution(pbInputData, pbOutputData,
+	// Cannot use the InPlace version, as have not yet fixed the various IMedia routines to ensure 
+	// that the input data in a multiple of the filter length in length. So will get an initial filter
+	// length's worth of silence.
+	*cbBytesProcessed = m_Convolution->doConvolutionWithLag(pbInputData, pbOutputData,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
 		m_fWetMix,
