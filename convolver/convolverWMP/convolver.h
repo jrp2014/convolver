@@ -54,7 +54,7 @@ const DWORD UNITS = 10000000;	// 1 sec = 1 * UNITS
 const DWORD MAXSTRING = 1024;	// length
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.  1024 taps might be a better choice
-const DWORD MAX_ATTENUATION = 20; // dB
+const DWORD MAX_ATTENUATION = 1000; // dB
 
 // registry location for preferences
 const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
@@ -232,7 +232,6 @@ END_COM_MAP()
     STDMETHOD( Discontinuity )( 
                    DWORD dwInputStreamIndex
                    );
-    
     STDMETHOD( AllocateStreamingResources )( void );
     
     STDMETHOD( FreeStreamingResources )( void );
@@ -324,7 +323,8 @@ private:
 	CSampleBuffer<float>*	m_Filter;				// The filter to be applied
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
-	HRESULT LoadFilter();
+	template<typename FFT_type>
+							HRESULT LoadFilter();
 
 #if defined(DEBUG) | defined(_DEBUG)
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output

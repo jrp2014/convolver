@@ -99,16 +99,17 @@ STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
     LTEXT           "Effect Level (%):",IDC_MIXLABEL,4,41,56,8
-    EDITTEXT        IDC_WETMIX,65,38,24,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_WETMIX,65,38,31,14,ES_RIGHT | ES_AUTOHSCROLL | 
+                    ES_NUMBER
     PUSHBUTTON      "Get filter ...",IDC_GETFILTER,4,0,50,14
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
                     WS_GROUP,65,2,146,11,WS_EX_CLIENTEDGE
     LTEXT           "",IDC_STATUS,3,56,206,63,SS_NOPREFIX | SS_ENDELLIPSIS
     LTEXT           "Attenuation (dB):",IDC_STATIC,4,22,57,8
-    EDITTEXT        IDC_ATTENUATION,65,19,24,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_ATTENUATION,65,19,31,14,ES_RIGHT | ES_AUTOHSCROLL
     PUSHBUTTON      "Calculate optimum attenuation",
-                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,94,19,102,14
+                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,100,19,102,14
 END
 
 
@@ -126,7 +127,8 @@ BEGIN
     IDS_TITLEPROPPAGE       "Convolver DSP Plug-in"
     IDS_HELPFILEPROPPAGE    "Help File Name"
     IDS_DOCSTRINGPROPPAGE   "Convolver Settings"
-    IDS_ATTENUATIONRANGEERROR "Attenuation must be between -20 and +20 (dB)"
+    IDS_ATTENUATIONRANGEERROR 
+                            "Attenuation must be between -1000 and +1000 (dB)"
 END
 
 #endif    // English (U.S.) resources

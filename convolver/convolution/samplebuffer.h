@@ -27,7 +27,7 @@
 // for ZeroMemory, etc
 #include <windows.h>
 
-template <typename T> // T will normally be float, or perhaps double, depending on the DFT routines used
+template <typename FFT_type> // FFT_type will normally be float, or perhaps double, depending on the DFT routines used
 class CSampleBuffer
 {
 public:
@@ -35,7 +35,7 @@ public:
 	WORD nChannels;				// number of channels
 	DWORD nSamples;				// length of each channel buffer
 
-	T** samples;				// 2d nChannels x nSamples array holding samples
+	FFT_type** samples;				// 2d nChannels x nSamples array holding samples
 								// TODO: tried this with a vector<T*>, but cpu usage high (in debug)
 
 	CSampleBuffer(const WORD Channels, const DWORD Samples);

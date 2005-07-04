@@ -670,7 +670,6 @@ STDMETHODIMP CConvolver::Discontinuity(DWORD dwInputStreamIndex)
 //
 // Implementation of IMediaObject::AllocateStreamingResources
 /////////////////////////////////////////////////////////////////////////////
-
 STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 {
 	// Allocate any buffers need to process the stream.
@@ -686,7 +685,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	}
 
 	// Set m_Filter and m_WfexFilterFormat
-	hr = LoadFilter();
+	hr = LoadFilter<float>();
 	if (FAILED(hr))
 	{
 		return hr;
@@ -1158,7 +1157,7 @@ STDMETHODIMP CConvolver::calculateOptimumAttenuation(double& fAttenuation)
 {
 	HRESULT hr = S_OK;
 
-	hr = LoadFilter();
+	hr = LoadFilter<float>();
 	if (FAILED(hr))
 		return hr;
 
@@ -1207,7 +1206,7 @@ STDMETHODIMP CConvolver::calculateOptimumAttenuation(double& fAttenuation)
 
 		// Scan the output buffer for larger output samples
 		again = FALSE;
-		pfOutputSample = reinterpret_cast<float *>(outputSamples);
+		pfOutputSample = reinterpret_cast<float*>(outputSamples);
 		for(DWORD i = 0; i!= nBufferLength; i++)
 		{
 			if (abs(*pfOutputSample) > abs(maxSample))
@@ -1458,6 +1457,8 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 	return S_OK;
 }
 
+
+template<typename FFT_type>
 HRESULT CConvolver::LoadFilter()
 {
 	HRESULT hr = S_OK;
@@ -1513,82 +1514,167 @@ HRESULT CConvolver::LoadFilter()
 	DWORD dwSizeRead = 0;
 
 	// Setup the filter
-	WORD wFilterFormatTag = m_WfexFilterFormat.wFormatTag;
-	if (wFilterFormatTag == WAVE_FORMAT_EXTENSIBLE)
-	{
-		// Multi-channel filter, or filter with container size > sample size.  (Latter is not implemented)
-		WAVEFORMATEXTENSIBLE* pFilterWaveXT = (WAVEFORMATEXTENSIBLE *) pFilterWave->GetFormat(); // TODO: reinterpret_cast?
-		if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
-			wFilterFormatTag = WAVE_FORMAT_PCM;
-		else
-			if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-				wFilterFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-			else
-				return E_INVALIDARG;
-	}
 
-	switch (wFilterFormatTag)
-	{
-	case WAVE_FORMAT_PCM:
-		return E_NOTIMPL; // TODO: Unimplemented filter type
-		//break;
+	// Filter length is 2 x Nh. Must be power of 2 for the Ooura FFT package.
+	// Eg, if m_cFilterLength = Nh = 6, c2xPaddedFilterLength = 16
+	DWORD c2xPaddedFilterLength = 1; // The length of the filter
+	for(c2xPaddedFilterLength = 1; c2xPaddedFilterLength < 2 * cFilterLength; c2xPaddedFilterLength *= 2);
 
-	case WAVE_FORMAT_IEEE_FLOAT:
-		switch (m_WfexFilterFormat.wBitsPerSample)
+	// Initialise the Filter and the various sample buffers that will be used during processing
+	m_Filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
+
+	FFT_type sample = 0;
+#if defined(DEBUG) | defined(_DEBUG)
+	FFT_type minSample = 0;
+	FFT_type maxSample = 0;
+#endif
+	BYTE bSample[8] = {0, 0, 0, 0, 0, 0, 0, 0}; // 8 is the biggest sample size (64-bit)
+	assert (dwSizeToRead <= 8);
+
+	// Read the filter file
+	for (DWORD nSample=0; nSample != cFilterLength; nSample++)
+	{
+		for (WORD nChannel=0; nChannel !=  m_Filter->nChannels; nChannel++)
 		{
-		case 24:
-			return E_NOTIMPL; // TODO: Unimplemented filter type
-			//break; 
-		case 32:
+			hr = pFilterWave->Read(bSample, dwSizeToRead, &dwSizeRead);
+			if (FAILED(hr))
 			{
-				assert(dwSizeToRead == sizeof(float));
+				ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
+				SAFE_DELETE(pFilterWave);
+				return hr;
+			}
 
-				DWORD c2xPaddedFilterLength = 1; // The length of the filter
+			if (dwSizeRead != dwSizeToRead) // file corrupt, non-existent, etc
+			{
+				ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
+				pFilterWave->Close();
+				delete pFilterWave;
+				return E_FAIL;
+			}
 
-				// Filter length is 2 x Nh. Must be power of 2 for the Ooura FFT package.
-				// Eg, if m_cFilterLength = Nh = 6, c2xPaddedFilterLength = 16
-				for(c2xPaddedFilterLength = 1; c2xPaddedFilterLength < 2 * cFilterLength; c2xPaddedFilterLength *= 2);
-
-				// Initialise the Filter and the various sample buffers that will be used during processing
-				m_Filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
-
-				// Read the filter file
-				for (DWORD j=0; j != cFilterLength; j++)
+			// Now convert bSample to the float sample
+			switch (m_WfexFilterFormat.wFormatTag)
+			{
+			case WAVE_FORMAT_PCM:
+				switch (m_WfexFilterFormat.wBitsPerSample)	// container size
 				{
-					for (unsigned short nChannel=0; nChannel !=  m_WfexFilterFormat.nChannels; nChannel++)
+				case 8:
 					{
-						hr = pFilterWave->Read((BYTE*)&m_Filter->samples[nChannel][j], dwSizeToRead, &dwSizeRead);
-						if (FAILED(hr))
-						{
-							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
-							SAFE_DELETE(pFilterWave);
-							return hr;
-						}
-						if (dwSizeRead != dwSizeToRead)
-						{
-							ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat) );
-							pFilterWave->Close();
-							delete pFilterWave;
-							return E_FAIL;
-						}
-					} // for nChannel
-				} // for j
+						assert(dwSizeToRead == sizeof(BYTE));
+						sample = static_cast<FFT_type>(bSample[0] - 128);
+					}
+				case 16:
+					{
+						assert(dwSizeToRead == sizeof(INT16));
+						sample = *reinterpret_cast<INT16*>(bSample);
+					}
+					break;
+				case 24:
+					{
+						assert(dwSizeToRead == 3);  // 3 bytes
+						// Get the input sample
+						int i = (char) bSample[2];
+						i = (i << 8) | bSample[1];
 
-				// Now create a FFT of the filter
-				for (unsigned short nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++)
-				{
-					rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[nChannel]);		
+						switch ((( WAVEFORMATEXTENSIBLE * ) m_mtInput.pbFormat)->Samples.wValidBitsPerSample)
+						{
+						case 16:
+							break;
+						case 20:
+							i = (i << 4) | (bSample[0] >> 4);
+							break;
+						case 24:
+							i = (i << 8) | bSample[0];
+							break;
+						default:
+							return DMO_E_TYPE_NOT_ACCEPTED;
+						}
+						sample = static_cast<FFT_type>(i);
+					}
+					break;
+				case 32:
+					{
+						assert(dwSizeToRead == sizeof(INT32));
+						long  *plSample = (long *) bSample;
+
+						// Get the input sample
+						int i = *plSample;
+
+						switch ((( WAVEFORMATEXTENSIBLE * ) m_mtInput.pbFormat)->Samples.wValidBitsPerSample)
+						{
+						case 16:
+							i >>= 16;
+							break;
+						case 20:
+							i >>= 12;
+							break;
+						case 24:
+							i >>= 8;
+							break;
+						case 32:
+							break;
+						default:
+							return DMO_E_TYPE_NOT_ACCEPTED;
+						}
+						sample = static_cast<FFT_type>(i);
+					}
+					break;
+				default:
+					return E_NOTIMPL; // Unsupported it sample size
 				}
+				break;
 
-			}  // case
-			break;
-		default:
-			return E_NOTIMPL; // Unsupported it sample size
-		}
-		break;
+			case WAVE_FORMAT_IEEE_FLOAT:
+				switch (m_WfexFilterFormat.wBitsPerSample)
+				{
+				case 24:
+					return E_NOTIMPL;
+				case 32:
+					{
+						assert(dwSizeToRead == sizeof(float));
+						sample = *reinterpret_cast<FFT_type*>(bSample);
+					}  // case
+					break;
+				default:
+					return E_NOTIMPL; // Unsupported it sample size
+				}
+				break;
 
-	default:
-		return E_NOTIMPL;	// Filter file format is not supported
+
+			case WAVE_FORMAT_EXTENSIBLE:
+				{
+					//// Multi-channel filter, or filter with container size > sample size.  (Latter is not implemented)
+					//WAVEFORMATEXTENSIBLE* pFilterWaveXT = (WAVEFORMATEXTENSIBLE *) pFilterWave->GetFormat(); // TODO: reinterpret_cast?
+					//if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+					//	wFilterFormatTag = WAVE_FORMAT_PCM;
+					//else
+					//	if (pFilterWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+					//		wFilterFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+					//	else
+					//		return E_INVALIDARG;
+					return E_NOTIMPL;
+				}
+				break;
+
+			default:
+				return E_NOTIMPL;	// Filter file format is not supported
+			}
+
+			m_Filter->samples[nChannel][nSample] = sample;
+#if defined(DEBUG) | defined(_DEBUG)
+			if (sample > maxSample)
+				maxSample = sample;
+			if (sample < minSample)
+				minSample = sample;
+#endif
+
+		} // for nChannel
+	} // for nSample
+
+	// Now create a FFT of the filter
+	for (unsigned short nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++)
+	{
+		rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[nChannel]);		
 	}
 
 	// Done with the filter file
@@ -1597,6 +1683,7 @@ HRESULT CConvolver::LoadFilter()
 
 #if defined(DEBUG) | defined(_DEBUG)
 	cdebug << waveFormatDescription(&m_WfexFilterFormat, cFilterLength, "FFT Filter:") << std::endl;
+	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;
 #endif
 
 	return hr;
