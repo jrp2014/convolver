@@ -104,6 +104,9 @@ public:
 // CConvolver
 /////////////////////////////////////////////////////////////////////////////
 
+// TODO: Could also implement the IMediaObjectInPlace interface, as an optimization
+// See: http://msdn.microsoft.com/library/default.asp?url=/library/en-us/directshow/htm/imediaobjectinplaceinterface.asp
+
 class ATL_NO_VTABLE CConvolver : 
     public CComObjectRootEx<CComMultiThreadModel>,
 #ifdef DMO
@@ -298,9 +301,6 @@ private:
 
 	//void FillBufferWithSilence(WAVEFORMATEX *pWfex); // TODO: Remove or make this do something useful
 
-
-
-
     DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
     DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
@@ -329,8 +329,6 @@ private:
 #if defined(DEBUG) | defined(_DEBUG)
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
-
-
 
     BOOL                    m_bEnabled;         // TRUE if enabled
 };

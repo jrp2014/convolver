@@ -187,9 +187,37 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	// update the plug-in
 	if (m_spConvolver)
 	{
-		m_spConvolver->put_wetmix(fWetmix);
-		m_spConvolver->put_attenuation(fAttenuation);
-		m_spConvolver->put_filterfilename(szFilterFileName);
+		HRESULT hr;
+
+		hr = m_spConvolver->put_wetmix(fWetmix);
+		if (FAILED(hr))
+		{
+			if (::LoadString(_Module.GetResourceInstance(), IDS_EFFECTSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+			{
+				MessageBox(szStr);
+			}
+			return hr;
+		}
+
+		hr = m_spConvolver->put_attenuation(fAttenuation);
+		if (FAILED(hr))
+		{
+			if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+			{
+				MessageBox(szStr);
+			}
+			return hr;
+		}
+
+		hr = m_spConvolver->put_filterfilename(szFilterFileName);
+		if (FAILED(hr))
+		{
+			if (::LoadString(_Module.GetResourceInstance(), IDS_FILTERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+			{
+				MessageBox(szStr);
+			}
+			return hr;
+		}
 	}
 
 	m_bDirty = FALSE; // Tell the property page to disable Apply.

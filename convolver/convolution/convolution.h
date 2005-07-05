@@ -38,13 +38,16 @@ public:
 		const DWORD nInputBufferIndex = 0);					// TODO: for use with partioned convolution
 	virtual ~CConvolution(void);
 
+	// TODO: make this thread safe.  As it stands, you can call doConvolutionArbitrary and doConvolutionConstrained and get into a mess, 
+	// as they use the same m_InputBuffer, etc (eg, by trying to set attenuation while something is playing.
+
 	// This version of the convolution routine works on input data that is not necessarily a whole number of filter lengths long
 	// It means that the initial filter length of output is just silence, until we have picked up a filter length of input, which
 	// can then be convolved.  It ought to be possible to arrange to feed the convolution routine to in buffers that are a
 	// multiple of the filter length long, but the would appear to require more fiddling with IMediaObject::GetInputSizeInfo, or
 	// allocating our own output buffers, etc.
 	// Returns number of bytes processed (== number of output bytes, too)
-	DWORD doConvolutionWithLag(const BYTE* pbInputData, BYTE* pbOutputData,
+	DWORD doConvolutionArbitrary(const BYTE* pbInputData, BYTE* pbOutputData,
 		DWORD dwBlocksToProcess,
 		const double fAttenuation_db,
 		const double fWetMix,
@@ -58,7 +61,7 @@ public:
 	// This version of the convolution routine works on input data that is a whole number of filter lengths long
 	// It means that the output does not need to lag
 	// Returns number of bytes processed  (== number of output bytes, too)
-	DWORD doConvolutionInPlace(const BYTE* pbInputData, BYTE* pbOutputData,
+	DWORD doConvolutionConstrained(const BYTE* pbInputData, BYTE* pbOutputData,
 		DWORD dwBlocksToProcess,
 		const double fAttenuation_db,
 		const double fWetMix,

@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,13,0,0
- PRODUCTVERSION 1,13,0,0
+ FILEVERSION 1,15,0,0
+ PRODUCTVERSION 1,15,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "1, 13, 0, 0"
+            VALUE "FileVersion", "1, 15, 0, 0"
             VALUE "InternalName", "Convolver"
             VALUE "LegalCopyright", "Copyright GPL 2005"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolver.dll"
             VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "1, 13, 0, 0"
+            VALUE "ProductVersion", "1, 15, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -129,6 +129,9 @@ BEGIN
     IDS_DOCSTRINGPROPPAGE   "Convolver Settings"
     IDS_ATTENUATIONRANGEERROR 
                             "Attenuation must be between -1000 and +1000 (dB)"
+    IDS_ATTENUATIONSAVEERROR "Failed to save attenuation"
+    IDS_EFFECTSAVEERROR     "Failed to save effect %"
+    IDS_FILTERSAVEERROR     "Invalid filter file"
 END
 
 #endif    // English (U.S.) resources
@@ -158,6 +161,15 @@ END
 
 #endif    // APSTUDIO_INVOKED
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICONCONVOLVER       ICON                    "multichan.ico"
 #endif    // English (U.K.) resources
 /////////////////////////////////////////////////////////////////////////////
 

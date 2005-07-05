@@ -108,12 +108,12 @@ STDAPI DllRegisterServer(void)
     bstrDescription.LoadString(IDS_DESCRIPTION);
 
     // Describe the type of data handled by the plug-in
-    DMO_PARTIAL_MEDIATYPE mt[3] = { 0, 0, 0};
+	const BYTE nMediaTypes = 2;
+    DMO_PARTIAL_MEDIATYPE mt[nMediaTypes] = { 0, 0};
     mt[0].type = MEDIATYPE_Audio;
     mt[0].subtype = MEDIASUBTYPE_PCM;
     mt[1].type = MEDIATYPE_Audio;
 	mt[1].subtype = MEDIASUBTYPE_IEEE_FLOAT;
-	mt[2].type = MEDIATYPE_AnalogAudio;	// TODO: Unclear what this does!
 
 #ifdef DMO
 
@@ -122,10 +122,10 @@ STDAPI DllRegisterServer(void)
         CLSID_ConvolverDMO,        // CLSID
         DMOCATEGORY_AUDIO_EFFECT,  // Category
         0,                         // Flags 
-        3,                         // Number of input types
-        mt,                       // Array of input types
-        3,                         // Number of output types
-        mt);                      // Array of output types
+        nMediaTypes,               // Number of input types
+        mt,                        // Array of input types
+        nMediaTypes,               // Number of output types
+        mt);                       // Array of output types
 
 #else
 
@@ -137,7 +137,7 @@ STDAPI DllRegisterServer(void)
                     1,                  // DirectShow priority for this plug-in
                     WMP_PLUGINTYPE_DSP, // Plug-in type
                     CLSID_Convolver,	// Class ID of plug-in
-                    3,                  // No. media types supported by plug-in
+                    nMediaTypes,        // No. media types supported by plug-in
                     &mt);               // Array of media types supported by plug-in
 
 #endif

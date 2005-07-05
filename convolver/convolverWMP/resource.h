@@ -13,9 +13,13 @@
 #define IDR_CONVOLVERPROPPAGE           107
 #define IDS_ATTENUATIONRANGEERROR       107
 #define IDD_CONVOLVERPROPPAGE           108
+#define IDS_ATTENUATIONSAVEERROR        108
 #define IDS_SCALERANGEERROR             109
+#define IDS_EFFECTSAVEERROR             109
+#define IDS_FILTERSAVEERROR             110
 #define IDC_MIXLABEL                    202
 #define IDC_WETMIX                      203
+#define IDI_ICONCONVOLVER               204
 #define IDC_GETFILTER                   205
 #define IDC_FILTERFILELABEL             206
 #define IDC_STATUS                      207
@@ -26,7 +30,7 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        204
+#define _APS_NEXT_RESOURCE_VALUE        205
 #define _APS_NEXT_COMMAND_VALUE         32768
 #define _APS_NEXT_CONTROL_VALUE         215
 #define _APS_NEXT_SYMED_VALUE           110

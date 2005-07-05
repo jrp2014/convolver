@@ -52,15 +52,15 @@ template <typename FFT_type>CConvolution<FFT_type>::~CConvolution(void)
 // allocating our own output buffers, etc.
 template <typename FFT_type>
 DWORD
-CConvolution<typename FFT_type>::doConvolutionWithLag(const BYTE* pbInputData, BYTE* pbOutputData,
-													  DWORD dwBlocksToProcess,
-													  const double fAttenuation_db,
-													  const double fWetMix,
-													  const double fDryMix
+CConvolution<typename FFT_type>::doConvolutionArbitrary(const BYTE* pbInputData, BYTE* pbOutputData,
+														DWORD dwBlocksToProcess,
+														const double fAttenuation_db,
+														const double fWetMix,
+														const double fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-													  , CWaveFile* CWaveFileTrace
+														, CWaveFile* CWaveFileTrace
 #endif	
-													  )  // Returns bytes processed
+														)  // Returns bytes processed
 {
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
@@ -185,15 +185,15 @@ CConvolution<typename FFT_type>::doConvolutionWithLag(const BYTE* pbInputData, B
 // It means that the output does not need to lag
 template <typename FFT_type>
 DWORD
-CConvolution<typename FFT_type>::doConvolutionInPlace(const BYTE* pbInputData, BYTE* pbOutputData,
-													  DWORD dwBlocksToProcess,
-													  const double fAttenuation_db,
-													  const double fWetMix,
-													  const double fDryMix
+CConvolution<typename FFT_type>::doConvolutionConstrained(const BYTE* pbInputData, BYTE* pbOutputData,
+														  DWORD dwBlocksToProcess,
+														  const double fAttenuation_db,
+														  const double fWetMix,
+														  const double fDryMix
 #if defined(DEBUG) | defined(_DEBUG)
-													  , CWaveFile* CWaveFileTrace
+														  , CWaveFile* CWaveFileTrace
 #endif	
-													  )  // Returns bytes processed
+														  )  // Returns bytes processed
 {
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
@@ -201,8 +201,8 @@ CConvolution<typename FFT_type>::doConvolutionInPlace(const BYTE* pbInputData, B
 	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
 	BYTE* pbOutputDataPointer = pbOutputData;
 
+	// An alternative semantic would be to remove the following test and leave some input samples unprocessed
 	assert(dwBlocksToProcess % m_nFilterLength == 0);  // Only support a whole number of filter lengths
-
 	if (dwBlocksToProcess % m_nFilterLength != 0)
 		return 0; // ie, no bytes processed.
 
