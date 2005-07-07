@@ -2,7 +2,7 @@ HKCR
 {
 	NoRemove CLSID
 	{
-		ForceRemove {E68732FA-624D-40B4-917C-DE6B8876AC5B} = s 'Convolver Class'
+		ForceRemove {47427372-7AED-4e37-ABEB-7BD64C4184BF} = s 'Convolver Class'
 		{
 			InprocServer32 = s '%MODULE%'
 			{

@@ -145,9 +145,6 @@
 				RelativePath=".\convolverPropPage.cpp">
 			</File>
 			<File
-				RelativePath=".\convolverwmp.def">
-			</File>
-			<File
 				RelativePath=".\StdAfx.cpp">
 				<FileConfiguration
 					Name="Debug|Win32">
@@ -352,6 +349,9 @@
 			</File>
 			<File
 				RelativePath=".\convolverPropPage.rgs">
+			</File>
+			<File
+				RelativePath=".\convolverwmp.def">
 			</File>
 			<File
 				RelativePath=".\multichan.ico">

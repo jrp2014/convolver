@@ -89,7 +89,7 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)
 STDAPI DllRegisterServer(void)
 {
 	HRESULT hr;
-#ifndef DMO
+
     CComPtr<IWMPMediaPluginRegistrar> spRegistrar;
 
     // Create the registration object
@@ -98,7 +98,6 @@ STDAPI DllRegisterServer(void)
     {
         return hr;
     }
-#endif
 
     // Load friendly name and description strings
     CComBSTR    bstrFriendlyName;
@@ -115,11 +114,10 @@ STDAPI DllRegisterServer(void)
     mt[1].type = MEDIATYPE_Audio;
 	mt[1].subtype = MEDIASUBTYPE_IEEE_FLOAT;
 
-#ifdef DMO
-
+	// Register as a DMO
     hr = DMORegister(
         bstrFriendlyName,          // Friendly name
-        CLSID_ConvolverDMO,        // CLSID
+        CLSID_Convolver,		   // CLSID
         DMOCATEGORY_AUDIO_EFFECT,  // Category
         0,                         // Flags 
         nMediaTypes,               // Number of input types
@@ -127,7 +125,10 @@ STDAPI DllRegisterServer(void)
         nMediaTypes,               // Number of output types
         mt);                       // Array of output types
 
-#else
+    if (FAILED(hr))
+    {
+        return hr;
+    }
 
     // Register the plug-in with WMP
     hr = spRegistrar->WMPRegisterPlayerPlugin(
@@ -140,24 +141,13 @@ STDAPI DllRegisterServer(void)
                     nMediaTypes,        // No. media types supported by plug-in
                     &mt);               // Array of media types supported by plug-in
 
-#endif
-
     if (FAILED(hr))
     {
         return hr;
     }
 
-#ifdef DMO
-
-	// Registers the object, with no typelib.
-    return _Module.RegisterServer(FALSE);
-
-#else // WMP10 plug-in
-
     // registers object, typelib and all interfaces in typelib
     return _Module.RegisterServer();
-
-#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -167,12 +157,6 @@ STDAPI DllRegisterServer(void)
 STDAPI DllUnregisterServer(void)
 
 {
-#ifdef DMO
-
-    DMOUnregister(CLSID_ConvolverDMO, DMOCATEGORY_AUDIO_EFFECT);
-    return _Module.UnregisterServer(TRUE);
-
-#else
 
     CComPtr<IWMPMediaPluginRegistrar> spRegistrar;
     HRESULT hr;
@@ -188,8 +172,6 @@ STDAPI DllUnregisterServer(void)
     hr = spRegistrar->WMPUnRegisterPlayerPlugin(WMP_PLUGINTYPE_DSP, CLSID_Convolver);
 
 	return _Module.UnregisterServer();
-
-#endif
 
 }
 

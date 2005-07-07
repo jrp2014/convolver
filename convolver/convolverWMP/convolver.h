@@ -65,15 +65,9 @@ const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 // IConvolver
 /////////////////////////////////////////////////////////////////////////////
 
-#ifdef DMO
-// {35708C4E-9CD1-4231-9B60-1D8BCDDCD391}
-DEFINE_GUID(CLSID_ConvolverDMO,
-			0x35708c4e, 0x9cd1, 0x4231, 0x9b, 0x60, 0x1d, 0x8b, 0xcd, 0xdc, 0xd3, 0x91);
-#else
-// {E68732FA-624D-40B4-917C-DE6B8876AC5B}
-DEFINE_GUID(CLSID_Convolver,
-			0xe68732fa, 0x624d, 0x40b4, 0x91, 0x7c, 0xde, 0x6b, 0x88, 0x76, 0xac, 0x5b);
-#endif
+// {47427372-7AED-4e37-ABEB-7BD64C4184BF}
+DEFINE_GUID(CLSID_Convolver, 
+0x47427372, 0x7aed, 0x4e37, 0xab, 0xeb, 0x7b, 0xd6, 0x4c, 0x41, 0x84, 0xbf);
 
 interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver : IUnknown
 {
@@ -103,16 +97,11 @@ public:
 
 class ATL_NO_VTABLE CConvolver : 
     public CComObjectRootEx<CComMultiThreadModel>,
-#ifdef DMO
-	public CComCoClass<CConvolver, &CLSID_ConvolverDMO>,
-#else
     public CComCoClass<CConvolver, &CLSID_Convolver>,
-#endif
     public IConvolver,
     public IMediaObject,
-#ifndef DMO
     public IWMPPluginEnable,
-#endif
+	public IPropertyBag,
     public ISpecifyPropertyPages
 {
 public:
@@ -126,9 +115,8 @@ DECLARE_PROTECT_FINAL_CONSTRUCT()
 BEGIN_COM_MAP(CConvolver)
     COM_INTERFACE_ENTRY(IConvolver)
     COM_INTERFACE_ENTRY(IMediaObject)
-#ifndef DMO
     COM_INTERFACE_ENTRY(IWMPPluginEnable)
-#endif
+	COM_INTERFACE_ENTRY(IPropertyBag)
     COM_INTERFACE_ENTRY(ISpecifyPropertyPages)
 END_COM_MAP()
 
@@ -266,6 +254,13 @@ END_COM_MAP()
 
     // ISpecifyPropertyPages methods
     STDMETHOD( GetPages )(CAUUID *pPages);
+
+	// IPropertyBag methods
+	STDMETHODIMP Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog);
+
+	STDMETHODIMP Write(LPCOLESTR pszPropName, VARIANT *pVar) 
+		{return E_NOTIMPL;}
+
 
 
 	// The following pair is needed because DWORD is unsigned

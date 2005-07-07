@@ -719,7 +719,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	if (FAILED(hr))
 		return hr;
 
-		// Set m_Filter and m_WfexFilterFormat
+	// Set m_Filter and m_WfexFilterFormat
 	hr = m_Convolution->LoadFilter(m_szFilterFileName);
 	if (FAILED(hr))
 		return hr;
@@ -1051,7 +1051,7 @@ STDMETHODIMP CConvolver::GetEnable( BOOL *pfEnable )
 
 STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 {
-	const unsigned CPROPPAGES = 2;
+	const unsigned CPROPPAGES = 1;
 	GUID *pGUID = (GUID*) CoTaskMemAlloc( CPROPPAGES * sizeof(GUID) );
 
 	pPages->cElems = 0;
@@ -1063,13 +1063,7 @@ STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 	}
 
 	// Fill the array of property pages now
-#ifdef DMO
-	pGUID[0] = CLSID_ConvolverPropPageDMO;
-	pGUID[1] = CLSID_ConvolverPropPageDMO;
-#else
 	pGUID[0] = CLSID_ConvolverPropPage;
-	pGUID[1] = CLSID_ConvolverPropPage;
-#endif
 
 	//Fill the structure and return
 	pPages->cElems = CPROPPAGES;
@@ -1359,71 +1353,76 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 	return S_OK;
 }
 
+// Helper
 
-//
-//// IPersistPropertyBag methods 
-//// WARNING !!! 
-//// WARNING !!! Not exposed in NonDelegatingQueryInterface
-//// WARNING !!! 
-//STDMETHODIMP InitNew() 
-//{
-//	return S_OK;
-//}
-//
-//STDMETHODIMP Load(IPropertyBag *pPropBag, IErrorLog *pErrorLog)
-//{
-//	return E_NOTIMPL;
-//}
-//
-//STDMETHODIMP Save(IPropertyBag *pPropBag, BOOL fClearDirty, BOOL fSaveAllProperties)
-//{
-//	if (m_MediaPropertyList.GetCount() == 0)
-//		return E_NOTIMPL;
-//
-//	POSITION pos = m_MediaPropertyList.GetHeadPosition();
-//	while(pos)
-//	{
-//		CMediaProperty *pInfo = m_MediaPropertyList.GetNext(pos);
-//
-//		pPropBag->Write(pInfo->tag, &pInfo->var);
-//	}
-//	return S_OK;
-//}
-//
-//// IPropertyBag methods
-//STDMETHODIMP Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog)
-//{
-//	if (lstrcmpW(pszPropName, L"IconStreams") == 0)
-//	{
-//		HMODULE hModule = GetModuleHandle("MMSwitch.ax");			
-//		//#define ANIMATE
-//#ifdef ANIMATE
-//		SAFEARRAYBOUND sab;
-//		sab.cElements = 4;
-//		sab.lLbound = 0;
-//		SAFEARRAY *psa = SafeArrayCreate(VT_UNKNOWN, 1, &sab);
-//
-//		if (psa)
-//		{
-//			long rgIndices;
-//			for (rgIndices = 0; rgIndices < 4; rgIndices++)
-//				SafeArrayPutElement(psa, &rgIndices, StreamFromResource(IDB_ICONSTREAM0 + rgIndices));
-//		}
-//
-//		pVar->punkVal = (IUnknown *)psa;
-//		pVar->vt = VT_ARRAY;
-//
-//#else
-//		pVar->punkVal = StreamFromResource(IDI_ICONCONVOLVER);
-//		pVar->vt = VT_UNKNOWN;
-//#endif
-//		if (pVar->punkVal != NULL)
-//			return S_OK;
-//		else
-//			return E_FAIL;
-//	}
-//	return E_NOTIMPL;
-//}
-//
-//STDMETHODIMP Write(LPCOLESTR pszPropName, VARIANT *pVar) 
-//{return E_NOTIMPL;}
+IStream* StreamFromResource(int id)
+{
+	HMODULE hModule;
+	HRSRC hrsrc = NULL;
+	int len = 0;
+	HGLOBAL hres = NULL;
+	LPVOID pres = NULL;
+	IStream* pstm = NULL;
+
+	hModule = GetModuleHandle(TEXT("convolverWMP.dll"));			
+	hrsrc = FindResource(hModule, MAKEINTRESOURCE(id), TEXT("STREAM")); // TODO: does not work
+	len = SizeofResource(hModule, hrsrc);
+	hres = LoadResource(hModule, hrsrc);
+	pres = LockResource(hres);
+	if (pres)
+	{
+		HGLOBAL hmem = GlobalAlloc(GMEM_FIXED, len);
+		BYTE* pmem = (BYTE*)GlobalLock(hmem);
+
+		if (pmem)
+		{
+			memcpy(pmem, pres, len);
+			CreateStreamOnHGlobal(hmem, FALSE, &pstm);
+		}
+
+		DeleteObject(hres);
+		DeleteObject(hrsrc);
+	}
+
+	if (hres) DeleteObject(hres);
+	if (hrsrc) DeleteObject(hrsrc);
+
+	return pstm;
+}
+
+
+// IPropertyBag method
+STDMETHODIMP CConvolver::Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog)
+{
+	if (lstrcmpW(pszPropName, L"IconStreams") == 0)
+	{
+		//HMODULE hModule = GetModuleHandle(TEXT("convolverWMP.dll"));			
+#undef ANIMATE
+#ifdef ANIMATE
+		SAFEARRAYBOUND sab;
+		sab.cElements = 4;
+		sab.lLbound = 0;
+		SAFEARRAY *psa = SafeArrayCreate(VT_UNKNOWN, 1, &sab);
+
+		if (psa)
+		{
+			long rgIndices;
+			for (rgIndices = 0; rgIndices < 4; rgIndices++)
+				SafeArrayPutElement(psa, &rgIndices, StreamFromResource(IDB_ICONSTREAM0 + rgIndices));
+		}
+
+		pVar->punkVal = (IUnknown *)psa;
+		pVar->vt = VT_ARRAY;
+
+#else
+		pVar->punkVal = StreamFromResource(IDI_ICONCONVOLVER);
+		pVar->vt = VT_UNKNOWN;
+#endif
+		if (pVar->punkVal != NULL)
+			return S_OK;
+		else
+			return E_FAIL;
+	}
+	return E_NOTIMPL;
+}
+

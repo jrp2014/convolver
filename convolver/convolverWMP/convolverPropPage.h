@@ -29,11 +29,7 @@
 #include "resource.h"
 #include "convolver.h"
 
-#ifdef DMO
-// {A87DA8E0-F517-4a13-A184-A5E573CB2EB5}
-DEFINE_GUID(CLSID_ConvolverPropPageDMO,
-			0xa87da8e0, 0xf517, 0x4a13, 0xa1, 0x84, 0xa5, 0xe5, 0x73, 0xcb, 0x2e, 0xb5);
-#else
+
 // {C4315842-44E6-42F5-8E0F-FDB07AF48EAC}
 DEFINE_GUID(CLSID_ConvolverPropPage,
 			0xc4315842, 0x44e6, 0x42f5, 0x8e, 0xf, 0xfd, 0xb0, 0x7a, 0xf4, 0x8e, 0xac);
@@ -41,19 +37,13 @@ DEFINE_GUID(CLSID_ConvolverPropPage,
 // {767AB4A0-CF52-4cb2-8715-07035A44E2C4}
 DEFINE_GUID(CLSID_ConvolverPropPageDS,
 			0x767ab4a0, 0xcf52, 0x4cb2, 0x87, 0x15, 0x7, 0x3, 0x5a, 0x44, 0xe2, 0xc4);
-#endif
-
 
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverPropPage
 class ATL_NO_VTABLE CConvolverPropPage :
 	public CComObjectRootEx<CComMultiThreadModel>,
-#ifdef DMO
-	public CComCoClass<CConvolverPropPage, &CLSID_ConvolverPropPageDMO>,
-#else
 	public CComCoClass<CConvolverPropPage, &CLSID_ConvolverPropPage>,
-#endif
 	public IPropertyPageImpl<CConvolverPropPage>,
 	public CDialogImpl<CConvolverPropPage>
 {
