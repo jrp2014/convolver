@@ -53,7 +53,6 @@
 const DWORD UNITS = 10000000;	// 1 sec = 1 * UNITS
 const DWORD MAXSTRING = 1024;	// length
 
-const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.  1024 taps might be a better choice
 const DWORD MAX_ATTENUATION = 1000; // dB
 
 // registry location for preferences
@@ -86,16 +85,11 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE get_filterfilename(TCHAR* *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_filterfilename(TCHAR* newVal) = 0;
 
-	virtual HRESULT STDMETHODCALLTYPE get_filterformat(WAVEFORMATEX *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_filterformat(WAVEFORMATEX newVal) = 0;
-
 	virtual HRESULT STDMETHODCALLTYPE get_attenuation(double *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_attenuation(double newVal) = 0;
 
 	virtual double	decode_Attenuationdb(const DWORD dwValue) = 0;
 	virtual DWORD	encode_Attenuationdb(const double fValue) = 0;
-
-	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation(double& fAttenuation) = 0;
 
 };
 
@@ -149,13 +143,8 @@ END_COM_MAP()
 	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
 	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
 
-	STDMETHOD(get_filterformat)(WAVEFORMATEX *pVal);
-	STDMETHOD(put_filterformat)(WAVEFORMATEX newVal);
-
 	STDMETHOD(get_attenuation)(double *pVal);
 	STDMETHOD(put_attenuation)(double newVal);
-
-	STDMETHOD (calculateOptimumAttenuation)(double& fAttenuation);
 
     // IMediaObject methods
     STDMETHOD( GetStreamCount )( 
@@ -313,18 +302,12 @@ private:
 
 	double					m_fWetMix;			// percentage of effect
 	double					m_fDryMix;			// percentage of dry signal
-
-
 	double					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 
 	CConvolution<float>*	m_Convolution;			// Polymorphic processing class
-	HRESULT SelectConvolution(const WAVEFORMATEX *pWave);
 
-	CSampleBuffer<float>*	m_Filter;				// The filter to be applied
+	//CSampleBuffer<float>*	m_Filter;				// The filter to be applied
 	TCHAR					m_szFilterFileName[MAX_PATH];
-	WAVEFORMATEX			m_WfexFilterFormat;	// The format of the filter file
-	template<typename FFT_type>
-							HRESULT LoadFilter();
 
 #if defined(DEBUG) | defined(_DEBUG)
 	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output

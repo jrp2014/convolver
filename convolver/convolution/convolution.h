@@ -25,16 +25,19 @@
 #include "debugging\debugStream.h"
 #endif
 
-#include ".\sampleBuffer.h"
+#include ".\samplebuffer.h"
+#include "convolverWMP\waveformat.h"
 
 // FFT routines
 #include "fft\fftsg_h.h"
+
+const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.  1024 taps might be a better choice
 
 template <typename FFT_type>
 class CConvolution
 {
 public:
-	CConvolution(const DWORD nSampleSize, const CSampleBuffer<FFT_type>* Filter,
+	CConvolution(const DWORD nContainerSize,
 		const DWORD nInputBufferIndex = 0);					// TODO: for use with partioned convolution
 	virtual ~CConvolution(void);
 
@@ -57,7 +60,6 @@ public:
 #endif	
 		);
 
-
 	// This version of the convolution routine works on input data that is a whole number of filter lengths long
 	// It means that the output does not need to lag
 	// Returns number of bytes processed  (== number of output bytes, too)
@@ -71,21 +73,22 @@ public:
 #endif	
 		);
 
+	const HRESULT LoadFilter(TCHAR szFilterFileName[MAX_PATH]);
+
+	const CSampleBuffer<FFT_type>*	m_Filter;
+	WAVEFORMATEX					m_WfexFilterFormat;	// The format of the filter file
+
 protected:
 
 	DWORD const m_nContainerSize;							// 8, 16, 24, or 32 bits (64 not implemented)
 
 private:
 
-	const CSampleBuffer<FFT_type>*	const m_Filter;
 	const CSampleBuffer<FFT_type>*	m_InputBuffer;
 	const CSampleBuffer<FFT_type>*	m_OutputBuffer;
 	const CSampleBuffer<FFT_type>*	m_InputBufferChannelCopy;	
 
-	const WORD					m_nChannels;
-	const DWORD					m_n2xFilterLength;		// 2 x Filter size in containers (2^n, padded with zeros for radix 2 FFT)
-	const DWORD					m_nFilterLength;		// Filter size in containers
-	DWORD						m_nInputBufferIndex;	// placeholder
+	DWORD							m_nInputBufferIndex;	// placeholder
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C, const int N);
@@ -102,13 +105,12 @@ protected:
 	virtual const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
 };
 
-
 // Specializations with the appropriate functions for accessing the sample buffer
 template <typename FFT_type>
 class Cconvolution_ieeefloat : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_ieeefloat(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(float), Filter){};
+	Cconvolution_ieeefloat() : CConvolution<FFT_type>(sizeof(float)){};
 
 private:
 	const FFT_type get_sample(const BYTE* container) const
@@ -130,7 +132,7 @@ template <typename FFT_type>
 class Cconvolution_pcm8 : public CConvolution<FFT_type>
 {
 public:
-	Cconvolution_pcm8(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(BYTE), Filter){};
+	Cconvolution_pcm8() : CConvolution<FFT_type>(sizeof(BYTE)){};
 
 private:
 
@@ -155,7 +157,7 @@ template <typename FFT_type>
 class Cconvolution_pcm16 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm16(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT16), Filter){};
+	Cconvolution_pcm16() : CConvolution<FFT_type>(sizeof(INT16)){};
 
 private:
 
@@ -182,7 +184,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm24 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm24(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(3 /* Bytes */, Filter){};
+	Cconvolution_pcm24() : CConvolution<FFT_type>(3 /* Bytes */){};
 
 private:
 
@@ -244,7 +246,7 @@ template <typename FFT_type, int validBits>
 class Cconvolution_pcm32 : public CConvolution<float>
 {
 public:
-	Cconvolution_pcm32(const CSampleBuffer<FFT_type>* Filter) : CConvolution<FFT_type>(sizeof(INT32), Filter){};
+	Cconvolution_pcm32() : CConvolution<FFT_type>(sizeof(INT32)){};
 
 private:
 
@@ -298,3 +300,231 @@ private:
 		return sizeof(INT32);  // ie, 4 bytes generated
 	};
 };
+
+
+// Pick the correct version of the processing class
+//
+// TODO: build this into the Factory class.  (Probably more trouble than it is worth)
+//
+// Note that this allows multi-channel and high-resolution WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT.
+// Strictly speaking these should be WAVE_FORMAT_EXTENSIBLE, if we want to avoid ambiguity.
+// The code below assumes that for WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT, wBitsPerSample is the container size.
+// The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
+// while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
+// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+template <typename FFT_type>
+HRESULT SelectConvolution(const WAVEFORMATEX* pWave, CConvolution<FFT_type>*& convolution)
+{
+	HRESULT hr = S_OK;
+
+	if (NULL == pWave)
+	{
+		return E_POINTER;
+	}
+
+	WORD wFormatTag = pWave->wFormatTag;
+	WORD wValidBitsPerSample = pWave->wBitsPerSample;
+	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	{
+		WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+		wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
+		if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+		{
+			wFormatTag = WAVE_FORMAT_PCM;
+			// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
+		}
+		else
+			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+			{
+				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+			}
+			else
+			{
+				return E_INVALIDARG;
+			}
+	}
+
+	delete convolution;
+
+	switch (wFormatTag)
+	{
+	case WAVE_FORMAT_PCM:
+		switch (pWave->wBitsPerSample)
+		{
+			// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+			// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+			// structure to determine the valid bits per sample. (See above)
+		case 8:
+			convolution = new Cconvolution_pcm8<FFT_type>();
+			break;
+
+		case 16:
+			convolution = new Cconvolution_pcm16<FFT_type>();
+			break;
+
+		case 24:
+			{
+				switch (wValidBitsPerSample)
+				{
+				case 16:
+					convolution = new Cconvolution_pcm24<FFT_type,16>();
+					break;
+
+				case 20:
+					convolution = new Cconvolution_pcm24<FFT_type,20>();
+					break;
+
+				case 24:
+					convolution = new Cconvolution_pcm24<FFT_type,24>();
+					break;
+
+				default:
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+				}
+			}
+			break;
+
+		case 32:
+			{
+				switch (wValidBitsPerSample)
+				{
+				case 16:
+					convolution = new Cconvolution_pcm32<FFT_type,16>();
+					break;
+
+				case 20:
+					convolution = new Cconvolution_pcm32<FFT_type,20>();
+					break;
+
+				case 24:
+					convolution = new Cconvolution_pcm32<FFT_type,24>();
+					break;
+
+				case 32:
+					convolution = new Cconvolution_pcm32<FFT_type,32>();
+					break;
+
+				default:
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+				}
+			}
+			break;
+
+		default:  // Unprocessable PCM
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+		}
+		break;
+
+	case WAVE_FORMAT_IEEE_FLOAT:
+		switch (pWave->wBitsPerSample)
+		{
+		case 32:
+			convolution = new Cconvolution_ieeefloat<FFT_type>();
+			break;
+
+		default:  // Unprocessable IEEE float
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+			//break;
+		}
+		break;
+
+	default: // Not PCM or IEEE Float
+		return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+	}
+
+	return hr;
+};
+
+// Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
+template<typename FFT_type>
+HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName[MAX_PATH])
+{
+	HRESULT hr = S_OK;
+
+	CConvolution<float>* c = new Cconvolution_ieeefloat<FFT_type>(); 
+
+	if ( NULL == c )
+	{
+		return E_OUTOFMEMORY;
+	}
+
+	hr = c->LoadFilter(szFilterFileName);
+	if ( FAILED(hr) )
+		return hr;
+
+	const WORD SAMPLES = 10; // length of the test sample, in filter lengths
+	const DWORD nBufferLength =c->m_Filter->nChannels * c->m_Filter->nSamples * SAMPLES;
+	const DWORD cBufferLength = nBufferLength * sizeof(FFT_type);
+
+
+	BYTE* inputSamples = new BYTE[cBufferLength];
+	BYTE* outputSamples = new BYTE[cBufferLength];
+	float* pfInputSample = NULL;
+	float* pfOutputSample = NULL;
+
+	// Seed the random-number generator with current time so that
+	// the numbers will be different every time we run.
+	srand( (unsigned)time( NULL ) );
+
+	bool again = TRUE;
+	float maxSample = 0;
+
+	do
+	{
+		pfInputSample = reinterpret_cast<FFT_type *>(inputSamples);
+		pfOutputSample = reinterpret_cast<FFT_type *>(outputSamples);
+
+		for(DWORD i = 0; i!= nBufferLength; i++)
+		{
+			*pfInputSample = (2.0f * rand() - RAND_MAX) / RAND_MAX; // -1..1
+			*pfOutputSample = 0;  // silence
+			pfInputSample++;
+			pfOutputSample++;
+		}
+
+		// Can use the constrained version of the convolution routine as have a buffer that is a multiple of the filter size in length to process
+		c->doConvolutionConstrained(inputSamples, outputSamples,
+			/* dwBlocksToProcess */ c->m_Filter->nSamples * SAMPLES,
+			/* fAttenuation_db */ 0,
+			/* fWetMix,*/ 1.0L,
+			/* fDryMix */ 0.0L
+#if defined(DEBUG) | defined(_DEBUG)
+			, NULL
+#endif
+			);
+
+		// Scan the output buffer for larger output samples
+		again = FALSE;
+		pfOutputSample = reinterpret_cast<FFT_type *>(outputSamples);
+		for(DWORD i = 0; i!= nBufferLength; i++)
+		{
+			if (abs(*pfOutputSample) > abs(maxSample))
+			{
+				maxSample = *pfOutputSample;
+				again = TRUE; // Keep convolving until find no larger output samples
+			}
+			pfOutputSample++;
+		}
+
+	} while (again);
+
+	// maxSample 0..1
+	// 10 ^ (fAttenuation_db / 20) = 1
+	// Limit fAttenuation to +/-MAX_ATTENUATION dB
+	fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
+
+	if (fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = MAX_ATTENUATION;
+	}
+	else if (-fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = -1.0L * MAX_ATTENUATION;
+	}
+
+	delete c;
+	delete outputSamples;
+	delete inputSamples;
+
+	return hr;
+}

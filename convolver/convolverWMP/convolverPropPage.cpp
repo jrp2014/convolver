@@ -351,7 +351,13 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
 	double	fAttenuation = 0;
-	HRESULT hr = m_spConvolver->calculateOptimumAttenuation(fAttenuation);
+	TCHAR*  szFilterFileName	= TEXT("");
+
+	HRESULT hr = m_spConvolver->get_filterfilename(&szFilterFileName);
+	if (FAILED(hr))
+		return hr;
+
+	hr = calculateOptimumAttenuation<float>(fAttenuation, szFilterFileName);
 	if (FAILED(hr))
 		return hr;
 

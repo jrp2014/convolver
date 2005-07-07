@@ -35,6 +35,7 @@
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				ShowProgress="0"
 				LinkDLL="TRUE"
 				ModuleDefinitionFile="convolverwmp.def"
 				GenerateDebugInformation="TRUE"
