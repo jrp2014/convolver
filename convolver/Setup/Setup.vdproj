@@ -39,42 +39,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
-        "OwnerKey" = "8:_26559F025A87489796454BD32F1077C6"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
-        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
-        "OwnerKey" = "8:_AD1578E6B8154959BDD73C377C3F2D4B"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
-        "OwnerKey" = "8:_26559F025A87489796454BD32F1077C6"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
-        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
-        "OwnerKey" = "8:_AD1578E6B8154959BDD73C377C3F2D4B"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_AD1578E6B8154959BDD73C377C3F2D4B"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -87,6 +51,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_BF3E2A8716A84D34A5DDD11CADA0A646"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_C3AD401CC2554FB2AAA0F55A124C5DEA"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -95,6 +65,12 @@
         {
         "MsmKey" = "8:_D24236F7D37E4255B76E8A3FB0A64FDE"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_ED7F11B61A2A44FFA9CAD50AA8803A50"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
         "MsmSig" = "8:_UNDEFINED"
         }
     }
@@ -179,46 +155,6 @@
             {
             "SourcePath" = "8:comdlg32.dll"
             "TargetName" = "8:comdlg32.dll"
-            "Tag" = "8:"
-            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_77208047C4A9B7BFF73716736A0ACA47"
-            {
-            "SourcePath" = "8:d3dx9_25.dll"
-            "TargetName" = "8:d3dx9_25.dll"
-            "Tag" = "8:"
-            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_840BA650E5CC2A97B2765FB15DBA35DF"
-            {
-            "SourcePath" = "8:DSOUND.dll"
-            "TargetName" = "8:DSOUND.dll"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
             "Condition" = "8:"
@@ -330,13 +266,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{90402EA9-5F99-4E6B-B4C6-9071FDB472EF}"
-        "PackageCode" = "8:{9304C9AC-4E77-4B42-8A3C-E25D24C473E8}"
+        "ProductCode" = "8:{F160ACE6-2562-4C84-936A-2A62B45DF14D}"
+        "PackageCode" = "8:{663744D9-B142-4512-B9C7-1DD51F5BF23C}"
         "UpgradeCode" = "8:{5F9F3FA2-C6AC-4376-BBDA-DC8B70430997}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.15.0"
+        "ProductVersion" = "8:1.16.0"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
@@ -828,6 +764,34 @@
         }
         "MergeModule"
         {
+            "{35A69C6E-5BA4-440D-803D-762B59A45393}:_BF3E2A8716A84D34A5DDD11CADA0A646"
+            {
+            "UseDynamicProperties" = "11:TRUE"
+            "IsDependency" = "11:TRUE"
+            "SourcePath" = "8:vc_user_crt71_rtl_x86_---.msm"
+                "Properties"
+                {
+                }
+            "LanguageId" = "3:0"
+            "Exclude" = "11:FALSE"
+            "Folder" = "8:"
+            "Feature" = "8:"
+            "IsolateTo" = "8:"
+            }
+            "{35A69C6E-5BA4-440D-803D-762B59A45393}:_ED7F11B61A2A44FFA9CAD50AA8803A50"
+            {
+            "UseDynamicProperties" = "11:TRUE"
+            "IsDependency" = "11:TRUE"
+            "SourcePath" = "8:vc_user_stl71_rtl_x86_---.msm"
+                "Properties"
+                {
+                }
+            "LanguageId" = "3:0"
+            "Exclude" = "11:FALSE"
+            "Folder" = "8:"
+            "Feature" = "8:"
+            "IsolateTo" = "8:"
+            }
         }
         "ProjectOutput"
         {
@@ -889,7 +853,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_26559F025A87489796454BD32F1077C6"
             {
-            "SourcePath" = "8:..\\convolvercmd\\release\\convolverCMD.exe"
+            "SourcePath" = "8:..\\convolverCMD\\Release\\convolverCMD.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
