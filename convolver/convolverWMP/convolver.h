@@ -38,8 +38,6 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
-#include <time.h>
-
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugStream.h"
 #endif
@@ -52,8 +50,6 @@
 
 const DWORD UNITS = 10000000;	// 1 sec = 1 * UNITS
 const DWORD MAXSTRING = 1024;	// length
-
-const DWORD MAX_ATTENUATION = 1000; // dB
 
 // registry location for preferences
 const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");

@@ -155,7 +155,7 @@ CConvolution<typename FFT_type>::doConvolutionArbitrary(const BYTE* pbInputData,
 				// Calculate the Xi(m)
 				rdft(m_Filter->nSamples, OouraRForward, m_InputBufferChannelCopy->samples[0]);  // get DFT of m_InputBuffer
 
-				// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  m_Filter (Hz(m)) is already calculated (in AllocateStreamingResources)
+				// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  m_Filter (Hz(m)) is already calculated (in LoadFilter)
 				cmult(m_InputBufferChannelCopy->samples[0], m_Filter->samples[nChannel], m_OutputBuffer->samples[nChannel], m_Filter->nSamples);
 
 				//get back the yi
@@ -166,7 +166,8 @@ CConvolution<typename FFT_type>::doConvolutionArbitrary(const BYTE* pbInputData,
 					m_OutputBuffer->samples[nChannel][nSample] *= static_cast<FFT_type>(2.0L / (double) m_Filter->nSamples);
 
 				// move overlap block x i to previous block x i-1, hence the overlap-save method
-				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned
+				// TODO: To avoid this copy (ie, make m_InputBuffer circular), but would need to have a m_Filter that was aligned or
+				// use two InputBuffers, one lagging the other by cnFilterLength
 				for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
 					m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
 			}
@@ -255,7 +256,7 @@ CConvolution<typename FFT_type>::doConvolutionConstrained(const BYTE* pbInputDat
 				// Calculate the Xi(m)
 				rdft(m_Filter->nSamples, OouraRForward, m_InputBufferChannelCopy->samples[0]);  // get DFT of m_InputBuffer
 
-				// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  m_Filter (Hz(m)) is already calculated (in AllocateStreamingResources)
+				// Multiply point by point the complex Yi(m) = Xi(m)Hz(m).  m_Filter (Hz(m)) is already calculated (in LoadFilter)
 				cmult(m_InputBufferChannelCopy->samples[0], m_Filter->samples[nChannel], m_OutputBuffer->samples[nChannel], m_Filter->nSamples);
 
 				//get back the yi
@@ -266,7 +267,8 @@ CConvolution<typename FFT_type>::doConvolutionConstrained(const BYTE* pbInputDat
 					m_OutputBuffer->samples[nChannel][nSample] *= static_cast<FFT_type>(2.0L / (double) m_Filter->nSamples);
 
 				// move overlap block x i to previous block x i-1, hence the overlap-save method
-				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned
+				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned or
+				// use two InputBuffers, one lagging the other by cnFilterLength
 				for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
 					m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
 			}
@@ -468,7 +470,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 	if (m_InputBufferChannelCopy == NULL)
 		return E_OUTOFMEMORY;
 
-	DWORD dwSizeToRead = m_WfexFilterFormat.wBitsPerSample / 8;  // in bytes
+	const DWORD dwSizeToRead = m_WfexFilterFormat.wBitsPerSample / 8;  // in bytes
 	DWORD dwSizeRead = 0;
 
 	FFT_type sample = 0;

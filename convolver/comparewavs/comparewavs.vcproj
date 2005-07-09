@@ -134,6 +134,58 @@
 						UsePrecompiledHeader="1"/>
 				</FileConfiguration>
 			</File>
+			<Filter
+				Name="Common"
+				Filter="">
+				<File
+					RelativePath="..\Common\dxstdafx.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\dxstdafx.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUT.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUT.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTenum.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTenum.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTgui.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTgui.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTMesh.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTMesh.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTmisc.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTmisc.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTSettingsDlg.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTSettingsDlg.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTsound.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTsound.h">
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -147,58 +199,6 @@
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
-		</Filter>
-		<Filter
-			Name="Common"
-			Filter="">
-			<File
-				RelativePath="..\Common\dxstdafx.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\dxstdafx.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUT.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUT.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTenum.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTenum.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTgui.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTgui.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTMesh.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTMesh.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTmisc.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTmisc.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTSettingsDlg.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTSettingsDlg.h">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTsound.cpp">
-			</File>
-			<File
-				RelativePath="..\Common\DXUTsound.h">
-			</File>
 		</Filter>
 		<File
 			RelativePath=".\ReadMe.txt">

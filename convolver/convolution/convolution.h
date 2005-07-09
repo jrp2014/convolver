@@ -21,6 +21,8 @@
 // Pull in Common DX classes
 #include "Common\dxstdafx.h"
 
+#include <time.h>
+
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugStream.h"
 #endif
@@ -32,6 +34,7 @@
 #include "fft\fftsg_h.h"
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.  1024 taps might be a better choice
+const DWORD MAX_ATTENUATION = 1000; // dB
 
 template <typename FFT_type>
 class CConvolution
@@ -77,6 +80,7 @@ public:
 
 	const CSampleBuffer<FFT_type>*	m_Filter;
 	WAVEFORMATEX					m_WfexFilterFormat;	// The format of the filter file
+	// TODO: Need to keep the number of source channels, and either mix them, or use a sub-set, if the filter has more channels
 
 protected:
 
@@ -450,15 +454,29 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 
 	hr = c->LoadFilter(szFilterFileName);
 	if ( FAILED(hr) )
+	{
+		delete c;
 		return hr;
+	}
 
-	const WORD SAMPLES = 10; // length of the test sample, in filter lengths
+	const WORD SAMPLES = 5; // length of the test sample, in filter lengths
 	const DWORD nBufferLength =c->m_Filter->nChannels * c->m_Filter->nSamples * SAMPLES;
 	const DWORD cBufferLength = nBufferLength * sizeof(FFT_type);
 
 
-	BYTE* inputSamples = new BYTE[cBufferLength];
-	BYTE* outputSamples = new BYTE[cBufferLength];
+	BYTE* pbInputSamples = new BYTE[cBufferLength];
+	if (NULL == pbInputSamples)
+	{
+		delete c;
+		return E_OUTOFMEMORY;
+	}
+	BYTE* pbOutputSamples = new BYTE[cBufferLength];
+	if (NULL == pbOutputSamples)
+	{
+		delete c;
+		delete pbInputSamples;
+		return E_OUTOFMEMORY;
+	}
 	float* pfInputSample = NULL;
 	float* pfOutputSample = NULL;
 
@@ -471,8 +489,8 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 
 	do
 	{
-		pfInputSample = reinterpret_cast<FFT_type *>(inputSamples);
-		pfOutputSample = reinterpret_cast<FFT_type *>(outputSamples);
+		pfInputSample = reinterpret_cast<FFT_type *>(pbInputSamples);
+		pfOutputSample = reinterpret_cast<FFT_type *>(pbOutputSamples);
 
 		for(DWORD i = 0; i!= nBufferLength; i++)
 		{
@@ -483,7 +501,7 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 		}
 
 		// Can use the constrained version of the convolution routine as have a buffer that is a multiple of the filter size in length to process
-		c->doConvolutionConstrained(inputSamples, outputSamples,
+		c->doConvolutionConstrained(pbInputSamples, pbOutputSamples,
 			/* dwBlocksToProcess */ c->m_Filter->nSamples * SAMPLES,
 			/* fAttenuation_db */ 0,
 			/* fWetMix,*/ 1.0L,
@@ -495,7 +513,7 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 
 		// Scan the output buffer for larger output samples
 		again = FALSE;
-		pfOutputSample = reinterpret_cast<FFT_type *>(outputSamples);
+		pfOutputSample = reinterpret_cast<FFT_type *>(pbOutputSamples);
 		for(DWORD i = 0; i!= nBufferLength; i++)
 		{
 			if (abs(*pfOutputSample) > abs(maxSample))
@@ -511,7 +529,9 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 	// maxSample 0..1
 	// 10 ^ (fAttenuation_db / 20) = 1
 	// Limit fAttenuation to +/-MAX_ATTENUATION dB
-	fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
+	// TODO: Is this really the right formula; seems to produce v conservative results
+	//fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
+	fAttenuation = abs(maxSample) > 1e-8 ? 10.0f * log(1.0f / abs(maxSample)) : 0; // TODO: 
 
 	if (fAttenuation > MAX_ATTENUATION)
 	{
@@ -523,8 +543,8 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 	}
 
 	delete c;
-	delete outputSamples;
-	delete inputSamples;
+	delete pbOutputSamples;
+	delete pbInputSamples;
 
 	return hr;
 }

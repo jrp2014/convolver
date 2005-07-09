@@ -152,6 +152,6 @@ const WORD BitsPerSample(const WAVEFORMATEX* w)
 std::string waveFormatDescription(const WAVEFORMATEX* w, const DWORD samples, const char* prefix)
 {
 	std::ostringstream s;
-	s << prefix << BitsPerSample(w) << "-bit " << w->nSamplesPerSec/1000 << "kHz " << channelDescription(w) << " " << formatDescription(w) << ", " << samples << " samples";
+	s << prefix << BitsPerSample(w) << "-bit " << w->nSamplesPerSec/1000.0f << "kHz " << channelDescription(w) << " " << formatDescription(w) << ", " << samples << " samples";
 	return s.str();
 }

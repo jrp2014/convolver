@@ -717,17 +717,21 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 	hr = SelectConvolution(pWave, m_Convolution); // Sets m_Convolution 
 	if (FAILED(hr))
+	{
 		return hr;
+	}
 
 	// Set m_Filter and m_WfexFilterFormat
 	hr = m_Convolution->LoadFilter(m_szFilterFileName);
 	if (FAILED(hr))
+	{
 		return hr;
+	}
 
 	// Check that the filter has the same number of channels and sample rate as the input
 	if ((pWave->nChannels != m_Convolution->m_Filter->nChannels) ||
 		(pWave->nSamplesPerSec != m_Convolution->m_WfexFilterFormat.nSamplesPerSec))
-		return hr;
+		return E_INVALIDARG;
 
 
 #if defined(DEBUG) | defined(_DEBUG)

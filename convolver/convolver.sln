@@ -15,6 +15,10 @@ Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Setup", "Setup\Setup.vdproj
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverCMD", "convolverCMD\convolverCMD.vcproj", "{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -34,6 +38,10 @@ Global
 		{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}.Release.Build.0 = Release|Win32
 		{F1B6A301-8DCE-432E-831A-95F7BF4BA1DF}.Debug.ActiveCfg = Debug
 		{F1B6A301-8DCE-432E-831A-95F7BF4BA1DF}.Release.ActiveCfg = Release
+		{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}.Debug.ActiveCfg = Debug|Win32
+		{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}.Debug.Build.0 = Debug|Win32
+		{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}.Release.ActiveCfg = Release|Win32
+		{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection
