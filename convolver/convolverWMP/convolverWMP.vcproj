@@ -85,6 +85,7 @@
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL"
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
+				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
@@ -104,6 +105,7 @@
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				SetChecksum="TRUE"
 				BaseAddress="254803968"
 				TargetMachine="1"/>
 			<Tool

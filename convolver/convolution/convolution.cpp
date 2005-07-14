@@ -168,8 +168,9 @@ CConvolution<typename FFT_type>::doConvolutionArbitrary(const BYTE* pbInputData,
 				// move overlap block x i to previous block x i-1, hence the overlap-save method
 				// TODO: To avoid this copy (ie, make m_InputBuffer circular), but would need to have a m_Filter that was aligned or
 				// use two InputBuffers, one lagging the other by cnFilterLength
-				for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
-					m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
+				memcpy(&(m_InputBuffer->samples[nChannel][cnFilterLength]), &(m_InputBuffer->samples[nChannel][0]), cnFilterLength * m_nContainerSize);
+				//for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
+				//	m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
 			}
 
 			m_nInputBufferIndex = 0;
@@ -269,8 +270,9 @@ CConvolution<typename FFT_type>::doConvolutionConstrained(const BYTE* pbInputDat
 				// move overlap block x i to previous block x i-1, hence the overlap-save method
 				// TODO: To avoid this copy (ie, make m_InputBuffer circular), would need to have a m_Filter that was aligned or
 				// use two InputBuffers, one lagging the other by cnFilterLength
-				for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
-					m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
+				memcpy(&(m_InputBuffer->samples[nChannel][cnFilterLength]), &(m_InputBuffer->samples[nChannel][0]), cnFilterLength * m_nContainerSize);
+				//for (DWORD nSample = 0; nSample != cnFilterLength; nSample++)
+				//	m_InputBuffer->samples[nChannel][nSample + cnFilterLength] = m_InputBuffer->samples[nChannel][nSample]; // TODO: MemCpy
 			}
 
 			// Now copy the convolved values (in FFT_type format) from OutputBuffer to OutputData (in byte stream PCM, IEEE, etc, format)

@@ -97,16 +97,11 @@ private:
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	void cmult(const FFT_type * A, const FFT_type * B, FFT_type * C, const int N);
 
-	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
-	{
-		return fAttenuation_db == 0 ? sample : 
-		static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
-	}
-
 protected:
 	// Pure virtual functions that convert from a the sample type, to the FFT type
 	virtual const FFT_type get_sample(const BYTE* container) const = 0;						// converts sample into a value of the right type
 	virtual const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const = 0;	// returns number of bytes processed
+	virtual const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const = 0;
 };
 
 // Specializations with the appropriate functions for accessing the sample buffer
@@ -129,6 +124,12 @@ private:
 		//* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
 		return sizeof(float);
 	};
+
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	{
+		return fAttenuation_db == 0 ? sample : 
+		static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
+	}
 };
 
 // 8-bit sound is 0..255 with 128 == silence
@@ -154,6 +155,12 @@ private:
 		*dstContainer = static_cast<BYTE>(srcSample + 128);
 		return sizeof(BYTE); // ie, 1 byte
 	};
+
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	{
+		return (fAttenuation_db == 0 ? sample  : 
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)))) / 128.0;
+	}
 };
 
 // 16-bit sound is -32768..32767 with 0 == silence
@@ -181,6 +188,12 @@ private:
 		//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
 		return sizeof(INT16);  // ie, 2 bytes produced
 	};
+
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	{
+		return (fAttenuation_db == 0 ? sample  : 
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)))) / 32768.0;
+	}
 };
 
 // 24-bit sound
@@ -242,6 +255,13 @@ private:
 
 		return 3; // ie, 3 bytes generated
 	};
+
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	{
+		return (fAttenuation_db == 0 ? sample  : 
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)))) / 8388608.0;
+	}
+
 };
 
 
@@ -303,6 +323,12 @@ private:
 		//*reinterpret_cast<INT32*>(dstContainer) = static_cast<INT32>(srcSample);
 		return sizeof(INT32);  // ie, 4 bytes generated
 	};
+
+	const FFT_type attenuated_sample(const double fAttenuation_db, const FFT_type sample) const
+	{
+		return (fAttenuation_db == 0 ? sample  : 
+			static_cast<FFT_type>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)))) / 2147483648.0;
+	}
 };
 
 
@@ -530,8 +556,8 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 	// 10 ^ (fAttenuation_db / 20) = 1
 	// Limit fAttenuation to +/-MAX_ATTENUATION dB
 	// TODO: Is this really the right formula; seems to produce v conservative results
-	//fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
-	fAttenuation = abs(maxSample) > 1e-8 ? 10.0f * log(1.0f / abs(maxSample)) : 0; // TODO: 
+	fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
+	//fAttenuation = abs(maxSample) > 1e-8 ? 10.0f * log(1.0f / abs(maxSample)) : 0; // TODO: 
 
 	if (fAttenuation > MAX_ATTENUATION)
 	{

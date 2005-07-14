@@ -165,6 +165,12 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	if (ERROR_SUCCESS == lResult)
 	{
 		lResult = key.SetDWORDValue( kszPrefsWetmix, dwWetmix );
+
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to save effect level to registry.") );
+			return lResult;
+		}
 	}
 
 	// Write the attenuation value to the registry.
@@ -172,6 +178,12 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	if (ERROR_SUCCESS == lResult)
 	{
 		lResult = key.SetDWORDValue( kszPrefsAttenuation, dwAttenuation );
+
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to save attenuation to registry.") );
+			return lResult;
+		}
 	}
 
 	// Write the filter filename to the registry.
@@ -182,6 +194,12 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
 
 		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
+
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to save filename to registry.") );
+			return lResult;
+		}
 	}
 
 	// update the plug-in
@@ -336,7 +354,38 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	hr = DisplayFilterFormat(szFilterFileName);
 
-	SetDirty(TRUE);
+	// Save the filter filename (without needing to apply)
+	// update the registry
+	CRegKey key;
+
+	// Write the filter filename to the registry.
+	LONG lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		// Get the filter file name from the dialog box.
+		GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
+
+		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
+
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to save filename to registry.") );
+			return lResult;
+		}
+	}
+
+	hr = m_spConvolver->put_filterfilename(szFilterFileName);
+	if (FAILED(hr))
+	{
+		TCHAR   szStr[MAXSTRING] = { 0 };
+		if (::LoadString(_Module.GetResourceInstance(), IDS_FILTERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+		{
+			MessageBox(szStr);
+		}
+		return hr;
+	}
+
+	//SetDirty(TRUE);
 
 	return ERROR_SUCCESS;
 }
@@ -355,11 +404,17 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 
 	HRESULT hr = m_spConvolver->get_filterfilename(&szFilterFileName);
 	if (FAILED(hr))
+	{
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
 		return hr;
+	}
 
 	hr = calculateOptimumAttenuation<float>(fAttenuation, szFilterFileName);
 	if (FAILED(hr))
+	{
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );  // TODO: internationalize
 		return hr;
+	}
 
 	// Display the attenuation.
 	TCHAR   szStr[MAXSTRING] = { 0 };
