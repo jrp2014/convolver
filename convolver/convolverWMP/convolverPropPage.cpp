@@ -89,7 +89,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	{
 		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
 		// TODO: internationalisation of Filter:
-		std::string description = waveFormatDescription(pFilterWave->GetFormat(), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
+		std::string description = waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat()), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
 		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
 	}
 	SAFE_DELETE(pFilterWave);

@@ -27,4 +27,4 @@
 #include <iomanip>
 
 
-std::string waveFormatDescription(const WAVEFORMATEX* w, const DWORD samples, const char* prefix);
+std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix);

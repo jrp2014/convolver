@@ -15,14 +15,62 @@
     {
         "Entry"
         {
+        "MsmKey" = "8:_23B880FF8A51E485B04EBD7D12B8D10D"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_26559F025A87489796454BD32F1077C6"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
+        "MsmKey" = "8:_36B5E90B5A8A06175E27D2D8B79AAFCB"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_553618143C9948AC9462DB7BE43CEF51"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
+        "OwnerKey" = "8:_26559F025A87489796454BD32F1077C6"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_77208047C4A9B7BFF73716736A0ACA47"
+        "OwnerKey" = "8:_AD1578E6B8154959BDD73C377C3F2D4B"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
+        "OwnerKey" = "8:_26559F025A87489796454BD32F1077C6"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
+        "OwnerKey" = "8:_B7A4B64573734FB9AB073FCFA9555E92"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_840BA650E5CC2A97B2765FB15DBA35DF"
+        "OwnerKey" = "8:_AD1578E6B8154959BDD73C377C3F2D4B"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -107,6 +155,86 @@
         }
         "File"
         {
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_23B880FF8A51E485B04EBD7D12B8D10D"
+            {
+            "SourcePath" = "8:msdmo.dll"
+            "TargetName" = "8:msdmo.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_36B5E90B5A8A06175E27D2D8B79AAFCB"
+            {
+            "SourcePath" = "8:comdlg32.dll"
+            "TargetName" = "8:comdlg32.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_77208047C4A9B7BFF73716736A0ACA47"
+            {
+            "SourcePath" = "8:d3dx9_25.dll"
+            "TargetName" = "8:d3dx9_25.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_840BA650E5CC2A97B2765FB15DBA35DF"
+            {
+            "SourcePath" = "8:DSOUND.dll"
+            "TargetName" = "8:DSOUND.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{A582A373-4685-4296-BEFE-614B80A702C3}:_C3AD401CC2554FB2AAA0F55A124C5DEA"
             {
             "SourcePath" = "8:multichan.ico"
@@ -202,13 +330,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{25DF875C-4818-4FC9-8665-C3C23BC045AC}"
-        "PackageCode" = "8:{A63F5E12-9F57-4F8F-B065-4F9C7BF2F2EF}"
+        "ProductCode" = "8:{E4D710F4-22D5-46DD-A7F4-5E254D938F2B}"
+        "PackageCode" = "8:{0D0EA415-1EC4-498C-B2BC-00C39C33467F}"
         "UpgradeCode" = "8:{5F9F3FA2-C6AC-4376-BBDA-DC8B70430997}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.17.0"
+        "ProductVersion" = "8:1.18.0"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"

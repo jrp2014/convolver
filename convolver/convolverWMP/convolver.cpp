@@ -580,7 +580,13 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
 
 	// Return the input buffer alignment, in bytes.
-	*pcbAlignment = pWave->nBlockAlign;
+	// TODO: This does not work, because this routine is called before AllocateStreaming resources loads the filter
+	if (m_Convolution && m_Convolution->m_Filter)
+	{
+		*pcbAlignment = pWave->nBlockAlign * m_Convolution->m_Filter->nSamples;
+	}
+	else
+		*pcbAlignment = pWave->nBlockAlign;
 
 	return S_OK;
 }
@@ -730,7 +736,7 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 	// Check that the filter has the same number of channels and sample rate as the input
 	if ((pWave->nChannels != m_Convolution->m_Filter->nChannels) ||
-		(pWave->nSamplesPerSec != m_Convolution->m_WfexFilterFormat.nSamplesPerSec))
+		(pWave->nSamplesPerSec != m_Convolution->m_WfexFilterFormat.Format.nSamplesPerSec))
 		return E_INVALIDARG;
 
 

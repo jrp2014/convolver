@@ -396,25 +396,21 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 	}
 
 	// Save filter characteristic, for access by the properties page, etc
-	m_WfexFilterFormat.cbSize = pFilterWave->GetFormat()->cbSize;
-	m_WfexFilterFormat.nAvgBytesPerSec = pFilterWave->GetFormat()->nAvgBytesPerSec;
-	m_WfexFilterFormat.nBlockAlign = pFilterWave->GetFormat()->nBlockAlign;
-	m_WfexFilterFormat.nChannels = pFilterWave->GetFormat()->nChannels;
-	m_WfexFilterFormat.nSamplesPerSec = pFilterWave->GetFormat()->nSamplesPerSec;
-	WORD wValidBitsPerSample = m_WfexFilterFormat.wBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
-	WORD wFormatTag = m_WfexFilterFormat.wFormatTag = pFilterWave->GetFormat()->wFormatTag;
+	::ZeroMemory( &m_WfexFilterFormat, sizeof(m_WfexFilterFormat));
+	m_WfexFilterFormat = * reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat());
 
+	WORD wValidBitsPerSample = pFilterWave->GetFormat()->wBitsPerSample;
+	WORD wFormatTag = pFilterWave->GetFormat()->wFormatTag;
 	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
-		WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pFilterWave->GetFormat();
-		wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
-		if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+		wValidBitsPerSample = m_WfexFilterFormat.Samples.wValidBitsPerSample;
+		if (m_WfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 		{
 			wFormatTag = WAVE_FORMAT_PCM;
-			// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
+			// TODO: cross-check m_WfexFilterFormat->Samples.wSamplesPerBlock
 		}
 		else
-			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+			if (m_WfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
 			{
 				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
 			}
@@ -424,7 +420,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 			}
 	}
 
-	DWORD cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.nBlockAlign;  // Filter length in samples (Nh)
+	DWORD cFilterLength = pFilterWave->GetSize() / m_WfexFilterFormat.Format.nBlockAlign;  // Filter length in samples (Nh)
 
 	// Check that the filter is not too big ...
 	if ( cFilterLength > MAX_FILTER_SIZE )
@@ -452,18 +448,18 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 
 	// Initialise the Filter and the various sample buffers that will be used during processing
 	delete m_Filter;
-	m_Filter = new CSampleBuffer<float>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
+	m_Filter = new CSampleBuffer<float>(m_WfexFilterFormat.Format.nChannels, c2xPaddedFilterLength);
 	if (m_Filter == NULL)
 		return E_OUTOFMEMORY;
 
 	// Also initialize the class buffers
 	delete m_InputBuffer;
-	m_InputBuffer = new CSampleBuffer<FFT_type>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
+	m_InputBuffer = new CSampleBuffer<FFT_type>(m_WfexFilterFormat.Format.nChannels, c2xPaddedFilterLength);
 	if (m_InputBuffer == NULL)
 		return E_OUTOFMEMORY;
 
 	delete m_OutputBuffer;
-	m_OutputBuffer = new CSampleBuffer<FFT_type>(m_WfexFilterFormat.nChannels, c2xPaddedFilterLength);
+	m_OutputBuffer = new CSampleBuffer<FFT_type>(m_WfexFilterFormat.Format.nChannels, c2xPaddedFilterLength);
 	if (m_OutputBuffer == NULL)
 		return E_OUTOFMEMORY;
 
@@ -472,7 +468,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 	if (m_InputBufferChannelCopy == NULL)
 		return E_OUTOFMEMORY;
 
-	const DWORD dwSizeToRead = m_WfexFilterFormat.wBitsPerSample / 8;  // in bytes
+	const DWORD dwSizeToRead = m_WfexFilterFormat.Format.wBitsPerSample / 8;  // in bytes
 	DWORD dwSizeRead = 0;
 
 	FFT_type sample = 0;
@@ -508,7 +504,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 			switch (wFormatTag)
 			{
 			case WAVE_FORMAT_PCM:
-				switch (m_WfexFilterFormat.wBitsPerSample)	// container size
+				switch (m_WfexFilterFormat.Format.wBitsPerSample)	// container size
 				{
 				case 8:
 					{
@@ -577,7 +573,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 				break;
 
 			case WAVE_FORMAT_IEEE_FLOAT:
-				switch (m_WfexFilterFormat.wBitsPerSample)
+				switch (m_WfexFilterFormat.Format.wBitsPerSample)
 				{
 				case 24:
 					return E_NOTIMPL;
@@ -612,7 +608,7 @@ const HRESULT CConvolution<FFT_type>::LoadFilter(TCHAR szFilterFileName[MAX_PATH
 	delete pFilterWave;
 
 	// Now create a FFT of the filter
-	for (unsigned short nChannel=0; nChannel != m_WfexFilterFormat.nChannels; nChannel++)
+	for (unsigned short nChannel=0; nChannel != m_WfexFilterFormat.Format.nChannels; nChannel++)
 	{
 		rdft(c2xPaddedFilterLength, OouraRForward, m_Filter->samples[nChannel]);		
 	}

@@ -26,7 +26,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		SAFE_DELETE(WavIn);
 		return hr;
 	}
-	std::cerr << waveFormatDescription(WavIn->GetFormat(), WavIn->GetSize() / WavIn->GetFormat()->nBlockAlign, "Input file format: ") << std::endl;
+	std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(WavIn->GetFormat()), WavIn->GetSize() / WavIn->GetFormat()->nBlockAlign, "Input file format: ") << std::endl;
 
 	CConvolution<float>* conv = NULL; 
 	hr = SelectConvolution(WavIn->GetFormat(), conv); // Sets conv 
@@ -53,12 +53,12 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	std::cerr << waveFormatDescription(&(conv->m_WfexFilterFormat), conv->m_Filter->nSamples, "Filter format: ") << std::endl;
 
-	if (conv->m_WfexFilterFormat.nAvgBytesPerSec != WavIn->GetFormat()->nAvgBytesPerSec ||
-		conv->m_WfexFilterFormat.nBlockAlign != WavIn->GetFormat()->nBlockAlign ||
-		conv->m_WfexFilterFormat.nChannels != WavIn->GetFormat()->nChannels ||
-		conv->m_WfexFilterFormat.nSamplesPerSec!= WavIn->GetFormat()->nSamplesPerSec ||
-		conv->m_WfexFilterFormat.wBitsPerSample != WavIn->GetFormat()->wBitsPerSample ||
-		conv->m_WfexFilterFormat.wFormatTag != WavIn->GetFormat()->wFormatTag)
+	if (conv->m_WfexFilterFormat.Format.nAvgBytesPerSec != WavIn->GetFormat()->nAvgBytesPerSec ||
+		conv->m_WfexFilterFormat.Format.nBlockAlign != WavIn->GetFormat()->nBlockAlign ||
+		conv->m_WfexFilterFormat.Format.nChannels != WavIn->GetFormat()->nChannels ||
+		conv->m_WfexFilterFormat.Format.nSamplesPerSec!= WavIn->GetFormat()->nSamplesPerSec ||
+		conv->m_WfexFilterFormat.Format.wBitsPerSample != WavIn->GetFormat()->wBitsPerSample ||
+		conv->m_WfexFilterFormat.Format.wFormatTag != WavIn->GetFormat()->wFormatTag)
 	{
 		std::cerr << "Filter format not the same Input file format" << std::endl;
 		delete conv;

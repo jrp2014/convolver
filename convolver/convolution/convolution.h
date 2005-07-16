@@ -79,7 +79,7 @@ public:
 	const HRESULT LoadFilter(TCHAR szFilterFileName[MAX_PATH]);
 
 	const CSampleBuffer<FFT_type>*	m_Filter;
-	WAVEFORMATEX					m_WfexFilterFormat;	// The format of the filter file
+	WAVEFORMATEXTENSIBLE					m_WfexFilterFormat;	// The format of the filter file
 	// TODO: Need to keep the number of source channels, and either mix them, or use a sub-set, if the filter has more channels
 
 protected:
@@ -147,7 +147,9 @@ private:
 	};
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
-	{   // Truncate if exceeded full scale.
+	{   
+		srcSample *= 128.0;
+		// Truncate if exceeded full scale.
 		if (srcSample > 127)
 			srcSample = 127;
 		if (srcSample < -128)
@@ -178,7 +180,9 @@ private:
 	}; 	// TODO: find a cleaner way to do this
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
-	{   // Truncate if exceeded full scale.
+	{   
+		srcSample *= 32768.0;
+		// Truncate if exceeded full scale.
 		if (srcSample > 32767)
 			srcSample = 32767;
 		else
@@ -225,6 +229,7 @@ private:
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
+		srcSample *= 8388608.0;
 		int iClip = 0;
 		switch (validBits)
 		{
@@ -296,6 +301,7 @@ private:
 
 	const DWORD normalize_sample(BYTE* dstContainer, double srcSample) const
 	{   
+		srcSample *= 2147483648.0;
 		INT32 iClip = 0;
 		switch (validBits)
 		{
@@ -555,9 +561,7 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 	// maxSample 0..1
 	// 10 ^ (fAttenuation_db / 20) = 1
 	// Limit fAttenuation to +/-MAX_ATTENUATION dB
-	// TODO: Is this really the right formula; seems to produce v conservative results
 	fAttenuation = abs(maxSample) > 1e-8 ? 20.0f * log(1.0f / abs(maxSample)) : 0;
-	//fAttenuation = abs(maxSample) > 1e-8 ? 10.0f * log(1.0f / abs(maxSample)) : 0; // TODO: 
 
 	if (fAttenuation > MAX_ATTENUATION)
 	{
