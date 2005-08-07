@@ -51,11 +51,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		goto exit;
 	}
 
-	if ( WavF1->GetSize() != WavF2->GetSize() )
-	{
-		_tprintf(TEXT("File sizes not equal: %i, %i\n"), WavF1->GetSize(), WavF2->GetSize());
-	}
-
 	if ( WavF1->GetFormat()->nAvgBytesPerSec != WavF2->GetFormat()->nAvgBytesPerSec)
 	{
 		_tprintf(TEXT("AvgBytesPerSec not equal: %i, %i\n"), WavF1->GetFormat()->nAvgBytesPerSec, WavF2->GetFormat()->nAvgBytesPerSec);
@@ -129,6 +124,12 @@ int _tmain(int argc, _TCHAR* argv[])
 
 #endif
 
+	if ( WavF1->GetSize() != WavF2->GetSize() )
+	{
+		_tprintf(TEXT("File sizes not equal: %i, %i\n"), WavF1->GetSize(), WavF2->GetSize());
+	}
+
+
 	DWORD dwSizeRead = 0;
 
 	WavF1->ResetFile();
@@ -153,9 +154,9 @@ int _tmain(int argc, _TCHAR* argv[])
 					float fSample2 = 0;
 					float fSampleDiff = 0;
 
-					for (unsigned int block=0; block < min(nSkipBlocks1, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign); block++)
+					for (int block=0; block < min(nSkipBlocks1, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign);++block)
 					{
-						for (unsigned int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
+						for (int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF1->Read((BYTE*)&fSample1, dwSampleSize, &dwSizeRead)))
 							{
@@ -165,9 +166,9 @@ int _tmain(int argc, _TCHAR* argv[])
 						}
 					}
 
-					for (unsigned int block=0; block < min(nSkipBlocks2, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign); block++)
+					for (int block=0; block < min(nSkipBlocks2, WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign);++block)
 					{
-						for (unsigned int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
+						for (int channel=0; channel < WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF2->Read((BYTE*)&fSample2, dwSampleSize, &dwSizeRead)))
 							{
@@ -177,20 +178,30 @@ int _tmain(int argc, _TCHAR* argv[])
 						}
 					}
 
-					for (unsigned int block=max(nSkipBlocks1, nSkipBlocks2); block < WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign; block++)
+					for (int block=max(nSkipBlocks1, nSkipBlocks2); block < (WavF1->GetSize() / WavF1->GetFormat()->nBlockAlign);++block)
 					{
-						for (unsigned int channel=0; channel <WavF1->GetFormat()->nChannels; channel++)
+						for (int channel=0; channel <WavF1->GetFormat()->nChannels; channel++)
 						{
 							if (hr = FAILED(WavF1->Read((BYTE*)&fSample1, dwSampleSize, &dwSizeRead)))
 							{
 								_tprintf(TEXT("Failed to read sample from %s\n"), argv[1]);
 								goto exit;
 							}
+							if (dwSampleSize != dwSizeRead)
+							{
+								_tprintf(TEXT("Failed to read sample from %s\n"), argv[1]);
+								fSample1 = 0;
+							}
 
 							if (hr = FAILED(WavF2->Read((BYTE*)&fSample2, dwSampleSize, &dwSizeRead)))
 							{
 								_tprintf(TEXT("Failed to read sample from %s\n"), argv[3]);
 								goto exit;
+							}
+							if (dwSampleSize != dwSizeRead)
+							{
+								_tprintf(TEXT("Failed to read sample from %s\n"), argv[3]);
+								fSample2 = 0;
 							}
 
 							fSampleDiff = fSample1 - fSample2;

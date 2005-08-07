@@ -165,6 +165,16 @@
 				RelativePath=".\waveformat.cpp">
 			</File>
 			<Filter
+				Name="fft"
+				Filter="">
+				<File
+					RelativePath="..\fft\fftsg_h.cpp">
+				</File>
+				<File
+					RelativePath="..\fft\fftsg_h.h">
+				</File>
+			</Filter>
+			<Filter
 				Name="Common"
 				Filter="">
 				<File
@@ -217,16 +227,6 @@
 				</File>
 			</Filter>
 			<Filter
-				Name="fft"
-				Filter="">
-				<File
-					RelativePath="..\fft\fftsg_h.cpp">
-				</File>
-				<File
-					RelativePath="..\fft\fftsg_h.h">
-				</File>
-			</Filter>
-			<Filter
 				Name="debugging"
 				Filter="">
 				<File
@@ -240,6 +240,12 @@
 				</File>
 				<File
 					RelativePath="..\debugging\debugStream.h">
+				</File>
+				<File
+					RelativePath="..\debugging\fastTiming.cpp">
+				</File>
+				<File
+					RelativePath="..\debugging\fastTiming.h">
 				</File>
 			</Filter>
 			<Filter
@@ -264,19 +270,10 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
-					RelativePath="..\convolution\convolutionInst.cpp">
-					<FileConfiguration
-						Name="Debug|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-					</FileConfiguration>
+					RelativePath="..\convolution\filter.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\filter.h">
 				</File>
 				<File
 					RelativePath="..\convolution\samplebuffer.cpp">
@@ -296,21 +293,6 @@
 				<File
 					RelativePath="..\convolution\samplebuffer.h">
 				</File>
-				<File
-					RelativePath="..\convolution\samplebufferInst.cpp">
-					<FileConfiguration
-						Name="Debug|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-					</FileConfiguration>
-				</File>
 			</Filter>
 		</Filter>
 		<Filter
@@ -327,10 +309,10 @@
 				RelativePath=".\resource.h">
 			</File>
 			<File
-				RelativePath=".\samplebuffer.h">
+				RelativePath=".\StdAfx.h">
 			</File>
 			<File
-				RelativePath=".\StdAfx.h">
+				RelativePath=".\wavefile.h">
 			</File>
 			<File
 				RelativePath=".\waveformat.h">

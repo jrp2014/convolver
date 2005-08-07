@@ -39,28 +39,23 @@
 // Constructor
 /////////////////////////////////////////////////////////////////////////////
 
-CConvolver::CConvolver()
+CConvolver::CConvolver() :
+	m_fWetMix(0.50),  // default to 50 percent wet
+	m_fDryMix(0.50),  // default to 50 percent dry
+	m_fAttenuation_db(encode_Attenuationdb(0)), // default attenuation
+	m_cbInputLength(0),
+	m_pbInputData (NULL),
+	m_bValidTime(false),
+	m_rtTimestamp(0),
+	m_bEnabled(TRUE),
+	m_nPartitions(0), // default, just overlap-save
+	m_Convolution(NULL)
 {
-	m_fWetMix = 0.50;  // default to 50 percent wet
-	m_fDryMix = 0.50;  // default to 50 percent dry
 
-	m_fAttenuation_db = 0; // default attenuation
-
-	m_cbInputLength = 0;
-	m_pbInputData = NULL;
-	m_bValidTime = false;
-	m_rtTimestamp = 0;
-	m_bEnabled = TRUE;
 	m_szFilterFileName[0] = 0;
-
-	m_Convolution=NULL;
 
 	::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
 	::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
-
-#if defined(DEBUG) | defined(_DEBUG)
-	m_CWaveFileTrace = NULL;
-#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -92,6 +87,11 @@ HRESULT CConvolver::FinalConstruct()
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkWindows::sOnly);
 	apDebugSinkWindows::sOnly.showHeader (true);
+
+	// 3 = function call trace
+	apDebug::gOnly().set(0);
+
+	DEBUGGING(3, cdebug << "FinalConstruct" << std::endl;);
 #endif
 
 	lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
@@ -113,7 +113,6 @@ HRESULT CConvolver::FinalConstruct()
 		{
 			// Convert the DWORD to a double.
 			m_fAttenuation_db = decode_Attenuationdb(dwValue);
-
 		}
 
 		// Read the filter file name from the registry. 
@@ -122,23 +121,19 @@ HRESULT CConvolver::FinalConstruct()
 
 		// Read the filter filename value.
 		lResult = key.QueryStringValue(kszPrefsFilterFileName, szValue, &ulMaxPath );
+
 		if (ERROR_SUCCESS == lResult)
 		{
 			_tcsncpy(m_szFilterFileName, szValue, ulMaxPath);
 		}
-		else
-			m_szFilterFileName[0] = 0;
 
-		//// TODO: Could try to load the filter at the outset, but
-		//// -- What happens if it is null, as it will be before we have chosen a filter?
-		//// -- What happens if we change formats in mid-flight?
-		//// so do it in AllocateStreamingResources, for now
-		//if (m_szFilterFileName == TEXT(""))
-		//{
-		//	HRESULT hr = LoadFilter();
-		//	if ( FAILED(hr))
-		//		return hr;
-		//}
+		// Read the number of partitions that the convolution routine should use
+		lResult = key.QueryDWORDValue(kszPrefsPartitions, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			// Convert the DWORD to a WORD.
+			m_nPartitions = dwValue;
+		}
 	}
 
 	return S_OK;
@@ -153,6 +148,10 @@ HRESULT CConvolver::FinalConstruct()
 
 void CConvolver::FinalRelease()
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "FinalRelease" << std::endl;);
+#endif
+
 	FreeStreamingResources();  // In case client does not call this.        
 }
 
@@ -165,6 +164,10 @@ void CConvolver::FinalRelease()
 STDMETHODIMP CConvolver::GetStreamCount(DWORD *pcInputStreams,
 										DWORD *pcOutputStreams)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetStreamCount" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( NULL == pcInputStreams )
@@ -193,7 +196,12 @@ STDMETHODIMP CConvolver::GetStreamCount(DWORD *pcInputStreams,
 STDMETHODIMP CConvolver::GetInputStreamInfo( 
 	DWORD dwInputStreamIndex,
 	DWORD *pdwFlags)
-{    
+{
+
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputStreamInfo" << std::endl;);
+#endif
+
 	if ( NULL == pdwFlags )
 	{
 		return E_POINTER;
@@ -206,7 +214,7 @@ STDMETHODIMP CConvolver::GetInputStreamInfo(
 	}
 
 	// Use the default input stream configuration (a single stream). 
-	*pdwFlags = 0;
+	*pdwFlags =  0;
 
 	return S_OK;
 }
@@ -221,6 +229,10 @@ STDMETHODIMP CConvolver::GetOutputStreamInfo(
 	DWORD dwOutputStreamIndex,
 	DWORD *pdwFlags)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetOutputStreamInfo" << std::endl;);
+#endif
+
 	if ( NULL == pdwFlags )
 	{
 		return E_POINTER;
@@ -248,6 +260,10 @@ STDMETHODIMP CConvolver::GetInputType (DWORD dwInputStreamIndex,
 									   DWORD dwTypeIndex,
 									   DMO_MEDIA_TYPE *pmt)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwInputStreamIndex )
@@ -309,6 +325,10 @@ STDMETHODIMP CConvolver::GetOutputType(DWORD dwOutputStreamIndex,
 									   DWORD dwTypeIndex,
 									   DMO_MEDIA_TYPE *pmt)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetOutputType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwOutputStreamIndex )
@@ -371,6 +391,10 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 									  const DMO_MEDIA_TYPE *pmt,
 									  DWORD dwFlags)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SetInputType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwInputStreamIndex )
@@ -424,7 +448,11 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 									   const DMO_MEDIA_TYPE *pmt,
 									   DWORD dwFlags)
-{ 
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SetOutputType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwOutputStreamIndex )
@@ -479,6 +507,10 @@ STDMETHODIMP CConvolver::GetInputCurrentType(
 	DWORD dwInputStreamIndex,
 	DMO_MEDIA_TYPE *pmt)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputCurrentType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwInputStreamIndex )
@@ -511,6 +543,10 @@ STDMETHODIMP CConvolver::GetOutputCurrentType(
 	DWORD dwOutputStreamIndex,
 	DMO_MEDIA_TYPE *pmt)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetOutputCurrentType" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwOutputStreamIndex )
@@ -545,6 +581,10 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	DWORD *pcbMaxLookahead,
 	DWORD *pcbAlignment)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputSizeInfo" << std::endl;);
+#endif
+
 	if ( 0 != dwInputStreamIndex )
 	{
 		return DMO_E_INVALIDSTREAMINDEX;
@@ -580,13 +620,7 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
 
 	// Return the input buffer alignment, in bytes.
-	// TODO: This does not work, because this routine is called before AllocateStreaming resources loads the filter
-	if (m_Convolution && m_Convolution->m_Filter)
-	{
-		*pcbAlignment = pWave->nBlockAlign * m_Convolution->m_Filter->nSamples;
-	}
-	else
-		*pcbAlignment = pWave->nBlockAlign;
+	*pcbAlignment = pWave->nBlockAlign;
 
 	return S_OK;
 }
@@ -602,6 +636,10 @@ STDMETHODIMP CConvolver::GetOutputSizeInfo(
 	DWORD *pcbSize,
 	DWORD *pcbAlignment)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetOutputSizeInfo" << std::endl;);
+#endif
+
 	if ( 0 != dwOutputStreamIndex )
 	{
 		return DMO_E_INVALIDSTREAMINDEX;
@@ -644,8 +682,26 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 	DWORD dwInputStreamIndex,
 	REFERENCE_TIME *prtMaxLatency)
 {
-	// TODO: work out how to use this, when partitioned convoltion implemented
-	return E_NOTIMPL; // Not dealing with latency in this plug-in.
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputMaxLatency" << std::endl;);
+#endif
+
+	//if ( 0 != dwInputStreamIndex )
+	//{
+	//	return DMO_E_INVALIDSTREAMINDEX;
+	//}
+
+	//// Get the pointer to the input format structure.
+	//WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+
+	//// Latency is half a partition length
+	//*prtMaxLatency = ::MulDiv( m_Convolution->m_FIR->nHalfPartitionLength * m_Convolution->m_FIR->wfexFilterFormat.Format.nChannels * 
+	//	m_Convolution->m_FIR->wfexFilterFormat.Format.wBitsPerSample * 8,
+	//	UNITS, m_Convolution->m_FIR->wfexFilterFormat.Format.nAvgBytesPerSec);
+
+	//return S_OK;
+
+	return E_NOTIMPL;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -658,6 +714,11 @@ STDMETHODIMP CConvolver::SetInputMaxLatency(
 	DWORD dwInputStreamIndex,
 	REFERENCE_TIME rtMaxLatency)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SetInputMaxLatency" << std::endl;);
+#endif
+
+	// TODO: work out how to use this, when partitioned convoltion implemented
 	return E_NOTIMPL; // Not dealing with latency in this plug-in.
 }
 
@@ -665,15 +726,36 @@ STDMETHODIMP CConvolver::SetInputMaxLatency(
 // CConvolver::Flush
 //
 // Implementation of IMediaObject::Flush
+//
+// The DMO performs the following actions when this method is called: 
+//
+// Releases any IMediaBuffer references it holds. 
+// Discards any values that specify the time stamp or sample length for a media buffer. 
+// Reinitializes any internal states that depend on the contents of a media sample. 
+// Media types, maximum latency, and locked state do not change.
+//
+// When the method returns, every input stream accepts data.
+// Output streams cannot produce any data until the application calls the 
+// IMediaObject::ProcessInput method on at least one input stream.
+//
 /////////////////////////////////////////////////////////////////////////////
 
 STDMETHODIMP CConvolver::Flush( void )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Flush" << std::endl;);
+#endif
+
 	m_spInputBuffer = NULL;  // release smart pointer
 	m_cbInputLength = 0;
 	m_pbInputData = NULL;
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
+
+	if (m_Convolution)
+	{
+		m_Convolution->Flush();
+	}
 
 	return S_OK;
 }
@@ -682,10 +764,30 @@ STDMETHODIMP CConvolver::Flush( void )
 // CConvolver::Discontinuity
 //
 // Implementation of IMediaObject::Discontinuity
+//
+// A discontinuity represents a break in the input. 
+// A discontinuity might occur because no more data is expected, the format 
+// is changing, or there is a gap in the data. After a discontinuity, the DMO
+// does not accept further input on that stream until all pending data has 
+// been processed. The application should call the ProcessOutput method until 
+// none of the streams returns the DMO_OUTPUT_DATA_BUFFERF_INCOMPLETE flag.
+//
+// This method might fail if it is called before the client sets the input 
+// and output types on the DMO. 
+//
 /////////////////////////////////////////////////////////////////////////////
 
 STDMETHODIMP CConvolver::Discontinuity(DWORD dwInputStreamIndex)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Discontinuity" << std::endl;);
+#endif
+
+	if ( 0 != dwInputStreamIndex )
+	{
+		return DMO_E_INVALIDSTREAMINDEX;
+	}
+
 	// TODO:: Check that this is enough
 	return S_OK;
 }
@@ -709,10 +811,13 @@ STDMETHODIMP CConvolver::Discontinuity(DWORD dwInputStreamIndex)
 /////////////////////////////////////////////////////////////////////////////
 STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "AllocateStreamingResources" << std::endl;);
+#endif
+
 	// Allocate any buffers need to process the stream.
 
 	HRESULT hr = S_OK;
-
 
 	// Get a pointer to the WAVEFORMATEX structure.
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
@@ -721,28 +826,22 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return E_FAIL;
 	}
 
-	hr = SelectConvolution(pWave, m_Convolution); // Sets m_Convolution 
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	// Set m_Filter and m_WfexFilterFormat
-	hr = m_Convolution->LoadFilter(m_szFilterFileName);
-	if (FAILED(hr))
+	// 1 partition used for overlap-save, which is signalled by m_nPartitions == 0 
+	hr = SelectConvolution(pWave, m_Convolution, m_szFilterFileName, m_nPartitions == 0 ? 1 : m_nPartitions);
+	if(FAILED(hr))
 	{
 		return hr;
 	}
 
 	// Check that the filter has the same number of channels and sample rate as the input
-	if ((pWave->nChannels != m_Convolution->m_Filter->nChannels) ||
-		(pWave->nSamplesPerSec != m_Convolution->m_WfexFilterFormat.Format.nSamplesPerSec))
+	if ((pWave->nChannels != m_Convolution->FIR.nChannels) ||
+		(pWave->nSamplesPerSec != m_Convolution->FIR.wfexFilterFormat.Format.nSamplesPerSec))
 		return E_INVALIDARG;
 
 
 #if defined(DEBUG) | defined(_DEBUG)
-	m_CWaveFileTrace = new CWaveFile;
-	if (FAILED(hr = m_CWaveFileTrace->Open(TEXT("c:\\temp\\Trace.wav"), pWave, WAVEFILE_WRITE)))
+	hr = m_CWaveFileTrace->Open(TEXT("c:\\temp\\Trace.wav"), pWave, WAVEFILE_WRITE);
+	if (FAILED(hr))
 	{
 		return DXTRACE_ERR_MSGBOX(TEXT("Failed to open trace file for writing"), hr);
 	}
@@ -762,6 +861,10 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 
 STDMETHODIMP CConvolver::FreeStreamingResources( void )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "FreeStreamingResources" << std::endl;);
+#endif
+
 	m_spInputBuffer = NULL; // release smart pointer
 	m_cbInputLength = 0;
 	m_pbInputData = NULL;
@@ -772,9 +875,6 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_Convolution = NULL;
 
 #if defined(DEBUG) | defined(_DEBUG)
-	if (m_CWaveFileTrace)
-		SAFE_DELETE(m_CWaveFileTrace);
-
 	_CrtMemDumpAllObjectsSince( NULL );
 
 	_CrtDumpMemoryLeaks();
@@ -790,7 +890,11 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 
 STDMETHODIMP CConvolver::GetInputStatus(DWORD dwInputStreamIndex,
 										DWORD *pdwFlags)
-{ 
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetInputStatus" << std::endl;);
+#endif
+
 	if ( 0 != dwInputStreamIndex )
 	{
 		return DMO_E_INVALIDSTREAMINDEX;
@@ -824,7 +928,11 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 									  DWORD dwFlags,
 									  REFERENCE_TIME rtTimestamp,
 									  REFERENCE_TIME rtTimelength)
-{ 
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ProcessInput" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( 0 != dwInputStreamIndex )
@@ -881,6 +989,10 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 									   DMO_OUTPUT_DATA_BUFFER *pOutputBuffers,
 									   DWORD *pdwStatus)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ProcessOutput" << std::endl;);
+#endif
+
 	HRESULT hr = S_OK;
 
 	if ( NULL == pOutputBuffers )
@@ -922,6 +1034,7 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	BYTE         *pbOutputData = NULL;
 	DWORD        cbOutputMaxLength = 0;
 	DWORD        cbBytesProcessed = 0;
+	DWORD		 cbBytesGenerated = 0;
 
 	// Get current length of output buffer
 	hr = pOutputBuffer->GetBufferAndLength(&pbOutputData, &cbOutputMaxLength);
@@ -951,14 +1064,14 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	}
 
 	// Call the internal processing method, which returns the no. bytes processed
-	hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesProcessed);
+	hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesProcessed, &cbBytesGenerated);
 	if (FAILED(hr))
 	{
 		return hr;
 	}
 
 	// Set the size of the valid data in the output buffer.
-	hr = pOutputBuffer->SetLength(cbBytesProcessed);
+	hr = pOutputBuffer->SetLength(cbBytesGenerated);
 	if (FAILED(hr))
 	{
 		return hr;
@@ -978,7 +1091,7 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 
 		// estimate time length of output buffer
 		pOutputBuffers[0].dwStatus |= DMO_OUTPUT_DATA_BUFFERF_TIMELENGTH;
-		pOutputBuffers[0].rtTimelength = ::MulDiv(cbBytesProcessed, UNITS, pWave->nAvgBytesPerSec);
+		pOutputBuffers[0].rtTimelength = ::MulDiv(cbBytesGenerated, UNITS, pWave->nAvgBytesPerSec);
 
 		// this much time has been consumed, so move the time stamp accordingly
 		m_rtTimestamp += pOutputBuffers[0].rtTimelength;
@@ -1012,6 +1125,10 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 
 STDMETHODIMP CConvolver::Lock( LONG bLock )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Lock" << std::endl;);
+#endif
+
 	return S_OK;
 }
 
@@ -1023,6 +1140,10 @@ STDMETHODIMP CConvolver::Lock( LONG bLock )
 
 STDMETHODIMP CConvolver::SetEnable( BOOL fEnable )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SetEnable" << std::endl;);
+#endif
+
 	// This function is called when the plug-in is being enabled or disabled,
 	// typically by user action. Once a plug-in is disabled, it will still be
 	// loaded into the graph but ProcessInput and ProcessOutput will not be called.
@@ -1043,6 +1164,10 @@ STDMETHODIMP CConvolver::SetEnable( BOOL fEnable )
 
 STDMETHODIMP CConvolver::GetEnable( BOOL *pfEnable )
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetEnable" << std::endl;);
+#endif
+
 	if ( NULL == pfEnable )
 	{
 		return E_POINTER;
@@ -1061,6 +1186,10 @@ STDMETHODIMP CConvolver::GetEnable( BOOL *pfEnable )
 
 STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "GetPages" << std::endl;);
+#endif
+
 	const unsigned CPROPPAGES = 1;
 	GUID *pGUID = (GUID*) CoTaskMemAlloc( CPROPPAGES * sizeof(GUID) );
 
@@ -1084,6 +1213,10 @@ STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 // Property get to retrieve the wet mix value by using the public interface.
 STDMETHODIMP CConvolver::get_wetmix(double *pVal)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_wetmix" << std::endl;);
+#endif
+
 	if ( NULL == pVal )
 	{
 		return E_POINTER;
@@ -1097,6 +1230,10 @@ STDMETHODIMP CConvolver::get_wetmix(double *pVal)
 // Property put to store the wet mix value by using the public interface.
 STDMETHODIMP CConvolver::put_wetmix(double newVal)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_wetmix" << std::endl;);
+#endif
+
 	m_fWetMix = newVal;
 
 	// Calculate m_fDryMix
@@ -1108,6 +1245,10 @@ STDMETHODIMP CConvolver::put_wetmix(double newVal)
 // Property get to retrieve the wet mix value by using the public interface.
 STDMETHODIMP CConvolver::get_attenuation(double *pVal)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_attenuation" << std::endl;);
+#endif
+
 	if ( NULL == pVal )
 	{
 		return E_POINTER;
@@ -1121,6 +1262,10 @@ STDMETHODIMP CConvolver::get_attenuation(double *pVal)
 // Property put to store the wet mix value by using the public interface.
 STDMETHODIMP CConvolver::put_attenuation(double newVal)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_attenuation" << std::endl;);
+#endif
+
 	m_fAttenuation_db = newVal;
 
 	return S_OK;
@@ -1129,6 +1274,10 @@ STDMETHODIMP CConvolver::put_attenuation(double newVal)
 // Property get to retrieve the filter filename by using the public interface.
 STDMETHODIMP CConvolver::get_filterfilename(TCHAR *pVal[])
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_filterfilename" << std::endl;);
+#endif
+
 	if ( NULL == pVal )
 	{
 		return E_POINTER;
@@ -1142,7 +1291,40 @@ STDMETHODIMP CConvolver::get_filterfilename(TCHAR *pVal[])
 // Property put to store the filter filename by using the public interface.
 STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_filterfilename" << std::endl;);
+#endif
+
 	_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
+
+	return S_OK;
+}
+
+// Property get to retrieve the wet mix value by using the public interface.
+STDMETHODIMP CConvolver::get_partitions(DWORD *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_partitions" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nPartitions;
+
+	return S_OK;
+}
+
+// Property put to store the wet mix value by using the public interface.
+STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_partitions" << std::endl;);
+#endif
+
+	m_nPartitions = newVal;
 
 	return S_OK;
 }
@@ -1155,14 +1337,20 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 
 HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 									const BYTE *pbInputData,
-									DWORD *cbBytesProcessed)
+									DWORD *cbInputBytesProcessed,
+									DWORD *cbOutputBytesGenerated)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "DoProcessOutput" << std::endl;);
+#endif
+
 	// see if the plug-in has been disabled by the user
 	if (!m_bEnabled)
 	{
 		// if so, just copy the data without changing it. You should
 		// also do any necessary format conversion here.
-		memcpy(pbOutputData, pbInputData, *cbBytesProcessed);
+		memcpy(pbOutputData, pbInputData, *cbInputBytesProcessed);
+		*cbOutputBytesGenerated = *cbInputBytesProcessed;
 
 		return S_OK;
 	}
@@ -1172,18 +1360,26 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat; // TODO: reinterpret_cast?
 
 	// Don't know what to do if there is a mismatch in the number of channels
-	if ( m_Convolution->m_Filter->nChannels != pWave->nChannels)
+	if ( m_Convolution->FIR.nChannels != pWave->nChannels)
 	{
 		return E_UNEXPECTED;
 	}
 
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
-	DWORD dwBlocksToProcess = (*cbBytesProcessed / pWave->nBlockAlign);
+	DWORD dwBlocksToProcess = (*cbInputBytesProcessed / pWave->nBlockAlign);
 
-	// Cannot use the InPlace version, as have not yet fixed the various IMedia routines to ensure 
-	// that the input data in a multiple of the filter length in length. So will get an initial filter
-	// length's worth of silence.
-	*cbBytesProcessed = m_Convolution->doConvolutionArbitrary(pbInputData, pbOutputData,
+	// Convolve the pbInputData to produce pbOutputData (of the same length)
+	*cbOutputBytesGenerated = m_nPartitions == 0 ?
+		m_Convolution->doConvolution(pbInputData, pbOutputData,
+		dwBlocksToProcess,
+		m_fAttenuation_db,
+		m_fWetMix,
+		m_fDryMix
+#if defined(DEBUG) | defined(_DEBUG)
+		, m_CWaveFileTrace
+#endif	
+		)
+		: 	m_Convolution->doPartitionedConvolution(pbInputData, pbOutputData,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
 		m_fWetMix,
@@ -1192,6 +1388,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 		, m_CWaveFileTrace
 #endif	
 		);
+
 	return S_OK;
 }
 
@@ -1203,6 +1400,10 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 
 HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO_MEDIA_TYPE *pmtPartner)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ValidateMediaType" << std::endl;);
+#endif
+
 	// make sure the target media type has the fields we require
 	if( ( MEDIATYPE_Audio != pmtTarget->majortype ) ||
 		( FORMAT_WaveFormatEx != pmtTarget->formattype ) ||
@@ -1363,10 +1564,15 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 	return S_OK;
 }
 
+#ifdef IPROPERTYBAG
 // Helper
 
 IStream* StreamFromResource(int id)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "StreamFromResource" << std::endl;);
+#endif
+
 	HMODULE hModule;
 	HRSRC hrsrc = NULL;
 	int len = 0;
@@ -1404,6 +1610,10 @@ IStream* StreamFromResource(int id)
 // IPropertyBag method
 STDMETHODIMP CConvolver::Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Read" << std::endl;);
+#endif
+
 	if (lstrcmpW(pszPropName, L"IconStreams") == 0)
 	{
 		//HMODULE hModule = GetModuleHandle(TEXT("convolverWMP.dll"));			
@@ -1435,4 +1645,4 @@ STDMETHODIMP CConvolver::Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pE
 	}
 	return E_NOTIMPL;
 }
-
+#endif

@@ -36,19 +36,20 @@ const std::string channelDescription(const WAVEFORMATEXTENSIBLE* w)
 {
 	if (w->Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_7POINT1)
+		// Need to check number of channels as the likes of Audition sets the channel mask to 7.1 for 5.1 wav files, eg
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_7POINT1 && w->Format.nChannels == 8)
 			return "7.1";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_5POINT1)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_5POINT1 && w->Format.nChannels == 6)
 			return "5.1";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_SURROUND)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_SURROUND && w->Format.nChannels == 4)
 			return "Surround";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_QUAD)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_QUAD && w->Format.nChannels == 4)
 			return "Quad";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_STEREO)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_STEREO && w->Format.nChannels == 2)
 			return "Stereo";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_SUPER_WOOFER)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_SUPER_WOOFER && w->Format.nChannels == 1)
 			return "Sub";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_MONO)
+		if (w->dwChannelMask & KSAUDIO_SPEAKER_MONO && w->Format.nChannels == 1)
 			return "Mono";
 		if (w->dwChannelMask & KSAUDIO_SPEAKER_DIRECTOUT)
 			return "Direct";

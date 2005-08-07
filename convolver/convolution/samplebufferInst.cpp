@@ -19,4 +19,6 @@
 
 #include "samplebuffer.cpp"
 
-template CSampleBuffer<float>;
+//template ChannelBuffer<float>;
+//template SampleBuffer<float>;
+//template PartitionedBuffer<float>;

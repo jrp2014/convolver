@@ -17,61 +17,80 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#include ".\SampleBuffer.h"
+#include "samplebuffer.h"
 
-
-template <typename T>
-CSampleBuffer<T>::CSampleBuffer(const WORD Channels, const DWORD Samples) : nChannels(Channels), nSamples(Samples)
+#if defined(DEBUG) | defined(_DEBUG)
+void DumpChannelBuffer(const ChannelBuffer& buffer )
 {
-	samples = new T*[nChannels];
-	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
+	const size_t LIMIT = 16; // Don't print too much
+	size_t limit = buffer.size() > LIMIT ? LIMIT : buffer.size();
+
+	for (int nSample = 0; nSample < limit; ++nSample)
 	{
-		samples[nChannel] = new T[nSamples];
-		ZeroMemory(samples[nChannel], sizeof(T) * nSamples);
+		cdebug << buffer[nSample] << " ";
+	}
+
+	if (buffer.size() > LIMIT)
+	{
+		cdebug << "... " << std::endl << "Size: " << buffer.size() << ", Max: " << buffer.max() << ", Min: " << buffer.min();
 	}
 };
 
-template <typename T>
-CSampleBuffer<T>::~CSampleBuffer(void)
+void DumpSampleBuffer(const SampleBuffer& buffer)
 {
-
-	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
+	for (int nChannel = 0; nChannel < buffer.size(); ++nChannel)
 	{
-		delete [] samples[nChannel];
-	}
-
-	delete [] samples;
-};
-
-template <typename T>
-CSampleBuffer<T>::CSampleBuffer(const CSampleBuffer& sb) : nChannels(sb.nChannels), nSamples(sb.nSamples) // copy constructor
-{
-	samples = new T*[nChannels];
-	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
-	{
-		samples[nChannel] = new T[nSamples];
-		for (DWORD j = 0; j != nSamples; j++)
-			samples[nChannel][j] = sb.samples[nChannel][j];
+		 cdebug << std::endl << "[" << nChannel << ": "; DumpChannelBuffer(buffer[nChannel]); cdebug << "]";
 	}
 };
 
-template <typename T>
-CSampleBuffer<T>& CSampleBuffer<T>::operator= (const CSampleBuffer& sb) // copy assignment
+void DumpPartitionedBuffer(const PartitionedBuffer& buffer)
 {
-	if (this != &sb)
+	
+	for (int nPartition = 0; nPartition < buffer.size(); ++nPartition)
 	{
-		this->~CSampleBuffer();
+		cdebug << "{" << nPartition << ": " ; DumpSampleBuffer(buffer[nPartition]); cdebug << "}" << std::endl; 
 
-		nChannels = sb.nChannels;
-		nSamples = sb.nSamples;
-
-		samples = new T*[nChannels];
-		for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
-		{
-			samples[nChannel] = new T[nSamples];
-			for (DWORD j = 0; j != nSamples; j++)
-				samples[nChannel][j] = sb.samples[nChannel][j];
-		}
 	}
-	return *this;
 };
+#endif
+
+
+//template <typename T>
+//CSampleBuffer<T>::CSampleBuffer(const WORD Channels, const DWORD Samples) : nChannels(Channels), nSamples(Samples)
+//{
+//	samples = new T*[nChannels];
+//	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
+//	{
+//		samples[nChannel] = new T[nSamples];
+//		ZeroMemory(&samples[nChannel], sizeof(T) * nSamples);
+//	}
+//};
+//
+//template <typename T>
+//CSampleBuffer<T>::~CSampleBuffer(void)
+//{
+//
+//	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
+//	{
+//		delete [] samples[nChannel];
+//	}
+//
+//	delete [] samples;
+//};
+//
+//template <typename T>
+//CSampleBuffer<T>::CSampleBuffer(const CSampleBuffer& sb) : nChannels(sb.nChannels), nSamples(sb.nSamples) // copy constructor
+//{
+//	samples = new T*[nChannels];
+//	for (WORD nChannel = 0; nChannel != nChannels; nChannel++)
+//	{
+//		samples[nChannel] = new T[nSamples];
+//		for (DWORD nSample = 0; nSample != nSamples; nSample++)
+//			samples[nChannel][nSample] = sb.samples[nChannel][nSample];
+//	}
+//};
+//
+
+//
+

@@ -39,6 +39,7 @@
 #include "Common\dxstdafx.h"
 
 #if defined(DEBUG) | defined(_DEBUG)
+#include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 #endif
 
@@ -56,6 +57,7 @@ const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
 const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsWetmix[] = _T("Wetmix");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
+const TCHAR kszPrefsPartitions[] = _T("Partitions");
 
 /////////////////////////////////////////////////////////////////////////////
 // IConvolver
@@ -81,6 +83,9 @@ public:
 	virtual double	decode_Attenuationdb(const DWORD dwValue) = 0;
 	virtual DWORD	encode_Attenuationdb(const double fValue) = 0;
 
+	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
+
 };
 
 
@@ -97,7 +102,9 @@ class ATL_NO_VTABLE CConvolver :
     public IConvolver,
     public IMediaObject,
     public IWMPPluginEnable,
+#ifdef IPROPERTYBAG
 	public IPropertyBag,
+#endif
     public ISpecifyPropertyPages
 {
 public:
@@ -112,7 +119,9 @@ BEGIN_COM_MAP(CConvolver)
     COM_INTERFACE_ENTRY(IConvolver)
     COM_INTERFACE_ENTRY(IMediaObject)
     COM_INTERFACE_ENTRY(IWMPPluginEnable)
+#ifdef IPROPERTYBAG
 	COM_INTERFACE_ENTRY(IPropertyBag)
+#endif
     COM_INTERFACE_ENTRY(ISpecifyPropertyPages)
 END_COM_MAP()
 
@@ -129,6 +138,9 @@ END_COM_MAP()
 
 	STDMETHOD(get_attenuation)(double *pVal);
 	STDMETHOD(put_attenuation)(double newVal);
+
+	STDMETHOD(get_partitions)(DWORD *pVal);
+	STDMETHOD(put_partitions)(DWORD newVal);
 
     // IMediaObject methods
     STDMETHOD( GetStreamCount )( 
@@ -251,13 +263,13 @@ END_COM_MAP()
     // ISpecifyPropertyPages methods
     STDMETHOD( GetPages )(CAUUID *pPages);
 
+#ifdef IPROPERTYBAG
 	// IPropertyBag methods
 	STDMETHODIMP Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog);
 
 	STDMETHODIMP Write(LPCOLESTR pszPropName, VARIANT *pVar) 
 		{return E_NOTIMPL;}
-
-
+#endif
 
 	// The following pair is needed because DWORD is unsigned
 	double decode_Attenuationdb(const DWORD dwValue)
@@ -274,7 +286,8 @@ private:
     HRESULT DoProcessOutput(
                 BYTE *pbOutputData,             // Pointer to the output buffer
                 const BYTE *pbInputData,        // Pointer to the input buffer
-                DWORD *cbBytesProcessed);       // Number of bytes processed
+				DWORD *cbInputBytesProcessed,	// Number of input bytes
+                DWORD *cbOutputBytesGenerated); // Number of output bytes
     HRESULT ValidateMediaType(
                 const DMO_MEDIA_TYPE *pmtTarget,    // target media type to verify
                 const DMO_MEDIA_TYPE *pmtPartner);  // partner media type to verify
@@ -294,14 +307,13 @@ private:
 	double					m_fWetMix;			// percentage of effect
 	double					m_fDryMix;			// percentage of dry signal
 	double					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
+	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 
-	CConvolution<float>*	m_Convolution;			// Polymorphic processing class
-
-	//CSampleBuffer<float>*	m_Filter;				// The filter to be applied
+	CConvolution*			m_Convolution;		// Processing class.
 	TCHAR					m_szFilterFileName[MAX_PATH];
 
 #if defined(DEBUG) | defined(_DEBUG)
-	CWaveFile*				m_CWaveFileTrace;	// To keep a record of the processed output
+	CWaveFileHandle			m_CWaveFileTrace;	// To keep a record of the processed output
 #endif
 
     BOOL                    m_bEnabled;         // TRUE if enabled

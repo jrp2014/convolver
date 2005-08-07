@@ -330,13 +330,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{E4D710F4-22D5-46DD-A7F4-5E254D938F2B}"
-        "PackageCode" = "8:{0D0EA415-1EC4-498C-B2BC-00C39C33467F}"
+        "ProductCode" = "8:{E7238AA6-4E89-474F-9DFC-67124B8EDB4C}"
+        "PackageCode" = "8:{AF2577F6-D2EA-4702-B46F-10F10EC1E768}"
         "UpgradeCode" = "8:{5F9F3FA2-C6AC-4376-BBDA-DC8B70430997}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:1.18.0"
+        "ProductVersion" = "8:1.19.0"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
@@ -889,7 +889,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_26559F025A87489796454BD32F1077C6"
             {
-            "SourcePath" = "8:..\\convolverCMD\\Debug\\convolverCMD.exe"
+            "SourcePath" = "8:..\\convolverCMD\\Release\\convolverCMD.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
@@ -917,7 +917,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_553618143C9948AC9462DB7BE43CEF51"
             {
-            "SourcePath" = "8:..\\generate_test_IRs\\Debug\\generate_test_IRs.exe"
+            "SourcePath" = "8:..\\generate_test_IRs\\Release\\generate_test_IRs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
@@ -1085,7 +1085,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_AD1578E6B8154959BDD73C377C3F2D4B"
             {
-            "SourcePath" = "8:..\\comparewavs\\Debug\\comparewavs.exe"
+            "SourcePath" = "8:..\\comparewavs\\Release\\comparewavs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"
@@ -1169,7 +1169,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_B7A4B64573734FB9AB073FCFA9555E92"
             {
-            "SourcePath" = "8:..\\convolverWMP\\Debug\\convolverWMP.dll"
+            "SourcePath" = "8:..\\convolverWMP\\Release\\convolverWMP.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_034777C2FD7B4B7BB97BE63B32DD9618"

@@ -68,6 +68,7 @@ BEGIN_MSG_MAP(CConvolverPropPage)
 	COMMAND_HANDLER(IDC_GETFILTER, BN_CLICKED, OnBnClickedGetfilter)
 	COMMAND_HANDLER(IDC_ATTENUATION, EN_CHANGE, OnEnChangeAttenuation)
 	COMMAND_HANDLER(IDC_BUTTON_CALCULATEOPTIMUMATTENUATION, BN_CLICKED, OnBnClickedButtonCalculateoptimumattenuation)
+	COMMAND_HANDLER(IDC_PARTITIONS, EN_CHANGE, OnEnChangePartitions)
 	CHAIN_MSG_MAP(IPropertyPageImpl<CConvolverPropPage>)
 	MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
 END_MSG_MAP()
@@ -87,6 +88,7 @@ public:
 	LRESULT OnBnClickedGetfilter(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnEnChangePartitions(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 #endif // __CCONVOLVERPROPPAGE_H_
