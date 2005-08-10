@@ -43,7 +43,7 @@
 #include "debugging\debugStream.h"
 #endif
 
-#include "waveformat.h"
+#include "convolution\waveformat.h"
 #include "convolution\convolution.h"
 
 // FFT routines

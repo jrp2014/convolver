@@ -8,7 +8,7 @@
 #include "debugging\debugging.h"
 #endif
 #include "debugging\fasttiming.h"
-#include "convolverWMP\wavefile.h"
+#include "convolution\wavefile.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -186,6 +186,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		WavIn->Close();
 		WavOut->Close();
+#if defined(DEBUG) | defined(_DEBUG)
+		CWaveFileTrace->Close();
+#endif
 
 		return 0;
 

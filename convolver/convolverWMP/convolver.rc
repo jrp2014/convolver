@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,19,0,0
- PRODUCTVERSION 1,19,0,0
+ FILEVERSION 1,20,0,0
+ PRODUCTVERSION 1,20,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "1, 19, 0, 0"
+            VALUE "FileVersion", "1, 20, 0, 0"
             VALUE "InternalName", "Convolver"
             VALUE "LegalCopyright", "Copyright GPL 2005"
             VALUE "LegalTrademarks", "GPL"
-            VALUE "OriginalFilename", "convolver.dll"
+            VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "1, 19, 0, 0"
+            VALUE "ProductVersion", "1, 20, 0, 0"
         END
     END
     BLOCK "VarFileInfo"

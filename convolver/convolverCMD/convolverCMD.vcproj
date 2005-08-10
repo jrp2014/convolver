@@ -201,6 +201,15 @@
 			<File
 				RelativePath="..\convolution\samplebuffer.h">
 			</File>
+			<File
+				RelativePath="..\convolverWMP\wavefile.h">
+			</File>
+			<File
+				RelativePath="..\convolverWMP\waveformat.cpp">
+			</File>
+			<File
+				RelativePath="..\convolverWMP\waveformat.h">
+			</File>
 		</Filter>
 		<Filter
 			Name="Common"
@@ -262,19 +271,6 @@
 			</File>
 			<File
 				RelativePath="..\fft\fftsg_h.h">
-			</File>
-		</Filter>
-		<Filter
-			Name="convolverWMP"
-			Filter="">
-			<File
-				RelativePath="..\convolverWMP\wavefile.h">
-			</File>
-			<File
-				RelativePath="..\convolverWMP\waveformat.cpp">
-			</File>
-			<File
-				RelativePath="..\convolverWMP\waveformat.h">
 			</File>
 		</Filter>
 		<File

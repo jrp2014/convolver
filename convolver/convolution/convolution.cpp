@@ -22,16 +22,17 @@
 
 // CConvolution Constructor
 CConvolution::CConvolution(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, const BYTE nContainerSize) :
-bStartWritingOutput(false),
 FIR(Filter(szFilterFileName, nPartitions)),
-nContainerSize(nContainerSize), 
-InputBuffer(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
-OutputBuffer(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))), // NB. Actually, only need half partition length for DoParititionedConvolution
-InputBufferCopy(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
-ComputationCircularBuffer(PartitionedBuffer(nPartitions, SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)))),
-MultipliedFFTBuffer(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
-nInputBufferIndex(0),
-nCircularBufferIndex(0)
+nContainerSize_(nContainerSize), 
+InputBuffer_(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
+OutputBuffer_(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))), // NB. Actually, only need half partition length for DoParititionedConvolution
+InputBufferCopy_(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
+ComputationCircularBuffer_(PartitionedBuffer(nPartitions, SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)))),
+MultipliedFFTBuffer_(SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
+nInputBufferIndex_(0),
+nPartitionIndex_(0),
+nOutputPartitionIndex_(0),
+bStartWritingOutput_(false)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "CConvolution" << std::endl;)
@@ -46,22 +47,22 @@ CConvolution::~CConvolution(void)
 {
 }
 
-
 // Reset various buffers and pointers
 void CConvolution::Flush()
 {
-		for(int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
-		{
-			InputBuffer[nChannel] = 0;
-			OutputBuffer[nChannel] = 0;
-			MultipliedFFTBuffer[nChannel] = 0;
-			for (int nPartition = 0; nPartition < FIR.nPartitions; ++nPartition)
-				ComputationCircularBuffer[nPartition][nChannel] = 0;
-		}
+	for(int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
+	{
+		InputBuffer_[nChannel] = 0;
+		OutputBuffer_[nChannel] = 0;
+		MultipliedFFTBuffer_[nChannel] = 0;
+		for (int nPartition = 0; nPartition < FIR.nPartitions; ++nPartition)
+			ComputationCircularBuffer_[nPartition][nChannel] = 0;
+	}
 
-	nInputBufferIndex = 0;			// placeholder
-	nCircularBufferIndex = 0;		// for partitioned convolution
-	bStartWritingOutput = false;	// don't start outputting until we have some convolved output
+	nInputBufferIndex_ = 0;			// placeholder
+	nPartitionIndex_ = 0;			// for partitioned convolution
+	nOutputPartitionIndex_ = 0;		// lags nPartitionIndex_ by 1
+	bStartWritingOutput_ = false;	// don't start outputting until we have some convolved output
 }
 
 
@@ -90,39 +91,39 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 		for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 		{
 			// Mix the processed signal with the dry signal
-			double outputSample = (InputBuffer[nChannel][nInputBufferIndex] * fDryMix ) + 
-				(OutputBuffer[nChannel][nInputBufferIndex] * fWetMix);
+			double outputSample = InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + 
+				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] * fWetMix;
 
 #if defined(DEBUG) | defined(_DEBUG)
 #if defined(DIRAC_DELTA_FUNCTIONS)
 			// Only for testing with perfect Dirac Delta filters, where the output is supposed to be the same as the input
 			// TODO: not a good test, if one of the values is 0
-			if (abs(OutputBuffer[nChannel][nInputBufferIndex] - InputBuffer[nChannel][nInputBufferIndex]) >
-				0.001 + 0.01 * (abs(OutputBuffer[nChannel][nInputBufferIndex]) + abs(InputBuffer[nChannel][nInputBufferIndex])))
+			if (abs(ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
+				0.001 + 0.01 * (abs(ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
 			{
 				cdebug 
 					<< dwBlocksToProcess << ","
-					<< nInputBufferIndex << ","
-					<< nCircularBufferIndex << ", "
+					<< nInputBufferIndex_ << ","
+					<< nPartitionIndex_ << ", "
+					<< nOutputPartitionIndex_ << ", "
 					<< nChannel << ", "
-					<< InputBuffer[nChannel][nInputBufferIndex] << ","
-					<< OutputBuffer[nChannel][nInputBufferIndex] << ", "
-					<< (OutputBuffer[nChannel][nInputBufferIndex] - InputBuffer[nChannel][nInputBufferIndex]) << std::endl;
+					<< InputBuffer_[nChannel][nInputBufferIndex_] << ","
+					<< ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] << ", "
+					<< (ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
 			}
 #endif
 #endif
-
 			// Get the input sample and convert it to a FFT_type (eg, float)
-			InputBuffer[nChannel][nInputBufferIndex] = AttenuatedSample(fAttenuation_db, GetSample(pbInputDataPointer)); // Channels are interleaved
-			pbInputDataPointer += nContainerSize;
-			cbInputBytesProcessed += nContainerSize;
+			InputBuffer_[nChannel][nInputBufferIndex_] = AttenuatedSample(fAttenuation_db, GetSample(pbInputDataPointer)); // Channels are interleaved
+			pbInputDataPointer += nContainerSize_;
+			cbInputBytesProcessed += nContainerSize_;
 
 			// Write to OutputData
-			if(bStartWritingOutput)
+			if(bStartWritingOutput_)
 			{
 #if defined(DEBUG) | defined(_DEBUG)
 				DWORD containerSize = NormalizeSample(pbOutputDataPointer, outputSample);
-				assert(containerSize == nContainerSize);
+				assert(containerSize == nContainerSize_);
 				cbOutputBytesGenerated += containerSize; // input container size == output container size
 #else
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
@@ -133,107 +134,74 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 					// This does not quite work, because AllocateStreamingResources seems to be called after IEEE FFT_type playback, which rewrites the file
 					// It is not clear why this happens, as it does not occur after PCM playback
 					UINT nSizeWrote;
-					HRESULT hr = CWaveFileTrace->Write(nContainerSize, pbOutputDataPointer, &nSizeWrote);
-					if (FAILED(hr) || nSizeWrote != nContainerSize)
+					HRESULT hr = CWaveFileTrace->Write(nContainerSize_, pbOutputDataPointer, &nSizeWrote);
+					if (FAILED(hr) || nSizeWrote != nContainerSize_)
 					{
 						return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
 					}
 				}
 #endif
-				pbOutputDataPointer += nContainerSize;
+				pbOutputDataPointer += nContainerSize_;
 			}
 		} // nChannel
 
 		// Got a block
-		if (nInputBufferIndex == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
+		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
 		{	
 
-			//cdebug << "InputBuffer: " << nInputBufferIndex; DumpSampleBuffer(InputBuffer); cdebug << std::endl;
+			//cdebug << "InputBuffer_: " << nInputBufferIndex_; DumpSampleBuffer(InputBuffer_); cdebug << std::endl;
 
 			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 			{
 				// Copy the sample buffer partition as the rdft routine overwrites it
-				//for (DWORD nSample=0; nSample != FIR.nPartitionLength; ++nSample)
-				//{
-				//	InputBufferChannelCopy[0][nSample] = InputBuffer[nChannel][nSample];
-				//}
-				//::CopyMemory(&InputBufferChannelCopy[0], &InputBuffer[nChannel][0], FIR.nPartitionLength * sizeof(float));
-				InputBufferCopy[nChannel] = InputBuffer[nChannel];
+				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
 
-				// Calculate the Xi(m)
-				//  rdft(n, 1, a):
-				//        n              :data length (int)
-				//                        n >= 2, n = power of 2
-				//        a[0...n-1]     :input data
-				//                        output data
-				//                                a[2*k] = R[k], 0<=k<n/2
-				//                                a[2*k+1] = I[k], 0<k<n/2
-				//                                a[1] = R[n/2]
+				// get DFT of InputBuffer_
+				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);
 
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy[nChannel][0]);  // get DFT of InputBuffer
+				// Zero the partition from circular buffer that we have just used, for the next cycle
+				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel] = 0;
 
-				for (DWORD nPartitionIndex = 0; nPartitionIndex != FIR.nPartitions; ++nPartitionIndex)
+				for (int nPartitionIndex = 0; nPartitionIndex < FIR.nPartitions; ++nPartitionIndex)
 				{
-					cmult(InputBufferCopy[nChannel], FIR.buffer[nPartitionIndex][nChannel],
-						MultipliedFFTBuffer[nChannel], FIR.nPartitionLength);	
+					// Complex vector multiplication
+					cmult(InputBufferCopy_[nChannel], FIR.buffer[nPartitionIndex][nChannel],
+						MultipliedFFTBuffer_[nChannel], FIR.nPartitionLength);	
 
-					//for (DWORD nSample = 0; nSample != FIR.nPartitionLength; ++nSample)
-					//{
-					//	ComputationCircularBuffer[nCircularBufferIndex][nChannel][nSample] += MultipliedFFTChannelBuffer[nSample];
-					//}
-					ComputationCircularBuffer[nCircularBufferIndex][nChannel] += MultipliedFFTBuffer[nChannel];
-
-					nCircularBufferIndex++;
-					nCircularBufferIndex %= FIR.nPartitions;	// circular
+					ComputationCircularBuffer_[nPartitionIndex_][nChannel] += MultipliedFFTBuffer_[nChannel];
+					nPartitionIndex_ = (nPartitionIndex_ + 1) % FIR.nPartitions;	// circular
 				}
 
 				//get back the yi: take the Inverse DFT
-				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer[nCircularBufferIndex][nChannel][0]);
+				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nChannel][0]);
 				// Not necessary to scale here, as did so when reading filter
 
-				// TODO:: use memcpy
-				//for (DWORD nSample = 0; nSample != FIR.nHalfPartitionLength; ++nSample)
-				//{
-				//	// Take the first half of the ComputationCircularBuffer as the output
-				//	OutputBuffer[nChannel][nSample] = ComputationCircularBuffer[nCircularBufferIndex][nChannel][nSample];
-
-				//	// Save the previous half partition; the first half will be read in over the next cycle
-				//	InputBuffer[nChannel][nSample + FIR.nHalfPartitionLength] = InputBuffer[nChannel][nSample];
-				//}
-				::CopyMemory(&OutputBuffer[nChannel][0], &ComputationCircularBuffer[nCircularBufferIndex][nChannel][0],
+				// Save the previous half partition; the first half will be read in over the next cycle
+				::CopyMemory(&InputBuffer_[nChannel][FIR.nHalfPartitionLength], &InputBuffer_[nChannel][0],
 					FIR.nHalfPartitionLength * sizeof(float));
-				::CopyMemory(&InputBuffer[nChannel][FIR.nHalfPartitionLength], &InputBuffer[nChannel][0],
-					FIR.nHalfPartitionLength * sizeof(float));
+				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
 
-				// Zero the circular buffer for the next cycle
-				//for (DWORD nSample = 0; nSample != FIR.nPartitionLength; ++nSample)
-				//{
-				//	ComputationCircularBuffer[nCircularBufferIndex][nChannel][nSample] = 0;
-				//}
-				//::ZeroMemory(&ComputationCircularBuffer[nCircularBufferIndex][nChannel][0], FIR.nPartitionLength * sizeof(float));
-				ComputationCircularBuffer[nCircularBufferIndex][nChannel] = 0;
 			} // nChannel
 
+			// Save the partition to be used for output and move the circular buffer on for the next cycle
+			nOutputPartitionIndex_ = nPartitionIndex_;
+			nPartitionIndex_ = (nPartitionIndex_ + 1) % FIR.nPartitions;	// circular
 
-			//cdebug << "OutputBuffer: " ; DumpSampleBuffer(OutputBuffer); cdebug << std::endl;
+			//cdebug << "nOutputPartitionIndex_, nPartitionIndex_: " << nOutputPartitionIndex_ << " " << nPartitionIndex_ << " ";
+			//DumpPartitionedBuffer(ComputationCircularBuffer_); cdebug << std::endl;
 
-
-			// Move the circular buffer on for the next cycle
-			nCircularBufferIndex++;
-			nCircularBufferIndex %= FIR.nPartitions;	// circular
-
-			nInputBufferIndex = 0;		// start to refill the InputBuffer
-			bStartWritingOutput = true;
+			nInputBufferIndex_ = 0;		// start to refill the InputBuffer_
+			bStartWritingOutput_ = true;
 		}
-		else // keep filling InputBuffer
-			nInputBufferIndex++;
+		else // keep filling InputBuffer_
+			nInputBufferIndex_++;
 	} // while
 
-//#if defined(DEBUG) | defined(_DEBUG)
-//	cdebug
-//		<< "nInputBufferIndex " << nInputBufferIndex
-//		<< ", bytes processed: " << cbInputBytesProcessed << " bytes generated: " << cbOutputBytesGenerated << std::endl;
-//#endif
+	//#if defined(DEBUG) | defined(_DEBUG)
+	//	cdebug
+	//		<< "nInputBufferIndex_ " << nInputBufferIndex_
+	//		<< ", bytes processed: " << cbInputBytesProcessed << " bytes generated: " << cbOutputBytesGenerated << std::endl;
+	//#endif
 
 	return cbOutputBytesGenerated;
 };
@@ -271,39 +239,39 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		{
 			// Mix the processed signal with the dry signal
 			// This will be silence, until we have gathered a filter length a convolved it to produce some output. Hence with lag
-			double outputSample = (InputBuffer[nChannel][nInputBufferIndex] * fDryMix ) + 
-				(OutputBuffer[nChannel][nInputBufferIndex] * fWetMix);
+			double outputSample = (InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix ) + 
+				(OutputBuffer_[nChannel][nInputBufferIndex_] * fWetMix);
 
 #if defined(DEBUG) | defined(_DEBUG)
-#if defined(DIRAC_DELTA_FUNCTIONS)
+//#if defined(DIRAC_DELTA_FUNCTIONS)
 			// Only for testing with perfect Dirac Delta filters, where the output is supposed to be the same as the input
 			// TODO: not a good test, if one of the values is 0
-			if (abs(OutputBuffer[nChannel][nInputBufferIndex] - InputBuffer[nChannel][nInputBufferIndex]) >
-				0.001 + 0.01 * (abs(OutputBuffer[nChannel][nInputBufferIndex]) + abs(InputBuffer[nChannel][nInputBufferIndex])))
+			if (abs(OutputBuffer_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
+				0.001 + 0.01 * (abs(OutputBuffer_[nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
 			{
 				cdebug 
 					<< dwBlocksToProcess << ","
-					<< nInputBufferIndex << ","
-					<< nCircularBufferIndex << ", "
+					<< nInputBufferIndex_ << ","
+					<< nPartitionIndex_ << ", "
 					<< nChannel << ", "
-					<< InputBuffer[nChannel][nInputBufferIndex] << ","
-					<< OutputBuffer[nChannel][nInputBufferIndex] << ", "
-					<< (OutputBuffer[nChannel][nInputBufferIndex] - InputBuffer[nChannel][nInputBufferIndex]) << std::endl;
+					<< InputBuffer_[nChannel][nInputBufferIndex_] << ","
+					<< OutputBuffer_[nChannel][nInputBufferIndex_] << ", "
+					<< (OutputBuffer_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
 			}
-#endif
+//#endif
 #endif
 
 			// Get the input sample and convert it to a FFT_type (eg, float)
-			InputBuffer[nChannel][nInputBufferIndex] = AttenuatedSample(fAttenuation_db, GetSample(pbInputDataPointer)); // Channels are interleaved
-			pbInputDataPointer += nContainerSize;
-			cbInputBytesProcessed += nContainerSize;
+			InputBuffer_[nChannel][nInputBufferIndex_] = AttenuatedSample(fAttenuation_db, GetSample(pbInputDataPointer)); // Channels are interleaved
+			pbInputDataPointer += nContainerSize_;
+			cbInputBytesProcessed += nContainerSize_;
 
 			// Write to OutputData
-			if(bStartWritingOutput)
+			if(bStartWritingOutput_)
 			{
 #if defined(DEBUG) | defined(_DEBUG)
 				DWORD containerSize = NormalizeSample(pbOutputDataPointer, outputSample);
-				assert(containerSize == nContainerSize);
+				assert(containerSize == nContainerSize_);
 				cbOutputBytesGenerated += containerSize; // input container size == output container size
 #else
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
@@ -314,80 +282,67 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					// This does not quite work, because AllocateStreamingResources seems to be called after IEEE FFT_type playback, which rewrites the file
 					// It is not clear why this happens, as it does not occur after PCM playback
 					UINT nSizeWrote;
-					HRESULT hr = CWaveFileTrace->Write(nContainerSize, pbOutputDataPointer, &nSizeWrote);
-					if (FAILED(hr) || nSizeWrote != nContainerSize)
+					HRESULT hr = CWaveFileTrace->Write(nContainerSize_, pbOutputDataPointer, &nSizeWrote);
+					if (FAILED(hr) || nSizeWrote != nContainerSize_)
 					{
 						return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
 					}
 				}
 #endif
-				pbOutputDataPointer += nContainerSize;
+				pbOutputDataPointer += nContainerSize_;
 			}
 		}
 
 		// Got a block
-		if (nInputBufferIndex == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
+		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
 		{	
 			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 			{
 				// Copy the sample buffer partition as the rdft routine overwrites it
-				//for (DWORD nSample=0; nSample != FIR.nPartitionLength; ++nSample)
-				//{
-				//	InputBufferChannelCopy[0][nSample] = InputBuffer[nChannel][nSample];
-				//}
-				//::CopyMemory(&InputBufferChannelCopy[0], &InputBuffer[nChannel][0], FIR.nPartitionLength * sizeof(float));
-				InputBufferCopy[nChannel] = InputBuffer[nChannel];
 
-				// Calculate the Xi(m)
-				//  rdft(n, 1, a):
-				//        n              :data length (int)
-				//                        n >= 2, n = power of 2
-				//        a[0...n-1]     :input data
-				//                        output data
-				//                                a[2*k] = R[k], 0<=k<n/2
-				//                                a[2*k+1] = I[k], 0<k<n/2
-				//                                a[1] = R[n/2]
+				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
 
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy[nChannel][0]);  // get DFT of InputBuffer
+				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);  // get DFT of InputBuffer_
 
-				cmult(InputBufferCopy[nChannel], FIR.buffer[0][nChannel],					// use the first partition only
-					OutputBuffer[nChannel], FIR.nPartitionLength);	
+				cmult(InputBufferCopy_[nChannel], FIR.buffer[0][nChannel],					// use the first partition only
+					OutputBuffer_[nChannel], FIR.nPartitionLength);	
 
 				//get back the yi: take the Inverse DFT
-				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer[nChannel][0]);
+				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0]);
 				// Not necessary to scale here, as did so when reading filter
 
-				//for (DWORD nSample = 0; nSample != FIR.nHalfPartitionLength; ++nSample)
-				//{
-				//	// Save the previous half partition; the first half will be read in over the next cycle
-				//	InputBuffer[nChannel][nSample + FIR.nHalfPartitionLength] = InputBuffer[nChannel][nSample];
-				//}
-				::CopyMemory(&InputBuffer[nChannel][FIR.nHalfPartitionLength], &InputBuffer[nChannel][0],
+				// Save the previous half partition; the first half will be read in over the next cycle
+				::CopyMemory(&InputBuffer_[nChannel][FIR.nHalfPartitionLength], &InputBuffer_[nChannel][0],
 					FIR.nHalfPartitionLength * sizeof(float));
 			}
-			nInputBufferIndex = 0;
-			bStartWritingOutput = true;
+			nInputBufferIndex_ = 0;
+			bStartWritingOutput_ = true;
 		}
-		else // keep filling InputBuffer
-			nInputBufferIndex++;
+		else // keep filling InputBuffer_
+			nInputBufferIndex_++;
 	} // while
 
-//#if defined(DEBUG) | defined(_DEBUG)
-//	cdebug
-//		<< "nInputBufferIndex " << nInputBufferIndex
-//		<< ", bytes processed: " << cbInputBytesProcessed << " bytes generated: " << cbOutputBytesGenerated << std::endl;
-//#endif
+	//#if defined(DEBUG) | defined(_DEBUG)
+	//	cdebug
+	//		<< "nInputBufferIndex_ " << nInputBufferIndex_
+	//		<< ", bytes processed: " << cbInputBytesProcessed << " bytes generated: " << cbOutputBytesGenerated << std::endl;
+	//#endif
 
 	return cbOutputBytesGenerated;
 };
 
 /* Complex multiplication */
+#ifdef VALARRAY
 inline void CConvolution::cmult(const std::valarray<float>& A, const std::valarray<float>& B, std::valarray<float>& C, const DWORD N)
+#endif
+#ifdef FASTARRAY
+inline void CConvolution::cmult(const fastarray<float>& A, const fastarray<float>& B, fastarray<float>& C, const DWORD N)
+#endif
 {
-	DWORD R;
-	DWORD I;
-	float T1;
-	float T2;
+	int R;
+	int I;
+	__declspec(align( 16 )) float T1;
+	__declspec(align( 16 )) float T2;
 
 	// a[2*k] = R[k], 0<=k<n/2
 	// a[2*k+1] = I[k], 0<k<n/2
@@ -402,8 +357,10 @@ inline void CConvolution::cmult(const std::valarray<float>& A, const std::valarr
 	//								  A[R]*B[I]      + A{I]*B[R]
 	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
 
-	// assert(N % 4 == 0);
-	// __assume(N % 4 == 0);
+	// tempt the optimizer
+	assert(N % 4 == 0);
+	__assume(N % 4 == 0);
+
 	C[0] = A[0] * B[0];
 	C[1] = A[1] * B[1];
 	for (R = 2,I = 3;R < N;R += 2,I += 2)
@@ -414,7 +371,7 @@ inline void CConvolution::cmult(const std::valarray<float>& A, const std::valarr
 		T2 = A[I] * B[I];
 		C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
 		C[R] = T1 - T2;
-	} 
+	}
 };
 
 
@@ -632,10 +589,9 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 			}
 		} while (again);
 
-		// maxSample 0..1
-		// 10 ^ (fAttenuation_db / 20) = 1
+		// maxSample * 10 ^ (fAttenuation_db / 20) = 1
 		// Limit fAttenuation to +/-MAX_ATTENUATION dB
-		fAttenuation = maxSample > 1e-8 ? 20.0f * log(1.0f / maxSample) : 0;
+		fAttenuation = -20.0f * log10(maxSample);
 
 		if (fAttenuation > MAX_ATTENUATION)
 		{

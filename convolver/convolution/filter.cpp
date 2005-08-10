@@ -46,16 +46,24 @@ nPartitions (nPartitions)
 
 	WORD wValidBitsPerSample = wfexFilterFormat.Format.wBitsPerSample;
 	WORD wFormatTag = wfexFilterFormat.Format.wFormatTag;
+
+	// nBlockAlign should equal nChannels * wBitsPerSample / 8 (bits per byte) for 
+	// WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT and WAVE_FORMAT_EXTENSIBLE
+	nFilterLength = pFilterWave->GetSize() / (wfexFilterFormat.Format.nChannels * wfexFilterFormat.Format.wBitsPerSample / 8);
+
 	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
 		wfexFilterFormat = *(WAVEFORMATEXTENSIBLE*) pFilterWave->GetFormat();  // TODO: Check that this works
+		// wValidBitsPerSample: usually equal to WAVEFORMATEX.wBitsPerSample, 
+		// but can store 20 bits in a 32-bit container, for example
 		wValidBitsPerSample = wfexFilterFormat.Samples.wValidBitsPerSample;
+
 		if (wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 		{
 			wFormatTag = WAVE_FORMAT_PCM;
-			// TODO: cross-check wfexFilterFormat->Samples.wSamplesPerBlock
 		}
 		else
+		{
 			if (wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
 			{
 				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
@@ -64,9 +72,8 @@ nPartitions (nPartitions)
 			{
 				throw(E_INVALIDARG);
 			}
+		}
 	}
-
-	nFilterLength = pFilterWave->GetSize() / wfexFilterFormat.Format.nBlockAlign;  // Filter length in samples (Nh)
 
 	// Check that the filter is not too big ...
 	if ( nFilterLength > MAX_FILTER_SIZE )
@@ -87,7 +94,7 @@ nPartitions (nPartitions)
 	}
 
 	// Now make sure that the partition length is a power of two long for the Ooura FFT package. (Will 0 pad if necessary.)
-	int nPaddedPartitionLength = 1;
+	int nPaddedPartitionLength = 4;	// Minimum length 4, to allow SIMD optimization
 	while (nPaddedPartitionLength < nPartitionLength)
 	{
 		nPaddedPartitionLength *= 2;
@@ -260,7 +267,7 @@ nPartitions (nPartitions)
 		}
 	} // while
 
-	// Pad the last partition (if necessary)
+	// Pad the current partition (if necessary)
 	if (nBlock % nHalfPartitionLength != 0)
 	{
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
@@ -282,13 +289,22 @@ nPartitions (nPartitions)
 		}
 	}
 
+	// Zero any further partitions (valarray should do this, but doesn't)
+	while (++nPartition < nPartitions)
+	{
+		for (int nChannel=0; nChannel < nChannels; ++nChannel)
+		{
+			buffer[nPartition][nChannel] = 0;
+		}
+	}
+
 	// The padded lengths become the actual lengths that we are going to work with
 	nPartitionLength = nPaddedPartitionLength;
 	nHalfPartitionLength = nHalfPaddedPartitionLength;
 	nFilterLength = nPartitions * nPartitionLength;
 
 #if defined(DEBUG) | defined(_DEBUG)
-	cdebug << "Filter: "; DumpPartitionedBuffer(buffer);
+	cdebug << "FFT Filter: "; DumpPartitionedBuffer(buffer);
 
 	cdebug << waveFormatDescription(&wfexFilterFormat, nFilterLength, "FFT Filter:") << std::endl;
 	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;

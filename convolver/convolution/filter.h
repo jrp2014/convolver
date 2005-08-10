@@ -29,8 +29,8 @@
 #include "Common\dxstdafx.h"
 
 #include "convolution\samplebuffer.h"
-#include "convolverWMP\waveformat.h"
-#include "convolverWMP\wavefile.h"
+#include "convolution\waveformat.h"
+#include "convolution\wavefile.h"
 #include "fft\fftsg_h.h"
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.

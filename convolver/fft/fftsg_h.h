@@ -15,6 +15,9 @@ http://momonga.t.u-tokyo.ac.jp/~ooura/fft.html
 #ifndef fftsg_h_h
 	#define fftsg_h_h
 
+// Slower
+//#define USE_CDFT_WINTHREADS 1;
+
 #undef UseDouble
 	#ifdef UseDouble
 		/* Tipo floating point usato per le elaborazioni */

@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="generate_test_IRs"
+	Name="generate_dirac_delta"
 	ProjectGUID="{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}"
 	Keyword="Win32Proj">
 	<Platforms>

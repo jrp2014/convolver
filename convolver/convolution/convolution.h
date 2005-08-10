@@ -83,23 +83,29 @@ public:
 
 protected:
 
-	const BYTE			nContainerSize;			// 8, 16, 24, or 32 bits (64 not implemented)
+	const BYTE			nContainerSize_;			// 8, 16, 24, or 32 bits (64 not implemented)
 
 private:
 
-	SampleBuffer		InputBuffer;
-	SampleBuffer		OutputBuffer;
-	SampleBuffer		InputBufferCopy;		// As FFT routines destroy their input
-	PartitionedBuffer	ComputationCircularBuffer;
-	SampleBuffer		MultipliedFFTBuffer;
+	SampleBuffer		InputBuffer_;
+	SampleBuffer		OutputBuffer_;				// This is used by overlap-save
+	SampleBuffer		InputBufferCopy_;			// As FFT routines destroy their input
+	PartitionedBuffer	ComputationCircularBuffer_;	// This is used as the output buffer for partitioned convolution
+	SampleBuffer		MultipliedFFTBuffer_;
 
-	DWORD				nInputBufferIndex;		// placeholder
-	DWORD				nCircularBufferIndex;	// for partitioned convolution
-	bool				bStartWritingOutput;	// don't start outputting until we have some convolved output
+	DWORD				nInputBufferIndex_;		// placeholder
+	DWORD				nPartitionIndex_;		// for partitioned convolution
+	DWORD				nOutputPartitionIndex_;	// lags nPartitionIndex_ by 1
+	bool				bStartWritingOutput_;	// don't start outputting until we have some convolved output
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	//void cmult(const std::vector<float>& A, const std::vector<float>& B, std::vector<float>& C, const DWORD N);
+#ifdef VALARRAY
 	void cmult(const std::valarray<float>& A, const std::valarray<float>& B, std::valarray<float>& C, const DWORD N);
+#endif
+#ifdef FASTARRAY
+	void cmult(const fastarray<float>& A, const fastarray<float>& B, fastarray<float>& C, const DWORD N);
+#endif
 
 	const bool isPowerOf2(int i) const
 	{
@@ -111,6 +117,26 @@ private:
 		return (fAttenuation_db == 0 ? sample  : 
 		static_cast<float>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L))));
 	}
+
+	// Round the argument to the nearest integer value, using the current rounding direction. 
+	// On Intel Pentium processors (especially PIII and probably P4), converting
+	// from float to int is very slow. To meet the C specs, the code produced by
+	// most C compilers targeting Pentium needs to change the FPU rounding mode
+	// before the float to int conversion is performed. Changing the FPU rounding
+	// mode causes the FPU pipeline to be flushed. It is this flushing of the
+	// pipeline which is so slow.
+	//inline long int lrint (double flt)
+	//{	
+	//	int intgr;
+
+	//	_asm
+	//	{
+	//		fld flt
+	//		fistp intgr
+	//	};
+
+	//	return intgr;
+	//};
 
 protected:
 	// Pure virtual functions that convert from a the sample type, to float

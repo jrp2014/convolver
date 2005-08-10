@@ -19,7 +19,7 @@
 //
 // WAV format helper routines
 
-#include "waveformat.h"
+#include "convolution\waveformat.h"
 //
 //class WaveFormat
 //{

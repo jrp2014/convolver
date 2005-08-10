@@ -40,16 +40,16 @@ void DumpSampleBuffer(const SampleBuffer& buffer)
 {
 	for (int nChannel = 0; nChannel < buffer.size(); ++nChannel)
 	{
-		 cdebug << std::endl << "[" << nChannel << ": "; DumpChannelBuffer(buffer[nChannel]); cdebug << "]";
+		 cdebug << std::endl << "[Channel " << nChannel << ": "; DumpChannelBuffer(buffer[nChannel]); cdebug << "]";
 	}
 };
 
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer)
 {
-	
+	cdebug << ".";
 	for (int nPartition = 0; nPartition < buffer.size(); ++nPartition)
 	{
-		cdebug << "{" << nPartition << ": " ; DumpSampleBuffer(buffer[nPartition]); cdebug << "}" << std::endl; 
+		cdebug << "{Partition " << nPartition << ": " ; DumpSampleBuffer(buffer[nPartition]); cdebug << "}" << std::endl; 
 
 	}
 };
