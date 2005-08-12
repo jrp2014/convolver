@@ -16,7 +16,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 {
 
 	HRESULT	hr = S_OK;
-	CConvolution* conv = NULL;
+	Holder<CConvolution> conv;
 	double fElapsedLoad	= 0;
 	double fTotalElapsedLoad = 0;
 	double fElapsedCalc = 0;
@@ -71,7 +71,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 
-		for (int nPartitions = 0; nPartitions < max_nPartitions; ++nPartitions)
+		for (int nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
 		{
 			for (int nIteration = 1; nIteration<=nIterations; ++nIteration)
 			{
@@ -79,7 +79,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				t.reset();
 				hr = SelectConvolution(pWave, conv,	argv[3], nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
 				fElapsedLoad = t.sec();
-				fTotalElapsedLoad +=fElapsedLoad;
+				fTotalElapsedLoad += fElapsedLoad;
 				if (FAILED(hr))
 				{
 					std::wcerr << "Failed to select filter " << FilterFileName << std::endl;
@@ -111,8 +111,6 @@ int	_tmain(int argc, _TCHAR* argv[])
 	{
 		std::wcerr << "Failed" <<std::endl;
 	}
-
-	delete conv;
 
 	return hr;
 

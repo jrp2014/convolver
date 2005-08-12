@@ -752,7 +752,7 @@ STDMETHODIMP CConvolver::Flush( void )
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
 
-	if (m_Convolution)
+	if (m_Convolution.get_ptr())
 	{
 		m_Convolution->Flush();
 	}
@@ -871,7 +871,6 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
 
-	delete m_Convolution;
 	m_Convolution = NULL;
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -1533,7 +1532,6 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 
 	default:
 		return DMO_E_TYPE_NOT_ACCEPTED;
-		break;
 	}
 
 	// if the partner media type is configured, make sure it matches the target.

@@ -35,27 +35,22 @@
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.
 
-class Filter 
+class Filter
 {
 public:
 
-	WORD											nChannels;				// number of channels
-	PartitionedBuffer								buffer;
-	WAVEFORMATEXTENSIBLE							wfexFilterFormat;		// The format of the filter file
-	const DWORD										nPartitions;
-	DWORD											nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	DWORD											nHalfPartitionLength;	// in blocks
-	DWORD											nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+	int						nChannels;				// number of channels
+	PartitionedBuffer		buffer;
+	WAVEFORMATEXTENSIBLE	wfexFilterFormat;		// The format of the filter file
+	const int				nPartitions;
+	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
+	int						nHalfPartitionLength;	// in blocks
+	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
 
-	explicit Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
+	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
 
-	~Filter()
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "deleted Filter Buffer " << std::endl;
-#endif
-	}
-
+private:
 	Filter(const Filter& other); // no impl.
 	void operator=(const Filter& other); // no impl.
+	Filter(Filter& other);                // discourage use of lvalue Filters
 };

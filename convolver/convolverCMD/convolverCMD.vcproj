@@ -202,13 +202,13 @@
 				RelativePath="..\convolution\samplebuffer.h">
 			</File>
 			<File
-				RelativePath="..\convolverWMP\wavefile.h">
+				RelativePath="..\convolution\wavefile.h">
 			</File>
 			<File
 				RelativePath="..\convolverWMP\waveformat.cpp">
 			</File>
 			<File
-				RelativePath="..\convolverWMP\waveformat.h">
+				RelativePath="..\convolution\waveformat.h">
 			</File>
 		</Filter>
 		<Filter

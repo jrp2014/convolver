@@ -304,7 +304,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					case 32:
 						{
 							float sample = 0;
-							UINT nSizeWrote = 0;
 							input >> sample ;
 							std::cerr << sample << std::endl;
 							hr = output->Write(Wave.Format.wBitsPerSample / 8, (BYTE *)&sample, &nSizeWrote);

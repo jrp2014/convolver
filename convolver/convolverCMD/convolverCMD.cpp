@@ -14,7 +14,7 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 
 	HRESULT hr = S_OK;
-	CConvolution* conv = NULL;
+	Holder<CConvolution> conv;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);
@@ -22,8 +22,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (argc != 5)
 	{
-		std::wcerr << "Usage: convolverCMD nPartitions filter.wav inputwavfile1.wav outputwavfile.wav" << std::endl;
-		std::wcerr << "	nParitions = 0 for overlap-save, or the number of partitions to be used." << std:: endl;
+		std::wcerr << "Usage: convolverCMD nPartitions filter.wav inputwavfile.wav outputwavfile.wav" << std::endl;
+		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std:: endl;
 		return 1;
 	}
 
@@ -197,7 +197,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		std::wcerr << "Failed" <<std::endl;
 	}
-	delete conv;
+
 	return hr;
 }
 

@@ -43,19 +43,21 @@ typedef	std::valarray<float> ChannelBuffer;
 
 #ifdef FASTARRAY
 #include <malloc.h>
-#include<windows.h>	// for ZeroMemory, CopyMemory, etc
+#include <windows.h>	// for ZeroMemory, CopyMemory, etc
 
-// The following undefs are needed to avoid valarray conflicts
+// The following undefs are needed to avoid conflicts
 #undef min
 #undef max
 
 template <typename T>
 class fastarray
 {
+	
+private:
 	class fastarray_impl		// Ensures cleanup after exception
 	{
 	public:
-		fastarray_impl(int size=0) :
+		explicit fastarray_impl(int size=0) :
 		  v_(static_cast<T*>(_aligned_malloc(size * sizeof(T), 16))),	// 16-byte aligned for SIMD
 			  //v_(new T[size]), // operator new ensures zero initialization
 			  size_(size), bsize_(size * sizeof(T))
@@ -80,21 +82,20 @@ class fastarray
 		// No copying allowed
 		fastarray_impl(const fastarray_impl&);
 		fastarray_impl& operator=(const fastarray_impl&);
+		fastarray_impl(fastarray_impl&);                // discourage use of lvalue fastarray_impls
 	};
-
-private:
 
 	fastarray_impl impl_;	// private implementation
 
 public:
 	fastarray(int size = 0) : impl_(size) {};
 
-	fastarray(const fastarray& other) : impl_(other.impl_.size_)
+	explicit fastarray(const fastarray<T>& other) : impl_(other.impl_.size_)
 	{
 		::CopyMemory(impl_.v_, other.impl_.v_, other.impl_.bsize_); // memcpy => overlap not allowed
 	}
 
-	fastarray& operator=(const fastarray& rhs)
+	fastarray<T>& operator=(const fastarray<T>& rhs)
 	{
 		//assert(impl_.bsize_ == rhs.impl_.bsize_);  
 		//if (this != &rhs) // 
@@ -107,7 +108,7 @@ public:
 		::MoveMemory(&impl_.v_[n], impl_.v_, n * sizeof(T));
 	}
 
-	fastarray& operator=(const int& value)
+	fastarray<T>& operator=(const int& value)
 	{
 		if( value == 0)
 		{
@@ -121,7 +122,7 @@ public:
 		return *this;
 	}
 
-	fastarray& operator=(const T& value)
+	fastarray<T>& operator=(const T& value)
 	{
 		{
 			for (int i = 0; i < impl_.size_; ++i)
@@ -132,13 +133,13 @@ public:
 
 	T  operator[](int n) const
 	{ 
-		//assert(n < impl_.size_);
+		//assert(n < impl_.size_ && n >= 0);;
 		return this->impl_.v_[n];
 	}
 
 	T& operator[](int n)
 	{ 
-		//assert(n < impl_.size_);
+		//assert(n < impl_.size_ && n >= 0);
 		return this->impl_.v_[n];
 	}
 
@@ -147,14 +148,15 @@ public:
 		return impl_.size_;
 	}
 
-	fastarray& operator*= (const T& value) // // TODO: optimize this
+	fastarray<T>& operator*= (const T& value) // // TODO: optimize this
 	{
 		for (int i = 0; i < impl_.size_; ++i)
 			impl_.v_[i] *= value;
 		return *this;
 	}
 
-	fastarray& operator+= (const fastarray& other)	// TODO: optimize this
+	// No longer needed
+	fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
 	{
 		for (int i = 0; i < this->size(); ++i)
 			impl_.v_[i] += other.impl_.v_[i];
@@ -178,6 +180,9 @@ public:
 				result = impl_.v_[i];
 		return result;
 	}
+
+private:
+	fastarray(fastarray<T>&);                // discourage use of lvalue fastarrays
 };
 
 typedef	fastarray<float> ChannelBuffer;

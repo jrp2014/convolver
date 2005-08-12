@@ -149,6 +149,7 @@ nPartitions (nPartitions)
 						assert(dwSizeToRead == sizeof(BYTE));
 						sample = static_cast<float>(bSample[0] - 128);
 					}
+					break;
 				case 16:
 					{
 						assert(dwSizeToRead == sizeof(INT16));

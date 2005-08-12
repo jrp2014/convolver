@@ -137,7 +137,7 @@ const std::string formatDescription(const WAVEFORMATEXTENSIBLE* w)
 	}
 }
 
-const WORD BitsPerSample(const WAVEFORMATEXTENSIBLE* w)
+WORD BitsPerSample(const WAVEFORMATEXTENSIBLE* w)
 {
 	if (w->Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 		return w->Samples.wValidBitsPerSample;

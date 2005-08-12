@@ -152,3 +152,4 @@ std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD sam
 	s << prefix << BitsPerSample(w) << "-bit " << w->Format.nSamplesPerSec/1000.0f << "kHz " << channelDescription(w) << " " << formatDescription(w) << ", " << samples << " samples";
 	return s.str();
 }
+

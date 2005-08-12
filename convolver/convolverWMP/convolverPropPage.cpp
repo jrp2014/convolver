@@ -450,7 +450,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	SetDirty(TRUE);
 
-	return ERROR_SUCCESS;
+	return hr;
 }
 
 LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)

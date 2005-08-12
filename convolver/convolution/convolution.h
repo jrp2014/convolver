@@ -29,14 +29,11 @@
 #include ".\samplebuffer.h"
 #include ".\filter.h"
 
-
 // FFT routines
 #include "fft\fftsg_h.h"
 
-#include <memory>
 
 const DWORD MAX_ATTENUATION = 1000; // dB
-
 
 // CConvolution does the work
 // The data path is:
@@ -44,6 +41,7 @@ const DWORD MAX_ATTENUATION = 1000; // dB
 // m_InputBuffer (FFT_type) -> [convolve] ->
 // m_OutputBuffer (FFT_type) -> NormalizeSample(BYTE* & dstContainer, double& srcSample) ->
 // pbOuputData (raw bytes)
+
 
 class CConvolution
 {
@@ -88,35 +86,25 @@ protected:
 private:
 
 	SampleBuffer		InputBuffer_;
-	SampleBuffer		OutputBuffer_;				// This is used by overlap-save
 	SampleBuffer		InputBufferCopy_;			// As FFT routines destroy their input
-	PartitionedBuffer	ComputationCircularBuffer_;	// This is used as the output buffer for partitioned convolution
-	SampleBuffer		MultipliedFFTBuffer_;
+	SampleBuffer		OutputBuffer_;				// Used by overlap-save
+	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
-	DWORD				nInputBufferIndex_;		// placeholder
-	DWORD				nPartitionIndex_;		// for partitioned convolution
-	DWORD				nOutputPartitionIndex_;	// lags nPartitionIndex_ by 1
+	int					nInputBufferIndex_;		// placeholder
+	int					nPartitionIndex_;		// for partitioned convolution
+	int					nOutputPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWritingOutput_;	// don't start outputting until we have some convolved output
 
 	// Complex array multiplication -- ordering specific to the Ooura routines. C = A * B
 	//void cmult(const std::vector<float>& A, const std::vector<float>& B, std::vector<float>& C, const DWORD N);
-#ifdef VALARRAY
-	void cmult(const std::valarray<float>& A, const std::valarray<float>& B, std::valarray<float>& C, const DWORD N);
-#endif
-#ifdef FASTARRAY
-	void cmult(const fastarray<float>& A, const fastarray<float>& B, fastarray<float>& C, const DWORD N);
-#endif
+	inline void cmult(const ChannelBuffer& A, const ChannelBuffer& B, ChannelBuffer& C, const int N);
+	inline void cmultadd(const ChannelBuffer& A, const ChannelBuffer& B, ChannelBuffer& C, const int N);
 
-	const bool isPowerOf2(int i) const
+	// Used to check filter / partion lengths
+	bool isPowerOf2(int i) const
 	{
 		return i > 0 && (i & (i - 1)) == 0;
 	};
-
-	const float AttenuatedSample(const double& fAttenuation_db, const float& sample) const
-	{
-		return (fAttenuation_db == 0 ? sample  : 
-		static_cast<float>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L))));
-	}
 
 	// Round the argument to the nearest integer value, using the current rounding direction. 
 	// On Intel Pentium processors (especially PIII and probably P4), converting
@@ -140,8 +128,64 @@ private:
 
 protected:
 	// Pure virtual functions that convert from a the sample type, to float
-	virtual const float GetSample(BYTE* & container) const = 0;						// converts sample into a float, [-1..1]
-	virtual const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const = 0;	// returns number of bytes processed
+	virtual float GetSample(BYTE* & container) const = 0;						// converts sample into a float, [-1..1]
+	virtual DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const = 0;	// returns number of bytes processed
+};
+
+
+/* The following code class adapted from is taken from the book
+* "C++ Templates - The Complete Guide"
+* by David Vandevoorde and Nicolai M. Josuttis, Addison-Wesley, 2002
+*
+* (C) Copyright David Vandevoorde and Nicolai M. Josuttis 2002.
+*/
+template <typename T>
+class Holder {
+private:
+	T* ptr_;    // refers to the object it holds (if any)
+
+public:
+	// default constructor: let the holder refer to nothing
+	Holder() : ptr_(0)	{}
+
+	// constructor for a pointer: let the holder refer to where the pointer refers
+	explicit Holder (T* p) : ptr_(p) { }
+
+	// destructor: releases the object to which it refers (if any)
+	~Holder()
+	{ 
+		delete ptr_;
+	}
+
+	// assignment of new pointer
+	Holder<T>& operator= (T* p)
+	{
+		delete ptr_;
+		ptr_ = p;
+		return *this;
+	}
+
+	// pointer operators
+	T& operator* () const
+	{ 
+		return *ptr_;
+	}
+
+	T* operator-> () const
+	{ 
+		return ptr_; 
+	}
+
+    // get referenced object (if any)
+    T* get_ptr() const
+	{
+        return ptr_;
+    }
+
+private:
+	// no copying and copy assignment allowed
+	Holder (Holder<T> const&);
+	Holder<T>& operator= (Holder<T> const&);
 };
 
 // Specializations with the appropriate functions for accessing the sample buffer
@@ -151,24 +195,18 @@ public:
 	Cconvolution_ieeefloat(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, sizeof(float)){};
 
 private:
-	const float GetSample(BYTE* & container) const
+	float GetSample(BYTE* & container) const
 	{
 		//return *(FFT_type *)container;
 		return *reinterpret_cast<const float *>(container);
 	};	// TODO: find a cleaner way to do this
 
-	const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const 
+	DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const 
 	{ 
 		*((float *) dstContainer) = (float) srcSample;
 		//* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
 		return sizeof(float);
 	};
-
-	const float AttenuatedSample(const double& fAttenuation_db, const float& sample) const
-	{
-		return fAttenuation_db == 0 ? sample : 
-		static_cast<float>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L)));
-	}
 };
 
 // 8-bit sound is 0..255 with 128 == silence
@@ -179,12 +217,12 @@ public:
 
 private:
 
-	const float GetSample(BYTE* & container) const
+	float GetSample(BYTE* & container) const
 	{
 		return static_cast<float>((*container - 128.0) / 128.0);  // Normalize to [-1..1]
 	};
 
-	const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
+	DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
 	{   
 		srcSample *= 128.0;
 
@@ -206,12 +244,12 @@ public:
 
 private:
 
-	const float GetSample(BYTE* & container) const 
+	float GetSample(BYTE* & container) const 
 	{ 
 		return static_cast<float>(*reinterpret_cast<INT16*>(container) / 32768.0);
 	}; 	// TODO: find a cleaner way to do this
 
-	const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
+	DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
 	{   
 		srcSample *= 32768.0;
 
@@ -224,12 +262,6 @@ private:
 		*(INT16 *)dstContainer = (INT16)(srcSample);
 		//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
 		return sizeof(INT16);  // ie, 2 bytes produced
-	};
-
-	const float AttenuatedSample(const double& fAttenuation_db, const float& sample) const
-	{
-		return (fAttenuation_db == 0 ? sample  : 
-		static_cast<float>(static_cast<double>(sample) * pow(static_cast<double>(10), static_cast<double>(fAttenuation_db / 20.0L))));
 	}
 };
 
@@ -242,7 +274,7 @@ public:
 
 private:
 
-	const float GetSample(BYTE* & container) const
+	float GetSample(BYTE* & container) const
 	{
 		int i = container[2];
 		i = ( i << 8 ) | container[1];
@@ -260,10 +292,10 @@ private:
 			assert(false);
 			return i / 8388608.0; // 2^23;
 		};
-		
+
 	};
 
-	const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
+	DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
 	{   
 		int iClip = 0;
 		switch (validBits)
@@ -313,7 +345,7 @@ public:
 
 private:
 
-	const float GetSample(BYTE* & container) const
+	float GetSample(BYTE* & container) const
 	{
 		INT32 i = *reinterpret_cast<INT32*>(container);
 		switch (validBits)
@@ -335,7 +367,7 @@ private:
 		}
 	}; 
 
-	const DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
+	DWORD NormalizeSample(BYTE* & dstContainer, double& srcSample) const
 	{   
 		INT32 iClip = 0;
 		switch (validBits)
@@ -374,5 +406,5 @@ private:
 	};
 };
 
-HRESULT SelectConvolution(WAVEFORMATEX* & pWave, CConvolution* & convolution, TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
+HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
 HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);

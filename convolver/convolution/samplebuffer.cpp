@@ -34,7 +34,7 @@ void DumpChannelBuffer(const ChannelBuffer& buffer )
 	{
 		cdebug << "... " << std::endl << "Size: " << buffer.size() << ", Max: " << buffer.max() << ", Min: " << buffer.min();
 	}
-};
+}
 
 void DumpSampleBuffer(const SampleBuffer& buffer)
 {
@@ -42,7 +42,7 @@ void DumpSampleBuffer(const SampleBuffer& buffer)
 	{
 		 cdebug << std::endl << "[Channel " << nChannel << ": "; DumpChannelBuffer(buffer[nChannel]); cdebug << "]";
 	}
-};
+}
 
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer)
 {
@@ -52,7 +52,7 @@ void DumpPartitionedBuffer(const PartitionedBuffer& buffer)
 		cdebug << "{Partition " << nPartition << ": " ; DumpSampleBuffer(buffer[nPartition]); cdebug << "}" << std::endl; 
 
 	}
-};
+}
 #endif
 
 

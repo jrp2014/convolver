@@ -37,6 +37,7 @@
 				RegisterOutput="TRUE"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
 				ShowProgress="0"
+				SuppressStartupBanner="FALSE"
 				LinkDLL="TRUE"
 				ModuleDefinitionFile="convolverwmp.def"
 				GenerateDebugInformation="TRUE"
@@ -299,7 +300,7 @@
 					RelativePath=".\waveformat.cpp">
 				</File>
 				<File
-					RelativePath=".\waveformat.h">
+					RelativePath="..\convolution\waveformat.h">
 				</File>
 			</Filter>
 		</Filter>
@@ -343,6 +344,9 @@
 				RelativePath=".\multichan.ico">
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\VTune\convolverWMP.vpj">
+		</File>
 		<File
 			RelativePath=".\gpl.txt">
 		</File>

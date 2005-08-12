@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#pragma once
 
 #include "Common\dxstdafx.h"
 
@@ -28,3 +29,16 @@
 
 
 std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix);
+
+//// Used to distinguish the different encoding and decoding routines
+//class WaveFormatSignature
+//{
+//public:
+//	WORD wFormatTag;
+//	WORD wBitsPerSample;
+//	WORD wValidBitsPerSample;
+//
+//	WaveFormatSignature(WORD wFormatTag, WORD wBitsPerSample, WORD wValidBitsPerSample) :
+//	wFormatTag(wFormatTag), wBitsPerSample(wBitsPerSample), wValidBitsPerSample(wValidBitsPerSample) {};
+//
+//};
