@@ -39,6 +39,7 @@
 #include "Common\dxstdafx.h"
 
 #if defined(DEBUG) | defined(_DEBUG)
+#define _CRTDBG_MAP_ALLOC 
 #include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 #endif
@@ -71,17 +72,17 @@ interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver 
 {
 public:
 
-	virtual HRESULT STDMETHODCALLTYPE get_wetmix(double *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_wetmix(double newVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE get_wetmix(float *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_wetmix(float newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_filterfilename(TCHAR* *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_filterfilename(TCHAR* newVal) = 0;
 
-	virtual HRESULT STDMETHODCALLTYPE get_attenuation(double *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_attenuation(double newVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE get_attenuation(float *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_attenuation(float newVal) = 0;
 
-	virtual double	decode_Attenuationdb(const DWORD dwValue) = 0;
-	virtual DWORD	encode_Attenuationdb(const double fValue) = 0;
+	virtual float	decode_Attenuationdb(const DWORD dwValue) = 0;
+	virtual DWORD	encode_Attenuationdb(const float fValue) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
@@ -130,14 +131,14 @@ END_COM_MAP()
     void    FinalRelease();
 
     // IConvolver methods
-	STDMETHOD(get_wetmix)(double *pVal);
-	STDMETHOD(put_wetmix)(double newVal);
+	STDMETHOD(get_wetmix)(float *pVal);
+	STDMETHOD(put_wetmix)(float newVal);
 
 	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
 	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
 
-	STDMETHOD(get_attenuation)(double *pVal);
-	STDMETHOD(put_attenuation)(double newVal);
+	STDMETHOD(get_attenuation)(float *pVal);
+	STDMETHOD(put_attenuation)(float newVal);
 
 	STDMETHOD(get_partitions)(DWORD *pVal);
 	STDMETHOD(put_partitions)(DWORD newVal);
@@ -272,14 +273,14 @@ END_COM_MAP()
 #endif
 
 	// The following pair is needed because DWORD is unsigned
-	double decode_Attenuationdb(const DWORD dwValue)
+	float decode_Attenuationdb(const DWORD dwValue)
 		{
 			assert(dwValue <= (MAX_ATTENUATION + MAX_ATTENUATION) * 100);
-			return static_cast<double>(dwValue) / 100.0L - MAX_ATTENUATION;
+			return static_cast<float>(dwValue) / 100.0f - MAX_ATTENUATION;
 		}
-	DWORD encode_Attenuationdb(const double fValue)
+	DWORD encode_Attenuationdb(const float fValue)
 		{	assert (abs(fValue) <= MAX_ATTENUATION);
-			return static_cast<DWORD>((fValue + MAX_ATTENUATION) * 100.0);
+			return static_cast<DWORD>((fValue + MAX_ATTENUATION) * 100.0f);
 		}
     
 private:
@@ -304,17 +305,13 @@ private:
     bool                    m_bValidTime;       // Is timestamp valid?
     REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
 
-	double					m_fWetMix;			// percentage of effect
-	double					m_fDryMix;			// percentage of dry signal
-	double					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
+	float					m_fWetMix;			// proportion of effect
+	float					m_fDryMix;			// proportion of dry signal
+	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 
 	Holder<CConvolution>	m_Convolution;		// Processing class.  Handle manages resources
 	TCHAR					m_szFilterFileName[MAX_PATH];
-
-#if defined(DEBUG) | defined(_DEBUG)
-	CWaveFileHandle			m_CWaveFileTrace;	// To keep a record of the processed output
-#endif
 
     BOOL                    m_bEnabled;         // TRUE if enabled
 };

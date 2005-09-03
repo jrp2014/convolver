@@ -28,7 +28,8 @@
 #include "convolverWMP\convolver.h"
 #include "convolverWMP\convolverPropPage.h"
 #include ".\convolverproppage.h"
-#include "debugging/fastTiming.h"
+#include "debugging\fastTiming.h"
+#include "convolution\waveformat.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -82,7 +83,21 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
 	// Load the wave file
-	CWaveFile* pFilterWave = new CWaveFile();
+#ifdef LIBSNDFILE
+	try
+	{
+		SF_INFO sfinfo;
+		ZeroMemory(&sfinfo, sizeof(sfinfo));
+		CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sfinfo);
+		std::string description = waveFormatDescription(sfinfo, "Filter: ");
+		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
+	}
+	catch (...)
+	{
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
+	}
+#else
+	CWaveFileHandle pFilterWave = new CWaveFile();
 	if( FAILED(hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ ) ) )
 	{
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
@@ -94,7 +109,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 		std::string description = waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat()), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
 		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
 	}
-	SAFE_DELETE(pFilterWave);
+#endif
 
 	return hr;
 }
@@ -108,16 +123,16 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	TCHAR   szStr[MAXSTRING] = { 0 };											// Temporary string
 #ifdef UNICODE
 	CHAR strTmp[2*(sizeof(szStr)+1)];	// SIZE equals (2*(sizeof(tstr)+1)). This ensures enough
-										// room for the multibyte characters if they are two
-										// bytes long and a terminating null character.
+	// room for the multibyte characters if they are two
+	// bytes long and a terminating null character.
 #endif
-	double	fAttenuation = 0.0;													// Initialize a double for the attenuation
+	float	fAttenuation = 0.0;													// Initialize a float for the attenuation
 	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
 	DWORD   dwWetmix = 50;														// Initialize a DWORD for effect level.
-	double  fWetmix = 0.50;														// Initialize a double for effect level.
+	float  fWetmix = 0.50;														// Initialize a float for effect level.
 	TCHAR	szFilterFileName[MAX_PATH]	= { 0 };
 	DWORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
-																				// to be used in the convolution algorithm
+	// to be used in the convolution algorithm
 	// Get the attenuation value from the dialog box.
 	GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
 	// atof does not work with Unicode
@@ -160,7 +175,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		return E_FAIL;
 	}
 	else
-		fWetmix = static_cast<double>(dwWetmix) / 100.0L; // %
+		fWetmix = static_cast<float>(dwWetmix) / 100.0L; // %
 
 	// Get the number of partitions value from the dialog box.
 	GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
@@ -297,13 +312,13 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	DWORD  dwWetmix			 = 50;									// Default wet mix DWORD.
-	double fWetmix			 = 0.50;								// Default wet mix double.
-	double fAttenuation		 = 0.0;									// Default attenuation double
+	DWORD  dwWetmix			 = 100;									// Default wet mix DWORD.
+	float fWetmix			 = 1.0;									// Default wet mix float.
+	float fAttenuation		 = 0.0;									// Default attenuation float
 	DWORD  dwAttenuation	 = 
 		static_cast<DWORD>((fAttenuation + MAX_ATTENUATION) * 100);	// Default attenuation DWORD (offset, as DWORD unsigned)
-	DWORD   nPartitions		 = 0;									// Default number of partitions
 	TCHAR*  szFilterFileName = TEXT("");
+	DWORD   nPartitions		 = 0;									// Default number of partitions
 	CRegKey key;
 	LONG    lResult = 0;
 	DWORD   dwValue = 0;
@@ -312,7 +327,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	if (m_spConvolver)
 	{
 		m_spConvolver->get_wetmix(&fWetmix);
-		// Convert wet mix from double to DWORD.
+		// Convert wet mix from float to DWORD.
 		dwWetmix = static_cast<DWORD>(fWetmix * 100);
 
 		m_spConvolver->get_attenuation(&fAttenuation);
@@ -462,7 +477,7 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 
 LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	double	fAttenuation = 0;
+	float	fAttenuation = 0;
 	DWORD	nPartitions = 1;
 	TCHAR*  szFilterFileName	= TEXT("");
 	HRESULT hr S_OK;
@@ -494,7 +509,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	double fElapsed = 0;
 	apHiResElapsedTime t;
 	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
-	fElapsed = t.msec();
+	fElapsed = t.sec();
 	if (FAILED(hr))
 	{
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );  // TODO: internationalize
@@ -507,7 +522,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	SetDlgItemText(IDC_ATTENUATION, szStr);
 
 	// Display calculation time
-	_stprintf(szStr, _T("Elapsed calculation time: %.2f microseconds"), fElapsed);
+	_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
 	SetDlgItemText(IDC_STATUS, szStr);
 
 	SetDirty(TRUE);
@@ -517,11 +532,6 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 
 LRESULT CConvolverPropPage::OnEnChangePartitions(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	// TODO:  If this is a RICHEDIT control, the control will not
-	// send this notification unless you override the __super::OnInitDialog()
-	// function and call CRichEditCtrl().SetEventMask()
-	// with the ENM_CHANGE flag ORed into the mask.
-
 	SetDirty(TRUE);
 
 	return 0;

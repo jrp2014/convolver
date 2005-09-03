@@ -40,9 +40,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 CConvolver::CConvolver() :
-	m_fWetMix(0.50),  // default to 50 percent wet
-	m_fDryMix(0.50),  // default to 50 percent dry
-	m_fAttenuation_db(encode_Attenuationdb(0)), // default attenuation
+	m_fWetMix(1.0),  // default to 100 percent wet
+	m_fDryMix(0.0),  // default to 0 percent dry
+	m_fAttenuation_db(0.0), // default attenuation
 	m_cbInputLength(0),
 	m_pbInputData (NULL),
 	m_bValidTime(false),
@@ -51,7 +51,6 @@ CConvolver::CConvolver() :
 	m_nPartitions(0), // default, just overlap-save
 	m_Convolution(NULL)
 {
-
 	m_szFilterFileName[0] = 0;
 
 	::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
@@ -85,6 +84,8 @@ HRESULT CConvolver::FinalConstruct()
 	DWORD   dwValue;
 
 #if defined(DEBUG) | defined(_DEBUG)
+
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
 	debugstream.sink (apDebugSinkWindows::sOnly);
 	apDebugSinkWindows::sOnly.showHeader (true);
 
@@ -101,8 +102,8 @@ HRESULT CConvolver::FinalConstruct()
 		lResult = key.QueryDWORDValue(kszPrefsWetmix, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			// Convert the DWORD to a double.
-			m_fWetMix = static_cast<double>(dwValue) / 100.0;
+			// Convert the DWORD to a float.
+			m_fWetMix = static_cast<float>(dwValue) / 100.0;
 			// Calculate the dry mix value.
 			m_fDryMix = 1.0 - m_fWetMix;
 		}
@@ -111,7 +112,7 @@ HRESULT CConvolver::FinalConstruct()
 		lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			// Convert the DWORD to a double.
+			// Convert the DWORD to a float.
 			m_fAttenuation_db = decode_Attenuationdb(dwValue);
 		}
 
@@ -792,7 +793,7 @@ STDMETHODIMP CConvolver::Discontinuity(DWORD dwInputStreamIndex)
 	return S_OK;
 }
 
-
+//
 //void CConvolver::FillBufferWithSilence(WAVEFORMATEX *pWfex)
 //{
 //	
@@ -834,21 +835,17 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 	}
 
 	// Check that the filter has the same number of channels and sample rate as the input
+#ifdef LIBSNDFILE
+		if ((pWave->nChannels != m_Convolution->FIR.nChannels) ||
+		(pWave->nSamplesPerSec != m_Convolution->FIR.sf_FilterFormat.samplerate))
+		return E_INVALIDARG;
+#else
 	if ((pWave->nChannels != m_Convolution->FIR.nChannels) ||
 		(pWave->nSamplesPerSec != m_Convolution->FIR.wfexFilterFormat.Format.nSamplesPerSec))
 		return E_INVALIDARG;
-
-
-#if defined(DEBUG) | defined(_DEBUG)
-	hr = m_CWaveFileTrace->Open(TEXT("c:\\temp\\Trace.wav"), pWave, WAVEFILE_WRITE);
-	if (FAILED(hr))
-	{
-		return DXTRACE_ERR_MSGBOX(TEXT("Failed to open trace file for writing"), hr);
-	}
 #endif
 
-	// TODO: Fill the buffer with values representing silence.
-	// FillBufferWithSilence(pWave);
+	//FillBufferWithSilence(pWave);
 
 	return hr;
 }
@@ -873,11 +870,6 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 
 	m_Convolution = NULL;
 
-#if defined(DEBUG) | defined(_DEBUG)
-	_CrtMemDumpAllObjectsSince( NULL );
-
-	_CrtDumpMemoryLeaks();
-#endif
 	return S_OK;
 }
 
@@ -1210,7 +1202,7 @@ STDMETHODIMP CConvolver::GetPages(CAUUID *pPages)
 }
 
 // Property get to retrieve the wet mix value by using the public interface.
-STDMETHODIMP CConvolver::get_wetmix(double *pVal)
+STDMETHODIMP CConvolver::get_wetmix(float *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_wetmix" << std::endl;);
@@ -1227,7 +1219,7 @@ STDMETHODIMP CConvolver::get_wetmix(double *pVal)
 }
 
 // Property put to store the wet mix value by using the public interface.
-STDMETHODIMP CConvolver::put_wetmix(double newVal)
+STDMETHODIMP CConvolver::put_wetmix(float newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_wetmix" << std::endl;);
@@ -1236,13 +1228,13 @@ STDMETHODIMP CConvolver::put_wetmix(double newVal)
 	m_fWetMix = newVal;
 
 	// Calculate m_fDryMix
-	m_fDryMix = 1.0 - m_fWetMix;
+	m_fDryMix = 1.0f - m_fWetMix;
 
 	return S_OK;
 }
 
 // Property get to retrieve the wet mix value by using the public interface.
-STDMETHODIMP CConvolver::get_attenuation(double *pVal)
+STDMETHODIMP CConvolver::get_attenuation(float *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_attenuation" << std::endl;);
@@ -1259,7 +1251,7 @@ STDMETHODIMP CConvolver::get_attenuation(double *pVal)
 }
 
 // Property put to store the wet mix value by using the public interface.
-STDMETHODIMP CConvolver::put_attenuation(double newVal)
+STDMETHODIMP CConvolver::put_attenuation(float newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_attenuation" << std::endl;);
@@ -1372,21 +1364,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 		m_Convolution->doConvolution(pbInputData, pbOutputData,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
-		m_fWetMix,
-		m_fDryMix
-#if defined(DEBUG) | defined(_DEBUG)
-		, m_CWaveFileTrace
-#endif	
-		)
+		m_fWetMix, m_fDryMix)
 		: 	m_Convolution->doPartitionedConvolution(pbInputData, pbOutputData,
 		dwBlocksToProcess,
 		m_fAttenuation_db,
-		m_fWetMix,
-		m_fDryMix
-#if defined(DEBUG) | defined(_DEBUG)
-		, m_CWaveFileTrace
-#endif	
-		);
+		m_fWetMix, m_fDryMix);
 
 	return S_OK;
 }

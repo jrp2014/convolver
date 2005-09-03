@@ -15,7 +15,7 @@
 			OutputDirectory="Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="1"
-			UseOfATL="1"
+			UseOfATL="2"
 			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
@@ -25,8 +25,10 @@
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
+				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
+				StructMemberAlignment="5"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="2"
@@ -70,19 +72,33 @@
 			OutputDirectory="Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="1"
-			UseOfATL="1"
-			CharacterSet="1">
+			UseOfATL="0"
+			ATLMinimizesCRunTimeLibraryUsage="FALSE"
+			CharacterSet="1"
+			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				Optimization="2"
+				GlobalOptimizations="TRUE"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="TRUE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="TRUE"
+				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				RuntimeLibrary="4"
+				ExceptionHandling="TRUE"
+				RuntimeLibrary="0"
+				StructMemberAlignment="5"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
-				UsePrecompiledHeader="2"
-				WarningLevel="3"
+				RuntimeTypeInfo="FALSE"
+				UsePrecompiledHeader="1"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"/>
 			<Tool
@@ -92,6 +108,8 @@
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
+				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreDefaultLibraryNames=""
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -120,6 +138,12 @@
 		</Configuration>
 	</Configurations>
 	<References>
+		<ProjectReference
+			ReferencedProjectIdentifier="{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}"
+			Name="cmul"/>
+		<ProjectReference
+			ReferencedProjectIdentifier="{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}"
+			Name="libsndfile"/>
 	</References>
 	<Files>
 		<Filter
@@ -196,6 +220,12 @@
 				RelativePath="..\convolution\filter.h">
 			</File>
 			<File
+				RelativePath="..\convolution\holder.h">
+			</File>
+			<File
+				RelativePath="..\convolution\Random.h">
+			</File>
+			<File
 				RelativePath="..\convolution\samplebuffer.cpp">
 			</File>
 			<File
@@ -205,7 +235,7 @@
 				RelativePath="..\convolution\wavefile.h">
 			</File>
 			<File
-				RelativePath="..\convolverWMP\waveformat.cpp">
+				RelativePath="..\convolution\waveformat.cpp">
 			</File>
 			<File
 				RelativePath="..\convolution\waveformat.h">

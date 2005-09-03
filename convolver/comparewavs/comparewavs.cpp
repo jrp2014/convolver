@@ -23,7 +23,7 @@
 //
 
 #include "stdafx.h"
-#include "dxstdafx.h"
+#include "Common\dxstdafx.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {

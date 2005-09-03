@@ -18,10 +18,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include  "convolution.h"
-#include  "filter.h"
 
 // CConvolution Constructor
-CConvolution::CConvolution(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, const BYTE nContainerSize) :
+CConvolution::CConvolution(TCHAR szFilterFileName[MAX_PATH], const int nPartitions, const int nContainerSize):
 FIR(szFilterFileName, nPartitions),
 nContainerSize_(nContainerSize), 
 InputBuffer_(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)),
@@ -68,13 +67,9 @@ void CConvolution::Flush()
 DWORD
 CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 									   DWORD dwBlocksToProcess, // A block contains a sample for each channel
-									   const double fAttenuation_db,
-									   const double fWetMix,
-									   const double fDryMix
-#if defined(DEBUG) | defined(_DEBUG)
-									   , CWaveFileHandle & CWaveFileTrace
-#endif	
-									   )  // Returns bytes processed
+									   const float fAttenuation_db,
+									   const float fWetMix,
+									   const float fDryMix)  // Returns bytes processed
 {
 	assert(isPowerOf2(FIR.nPartitionLength));
 
@@ -88,11 +83,12 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 
 	while (dwBlocksToProcess--)
 	{
-		 // Channels are stored sequentially in a block
+		// Channels are stored sequentially in a block
+#pragma loop count(6)
 		for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 		{
 			// Mix the processed signal with the dry signal
-			double outputSample = InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + 
+			float outputSample = InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + 
 				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] * fWetMix;
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -123,18 +119,6 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 			if(bStartWritingOutput_)
 			{
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
-#if defined(DEBUG) | defined(_DEBUG)
-				{
-					// This does not quite work, because AllocateStreamingResources seems to be called after IEEE FFT_type playback, which rewrites the file
-					// It is not clear why this happens, as it does not occur after PCM playback
-					UINT nSizeWrote;
-					HRESULT hr = CWaveFileTrace->Write(nContainerSize_, pbOutputDataPointer, &nSizeWrote);
-					if (FAILED(hr) || nSizeWrote != nContainerSize_)
-					{
-						return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
-					}
-				}
-#endif
 				pbOutputDataPointer += nContainerSize_;
 			}
 		} // nChannel
@@ -142,6 +126,7 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 		// Got a block
 		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
 		{	
+#pragma loop count(6)
 			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 			{
 				// Copy the sample buffer partition as the rdft routine overwrites it
@@ -156,8 +141,15 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 				for (int nPartitionIndex = 0; nPartitionIndex < FIR.nPartitions; ++nPartitionIndex)
 				{
 					// Complex vector multiplication of InputBufferCopy_ and FIR.buffer_, added to ComputationCircularBuffer_
+#if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
+					// Vectorizable
+					cmuladd(&InputBufferCopy_[nChannel][0], &FIR.buffer[nPartitionIndex][nChannel][0],
+						&ComputationCircularBuffer_[nPartitionIndex_][nChannel][0], FIR.nPartitionLength);
+#else
+					// Non-vectorizable
 					cmultadd(InputBufferCopy_[nChannel], FIR.buffer[nPartitionIndex][nChannel],
-						ComputationCircularBuffer_[nPartitionIndex_][nChannel], FIR.nPartitionLength);	
+						ComputationCircularBuffer_[nPartitionIndex_][nChannel], FIR.nPartitionLength);
+#endif
 
 					nPartitionIndex_ = (nPartitionIndex_ + 1) % FIR.nPartitions;	// circular
 				}
@@ -189,13 +181,9 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 DWORD
 CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 							DWORD dwBlocksToProcess, // A block contains a sample for each channel
-							const double fAttenuation_db,
-							const double fWetMix,
-							const double fDryMix
-#if defined(DEBUG) | defined(_DEBUG)
-							, CWaveFileHandle & CWaveFileTrace
-#endif	
-							)  // Returns bytes processed
+							const float fAttenuation_db,
+							const float fWetMix,
+							const float fDryMix)  // Returns bytes processed
 {
 	// This convolution algorithm assumes that the filter is stored in the first, and only, partition
 	if(FIR.nPartitions != 1)
@@ -217,10 +205,11 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	while (dwBlocksToProcess--)
 	{
 		// Channels are stored sequentially in a block
+#pragma loop count(6)
 		for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 		{
 			// Mix the processed signal with the dry signal
-			double outputSample = (InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix ) + 
+			float outputSample = (InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix ) + 
 				(OutputBuffer_[nChannel][nInputBufferIndex_] * fWetMix);
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -250,19 +239,6 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 			if(bStartWritingOutput_)
 			{
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
-
-#if defined(DEBUG) | defined(_DEBUG)
-				{
-					// This does not quite work, because AllocateStreamingResources seems to be called after IEEE FFT_type playback, which rewrites the file
-					// It is not clear why this happens, as it does not occur after PCM playback
-					UINT nSizeWrote;
-					HRESULT hr = CWaveFileTrace->Write(nContainerSize_, pbOutputDataPointer, &nSizeWrote);
-					if (FAILED(hr) || nSizeWrote != nContainerSize_)
-					{
-						return DXTRACE_ERR_MSGBOX(TEXT("Failed to write to trace file"), hr);
-					}
-				}
-#endif
 				pbOutputDataPointer += nContainerSize_;
 			}
 		}
@@ -270,6 +246,8 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		// Got a block
 		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
 		{	
+#pragma omp parallel for
+#pragma loop count(6)
 			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 			{
 				// Copy the sample buffer partition as the rdft routine overwrites it
@@ -277,12 +255,18 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 
 				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);  // get DFT of InputBuffer_
 
+#if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
+				// vectorized
+				cmul(&InputBufferCopy_[nChannel][0], &FIR.buffer[0][nChannel][0],					// use the first partition only
+					&OutputBuffer_[nChannel][0], FIR.nPartitionLength);	
+#else
+				// Non-vectorizable
 				cmult(InputBufferCopy_[nChannel], FIR.buffer[0][nChannel],					// use the first partition only
 					OutputBuffer_[nChannel], FIR.nPartitionLength);	
-
+#endif
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0]);
-				
+
 				// Save the previous half partition; the first half will be read in over the next cycle
 				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
 			}
@@ -296,11 +280,48 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	return cbOutputBytesGenerated;
 }
 
+#if !(defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
+// Non-vectorizable versions
+
 /* Complex multiplication */
-inline void CConvolution::cmult(const ChannelBuffer& A, const ChannelBuffer& B, ChannelBuffer& C, const int N)
+void CConvolution::cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const int N)
 {
-	int R;
-	int I;
+	//__declspec(align( 16 )) float T1;
+	//__declspec(align( 16 )) float T2;
+
+	// a[2*k] = R[k], 0<=k<n/2
+	// a[2*k+1] = I[k], 0<k<n/2
+	// a[1] = R[n/2]
+
+	// (R[R[a] + I[a]) * (R[b]+I[b]] = R[a]R[b] - I[a]I[b]
+	// (I[R[a] + I[a]) * (R[b]+I[b]] = R[a]I[b] + I[a]R[b]
+
+	// 0<k<n/2
+	//								  A[R]*B[R]      - A[I]*B[I]
+	// R[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k]   - a[2*k+1]b[2*k+1]
+	//								  A[R]*B[I]      + A{I]*B[R]
+	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
+
+	// tempt the optimizer
+	assert(N % 4 == 0);
+
+	C[0] = A[0] * B[0];
+	C[1] = A[1] * B[1];
+	for(int R = 2, I = 3; R < N ;R += 2, I += 2)
+	{
+		C[R] = A[R]*B[R] - A[I]*B[I];
+		C[I] = A[R]*B[I] + A[I]*B[R];
+		//T1 = A[R] * B[R];
+		//T2 = A[I] * B[I];
+		//C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
+		//C[R] = T1 - T2;
+	}
+}
+
+
+/* Complex multiplication with addition */
+void CConvolution::cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const int N)
+{
 	//__declspec(align( 16 )) float T1;
 	//__declspec(align( 16 )) float T2;
 
@@ -319,58 +340,22 @@ inline void CConvolution::cmult(const ChannelBuffer& A, const ChannelBuffer& B, 
 
 	// tempt the optimizer
 	assert(N % 4 == 0);
-	__assume(N % 4 == 0);
-
-	C[0] = A[0] * B[0];
-	C[1] = A[1] * B[1];
-	for (R = 2,I = 3;R < N;R += 2,I += 2)
-	{
-		C[R] = A[R]*B[R] - A[I]*B[I];
-		C[I] = A[R]*B[I] + A[I]*B[R];
-		//T1 = A[R] * B[R];
-		//T2 = A[I] * B[I];
-		//C[I] = ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
-		//C[R] = T1 - T2;
-	}
-}
-
-/* Complex multiplication with addition */
-inline void CConvolution::cmultadd(const ChannelBuffer& A, const ChannelBuffer& B, ChannelBuffer& C, const int N)
-{
-	int R;
-	int I;
-	__declspec(align( 16 )) float T1;
-	__declspec(align( 16 )) float T2;
-
-	// a[2*k] = R[k], 0<=k<n/2
-	// a[2*k+1] = I[k], 0<k<n/2
-	// a[1] = R[n/2]
-
-	// R[R[a] + I[a]) * (R[b]+I[b]] = R[a]R[b] - I[a]I[b]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = R[a]I[b] + I[a]R[b]
-
-	// 0<k<n/2
-	//								  A[R]*B[R]      - A[I]*B[I]
-	// R[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k]   - a[2*k+1]b[2*k+1]
-	//								  A[R]*B[I]      + A{I]*B[R]
-	// I[R[a] + I[a]) * (R[b]+I[b]] = a[2*k]b[2*k+1] + a[2*k+1]b[2*k]
-
-	// tempt the optimizer
-	assert(N % 4 == 0);
-	__assume(N % 4 == 0);
 
 	C[0] += A[0] * B[0];
 	C[1] += A[1] * B[1];
-	for (R = 2,I = 3;R < N;R += 2,I += 2)
+
+	for (int R = 2, I = 3; R < N ;R += 2, I += 2)
 	{
-		C[R] = A[R]*B[R] - A[I]*B[I];
-		C[I] = A[R]*B[I] + A[I]*B[R];
+		C[R] += A[R]*B[R] - A[I]*B[I];
+		C[I] += A[R]*B[I] + A[I]*B[R];
 		//T1 = A[R] * B[R];
 		//T2 = A[I] * B[I];
 		//C[I] += ((A[R] + A[I]) * (B[R] + B[I])) - (T1 + T2);
 		//C[R] += T1 - T2;
 	}
 }
+
+#endif
 
 // Pick the correct version of the processing class
 //
@@ -382,7 +367,7 @@ inline void CConvolution::cmultadd(const ChannelBuffer& A, const ChannelBuffer& 
 // The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
 // while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
 // See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions)
+HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szFilterFileName[MAX_PATH], const int nPartitions)
 {
 	HRESULT hr = S_OK;
 
@@ -510,7 +495,7 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 }
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
-HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions)
+HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szFilterFileName[MAX_PATH], const int nPartitions)
 {
 	HRESULT hr = S_OK;
 
@@ -518,55 +503,57 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 	{
 		Cconvolution_ieeefloat c(szFilterFileName, nPartitions == 0 ? 1 : nPartitions); // 0 used to signal use of overlap-save
 
-		const int nSamples = 5; // length of the test sample, in filter lengths
+		const int nSamples = 10; // length of the test sample, in filter lengths
+		// So if you are using a 44.1kHz sample rate and it takes 1s to calculate optimum attenuation,
+		// that is equivalent to 0.1s to process a filter
+		// which means that the filter must be less than 44100 / .1 samples in length to keep up
 		const int nBlocks = nSamples * c.FIR.nFilterLength;
 		const int nBufferLength = nBlocks * c.FIR.nChannels;	// Channels are interleaved
 
-#if defined(DEBUG) | defined(_DEBUG)
-		CWaveFileHandle CWaveFileTrace;
-		if (FAILED(hr = CWaveFileTrace->Open(TEXT("c:\\temp\\AttenuationTrace.wav"), &c.FIR.wfexFilterFormat.Format, WAVEFILE_WRITE)))
-		{
-			return DXTRACE_ERR_MSGBOX(TEXT("Failed to open trace file for writing"), hr);
-		}
-#endif
 		std::vector<float>InputSamples(nBufferLength);
 		std::vector<float>OutputSamples(nBufferLength);
 
-		// Seed the random-number generator with current time so that
-		// the numbers will be different every time we run.
+		// The MT random number generator is much faster than rand, but it may not work under VC++
+#ifdef USEMT
+		MT<float> r;	// Random number generator class
+#else
 		srand( (unsigned)time( NULL ) );
+#endif
 
 		bool again = TRUE;
 		float maxSample = 0;
 
 		do
 		{
-			for(int i = 0; i < nBufferLength; i++)
+			for(int i = 0; i < nBufferLength; ++i)
 			{
-				InputSamples[i] = static_cast<float>((2.0 * rand() - RAND_MAX) / RAND_MAX); // -1..1
+#ifdef USEMT
+				InputSamples[i] = (2.0f * r.mt_random() - r.mt_max()) / r.mt_max(); // -1..1
+#if defined(DEBUG) | defined(_DEBUG)
+				cdebug << InputSamples[i] << " " ;
+#endif
+#else
+				InputSamples[i] = (2.0f * static_cast<float>(rand()) - static_cast<float>(RAND_MAX)) / static_cast<float>(RAND_MAX); // -1..1
+#endif
 				OutputSamples[i] = 0;  // silence
 			}
+
+#if defined(DEBUG) | defined(_DEBUG)
+//			copy(InputSamples.begin(), InputSamples.end(), ostream_iterator<float>(cdebug, ", "));
+#endif
 
 			// nPartitions == 0 => use overlap-save version
 			DWORD nBytesGenerated = nPartitions == 0 ?
 				c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-				/* dwBlocksToProcess */ nBlocks,
-				/* fAttenuation_db */ 0,
-				/* fWetMix,*/ 1.0L,
-				/* fDryMix */ 0.0L
-#if defined(DEBUG) | defined(_DEBUG)
-				, CWaveFileTrace
-#endif
-				)
+					/* dwBlocksToProcess */ nBlocks,
+					/* fAttenuation_db */ 0,
+					/* fWetMix,*/ 1.0L,
+					/* fDryMix */ 0.0L)
 				: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-				/* dwBlocksToProcess */ nBlocks,
-				/* fAttenuation_db */ 0,
-				/* fWetMix,*/ 1.0L,
-				/* fDryMix */ 0.0L
-#if defined(DEBUG) | defined(_DEBUG)
-				, CWaveFileTrace
-#endif
-				);
+					/* dwBlocksToProcess */ nBlocks,
+					/* fAttenuation_db */ 0,
+					/* fWetMix,*/ 1.0L,
+					/* fDryMix */ 0.0L);
 			// The output will be missing the last half filter length, the first time around
 			assert (nBytesGenerated % sizeof(float) == 0);
 			assert (nBytesGenerated <= nBufferLength * sizeof(float));
@@ -607,4 +594,3 @@ HRESULT calculateOptimumAttenuation(double& fAttenuation, TCHAR szFilterFileName
 		return E_OUTOFMEMORY;
 	}
 }
-

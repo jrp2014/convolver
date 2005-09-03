@@ -23,7 +23,7 @@
 //
 
 #include "stdafx.h"
-#include "dxstdafx.h"
+#include "Common\dxstdafx.h"
 
 int generate_perfect_dirac_delta(int nSamplesPerSec, int nChannels, int nSilence);
 

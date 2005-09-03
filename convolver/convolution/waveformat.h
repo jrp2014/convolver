@@ -19,6 +19,7 @@
 #pragma once
 
 #include "Common\dxstdafx.h"
+#include "convolution\wavefile.h"
 
 #include <ks.h>
 #include <ksmedia.h>
@@ -27,8 +28,11 @@
 #include <sstream>
 #include <iomanip>
 
-
+#ifdef LIBSNDFILE
+std::string waveFormatDescription(const SF_INFO& sf_info, const char* prefix);
+#else
 std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix);
+#endif
 
 //// Used to distinguish the different encoding and decoding routines
 //class WaveFormatSignature

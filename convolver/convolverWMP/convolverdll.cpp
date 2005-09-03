@@ -27,6 +27,7 @@
 #include "ConvolverPropPage.h"
 
 #define CRTDBG_MAP_ALLOC
+#include <stdlib.h>
 #include <crtdbg.h>     // Debug header
 #include <uuids.h>      // DirectX SDK media types and subtyes
 #include <dmoreg.h>     // DirectX SDK registration

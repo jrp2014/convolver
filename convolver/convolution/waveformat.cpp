@@ -19,7 +19,7 @@
 //
 // WAV format helper routines
 
-#include "waveformat.h"
+#include ".\waveformat.h"
 //
 //class WaveFormat
 //{
@@ -31,6 +31,55 @@
 //};
 
 // TODO: put the strings in this file into the resource file for internationalisation
+
+#ifdef LIBSNDFILE
+
+const std::string channelDescription(const SF_INFO& sfinfo)
+{
+	switch(sfinfo.channels)
+	{
+	case 1:
+		return "Mono";
+	case 2:
+		return "Stereo";
+	default:
+		{
+			std::ostringstream s;
+			s << sfinfo.channels << "-channel";
+			return s.str();
+		}
+	}
+}
+
+const std::string formatDescription(const SF_INFO& sfinfo)
+{
+	SF_FORMAT_INFO	format_info;
+	format_info.format = sfinfo.format;
+	sf_command (NULL, SFC_GET_FORMAT_INFO, &format_info, sizeof (format_info)) ;
+	//printf ("%08x  %s %s\n", format_info.format, format_info.name, format_info.extension) ;
+	std::ostringstream s;
+	s <<  format_info.name 
+#if defined(DEBUG) | defined(_DEBUG)
+	<< " [" << format_info.extension << "]"
+#endif
+	;
+	return s.str();
+}
+
+std::string waveFormatDescription(const SF_INFO& sfinfo, const char* prefix)
+{
+	std::ostringstream s;
+	s << prefix << channelDescription(sfinfo) << " " 
+		<< formatDescription(sfinfo) << " "
+		<< sfinfo.samplerate/1000.0f << "kHz "
+#if defined(DEBUG) | defined(_DEBUG)
+		<< sfinfo.sections << " sections "
+#endif
+		<< sfinfo.frames << " taps";
+	return s.str();
+}
+
+#else
 
 const std::string channelDescription(const WAVEFORMATEXTENSIBLE* w)
 {
@@ -152,3 +201,5 @@ std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD sam
 	s << prefix << BitsPerSample(w) << "-bit " << w->Format.nSamplesPerSec/1000.0f << "kHz " << channelDescription(w) << " " << formatDescription(w) << ", " << samples << " samples";
 	return s.str();
 }
+
+#endif

@@ -19,14 +19,10 @@
 
 #pragma once
 
-
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 #endif
-
-// Pull in Common DX classes
-#include "Common\dxstdafx.h"
 
 #include "convolution\samplebuffer.h"
 #include "convolution\waveformat.h"
@@ -41,7 +37,11 @@ public:
 
 	int						nChannels;				// number of channels
 	PartitionedBuffer		buffer;
+#ifdef LIBSNDFILE
+	SF_INFO					sf_FilterFormat;		// The format of the filter file
+#else
 	WAVEFORMATEXTENSIBLE	wfexFilterFormat;		// The format of the filter file
+#endif
 	const int				nPartitions;
 	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int						nHalfPartitionLength;	// in blocks

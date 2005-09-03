@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,21,0,0
- PRODUCTVERSION 1,21,0,0
+ FILEVERSION 1,23,0,0
+ PRODUCTVERSION 1,23,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "1, 21, 0, 0"
+            VALUE "FileVersion", "1, 23, 0, 0"
             VALUE "InternalName", "Convolver"
             VALUE "LegalCopyright", "Copyright GPL 2005"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "1, 21, 0, 0"
+            VALUE "ProductVersion", "1, 23, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -106,7 +106,7 @@ BEGIN
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
                     WS_GROUP,62,2,149,11,WS_EX_CLIENTEDGE
-    LTEXT           "",IDC_STATUS,3,59,206,60,SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "",IDC_STATUS,3,59,206,60,SS_NOPREFIX
     LTEXT           "Attenuation (dB):",IDC_STATIC,4,22,57,8
     EDITTEXT        IDC_ATTENUATION,62,19,40,14,ES_RIGHT | ES_AUTOHSCROLL
     PUSHBUTTON      "Calculate optimum attenuation",

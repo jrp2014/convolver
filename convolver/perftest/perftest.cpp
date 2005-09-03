@@ -56,6 +56,12 @@ int	_tmain(int argc, _TCHAR* argv[])
 			throw(std::length_error("invalid nIterations"));
 		}
 
+#ifdef LIBSNDFILE
+		SF_INFO sfinfo;
+		ZeroMemory(&sfinfo, sizeof(SF_INFO));
+		CWaveFileHandle FilterWav(argv[3], SFM_READ, &sfinfo);
+		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
+#else
 		std::basic_string< _TCHAR >FilterFileName(argv[3],	_tcslen(argv[3]));
 		if(	FAILED(	hr = FilterWav->Open( argv[3], NULL, WAVEFILE_READ ) ) )
 		{
@@ -66,8 +72,9 @@ int	_tmain(int argc, _TCHAR* argv[])
 		WAVEFORMATEX *pWave	= FilterWav->GetFormat();
 		std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pWave), 
 			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
+#endif
 
-		double fAttenuation	= 0;
+		float fAttenuation	= 0;
 
 		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 
@@ -77,19 +84,24 @@ int	_tmain(int argc, _TCHAR* argv[])
 			{
 
 				t.reset();
+#ifdef LIBSNDFILE
+				conv = new Cconvolution_ieeefloat(argv[3], nPartitions == 0 ? 1 : nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
+#else
 				hr = SelectConvolution(pWave, conv,	argv[3], nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
-				fElapsedLoad = t.sec();
-				fTotalElapsedLoad += fElapsedLoad;
 				if (FAILED(hr))
 				{
 					std::wcerr << "Failed to select filter " << FilterFileName << std::endl;
 					throw(hr);
 				}
-
+#endif
+				fElapsedLoad = t.sec();
+				fTotalElapsedLoad += fElapsedLoad;
+				
 				t.reset();
 				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	nPartitions);
 				fElapsedCalc = t.sec();
 				fTotalElapsedCalc += fElapsedCalc;
+				
 				if (FAILED(hr))
 				{
 					std::wcerr << "Failed to calculate optimum attenuation"	<< std::endl;
@@ -104,15 +116,16 @@ int	_tmain(int argc, _TCHAR* argv[])
 		std::cout << std::endl << "Total load time: " << fTotalElapsedLoad  << "s" << std::endl;
 		std::cout << "Total execution time: " << fTotalElapsedCalc << "s" << std::endl;
 
-		FilterWav->Close();
-
 	}
 	catch (...)
 	{
 		std::wcerr << "Failed" <<std::endl;
 	}
 
+#if defined(DEBUG) | defined(_DEBUG)
+	_CrtDumpMemoryLeaks();
+#endif
+
 	return hr;
 
 }
-

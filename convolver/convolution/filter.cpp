@@ -22,7 +22,9 @@
 Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions) : 
 nPartitions (nPartitions)
 {
+#ifndef LIBSNDFILE
 	HRESULT hr = S_OK;
+#endif
 
 	if (nPartitions == 0)
 	{
@@ -30,6 +32,16 @@ nPartitions (nPartitions)
 	}
 
 	// Load the wave file
+#ifdef LIBSNDFILE
+	::ZeroMemory(&sf_FilterFormat, sizeof(SF_INFO));
+	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat); // Throws, if file invalid
+
+	// Save number of channels for easy access
+	nChannels = sf_FilterFormat.channels;
+
+	nFilterLength = sf_FilterFormat.frames;
+
+#else
 	CWaveFileHandle pFilterWave;
 	hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ );
 	if( FAILED(hr) )
@@ -61,6 +73,9 @@ nPartitions (nPartitions)
 		if (wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 		{
 			wFormatTag = WAVE_FORMAT_PCM;
+			//// HACK: for Audition -- doesn't work
+			//wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+			//wFormatTag = WAVE_FORMAT_IEEE_FLOAT; // For Audition-generated files
 		}
 		else
 		{
@@ -74,6 +89,7 @@ nPartitions (nPartitions)
 			}
 		}
 	}
+#endif
 
 	// Check that the filter is not too big ...
 	if ( nFilterLength > MAX_FILTER_SIZE )
@@ -102,10 +118,11 @@ nPartitions (nPartitions)
 	DWORD nHalfPaddedPartitionLength = nPaddedPartitionLength / 2;
 
 	// Initialise the Filter
-	//for (DWORD nPartitionCount= 0; nPartitionCount != nPartitions; ++nPartitionCount)
-	//	buffer.partitions.push_back(SampleBuffer<FFT_type>(nChannels, nPaddedPartitionLength));
 	buffer = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nPaddedPartitionLength)));
 
+#ifdef LIBSNDFILE
+	std::vector<float> item(nChannels);
+#else
 	assert(wfexFilterFormat.Format.wBitsPerSample >= wValidBitsPerSample);
 	const DWORD dwSizeToRead = wfexFilterFormat.Format.wBitsPerSample / 8;  // container size, in bytes
 
@@ -115,6 +132,8 @@ nPartitions (nPartitions)
 	DWORD dwSizeRead = 0;
 
 	float sample = 0;
+#endif
+
 #if defined(DEBUG) | defined(_DEBUG)
 	float minSample = 0;
 	float maxSample = 0;
@@ -122,9 +141,31 @@ nPartitions (nPartitions)
 
 	// Read the filter file
 	DWORD nPartition = 0;
-	DWORD nBlock = 0; 
-	while (nBlock != nFilterLength)
+	DWORD nBlock = 0;					// LibSndFile refers to blocks as frames
+	while (nBlock < nFilterLength)
 	{
+#ifdef LIBSNDFILE
+
+		if (1 == pFilterWave.readf_float(&item[0], 1))		// 1 = 1 frame = nChannel items
+		{
+			// Got a frame / block ... the items / samples for each channel
+			for (int nChannel=0; nChannel < nChannels; ++nChannel)
+			{
+				buffer[nPartition][nChannel][nBlock % nHalfPartitionLength] = item[nChannel];
+#if defined(DEBUG) | defined(_DEBUG)
+				if (item[nChannel] > maxSample)
+					maxSample = item[nChannel];
+				if (item[nChannel] < minSample)
+					minSample = item[nChannel];
+#endif
+			}
+		}
+		else
+		{
+			throw std::length_error("Failed to read a frame");
+		};
+
+#else
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
 		{
 			hr = pFilterWave->Read(&bSample[0], dwSizeToRead, &dwSizeRead);
@@ -241,7 +282,9 @@ nPartitions (nPartitions)
 			if (sample < minSample)
 				minSample = sample;
 #endif
+
 		} // for nChannel
+#endif
 
 		++nBlock;
 		if (nBlock % nHalfPartitionLength == 0)
@@ -288,10 +331,11 @@ nPartitions (nPartitions)
 			//}
 			buffer[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
 		}
+		++nPartition;
 	}
 
 	// Zero any further partitions (valarray should do this, but doesn't)
-	while (++nPartition < nPartitions)
+	for (;nPartition < nPartitions; ++nPartition)
 	{
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
 		{
@@ -307,7 +351,12 @@ nPartitions (nPartitions)
 #if defined(DEBUG) | defined(_DEBUG)
 	cdebug << "FFT Filter: "; DumpPartitionedBuffer(buffer);
 
+#ifdef LIBSNDFILE
+	cdebug << waveFormatDescription(sf_FilterFormat, "FFT Filter: ") << std::endl;
+#else
 	cdebug << waveFormatDescription(&wfexFilterFormat, nFilterLength, "FFT Filter:") << std::endl;
+#endif
+
 	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;
 #endif
 }

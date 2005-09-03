@@ -6,6 +6,7 @@
 #include "Common\dxstdafx.h"
 #include <fstream>
 #include <ios>
+#include <vector>
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugging.h"
 #endif
@@ -37,36 +38,58 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::wcerr << "Failed to open " << inputFilename << std::endl;
 		return 1;
 	}
-	
+
+#ifndef LIBSNDFILE
 	CWaveFileHandle	output;
+	UINT nSizeWrote = 0;
+#endif
 
 	int nSamples = 0;
-	UINT nSizeWrote = 0;
 
+#ifdef LIBSNDFILE
+	SF_INFO sf_info;
+	::ZeroMemory(&sf_info, sizeof(sf_info));
+#else
 	WAVEFORMATEXTENSIBLE Wave;
 	ZeroMemory(&Wave, sizeof(Wave));
+#endif
 
 	try
 	{
 		input.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
 
-
-
+#ifndef LIBSNDFILE
 		WORD wFormatTag = 0;
+#endif
 
 		std::string sFormatTag;
 		input >> sFormatTag;
 
 		if(sFormatTag == "PCM")
 		{
+#ifdef LIBSNDFILE
+			sf_info.format = SF_FORMAT_WAV;
+#else
 			wFormatTag = Wave.Format.wFormatTag = WAVE_FORMAT_PCM;
+#endif
 		}
 		else
 		{
 			if(sFormatTag == "IEEE")
 			{
+#ifdef LIBSNDFILE
+				sf_info.format = SF_FORMAT_WAV;
+#else
 				wFormatTag = Wave.Format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+#endif
 			}
+#ifdef LIBSNDFILE
+			else
+			{
+				std::cerr << "Unrecognised format: " << sFormatTag << ". Should be PCM or IEEE" << std::endl;
+				return 1;
+			}
+#else
 			else
 			{
 				if (sFormatTag == "ExtensiblePCM")
@@ -83,7 +106,6 @@ int _tmain(int argc, _TCHAR* argv[])
 						Wave.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 						wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
 					}
-
 					else
 					{
 						std::cerr << "Unrecognised format: " << sFormatTag << ". Should be PCM or IEEE or ExtensiblePCM or ExtensibleIEEE" << std::endl;
@@ -91,13 +113,60 @@ int _tmain(int argc, _TCHAR* argv[])
 					}
 				}
 			}
+#endif
 		}
 #if	defined(DEBUG) | defined(_DEBUG)
 		cdebug << "sFormatTag " << sFormatTag << std::endl;
 #endif
 
 		// Get the Wave format
-		input >> Wave.Format.wBitsPerSample; 
+#ifdef LIBSNDFILE
+		WORD wBitsPerSample=0;
+		input >> wBitsPerSample;
+		if (sFormatTag == "PCM")
+		{
+			switch (wBitsPerSample)
+			{
+			case 8:
+				sf_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_S8;
+				break;
+			case 16:
+				sf_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
+				break;
+			case 24:
+				sf_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_24;
+				break;
+			case 32:
+				sf_info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
+				break;
+			default:
+				std::cerr << "Unrecognised bits per sample: " << wBitsPerSample << ". Should be 8, 16, 24 or 32" << std::endl;
+			}
+		}
+		else
+		{
+			if (sFormatTag == "IEEE")
+			{
+				switch (wBitsPerSample)
+				{
+				case 32:
+					sf_info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT;
+					break;
+				case 64:
+					sf_info.format = SF_FORMAT_WAV | SF_FORMAT_DOUBLE;
+					break;
+				default:
+					std::cerr << "Unrecognised bits per sample: " << wBitsPerSample << ". Should be 32 or 64" << std::endl;
+				}
+			}
+			else
+			{
+				std::cerr << "Unrecognised format tag: " << sFormatTag << ". Should be PCM or IEEE." << std::endl;
+			}
+		}
+
+#else
+		input >> Wave.Format.wBitsPerSample;
 #if	defined(DEBUG) | defined(_DEBUG)
 		cdebug << "wBitsPerSample " << Wave.Format.wBitsPerSample << std::endl;
 #endif
@@ -107,13 +176,27 @@ int _tmain(int argc, _TCHAR* argv[])
 			return 1;
 		}
 		Wave.Samples.wValidBitsPerSample = Wave.Format.wBitsPerSample;
+#endif
 
+#ifdef LIBSNDFILE
+		input >> sf_info.channels;
+#if	defined(DEBUG) | defined(_DEBUG)
+		cdebug << "nChannels " << sf_info.channels << std::endl;
+#endif
+#else
 		input >> Wave.Format.nChannels;
 #if	defined(DEBUG) | defined(_DEBUG)
 		cdebug << "nChannels " << Wave.Format.nChannels << std::endl;
 #endif
 		Wave.Format.nBlockAlign =  Wave.Format.nChannels * Wave.Format.wBitsPerSample / 8;
+#endif
 
+#ifdef LIBSNDFILE
+		input >> sf_info.samplerate;
+#if	defined(DEBUG) | defined(_DEBUG)
+		cdebug << "samplerate " << sf_info.samplerate << std::endl;
+#endif
+#else
 		input >> Wave.Format.nSamplesPerSec;
 #if	defined(DEBUG) | defined(_DEBUG)
 		cdebug << "nSamplesPerSec " << Wave.Format.nSamplesPerSec << std::endl;
@@ -142,9 +225,13 @@ int _tmain(int argc, _TCHAR* argv[])
 			cdebug << "dwChannelMask " << std::hex << Wave.dwChannelMask << std::dec << std::endl;
 #endif
 		}
+#endif
 
 		// Open the output file
 
+#ifdef LIBSNDFILE
+		CWaveFileHandle output(argv[2], SFM_WRITE, &sf_info);
+#else
 #if	defined(DEBUG) | defined(_DEBUG)
 		std::wcerr  << "Writing to " << std::basic_string< _TCHAR >(argv[2], _tcslen(argv[2])) << std::endl;
 #endif
@@ -154,10 +241,42 @@ int _tmain(int argc, _TCHAR* argv[])
 			std::wcerr << "Failed to open output file " << std::basic_string< _TCHAR >(argv[2], _tcslen(argv[3])) << std::endl;
 			return hr;
 		}
-
+#endif
 
 		while (!input.eof())		// Will never be true as EOF will throw exception
 		{
+#ifdef LIBSNDFILE
+			if (sFormatTag == "PCM")
+			{
+				std::vector<int> samples(sf_info.channels);
+				for (int nChannel = 0; nChannel < sf_info.channels; ++nChannel)
+				{
+					input >> samples[nChannel];
+					++nSamples;
+				}
+				if (output.write_int(&samples[0], sf_info.channels) != sf_info.channels)
+				{
+					std::cerr << "Failed to write " << sf_info.channels << " items at sample " << nSamples << std::endl;
+				};
+			}
+			else
+			{
+				if(sFormatTag == "IEEE")
+				{
+					std::vector<float> samples(sf_info.channels);
+					for (int nChannel = 0; nChannel < sf_info.channels; ++nChannel)
+					{
+						input >> samples[nChannel];
+						++nSamples;
+					}
+
+					if (output.writef_float(&samples[0], sf_info.channels) != 1) // write 1 frame
+					{
+						std::cerr << "Failed to write a frame at sample " << nSamples << std::endl;
+					}
+				}
+			}
+#else
 			switch(wFormatTag)
 			{
 			case WAVE_FORMAT_PCM:
@@ -334,6 +453,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					<< nSamples  << std::endl;
 				return 1;
 			}
+#endif
 		}// while ! eof / good
 	} // try
 
@@ -357,7 +477,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		return 1;
 	}
 
-
+#ifdef LIBSNDFILE
+#else
 	std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(&Wave), nSamples, "Output format: ") << std::endl;
 
 	if (nSamples % Wave.Format.nChannels != 0)
@@ -366,8 +487,11 @@ int _tmain(int argc, _TCHAR* argv[])
 			"). Invalid output file produced." << std::endl;
 		return 1;
 	}
+#endif
 
+#ifndef LIBSNDFILE
 	output->Close();
+#endif
 
 	return hr;
 }

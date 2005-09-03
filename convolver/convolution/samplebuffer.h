@@ -58,11 +58,11 @@ private:
 	{
 	public:
 		explicit fastarray_impl(int size=0) :
-		  v_(static_cast<T*>(_aligned_malloc(size * sizeof(T), 16))),	// 16-byte aligned for SIMD
+		v_(size ? static_cast<T*>(_aligned_malloc(size * sizeof(T), 16)) : NULL),	// 16-byte aligned for SIMD
 			  //v_(new T[size]), // operator new ensures zero initialization
 			  size_(size), bsize_(size * sizeof(T))
 		  {
-			  if(!v_)
+			  if(size && !v_)
 			  {
 				  throw(std::bad_alloc());
 			  }
@@ -116,6 +116,9 @@ public:
 		}
 		else
 		{
+#pragma omp parallel for
+#pragma ivdep
+#pragma vector aligned
 			for (int i = 0; i < impl_.size_; ++i)
 				impl_.v_[i] = static_cast<T>(value);				// TODO: optimize int->float
 		}
@@ -125,6 +128,9 @@ public:
 	fastarray<T>& operator=(const T& value)
 	{
 		{
+#pragma omp parallel for
+#pragma ivdep
+#pragma vector aligned
 			for (int i = 0; i < impl_.size_; ++i)
 				impl_.v_[i] = value;
 		}
@@ -150,18 +156,21 @@ public:
 
 	fastarray<T>& operator*= (const T& value) // // TODO: optimize this
 	{
+#pragma omp parallel for
+#pragma ivdep
+#pragma vector aligned
 		for (int i = 0; i < impl_.size_; ++i)
 			impl_.v_[i] *= value;
 		return *this;
 	}
 
 	// No longer needed
-	fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
-	{
-		for (int i = 0; i < this->size(); ++i)
-			impl_.v_[i] += other.impl_.v_[i];
-		return *this;
-	}
+	//fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
+	//{
+	//	for (int i = 0; i < this->size(); ++i)
+	//		impl_.v_[i] += other.impl_.v_[i];
+	//	return *this;
+	//}
 
 	T min () const
 	{
@@ -186,7 +195,6 @@ private:
 };
 
 typedef	fastarray<float> ChannelBuffer;
-
 #endif
 
 // Don't use fastarray, as the fastarray assumes a fundamental type: it doesn't use contructors
@@ -196,116 +204,3 @@ typedef	std::vector< SampleBuffer > PartitionedBuffer;
 void DumpChannelBuffer(const ChannelBuffer& buffer );
 void DumpSampleBuffer(const SampleBuffer& buffer);
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer);
-
-//template <typename FFT_type> // FFT_type will normally be float, or perhaps double, depending on the DFT routines used
-//class ChannelBuffer
-//{
-//public:
-//	DWORD nSamples;				// length of each channel buffer
-//
-//	std::vector<FFT_type> samples;
-//
-//	explicit ChannelBuffer(const DWORD nSamples) : nSamples(nSamples), samples(std::vector<FFT_type>(nSamples))
-//	{
-//#if defined(DEBUG) | defined(_DEBUG)
-//		cdebug << "new ChannelBuffer " << nSamples << std::endl;
-//#endif
-//	};
-//
-////	~ChannelBuffer()
-////	{
-////#if defined(DEBUG) | defined(_DEBUG)
-////		cdebug << "deleted ChannelBuffer " << std::endl;
-////#endif
-////	}
-//
-//#if defined(DEBUG) | defined(_DEBUG)
-//	void DumpBuffer() const;
-//#endif
-//
-//private:
-//	//ChannelBuffer(const ChannelBuffer&);
-//	//ChannelBuffer& operator=(const ChannelBuffer&);
-//};
-//
-//template <typename FFT_type> // FFT_type will normally be float, or perhaps double, depending on the DFT routines used
-//class SampleBuffer
-//{
-//public:
-//	WORD nChannels;				// number of channels
-//
-//	std::vector< ChannelBuffer<FFT_type> > channels;
-//
-//	explicit SampleBuffer(const WORD nChannels, const DWORD nSamples) : nChannels(nChannels), 
-//		channels(std::vector< ChannelBuffer<FFT_type> >(nChannels, ChannelBuffer<FFT_type>(nSamples)))
-//	{
-//#if defined(DEBUG) | defined(_DEBUG)
-//		cdebug << "new SampleBuffer " << nChannels << " " << nSamples << std::endl;
-//#endif
-//		//channels.reserve(nChannels);
-//		//for(WORD nChannel = 0; nChannel != nChannels; ++nChannel)
-//		//{
-//		//	channels.push_back(ChannelBuffer<FFT_type>(nSamples));
-//		//}
-//	};
-//
-////	~SampleBuffer()
-////	{
-////#if defined(DEBUG) | defined(_DEBUG)
-////		cdebug << "deleted SampleBuffer" << std::endl;
-////#endif
-////	}
-//
-//#if defined(DEBUG) | defined(_DEBUG)
-//	void DumpBuffer() const;
-//#endif
-//
-//private:
-//	//SampleBuffer(const SampleBuffer&);
-//	//SampleBuffer& operator=(const SampleBuffer&);
-//};
-//
-//template <typename FFT_type> // FFT_type will normally be float, or perhaps double, depending on the DFT routines used
-//class PartitionedBuffer
-//{
-//public:
-//	DWORD nPartitions;				// number of partitions
-//
-//	std::vector< SampleBuffer<FFT_type> > partitions;
-//
-//	explicit PartitionedBuffer(DWORD nPartitions) : nPartitions(nPartitions)
-//	{
-//#if defined(DEBUG) | defined(_DEBUG)
-//		cdebug << "new empty Parititioned Buffer" << std::endl;
-//#endif
-//		partitions.reserve(nPartitions);
-//	}
-//
-//	explicit PartitionedBuffer(DWORD nPartitions, WORD nChannels, DWORD nSamples) : nPartitions(nPartitions),
-//		partitions(std::vector< SampleBuffer<FFT_type> >(nPartitions, SampleBuffer<FFT_type>(nChannels, nSamples)))
-//	{
-//#if defined(DEBUG) | defined(_DEBUG)
-//		cdebug << "new Parititioned Buffer " << nPartitions << " " << nChannels << " " << nSamples << std::endl;
-//#endif
-//		//partitions.reserve(nPartitions);
-//		//for (DWORD nPartition = 0; nPartition != nPartitions; ++nPartition)
-//		//{
-//		//	partitions.push_back(SampleBuffer<FFT_type>(nChannels, nSamples));
-//		//}
-//	};
-//
-////	~PartitionedBuffer()
-////	{
-////#if defined(DEBUG) | defined(_DEBUG)
-////		cdebug << "deleted ParititionedBuffer " << std::endl;
-////#endif
-////	}
-//
-//#if defined(DEBUG) | defined(_DEBUG)
-//	void DumpBuffer() const;
-//#endif
-//
-//private:
-//	//PartitionedBuffer(const PartitionedBuffer&);
-//	//PartitionedBuffer& operator=(const PartitionedBuffer&);
-//};

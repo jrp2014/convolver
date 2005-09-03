@@ -23,7 +23,9 @@
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="5"
+				RuntimeLibrary="1"
+				StructMemberAlignment="5"
+				BufferSecurityCheck="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
@@ -33,7 +35,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
@@ -71,10 +73,14 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="FALSE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="TRUE"
 				AdditionalIncludeDirectories="..\"
@@ -93,9 +99,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
+				IgnoreAllDefaultLibraries="FALSE"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -125,6 +132,12 @@
 		</Configuration>
 	</Configurations>
 	<References>
+		<ProjectReference
+			ReferencedProjectIdentifier="{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}"
+			Name="cmul"/>
+		<ProjectReference
+			ReferencedProjectIdentifier="{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}"
+			Name="libsndfile"/>
 	</References>
 	<Files>
 		<Filter
@@ -239,6 +252,12 @@
 					RelativePath="..\convolution\filter.h">
 				</File>
 				<File
+					RelativePath="..\convolution\holder.h">
+				</File>
+				<File
+					RelativePath="..\convolution\Random.h">
+				</File>
+				<File
 					RelativePath="..\convolution\samplebuffer.cpp">
 				</File>
 				<File
@@ -269,6 +288,9 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+			<File
+				RelativePath="..\libsndfile\sndfile.h">
+			</File>
 			<File
 				RelativePath=".\stdafx.h">
 			</File>
