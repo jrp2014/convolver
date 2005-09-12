@@ -50,6 +50,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libsndfile", "libsndfile\li
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConvolverWrapper", "..\..\DScaler5\Filters\Processing\ConvolverWrapper\ConvolverWrapper.vcproj", "{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GenDMOProp", "..\..\DScaler5\GenDMOProp\GenDMOProp.vcproj", "{2A680E85-E6AC-4868-A55F-47F8493FB147}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -91,6 +99,14 @@ Global
 		{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}.Debug.Build.0 = Debug|Win32
 		{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}.Release.ActiveCfg = Release|Win32
 		{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}.Release.Build.0 = Release|Win32
+		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Debug.ActiveCfg = Debug|Win32
+		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Debug.Build.0 = Debug|Win32
+		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Release.ActiveCfg = Release|Win32
+		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Release.Build.0 = Release|Win32
+		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Debug.ActiveCfg = Debug|Win32
+		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Debug.Build.0 = Debug|Win32
+		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Release.ActiveCfg = Release|Win32
+		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

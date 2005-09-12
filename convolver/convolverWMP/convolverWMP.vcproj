@@ -188,7 +188,7 @@
 				Name="fft"
 				Filter="">
 				<File
-					RelativePath="..\fft\fftsg_h.cpp">
+					RelativePath="..\fft\fftsg.cpp">
 				</File>
 				<File
 					RelativePath="..\fft\fftsg_h.h">

@@ -46,7 +46,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
 		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info);
-		std::cerr << "Input file format: " << std::endl;
+		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
 		conv = new Cconvolution_ieeefloat(argv[2], nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
 		const DWORD cBufferLength = conv->FIR.nFilterLength * SAMPLES;  // frames
@@ -115,7 +115,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			throw (hr);
 		}
 		std::wcerr << "Optimum attenuation: " << fAttenuation << " calculated in " << fElapsed << " milliseconds" << std::endl;
-		fAttenuation = 0;
+		//fAttenuation = 0;
 		std::wcerr << "Using attenuation of " << fAttenuation << std::endl;
 
 #ifdef	LIBSNDFILE
@@ -181,9 +181,9 @@ int _tmain(int argc, _TCHAR* argv[])
 				/* fDryMix */ 0.0L)
 				:
 #ifdef LIBSNDFILE
-			conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+				conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
-			conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
+				conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation,

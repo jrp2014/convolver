@@ -79,7 +79,7 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
 	BYTE* pbOutputDataPointer = pbOutputData;
 
-	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0);
+	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
 	while (dwBlocksToProcess--)
 	{
@@ -133,7 +133,11 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
 
 				// get DFT of InputBuffer_
+#ifdef OOURA_SIMPLE
 				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);
+#else
+				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+#endif
 
 				// Zero the partition from circular buffer that we have just used, for the next cycle
 				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel] = 0;
@@ -155,7 +159,11 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 				}
 
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
+#ifdef SIMPLE_OOURA
 				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nChannel][0]);
+#else
+				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nChannel][0], &FIR.ip[0], &FIR.w[0]);
+#endif
 
 				// Save the previous half partition; the first half will be read in over the next cycle
 				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
@@ -200,7 +208,7 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
 	BYTE* pbOutputDataPointer = pbOutputData;
 
-	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0);
+	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
 	while (dwBlocksToProcess--)
 	{
@@ -253,7 +261,12 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				// Copy the sample buffer partition as the rdft routine overwrites it
 				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
 
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);  // get DFT of InputBuffer_
+				// get DFT of InputBufferCopy_
+#ifdef OOURA_SIMPLE
+				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);
+#else
+				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+#endif
 
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 				// vectorized
@@ -265,7 +278,11 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					OutputBuffer_[nChannel], FIR.nPartitionLength);	
 #endif
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
+#ifdef OOURA_SIMPLE
 				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0]);
+#else
+				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+#endif
 
 				// Save the previous half partition; the first half will be read in over the next cycle
 				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);

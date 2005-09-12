@@ -97,7 +97,7 @@
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="FALSE"
-				UsePrecompiledHeader="1"
+				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"/>
@@ -297,7 +297,7 @@
 			Name="fft"
 			Filter="">
 			<File
-				RelativePath="..\fft\fftsg_h.cpp">
+				RelativePath="..\fft\fftsg.cpp">
 			</File>
 			<File
 				RelativePath="..\fft\fftsg_h.h">

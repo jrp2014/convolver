@@ -46,6 +46,14 @@ public:
 	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int						nHalfPartitionLength;	// in blocks
 	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+#ifndef SIMPLE_OOURA
+	// Workspace for the non-simple Ooura routines.  
+	std::vector<DLReal>		w;						// w[0...n/2-1]   :cos/sin table
+	std::vector<int>		ip;						// work area for bit reversal
+													// length of ip >= 2+sqrt(n)
+													// strictly, length of ip >= 
+													//    2+(1<<(int)(log(n+0.5)/log(2))/2).
+#endif
 
 	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
 

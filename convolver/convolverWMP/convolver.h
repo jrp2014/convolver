@@ -24,7 +24,7 @@
 // Note: Requires DirectX 8 SDK or later.
 //
 /////////////////////////////////////////////////////////////////////////////
-  
+
 #ifndef __CCONVOLVER_H_
 #define __CCONVOLVER_H_
 
@@ -66,7 +66,7 @@ const TCHAR kszPrefsPartitions[] = _T("Partitions");
 
 // {47427372-7AED-4e37-ABEB-7BD64C4184BF}
 DEFINE_GUID(CLSID_Convolver, 
-0x47427372, 0x7aed, 0x4e37, 0xab, 0xeb, 0x7b, 0xd6, 0x4c, 0x41, 0x84, 0xbf);
+			0x47427372, 0x7aed, 0x4e37, 0xab, 0xeb, 0x7b, 0xd6, 0x4c, 0x41, 0x84, 0xbf);
 
 interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver : IUnknown
 {
@@ -98,39 +98,39 @@ public:
 // See: http://msdn.microsoft.com/library/default.asp?url=/library/en-us/directshow/htm/imediaobjectinplaceinterface.asp
 
 class ATL_NO_VTABLE CConvolver : 
-    public CComObjectRootEx<CComMultiThreadModel>,
-    public CComCoClass<CConvolver, &CLSID_Convolver>,
-    public IConvolver,
-    public IMediaObject,
-    public IWMPPluginEnable,
+	public CComObjectRootEx<CComMultiThreadModel>,
+	public CComCoClass<CConvolver, &CLSID_Convolver>,
+	public IConvolver,
+	public IMediaObject,
+	public IWMPPluginEnable,
 #ifdef IPROPERTYBAG
 	public IPropertyBag,
 #endif
-    public ISpecifyPropertyPages
+	public ISpecifyPropertyPages
 {
 public:
-    CConvolver();
-    virtual ~CConvolver();
+	CConvolver();
+	virtual ~CConvolver();
 
-DECLARE_REGISTRY_RESOURCEID(IDR_CONVOLVER)
+	DECLARE_REGISTRY_RESOURCEID(IDR_CONVOLVER)
 
-DECLARE_PROTECT_FINAL_CONSTRUCT()
+	DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-BEGIN_COM_MAP(CConvolver)
-    COM_INTERFACE_ENTRY(IConvolver)
-    COM_INTERFACE_ENTRY(IMediaObject)
-    COM_INTERFACE_ENTRY(IWMPPluginEnable)
+	BEGIN_COM_MAP(CConvolver)
+		COM_INTERFACE_ENTRY(IConvolver)
+		COM_INTERFACE_ENTRY(IMediaObject)
+		COM_INTERFACE_ENTRY(IWMPPluginEnable)
 #ifdef IPROPERTYBAG
-	COM_INTERFACE_ENTRY(IPropertyBag)
+		COM_INTERFACE_ENTRY(IPropertyBag)
 #endif
-    COM_INTERFACE_ENTRY(ISpecifyPropertyPages)
-END_COM_MAP()
+		COM_INTERFACE_ENTRY(ISpecifyPropertyPages)
+	END_COM_MAP()
 
-    // CComCoClass Overrides
-    HRESULT FinalConstruct();
-    void    FinalRelease();
+	// CComCoClass Overrides
+	HRESULT FinalConstruct();
+	void    FinalRelease();
 
-    // IConvolver methods
+	// IConvolver methods
 	STDMETHOD(get_wetmix)(float *pVal);
 	STDMETHOD(put_wetmix)(float newVal);
 
@@ -143,167 +143,167 @@ END_COM_MAP()
 	STDMETHOD(get_partitions)(DWORD *pVal);
 	STDMETHOD(put_partitions)(DWORD newVal);
 
-    // IMediaObject methods
-    STDMETHOD( GetStreamCount )( 
-                   DWORD *pcInputStreams,
-                   DWORD *pcOutputStreams
-                   );
-    
-    STDMETHOD( GetInputStreamInfo )( 
-                   DWORD dwInputStreamIndex,
-                   DWORD *pdwFlags
-                   );
-    
-    STDMETHOD( GetOutputStreamInfo )( 
-                   DWORD dwOutputStreamIndex,
-                   DWORD *pdwFlags
-                   );
-    
-    STDMETHOD( GetInputType )( 
-                   DWORD dwInputStreamIndex,
-                   DWORD dwTypeIndex,
-                   DMO_MEDIA_TYPE *pmt
-                   );
-    
-    STDMETHOD( GetOutputType )( 
-                   DWORD dwOutputStreamIndex,
-                   DWORD dwTypeIndex,
-                   DMO_MEDIA_TYPE *pmt
-                   );
-    
-    STDMETHOD( SetInputType )( 
-                   DWORD dwInputStreamIndex,
-                   const DMO_MEDIA_TYPE *pmt,
-                   DWORD dwFlags
-                   );
-    
-    STDMETHOD( SetOutputType )( 
-                   DWORD dwOutputStreamIndex,
-                   const DMO_MEDIA_TYPE *pmt,
-                   DWORD dwFlags
-                   );
-    
-    STDMETHOD( GetInputCurrentType )( 
-                   DWORD dwInputStreamIndex,
-                   DMO_MEDIA_TYPE *pmt
-                   );
-    
-    STDMETHOD( GetOutputCurrentType )( 
-                   DWORD dwOutputStreamIndex,
-                   DMO_MEDIA_TYPE *pmt
-                   );
-    
-    STDMETHOD( GetInputSizeInfo )( 
-                   DWORD dwInputStreamIndex,
-                   DWORD *pcbSize,
-                   DWORD *pcbMaxLookahead,
-                   DWORD *pcbAlignment
-                   );
-    
-    STDMETHOD( GetOutputSizeInfo )( 
-                   DWORD dwOutputStreamIndex,
-                   DWORD *pcbSize,
-                   DWORD *pcbAlignment
-                   );
-    
-    STDMETHOD( GetInputMaxLatency )( 
-                   DWORD dwInputStreamIndex,
-                   REFERENCE_TIME *prtMaxLatency
-                   );
-    
-    STDMETHOD( SetInputMaxLatency )( 
-                   DWORD dwInputStreamIndex,
-                   REFERENCE_TIME rtMaxLatency
-                   );
-    
-    STDMETHOD( Flush )( void );
-    
-    STDMETHOD( Discontinuity )( 
-                   DWORD dwInputStreamIndex
-                   );
-    STDMETHOD( AllocateStreamingResources )( void );
-    
-    STDMETHOD( FreeStreamingResources )( void );
-    
-    STDMETHOD( GetInputStatus )( 
-                   DWORD dwInputStreamIndex,
-                   DWORD *pdwFlags
-                   );
-    
-    STDMETHOD( ProcessInput )( 
-                   DWORD dwInputStreamIndex,
-                   IMediaBuffer *pBuffer,
-                   DWORD dwFlags,
-                   REFERENCE_TIME rtTimestamp,
-                   REFERENCE_TIME rtTimelength
-                   );
-    
-    STDMETHOD( ProcessOutput )( 
-                   DWORD dwFlags,
-                   DWORD cOutputBufferCount,
-                   DMO_OUTPUT_DATA_BUFFER *pOutputBuffers,
-                   DWORD *pdwStatus
-                   );
+	// IMediaObject methods
+	STDMETHOD( GetStreamCount )( 
+		DWORD *pcInputStreams,
+		DWORD *pcOutputStreams
+		);
 
-    STDMETHOD( Lock )( LONG bLock );
+	STDMETHOD( GetInputStreamInfo )( 
+		DWORD dwInputStreamIndex,
+		DWORD *pdwFlags
+		);
 
-    // Note: need to override CComObjectRootEx::Lock to avoid
-    // ambiguity with IMediaObject::Lock. The override just
-    // calls through to the base class implementation.
+	STDMETHOD( GetOutputStreamInfo )( 
+		DWORD dwOutputStreamIndex,
+		DWORD *pdwFlags
+		);
 
-    // CComObjectRootEx overrides
-    void Lock()
-    {
-        CComObjectRootEx<CComMultiThreadModel>::Lock();
-    }
+	STDMETHOD( GetInputType )( 
+		DWORD dwInputStreamIndex,
+		DWORD dwTypeIndex,
+		DMO_MEDIA_TYPE *pmt
+		);
 
-    // IWMPPluginEnable methods
-    STDMETHOD( SetEnable )( BOOL fEnable );
-    STDMETHOD( GetEnable )( BOOL *pfEnable );
+	STDMETHOD( GetOutputType )( 
+		DWORD dwOutputStreamIndex,
+		DWORD dwTypeIndex,
+		DMO_MEDIA_TYPE *pmt
+		);
 
-    // ISpecifyPropertyPages methods
-    STDMETHOD( GetPages )(CAUUID *pPages);
+	STDMETHOD( SetInputType )( 
+		DWORD dwInputStreamIndex,
+		const DMO_MEDIA_TYPE *pmt,
+		DWORD dwFlags
+		);
+
+	STDMETHOD( SetOutputType )( 
+		DWORD dwOutputStreamIndex,
+		const DMO_MEDIA_TYPE *pmt,
+		DWORD dwFlags
+		);
+
+	STDMETHOD( GetInputCurrentType )( 
+		DWORD dwInputStreamIndex,
+		DMO_MEDIA_TYPE *pmt
+		);
+
+	STDMETHOD( GetOutputCurrentType )( 
+		DWORD dwOutputStreamIndex,
+		DMO_MEDIA_TYPE *pmt
+		);
+
+	STDMETHOD( GetInputSizeInfo )( 
+		DWORD dwInputStreamIndex,
+		DWORD *pcbSize,
+		DWORD *pcbMaxLookahead,
+		DWORD *pcbAlignment
+		);
+
+	STDMETHOD( GetOutputSizeInfo )( 
+		DWORD dwOutputStreamIndex,
+		DWORD *pcbSize,
+		DWORD *pcbAlignment
+		);
+
+	STDMETHOD( GetInputMaxLatency )( 
+		DWORD dwInputStreamIndex,
+		REFERENCE_TIME *prtMaxLatency
+		);
+
+	STDMETHOD( SetInputMaxLatency )( 
+		DWORD dwInputStreamIndex,
+		REFERENCE_TIME rtMaxLatency
+		);
+
+	STDMETHOD( Flush )( void );
+
+	STDMETHOD( Discontinuity )( 
+		DWORD dwInputStreamIndex
+		);
+	STDMETHOD( AllocateStreamingResources )( void );
+
+	STDMETHOD( FreeStreamingResources )( void );
+
+	STDMETHOD( GetInputStatus )( 
+		DWORD dwInputStreamIndex,
+		DWORD *pdwFlags
+		);
+
+	STDMETHOD( ProcessInput )( 
+		DWORD dwInputStreamIndex,
+		IMediaBuffer *pBuffer,
+		DWORD dwFlags,
+		REFERENCE_TIME rtTimestamp,
+		REFERENCE_TIME rtTimelength
+		);
+
+	STDMETHOD( ProcessOutput )( 
+		DWORD dwFlags,
+		DWORD cOutputBufferCount,
+		DMO_OUTPUT_DATA_BUFFER *pOutputBuffers,
+		DWORD *pdwStatus
+		);
+
+	STDMETHOD( Lock )( LONG bLock );
+
+	// Note: need to override CComObjectRootEx::Lock to avoid
+	// ambiguity with IMediaObject::Lock. The override just
+	// calls through to the base class implementation.
+
+	// CComObjectRootEx overrides
+	void Lock()
+	{
+		CComObjectRootEx<CComMultiThreadModel>::Lock();
+	}
+
+	// IWMPPluginEnable methods
+	STDMETHOD( SetEnable )( BOOL fEnable );
+	STDMETHOD( GetEnable )( BOOL *pfEnable );
+
+	// ISpecifyPropertyPages methods
+	STDMETHOD( GetPages )(CAUUID *pPages);
 
 #ifdef IPROPERTYBAG
 	// IPropertyBag methods
 	STDMETHODIMP Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pErrorLog);
 
 	STDMETHODIMP Write(LPCOLESTR pszPropName, VARIANT *pVar) 
-		{return E_NOTIMPL;}
+	{return E_NOTIMPL;}
 #endif
 
 	// The following pair is needed because DWORD is unsigned
 	float decode_Attenuationdb(const DWORD dwValue)
-		{
-			assert(dwValue <= (MAX_ATTENUATION + MAX_ATTENUATION) * 100);
-			return static_cast<float>(dwValue) / 100.0f - MAX_ATTENUATION;
-		}
+	{
+		assert(dwValue <= (MAX_ATTENUATION + MAX_ATTENUATION) * 100);
+		return static_cast<float>(dwValue) / 100.0f - MAX_ATTENUATION;
+	}
 	DWORD encode_Attenuationdb(const float fValue)
-		{	assert (abs(fValue) <= MAX_ATTENUATION);
-			return static_cast<DWORD>((fValue + MAX_ATTENUATION) * 100.0f);
-		}
-    
+	{	assert (abs(fValue) <= MAX_ATTENUATION);
+		return static_cast<DWORD>((fValue + MAX_ATTENUATION) * 100.0f);
+	}
+
 private:
-    HRESULT DoProcessOutput(
-                BYTE *pbOutputData,             // Pointer to the output buffer
-                const BYTE *pbInputData,        // Pointer to the input buffer
-				DWORD *cbInputBytesProcessed,	// Number of input bytes
-                DWORD *cbOutputBytesGenerated); // Number of output bytes
-    HRESULT ValidateMediaType(
-                const DMO_MEDIA_TYPE *pmtTarget,    // target media type to verify
-                const DMO_MEDIA_TYPE *pmtPartner);  // partner media type to verify
+	HRESULT DoProcessOutput(
+		BYTE *pbOutputData,						// Pointer to the output buffer
+		const BYTE *pbInputData,				// Pointer to the input buffer
+		DWORD *cbInputBytesProcessed,			// Number of input bytes
+		DWORD *cbOutputBytesGenerated);			// Number of output bytes
+	HRESULT ValidateMediaType(
+		const DMO_MEDIA_TYPE *pmtTarget,		// target media type to verify
+		const DMO_MEDIA_TYPE *pmtPartner);		// partner media type to verify
 
 	//void FillBufferWithSilence(WAVEFORMATEX *pWfex); // TODO: Remove or make this do something useful
 
-    DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
-    DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
+	DMO_MEDIA_TYPE          m_mtInput;          // Stores the input format structure
+	DMO_MEDIA_TYPE          m_mtOutput;         // Stores the output format structure
 
-    CComPtr<IMediaBuffer>   m_spInputBuffer;    // Smart pointer to the input buffer object
-    BYTE*                   m_pbInputData;      // Pointer to the data in the input buffer
-    DWORD                   m_cbInputLength;    // Length of the data in the input buffer
-   
-    bool                    m_bValidTime;       // Is timestamp valid?
-    REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
+	CComPtr<IMediaBuffer>   m_spInputBuffer;    // Smart pointer to the input buffer object
+	BYTE*                   m_pbInputData;      // Pointer to the data in the input buffer
+	DWORD                   m_cbInputLength;    // Length of the data in the input buffer
+
+	bool                    m_bValidTime;       // Is timestamp valid?
+	REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
 
 	float					m_fWetMix;			// proportion of effect
 	float					m_fDryMix;			// proportion of dry signal
@@ -313,7 +313,7 @@ private:
 	Holder<CConvolution>	m_Convolution;		// Processing class.  Handle manages resources
 	TCHAR					m_szFilterFileName[MAX_PATH];
 
-    BOOL                    m_bEnabled;         // TRUE if enabled
+	BOOL                    m_bEnabled;         // TRUE if enabled
 };
 
 #endif //__CCONVOLVER_H_
