@@ -119,9 +119,9 @@ nPartitions (nPartitions)
 
 #ifndef OOURA_SIMPLE
 	// Initialize the Oooura workspace;
-	ip.reserve(static_cast<int>(sqrt(static_cast<float>(nPaddedPartitionLength)) + 2));
+	ip.resize(static_cast<int>(sqrt(static_cast<float>(nPaddedPartitionLength)) + 2));
 	ip[0]=0; // signal the need to initialize
-	w.reserve(nHalfPaddedPartitionLength);	// w[0..nPaddedPartitionLength/2 - 1]
+	w.resize(nHalfPaddedPartitionLength);	// w[0..nPaddedPartitionLength/2 - 1]
 #endif
 
 	// Initialise the Filter

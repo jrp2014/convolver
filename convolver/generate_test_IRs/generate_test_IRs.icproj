@@ -79,7 +79,7 @@
 				WholeProgramOptimization="TRUE"/>
 			<Tool 
 				Name="CppCmplrTool"
-				Optimization="1000"
+				Optimization="3"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"

@@ -16,7 +16,7 @@ http://momonga.t.u-tokyo.ac.jp/~ooura/fft.html
 #define fftsg_h_h
 
 // Slower?
-//#define USE_CDFT_WINTHREADS 1;
+#define USE_CDFT_WINTHREADS 1;
 
 #undef UseDouble
 #ifdef UseDouble

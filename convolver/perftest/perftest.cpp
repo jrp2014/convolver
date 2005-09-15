@@ -90,7 +90,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				hr = SelectConvolution(pWave, conv,	argv[3], nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
 				if (FAILED(hr))
 				{
-					std::wcerr << "Failed to select filter " << FilterFileName << std::endl;
+					std::wcerr << "Failed to select filter " << FilterFileName << " (" << std::hex << hr	<< std::dec << ")" << std::endl;
 					throw(hr);
 				}
 #endif
@@ -104,7 +104,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				
 				if (FAILED(hr))
 				{
-					std::wcerr << "Failed to calculate optimum attenuation"	<< std::endl;
+					std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
 					throw (hr);
 				}
 				std::cout  << nPartitions << "\t"  << fElapsedCalc << "\t" << fElapsedLoad << "\t" 

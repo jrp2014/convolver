@@ -254,8 +254,9 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		// Got a block
 		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
 		{	
-#pragma omp parallel for
+
 #pragma loop count(6)
+#pragma omp parallel for
 			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
 			{
 				// Copy the sample buffer partition as the rdft routine overwrites it
@@ -287,6 +288,7 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				// Save the previous half partition; the first half will be read in over the next cycle
 				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
 			}
+
 			nInputBufferIndex_ = 0;
 			bStartWritingOutput_ = true;
 		}
