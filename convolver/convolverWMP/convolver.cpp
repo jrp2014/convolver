@@ -90,7 +90,7 @@ HRESULT CConvolver::FinalConstruct()
 	apDebugSinkWindows::sOnly.showHeader (true);
 
 	// 3 = function call trace
-	apDebug::gOnly().set(0);
+	apDebug::gOnly().set(3);
 
 	DEBUGGING(3, cdebug << "FinalConstruct" << std::endl;);
 #endif
@@ -834,14 +834,14 @@ STDMETHODIMP CConvolver::AllocateStreamingResources ( void )
 		return hr;
 	}
 
-	// Check that the filter has the same number of channels and sample rate as the input
+	// Check that the filter no more channels than the Mixer and the same sample rate as the input
 #ifdef LIBSNDFILE
-		if ((pWave->nChannels != m_Convolution->FIR.nChannels) ||
-		(pWave->nSamplesPerSec != m_Convolution->FIR.sf_FilterFormat.samplerate))
+		if ((pWave->nChannels < m_Convolution->Mixer.nChannels) ||
+		(pWave->nSamplesPerSec != m_Convolution->Mixer.Paths[0].filter.sf_FilterFormat.samplerate))
 		return E_INVALIDARG;
 #else
-	if ((pWave->nChannels != m_Convolution->FIR.nChannels) ||
-		(pWave->nSamplesPerSec != m_Convolution->FIR.wfexFilterFormat.Format.nSamplesPerSec))
+	if ((pWave->nChannels < m_Convolution->FIR.nChannels) ||
+		(pWave->nSamplesPerSec != m_Convolution->Mixer.wfexFilterFormat.Format.nSamplesPerSec))
 		return E_INVALIDARG;
 #endif
 
@@ -1351,7 +1351,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat; // TODO: reinterpret_cast?
 
 	// Don't know what to do if there is a mismatch in the number of channels
-	if ( m_Convolution->FIR.nChannels != pWave->nChannels)
+	if ( m_Convolution->Mixer.nChannels != pWave->nChannels)
 	{
 		return E_UNEXPECTED;
 	}

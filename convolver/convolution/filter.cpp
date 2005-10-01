@@ -19,7 +19,7 @@
 
 #include ".\filter.h"
 
-Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions) : 
+Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions) : 
 nPartitions (nPartitions)
 {
 #ifndef LIBSNDFILE

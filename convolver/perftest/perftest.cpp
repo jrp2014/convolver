@@ -3,6 +3,9 @@
 
 #include "stdafx.h"
 
+// TODO: fix
+#define NCHANNELS 8
+
 #include "Common\dxstdafx.h"
 #include <sstream>
 #if defined(DEBUG) | defined(_DEBUG)
@@ -15,6 +18,9 @@
 int	_tmain(int argc, _TCHAR* argv[])
 {
 
+#if	defined(DEBUG) | defined(_DEBUG)
+	debugstream.sink (apDebugSinkConsole::sOnly);
+#endif
 	HRESULT	hr = S_OK;
 	Holder<CConvolution> conv;
 	double fElapsedLoad	= 0;
@@ -23,15 +29,11 @@ int	_tmain(int argc, _TCHAR* argv[])
 	double fTotalElapsedCalc = 0;
 	apHiResElapsedTime t;
 
-	CWaveFileHandle	FilterWav;
-
-#if	defined(DEBUG) | defined(_DEBUG)
-	debugstream.sink (apDebugSinkConsole::sOnly);
-#endif
+	//CWaveFileHandle	FilterWav;
 
 	if (argc !=	4)
 	{
-		std::wcerr << "Usage: perftest MaxnPartitions nIterations filter.wav" << std::endl;
+		std::wcerr << "Usage: perftest MaxnPartitions nIterations config.txt" << std::endl;
 		return 1;
 	}
 
@@ -56,27 +58,31 @@ int	_tmain(int argc, _TCHAR* argv[])
 			throw(std::length_error("invalid nIterations"));
 		}
 
-#ifdef LIBSNDFILE
-		SF_INFO sfinfo;
-		ZeroMemory(&sfinfo, sizeof(SF_INFO));
-		CWaveFileHandle FilterWav(argv[3], SFM_READ, &sfinfo);
-		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
-#else
-		std::basic_string< _TCHAR >FilterFileName(argv[3],	_tcslen(argv[3]));
-		if(	FAILED(	hr = FilterWav->Open( argv[3], NULL, WAVEFILE_READ ) ) )
-		{
-			std::wcerr << "Failed to open "	<< FilterFileName << " for reading"	<< std::endl;
-			throw(hr);
-		}
-
-		WAVEFORMATEX *pWave	= FilterWav->GetFormat();
-		std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pWave), 
-			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
-#endif
+//#ifdef LIBSNDFILE
+//		SF_INFO sfinfo;
+//		ZeroMemory(&sfinfo, sizeof(SF_INFO));
+//		CWaveFileHandle FilterWav(argv[3], SFM_READ, &sfinfo);
+//		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
+//#else
+//		std::basic_string< _TCHAR >FilterFileName(argv[3],	_tcslen(argv[3]));
+//		if(	FAILED(	hr = FilterWav->Open( argv[3], NULL, WAVEFILE_READ ) ) )
+//		{
+//			std::wcerr << "Failed to open "	<< FilterFileName << " for reading"	<< std::endl;
+//			throw(hr);
+//		}
+//
+//		WAVEFORMATEX *pWave	= FilterWav->GetFormat();
+//		std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pWave), 
+//			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
+//#endif
 
 		float fAttenuation	= 0;
 
+#ifdef LIBSNDFILE
+		std::cout << std::endl << "Partitions\tCapacity\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
+#else
 		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
+#endif
 
 		for (int nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
 		{
@@ -85,9 +91,9 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 				t.reset();
 #ifdef LIBSNDFILE
-				conv = new Cconvolution_ieeefloat(argv[3], nPartitions == 0 ? 1 : nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
+				conv = new Cconvolution_ieeefloat(argv[3], NCHANNELS, nPartitions == 0 ? 1 : nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
 #else
-				hr = SelectConvolution(pWave, conv,	argv[3], nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
+				hr = SelectConvolution(pWave, conv,	argv[3], NCHANNELS, nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
 				if (FAILED(hr))
 				{
 					std::wcerr << "Failed to select filter " << FilterFileName << " (" << std::hex << hr	<< std::dec << ")" << std::endl;
@@ -98,7 +104,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				fTotalElapsedLoad += fElapsedLoad;
 				
 				t.reset();
-				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	nPartitions);
+				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	NCHANNELS, nPartitions);
 				fElapsedCalc = t.sec();
 				fTotalElapsedCalc += fElapsedCalc;
 				
@@ -107,9 +113,16 @@ int	_tmain(int argc, _TCHAR* argv[])
 					std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
 					throw (hr);
 				}
-				std::cout  << nPartitions << "\t"  << fElapsedCalc << "\t" << fElapsedLoad << "\t" 
-					<< fAttenuation << "\t" << conv->FIR.nFilterLength << "\t" 
-					<< conv->FIR.nPartitionLength << "\t" << nIteration  << std::endl;
+				std::cout  << nPartitions << "\t"
+#ifdef LIBSNDFILE
+					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * 10) / fElapsedCalc) /
+						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) * conv->Mixer.nChannels << "\t"
+					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * 10) / fElapsedCalc) /
+						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) << "\t"
+#endif
+					<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
+					<< fAttenuation << "\t" << conv->Mixer.nFilterLength << "\t" 
+					<< conv->Mixer.nPartitionLength << "\t" << nIteration  << std::endl;
 			}
 		}
 

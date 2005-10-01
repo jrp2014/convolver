@@ -52,31 +52,31 @@ typedef	std::valarray<float> ChannelBuffer;
 template <typename T>
 class fastarray
 {
-	
+
 private:
 	class fastarray_impl		// Ensures cleanup after exception
 	{
 	public:
 		explicit fastarray_impl(int size=0) :
 		v_(size ? static_cast<T*>(_aligned_malloc(size * sizeof(T), 16)) : NULL),	// 16-byte aligned for SIMD
-			  //v_(new T[size]), // operator new ensures zero initialization
-			  size_(size), bsize_(size * sizeof(T))
-		  {
-			  if(size && !v_)
-			  {
-				  throw(std::bad_alloc());
-			  }
-		  };
+			//v_(new T[size]), // operator new ensures zero initialization
+			size_(size), bsize_(size * sizeof(T))
+		{
+			if(size && !v_)
+			{
+				throw(std::bad_alloc());
+			}
+		};
 
-		  ~fastarray_impl()
-		  {
-			  _aligned_free(v_);
-			  //delete [] (v_);
-		  };
+		~fastarray_impl()
+		{
+			_aligned_free(v_);
+			//delete [] (v_);
+		};
 
-		  T* v_;
-		  int size_;		// size in elements
-		  int bsize_;	// size in bytes
+		T* v_;
+		int size_;		// size in elements
+		int bsize_;	// size in bytes
 
 	private:
 		// No copying allowed
@@ -97,8 +97,8 @@ public:
 
 	fastarray<T>& operator=(const fastarray<T>& rhs)
 	{
-		//assert(impl_.bsize_ == rhs.impl_.bsize_);  
-		//if (this != &rhs) // 
+		assert(impl_.bsize_ == rhs.impl_.bsize_);  
+		assert (this != &rhs);
 		::CopyMemory(impl_.v_, rhs.impl_.v_, impl_.bsize_); // memcpy => overlap not allowed
 		return *this;
 	}
@@ -116,7 +116,7 @@ public:
 		}
 		else
 		{
-#pragma omp parallel for
+//#pragma omp parallel for
 #pragma ivdep
 #pragma vector aligned
 			for (int i = 0; i < impl_.size_; ++i)
@@ -128,7 +128,7 @@ public:
 	fastarray<T>& operator=(const T& value)
 	{
 		{
-#pragma omp parallel for
+//#pragma omp parallel for
 #pragma ivdep
 #pragma vector aligned
 			for (int i = 0; i < impl_.size_; ++i)
@@ -139,13 +139,13 @@ public:
 
 	T  operator[](int n) const
 	{ 
-		//assert(n < impl_.size_ && n >= 0);;
+		assert(n < impl_.size_ && n >= 0);;
 		return this->impl_.v_[n];
 	}
 
 	T& operator[](int n)
 	{ 
-		//assert(n < impl_.size_ && n >= 0);
+		assert(n < impl_.size_ && n >= 0);
 		return this->impl_.v_[n];
 	}
 
@@ -156,21 +156,26 @@ public:
 
 	fastarray<T>& operator*= (const T& value) // // TODO: optimize this
 	{
-#pragma omp parallel for
+		if (value != static_cast<T>(1.0))
+		{
+//#pragma omp parallel for
 #pragma ivdep
 #pragma vector aligned
-		for (int i = 0; i < impl_.size_; ++i)
-			impl_.v_[i] *= value;
+			for (int i = 0; i < impl_.size_; ++i)
+				impl_.v_[i] *= value;
+		}
 		return *this;
 	}
 
-	// No longer needed
-	//fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
-	//{
-	//	for (int i = 0; i < this->size(); ++i)
-	//		impl_.v_[i] += other.impl_.v_[i];
-	//	return *this;
-	//}
+	fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
+	{
+		assert(impl_.size_ == other.impl_.size_);
+#pragma ivdep
+#pragma vector aligned
+		for (int i = 0; i < this->size(); ++i)
+			impl_.v_[i] += other.impl_.v_[i];
+		return *this;
+	}
 
 	T min () const
 	{

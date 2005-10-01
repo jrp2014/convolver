@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,26,0,0
- PRODUCTVERSION 1,26,0,0
+ FILEVERSION 2,1,0,0
+ PRODUCTVERSION 2,1,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "1, 26, 0, 0"
+            VALUE "FileVersion", "2, 1, 0, 0"
             VALUE "InternalName", "Convolver"
             VALUE "LegalCopyright", "Copyright GPL 2005"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "1, 26, 0, 0"
+            VALUE "ProductVersion", "2, 1, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -102,7 +102,7 @@ BEGIN
     LTEXT           "Effect Level (%):",IDC_MIXLABEL,4,42,56,8
     EDITTEXT        IDC_WETMIX,62,39,40,14,ES_RIGHT | ES_AUTOHSCROLL | 
                     ES_NUMBER
-    PUSHBUTTON      "Get filter ...",IDC_GETFILTER,4,0,50,14
+    PUSHBUTTON      "Get config ...",IDC_GETFILTER,4,0,50,14
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
                     WS_GROUP,62,2,149,11,WS_EX_CLIENTEDGE

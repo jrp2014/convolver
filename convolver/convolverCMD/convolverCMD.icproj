@@ -216,6 +216,12 @@
 			Name="convolution"
 			Filter="">
 			<File 
+				RelativePath="..\convolution\channelpaths.cpp">
+			</File>
+			<File 
+				RelativePath="..\convolution\channelpaths.h">
+			</File>
+			<File 
 				RelativePath="..\convolution\convolution.cpp">
 			</File>
 			<File 

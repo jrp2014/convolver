@@ -83,33 +83,33 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
 	// Load the wave file
-#ifdef LIBSNDFILE
-	try
-	{
-		SF_INFO sfinfo;
-		ZeroMemory(&sfinfo, sizeof(sfinfo));
-		CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sfinfo);
-		std::string description = waveFormatDescription(sfinfo, "Filter: ");
-		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
-	}
-	catch (...)
-	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
-	}
-#else
-	CWaveFileHandle pFilterWave = new CWaveFile();
-	if( FAILED(hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ ) ) )
-	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
-	}
-	else
-	{
-		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
-		// TODO: internationalisation of Filter:
-		std::string description = waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat()), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
-		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
-	}
-#endif
+//#ifdef LIBSNDFILE
+//	try
+//	{
+//		SF_INFO sfinfo;
+//		ZeroMemory(&sfinfo, sizeof(sfinfo));
+//		CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sfinfo);
+//		std::string description = waveFormatDescription(sfinfo, "Filter: ");
+//		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
+//	}
+//	catch (...)
+//	{
+//		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
+//	}
+//#else
+//	CWaveFileHandle pFilterWave = new CWaveFile();
+//	if( FAILED(hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ ) ) )
+//	{
+//		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
+//	}
+//	else
+//	{
+//		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
+//		// TODO: internationalisation of Filter:
+//		std::string description = waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat()), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
+//		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
+//	}
+//#endif
 
 	return hr;
 }
@@ -315,8 +315,8 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	DWORD  dwWetmix			 = 100;									// Default wet mix DWORD.
 	float fWetmix			 = 1.0;									// Default wet mix float.
 	float fAttenuation		 = 0.0;									// Default attenuation float
-	DWORD  dwAttenuation	 = 
-		static_cast<DWORD>((fAttenuation + MAX_ATTENUATION) * 100);	// Default attenuation DWORD (offset, as DWORD unsigned)
+	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
+		m_spConvolver->encode_Attenuationdb(fAttenuation);
 	TCHAR*  szFilterFileName = TEXT("");
 	DWORD   nPartitions		 = 0;									// Default number of partitions
 	CRegKey key;
@@ -413,13 +413,13 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	// Setup the OPENFILENAME structure
 	OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
-		TEXT("Wave Files\0*.wav\0PCM Files\0*.pcm\0All Files\0*.*\0\0"), NULL,
+		TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
 		0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
 		TEXT("Get filter file"),
 		OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY, 
 		0, 0, TEXT(".wav"), 0, NULL, NULL };
 
-	SetDlgItemText( IDC_STATUS, TEXT("Filter filename...") );
+	SetDlgItemText( IDC_STATUS, TEXT("Configuration filename...") );
 
 	// Display the SaveFileName dialog. Then, try to load the specified file
 	if( TRUE != GetSaveFileName( &ofn ) )
@@ -508,7 +508,8 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 
 	double fElapsed = 0;
 	apHiResElapsedTime t;
-	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
+	// TODO: the 8 should be derived
+	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, 8, nPartitions);
 	fElapsed = t.sec();
 	if (FAILED(hr))
 	{

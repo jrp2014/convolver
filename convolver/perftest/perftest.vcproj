@@ -4,6 +4,7 @@
 	Version="7.10"
 	Name="perftest"
 	ProjectGUID="{94A0FD16-A5D1-40B4-91DD-78C2F2301552}"
+	RootNamespace="perftest"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -38,6 +39,7 @@
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
+				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/perftest.pdb"
 				SubSystem="1"
@@ -137,7 +139,7 @@
 			ReferencedProjectIdentifier="{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}"
 			Name="cmul"/>
 		<ProjectReference
-			ReferencedProjectIdentifier="{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}"
+			ReferencedProjectIdentifier="{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}"
 			Name="libsndfile"/>
 	</References>
 	<Files>
@@ -241,6 +243,12 @@
 				Name="convolution"
 				Filter="">
 				<File
+					RelativePath="..\convolution\channelpaths.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\channelpaths.h">
+				</File>
+				<File
 					RelativePath="..\convolution\convolution.cpp">
 				</File>
 				<File
@@ -301,9 +309,6 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
-		<File
-			RelativePath=".\VTune\perftest.vpj">
-		</File>
 		<File
 			RelativePath=".\ReadMe.txt">
 		</File>

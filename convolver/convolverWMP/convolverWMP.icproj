@@ -44,7 +44,7 @@
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
 				ShowProgress="0"
 				SuppressStartupBanner="FALSE"
-				AdditionalLibraryDirectories="D:\Projects\convolver\convolver\libsndfile\Debug"
+				AdditionalLibraryDirectories=""
 				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
@@ -279,6 +279,12 @@
 			<Filter 
 				Name="convolution"
 				Filter="">
+				<File 
+					RelativePath="..\convolution\channelpaths.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\channelpaths.h">
+				</File>
 				<File 
 					RelativePath="..\convolution\convolution.cpp">
 					<FileConfiguration 

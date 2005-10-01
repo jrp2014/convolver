@@ -42,7 +42,7 @@ public:
 #else
 	WAVEFORMATEXTENSIBLE	wfexFilterFormat;		// The format of the filter file
 #endif
-	const int				nPartitions;
+	int						nPartitions;
 	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int						nHalfPartitionLength;	// in blocks
 	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
@@ -55,10 +55,10 @@ public:
 													//    2+(1<<(int)(log(n+0.5)/log(2))/2).
 #endif
 
-	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions);
+	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions);
 
 private:
-	Filter(const Filter& other); // no impl.
-	void operator=(const Filter& other); // no impl.
-	Filter(Filter& other);                // discourage use of lvalue Filters
+	//Filter(const Filter& other); // no impl.
+	//void operator=(const Filter& other); // no impl.
+	//Filter(Filter& other);                // discourage use of lvalue Filters
 };

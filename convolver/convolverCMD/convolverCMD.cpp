@@ -2,7 +2,9 @@
 //
 
 #include "stdafx.h"
+#ifndef LIBSNDFILE
 #include "Common\dxstdafx.h"
+#endif
 #include <sstream>
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugging.h"
@@ -23,7 +25,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (argc != 5)
 	{
-		std::wcerr << "Usage: convolverCMD nPartitions filter.wav inputwavfile.wav outputwavfile.wav" << std::endl;
+		std::wcerr << "Usage: convolverCMD nPartitions config.txt inputwavfile.wav outputwavfile.wav" << std::endl;
 		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std:: endl;
 		return 1;
 	}
@@ -48,8 +50,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info);
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
-		conv = new Cconvolution_ieeefloat(argv[2], nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
-		const DWORD cBufferLength = conv->FIR.nFilterLength * SAMPLES;  // frames
+		conv = new Cconvolution_ieeefloat(argv[2], sf_info.channels, nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
+		const DWORD cBufferLength = conv->Mixer.nFilterLength * SAMPLES;  // frames
 #else
 		CWaveFileHandle WavIn;
 		if( FAILED( hr = WavIn->Open( argv[3], NULL, WAVEFILE_READ ) ) )
@@ -107,7 +109,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		float fAttenuation = 0;
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = calculateOptimumAttenuation(fAttenuation, argv[2], nPartitions);
+		hr = calculateOptimumAttenuation(fAttenuation, argv[2], sf_info.channels, nPartitions);
 		fElapsed = t.msec();
 		if (FAILED(hr))
 		{
@@ -117,6 +119,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::wcerr << "Optimum attenuation: " << fAttenuation << " calculated in " << fElapsed << " milliseconds" << std::endl;
 		//fAttenuation = 0;
 		std::wcerr << "Using attenuation of " << fAttenuation << std::endl;
+
+#ifdef LIBSNDFILE
+		std::vector<float> pfInputSamples(cBufferLength * sf_info.channels);
+		std::vector<float> pfOutputSamples(cBufferLength * sf_info.channels);
+#else
+		std::vector<BYTE> pbInputSamples(cBufferLength);
+		std::vector<BYTE> pbOutputSamples(cBufferLength);
+#endif
 
 #ifdef	LIBSNDFILE
 		// Write out in the same format as the input file
@@ -130,19 +140,15 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 #endif
 
-#ifdef LIBSNDFILE
-		std::vector<float> pfInputSamples(cBufferLength * sf_info.channels);
-		std::vector<float> pfOutputSamples(cBufferLength * sf_info.channels);
-#else
-		std::vector<BYTE> pbInputSamples(cBufferLength);
-		std::vector<BYTE> pbOutputSamples(cBufferLength);
-#endif
-
 		t.reset(); // Start timing
 		while (dwTotalSizeRead != dwTotalSizeToRead)
 		{
 #ifdef LIBSNDFILE
 			dwSizeRead = WavIn.readf_float(&pfInputSamples[0], cBufferLength);
+			if (dwSizeRead == 0)
+			{
+				throw std::length_error("Failed to read input buffer");
+			}
 #else
 			hr = WavIn->Read(&pbInputSamples[0], cBufferLength, &dwSizeRead);
 			if (FAILED(hr))
@@ -151,21 +157,30 @@ int _tmain(int argc, _TCHAR* argv[])
 				throw(std::length_error("Failed to read"));
 			}
 #endif
-			if (dwSizeRead == 0)
-			{
-				throw std::length_error("Failed to read input buffer");
-			}
 			dwTotalSizeRead += dwSizeRead;
 
 #ifdef LIBSNDFILE
-			DWORD dwBlocksToProcess = dwSizeRead;
+			// Pad with zeros, to flush
+			for(int i = dwSizeRead * sf_info.channels; i < cBufferLength * sf_info.channels; ++i)
+				pfInputSamples[i]=0;
+
+			DWORD dwBlocksToProcess = cBufferLength;
+			// Pad with zeros, to flush
+			for(int i = dwSizeRead; i < cBufferLength; ++i)
+				pfInputSamples[i]=0;
 #else
-			if (dwSizeRead % conv->FIR.wfexFilterFormat.Format.nBlockAlign != 0)
+			if (dwSizeRead % conv->Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
 			{
 				std::wcerr << "Failed to read a whole number of blocks. Read " << dwSizeRead << " bytes." << std::endl;
 				throw(std::length_error("Failed to read a whole number of blocks"));
 			}
-			DWORD dwBlocksToProcess = dwSizeRead / conv->FIR.wfexFilterFormat.Format.nBlockAlign;
+
+			// Pad with zeros, to flush
+			for(int i = dwSizeRead; i < cBufferLength; ++i)
+				pfInputSamples[i]=0;
+
+			DWORD dwBlocksToProcess = cBufferLength / conv->Mixer.wfexFilterFormat.Format.nBlockAlign;
+
 #endif
 
 			// nPartitions == 0 => use overlap-save version
@@ -177,21 +192,21 @@ int _tmain(int argc, _TCHAR* argv[])
 #endif
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation,
-				/* fWetMix,*/ 1.0L,
-				/* fDryMix */ 0.0L)
+				/* fWetMix,*/ 1.0f,
+				/* fDryMix */ 0.0f)
 				:
 #ifdef LIBSNDFILE
-				conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+			conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
-				conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
+			conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation,
-				/* fWetMix,*/ 1.0L,
-				/* fDryMix */ 0.0L);
+				/* fWetMix,*/ 1.0f,
+				/* fDryMix */ 0.0f);
 
 #if defined(DEBUG) | defined(_DEBUG)
-//			cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;
+				//cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;
 #endif
 
 #ifdef LIBSNDFILE
@@ -211,13 +226,21 @@ int _tmain(int argc, _TCHAR* argv[])
 					<< dwSizeWrote << std::endl;
 				throw(std::length_error("Failed to write"));
 			}
+
 			dwTotalSizeWritten += dwSizeWrote;
+
 		} 
 
 		fElapsed = t.msec();
 
-		std::wcerr << "Convolved and wrote " << dwTotalSizeWritten << " bytes to " << std::basic_string< _TCHAR >(argv[4], _tcslen(argv[4]))
-			 << " in " << fElapsed << " milliseconds" << std::endl;
+		std::wcerr << "Convolved and wrote " << dwTotalSizeWritten <<
+#ifdef LIBSNDFILE
+			" frames to "
+#else
+			" bytes to " 
+#endif
+			<< std::basic_string< _TCHAR >(argv[4], _tcslen(argv[4]))
+			<< " in " << fElapsed << " milliseconds" << std::endl;
 
 #ifndef LIBSNDFILE
 		WavIn->Close();
@@ -226,6 +249,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		return 0;
 
+	}
+	catch(const std::exception& error)
+	{
+		std::wcerr << "Standard exception: " << error.what() << std::endl;
+	}
+	catch(const HRESULT& hr)
+	{	
+		std::wcerr << "Failed (" << std::hex << hr	<< std::dec << ")" << std::endl;
 	}
 	catch (...)
 	{

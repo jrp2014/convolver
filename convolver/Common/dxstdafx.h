@@ -78,6 +78,7 @@
 #pragma deprecated("_tcsncat")
 #endif
 
+#include <tchar.h>
 #include <strsafe.h>
 
 #include "DXUT.h"

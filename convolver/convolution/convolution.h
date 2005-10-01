@@ -30,7 +30,7 @@
 #endif
 
 #include ".\holder.h"
-#include ".\filter.h"
+#include ".\channelpaths.h"
 
 
 // FFT routines
@@ -62,14 +62,14 @@ extern "C" void cmuladd(float *, float *, float *, int);
 // The data path is:
 // pbInputData (raw bytes) ->  AttenuatedSample(const float fAttenuation_db, GetSample(BYTE* & container)) ->
 // m_InputBuffer (FFT_type) -> [convolve] ->
-// m_OutputBuffer (FFT_type) -> NormalizeSample(BYTE* & dstContainer, float& srcSample) ->
+// m_OutputBuffer (FFT_type) -> NormalizeSample(BYTE* dstContainer, float& srcSample) ->
 // pbOuputData (raw bytes)
 
 
 class CConvolution
 {
 public:
-	CConvolution(TCHAR szFilterFileName[MAX_PATH], const int nPartitions, const int nContainerSize);
+	CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int& nContainerSize);
 	virtual ~CConvolution(void);
 
 	// This version of the convolution routine does partitioned convolution
@@ -92,7 +92,8 @@ public:
 	void Flush();								// zero buffers, reset pointers
 
 	// TODO: Need to keep the number of source channels, and either mix them, or use a sub-set, if the filter has more channels
-	Filter				FIR;					// Order dependent
+	//Filter				FIR;					// Order dependent
+	ChannelPaths			Mixer;
 
 protected:
 
@@ -101,8 +102,9 @@ protected:
 private:
 
 	SampleBuffer		InputBuffer_;
-	SampleBuffer		InputBufferCopy_;			// As FFT routines destroy their input
+	SampleBuffer		InputBufferAccumulator_;	// As FFT routines destroy their input
 	SampleBuffer		OutputBuffer_;				// Used by overlap-save
+	SampleBuffer		OutputBufferAccumulator_;	// As FFT routines destroy their input
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
 	int					nInputBufferIndex_;		// placeholder
@@ -129,14 +131,15 @@ private:
 protected:
 	// Pure virtual functions that convert from a the sample type, to float
 	virtual float GetSample(BYTE* & container) const = 0;						// converts sample into a float, [-1..1]
-	virtual int NormalizeSample(BYTE* & dstContainer, float& srcSample) const = 0;	// returns number of bytes processed
+	virtual int NormalizeSample(BYTE* dstContainer, float& srcSample) const = 0;	// returns number of bytes processed
 };
 
 // Specializations with the appropriate functions for accessing the sample buffer
 class Cconvolution_ieeefloat : public CConvolution
 {
 public:
-	Cconvolution_ieeefloat(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, sizeof(float)){};
+	Cconvolution_ieeefloat(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+	  CConvolution(szConfigFileName, nChannels, nPartitions, sizeof(float)){};
 
 private:
 	float GetSample(BYTE* & container) const
@@ -144,7 +147,7 @@ private:
 		return *reinterpret_cast<const float *>(container);
 	};
 
-	int NormalizeSample(BYTE* & dstContainer, float& srcSample) const 
+	int NormalizeSample(BYTE* dstContainer, float& srcSample) const 
 	{ 
 		*((float *) dstContainer) = srcSample;
 		//* reinterpret_cast<float*>(dstContainer) = static_cast<float>(srcSample); // TODO: find cleaner way to do this
@@ -156,7 +159,8 @@ private:
 class Cconvolution_pcm8 : public CConvolution
 {
 public:
-	Cconvolution_pcm8(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, sizeof(BYTE)){};
+	Cconvolution_pcm8(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+	  CConvolution(szConfigFileName, nChannels, nPartitions, sizeof(BYTE)){};
 
 private:
 
@@ -165,7 +169,7 @@ private:
 		return static_cast<float>((*container - 128.0) / 128.0);  // Normalize to [-1..1]
 	};
 
-	int NormalizeSample(BYTE* & dstContainer, float& srcSample) const
+	int NormalizeSample(BYTE* dstContainer, float& srcSample) const
 	{   
 		srcSample *= 128.0;
 
@@ -183,7 +187,8 @@ private:
 class Cconvolution_pcm16 : public CConvolution
 {
 public:
-	Cconvolution_pcm16(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, sizeof(INT16)){};
+	Cconvolution_pcm16(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+	  CConvolution(szConfigFileName, nChannels, nPartitions, sizeof(INT16)){};
 
 private:
 
@@ -192,7 +197,7 @@ private:
 		return static_cast<float>(*reinterpret_cast<INT16*>(container) / 32768.0);
 	}; 	// TODO: find a cleaner way to do this
 
-	int NormalizeSample(BYTE* & dstContainer, float& srcSample) const
+	int NormalizeSample(BYTE* dstContainer, float& srcSample) const
 	{   
 		srcSample *= 32768.0;
 
@@ -213,7 +218,8 @@ template <int validBits>
 class Cconvolution_pcm24 : public CConvolution
 {
 public:
-	Cconvolution_pcm24(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, 3 /* Bytes */){};
+	Cconvolution_pcm24(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+	  CConvolution(szConfigFileName, nChannels, nPartitions, 3 /* Bytes */){};
 
 private:
 
@@ -238,7 +244,7 @@ private:
 
 	};
 
-	int NormalizeSample(BYTE* & dstContainer, float& srcSample) const
+	int NormalizeSample(BYTE* dstContainer, float& srcSample) const
 	{   
 		int iClip = 0;
 		switch (validBits)
@@ -284,7 +290,8 @@ template <int validBits>
 class Cconvolution_pcm32 : public CConvolution
 {
 public:
-	Cconvolution_pcm32(TCHAR szFilterFileName[MAX_PATH], DWORD nPartitions) : CConvolution(szFilterFileName, nPartitions, sizeof(INT32)){};
+	Cconvolution_pcm32(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+	  CConvolution(szConfigFileName, nChannels, nPartitions, sizeof(INT32)){};
 
 private:
 
@@ -310,7 +317,7 @@ private:
 		}
 	}; 
 
-	int NormalizeSample(BYTE* & dstContainer, float& srcSample) const
+	int NormalizeSample(BYTE* dstContainer, float& srcSample) const
 	{   
 		INT32 iClip = 0;
 		switch (validBits)
@@ -353,5 +360,5 @@ private:
 	};
 };
 
-HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szFilterFileName[MAX_PATH], const int nPartitions);
-HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szFilterFileName[MAX_PATH], const int nPartitions);
+HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szConfigFileName[MAX_PATH], const int nPartitions);
+HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions);

@@ -128,7 +128,7 @@
 	</Configurations>
 	<References>
 		<ProjectReference
-			ReferencedProjectIdentifier="{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}"
+			ReferencedProjectIdentifier="{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}"
 			Name="libsndfile"/>
 	</References>
 	<Files>

@@ -41,6 +41,7 @@
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
+				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/perftest.pdb"
 				SubSystem="1"
@@ -248,6 +249,12 @@
 				Name="convolution"
 				Filter="">
 				<File 
+					RelativePath="..\convolution\channelpaths.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\channelpaths.h">
+				</File>
+				<File 
 					RelativePath="..\convolution\convolution.cpp">
 				</File>
 				<File 
@@ -308,9 +315,6 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
-		<File 
-			RelativePath=".\VTune\perftest.vpj">
-		</File>
 		<File 
 			RelativePath=".\ReadMe.txt">
 		</File>

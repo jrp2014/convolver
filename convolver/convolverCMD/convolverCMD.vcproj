@@ -142,7 +142,7 @@
 			ReferencedProjectIdentifier="{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}"
 			Name="cmul"/>
 		<ProjectReference
-			ReferencedProjectIdentifier="{54F0A16D-8E39-4D83-A543-7EA8A44A1ED1}"
+			ReferencedProjectIdentifier="{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}"
 			Name="libsndfile"/>
 	</References>
 	<Files>
@@ -207,6 +207,12 @@
 		<Filter
 			Name="convolution"
 			Filter="">
+			<File
+				RelativePath="..\convolution\channelpaths.cpp">
+			</File>
+			<File
+				RelativePath="..\convolution\channelpaths.h">
+			</File>
 			<File
 				RelativePath="..\convolution\convolution.cpp">
 			</File>

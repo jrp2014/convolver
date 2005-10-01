@@ -20,16 +20,17 @@
 #include  "convolution.h"
 
 // CConvolution Constructor
-CConvolution::CConvolution(TCHAR szFilterFileName[MAX_PATH], const int nPartitions, const int nContainerSize):
-FIR(szFilterFileName, nPartitions),
+CConvolution::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int& nContainerSize):
+Mixer(szConfigFileName, nChannels, nPartitions),
 nContainerSize_(nContainerSize), 
-InputBuffer_(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)),
-InputBufferCopy_(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)),
-OutputBuffer_(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength)), // NB. Actually, only need half partition length for DoParititionedConvolution
-ComputationCircularBuffer_(nPartitions, SampleBuffer(FIR.nChannels, ChannelBuffer(FIR.nPartitionLength))),
+InputBuffer_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)),
+InputBufferAccumulator_(Mixer.Paths.size(), ChannelBuffer(Mixer.nPartitionLength)),
+OutputBuffer_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)), // NB. Actually, only need half partition length for DoParititionedConvolution
+ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.Paths.size(), ChannelBuffer(Mixer.nPartitionLength))),
+OutputBufferAccumulator_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)),
 nInputBufferIndex_(0),
 nPartitionIndex_(0),
-nOutputPartitionIndex_(FIR.nPartitions-1),
+nOutputPartitionIndex_(Mixer.nPartitions-1),
 bStartWritingOutput_(false)
 {
 #if defined(DEBUG) | defined(_DEBUG)
@@ -40,7 +41,7 @@ bStartWritingOutput_(false)
 		Flush();
 }
 
-// CConvolution Destructor
+//CConvolution Destructor
 CConvolution::~CConvolution(void)
 {
 }
@@ -48,17 +49,23 @@ CConvolution::~CConvolution(void)
 // Reset various buffers and pointers
 void CConvolution::Flush()
 {
-	for(int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
+	for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
 	{
 		InputBuffer_[nChannel] = 0;
 		OutputBuffer_[nChannel] = 0;
-		for (int nPartition = 0; nPartition < FIR.nPartitions; ++nPartition)
-			ComputationCircularBuffer_[nPartition][nChannel] = 0;
+		OutputBufferAccumulator_[nChannel]=0;
+	}
+
+	for(int nPath=0; nPath < Mixer.Paths.size(); ++ nPath)
+	{
+		InputBufferAccumulator_[nPath]=0;
+		for (int nPartition = 0; nPartition < Mixer.nPartitions; ++nPartition)
+			ComputationCircularBuffer_[nPartition][nPath] = 0;
 	}
 
 	nInputBufferIndex_ = 0;							// placeholder
 	nPartitionIndex_ = 0;							// for partitioned convolution
-	nOutputPartitionIndex_ = FIR.nPartitions-1;		// lags nPartitionIndex_ by 1
+	nOutputPartitionIndex_ = Mixer.nPartitions-1;	// lags nPartitionIndex_ by 1
 	bStartWritingOutput_ = false;					// don't start outputting until we have some convolved output
 }
 
@@ -71,7 +78,7 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 									   const float fWetMix,
 									   const float fDryMix)  // Returns bytes processed
 {
-	assert(isPowerOf2(FIR.nPartitionLength));
+	assert(isPowerOf2(Mixer.nPartitionLength));
 
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
@@ -81,41 +88,44 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 
 	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
-	while (dwBlocksToProcess--)
+	while (dwBlocksToProcess--)	// Frames to process
 	{
-		// Channels are stored sequentially in a block
+		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
+
 #pragma loop count(6)
-		for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
+		// Get the next frame from pbInputBuffer_ to InputBuffer_, copying the previous frame from OutputBuffer_ to pbOutputData
+		for (int nChannel = 0; nChannel<Mixer.nChannels; ++nChannel)
 		{
 			// Mix the processed signal with the dry signal
+			// TODO: remove support for wet/drymix
 			float outputSample = InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + 
-				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] * fWetMix;
+				OutputBufferAccumulator_[nChannel][nInputBufferIndex_] * fWetMix;
 
 #if defined(DEBUG) | defined(_DEBUG)
 #if defined(DIRAC_DELTA_FUNCTIONS)
 			// Only for testing with perfect Dirac Delta filters, where the output is supposed to be the same as the input
 			// TODO: not a good test, if one of the values is 0
-			if (abs(ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
-				0.001 + 0.01 * (abs(ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
+			if (abs(OutputBufferAccumulator_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
+				0.001 + 0.01 * (abs(OutputBufferAccumulator_[nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
 			{
 				cdebug 
 					<< dwBlocksToProcess << ","
 					<< nInputBufferIndex_ << ","
 					<< nPartitionIndex_ << ", "
 					<< nOutputPartitionIndex_ << ", "
-					<< nChannel << ", "
 					<< InputBuffer_[nChannel][nInputBufferIndex_] << ","
-					<< ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] << ", "
-					<< (ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
+					<< OutputBufferAccumulator_[nChannel][nInputBufferIndex_] << ", "
+					<< (OutputBufferAccumulator_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
 			}
 #endif
 #endif
+
 			// Get the input sample and convert it to a float, and scale it
 			InputBuffer_[nChannel][nInputBufferIndex_] = fAttenuationFactor * GetSample(pbInputDataPointer);
 			pbInputDataPointer += nContainerSize_;
 			cbInputBytesProcessed += nContainerSize_;
 
-			// Write to OutputData
+			// Write to OutputData.  Channels are interleaved in the output
 			if(bStartWritingOutput_)
 			{
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
@@ -123,62 +133,98 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 			}
 		} // nChannel
 
-		// Got a block
-		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
+		// Got a frame
+		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength - 1) // Got half a partition-length's worth of frames
 		{	
-#pragma loop count(6)
-			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
-			{
-				// Copy the sample buffer partition as the rdft routine overwrites it
-				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
+			// Apply the filters
 
-				// get DFT of InputBuffer_
+#pragma loop count(6)
+			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
+			{
+				// Mix the input samples for this filter
+				InputBufferAccumulator_[nPath] = 0;
+				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
+				{
+					for(int i=0; i<Mixer.nPartitionLength; ++i)
+					{
+						InputBufferAccumulator_[nPath][i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
+							Mixer.Paths[nPath].inChannel[nChannel].fScale;
+					}
+				}
+			}
+
+			// Save the previous half partition; the first half will be read in over the next cycle
+			// TODO: avoid this copy by rotating the filter when it is read in?
+			// TODO: move to the implementation of SampleBuffer
+			// Zero the partition from circular buffer that we have just used, for the next cycle
+#pragma loop count(6)
+			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
+			{
+				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
+				OutputBufferAccumulator_[nChannel] = 0;
+			}
+
+			for(int nPath=0; nPath < Mixer.Paths.size(); ++nPath)
+			{
+				ComputationCircularBuffer_[nOutputPartitionIndex_][nPath] = 0;
+			}
+
+#pragma loop count(6)
+			for (int nPath=0; nPath < Mixer.Paths.size(); ++nPath)
+			{
+				// get DFT of InputBufferAccumulator_
 #ifdef OOURA_SIMPLE
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0]);
 #else
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+				// TODO: rationalize the ip, w references
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0], 
+					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 
-				// Zero the partition from circular buffer that we have just used, for the next cycle
-				ComputationCircularBuffer_[nOutputPartitionIndex_][nChannel] = 0;
-
-				for (int nPartitionIndex = 0; nPartitionIndex < FIR.nPartitions; ++nPartitionIndex)
+				for (int nPartitionIndex = 0; nPartitionIndex < Mixer.nPartitions; ++nPartitionIndex)
 				{
-					// Complex vector multiplication of InputBufferCopy_ and FIR.buffer_, added to ComputationCircularBuffer_
+					// Complex vector multiplication of InputBufferAccumulator_ and Mixer.Paths[nPath].filter,
+					// added to ComputationCircularBuffer_
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 					// Vectorizable
-					cmuladd(&InputBufferCopy_[nChannel][0], &FIR.buffer[nPartitionIndex][nChannel][0],
-						&ComputationCircularBuffer_[nPartitionIndex_][nChannel][0], FIR.nPartitionLength);
+					cmuladd(&InputBufferAccumulator_[nPath][0], &Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0][0],
+						&ComputationCircularBuffer_[nPartitionIndex_][nPath][0], Mixer.nPartitionLength);
 #else
 					// Non-vectorizable
-					cmultadd(InputBufferCopy_[nChannel], FIR.buffer[nPartitionIndex][nChannel],
-						ComputationCircularBuffer_[nPartitionIndex_][nChannel], FIR.nPartitionLength);
+					cmultadd(InputBufferAccumulator_[nPath], Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0], //TODO: 0=assume only one channel for filter
+						ComputationCircularBuffer_[nPartitionIndex_][nPath], Mixer.nPartitionLength);
 #endif
-
-					nPartitionIndex_ = (nPartitionIndex_ + 1) % FIR.nPartitions;	// circular
-				}
+					nPartitionIndex_ = (nPartitionIndex_ + 1) % Mixer.nPartitions;	// circular
+				} // nPartitionIndex
 
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef SIMPLE_OOURA
-				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nChannel][0]);
+				rdft(Mixer.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nPath][0]);
 #else
-				rdft(FIR.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nChannel][0], &FIR.ip[0], &FIR.w[0]);
+				rdft(Mixer.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nPath][0],
+					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
-
-				// Save the previous half partition; the first half will be read in over the next cycle
-				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
-
-			} // nChannel
+				// Mix the outputs
+#pragma loop_count(6)
+				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
+				{
+					for(int i=0; i < Mixer.nHalfPartitionLength; ++i)
+					{
+						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] +=
+							ComputationCircularBuffer_[nPartitionIndex_][nPath][i] * Mixer.Paths[nPath].outChannel[nChannel].fScale;
+					}
+				}
+			} // nPath
 
 			// Save the partition to be used for output and move the circular buffer on for the next cycle
 			nOutputPartitionIndex_ = nPartitionIndex_;
-			nPartitionIndex_ = (nPartitionIndex_ + 1) % FIR.nPartitions;	// circular
+			nPartitionIndex_ = (nPartitionIndex_ + 1) % Mixer.nPartitions;	// circular
 			bStartWritingOutput_ = true;
 
 			nInputBufferIndex_ = 0;		// start to refill the InputBuffer_
 		}
 		else // keep filling InputBuffer_
-			nInputBufferIndex_++;
+			++nInputBufferIndex_;
 	} // while
 
 	return cbOutputBytesGenerated;
@@ -194,13 +240,13 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 							const float fDryMix)  // Returns bytes processed
 {
 	// This convolution algorithm assumes that the filter is stored in the first, and only, partition
-	if(FIR.nPartitions != 1)
+	if(Mixer.nPartitions != 1)
 	{
 		return 0;
 	}
 
-	assert(isPowerOf2(FIR.nPartitionLength));
-	assert(FIR.nPartitionLength == FIR.nFilterLength);
+	assert(isPowerOf2(Mixer.nPartitionLength));
+	assert(Mixer.nPartitionLength == Mixer.nFilterLength);
 
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
@@ -212,88 +258,126 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 
 	while (dwBlocksToProcess--)
 	{
-		// Channels are stored sequentially in a block
+		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
+
 #pragma loop count(6)
-		for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
+		// Get the next frame from pbInputBuffer_ to InputBuffer_, copying the previous frame from OutputBuffer_ to pbOutputData
+		for (int nChannel = 0; nChannel<Mixer.nChannels; ++nChannel)
 		{
 			// Mix the processed signal with the dry signal
-			float outputSample = (InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix ) + 
-				(OutputBuffer_[nChannel][nInputBufferIndex_] * fWetMix);
+			// TODO: remove support for wet/drymix
+			float outputSample = InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + 
+				OutputBufferAccumulator_[nChannel][nInputBufferIndex_] * fWetMix;
 
 #if defined(DEBUG) | defined(_DEBUG)
 #if defined(DIRAC_DELTA_FUNCTIONS)
 			// Only for testing with perfect Dirac Delta filters, where the output is supposed to be the same as the input
 			// TODO: not a good test, if one of the values is 0
-			if (abs(OutputBuffer_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
-				0.001 + 0.01 * (abs(OutputBuffer_[nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
+			if (abs(OutputBufferAccumulator_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) >
+				0.001 + 0.01 * (abs(OutputBufferAccumulator_[nChannel][nInputBufferIndex_]) + abs(InputBuffer_[nChannel][nInputBufferIndex_])))
 			{
 				cdebug 
 					<< dwBlocksToProcess << ","
 					<< nInputBufferIndex_ << ","
 					<< nPartitionIndex_ << ", "
-					<< nChannel << ", "
+					<< nOutputPartitionIndex_ << ", "
 					<< InputBuffer_[nChannel][nInputBufferIndex_] << ","
-					<< OutputBuffer_[nChannel][nInputBufferIndex_] << ", "
-					<< (OutputBuffer_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
+					<< OutputBufferAccumulator_[nChannel][nInputBufferIndex_] << ", "
+					<< (OutputBufferAccumulator_[nChannel][nInputBufferIndex_] - InputBuffer_[nChannel][nInputBufferIndex_]) << std::endl;
 			}
 #endif
 #endif
+
 			// Get the input sample and convert it to a float, and scale it
 			InputBuffer_[nChannel][nInputBufferIndex_] = fAttenuationFactor * GetSample(pbInputDataPointer);
 			pbInputDataPointer += nContainerSize_;
 			cbInputBytesProcessed += nContainerSize_;
 
-			// Write to OutputData
+			// Write to OutputData.  Channels are interleaved in the output
 			if(bStartWritingOutput_)
 			{
 				cbOutputBytesGenerated += NormalizeSample(pbOutputDataPointer, outputSample);
 				pbOutputDataPointer += nContainerSize_;
 			}
-		}
+		} // nChannel
 
-		// Got a block
-		if (nInputBufferIndex_ == FIR.nHalfPartitionLength - 1) // Got half a partition-length's worth
-		{	
+		// Got a frame
+		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength - 1) // Got half a partition-length's worth of frames
+		{
+			// Apply the filters
 
 #pragma loop count(6)
-#pragma omp parallel for
-			for (int nChannel = 0; nChannel < FIR.nChannels; ++nChannel)
+			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
 			{
-				// Copy the sample buffer partition as the rdft routine overwrites it
-				InputBufferCopy_[nChannel] = InputBuffer_[nChannel];
+				// Mix the input samples for this filter
+				InputBufferAccumulator_[nPath] = 0;
+				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
+				{
+					for(int i=0; i<Mixer.nPartitionLength; ++i)
+					{
+						InputBufferAccumulator_[nPath][i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
+							Mixer.Paths[nPath].inChannel[nChannel].fScale;
+					}
+				}
+			}
 
+			// Save the previous half partition; the first half will be read in over the next cycle
+			// TODO: avoid this copy by rotating the filter when it is read in?
+			// TODO: move to the implementation of SampleBuffer
+			// Zero the partition from circular buffer that we have just used, for the next cycle
+#pragma loop count(6)
+			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
+			{
+				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
+				OutputBufferAccumulator_[nChannel] = 0;
+			}
+
+#pragma loop count(6)
+			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
+			{
 				// get DFT of InputBufferCopy_
 #ifdef OOURA_SIMPLE
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0]);
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0]);
 #else
-				rdft(FIR.nPartitionLength, OouraRForward, &InputBufferCopy_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0], 
+					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 				// vectorized
-				cmul(&InputBufferCopy_[nChannel][0], &FIR.buffer[0][nChannel][0],					// use the first partition only
-					&OutputBuffer_[nChannel][0], FIR.nPartitionLength);	
+				cmul(&InputBufferAccumulator_[nPath][0], 
+					&Mixer.Paths[nPath].filter.buffer[0][0][0],					// use the first partition and channel only
+					&OutputBuffer_[nPath][0], Mixer.nPartitionLength);	
 #else
 				// Non-vectorizable
-				cmult(InputBufferCopy_[nChannel], FIR.buffer[0][nChannel],					// use the first partition only
-					OutputBuffer_[nChannel], FIR.nPartitionLength);	
+				cmult(InputBufferAccumulator_[nPath],
+					Mixer.Paths[nPath].filter.buffer[0][0],					// use the first partition and channel only
+					OutputBuffer_[nPath], Mixer.nPartitionLength);	
 #endif
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef OOURA_SIMPLE
-				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0]);
+				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[nPath][0]);
 #else
-				rdft(FIR.nPartitionLength, OouraRBackward, &OutputBuffer_[nChannel][0], &FIR.ip[0], &FIR.w[0]);
+				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[nPath][0],
+					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
-
-				// Save the previous half partition; the first half will be read in over the next cycle
-				InputBuffer_[nChannel].shiftright(FIR.nHalfPartitionLength);
+				// Mix the outputs
+#pragma loop_count(6)
+				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
+				{
+					for(int i=0; i<Mixer.nHalfPartitionLength; ++i)
+					{
+						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] += 
+							OutputBuffer_[nPath][i] * Mixer.Paths[nPath].outChannel[nChannel].fScale;
+					}
+				}
 			}
 
 			nInputBufferIndex_ = 0;
 			bStartWritingOutput_ = true;
 		}
 		else // keep filling InputBuffer_
-			nInputBufferIndex_++;
+			++nInputBufferIndex_;
 	} // while
 
 	return cbOutputBytesGenerated;
@@ -386,7 +470,7 @@ void CConvolution::cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer
 // The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
 // while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
 // See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szFilterFileName[MAX_PATH], const int nPartitions)
+HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convolution, TCHAR szConfigFileName[MAX_PATH], const int nPartitions)
 {
 	HRESULT hr = S_OK;
 
@@ -397,6 +481,7 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 
 	WORD wFormatTag = pWave->wFormatTag;
 	WORD wValidBitsPerSample = pWave->wBitsPerSample;
+	int nChannels = pWave->nChannels;
 	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
 		WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
@@ -428,11 +513,11 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
 				// structure to determine the valid bits per sample. (See above)
 			case 8:
-				convolution = new Cconvolution_pcm8(szFilterFileName, nPartitions);
+				convolution = new Cconvolution_pcm8(szConfigFileName, nChannels, nPartitions);
 				break;
 
 			case 16:
-				convolution = new Cconvolution_pcm16(szFilterFileName, nPartitions);
+				convolution = new Cconvolution_pcm16(szConfigFileName, nChannels, nPartitions);
 				break;
 
 			case 24:
@@ -440,15 +525,15 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 					switch (wValidBitsPerSample)
 					{
 					case 16:
-						convolution = new Cconvolution_pcm24<16>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm24<16>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					case 20:
-						convolution = new Cconvolution_pcm24<20>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm24<20>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					case 24:
-						convolution = new Cconvolution_pcm24<24>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm24<24>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					default:
@@ -462,19 +547,19 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 					switch (wValidBitsPerSample)
 					{
 					case 16:
-						convolution = new Cconvolution_pcm32<16>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm32<16>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					case 20:
-						convolution = new Cconvolution_pcm32<20>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm32<20>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					case 24:
-						convolution = new Cconvolution_pcm32<24>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm32<24>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					case 32:
-						convolution = new Cconvolution_pcm32<32>(szFilterFileName, nPartitions);
+						convolution = new Cconvolution_pcm32<32>(szConfigFileName, nChannels, nPartitions);
 						break;
 
 					default:
@@ -492,7 +577,7 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 			switch (pWave->wBitsPerSample)
 			{
 			case 32:
-				convolution = new Cconvolution_ieeefloat(szFilterFileName, nPartitions);
+				convolution = new Cconvolution_ieeefloat(szConfigFileName, nChannels, nPartitions);
 				break;
 
 			default:  // Unprocessable IEEE float
@@ -514,25 +599,25 @@ HRESULT SelectConvolution(WAVEFORMATEX* & pWave, Holder<CConvolution>& convoluti
 }
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
-HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szFilterFileName[MAX_PATH], const int nPartitions)
+HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions)
 {
 	HRESULT hr = S_OK;
 
 	try 
 	{
-		Cconvolution_ieeefloat c(szFilterFileName, nPartitions == 0 ? 1 : nPartitions); // 0 used to signal use of overlap-save
+		Cconvolution_ieeefloat c(szConfigFileName, nChannels, nPartitions == 0 ? 1 : nPartitions); // 0 used to signal use of overlap-save
 
 		const int nSamples = 10; // length of the test sample, in filter lengths
 		// So if you are using a 44.1kHz sample rate and it takes 1s to calculate optimum attenuation,
 		// that is equivalent to 0.1s to process a filter
 		// which means that the filter must be less than 44100 / .1 samples in length to keep up
-		const int nBlocks = nSamples * c.FIR.nFilterLength;
-		const int nBufferLength = nBlocks * c.FIR.nChannels;	// Channels are interleaved
+		const int nBlocks = nSamples * c.Mixer.nFilterLength;
+		const int nBufferLength = nBlocks * c.Mixer.nChannels;	// Channels are interleaved
 
 		std::vector<float>InputSamples(nBufferLength);
 		std::vector<float>OutputSamples(nBufferLength);
 
-		// The MT random number generator is much faster than rand, but it may not work under VC++
+		// The MT random number generator is supposed to be faster than rand, but it may not work under VC++
 #ifdef USEMT
 		MT<float> r;	// Random number generator class
 #else
@@ -558,23 +643,23 @@ HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szFilterFileName[
 			}
 
 #if defined(DEBUG) | defined(_DEBUG)
-//			copy(InputSamples.begin(), InputSamples.end(), ostream_iterator<float>(cdebug, ", "));
+			//copy(InputSamples.begin(), InputSamples.end(), ostream_iterator<float>(cdebug, ", "));
 #endif
-
 			// nPartitions == 0 => use overlap-save version
 			DWORD nBytesGenerated = nPartitions == 0 ?
 				c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-					/* dwBlocksToProcess */ nBlocks,
-					/* fAttenuation_db */ 0,
-					/* fWetMix,*/ 1.0L,
-					/* fDryMix */ 0.0L)
+				/* dwBlocksToProcess */ nBlocks,
+				/* fAttenuation_db */ 0,
+				/* fWetMix,*/ 1.0L,
+				/* fDryMix */ 0.0L)
 				: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-					/* dwBlocksToProcess */ nBlocks,
-					/* fAttenuation_db */ 0,
-					/* fWetMix,*/ 1.0L,
-					/* fDryMix */ 0.0L);
-			// The output will be missing the last half filter length, the first time around
-			assert (nBytesGenerated % sizeof(float) == 0);
+				/* dwBlocksToProcess */ nBlocks,
+				/* fAttenuation_db */ 0,
+				/* fWetMix,*/ 1.0L,
+				/* fDryMix */ 0.0L);
+
+				// The output will be missing the last half filter length, the first time around
+				assert (nBytesGenerated % sizeof(float) == 0);
 			assert (nBytesGenerated <= nBufferLength * sizeof(float));
 
 			// Scan the output buffer for larger output samples
@@ -606,10 +691,33 @@ HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szFilterFileName[
 	}
 	catch (HRESULT& hr) // from CConvolution
 	{
+#if defined(DEBUG) | defined(_DEBUG)	
+		cdebug << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
+#endif
 		return hr;
 	}
+#if defined(DEBUG) | defined(_DEBUG)
+	catch(const std::exception& error)
+	{
+		cdebug << "Standard exception: " << error.what() << std::endl;
+		return E_OUTOFMEMORY;
+	}
+	catch (const char* what)
+	{
+		cdebug << "Failed: " << what << std::endl;
+		return E_OUTOFMEMORY;
+	}
+	catch (const TCHAR* what)
+	{
+		cdebug << "Failed: " << what << std::endl;
+		return E_OUTOFMEMORY;
+	}
+#endif
 	catch (...)
 	{
+#if defined(DEBUG) | defined(_DEBUG)	
+		cdebug << "Failed to calculate optimum attenuation.  Unknown exception." << std::endl;
+#endif
 		return E_OUTOFMEMORY;
 	}
 }

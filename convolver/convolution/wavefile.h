@@ -65,7 +65,7 @@ public:
 	{
 
 #if defined(DEBUG) | defined(_DEBUG)
-		char  buffer [2048] ;
+		char  buffer [2048];
 		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
 
 		cdebug << "opening " << path << ": " << buffer;
