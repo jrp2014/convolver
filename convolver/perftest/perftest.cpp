@@ -79,7 +79,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		float fAttenuation	= 0;
 
 #ifdef LIBSNDFILE
-		std::cout << std::endl << "Partitions\tCapacity\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
+		std::cout << std::endl << "Partitions\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 #else
 		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 #endif
@@ -113,10 +113,8 @@ int	_tmain(int argc, _TCHAR* argv[])
 					std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
 					throw (hr);
 				}
-				std::cout  << nPartitions << "\t"
+				std::cout  << std::setprecision(3) << nPartitions << "\t"
 #ifdef LIBSNDFILE
-					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * 10) / fElapsedCalc) /
-						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) * conv->Mixer.nChannels << "\t"
 					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * 10) / fElapsedCalc) /
 						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) << "\t"
 #endif

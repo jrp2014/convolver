@@ -9,6 +9,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "comparewavs", "comparewavs\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverWMP", "convolverWMP\convolverWMP.vcproj", "{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"
 	ProjectSection(ProjectDependencies) = postProject
+		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8} = {F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0} = {C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}
 	EndProjectSection
 EndProject
@@ -42,15 +43,21 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cmul", "cmul\cmul.vcproj", 
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConvolverWrapper", "..\..\DScaler5\Filters\Processing\ConvolverWrapper\ConvolverWrapper.vcproj", "{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}"
-	ProjectSection(ProjectDependencies) = postProject
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GenDMOProp", "..\..\DScaler5\GenDMOProp\GenDMOProp.vcproj", "{2A680E85-E6AC-4868-A55F-47F8493FB147}"
-	ProjectSection(ProjectDependencies) = postProject
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libsndfile", "libsndfile\libsndfile.vcproj", "{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConvolverWrapper", "..\..\DScaler5\Filters\Processing\ConvolverWrapper\ConvolverWrapper.vcproj", "{440079A8-8E9D-42EE-92F5-11F5281466EC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4510F548-39D4-4E1B-98D7-637126447CB7} = {4510F548-39D4-4E1B-98D7-637126447CB7}
+		{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB} = {706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Filter_Lib", "..\..\DScaler5\Filters\Filter_Lib\Filter_Lib.vcproj", "{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GenDMOProp", "..\..\DScaler5\GenDMOProp\GenDMOProp.vcproj", "{4510F548-39D4-4E1B-98D7-637126447CB7}"
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
@@ -93,18 +100,22 @@ Global
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}.Debug.Build.0 = Debug|Win32
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}.Release.ActiveCfg = Release|Win32
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}.Release.Build.0 = Release|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Debug.ActiveCfg = Debug|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Debug.Build.0 = Debug|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Release.ActiveCfg = Release|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Release.Build.0 = Release|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Debug.ActiveCfg = Debug|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Debug.Build.0 = Debug|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Release.ActiveCfg = Release|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Release.Build.0 = Release|Win32
 		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}.Debug.ActiveCfg = Debug|Win32
 		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}.Debug.Build.0 = Debug|Win32
 		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}.Release.ActiveCfg = Release|Win32
 		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}.Release.Build.0 = Release|Win32
+		{440079A8-8E9D-42EE-92F5-11F5281466EC}.Debug.ActiveCfg = Debug|Win32
+		{440079A8-8E9D-42EE-92F5-11F5281466EC}.Debug.Build.0 = Debug|Win32
+		{440079A8-8E9D-42EE-92F5-11F5281466EC}.Release.ActiveCfg = Release|Win32
+		{440079A8-8E9D-42EE-92F5-11F5281466EC}.Release.Build.0 = Release|Win32
+		{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}.Debug.ActiveCfg = Debug|Win32
+		{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}.Debug.Build.0 = Debug|Win32
+		{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}.Release.ActiveCfg = Release|Win32
+		{706382C1-D48F-4BFC-9C40-21BCFE0B3DEB}.Release.Build.0 = Release|Win32
+		{4510F548-39D4-4E1B-98D7-637126447CB7}.Debug.ActiveCfg = Debug|Win32
+		{4510F548-39D4-4E1B-98D7-637126447CB7}.Debug.Build.0 = Debug|Win32
+		{4510F548-39D4-4E1B-98D7-637126447CB7}.Release.ActiveCfg = Release|Win32
+		{4510F548-39D4-4E1B-98D7-637126447CB7}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection
