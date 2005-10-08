@@ -18,39 +18,14 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#pragma once
+#include "convolution\config.h"
+#include "convolution\samplebuffer.h"
+#include "convolution\channelpaths.h"
+#include "convolution\waveformat.h"
+#include "convolution\holder.h"
 
-#if defined(DEBUG) | defined(_DEBUG)
-#define _CRTDBG_MAP_ALLOC
-//#include <stdlib.h>
-//#include <crtdbg.h>
-
-#include "debugging\debugging.h"
-#include "debugging\debugStream.h"
-#endif
-
-#include ".\holder.h"
-#include ".\channelpaths.h"
-
-
-// FFT routines
-#include "fft\fftsg_h.h"
-
-#ifdef _MSC_VER
-#define restrict 
-#endif
-
-// MT = use included random number generator
-#undef USEMT
-#ifdef USEMT
-#include ".\random.h"
-#else
+// For random number seed
 #include <time.h>
-#endif
-
-#undef DIRAC_DELTA_FUNCTIONS
-
-const DWORD MAX_ATTENUATION = 1000; // dB
 
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 // Intel compiler, for vectorization
@@ -69,7 +44,7 @@ extern "C" void cmuladd(float *, float *, float *, int);
 class CConvolution
 {
 public:
-	CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int& nContainerSize);
+	CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int nContainerSize);
 	virtual ~CConvolution(void);
 
 	// This version of the convolution routine does partitioned convolution
@@ -91,9 +66,7 @@ public:
 
 	void Flush();								// zero buffers, reset pointers
 
-	// TODO: Need to keep the number of source channels, and either mix them, or use a sub-set, if the filter has more channels
-	//Filter				FIR;					// Order dependent
-	ChannelPaths			Mixer;
+	ChannelPaths			Mixer;				// Order dependent
 
 protected:
 
@@ -102,8 +75,8 @@ protected:
 private:
 
 	SampleBuffer		InputBuffer_;
-	SampleBuffer		InputBufferAccumulator_;	// As FFT routines destroy their input
-	SampleBuffer		OutputBuffer_;				// Used by overlap-save
+	ChannelBuffer		InputBufferAccumulator_;	// Only need to accumulate one channel at a time
+	ChannelBuffer		OutputBuffer_;				// Used by overlap-save
 	SampleBuffer		OutputBufferAccumulator_;	// As FFT routines destroy their input
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
@@ -133,6 +106,8 @@ protected:
 	virtual float GetSample(BYTE* & container) const = 0;						// converts sample into a float, [-1..1]
 	virtual int NormalizeSample(BYTE* dstContainer, float& srcSample) const = 0;	// returns number of bytes processed
 };
+
+
 
 // Specializations with the appropriate functions for accessing the sample buffer
 class Cconvolution_ieeefloat : public CConvolution

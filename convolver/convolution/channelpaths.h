@@ -18,19 +18,16 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
-#if defined(DEBUG) | defined(_DEBUG)
-#include "debugging\debugStream.h"
-#endif
-
-#include "filter.h"
+#include "convolution\config.h"
+#include "convolution\filter.h"
 #include <fstream>
+#include <vector>
+#include <math.h>
 
 
 class ChannelPaths
 {
 private:
-
-
 
 	class ChannelPath
 	{
@@ -42,8 +39,9 @@ private:
 			float fScale;
 
 			ScaledChannel(int& nChannel, float& fScale) : nChannel(nChannel), fScale(fScale) {};
+
 #if defined(DEBUG) | defined(_DEBUG)
-		void Dump();
+			void Dump();
 #endif
 		};
 
@@ -51,7 +49,7 @@ private:
 		Filter filter;
 		std::vector<ScaledChannel> outChannel;
 
-		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions,
+		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions,
 			std::vector<ScaledChannel>& inChannel, std::vector<ScaledChannel>& outChannel) :
 		filter(szConfigFileName, nPartitions), inChannel(inChannel), outChannel(outChannel){};
 

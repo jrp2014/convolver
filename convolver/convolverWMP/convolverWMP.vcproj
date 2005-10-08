@@ -40,6 +40,7 @@
 				RegisterOutput="TRUE"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
 				ShowProgress="0"
+				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
 				SuppressStartupBanner="FALSE"
 				AdditionalLibraryDirectories=""
 				LinkDLL="TRUE"
@@ -83,7 +84,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="3"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
@@ -112,6 +113,7 @@
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
 				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
@@ -278,6 +280,9 @@
 					RelativePath="..\convolution\channelpaths.h">
 				</File>
 				<File
+					RelativePath="..\convolution\config.h">
+				</File>
+				<File
 					RelativePath="..\convolution\convolution.cpp">
 					<FileConfiguration
 						Name="Debug|Win32">
@@ -302,7 +307,7 @@
 					RelativePath="..\convolution\filter.h">
 				</File>
 				<File
-					RelativePath="..\convolution\Random.h">
+					RelativePath="..\convolution\holder.h">
 				</File>
 				<File
 					RelativePath="..\convolution\samplebuffer.cpp">

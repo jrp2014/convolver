@@ -40,7 +40,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="$(OutDir)/convolverCMD.exe"
+				OutputFile="../bin/$(OutDir)/convolverCMD.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/convolverCMD.pdb"
@@ -78,7 +78,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="3"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
@@ -106,7 +106,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="$(OutDir)/convolverCMD.exe"
+				OutputFile="../bin/$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
 				IgnoreAllDefaultLibraries="FALSE"
 				IgnoreDefaultLibraryNames=""
@@ -214,6 +214,9 @@
 				RelativePath="..\convolution\channelpaths.h">
 			</File>
 			<File
+				RelativePath="..\convolution\config.h">
+			</File>
+			<File
 				RelativePath="..\convolution\convolution.cpp">
 			</File>
 			<File
@@ -227,9 +230,6 @@
 			</File>
 			<File
 				RelativePath="..\convolution\holder.h">
-			</File>
-			<File
-				RelativePath="..\convolution\Random.h">
 			</File>
 			<File
 				RelativePath="..\convolution\samplebuffer.cpp">

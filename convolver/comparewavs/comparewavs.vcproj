@@ -4,6 +4,7 @@
 	Version="7.10"
 	Name="comparewavs"
 	ProjectGUID="{27FA09AC-9D9D-4474-BB9A-5F2C8E0D1860}"
+	RootNamespace="comparewavs"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -34,7 +35,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="$(OutDir)/comparewavs.exe"
+				OutputFile="../bin/$(OutDir)/comparewavs.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/comparewavs.pdb"
@@ -70,7 +71,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="3"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
@@ -94,7 +95,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="$(OutDir)/comparewavs.exe"
+				OutputFile="../bin/$(OutDir)/comparewavs.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"

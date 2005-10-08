@@ -37,7 +37,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
-				OutputFile="$(OutDir)/perftest.exe"
+				OutputFile="../bin/$(OutDir)/perftest.exe"
 				LinkIncremental="2"
 				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
@@ -75,8 +75,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions=""
-				Optimization="3"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
@@ -103,7 +102,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
-				OutputFile="$(OutDir)/perftest.exe"
+				OutputFile="../bin/$(OutDir)/perftest.exe"
 				LinkIncremental="1"
 				IgnoreAllDefaultLibraries="FALSE"
 				GenerateDebugInformation="TRUE"
@@ -247,6 +246,9 @@
 				</File>
 				<File
 					RelativePath="..\convolution\channelpaths.h">
+				</File>
+				<File
+					RelativePath="..\convolution\config.h">
 				</File>
 				<File
 					RelativePath="..\convolution\convolution.cpp">

@@ -1,3 +1,4 @@
+#pragma once
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
@@ -17,17 +18,14 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#pragma once
-
-#if defined(DEBUG) | defined(_DEBUG)
-#include "debugging\debugging.h"
-#include "debugging\debugStream.h"
-#endif
-
+#include "convolution\config.h"
 #include "convolution\samplebuffer.h"
-#include "convolution\waveformat.h"
 #include "convolution\wavefile.h"
-#include "fft\fftsg_h.h"
+#include "convolution\waveformat.h"
+#include <vector>
+#ifdef OOURA
+#include <math.h>
+#endif
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.
 
@@ -46,7 +44,7 @@ public:
 	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int						nHalfPartitionLength;	// in blocks
 	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
-#ifndef SIMPLE_OOURA
+#ifdef OOURA
 	// Workspace for the non-simple Ooura routines.  
 	std::vector<DLReal>		w;						// w[0...n/2-1]   :cos/sin table
 	std::vector<int>		ip;						// work area for bit reversal

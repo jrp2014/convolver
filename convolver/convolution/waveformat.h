@@ -18,10 +18,15 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
-#ifndef LIBSNDFILE
-#include "Common\dxstdafx.h"
+#include "convolution\config.h"
+#include <mmreg.h>
 #include <ks.h>
 #include <ksmedia.h>
+
+#ifndef LIBSNDFILE
+#include "Common\dxstdafx.h"
+#else
+#include "libsndfile\sndfile.h"
 #endif
 #include "convolution\wavefile.h"
 

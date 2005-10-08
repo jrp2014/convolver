@@ -19,29 +19,10 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 
-#if defined(DEBUG) | defined(_DEBUG)
-#include "debugging\debugStream.h"
-#endif
-#include <assert.h>
+#include "convolution\config.h"
 
 // Vector is slow when debugging
 #include <vector>
-
-// A range of different buffer implementations ...
-
-// std::valarray
-#undef VALARRAY
-#define FASTARRAY 1
-
-#ifdef	VALARRAY
-// The following undefs are needed to avoid valarray conflicts
-#undef min
-#undef max
-#include <valarray>
-typedef	std::valarray<float> ChannelBuffer;
-#endif
-
-#ifdef FASTARRAY
 #include <malloc.h>
 #include <windows.h>	// for ZeroMemory, CopyMemory, etc
 
@@ -49,6 +30,7 @@ typedef	std::valarray<float> ChannelBuffer;
 #undef min
 #undef max
 
+// T is normally float
 template <typename T>
 class fastarray
 {
@@ -139,7 +121,7 @@ public:
 
 	T  operator[](int n) const
 	{ 
-		assert(n < impl_.size_ && n >= 0);;
+		assert(n < impl_.size_ && n >= 0);
 		return this->impl_.v_[n];
 	}
 
@@ -200,12 +182,11 @@ private:
 };
 
 typedef	fastarray<float> ChannelBuffer;
-#endif
-
-// Don't use fastarray, as the fastarray assumes a fundamental type: it doesn't use contructors
 typedef	std::vector< ChannelBuffer > SampleBuffer;
 typedef	std::vector< SampleBuffer > PartitionedBuffer;
 
+#if defined(DEBUG) | defined(_DEBUG)
 void DumpChannelBuffer(const ChannelBuffer& buffer );
 void DumpSampleBuffer(const SampleBuffer& buffer);
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer);
+#endif

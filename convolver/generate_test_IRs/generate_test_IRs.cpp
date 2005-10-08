@@ -25,7 +25,7 @@
 #include "stdafx.h"
 #include "Common\dxstdafx.h"
 
-int generate_perfect_dirac_delta(int nSamplesPerSec, int nChannels, int nSilence);
+int generate_perfect_dirac_delta(int nSamplesPerSec, WORD nChannels, int nSilence);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -64,7 +64,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 
-int generate_perfect_dirac_delta(int nSamplesPerSec, int nChannels, int nSilence)
+int generate_perfect_dirac_delta(int nSamplesPerSec, WORD nChannels, int nSilence)
 {
 	HRESULT hr = S_OK;
 

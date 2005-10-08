@@ -32,7 +32,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/libsndfile.dll"
+				OutputFile="../bin/$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
 				GenerateDebugInformation="TRUE"
@@ -70,18 +70,21 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="3"
+				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\..\..\libsndfile-1.0.12\src"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
 				RuntimeLibrary="0"
+				StructMemberAlignment="5"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -90,7 +93,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/libsndfile.dll"
+				OutputFile="../bin/$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
 				GenerateDebugInformation="TRUE"

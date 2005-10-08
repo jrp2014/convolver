@@ -17,15 +17,15 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#include  "convolution.h"
+#include  "convolution\convolution.h"
 
 // CConvolution Constructor
-CConvolution::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int& nContainerSize):
+CConvolution::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions, const int nContainerSize):
 Mixer(szConfigFileName, nChannels, nPartitions),
 nContainerSize_(nContainerSize), 
 InputBuffer_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)),
-InputBufferAccumulator_(Mixer.Paths.size(), ChannelBuffer(Mixer.nPartitionLength)),
-OutputBuffer_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)), // NB. Actually, only need half partition length for DoParititionedConvolution
+InputBufferAccumulator_(ChannelBuffer(Mixer.nPartitionLength)),
+OutputBuffer_(ChannelBuffer(Mixer.nPartitionLength)), // NB. Actually, only need half partition length for DoParititionedConvolution
 ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.Paths.size(), ChannelBuffer(Mixer.nPartitionLength))),
 OutputBufferAccumulator_(Mixer.nChannels, ChannelBuffer(Mixer.nPartitionLength)),
 nInputBufferIndex_(0),
@@ -52,13 +52,10 @@ void CConvolution::Flush()
 	for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
 	{
 		InputBuffer_[nChannel] = 0;
-		OutputBuffer_[nChannel] = 0;
-		OutputBufferAccumulator_[nChannel]=0;
 	}
 
 	for(int nPath=0; nPath < Mixer.Paths.size(); ++ nPath)
 	{
-		InputBufferAccumulator_[nPath]=0;
 		for (int nPartition = 0; nPartition < Mixer.nPartitions; ++nPartition)
 			ComputationCircularBuffer_[nPartition][nPath] = 0;
 	}
@@ -119,7 +116,6 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 			}
 #endif
 #endif
-
 			// Get the input sample and convert it to a float, and scale it
 			InputBuffer_[nChannel][nInputBufferIndex_] = fAttenuationFactor * GetSample(pbInputDataPointer);
 			pbInputDataPointer += nContainerSize_;
@@ -136,62 +132,54 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 		// Got a frame
 		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength - 1) // Got half a partition-length's worth of frames
 		{	
-			// Apply the filters
+			// Apply the filter paths
+
+#pragma loop count(2)
+			for(int nChannel=0; nChannel<Mixer.nChannels; ++nChannel)
+			{
+				OutputBufferAccumulator_[nChannel] = 0;
+			}
 
 #pragma loop count(6)
 			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
 			{
-				// Mix the input samples for this filter
-				InputBufferAccumulator_[nPath] = 0;
+				// Zero the partition from circular buffer that we have just used, for the next cycle
+				ComputationCircularBuffer_[nOutputPartitionIndex_][nPath] = 0;
+
+				// Mix the input samples for this filter path
+				InputBufferAccumulator_ = 0;
+#pragma loop count(6)
 				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
 				{
+#pragma loop count(65536)
 					for(int i=0; i<Mixer.nPartitionLength; ++i)
 					{
-						InputBufferAccumulator_[nPath][i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
+						InputBufferAccumulator_[i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
 							Mixer.Paths[nPath].inChannel[nChannel].fScale;
 					}
 				}
-			}
 
-			// Save the previous half partition; the first half will be read in over the next cycle
-			// TODO: avoid this copy by rotating the filter when it is read in?
-			// TODO: move to the implementation of SampleBuffer
-			// Zero the partition from circular buffer that we have just used, for the next cycle
-#pragma loop count(6)
-			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
-			{
-				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
-				OutputBufferAccumulator_[nChannel] = 0;
-			}
-
-			for(int nPath=0; nPath < Mixer.Paths.size(); ++nPath)
-			{
-				ComputationCircularBuffer_[nOutputPartitionIndex_][nPath] = 0;
-			}
-
-#pragma loop count(6)
-			for (int nPath=0; nPath < Mixer.Paths.size(); ++nPath)
-			{
 				// get DFT of InputBufferAccumulator_
 #ifdef OOURA_SIMPLE
-				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0]);
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0]);
 #else
 				// TODO: rationalize the ip, w references
-				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0], 
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0], 
 					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 
+#pragma loop count(4)
 				for (int nPartitionIndex = 0; nPartitionIndex < Mixer.nPartitions; ++nPartitionIndex)
 				{
 					// Complex vector multiplication of InputBufferAccumulator_ and Mixer.Paths[nPath].filter,
 					// added to ComputationCircularBuffer_
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 					// Vectorizable
-					cmuladd(&InputBufferAccumulator_[nPath][0], &Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0][0],
+					cmuladd(&InputBufferAccumulator_[0], &Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0][0],
 						&ComputationCircularBuffer_[nPartitionIndex_][nPath][0], Mixer.nPartitionLength);
 #else
 					// Non-vectorizable
-					cmultadd(InputBufferAccumulator_[nPath], Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0], //TODO: 0=assume only one channel for filter
+					cmultadd(InputBufferAccumulator_, Mixer.Paths[nPath].filter.buffer[nPartitionIndex][0], //TODO: 0=assume only one channel for filter
 						ComputationCircularBuffer_[nPartitionIndex_][nPath], Mixer.nPartitionLength);
 #endif
 					nPartitionIndex_ = (nPartitionIndex_ + 1) % Mixer.nPartitions;	// circular
@@ -205,9 +193,10 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 				// Mix the outputs
-#pragma loop_count(6)
+#pragma loop count(6)
 				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
 				{
+#pragma loop count(65536)
 					for(int i=0; i < Mixer.nHalfPartitionLength; ++i)
 					{
 						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] +=
@@ -215,6 +204,14 @@ CConvolution::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputDa
 					}
 				}
 			} // nPath
+
+			// Save the previous half partition; the first half will be read in over the next cycle
+			// TODO: avoid this copy by rotating the filter when it is read in?
+#pragma loop count(6)
+			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
+			{
+				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
+			}
 
 			// Save the partition to be used for output and move the circular buffer on for the next cycle
 			nOutputPartitionIndex_ = nPartitionIndex_;
@@ -307,70 +304,71 @@ CConvolution::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 			// Apply the filters
 
 #pragma loop count(6)
-			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
-			{
-				// Mix the input samples for this filter
-				InputBufferAccumulator_[nPath] = 0;
-				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
-				{
-					for(int i=0; i<Mixer.nPartitionLength; ++i)
-					{
-						InputBufferAccumulator_[nPath][i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
-							Mixer.Paths[nPath].inChannel[nChannel].fScale;
-					}
-				}
-			}
-
-			// Save the previous half partition; the first half will be read in over the next cycle
-			// TODO: avoid this copy by rotating the filter when it is read in?
-			// TODO: move to the implementation of SampleBuffer
-			// Zero the partition from circular buffer that we have just used, for the next cycle
-#pragma loop count(6)
 			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
 			{
-				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
 				OutputBufferAccumulator_[nChannel] = 0;
 			}
 
 #pragma loop count(6)
 			for (int nPath = 0; nPath < Mixer.Paths.size(); ++nPath)
 			{
-				// get DFT of InputBufferCopy_
+				// Mix the input samples for this filter
+				InputBufferAccumulator_ = 0;
+				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
+				{
+#pragma loop count(65536)
+					for(int i=0; i<Mixer.nPartitionLength; ++i)
+					{
+						InputBufferAccumulator_[i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
+							Mixer.Paths[nPath].inChannel[nChannel].fScale;
+					}
+				}
+
+				// get DFT of InputBufferAccumulator_
 #ifdef OOURA_SIMPLE
-				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0]);
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0]);
 #else
-				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[nPath][0], 
+				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0], 
 					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 				// vectorized
-				cmul(&InputBufferAccumulator_[nPath][0], 
+				cmul(&InputBufferAccumulator_[0], 
 					&Mixer.Paths[nPath].filter.buffer[0][0][0],					// use the first partition and channel only
-					&OutputBuffer_[nPath][0], Mixer.nPartitionLength);	
+					&OutputBuffer_[0], Mixer.nPartitionLength);	
 #else
 				// Non-vectorizable
-				cmult(InputBufferAccumulator_[nPath],
+				cmult(InputBufferAccumulator_,
 					Mixer.Paths[nPath].filter.buffer[0][0],					// use the first partition and channel only
-					OutputBuffer_[nPath], Mixer.nPartitionLength);	
+					OutputBuffer_, Mixer.nPartitionLength);	
 #endif
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef OOURA_SIMPLE
-				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[nPath][0]);
+				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[0]);
 #else
-				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[nPath][0],
+				rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[0],
 					&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #endif
 				// Mix the outputs
-#pragma loop_count(6)
+#pragma loop count(6)
 				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
 				{
+#pragma loop count(65536)
 					for(int i=0; i<Mixer.nHalfPartitionLength; ++i)
 					{
 						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] += 
-							OutputBuffer_[nPath][i] * Mixer.Paths[nPath].outChannel[nChannel].fScale;
+							OutputBuffer_[i] * Mixer.Paths[nPath].outChannel[nChannel].fScale;
 					}
 				}
+			} // nPath
+
+				// Save the previous half partition; the first half will be read in over the next cycle
+				// TODO: avoid this copy by rotating the filter when it is read in?
+#pragma loop count(6)
+			for(int nChannel = 0; nChannel < Mixer.nChannels; ++nChannel)
+			{
+				InputBuffer_[nChannel].shiftright(Mixer.nHalfPartitionLength);
 			}
 
 			nInputBufferIndex_ = 0;
@@ -617,12 +615,7 @@ HRESULT calculateOptimumAttenuation(float& fAttenuation, TCHAR szConfigFileName[
 		std::vector<float>InputSamples(nBufferLength);
 		std::vector<float>OutputSamples(nBufferLength);
 
-		// The MT random number generator is supposed to be faster than rand, but it may not work under VC++
-#ifdef USEMT
-		MT<float> r;	// Random number generator class
-#else
 		srand( (unsigned)time( NULL ) );
-#endif
 
 		bool again = TRUE;
 		float maxSample = 0;

@@ -1,27 +1,45 @@
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#include "channelpaths.h"
+
+#include "convolution\channelpaths.h"
 
 ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
 nPartitions(nPartitions),
 nChannels(nChannels)
 {
-
 	USES_CONVERSION;
 	std::ifstream  config(T2A(szConfigFileName));
-
 	if (config == NULL)
 	{
 		throw TEXT("Failed to open config file");
 	}
 
+
 	try
 	{
 		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
 
-		while(true)		// will throw eof exception when all paths read
+		char szFilterFilename[MAX_PATH];
+		while(!config.eof())
 		{
-			std::string FilterFilename;
-			config >> FilterFilename;
+			config.getline(szFilterFilename,MAX_PATH);
 
 			std::vector<ChannelPath::ScaledChannel> inChannel;
 			while(true)
@@ -47,7 +65,7 @@ nChannels(nChannels)
 
 				inChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-				int nextchar = config.peek();
+				int nextchar = config.get();
 				if (nextchar == '\n' || nextchar == EOF)
 					break;
 			}
@@ -56,8 +74,6 @@ nChannels(nChannels)
 			std::vector<ChannelPath::ScaledChannel> outChannel;
 			while(true)
 			{
-
-
 				float scale;
 				config >> scale;
 
@@ -78,14 +94,12 @@ nChannels(nChannels)
 
 				outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-				int nextchar = config.peek();
+				int nextchar = config.get();
 				if (nextchar == '\n' || nextchar == EOF)
 					break;
 			}
 
-			Paths.push_back(ChannelPath(CA2CT(FilterFilename.c_str()), nChannels, nPartitions, inChannel, outChannel));
-
-
+			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel));
 		}
 	}
 	catch(const std::ios_base::failure& error)

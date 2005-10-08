@@ -4,6 +4,10 @@
 //
 // This may be a inelegant, but it beats having to learn assembler
 
+#ifndef __RESTRICT
+#define restrict
+#endif
+
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 
 #include<complex.h>

@@ -24,11 +24,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
-#if defined(DEBUG) | defined(_DEBUG)
-#include "debugging\debugStream.h"
-#endif
-
-#define LIBSNDFILE 1
+#include "convolution\config.h"
 
 #ifdef LIBSNDFILE
 

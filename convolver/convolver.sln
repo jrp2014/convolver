@@ -15,11 +15,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverWMP", "convolverWM
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverCMD", "convolverCMD\convolverCMD.vcproj", "{96DC6ADC-8C9C-459E-B54D-5D0BA731EF13}"
 	ProjectSection(ProjectDependencies) = postProject
+		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8} = {F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0} = {C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "perftest", "perftest\perftest.vcproj", "{94A0FD16-A5D1-40B4-91DD-78C2F2301552}"
 	ProjectSection(ProjectDependencies) = postProject
+		{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8} = {F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}
 		{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0} = {C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}
 	EndProjectSection
 EndProject
@@ -116,10 +118,6 @@ Global
 		{4510F548-39D4-4E1B-98D7-637126447CB7}.Debug.Build.0 = Debug|Win32
 		{4510F548-39D4-4E1B-98D7-637126447CB7}.Release.ActiveCfg = Release|Win32
 		{4510F548-39D4-4E1B-98D7-637126447CB7}.Release.Build.0 = Release|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Debug.ActiveCfg = Debug|Win32
-		{3AACF0DC-0DAB-4CA1-92A7-056B5A131BC3}.Release.ActiveCfg = Release|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Debug.ActiveCfg = Debug|Win32
-		{2A680E85-E6AC-4868-A55F-47F8493FB147}.Release.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection
