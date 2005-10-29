@@ -12,28 +12,42 @@
 			Name="Debug|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Debug"
+				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
-				CharacterSet="2"/>
+				CharacterSet="2"
+				WholeProgramOptimization="0"/>
 			<Tool 
 				Name="DebugTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
+				GlobalOptimizations="0"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="1"
+				FavorSizeOrSpeed="1"
+				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\..\..\libsndfile-1.0.12\src"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
 				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
-				UsePrecompiledHeader="2"
+				StructMemberAlignment="5"
+				EnableFunctionLevelLinking="1"
+				ForceConformanceInForLoopScope="1"
+				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="1"
-				DebugInformationFormat="4"/>
+				DebugInformationFormat="4"
+				OpenMP="1"
+				RequireProcExt="2"
+				Parallelization="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
 				Name="LinkerTool"
 				DelayImpLib=""
-				OutputFile="../bin/$(OutDir)/libsndfile.dll"
+				OutputFile="$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
 				GenerateDebugInformation="1"
@@ -64,7 +78,7 @@
 			Name="Release|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Release"
+				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
 				CharacterSet="2"
@@ -84,6 +98,7 @@
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
 				RuntimeLibrary="0"
 				StructMemberAlignment="5"
+				BufferSecurityCheck="0"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="1"
@@ -91,16 +106,18 @@
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"/>
+				RecognizeRestrictKeyword="1"
+				SupportMultibyteCharSource="1"/>
 			<Tool 
 				Name="LinkerTool"
 				DelayImpLib=""
-				OutputFile="../bin/$(OutDir)/libsndfile.dll"
+				OutputFile="$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
 				GenerateDebugInformation="1"

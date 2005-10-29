@@ -11,297 +11,409 @@
 			Name="Debug|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Debug"
+				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
 				UseOfATL="2"
-				CharacterSet="1"/>
-			<Tool 
-				Name="DebugTool"/>
+				CharacterSet="1"
+				WholeProgramOptimization="FALSE"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
+				GlobalOptimizations="FALSE"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="1"
+				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG"
-				MinimalRebuild="1"
+				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				ForceConformanceInForLoopScope="1"
-				RuntimeTypeInfo="1"
-				UsePrecompiledHeader="2"
+				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="2"
+				ForceConformanceInForLoopScope="TRUE"
+				RuntimeTypeInfo="TRUE"
+				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="1"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"
 				CallingConvention="0"
-				OpenMP="1"
+				RequireProcExt="2"
+				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
-				InitLocalVarToNaN="1"/>
+				InitLocalVarToNaN="1"
+				OpenMP="1"/>
+			<Tool 
+				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				DelayImpLib=""
-				RegisterOutput="1"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				RegisterOutput="TRUE"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
 				ShowProgress="0"
-				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
-				SuppressStartupBanner="0"
-				AdditionalLibraryDirectories=""
+				OutputFile="$(OutDir)/$(ProjectName).dll"
+				SuppressStartupBanner="FALSE"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
-				GenerateDebugInformation="1"
+				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				BaseAddress="254803968"
-				SupportUnloadOfDelayLoadedDLL="1"
+				SupportUnloadOfDelayLoadedDLL="TRUE"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="LibrarianTool"/>
-			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebDeploymentTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Release"
+				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
 				UseOfATL="1"
-				ATLMinimizesCRunTimeLibraryUsage="0"
+				ATLMinimizesCRunTimeLibraryUsage="FALSE"
 				CharacterSet="1"
-				WholeProgramOptimization="1"/>
-			<Tool 
-				Name="DebugTool"/>
+				WholeProgramOptimization="TRUE"/>
 			<Tool 
 				Name="CppCmplrTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="1000"
-				GlobalOptimizations="1"
+				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="1"
+				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
-				OmitFramePointers="1"
+				OmitFramePointers="TRUE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="0"
+				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
-				StringPooling="0"
-				ExceptionHandling="1"
+				StringPooling="FALSE"
+				ExceptionHandling="TRUE"
 				RuntimeLibrary="0"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="0"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
-				ForceConformanceInForLoopScope="1"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="1"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"
-				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
-				InitLocalVarToNaN="0"/>
+				InitLocalVarToNaN="0"
+				SupportMultibyteCharSource="1"
+				OpenMP="1"/>
+			<Tool 
+				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				DelayImpLib=""
-				RegisterOutput="1"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
+				RegisterOutput="TRUE"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
-				GenerateDebugInformation="1"
+				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				SetChecksum="0"
+				SetChecksum="FALSE"
 				BaseAddress="254803968"
-				SupportUnloadOfDelayLoadedDLL="1"
+				SupportUnloadOfDelayLoadedDLL="TRUE"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="LibrarianTool"/>
-			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebDeploymentTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
+		<Filter 
+			Name="Source Files"
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
+			<File 
+				RelativePath=".\convolver.cpp">
+			</File>
+			<File 
+				RelativePath=".\convolverdll.cpp">
+			</File>
+			<File 
+				RelativePath=".\convolverPropPage.cpp">
+			</File>
+			<File 
+				RelativePath=".\StdAfx.cpp">
+				<FileConfiguration 
+					Name="Debug|Win32">
+					<Tool 
+						Name="CppCmplrTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+				<FileConfiguration 
+					Name="Release|Win32">
+					<Tool 
+						Name="CppCmplrTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+			</File>
+			<Filter 
+				Name="fft"
+				Filter="">
+				<File 
+					RelativePath="..\fft\fftsg.cpp">
+				</File>
+				<File 
+					RelativePath="..\fft\fftsg_h.h">
+				</File>
+			</Filter>
+			<Filter 
+				Name="Common"
+				Filter="">
+				<File 
+					RelativePath="..\Common\dxstdafx.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\dxstdafx.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUT.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUT.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTenum.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTenum.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTgui.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTgui.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTMesh.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTMesh.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTmisc.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTmisc.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTSettingsDlg.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTSettingsDlg.h">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTsound.cpp">
+				</File>
+				<File 
+					RelativePath="..\Common\DXUTsound.h">
+				</File>
+			</Filter>
+			<Filter 
+				Name="debugging"
+				Filter="">
+				<File 
+					RelativePath="..\debugging\debugging.cpp">
+				</File>
+				<File 
+					RelativePath="..\debugging\debugging.h">
+				</File>
+				<File 
+					RelativePath="..\debugging\debugStream.cpp">
+				</File>
+				<File 
+					RelativePath="..\debugging\debugStream.h">
+				</File>
+				<File 
+					RelativePath="..\debugging\fastTiming.cpp">
+				</File>
+				<File 
+					RelativePath="..\debugging\fastTiming.h">
+				</File>
+			</Filter>
+			<Filter 
+				Name="convolution"
+				Filter="">
+				<File 
+					RelativePath="..\convolution\channelpaths.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\channelpaths.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\config.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\convolution.cpp">
+					<FileConfiguration 
+						Name="Debug|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
+					<FileConfiguration 
+						Name="Release|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
+				</File>
+				<File 
+					RelativePath="..\convolution\convolution.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\filter.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\filter.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\holder.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\lrint.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\sample.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\samplebuffer.cpp">
+					<FileConfiguration 
+						Name="Debug|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
+					<FileConfiguration 
+						Name="Release|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
+				</File>
+				<File 
+					RelativePath="..\convolution\samplebuffer.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\wavefile.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\waveformat.cpp">
+				</File>
+				<File 
+					RelativePath="..\convolution\waveformat.h">
+				</File>
+			</Filter>
+		</Filter>
+		<Filter 
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+			<File 
+				RelativePath=".\convolver.h">
+			</File>
+			<File 
+				RelativePath=".\convolverPropPage.h">
+			</File>
+			<File 
+				RelativePath=".\resource.h">
+			</File>
+			<File 
+				RelativePath=".\StdAfx.h">
+			</File>
+			<File 
+				RelativePath=".\wmpservices.h">
+			</File>
+		</Filter>
+		<Filter 
+			Name="Resource Files"
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+			<File 
+				RelativePath=".\convolver.rc">
+			</File>
+			<File 
+				RelativePath=".\convolver.rgs">
+			</File>
+			<File 
+				RelativePath=".\convolverPropPage.rgs">
+			</File>
+			<File 
+				RelativePath=".\convolverwmp.def">
+			</File>
+			<File 
+				RelativePath=".\multichan.ico">
+			</File>
+		</Filter>
 		<File 
-			RelativePath=".\convolver.cpp"/>
-		<File 
-			RelativePath=".\convolverdll.cpp"/>
-		<File 
-			RelativePath=".\convolverPropPage.cpp"/>
-		<File 
-			RelativePath=".\StdAfx.cpp">
-			<FileConfiguration 
-				Name="Debug|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					UsePrecompiledHeader="1"/>
-			</FileConfiguration>
-			<FileConfiguration 
-				Name="Release|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					UsePrecompiledHeader="1"/>
-			</FileConfiguration>
+			RelativePath=".\VTune\convolverWMP.vpj">
 		</File>
 		<File 
-			RelativePath="..\fft\fftsg.cpp"/>
-		<File 
-			RelativePath="..\fft\fftsg_h.h"/>
-		<File 
-			RelativePath="..\Common\dxstdafx.cpp"/>
-		<File 
-			RelativePath="..\Common\dxstdafx.h"/>
-		<File 
-			RelativePath="..\Common\DXUT.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUT.h"/>
-		<File 
-			RelativePath="..\Common\DXUTenum.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTenum.h"/>
-		<File 
-			RelativePath="..\Common\DXUTgui.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTgui.h"/>
-		<File 
-			RelativePath="..\Common\DXUTMesh.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTMesh.h"/>
-		<File 
-			RelativePath="..\Common\DXUTmisc.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTmisc.h"/>
-		<File 
-			RelativePath="..\Common\DXUTSettingsDlg.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTSettingsDlg.h"/>
-		<File 
-			RelativePath="..\Common\DXUTsound.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTsound.h"/>
-		<File 
-			RelativePath="..\debugging\debugging.cpp"/>
-		<File 
-			RelativePath="..\debugging\debugging.h"/>
-		<File 
-			RelativePath="..\debugging\debugStream.cpp"/>
-		<File 
-			RelativePath="..\debugging\debugStream.h"/>
-		<File 
-			RelativePath="..\debugging\fastTiming.cpp"/>
-		<File 
-			RelativePath="..\debugging\fastTiming.h"/>
-		<File 
-			RelativePath="..\convolution\channelpaths.cpp"/>
-		<File 
-			RelativePath="..\convolution\channelpaths.h"/>
-		<File 
-			RelativePath="..\convolution\config.h"/>
-		<File 
-			RelativePath="..\convolution\convolution.cpp">
-			<FileConfiguration 
-				Name="Debug|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-			</FileConfiguration>
-			<FileConfiguration 
-				Name="Release|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-			</FileConfiguration>
+			RelativePath=".\gpl.txt">
 		</File>
-		<File 
-			RelativePath="..\convolution\convolution.h"/>
-		<File 
-			RelativePath="..\convolution\filter.cpp"/>
-		<File 
-			RelativePath="..\convolution\filter.h"/>
-		<File 
-			RelativePath="..\convolution\holder.h"/>
-		<File 
-			RelativePath="..\convolution\samplebuffer.cpp">
-			<FileConfiguration 
-				Name="Debug|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-			</FileConfiguration>
-			<FileConfiguration 
-				Name="Release|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
-			</FileConfiguration>
-		</File>
-		<File 
-			RelativePath="..\convolution\samplebuffer.h"/>
-		<File 
-			RelativePath="..\convolution\wavefile.h"/>
-		<File 
-			RelativePath="..\convolution\waveformat.cpp"/>
-		<File 
-			RelativePath="..\convolution\waveformat.h"/>
-		<File 
-			RelativePath=".\convolver.h"/>
-		<File 
-			RelativePath=".\convolverPropPage.h"/>
-		<File 
-			RelativePath=".\resource.h"/>
-		<File 
-			RelativePath=".\StdAfx.h"/>
-		<File 
-			RelativePath=".\wmpservices.h"/>
-		<File 
-			RelativePath=".\convolver.rc"/>
-		<File 
-			RelativePath=".\convolver.rgs"/>
-		<File 
-			RelativePath=".\convolverPropPage.rgs"/>
-		<File 
-			RelativePath=".\convolverWMP.def"/>
-		<File 
-			RelativePath=".\multichan.ico"/>
-		<File 
-			RelativePath=".\VTune\convolverWMP.vpj"/>
-		<File 
-			RelativePath=".\gpl.txt"/>
 	</Files>
 </VisualStudioProject>
 

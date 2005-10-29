@@ -22,12 +22,11 @@
 #include "convolution\filter.h"
 #include <fstream>
 #include <vector>
-#include <math.h>
 
 
 class ChannelPaths
 {
-private:
+public:
 
 	class ChannelPath
 	{
@@ -59,15 +58,22 @@ private:
 	};
 
 public:
-	int	nChannels;				// number of channels (used to check that the in and out Channels are in range)
+	int	nInputChannels;			// number of input channels
+	int nOutputChannels;		// number of output channels
+	int nPaths;					// number of Paths
 	int	nPartitions;
 	int	nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int	nHalfPartitionLength;	// in blocks
 	int	nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+#ifdef FFTW
+	int	nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
+#endif
 
 	std::vector<ChannelPath> Paths;
 
-	ChannelPaths(TCHAR szConfigFileName[MAX_PATH],  const int& nChannels, const int& nPartitions);
+	ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
+
+	const std::string DisplayChannelPaths();
 
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump();

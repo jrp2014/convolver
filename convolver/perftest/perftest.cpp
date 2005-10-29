@@ -6,7 +6,9 @@
 // TODO: fix
 #define NCHANNELS 8
 
+#ifndef LIBSNDFILE
 #include "Common\dxstdafx.h"
+#endif
 #include <sstream>
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugging.h"
@@ -22,7 +24,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 	debugstream.sink (apDebugSinkConsole::sOnly);
 #endif
 	HRESULT	hr = S_OK;
-	Holder<CConvolution> conv;
+	Holder< CConvolution<float> > conv;
 	double fElapsedLoad	= 0;
 	double fTotalElapsedLoad = 0;
 	double fElapsedCalc = 0;
@@ -90,16 +92,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 			{
 
 				t.reset();
-#ifdef LIBSNDFILE
-				conv = new Cconvolution_ieeefloat(argv[3], NCHANNELS, nPartitions == 0 ? 1 : nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
-#else
-				hr = SelectConvolution(pWave, conv,	argv[3], NCHANNELS, nPartitions ==	0 ?	1 :	nPartitions); // Sets conv.	nPartitions==0 => use overlap-save
-				if (FAILED(hr))
-				{
-					std::wcerr << "Failed to select filter " << FilterFileName << " (" << std::hex << hr	<< std::dec << ")" << std::endl;
-					throw(hr);
-				}
-#endif
+				conv = new CConvolution<float>(argv[3], nPartitions == 0 ? 1 : nPartitions); // Used to calculate nPartitionLength
 				fElapsedLoad = t.sec();
 				fTotalElapsedLoad += fElapsedLoad;
 				
@@ -115,7 +108,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				}
 				std::cout  << std::setprecision(3) << nPartitions << "\t"
 #ifdef LIBSNDFILE
-					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * 10) / fElapsedCalc) /
+					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * NSAMPLES) / fElapsedCalc) /
 						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) << "\t"
 #endif
 					<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
@@ -128,9 +121,30 @@ int	_tmain(int argc, _TCHAR* argv[])
 		std::cout << "Total execution time: " << fTotalElapsedCalc << "s" << std::endl;
 
 	}
+
+	catch (HRESULT& hr) // from CConvolution
+	{
+		std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
+		return hr;
+	}
+	catch(const std::exception& error)
+	{
+		std::wcerr << "Standard exception: " << error.what() << std::endl;
+		return E_OUTOFMEMORY;
+	}
+	catch (const char* what)
+	{
+		std::wcerr << "Failed: " << what << std::endl;
+		return E_OUTOFMEMORY;
+	}
+	catch (const TCHAR* what)
+	{
+		std::wcerr << "Failed: " << what << std::endl;
+		return E_OUTOFMEMORY;
+	}
 	catch (...)
 	{
-		std::wcerr << "Failed" <<std::endl;
+		std::wcerr << "Failed." <<std::endl;
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)

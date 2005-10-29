@@ -15,23 +15,33 @@
 				OutputDirectory="Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="4"
-				CharacterSet="1"/>
+				CharacterSet="1"
+				WholeProgramOptimization="0"/>
 			<Tool 
 				Name="DebugTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
+				GlobalOptimizations="0"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="0"
+				FavorSizeOrSpeed="0"
+				OptimizeForProcessor="3"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
 				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
 				BufferSecurityCheck="1"
+				EnableFunctionLevelLinking="1"
+				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="4"
 				OpenMP="1"
+				RequireProcExt="2"
+				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"/>
 			<Tool 
@@ -88,12 +98,14 @@
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"/>
+				RecognizeRestrictKeyword="1"
+				SupportMultibyteCharSource="1"/>
 			<Tool 
 				Name="LinkerTool"
 				DelayImpLib=""/>

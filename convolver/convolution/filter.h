@@ -23,9 +23,7 @@
 #include "convolution\wavefile.h"
 #include "convolution\waveformat.h"
 #include <vector>
-#ifdef OOURA
-#include <math.h>
-#endif
+
 
 const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.
 
@@ -34,7 +32,7 @@ class Filter
 public:
 
 	int						nChannels;				// number of channels
-	PartitionedBuffer		buffer;
+	PartitionedBuffer		coeffs;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat;		// The format of the filter file
 #else
@@ -44,6 +42,16 @@ public:
 	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
 	int						nHalfPartitionLength;	// in blocks
 	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+#ifdef FFTW
+	int						nFFTWPartitionLength;	// 2*(nPaddedPartitionLength/2+1);
+	fftwf_plan				plan;
+	fftwf_plan				reverse_plan;
+	PartitionedBuffer		fft_coeffs;
+#endif
+
+	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions);
+
+private:
 #ifdef OOURA
 	// Workspace for the non-simple Ooura routines.  
 	std::vector<DLReal>		w;						// w[0...n/2-1]   :cos/sin table
@@ -52,10 +60,6 @@ public:
 													// strictly, length of ip >= 
 													//    2+(1<<(int)(log(n+0.5)/log(2))/2).
 #endif
-
-	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions);
-
-private:
 	//Filter(const Filter& other); // no impl.
 	//void operator=(const Filter& other); // no impl.
 	//Filter(Filter& other);                // discourage use of lvalue Filters

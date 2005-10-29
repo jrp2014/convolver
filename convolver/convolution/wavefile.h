@@ -43,11 +43,14 @@ public:
 
 	~CWaveFileHandle()
 	{
+
+		 sf_write_sync(sndfile_);
+
 		int result = sf_close (sndfile_);
 #if defined(DEBUG) | defined(_DEBUG)
 		if (result)
 		{
-			cdebug << "Failed to close cleanly: " << result << " " << sf_error_number(result) << std::endl;
+			cdebug << "Failed to close cleanly: (" << result << ") " << sf_error_number(result) << std::endl;
 		}
 		else
 		{
@@ -59,15 +62,25 @@ public:
 	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo) :
 	sndfile_(sf_open(CT2CA(path), mode, sfinfo))
 	{
-
 #if defined(DEBUG) | defined(_DEBUG)
+		//if (mode == SFM_WRITE)
+		//{
+		//	if (sf_format_check (sfinfo) == false)
+		//	{
+		//		cdebug << "Invalid output file format." << std::endl;
+		//	}
+		//}
+
 		char  buffer [2048];
 		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
 
-		cdebug << "opening " << path << ": " << buffer;
+		cdebug << "opening " << CT2CA(path) << ": " << std::endl << buffer;
 #endif
 		if(!sndfile_)
 		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Failed to open " << CT2CA(path) << std::endl;
+#endif
 			throw sf_strerror (NULL);
 		}
 	};
@@ -77,10 +90,17 @@ public:
 		return sf_readf_float(sndfile_, ptr, frames);
 	};
 
-	sf_count_t writef_float(float *ptr, sf_count_t frames) const
+	sf_count_t  write_float(float *ptr, sf_count_t items) const
 	{
-		return sf_writef_float(sndfile_, ptr, frames);
+		return sf_write_float(sndfile_, ptr, items);
 	};
+
+
+	sf_count_t  writef_float  (float *ptr, sf_count_t frames) const
+	{
+		return sf_writef_float  (sndfile_, ptr, frames);
+	}
+
 
 	sf_count_t read_int(int *ptr, sf_count_t items) const
 	{
@@ -103,6 +123,20 @@ public:
 	{
 		return sf_write_raw(sndfile_, ptr, bytes);
 	};
+
+	int  sf_format_check (const SF_INFO *info)
+	{
+		const int result = sf_format_check (info);
+
+#if defined(DEBUG) | defined(_DEBUG)
+		char  buffer [2048];
+		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
+
+		cdebug << "Invalid format: " << buffer << std::endl;
+#endif
+		return result;
+
+	}
 
 	//WAVEFORMATEXTENSIBLE sfinfo_to_wfex(const SF_INFO& sf_info) const
 	//{

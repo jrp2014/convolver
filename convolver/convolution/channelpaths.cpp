@@ -20,17 +20,27 @@
 
 #include "convolution\channelpaths.h"
 
-ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions) :
+ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
+nInputChannels(0),
+nOutputChannels(0),
+nPaths(0),
 nPartitions(nPartitions),
-nChannels(nChannels)
+nPartitionLength(0),
+nHalfPartitionLength(0),
+nFilterLength(0)
+#ifdef FFTW
+,nFFTWPartitionLength(2)
+#endif
 {
 	USES_CONVERSION;
 	std::ifstream  config(T2A(szConfigFileName));
 	if (config == NULL)
 	{
-		throw TEXT("Failed to open config file");
+		throw "Failed to open config file";
 	}
 
+
+	bool got_path_spec = false;
 
 	try
 	{
@@ -41,6 +51,8 @@ nChannels(nChannels)
 		{
 			config.getline(szFilterFilename,MAX_PATH);
 
+			got_path_spec = false;
+
 			std::vector<ChannelPath::ScaledChannel> inChannel;
 			while(true)
 			{
@@ -49,16 +61,20 @@ nChannels(nChannels)
 				config >> scale;
 
 				if(scale < 0)
-					throw TEXT("Negative input channel number. Invalid");
+					throw "Negative input channel number. Invalid";
 
 				// The integer part designates the input channel
-				int channel = floor(scale);
+				int channel = floor(scale);   
 
-				if(channel > nChannels - 1)
-					throw TEXT("Invalid input Channel number");
+				if(channel > nInputChannels - 1)
+					nInputChannels = channel + 1; // Got a bigger channel number
+
+				if (nInputChannels > MAX_CHANNEL)
+					throw "Invalid input Channel number";
 
 				// The fractional part is the scaling factor to be applied
 				scale -= channel;
+
 				// 0 implies no scaling to be applied (ie, scale = 1)
 				if(scale == 0)
 					scale = 1.0f;
@@ -78,13 +94,16 @@ nChannels(nChannels)
 				config >> scale;
 
 				if(scale < 0)
-					throw TEXT("Negative output channel number. Invalid");
+					throw "Negative output channel number. Invalid";
 
 				// The integer part designates the output channel
 				int channel = floor(scale);
 
-				if(channel > nChannels - 1)
-					throw TEXT("Invalid output Channel number");
+				if(channel > nOutputChannels - 1)
+					nOutputChannels = channel + 1; // Got a bigger channel number
+
+				if (nOutputChannels > MAX_CHANNEL)
+					throw "Invalid output Channel number";
 
 				// The fractional part is the scaling factor to be applied
 				scale -= channel;
@@ -100,35 +119,56 @@ nChannels(nChannels)
 			}
 
 			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel));
+			++nPaths;
+
+			got_path_spec = true;
 		}
 	}
 	catch(const std::ios_base::failure& error)
 	{
 		if(config.eof())
 		{
+
+			if(!got_path_spec)
+			{
+				throw "Premature end of configuration file.  Missing final blank line?";
+			}
+
 			// Verify
-			if (Paths.size() > 0)
+			if (nPaths > 0)
 			{
 				nPartitionLength = Paths[0].filter.nPartitionLength;			// in frames (a frame contains the interleaved samples for each channel)
 				nHalfPartitionLength = Paths[0].filter.nHalfPartitionLength;	// in frames
 				nFilterLength = Paths[0].filter.nFilterLength;					// nFilterLength = nPartitions * nPartitionLength
+#ifdef FFTW
+				nFFTWPartitionLength = 2 * (nPartitionLength / 2 + 1);			// Needs an extra element
+#endif
 			}
 			else
 			{
 				throw "Must specify at least one filter";
 			}
 
-			for(int i = 0; i < Paths.size(); ++i)
+			for(int i = 0; i < nPaths; ++i)
 			{
 				if(Paths[i].filter.nChannels != 1)
 				{
-					throw TEXT("Filters must have one channel");
+					throw "Filters must have exactly one channel";
 				}
 
 				if(Paths[i].filter.nFilterLength != nFilterLength)
 				{
-					throw TEXT("Filters must all be of the same length");
+					throw "Filters must all be of the same length";
 				}
+#ifdef LIBSNDFILE
+				if(Paths[0].filter.sf_FilterFormat.samplerate != Paths[i].filter.sf_FilterFormat.samplerate)
+#else
+				if(Paths[0].filter.wfewfexFilterFormat.nBytesPerSec != Paths[i].filter.wfexFilterFormat.nBytesPerSec)
+#endif
+				{
+					throw "Filters must all have the same samplerate";
+				}
+
 			}
 #if defined(DEBUG) | defined(_DEBUG)
 			Dump();
@@ -150,14 +190,14 @@ nChannels(nChannels)
 #endif
 		throw;
 	}
-	catch (const char* what)
+	catch (const char* & what)
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << "Failed: " << what << std::endl;
 #endif
 		throw;
 	}
-	catch (const TCHAR* what)
+	catch (const TCHAR* & what)
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << "Failed: " << what << std::endl;
@@ -176,9 +216,10 @@ nChannels(nChannels)
 #if defined(DEBUG) | defined(_DEBUG)
 void ChannelPaths::Dump()
 {
-	cdebug << "ChannelPaths: " << " nChannels:" << nChannels << " nPartitions:" << nPartitions << " nPartitionLength:" << nPartitionLength <<
+	cdebug << "ChannelPaths: " << " nInputChannels:" << nInputChannels << " nOutputChannels:" << nOutputChannels <<
+		" nPartitions:" << nPartitions << " nPartitionLength:" << nPartitionLength <<
 		" nHalfPartitionLength:" << nHalfPartitionLength << " nFilterLength:" << nFilterLength << std::endl;
-	for(int i = 0; i < Paths.size(); ++i) 
+	for(int i = 0; i < nPaths; ++i) 
 		Paths[i].Dump();
 }
 
@@ -204,3 +245,55 @@ void ChannelPaths::ChannelPath::ScaledChannel::Dump()
 }
 
 #endif
+
+const std::string ChannelPaths::DisplayChannelPaths()
+{
+	std::ostringstream result;
+
+	if (nPaths == 0)
+	{
+		result << "No paths defined";
+	}
+	else
+	{
+		if (nPaths == 1)
+		{
+			result << "1 path (";
+		}
+		else
+		{
+			result << nPaths << " paths (";
+		}
+
+		if (nInputChannels == 1)
+		{
+			result << "mono to ";
+		}
+		else if (nInputChannels == 2)
+		{
+			result << "stereo to ";
+		}
+		else
+			result << nInputChannels << ") ";
+
+		if (nOutputChannels == 1)
+		{
+			result << "mono) ";
+		}
+		else if (nOutputChannels == 2)
+		{
+			result << "stereo) ";
+		}
+		else
+			result << nOutputChannels << ") ";
+
+		result
+#ifdef LIBSNDFILE
+			<< Paths[0].filter.sf_FilterFormat.samplerate/1000.0f << "kHz " 
+#else
+			<< Paths[0].filter.wfexFilterFormat.Format.nSamplesPerSec/1000.0f << "kHz " 
+#endif
+			<< Paths[0].filter.nFilterLength << " taps";
+	}
+	return result.str();
+}

@@ -20,7 +20,7 @@
 #include "convolution\samplebuffer.h"
 
 #if defined(DEBUG) | defined(_DEBUG)
-void DumpChannelBuffer(const ChannelBuffer& buffer )
+void DumpChannelBuffer(const ChannelBuffer &buffer )
 {
 	const size_t LIMIT = 16; // Don't print too much
 	size_t limit = buffer.size() > LIMIT ? LIMIT : buffer.size();
@@ -29,15 +29,12 @@ void DumpChannelBuffer(const ChannelBuffer& buffer )
 	{
 		cdebug << buffer[nSample] << " ";
 	}
-
-	if (buffer.size() > LIMIT)
-	{
-		cdebug << "... " << std::endl << "Size: " << buffer.size() << ", Max: " << buffer.max() << ", Min: " << buffer.min();
-	}
 }
 
 void DumpSampleBuffer(const SampleBuffer& buffer)
 {
+	cdebug << "SampleBuffer: " ;
+
 	for (int nChannel = 0; nChannel < buffer.size(); ++nChannel)
 	{
 		 cdebug << std::endl << "[Channel " << nChannel << ": "; DumpChannelBuffer(buffer[nChannel]); cdebug << "]";
@@ -46,7 +43,7 @@ void DumpSampleBuffer(const SampleBuffer& buffer)
 
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer)
 {
-	cdebug << ".";
+	cdebug << "PartitionedBuffer: "  ;
 	for (int nPartition = 0; nPartition < buffer.size(); ++nPartition)
 	{
 		cdebug << "{Partition " << nPartition << ": " ; DumpSampleBuffer(buffer[nPartition]); cdebug << "}" << std::endl; 

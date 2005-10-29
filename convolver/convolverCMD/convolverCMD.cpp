@@ -1,3 +1,24 @@
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
+/////////////////////////////////////////////////////////////////////////////
+//
 // convolverCMD.cpp : Defines the entry point for the console application.
 //
 
@@ -17,7 +38,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time{
 
 	HRESULT hr = S_OK;
-	Holder<CConvolution> conv;
+	Holder< CConvolution<float> > conv;
+	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
 
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);
@@ -50,7 +72,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info);
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
-		conv = new Cconvolution_ieeefloat(argv[2], sf_info.channels, nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
+		conv = new CConvolution<float>(argv[2], nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
 		const DWORD cBufferLength = conv->Mixer.nFilterLength * SAMPLES;  // frames
 #else
 		CWaveFileHandle WavIn;
@@ -190,6 +212,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 				conv->doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
+				convertor, convertor,
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation,
 				/* fWetMix,*/ 1.0f,
@@ -200,6 +223,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 			conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
+				convertor, convertor,
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation,
 				/* fWetMix,*/ 1.0f,

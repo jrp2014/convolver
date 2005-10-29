@@ -270,7 +270,7 @@ int _tmain(int argc, _TCHAR* argv[])
 						++nSamples;
 					}
 
-					if (output.writef_float(&samples[0], sf_info.channels) != 1) // write 1 frame
+					if (output.write_float(&samples[0], sf_info.channels) != sf_info.channels) // write 1 frame
 					{
 						std::cerr << "Failed to write a frame at sample " << nSamples << std::endl;
 					}

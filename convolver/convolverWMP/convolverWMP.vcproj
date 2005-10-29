@@ -12,23 +12,31 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="Debug"
+			OutputDirectory="..\bin\Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="2"
 			UseOfATL="2"
-			CharacterSet="1">
+			CharacterSet="1"
+			WholeProgramOptimization="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				GlobalOptimizations="FALSE"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="1"
+				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
+				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
-				UsePrecompiledHeader="2"
+				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"
@@ -38,11 +46,11 @@
 			<Tool
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
 				ShowProgress="0"
-				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
+				OutputFile="$(OutDir)/$(ProjectName).dll"
 				SuppressStartupBanner="FALSE"
-				AdditionalLibraryDirectories=""
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
@@ -75,7 +83,7 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="Release"
+			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="2"
 			UseOfATL="1"
@@ -84,6 +92,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
@@ -98,7 +107,7 @@
 				StringPooling="FALSE"
 				ExceptionHandling="TRUE"
 				RuntimeLibrary="0"
-				StructMemberAlignment="5"
+				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
@@ -112,9 +121,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/$(ProjectName).dll"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				LinkDLL="TRUE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
@@ -308,6 +318,15 @@
 				</File>
 				<File
 					RelativePath="..\convolution\holder.h">
+				</File>
+				<File
+					RelativePath="..\convolution\lrint.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File
+					RelativePath="..\convolution\sample.h">
 				</File>
 				<File
 					RelativePath="..\convolution\samplebuffer.cpp">

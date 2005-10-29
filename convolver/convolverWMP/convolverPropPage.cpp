@@ -23,11 +23,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
+#include "convolution\config.h"
 #include "stdafx.h"
 #include <stdio.h>
 #include "convolverWMP\convolver.h"
 #include "convolverWMP\convolverPropPage.h"
-#include ".\convolverproppage.h"
 #include "debugging\fastTiming.h"
 #include "convolution\waveformat.h"
 
@@ -56,7 +56,7 @@ CConvolverPropPage::~CConvolverPropPage()
 STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 {
 	// find our plug-in object, if it was passed in
-	for (DWORD i = 0; i < nObjects; i++)
+	for (DWORD i = 0; i < nObjects; ++i)
 	{
 		CComPtr<IConvolver> pPlugin;
 
@@ -81,6 +81,27 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	HRESULT hr = ERROR_SUCCESS;
 
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
+
+	if (m_spConvolver)
+	{
+		try
+		{
+			Holder< CConvolution<float> >	conv(new CConvolution<float>(szFilterFileName,  1));
+			SetDlgItemText( IDC_STATUS, CA2CT(conv->Mixer.DisplayChannelPaths().c_str()));
+		}
+		catch (...) // creating m_Convolution might throw
+		{
+
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to load filter.") );
+			hr = E_FAIL;
+		}
+	}
+	else
+	{
+		SetDlgItemText( IDC_STATUS, TEXT("Convolution plug-in initialization failed.") );
+	}
+
+	return hr;
 
 	// Load the wave file
 //#ifdef LIBSNDFILE
@@ -110,8 +131,6 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 //		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
 //	}
 //#endif
-
-	return hr;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -175,7 +194,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		return E_FAIL;
 	}
 	else
-		fWetmix = static_cast<float>(dwWetmix) / 100.0L; // %
+		fWetmix = static_cast<float>(dwWetmix) / 100.0f; // %
 
 	// Get the number of partitions value from the dialog box.
 	GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
@@ -513,7 +532,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	fElapsed = t.sec();
 	if (FAILED(hr))
 	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );  // TODO: internationalize
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
 		return hr;
 	}
 

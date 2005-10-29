@@ -13,20 +13,29 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="Debug"
+			OutputDirectory="..\bin\Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="1"
-			CharacterSet="1">
+			CharacterSet="1"
+			WholeProgramOptimization="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				GlobalOptimizations="FALSE"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
+				OptimizeForProcessor="3"
+				AdditionalIncludeDirectories=".."
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
 				BufferSecurityCheck="TRUE"
+				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
@@ -36,13 +45,16 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
-				OutputFile="../bin/$(OutDir)/perftest.exe"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib fftw3.lib"
+				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
 				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/perftest.pdb"
 				SubSystem="1"
+				OptimizeReferences="0"
+				EnableCOMDATFolding="0"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool
@@ -68,13 +80,14 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="Release"
+			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="1"
 			CharacterSet="1"
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
@@ -85,10 +98,10 @@
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="TRUE"
-				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				AdditionalIncludeDirectories=".."
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW3_IMPORTS"
 				RuntimeLibrary="0"
-				StructMemberAlignment="5"
+				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
@@ -101,9 +114,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib"
-				OutputFile="../bin/$(OutDir)/perftest.exe"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw3.lib"
+				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				IgnoreAllDefaultLibraries="FALSE"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
@@ -266,7 +280,13 @@
 					RelativePath="..\convolution\holder.h">
 				</File>
 				<File
-					RelativePath="..\convolution\Random.h">
+					RelativePath="..\convolution\lrint.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File
+					RelativePath="..\convolution\sample.h">
 				</File>
 				<File
 					RelativePath="..\convolution\samplebuffer.cpp">
@@ -300,9 +320,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
-				RelativePath="..\libsndfile\sndfile.h">
-			</File>
-			<File
 				RelativePath=".\stdafx.h">
 			</File>
 		</Filter>
@@ -311,6 +328,9 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
+		<File
+			RelativePath=".\VTune\perftest.vpj">
+		</File>
 		<File
 			RelativePath=".\ReadMe.txt">
 		</File>

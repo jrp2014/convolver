@@ -36,9 +36,9 @@
 
 #include <assert.h>
 #include <wchar.h>
+#include <math.h>
 #include <windows.h>
 #include <mmsystem.h>
-#include <math.h>
 #include <limits.h>      
 #include <stdio.h>
 
@@ -54,31 +54,44 @@
 #include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 
-#undef DIRAC_DELTA_FUNCTIONS
+#define DIRAC_DELTA_FUNCTIONS
 
 #endif
 
-
-#ifndef __RESTRICT
+#ifndef __INTEL_COMPILER
 #define restrict
 #endif
 
 
 
-
 // FFT routines
-#define OOURA	1
-//#define FFTW	1
+//#define OOURA	1
+//#define SIMPLE_OOURA	1
+#define FFTW	1
 
-#ifdef OOURA
-#undef SIMPLE_OOURA
+#if defined(OOURA) || defined(SIMPLE_OOURA)
 #include "fft\fftsg_h.h"
+
 #elif defined(FFTW)
 #include "fftw\fftw3.h"
+
+#else
+#error "No FFT package defined"
 #endif
+
+
+// using home grown array
+#define FASTARRAY
+// User array initialization, rather than vector initialization
+// Unimplemented
+#undef ARRAY
 
 // Use LibSndFile, rather than the DirectX samples
 #define LIBSNDFILE 1
 
 
 const DWORD MAX_ATTENUATION = 1000; // dB
+const int MAX_CHANNEL = 32; // Maximum number of channels (used just for sanity checking)
+
+// Number of filter lengths used to calculate optimum attenuation
+const int NSAMPLES = 10;

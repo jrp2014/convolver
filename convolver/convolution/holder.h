@@ -16,7 +16,7 @@ private:
 public:
 	// default constructor: let the holder refer to nothing, and
 	// constructor for a pointer: let the holder refer to where the pointer refers
-	explicit Holder (T* p = 0) : ptr_(p) { }
+	explicit Holder (T* p = 0) : ptr_(p) {}
 
 	// destructor: releases the object to which it refers (if any)
 	~Holder()
@@ -35,11 +35,13 @@ public:
 	// pointer operators
 	T& operator* () const
 	{ 
+		assert(ptr_);
 		return *ptr_;
 	}
 
 	T* operator-> () const
 	{ 
+		assert(ptr_);
 		return ptr_; 
 	}
 

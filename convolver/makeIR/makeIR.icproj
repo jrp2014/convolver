@@ -12,30 +12,43 @@
 			Name="Debug|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Debug"
+				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="1"
-				CharacterSet="1"/>
+				CharacterSet="1"
+				WholeProgramOptimization="0"/>
 			<Tool 
 				Name="DebugTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
+				GlobalOptimizations="0"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="1"
+				FavorSizeOrSpeed="1"
+				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				UsePrecompiledHeader="2"
+				EnableFunctionLevelLinking="1"
+				ForceConformanceInForLoopScope="1"
+				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="1"
-				DebugInformationFormat="4"/>
+				DebugInformationFormat="4"
+				OpenMP="1"
+				RequireProcExt="2"
+				Parallelization="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
 				Name="LinkerTool"
 				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/makeIR.exe"
+				OutputFile="$(OutDir)/makeIR.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="1"
 				ProgramDatabaseFile="$(OutDir)/makeIR.pdb"
@@ -64,7 +77,7 @@
 			Name="Release|Win32">
 			<Tool 
 				Name="GeneralTool"
-				OutputDirectory="Release"
+				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
 				UseOfATL="0"
@@ -87,6 +100,7 @@
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				StructMemberAlignment="5"
+				BufferSecurityCheck="0"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="1"
@@ -94,17 +108,19 @@
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"/>
+				RecognizeRestrictKeyword="1"
+				SupportMultibyteCharSource="1"/>
 			<Tool 
 				Name="LinkerTool"
 				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/makeIR.exe"
+				OutputFile="$(OutDir)/makeIR.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="1"
 				SubSystem="1"

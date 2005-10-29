@@ -15,16 +15,25 @@
 			OutputDirectory="Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="4"
-			CharacterSet="1">
+			CharacterSet="1"
+			WholeProgramOptimization="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				GlobalOptimizations="FALSE"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="FALSE"
+				FavorSizeOrSpeed="0"
+				WholeProgramOptimization="FALSE"
+				OptimizeForProcessor="3"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
 				BufferSecurityCheck="TRUE"
+				EnableFunctionLevelLinking="TRUE"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
@@ -62,6 +71,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
@@ -72,7 +82,7 @@
 				OptimizeForProcessor="3"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="0"
-				StructMemberAlignment="5"
+				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"

@@ -94,14 +94,12 @@ nPartitions (nPartitions)
 	// Check that the filter is not too big ...
 	if ( nFilterLength > MAX_FILTER_SIZE )
 	{
-		throw(E_ABORT);
+		throw std::length_error("Filter too big to handle");
 	}
 
 	// Setup the filter
 	// A partition will contain half real data, and half zero padding.  Taking the DFT will, of course, overwrite that padding
-
 	nHalfPartitionLength = (nFilterLength + nPartitions - 1) / nPartitions;
-	nPartitionLength = nHalfPartitionLength * 2;
 
 	// .. or filter too small
 	if ( nHalfPartitionLength == 0 )
@@ -109,15 +107,26 @@ nPartitions (nPartitions)
 		throw(E_INVALIDARG);
 	}
 
-	// Now make sure that the partition length is a power of two long for the Ooura FFT package. (Will 0 pad if necessary.)
+	if ( nHalfPartitionLength == 1 )
+		nHalfPartitionLength = 2; // Make sure that the minimum partition length is 4
+
+	nPartitionLength = nHalfPartitionLength * 2;
+
+#ifdef FFTW
+	// Don't need to pad to power of 2 for FFTW
+	int nPaddedPartitionLength = nPartitionLength;
+#else
 	int nPaddedPartitionLength = 4;	// Minimum length 4, to allow SIMD optimization
+	// Now make sure that the partition length is a power of two long for the Ooura FFT package. (Will 0 pad if necessary.)
 	while (nPaddedPartitionLength < nPartitionLength)
 	{
 		nPaddedPartitionLength *= 2;
 	}
+#endif
+
 	DWORD nHalfPaddedPartitionLength = nPaddedPartitionLength / 2;
 
-#ifndef OOURA_SIMPLE
+#ifdef OOURA
 	// Initialize the Oooura workspace;
 	ip.resize(static_cast<int>(sqrt(static_cast<float>(nPaddedPartitionLength)) + 2));
 	ip[0]=0; // signal the need to initialize
@@ -125,7 +134,39 @@ nPartitions (nPartitions)
 #endif
 
 	// Initialise the Filter
-	buffer = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nPaddedPartitionLength)));
+#ifdef ARRAY
+	coeffs = PartitionedBuffer(nPartitions, nChannels, nPaddedPartitionLength);
+#else
+	coeffs = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nPaddedPartitionLength)));
+#endif
+#ifdef FFTW
+	nFFTWPartitionLength = 2*(nPaddedPartitionLength/2+1);
+#ifdef ARRAY
+	fft_coeffs = PartitionedBuffer(nPartitions, nChannels, nFFTWPartitionLength);
+#else
+	fft_coeffs = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nFFTWPartitionLength)));
+#endif
+	plan =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
+		&coeffs[0][0][0],
+		reinterpret_cast<fftwf_complex*>(&fft_coeffs[0][0][0]),
+		FFTW_MEASURE 
+#if defined(DEBUG) || defined(_DEBUG)
+		| FFTW_PRESERVE_INPUT
+#else
+		| FFTW_DESTROY_INPUT
+#endif
+		);
+	reverse_plan =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
+		reinterpret_cast<fftwf_complex*>(&fft_coeffs[0][0][0]),
+		&coeffs[0][0][0],
+		FFTW_MEASURE
+#if defined(DEBUG) || defined(_DEBUG)
+		| FFTW_PRESERVE_INPUT
+#else
+		| FFTW_DESTROY_INPUT
+#endif
+		);
+#endif
 
 #ifdef LIBSNDFILE
 	std::vector<float> item(nChannels);
@@ -147,18 +188,17 @@ nPartitions (nPartitions)
 #endif
 
 	// Read the filter file
-	DWORD nPartition = 0;
-	DWORD nBlock = 0;					// LibSndFile refers to blocks as frames
-	while (nBlock < nFilterLength)
+	int nPartition = 0;
+	int nFrame = 0;					// LibSndFile refers to blocks as frames
+	while (nFrame < nFilterLength)
 	{
 #ifdef LIBSNDFILE
-
 		if (1 == pFilterWave.readf_float(&item[0], 1))		// 1 = 1 frame = nChannel items
 		{
 			// Got a frame / block ... the items / samples for each channel
 			for (int nChannel=0; nChannel < nChannels; ++nChannel)
 			{
-				buffer[nPartition][nChannel][nBlock % nHalfPartitionLength] = item[nChannel];
+				coeffs[nPartition][nChannel][nFrame % nHalfPartitionLength] = item[nChannel];
 #if defined(DEBUG) | defined(_DEBUG)
 				if (item[nChannel] > maxSample)
 					maxSample = item[nChannel];
@@ -281,7 +321,7 @@ nPartitions (nPartitions)
 				throw(E_NOTIMPL);	// Filter file format is not supported
 			}
 
-			buffer[nPartition][nChannel][nBlock % nHalfPartitionLength] = sample;
+			coeffs[nPartition][nChannel][nFrame % nHalfPartitionLength] = sample;
 
 #if defined(DEBUG) | defined(_DEBUG)
 			if (sample > maxSample)
@@ -293,58 +333,72 @@ nPartitions (nPartitions)
 		} // for nChannel
 #endif
 
-		++nBlock;
-		if (nBlock % nHalfPartitionLength == 0)
+		++nFrame;
+		if (nFrame % nHalfPartitionLength == 0)
 		{
 			// Pad partition
 			for (int nChannel=0; nChannel < nChannels; ++nChannel)
 			{
 				for (int nPadding = nHalfPartitionLength; nPadding < nPaddedPartitionLength; ++nPadding)
 				{
-					buffer[nPartition][nChannel][nPadding] = 0;
+					coeffs[nPartition][nChannel][nPadding] = 0;
 				}
 
 				// Take the DFT
-#ifdef OOURA_SIMPLE
-				rdft(nPaddedPartitionLength, OouraRForward, &buffer[nPartition][nChannel][0]);
+#ifdef FFTW
+				fftwf_execute_dft_r2c(plan, 
+					&coeffs[nPartition][nChannel][0], 
+					reinterpret_cast<fftwf_complex*>(&fft_coeffs[nPartition][nChannel][0]));
+#elif defined(OOURA_SIMPLE)
+				rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0]);
+#elif defined(OOURA)
+				rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0], &ip[0], &w[0]);
 #else
-				rdft(nPaddedPartitionLength, OouraRForward, &buffer[nPartition][nChannel][0], &ip[0], &w[0]);
+#error "No FFT package defined"
 #endif
 
-				// Scale here, so it is not necessary to do it when taking the inverse convolution
-				//for (int nSample = 0; nSample < nPaddedPartitionLength; ++nSample)
-				//{
-				//	buffer[nPartition][nChannel][nSample] *= static_cast<float>(2.0L / nPaddedPartitionLength);
-				//}
-				buffer[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+				// Scale here, so that we don't need to do so when convolving
+#ifdef FFTW
+				fft_coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+#elif defined(OOURA) || defined(SIMPLE_OOURA)
+				coeffs[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+#else
+#error "No FFT package defined"
+#endif
 			}
 			++nPartition;
 		}
 	} // while
 
 	// Pad the current partition (if necessary)
-	if (nBlock % nHalfPartitionLength != 0)
+	if (nFrame % nHalfPartitionLength != 0)
 	{
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
 		{
-			for (int nSample = nBlock % nHalfPartitionLength; nSample < nPaddedPartitionLength; ++nSample)
+			for (int nSample = nFrame % nHalfPartitionLength; nSample < nPaddedPartitionLength; ++nSample)
 			{
-				buffer[nPartition][nChannel][nSample] = 0;
+				coeffs[nPartition][nChannel][nSample] = 0;
 			}
 
 			// Take the DFT
-#ifdef OOURA_SIMPLE
-			rdft(nPaddedPartitionLength, OouraRForward, &buffer[nPartition][nChannel][0]);
+#ifdef FFTW
+			fftwf_execute_dft_r2c(plan, &coeffs[nPartition][nChannel][0], reinterpret_cast<fftwf_complex*>(&fft_coeffs[nPartition][nChannel][0]));
+#elif defined(OOURA_SIMPLE)
+			rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0]);
+#elif defined(OOURA)
+			rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0], &ip[0], &w[0]);
 #else
-			rdft(nPaddedPartitionLength, OouraRForward, &buffer[nPartition][nChannel][0], &ip[0], &w[0]);
+#error "No FFT package defined"
 #endif
 
-			// Scale here, so it is not necessary to do it during convolution
-			//for (int nSample = 0; nSample < nPaddedPartitionLength; ++nSample)
-			//{
-			//	buffer[nPartition][nChannel][nSample] *= static_cast<float>(2.0L / nPaddedPartitionLength);
-			//}
-			buffer[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+			// Scale here, so that we don't need to do so when convolving
+#ifdef FFTW
+			fft_coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+#elif defined(OOURA) || defined(SIMPLE_OOURA)
+			coeffs[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+#else
+#error "No FFT package defined"
+#endif
 		}
 		++nPartition;
 	}
@@ -354,7 +408,10 @@ nPartitions (nPartitions)
 	{
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
 		{
-			buffer[nPartition][nChannel] = 0;
+			coeffs[nPartition][nChannel] = 0;
+#ifdef FFTW
+			fft_coeffs[nPartition][nChannel] = 0;
+#endif
 		}
 	}
 
@@ -363,8 +420,16 @@ nPartitions (nPartitions)
 	nHalfPartitionLength = nHalfPaddedPartitionLength;
 	nFilterLength = nPartitions * nPartitionLength;
 
+
 #if defined(DEBUG) | defined(_DEBUG)
-	cdebug << "FFT Filter: "; DumpPartitionedBuffer(buffer);
+
+	cdebug << "FFT Filter: ";
+#ifdef FFTW
+	DumpPartitionedBuffer(fft_coeffs);
+	cdebug << std::endl << "Filter: ";
+#endif
+	 DumpPartitionedBuffer(coeffs);
+
 
 #ifdef LIBSNDFILE
 	cdebug << waveFormatDescription(sf_FilterFormat, "FFT Filter: ") << std::endl;
@@ -374,4 +439,5 @@ nPartitions (nPartitions)
 
 	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;
 #endif
+
 }

@@ -12,16 +12,22 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="Debug"
+			OutputDirectory="..\bin\Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="1"
-			UseOfATL="2"
-			CharacterSet="1">
+			UseOfATL="0"
+			CharacterSet="1"
+			WholeProgramOptimization="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				GlobalOptimizations="FALSE"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="FALSE"
+				FavorSizeOrSpeed="0"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="TRUE"
+				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
@@ -29,9 +35,10 @@
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
+				EnableFunctionLevelLinking="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
-				UsePrecompiledHeader="2"
+				UsePrecompiledHeader="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"/>
@@ -39,9 +46,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/convolverCMD.exe"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/convolverCMD.pdb"
 				SubSystem="1"
@@ -69,7 +77,7 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="Release"
+			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="1"
 			UseOfATL="0"
@@ -78,6 +86,7 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
@@ -91,7 +100,7 @@
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				ExceptionHandling="TRUE"
 				RuntimeLibrary="0"
-				StructMemberAlignment="5"
+				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
@@ -105,9 +114,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib"
-				OutputFile="../bin/$(OutDir)/convolverCMD.exe"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				IgnoreAllDefaultLibraries="FALSE"
 				IgnoreDefaultLibraryNames=""
 				GenerateDebugInformation="TRUE"
@@ -230,6 +240,15 @@
 			</File>
 			<File
 				RelativePath="..\convolution\holder.h">
+			</File>
+			<File
+				RelativePath="..\convolution\lrint.cpp">
+			</File>
+			<File
+				RelativePath="..\convolution\lrint.h">
+			</File>
+			<File
+				RelativePath="..\convolution\sample.h">
 			</File>
 			<File
 				RelativePath="..\convolution\samplebuffer.cpp">

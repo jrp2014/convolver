@@ -60,7 +60,7 @@
 //   })
 //
 
-#ifdef NODEBUG
+#ifdef NDEBUG
 #define DEBUGGING(level,statements)
 #else
 #define DEBUGGING(level,statements)        \

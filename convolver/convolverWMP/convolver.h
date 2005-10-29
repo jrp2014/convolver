@@ -310,7 +310,9 @@ private:
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 
-	Holder<CConvolution>	m_Convolution;		// Processing class.  Handle manages resources
+	Holder< CConvolution<float> >	m_Convolution;			// Processing class.  Handle manages resources
+	Holder< Sample<float> >			m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Holder< Sample<float> >			m_OutputSampleConvertor;	// float
 	TCHAR					m_szFilterFileName[MAX_PATH];
 
 	BOOL                    m_bEnabled;         // TRUE if enabled
