@@ -2,20 +2,25 @@
 //
 
 #include "stdafx.h"
+#include "convolution\config.h"
 
 // TODO: fix
 #define NCHANNELS 8
 
-#ifndef LIBSNDFILE
+#ifdef LIBSNDFILE
+#include "libsndfile\sndfile.h"
+#else
 #include "Common\dxstdafx.h"
 #endif
-#include <sstream>
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
 #include "debugging\debugging.h"
 #endif
 #include "debugging\fasttiming.h"
 #include "convolution\wavefile.h"
 #include "convolution\convolution.h"
+#include <iostream>
+#include <sstream>
+
 
 int	_tmain(int argc, _TCHAR* argv[])
 {

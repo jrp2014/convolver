@@ -28,7 +28,8 @@
 #define IDC_ATTENUATION                 208
 #define IDC_BUTTON_CALCULATEOPTIMUMATTENUATION 209
 #define IDC_PARTITIONSLABEL             210
-#define IDC_PARTITIONS		            211
+#define IDC_PARTITIONS                  211
+#define IDC_STATIC_VERSION              213
 
 // Next default values for new objects
 // 
@@ -36,7 +37,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        206
 #define _APS_NEXT_COMMAND_VALUE         32768
-#define _APS_NEXT_CONTROL_VALUE         212
+#define _APS_NEXT_CONTROL_VALUE         214
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

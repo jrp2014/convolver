@@ -24,15 +24,17 @@
 				InlineFunctionExpansion="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
-				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
+				SmallerTypeCheck="TRUE"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
+				BufferSecurityCheck="TRUE"
 				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
@@ -48,6 +50,8 @@
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/makeIR.pdb"
 				SubSystem="1"
+				OptimizeReferences="0"
+				EnableCOMDATFolding="0"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -93,6 +97,7 @@
 				OptimizeForWindowsApplication="TRUE"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
@@ -100,7 +105,8 @@
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
-				WarningLevel="4"
+				WarningLevel="3"
+				SuppressStartupBanner="FALSE"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"/>
 			<Tool

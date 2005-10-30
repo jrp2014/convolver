@@ -482,13 +482,14 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& thisPath
 	{
 		const float fScale = thisPath.inChannel[nChannel].fScale;
 		const float thisChannel = thisPath.inChannel[nChannel].nChannel;
+		const ChannelBuffer& InputSamples = InputBuffer_[thisChannel];
 #pragma loop count(65536)
 #pragma ivdep
 		// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
 		// because FFTW destroys its inputs.
 		for(int i=0; i<Mixer.nPartitionLength; ++i)
 		{
-			InputBufferAccumulator_[i] += fScale * InputBuffer_[thisChannel][i];
+			InputBufferAccumulator_[i] += fScale * InputSamples[i];
 		}
 	}
 }

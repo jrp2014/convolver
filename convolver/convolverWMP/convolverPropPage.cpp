@@ -30,6 +30,7 @@
 #include "convolverWMP\convolverPropPage.h"
 #include "debugging\fastTiming.h"
 #include "convolution\waveformat.h"
+#include "convolverWMP\version.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -341,6 +342,16 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	CRegKey key;
 	LONG    lResult = 0;
 	DWORD   dwValue = 0;
+
+	try
+	{
+		version v(TEXT("convolverWMP.dll"));
+		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("version ") + v.get_product_version()).c_str());
+	}
+	catch(const std::exception& e)
+	{
+		SetDlgItemText(IDC_STATIC_VERSION,  CA2CT(e.what()));
+	}
 
 	// read from plug-in if it is available
 	if (m_spConvolver)

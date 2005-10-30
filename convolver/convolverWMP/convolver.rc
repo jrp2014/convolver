@@ -114,6 +114,7 @@ BEGIN
     LTEXT           "No of partitions:",IDC_PARTITIONSLABEL,111,42,56,8
     EDITTEXT        IDC_PARTITIONS,171,39,40,14,ES_RIGHT | ES_AUTOHSCROLL | 
                     ES_NUMBER
+    RTEXT           "Unknown version",IDC_STATIC_VERSION,154,109,59,8
 END
 
 
