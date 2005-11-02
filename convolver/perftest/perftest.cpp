@@ -102,7 +102,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 				fTotalElapsedLoad += fElapsedLoad;
 				
 				t.reset();
-				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	NCHANNELS, nPartitions);
+				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	nPartitions);
 				fElapsedCalc = t.sec();
 				fTotalElapsedCalc += fElapsedCalc;
 				

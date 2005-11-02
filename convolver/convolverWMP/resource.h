@@ -14,7 +14,6 @@
 #define IDS_ATTENUATIONRANGEERROR       107
 #define IDD_CONVOLVERPROPPAGE           108
 #define IDS_ATTENUATIONSAVEERROR        108
-#define IDS_SCALERANGEERROR             109
 #define IDS_EFFECTSAVEERROR             109
 #define IDS_FILTERSAVEERROR             110
 #define IDS_PARTITIONSERROR             111

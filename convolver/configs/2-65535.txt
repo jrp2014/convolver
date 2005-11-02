@@ -1,6 +1,6 @@
-D:\Projects\convolver\convolver\Media\PerfectDiracDelta-44100-1-65535.wav
+D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
 0.0
 0.0
-D:\Projects\convolver\convolver\Media\PerfectDiracDelta-44100-1-65535.wav
+D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
 1.0
 1.0

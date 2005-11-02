@@ -101,14 +101,14 @@ private:
 	bool				bStartWritingOutput_;		// don't start outputting until we have some convolved output
 
 
-	void mix_input(const ChannelPaths::ChannelPath& thisPath);
-	void mix_output(const ChannelPaths::ChannelPath& thisPath, SampleBuffer& Accumulator, const ChannelBuffer& Output, 
-		const int from, const int to);
+	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
+	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
+										const ChannelBuffer& restrict Output, const int from, const int  to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
-	void inline complex_mul(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, unsigned int count);
-	void inline complex_mul_add(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, unsigned int count);
+	void inline complex_mul(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count);
+	void inline complex_mul_add(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count);
 #if defined(DEBUG) | defined(_DEBUG)
 	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, const int from, const int to) const;
 #endif
@@ -133,4 +133,4 @@ template <typename T>
 HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor);
 
 template <typename T>
-HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions);
+HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);

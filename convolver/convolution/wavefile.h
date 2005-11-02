@@ -59,24 +59,78 @@ public:
 #endif
 	};
 
-	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo) :
-	sndfile_(sf_open(CT2CA(path), mode, sfinfo))
+	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo)
 	{
-#if defined(DEBUG) | defined(_DEBUG)
-		//if (mode == SFM_WRITE)
-		//{
-		//	if (sf_format_check (sfinfo) == false)
-		//	{
-		//		cdebug << "Invalid output file format." << std::endl;
-		//	}
-		//}
 
+		if (mode == SFM_WRITE && sf_format_check (sfinfo) == false)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Invalid output file format." << std::endl;
+#endif
+			throw sf_strerror (NULL);
+		}
+		else if(mode == SFM_READ)
+		{
+			sfinfo->format = 0;
+
+//			// Look for .pcm
+//			if (path == NULL)
+//			{
+//				throw "Null filename invalid";
+//			}
+//
+//			TCHAR* cptr = _tcsrchr (path,
+//#ifdef _UNICODE
+//				L'.'
+//#else
+//				'.'
+//#endif
+//				);
+//
+//			if (cptr != NULL)
+//			{
+//				TCHAR buffer[16];
+//				++cptr;	// points to the extension
+//				if (_tcslen (cptr) > sizeof (buffer) - 1)
+//					throw "Filename extension too long" ;
+//
+//				_tcsncpy (buffer, cptr, sizeof (buffer)) ;
+//				buffer [sizeof (buffer) - 1] = 0 ;
+//
+//				/* Convert everything in the buffer to lower case. */
+//				cptr = buffer ;
+//				while (*cptr)
+//				{	
+//					*cptr = 
+//#ifdef _UNICODE
+//						towlower (*cptr);
+//#else
+//						tolower (*cptr);
+//#endif
+//					++cptr;
+//				}
+//
+//				cptr = buffer;
+//
+//				if (_tcsncmp (cptr, "pcm") == 0)
+//				{
+//					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_FLOAT;	// RAW PCM data (32 bit IEEE floating point)
+//					sfinfo->channels = 1;								// Single channel
+//					sfinfo->samplerate = ??;
+//
+//				}
+//			}
+		}
+
+	sndfile_ = sf_open(CT2CA(path), mode, sfinfo);
+
+#if defined(DEBUG) | defined(_DEBUG)
 		char  buffer [2048];
 		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
 
 		cdebug << "opening " << CT2CA(path) << ": " << std::endl << buffer;
 #endif
-		if(!sndfile_)
+		if(sndfile_ == NULL)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Failed to open " << CT2CA(path) << std::endl;
@@ -124,7 +178,7 @@ public:
 		return sf_write_raw(sndfile_, ptr, bytes);
 	};
 
-	int  sf_format_check (const SF_INFO *info)
+	int format_check (const SF_INFO *info)
 	{
 		const int result = sf_format_check (info);
 

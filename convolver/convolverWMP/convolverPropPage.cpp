@@ -539,7 +539,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	double fElapsed = 0;
 	apHiResElapsedTime t;
 	// TODO: the 8 should be derived
-	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, 8, nPartitions);
+	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
 	fElapsed = t.sec();
 	if (FAILED(hr))
 	{

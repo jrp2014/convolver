@@ -158,16 +158,16 @@ public:
 		switch (validBits)
 		{
 		case 16:
-			dstSample =  fAttenuationFactor * i * 1.0 / static_cast<T>(32768); // 2^15
+			dstSample =  fAttenuationFactor * i / static_cast<T>(32768); // 2^15
 		case 20:
 			i = (i << 4) | (srcContainer[0] >> 4);
-			dstSample =  fAttenuationFactor * i * 1.0 / static_cast<T>(524288); // 2^19
+			dstSample =  fAttenuationFactor * i / static_cast<T>(524288); // 2^19
 		case 24:
 			i = (i << 8) | srcContainer[0];
-			dstSample =  fAttenuationFactor * i * 1.0 / static_cast<T>(8388608); // 2^23
+			dstSample =  fAttenuationFactor * i / static_cast<T>(8388608); // 2^23
 		default:
 			assert(false);
-			dstSample =  fAttenuationFactor * i * 1.0 / static_cast<T>(8388608); // 2^23;
+			dstSample =  fAttenuationFactor * i / static_cast<T>(8388608); // 2^23;
 		};
 
 		srcContainer += 3;
@@ -233,18 +233,18 @@ public:
 		{
 		case 16:
 			i >>= 16;
-			dstSample = fAttenuationFactor * i * 1.0 / static_cast<T>(32768); // 2^15;
+			dstSample = fAttenuationFactor * i / static_cast<T>(32768); // 2^15;
 		case 20:
 			i >>= 12;
-			dstSample = fAttenuationFactor * i * 1.0 / static_cast<T>(524288); // 2^19;
+			dstSample = fAttenuationFactor * i / static_cast<T>(524288); // 2^19;
 		case 24:
 			i >>= 8;
-			dstSample = fAttenuationFactor * i * 1.0 / static_cast<T>(8388608); // 2^23;
+			dstSample = fAttenuationFactor * i / static_cast<T>(8388608); // 2^23;
 		case 32:
-			dstSample = fAttenuationFactor * i * 1.0 / static_cast<T>(2147483648); // 2^31
+			dstSample = fAttenuationFactor * i / static_cast<T>(2147483648); // 2^31
 		default:
 			assert(false);
-			dstSample = fAttenuationFactor * i * 1.0 / static_cast<T>(2147483648); // 2^31
+			dstSample = fAttenuationFactor * i / static_cast<T>(2147483648); // 2^31
 		}
 
 		srcContainer += 4;

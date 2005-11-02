@@ -1,0 +1,2 @@
+DefineFilter(ConvolverWrapper.dll)
+AudioFilter(Name=ConvolverWrapper,CLSID={6105E395-1C5A-4B3E-9701-FB71C2523AB6},InPin=Input,OutPin=Output)

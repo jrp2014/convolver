@@ -40,18 +40,18 @@
 /////////////////////////////////////////////////////////////////////////////
 
 CConvolver::CConvolver() :
-	m_fWetMix(1.0),  // default to 100 percent wet
-	m_fDryMix(0.0),  // default to 0 percent dry
-	m_fAttenuation_db(0.0), // default attenuation
-	m_cbInputLength(0),
-	m_pbInputData (NULL),
-	m_bValidTime(false),
-	m_rtTimestamp(0),
-	m_bEnabled(TRUE),
-	m_nPartitions(0), // default, just overlap-save
-	m_Convolution(NULL),
-	m_InputSampleConvertor(NULL),
-	m_OutputSampleConvertor(NULL)
+m_fWetMix(1.0),  // default to 100 percent wet
+m_fDryMix(0.0),  // default to 0 percent dry
+m_fAttenuation_db(0.0), // default attenuation
+m_cbInputLength(0),
+m_pbInputData (NULL),
+m_bValidTime(false),
+m_rtTimestamp(0),
+m_bEnabled(TRUE),
+m_nPartitions(0), // default, just overlap-save
+m_Convolution(NULL),
+m_InputSampleConvertor(NULL),
+m_OutputSampleConvertor(NULL)
 {
 	m_szFilterFileName[0] = 0;
 
@@ -69,6 +69,7 @@ CConvolver::~CConvolver()
 {
 	::MoFreeMediaType(&m_mtInput);
 	::MoFreeMediaType(&m_mtOutput);
+	m_Convolution = NULL;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -137,14 +138,14 @@ HRESULT CConvolver::FinalConstruct()
 			// Convert the DWORD to a WORD.
 			m_nPartitions = dwValue;
 		}
-		try
+
+		try // creating m_Convolution might throw
 		{
 			m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
 		}
-		catch (...) // creating m_Convolution might throw
+		catch (...) 
 		{
-			m_bEnabled=false; // disable the plug-in
-			return   S_FALSE; //Don't return failure as cannot then access plug-in property pages (eg, to change an invalid file name)
+			return S_FALSE;  // Don't return a real error as it will prevent the property page from showing
 		}
 	}
 
@@ -948,7 +949,8 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
 
-	m_Convolution = NULL;
+	// Don't delete this here; only when filter name or partition number changes
+	//m_Convolution = NULL;
 
 	return S_OK;
 }
@@ -1368,6 +1370,19 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 
 	_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
+	try // creating m_Convolution might throw
+	{
+		m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
+	}
+	catch (HRESULT& hr)
+	{
+		return hr;
+	}
+	catch (...) 
+	{
+		return E_FAIL;
+	}
+
 	return S_OK;
 }
 
@@ -1396,6 +1411,19 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 #endif
 
 	m_nPartitions = newVal;
+
+	try // creating m_Convolution might throw
+	{
+		m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
+	}
+	catch (HRESULT& hr)
+	{
+		return hr;
+	}
+	catch (...) 
+	{
+		return E_FAIL;
+	}
 
 	return S_OK;
 }

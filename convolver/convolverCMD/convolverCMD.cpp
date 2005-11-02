@@ -131,7 +131,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		float fAttenuation = 0;
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = calculateOptimumAttenuation(fAttenuation, argv[2], sf_info.channels, nPartitions);
+		hr = calculateOptimumAttenuation(fAttenuation, argv[2], nPartitions);
 		fElapsed = t.msec();
 		if (FAILED(hr))
 		{

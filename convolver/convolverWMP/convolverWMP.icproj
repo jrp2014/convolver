@@ -29,8 +29,10 @@
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
+				SmallerTypeCheck="TRUE"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
+				BufferSecurityCheck="TRUE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
@@ -61,6 +63,8 @@
 				ModuleDefinitionFile="convolverwmp.def"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
+				OptimizeReferences="0"
+				EnableCOMDATFolding="0"
 				BaseAddress="254803968"
 				SupportUnloadOfDelayLoadedDLL="TRUE"
 				TargetMachine="1"
@@ -113,16 +117,17 @@
 				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
-				StringPooling="FALSE"
+				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				RuntimeLibrary="0"
-				StructMemberAlignment="5"
+				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
-				WarningLevel="4"
+				WarningLevel="3"
+				SuppressStartupBanner="FALSE"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"
 				UseProcExt="4"
@@ -383,6 +388,9 @@
 			</File>
 			<File 
 				RelativePath=".\StdAfx.h">
+			</File>
+			<File 
+				RelativePath=".\version.h">
 			</File>
 			<File 
 				RelativePath=".\wmpservices.h">

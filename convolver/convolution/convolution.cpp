@@ -21,7 +21,7 @@
 
 template class CConvolution<float>;
 template HRESULT SelectSampleConvertor<float>(WAVEFORMATEX* & pWave, Holder< Sample<float> >& sample_convertor);
-template HRESULT calculateOptimumAttenuation<float>(float& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions);
+template HRESULT calculateOptimumAttenuation<float>(float& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
 
 
 // CConvolution Constructor
@@ -472,7 +472,7 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 
 // TODO: optimize as the previous half-partition is in the accumulator
 template <typename T>
-void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& thisPath)
+void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath)
 {
 	InputBufferAccumulator_ = 0;
 	const int nChannels = thisPath.inChannel.size();
@@ -481,8 +481,7 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& thisPath
 	for(int nChannel = 0; nChannel < nChannels; ++nChannel)
 	{
 		const float fScale = thisPath.inChannel[nChannel].fScale;
-		const float thisChannel = thisPath.inChannel[nChannel].nChannel;
-		const ChannelBuffer& InputSamples = InputBuffer_[thisChannel];
+		const ChannelBuffer& InputSamples = InputBuffer_[thisPath.inChannel[nChannel].nChannel];
 #pragma loop count(65536)
 #pragma ivdep
 		// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
@@ -495,16 +494,17 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& thisPath
 }
 
 template <typename T>
-void inline CConvolution<T>::mix_output(const ChannelPaths::ChannelPath& thisPath, SampleBuffer& Accumulator, const ChannelBuffer& Output,
-										const int 	from, const int  to)
+void inline CConvolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
+										const ChannelBuffer& restrict Output, const int from, const int  to)
 {
+	// Don't zero the Accumulator as it can accumulate from more than one output
 	const int nChannels = thisPath.outChannel.size();
 #pragma loop count(6)
 #pragma ivdep
 	for(int nChannel=0; nChannel<nChannels; ++nChannel)
 	{
 		const float fScale = thisPath.outChannel[nChannel].fScale;
-		const float thisChannel = thisPath.outChannel[nChannel].nChannel;
+		const int thisChannel = thisPath.outChannel[nChannel].nChannel;
 #pragma loop count(65536)
 #pragma ivdep
 		for(int i= from; i < to; ++i)
@@ -516,12 +516,13 @@ void inline CConvolution<T>::mix_output(const ChannelPaths::ChannelPath& thisPat
 
 #ifdef FFTW
 template <typename T>
-void inline CConvolution<T>::complex_mul(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, unsigned int count)
+void inline CConvolution<T>::complex_mul(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count)
 {
 
 	//__declspec(align( 16 )) float T1;
 	//__declspec(align( 16 )) float T2;
 #pragma ivdep
+#pragma loop count (65536)
 	for (int index = 0; index < count/2+1; ++index) {
 
 		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
@@ -536,12 +537,13 @@ void inline CConvolution<T>::complex_mul(fftwf_complex* restrict in1, fftwf_comp
 }
 
 template <typename T>
-void inline CConvolution<T>::complex_mul_add(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, unsigned int count)
+void inline CConvolution<T>::complex_mul_add(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count)
 {
 
 	//__declspec(align( 16 )) float T1;
 	//__declspec(align( 16 )) float T2;
 #pragma ivdep
+#pragma loop count (65536)
 	for (int index = 0; index < count/2+1; ++index) {
 
 		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
@@ -819,7 +821,7 @@ HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
 template <typename T>
-HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nChannels, const int& nPartitions)
+HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;)
