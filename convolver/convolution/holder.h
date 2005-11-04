@@ -22,6 +22,7 @@ public:
 	~Holder()
 	{ 
 		delete ptr_;
+		ptr_ = NULL;
 	}
 
 	// assignment of new pointer

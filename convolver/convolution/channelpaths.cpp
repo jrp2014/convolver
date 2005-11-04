@@ -32,24 +32,37 @@ nFilterLength(0)
 ,nFFTWPartitionLength(2)
 #endif
 {
-	USES_CONVERSION;
-	std::ifstream  config(T2A(szConfigFileName));
-	if (config == NULL)
-	{
-		throw "Failed to open config file";
-	}
-
-
+	std::ifstream config;
 	bool got_path_spec = false;
 
 	try
 	{
+		USES_CONVERSION;
+		config.open(T2A(szConfigFileName));
+		if (config == NULL)
+		{
+			throw configException("Failed to open config file");
+		}
+
 		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
+
+		config >> nInputChannels;
+#if defined(DEBUG) | defined(_DEBUG)
+		cdebug << nInputChannels << " input channels" << std::endl;
+#endif
+		config >> nOutputChannels;
+#if defined(DEBUG) | defined(_DEBUG)
+		cdebug << nInputChannels << " output channels" << std::endl;
+#endif
+		config.get();  // consume newline
 
 		char szFilterFilename[MAX_PATH];
 		while(!config.eof())
 		{
-			config.getline(szFilterFilename,MAX_PATH);
+			config.getline(szFilterFilename, MAX_PATH);
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Reading specification for " << szFilterFilename << std::endl;
+#endif
 
 			got_path_spec = false;
 
@@ -61,16 +74,13 @@ nFilterLength(0)
 				config >> scale;
 
 				if(scale < 0)
-					throw "Negative input channel number. Invalid";
+					throw configException("Negative input channel number");
 
 				// The integer part designates the input channel
 				int channel = floor(scale);   
 
 				if(channel > nInputChannels - 1)
-					nInputChannels = channel + 1; // Got a bigger channel number
-
-				if (nInputChannels > MAX_CHANNEL)
-					throw "Invalid input Channel number";
+					throw configException("Input channel number greater than the specified number of input channels");
 
 				// The fractional part is the scaling factor to be applied
 				scale -= channel;
@@ -94,16 +104,13 @@ nFilterLength(0)
 				config >> scale;
 
 				if(scale < 0)
-					throw "Negative output channel number. Invalid";
+					throw configException("Negative output channel number");
 
 				// The integer part designates the output channel
 				int channel = floor(scale);
 
 				if(channel > nOutputChannels - 1)
-					nOutputChannels = channel + 1; // Got a bigger channel number
-
-				if (nOutputChannels > MAX_CHANNEL)
-					throw "Invalid output Channel number";
+					throw configException("Output channel number greater than the specified number of output channels");
 
 				// The fractional part is the scaling factor to be applied
 				scale -= channel;
@@ -131,7 +138,7 @@ nFilterLength(0)
 
 			if(!got_path_spec)
 			{
-				throw "Premature end of configuration file.  Missing final blank line?";
+				throw configException("Premature end of configuration file.  Missing final blank line?");
 			}
 
 			// Verify
@@ -146,19 +153,19 @@ nFilterLength(0)
 			}
 			else
 			{
-				throw "Must specify at least one filter";
+				throw configException("Must specify at least one filter");
 			}
 
 			for(int i = 0; i < nPaths; ++i)
 			{
 				if(Paths[i].filter.nChannels != 1)
 				{
-					throw "Filters must have exactly one channel";
+					throw configException("Filters must have exactly one channel");
 				}
 
 				if(Paths[i].filter.nFilterLength != nFilterLength)
 				{
-					throw "Filters must all be of the same length";
+					throw configException("Filters must all be of the same length");
 				}
 #ifdef LIBSNDFILE
 				if(Paths[0].filter.sf_FilterFormat.samplerate != Paths[i].filter.sf_FilterFormat.samplerate)
@@ -166,50 +173,44 @@ nFilterLength(0)
 				if(Paths[0].filter.wfewfexFilterFormat.nBytesPerSec != Paths[i].filter.wfexFilterFormat.nBytesPerSec)
 #endif
 				{
-					throw "Filters must all have the same samplerate";
+					throw configException("Filters must all have the same sample rate");
 				}
-
 			}
 #if defined(DEBUG) | defined(_DEBUG)
 			Dump();
 #endif
+		}
+		else if (config.fail())
+		{
+			throw configException("Config file syntax is incorrect");
+		}
+		else if (config.bad())
+		{
+			throw configException("Fatal error reading config file");
 		}
 		else
 		{
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "I/O exception: " << error.what() << std::endl;
 #endif
-			throw;
+			throw configException(error.what());
 		}
 		// else fall through
+	}
+	catch(const convolutionException& ex)	// self-generated exception
+	{
+		throw configException(ex.what());
 	}
 	catch(const std::exception& error)
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << "Standard exception: " << error.what() << std::endl;
 #endif
-		throw;
-	}
-	catch (const char* & what)
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "Failed: " << what << std::endl;
-#endif
-		throw;
-	}
-	catch (const TCHAR* & what)
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "Failed: " << what << std::endl;
-#endif
-		throw;
+		throw configException(error.what());
 	}
 	catch (...)
 	{
-#if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "Failed." << std::endl;
-#endif
-		throw;
+		throw configException("Unexpected exception");
 	}
 }
 

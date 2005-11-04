@@ -20,5 +20,21 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <convolution/config.h>
+
+void SIMDFlushToZero(void);
 long int lrint (double flt);
 long int lrintf (float flt);
+
+inline int conv_float_to_int (float x);
+inline int conv_float_to_int_mem (double x);
+int round_int (double x);
+int floor_int (double x);
+int ceil_int (double x);
+//int truncate_int (double x);
+
+void test_and_kill_denormal (float &val);
+void kill_denormal_by_quantization (float &val);
+bool is_denormalized ();
+void add_white_noise (float &val);
+void add_dc (float &val);

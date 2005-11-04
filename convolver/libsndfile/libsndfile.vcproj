@@ -29,7 +29,7 @@
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="FALSE"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
 				BufferSecurityCheck="TRUE"

@@ -67,7 +67,7 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Invalid output file format." << std::endl;
 #endif
-			throw sf_strerror (NULL);
+			throw wavfileException("Invalid output file format", path, "");
 		}
 		else if(mode == SFM_READ)
 		{
@@ -76,7 +76,7 @@ public:
 //			// Look for .pcm
 //			if (path == NULL)
 //			{
-//				throw "Null filename invalid";
+//				throw wavfileException("Null filename invalid");
 //			}
 //
 //			TCHAR* cptr = _tcsrchr (path,
@@ -92,9 +92,9 @@ public:
 //				TCHAR buffer[16];
 //				++cptr;	// points to the extension
 //				if (_tcslen (cptr) > sizeof (buffer) - 1)
-//					throw "Filename extension too long" ;
+//					throw wavfileException("Filename extension too long");
 //
-//				_tcsncpy (buffer, cptr, sizeof (buffer)) ;
+//				_tcsncpy (buffer, cptr, sizeof (buffer));
 //				buffer [sizeof (buffer) - 1] = 0 ;
 //
 //				/* Convert everything in the buffer to lower case. */
@@ -128,14 +128,14 @@ public:
 		char  buffer [2048];
 		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
 
-		cdebug << "opening " << CT2CA(path) << ": " << std::endl << buffer;
+		cdebug << "Opening " << CT2CA(path) << ": " << std::endl << buffer;
 #endif
 		if(sndfile_ == NULL)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Failed to open " << CT2CA(path) << std::endl;
 #endif
-			throw sf_strerror (NULL);
+			throw wavfileException("Failed to open", path, sf_strerror (NULL));
 		}
 	};
 

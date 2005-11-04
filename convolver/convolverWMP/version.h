@@ -38,13 +38,13 @@ public:
 						TEXT("\\VarFileInfo\\Translation"),
 						reinterpret_cast<LPVOID*>(&language_information_),
 						&size) == FALSE)
-						throw std::exception("Requested localized version information not available");
+						throw versionException("Requested localized version information not available");
 				}
 				else
 				{
 					std::stringstream exception;
 					exception << "Could not get version information (Windows error: " << ::GetLastError() << ")";
-					throw std::exception(exception.str().c_str());
+					throw versionException(exception.str().c_str());
 				}
 			}
 			else
@@ -54,7 +54,7 @@ public:
 		{
 			std::stringstream exception;
 			exception << "No version information found (Windows error: " << ::GetLastError() << ")";
-			throw std::exception(exception.str().c_str());
+			throw versionException(exception.str().c_str());
 		}
 	}
 
@@ -71,7 +71,7 @@ public:
 			version::version(app_name);
 		}
 		else
-			throw std::exception("Could not get application name");
+			throw versionException("Could not get application name");
 	}
 
 	~version() { delete [] resource_data_; }

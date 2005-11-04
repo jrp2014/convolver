@@ -24,10 +24,20 @@
 
 int	_tmain(int argc, _TCHAR* argv[])
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	const int	mode =   (1 * _CRTDBG_MODE_DEBUG) | (0 * _CRTDBG_MODE_WNDW);
+	::_CrtSetReportMode (_CRT_WARN, mode);
+	::_CrtSetReportMode (_CRT_ERROR, mode);
+	::_CrtSetReportMode (_CRT_ASSERT, mode);
+	const int	old_flags = ::_CrtSetDbgFlag (_CRTDBG_REPORT_FLAG);
+	::_CrtSetDbgFlag (  old_flags
+		| (1 * _CRTDBG_LEAK_CHECK_DF)
+		| (1 * _CRTDBG_CHECK_ALWAYS_DF)
+		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
-#if	defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);
 #endif
+
 	HRESULT	hr = S_OK;
 	Holder< CConvolution<float> > conv;
 	double fElapsedLoad	= 0;
@@ -127,6 +137,10 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 	}
 
+	catch (convolutionException& error)
+	{
+		std::wcerr << "Convolver error: " << error.what() << std::endl;
+	}
 	catch (HRESULT& hr) // from CConvolution
 	{
 		std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;

@@ -6,13 +6,13 @@ class Sample
 public:
 	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, int& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
 	virtual void PutSample(BYTE* & dstContainer, T srcSample, int& nBytesGenerated) const = 0;			// returns number of bytes processed
-	virtual const int nContainerSize() const = 0;
+	virtual int nContainerSize() const = 0;
 
 	virtual ~Sample(void) = 0;
 };
 
 template <typename T>
-inline Sample<T>::~Sample(){};
+inline Sample<T>::~Sample(){}
 
 // Specializations with the appropriate functions for accessing the sample buffer
 template <typename T>
@@ -35,7 +35,7 @@ public:
 		nBytesGenerated += sizeof(float);
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return sizeof(float);
 	}
@@ -61,7 +61,7 @@ public:
 		nBytesGenerated += sizeof(double);
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return sizeof(double);
 	}
@@ -101,7 +101,7 @@ public:
 		++nBytesGenerated;
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return 1;
 	}
@@ -140,7 +140,7 @@ public:
 		nBytesGenerated += 2;
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return 2;
 	}
@@ -215,7 +215,7 @@ public:
 		nBytesGenerated += 3;
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return 3;
 	}
@@ -297,7 +297,7 @@ public:
 		nBytesGenerated += 4;
 	}
 
-	virtual const int nContainerSize() const
+	virtual int nContainerSize() const
 	{
 		return 4;
 	}

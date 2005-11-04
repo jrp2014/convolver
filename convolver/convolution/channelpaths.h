@@ -20,6 +20,7 @@
 
 #include "convolution\config.h"
 #include "convolution\filter.h"
+#include <string>
 #include <fstream>
 #include <vector>
 

@@ -69,7 +69,22 @@ CConvolver::~CConvolver()
 {
 	::MoFreeMediaType(&m_mtInput);
 	::MoFreeMediaType(&m_mtOutput);
+
+	// The following is probably unnecessary, as they Holder should destroy them
+	m_InputSampleConvertor = NULL;
+	m_OutputSampleConvertor = NULL;
 	m_Convolution = NULL;
+
+
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "~CConvolver" << std::endl;);
+	const int	mode =   (1 * _CRTDBG_MODE_DEBUG) | (0 * _CRTDBG_MODE_WNDW);
+	::_CrtSetReportMode (_CRT_WARN, mode);
+	::_CrtSetReportMode (_CRT_ERROR, mode);
+	::_CrtSetReportMode (_CRT_ASSERT, mode);
+
+	::_CrtDumpMemoryLeaks();
+#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -87,15 +102,31 @@ HRESULT CConvolver::FinalConstruct()
 	DWORD   dwValue;
 
 #if defined(DEBUG) | defined(_DEBUG)
-
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
-	debugstream.sink (apDebugSinkWindows::sOnly);
-	apDebugSinkWindows::sOnly.showHeader (true);
-
 	// 3 = function call trace
 	apDebug::gOnly().set(3);
 
 	DEBUGGING(3, cdebug << "FinalConstruct" << std::endl;);
+
+	const int	mode =   (1 * _CRTDBG_MODE_DEBUG) | (1 * _CRTDBG_MODE_WNDW);
+	::_CrtSetReportMode (_CRT_WARN, mode);
+	::_CrtSetReportMode (_CRT_ERROR, mode);
+	::_CrtSetReportMode (_CRT_ASSERT, mode);
+
+	const int	old_flags = ::_CrtSetDbgFlag (_CRTDBG_REPORT_FLAG);
+	::_CrtSetDbgFlag (  old_flags
+		| (1 * _CRTDBG_LEAK_CHECK_DF)
+		| (1 * _CRTDBG_CHECK_ALWAYS_DF)
+		| (1 * _CRTDBG_ALLOC_MEM_DF));
+	//::_CrtSetBreakAlloc (-1);	// Specify here a memory bloc number
+	::_CrtSetBreakAlloc (355);	// Specify here a memory bloc number
+		::_CrtSetBreakAlloc (243);
+			::_CrtSetBreakAlloc (81);
+				::_CrtSetBreakAlloc (80);
+					::_CrtSetBreakAlloc (79);
+					::_CrtSetBreakAlloc (75);
+
+	debugstream.sink (apDebugSinkWindows::sOnly);
+	apDebugSinkWindows::sOnly.showHeader (true);
 #endif
 
 	lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
@@ -145,6 +176,7 @@ HRESULT CConvolver::FinalConstruct()
 		}
 		catch (...) 
 		{
+			//throw(std::runtime_error("Failed to initialize Convolver with current config file"));
 			return S_FALSE;  // Don't return a real error as it will prevent the property page from showing
 		}
 	}
@@ -476,15 +508,7 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 #endif
 			return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 
-		hr = SelectSampleConvertor(pWave, m_InputSampleConvertor);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
-		else
-		{
-			return S_OK;
-		}
+		return SelectSampleConvertor(pWave, m_InputSampleConvertor);
 	}
 }
 
@@ -572,15 +596,7 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 #endif
 			return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 
-		hr = SelectSampleConvertor(pWave, m_OutputSampleConvertor);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
-		else
-		{
-			return S_OK;
-		}
+		return SelectSampleConvertor(pWave, m_OutputSampleConvertor);
 	}
 }
 
@@ -1370,18 +1386,8 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 
 	_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-	try // creating m_Convolution might throw
-	{
-		m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
-	}
-	catch (HRESULT& hr)
-	{
-		return hr;
-	}
-	catch (...) 
-	{
-		return E_FAIL;
-	}
+	// May throw
+	m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
 
 	return S_OK;
 }
@@ -1412,18 +1418,8 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 
 	m_nPartitions = newVal;
 
-	try // creating m_Convolution might throw
-	{
-		m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
-	}
-	catch (HRESULT& hr)
-	{
-		return hr;
-	}
-	catch (...) 
-	{
-		return E_FAIL;
-	}
+	// May throw
+	m_Convolution = new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions); // 0 partitions = overlap-save
 
 	return S_OK;
 }

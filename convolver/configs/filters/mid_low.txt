@@ -1,3 +1,4 @@
+1 1
 D:\Projects\convolver\convolver\Media\filters\mid_low.wav
 0.0
 0.0

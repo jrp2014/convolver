@@ -273,6 +273,9 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
 					RelativePath="..\convolution\filter.cpp">
 				</File>
 				<File

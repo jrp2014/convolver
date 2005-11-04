@@ -17,75 +17,72 @@
 				ConfigurationType="1"
 				UseOfATL="0"
 				CharacterSet="1"
-				WholeProgramOptimization="FALSE"/>
+				WholeProgramOptimization="0"/>
+			<Tool 
+				Name="DebugTool"
+				CommandArguments="0 ..\..\configs\monomix.txt ..\..\Media\PerfectDiracDelta-44100-1-256.wav out.wav"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
-				GlobalOptimizations="FALSE"
+				GlobalOptimizations="0"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="FALSE"
+				OptimizeForWindowsApplication="0"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
-				MinimalRebuild="TRUE"
-				ExceptionHandling="TRUE"
+				MinimalRebuild="1"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="1"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="TRUE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="1"
+				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="2"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				ForceConformanceInForLoopScope="1"
+				RuntimeTypeInfo="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="4"
+				OpenMP="1"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"
-				OpenMP="1"/>
-			<Tool 
-				Name="CustomTool"/>
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
 				Name="LinkerTool"
+				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="1"
 				ProgramDatabaseFile="$(OutDir)/convolverCMD.pdb"
 				SubSystem="1"
 				OptimizeReferences="0"
 				EnableCOMDATFolding="0"
 				TargetMachine="1"/>
 			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="CustomTool"/>
 			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool 
-				Name="VCWebDeploymentTool"/>
-			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="DebugTool"
-				CommandArguments="0 ..\..\configs\1-1.txt ..\..\Media\4ch.wav 4ch.wav"/>
+				Name="CustomNodeTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
@@ -95,259 +92,181 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
 				UseOfATL="0"
-				ATLMinimizesCRunTimeLibraryUsage="FALSE"
+				ATLMinimizesCRunTimeLibraryUsage="0"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="DebugTool"/>
 			<Tool 
 				Name="CppCmplrTool"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
+				GlobalOptimizations="1"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
-				OmitFramePointers="TRUE"
-				WholeProgramOptimization="TRUE"
+				OmitFramePointers="1"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="FALSE"
+				OptimizeForWindowsApplication="0"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="1"
+				ExceptionHandling="1"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="0"
+				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="2"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="FALSE"
+				ForceConformanceInForLoopScope="1"
+				RuntimeTypeInfo="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="0"
+				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
+				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
-			<Tool 
-				Name="CustomTool"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
 				Name="LinkerTool"
+				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreAllDefaultLibraries="0"
 				IgnoreDefaultLibraryNames=""
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="1"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"/>
 			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="CustomTool"/>
 			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool 
-				Name="VCWebDeploymentTool"/>
-			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="DebugTool"/>
+				Name="CustomNodeTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
-		<Filter 
-			Name="Source Files"
-			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
-			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
-			<File 
-				RelativePath=".\convolverCMD.cpp">
-			</File>
-			<File 
-				RelativePath=".\stdafx.cpp">
-				<FileConfiguration 
-					Name="Debug|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration 
-					Name="Release|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-			</File>
-		</Filter>
-		<Filter 
-			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc;xsd"
-			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
-			<File 
-				RelativePath=".\stdafx.h">
-			</File>
-		</Filter>
-		<Filter 
-			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
-			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
-		</Filter>
-		<Filter 
-			Name="debugging"
-			Filter="">
-			<File 
-				RelativePath="..\debugging\debugging.cpp">
-			</File>
-			<File 
-				RelativePath="..\debugging\debugging.h">
-			</File>
-			<File 
-				RelativePath="..\debugging\debugStream.cpp">
-			</File>
-			<File 
-				RelativePath="..\debugging\debugStream.h">
-			</File>
-			<File 
-				RelativePath="..\debugging\fastTiming.cpp">
-			</File>
-			<File 
-				RelativePath="..\debugging\fastTiming.h">
-			</File>
-		</Filter>
-		<Filter 
-			Name="convolution"
-			Filter="">
-			<File 
-				RelativePath="..\convolution\channelpaths.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\channelpaths.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\config.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\convolution.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\convolution.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\filter.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\filter.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\holder.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\lrint.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\lrint.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\sample.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\samplebuffer.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\samplebuffer.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\wavefile.h">
-			</File>
-			<File 
-				RelativePath="..\convolution\waveformat.cpp">
-			</File>
-			<File 
-				RelativePath="..\convolution\waveformat.h">
-			</File>
-		</Filter>
-		<Filter 
-			Name="Common"
-			Filter="">
-			<File 
-				RelativePath="..\Common\dxstdafx.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\dxstdafx.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUT.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUT.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTenum.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTenum.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTgui.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTgui.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTMesh.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTMesh.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTmisc.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTmisc.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTSettingsDlg.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTSettingsDlg.h">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTsound.cpp">
-			</File>
-			<File 
-				RelativePath="..\Common\DXUTsound.h">
-			</File>
-		</Filter>
-		<Filter 
-			Name="fft"
-			Filter="">
-			<File 
-				RelativePath="..\fft\fftsg.cpp">
-			</File>
-			<File 
-				RelativePath="..\fft\fftsg_h.h">
-			</File>
-		</Filter>
 		<File 
-			RelativePath=".\ReadMe.txt">
+			RelativePath=".\convolverCMD.cpp"/>
+		<File 
+			RelativePath=".\stdafx.cpp">
+			<FileConfiguration 
+				Name="Debug|Win32">
+				<Tool 
+					Name="CppCmplrTool"
+					UsePrecompiledHeader="1"/>
+			</FileConfiguration>
+			<FileConfiguration 
+				Name="Release|Win32">
+				<Tool 
+					Name="CppCmplrTool"
+					UsePrecompiledHeader="1"/>
+			</FileConfiguration>
 		</File>
+		<File 
+			RelativePath=".\stdafx.h"/>
+		<File 
+			RelativePath="..\debugging\debugging.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugging.h"/>
+		<File 
+			RelativePath="..\debugging\debugStream.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugStream.h"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.cpp"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.h"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.cpp"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.h"/>
+		<File 
+			RelativePath="..\convolution\config.h"/>
+		<File 
+			RelativePath="..\convolution\convolution.cpp"/>
+		<File 
+			RelativePath="..\convolution\convolution.h"/>
+		<File 
+			RelativePath="..\convolution\filter.cpp"/>
+		<File 
+			RelativePath="..\convolution\filter.h"/>
+		<File 
+			RelativePath="..\convolution\holder.h"/>
+		<File 
+			RelativePath="..\convolution\lrint.cpp"/>
+		<File 
+			RelativePath="..\convolution\lrint.h"/>
+		<File 
+			RelativePath="..\convolution\sample.h"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.cpp"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.h"/>
+		<File 
+			RelativePath="..\convolution\wavefile.h"/>
+		<File 
+			RelativePath="..\convolution\waveformat.cpp"/>
+		<File 
+			RelativePath="..\convolution\waveformat.h"/>
+		<File 
+			RelativePath="..\Common\dxstdafx.cpp"/>
+		<File 
+			RelativePath="..\Common\dxstdafx.h"/>
+		<File 
+			RelativePath="..\Common\DXUT.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUT.h"/>
+		<File 
+			RelativePath="..\Common\DXUTenum.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTenum.h"/>
+		<File 
+			RelativePath="..\Common\DXUTgui.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTgui.h"/>
+		<File 
+			RelativePath="..\Common\DXUTMesh.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTMesh.h"/>
+		<File 
+			RelativePath="..\Common\DXUTmisc.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTmisc.h"/>
+		<File 
+			RelativePath="..\Common\DXUTSettingsDlg.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTSettingsDlg.h"/>
+		<File 
+			RelativePath="..\Common\DXUTsound.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTsound.h"/>
+		<File 
+			RelativePath="..\fft\fftsg.cpp"/>
+		<File 
+			RelativePath="..\fft\fftsg_h.h"/>
+		<File 
+			RelativePath=".\ReadMe.txt"/>
 	</Files>
 </VisualStudioProject>
 

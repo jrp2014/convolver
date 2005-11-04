@@ -26,7 +26,7 @@ template HRESULT calculateOptimumAttenuation<float>(float& fAttenuation, TCHAR s
 
 // CConvolution Constructor
 template <typename T>
-CConvolution<T>::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions):
+CConvolution<T>::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
 Mixer(szConfigFileName, nPartitions),
 #ifdef ARRAY
 InputBuffer_(Mixer.nInputChannels, Mixer.nPartitionLength),
@@ -688,6 +688,9 @@ T CConvolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffe
 template <typename T>
 HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SelectSampleConvertor" << std::endl;);
+#endif
 	HRESULT hr = S_OK;
 
 	if (NULL == pWave)
@@ -719,104 +722,97 @@ HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample
 
 	sample_convertor = NULL;
 
-	try
+	switch (wFormatTag)
 	{
-		switch (wFormatTag)
+	case WAVE_FORMAT_PCM:
+		switch (pWave->wBitsPerSample)
 		{
-		case WAVE_FORMAT_PCM:
-			switch (pWave->wBitsPerSample)
+			// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+			// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+			// structure to determine the valid bits per sample. (See above)
+		case 8:
+			sample_convertor = new Sample_pcm8<T>();
+			break;
+
+		case 16:
+			sample_convertor = new Sample_pcm16<T>();
+			break;
+
+		case 24:
 			{
-				// Note: for 8 and 16-bit samples, we assume the sample is the same size as
-				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-				// structure to determine the valid bits per sample. (See above)
-			case 8:
-				sample_convertor = new Sample_pcm8<T>();
-				break;
-
-			case 16:
-				sample_convertor = new Sample_pcm16<T>();
-				break;
-
-			case 24:
+				switch (wValidBitsPerSample)
 				{
-					switch (wValidBitsPerSample)
-					{
-					case 16:
-						sample_convertor = new Sample_pcm24<T, 16>();
-						break;
+				case 16:
+					sample_convertor = new Sample_pcm24<T, 16>();
+					break;
 
-					case 20:
-						sample_convertor = new Sample_pcm24<T, 20>();
-						break;
+				case 20:
+					sample_convertor = new Sample_pcm24<T, 20>();
+					break;
 
-					case 24:
-						sample_convertor = new Sample_pcm24<T, 24>();
-						break;
+				case 24:
+					sample_convertor = new Sample_pcm24<T, 24>();
+					break;
 
-					default:
-						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-					}
+				default:
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 				}
-				break;
-
-			case 32:
-				{
-					switch (wValidBitsPerSample)
-					{
-					case 16:
-						sample_convertor = new Sample_pcm32<T, 16>();
-						break;
-
-					case 20:
-						sample_convertor = new Sample_pcm32<T, 20>();
-						break;
-
-					case 24:
-						sample_convertor = new Sample_pcm32<T, 24>();
-						break;
-
-					case 32:
-						sample_convertor = new Sample_pcm32<T, 32>();
-						break;
-
-					default:
-						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-					}
-				}
-				break;
-
-			default:  // Unprocessable PCM
-				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 			}
 			break;
 
-		case WAVE_FORMAT_IEEE_FLOAT:
-			switch (pWave->wBitsPerSample)
+		case 32:
 			{
-			case 32:
-				sample_convertor = new Sample_ieeefloat<T>();
-				break;
+				switch (wValidBitsPerSample)
+				{
+				case 16:
+					sample_convertor = new Sample_pcm32<T, 16>();
+					break;
 
-			case 64:
-				sample_convertor = new Sample_ieeedouble<T>();
-				break;
+				case 20:
+					sample_convertor = new Sample_pcm32<T, 20>();
+					break;
 
-			default:  // Unprocessable IEEE float
-				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-				//break;
+				case 24:
+					sample_convertor = new Sample_pcm32<T, 24>();
+					break;
+
+				case 32:
+					sample_convertor = new Sample_pcm32<T, 32>();
+					break;
+
+				default:
+					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+				}
 			}
 			break;
 
-		default: // Not PCM or IEEE Float
+		default:  // Unprocessable PCM
 			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 		}
+		break;
 
-		return hr;
+	case WAVE_FORMAT_IEEE_FLOAT:
+		switch (pWave->wBitsPerSample)
+		{
+		case 32:
+			sample_convertor = new Sample_ieeefloat<T>();
+			break;
+
+		case 64:
+			sample_convertor = new Sample_ieeedouble<T>();
+			break;
+
+		default:  // Unprocessable IEEE float
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+			//break;
+		}
+		break;
+
+	default: // Not PCM or IEEE Float
+		return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 	}
-	catch(HRESULT hr)
-	{
-		return hr;
-	}
+
+	return hr;
 }
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
@@ -828,126 +824,92 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 #endif
 		HRESULT hr = S_OK;
 
-	try 
+	CConvolution<T> c(szConfigFileName, nPartitions == 0 ? 1 : nPartitions); // 0 used to signal use of overlap-save
+
+	const int nSamples = NSAMPLES; // length of the test sample, in filter lengths
+	// So if you are using a 44.1kHz sample rate and it takes 1s to calculate optimum attenuation,
+	// that is equivalent to 0.1s to process a filter
+	// which means that the filter must be less than 44100 / .1 samples in length to keep up
+	const int nBlocks = nSamples * c.Mixer.nFilterLength;
+	const int nBufferLength = nBlocks * c.Mixer.nInputChannels;	// Channels are interleaved
+
+	std::vector<T>InputSamples(nBufferLength);
+	std::vector<T>OutputSamples(nBufferLength);
+
+	Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
+
+	srand( (unsigned)time( NULL ) );
+
+	bool again = TRUE;
+	float maxSample = 0;
+
+	// TODO: don't keep repeating, as this messes up the rate calculation which does not know how many iterations
+	// have been used
+	//do
+	//{
+	for(int i = 0; i < nBufferLength; ++i)
 	{
-		CConvolution<T> c(szConfigFileName, nPartitions == 0 ? 1 : nPartitions); // 0 used to signal use of overlap-save
-
-		const int nSamples = NSAMPLES; // length of the test sample, in filter lengths
-		// So if you are using a 44.1kHz sample rate and it takes 1s to calculate optimum attenuation,
-		// that is equivalent to 0.1s to process a filter
-		// which means that the filter must be less than 44100 / .1 samples in length to keep up
-		const int nBlocks = nSamples * c.Mixer.nFilterLength;
-		const int nBufferLength = nBlocks * c.Mixer.nInputChannels;	// Channels are interleaved
-
-		std::vector<T>InputSamples(nBufferLength);
-		std::vector<T>OutputSamples(nBufferLength);
-
-		Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
-
-		srand( (unsigned)time( NULL ) );
-
-		bool again = TRUE;
-		float maxSample = 0;
-
-		// TODO: don't keep repeating, as this messes up the rate calculation which does not know how many iterations
-		// have been used
-		//do
-		//{
-		for(int i = 0; i < nBufferLength; ++i)
-		{
-			InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
-			//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
-			OutputSamples[i] = 0;  // silence
-		}
+		InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
+		//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
+		OutputSamples[i] = 0;  // silence
+	}
 
 #if defined(DEBUG) | defined(_DEBUG)
-		DEBUGGING(4, 
-			cdebug << "InputSamples: ";
-		copy(InputSamples.begin(), InputSamples.end(), std::ostream_iterator<float>(cdebug, ", "));
-		cdebug << std::endl;);
+	DEBUGGING(4, 
+		cdebug << "InputSamples: ";
+	copy(InputSamples.begin(), InputSamples.end(), std::ostream_iterator<float>(cdebug, ", "));
+	cdebug << std::endl;);
 #endif
-		// nPartitions == 0 => use overlap-save version
-		DWORD nBytesGenerated = nPartitions == 0 ?
-			c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-			convertor, convertor,
-			/* dwBlocksToProcess */ nBlocks,
-			/* fAttenuation_db */ 0,
-			/* fWetMix,*/ 1.0L,
-			/* fDryMix */ 0.0L)
-			: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-			convertor, convertor,
-			/* dwBlocksToProcess */ nBlocks,
-			/* fAttenuation_db */ 0,
-			/* fWetMix,*/ 1.0L,
-			/* fDryMix */ 0.0L);
+	// nPartitions == 0 => use overlap-save version
+	DWORD nBytesGenerated = nPartitions == 0 ?
+		c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
+		convertor, convertor,
+		/* dwBlocksToProcess */ nBlocks,
+		/* fAttenuation_db */ 0,
+		/* fWetMix,*/ 1.0L,
+		/* fDryMix */ 0.0L)
+		: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
+		convertor, convertor,
+		/* dwBlocksToProcess */ nBlocks,
+		/* fAttenuation_db */ 0,
+		/* fWetMix,*/ 1.0L,
+		/* fDryMix */ 0.0L);
 
-			// The output will be missing the last half filter length, the first time around
-			assert (nBytesGenerated % sizeof(T) == 0);
-		assert (nBytesGenerated <= nBufferLength * sizeof(T));
+		// The output will be missing the last half filter length, the first time around
+		assert (nBytesGenerated % sizeof(T) == 0);
+	assert (nBytesGenerated <= nBufferLength * sizeof(T));
 
 #if defined(DEBUG) | defined(_DEBUG)
-		DEBUGGING(4,
-			cdebug << "OutputSamples(" << nBytesGenerated/sizeof(T) << ") " ;
-		copy(OutputSamples.begin(), OutputSamples.end(), std::ostream_iterator<T>(cdebug, ", "));
-		cdebug << std::endl << std::endl;);
+	DEBUGGING(4,
+		cdebug << "OutputSamples(" << nBytesGenerated/sizeof(T) << ") " ;
+	copy(OutputSamples.begin(), OutputSamples.end(), std::ostream_iterator<T>(cdebug, ", "));
+	cdebug << std::endl << std::endl;);
 #endif
 
-		// Scan the output coeffs for larger output samples
-		again = FALSE;
-		for(int i = 0; i  < nBytesGenerated / sizeof(T); ++i)
+	// Scan the output coeffs for larger output samples
+	again = FALSE;
+	for(int i = 0; i  < nBytesGenerated / sizeof(T); ++i)
+	{
+		if (abs(OutputSamples[i]) > maxSample)
 		{
-			if (abs(OutputSamples[i]) > maxSample)
-			{
-				maxSample = abs(OutputSamples[i]);
-				again = TRUE; // Keep convolving until find no larger output samples
-			}
+			maxSample = abs(OutputSamples[i]);
+			again = TRUE; // Keep convolving until find no larger output samples
 		}
-		//} while (again);
+	}
+	//} while (again);
 
-		// maxSample * 10 ^ (fAttenuation_db / 20) = 1
-		// Limit fAttenuation to +/-MAX_ATTENUATION dB
-		fAttenuation = -20.0f * log10(maxSample);
+	// maxSample * 10 ^ (fAttenuation_db / 20) = 1
+	// Limit fAttenuation to +/-MAX_ATTENUATION dB
+	fAttenuation = -20.0f * log10(maxSample);
 
-		if (fAttenuation > MAX_ATTENUATION)
-		{
-			fAttenuation = MAX_ATTENUATION;
-		}
-		else if (-fAttenuation > MAX_ATTENUATION)
-		{
-			fAttenuation = -1.0L * MAX_ATTENUATION;
-		}
+	if (fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = MAX_ATTENUATION;
+	}
+	else if (-fAttenuation > MAX_ATTENUATION)
+	{
+		fAttenuation = -1.0L * MAX_ATTENUATION;
+	}
 
-		return hr;
-	}
-	catch (HRESULT& hr) // from CConvolution
-	{
-#if defined(DEBUG) | defined(_DEBUG)	
-		cdebug << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
-#endif
-		return hr;
-	}
-#if defined(DEBUG) | defined(_DEBUG)
-	catch(const std::exception& error)
-	{
-		cdebug << "Standard exception: " << error.what() << std::endl;
-		return E_OUTOFMEMORY;
-	}
-	catch (const char* what)
-	{
-		cdebug << "Failed: " << what << std::endl;
-		return E_OUTOFMEMORY;
-	}
-	catch (const TCHAR* what)
-	{
-		cdebug << "Failed: " << what << std::endl;
-		return E_OUTOFMEMORY;
-	}
-#endif
-	catch (...)
-	{
-#if defined(DEBUG) | defined(_DEBUG)	
-		cdebug << "Failed to calculate optimum attenuation.  Unknown exception." << std::endl;
-#endif
-		return E_OUTOFMEMORY;
-	}
+	return hr;
 }

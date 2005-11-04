@@ -420,6 +420,9 @@
 			RelativePath=".\VTune\convolverWMP.vpj">
 		</File>
 		<File 
+			RelativePath=".\ConvolverWrapper.filterdata">
+		</File>
+		<File 
 			RelativePath=".\gpl.txt">
 		</File>
 	</Files>

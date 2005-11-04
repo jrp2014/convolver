@@ -12,6 +12,7 @@
 #endif
 #include "convolution\wavefile.h"
 #include "convolution\waveformat.h"
+#include "convolution\exception.h"
 
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -457,6 +458,11 @@ int _tmain(int argc, _TCHAR* argv[])
 		}// while ! eof / good
 	} // try
 
+	catch(const convolutionException& error)
+	{
+			std::cerr << error.what() << std::endl;
+			return 1;
+	}
 	catch(const std::ios_base::failure& error)
 	{
 		if(!input.eof())

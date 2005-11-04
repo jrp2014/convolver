@@ -1,0 +1,4 @@
+2 2
+D:\Projects\convolver\convolver\Media\PerfectDiracDelta-44100-1-256.wav
+0.0 1.0
+0.5 1.5

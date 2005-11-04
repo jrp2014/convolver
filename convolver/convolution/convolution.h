@@ -75,7 +75,7 @@ public:
 
 	void Flush();								// zero buffers, reset pointers
 
-	ChannelPaths			Mixer;				// Order dependent
+	ChannelPaths		Mixer;				// Order dependent
 
 	int cbLookAhead(const Holder < Sample<T> >& sample_convertor)
 	{

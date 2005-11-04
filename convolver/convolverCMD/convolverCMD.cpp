@@ -23,6 +23,7 @@
 //
 
 #include "stdafx.h"
+#include "convolution\config.h"
 #ifndef LIBSNDFILE
 #include "Common\dxstdafx.h"
 #endif
@@ -35,6 +36,19 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	const int	mode =   (1 * _CRTDBG_MODE_DEBUG) | (0 * _CRTDBG_MODE_WNDW);
+	::_CrtSetReportMode (_CRT_WARN, mode);
+	::_CrtSetReportMode (_CRT_ERROR, mode);
+	::_CrtSetReportMode (_CRT_ASSERT, mode);
+
+	const int	old_flags = ::_CrtSetDbgFlag (_CRTDBG_REPORT_FLAG);
+	::_CrtSetDbgFlag (  old_flags
+		| (1 * _CRTDBG_LEAK_CHECK_DF)
+		| (1 * _CRTDBG_CHECK_ALWAYS_DF)
+		| (1 * _CRTDBG_ALLOC_MEM_DF));
+#endif
+
 	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time{
 
 	HRESULT hr = S_OK;
@@ -151,7 +165,8 @@ int _tmain(int argc, _TCHAR* argv[])
 #endif
 
 #ifdef	LIBSNDFILE
-		// Write out in the same format as the input file
+		// Write out in the same format as the input file, but with the right number of output channels
+		sf_info.channels = conv->Mixer.nOutputChannels;
 		CWaveFileHandle WavOut(argv[4], SFM_WRITE, &sf_info);
 #else
 		CWaveFileHandle WavOut;
@@ -274,6 +289,10 @@ int _tmain(int argc, _TCHAR* argv[])
 		return 0;
 
 	}
+	catch(const convolutionException& error)
+	{
+		std::wcerr << "Convolution error: " << error.what() << std::endl;
+	}
 	catch(const std::exception& error)
 	{
 		std::wcerr << "Standard exception: " << error.what() << std::endl;
@@ -282,13 +301,21 @@ int _tmain(int argc, _TCHAR* argv[])
 	{	
 		std::wcerr << "Failed (" << std::hex << hr	<< std::dec << ")" << std::endl;
 	}
+	catch (const char* what)
+	{
+		std::wcerr << "Failed: " << what << std::endl;
+	}
+	catch (const TCHAR* what)
+	{
+		std::wcerr << "Failed: " << what << std::endl;
+	}
 	catch (...)
 	{
 		std::wcerr << "Failed" <<std::endl;
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
-	_CrtDumpMemoryLeaks();
+	::_CrtDumpMemoryLeaks();
 #endif
 
 	return hr;

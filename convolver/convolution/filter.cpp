@@ -26,9 +26,11 @@ nPartitions (nPartitions)
 	HRESULT hr = S_OK;
 #endif
 
+	SIMDFlushToZero();	// Set flush to zero processor mode for speed, with a loss of accuracy
+
 	if (nPartitions == 0)
 	{
-		throw (E_INVALIDARG);
+		throw filterException("Number of partitions must be at least one");
 	}
 
 	// Load the wave file
@@ -46,7 +48,7 @@ nPartitions (nPartitions)
 	hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ );
 	if( FAILED(hr) )
 	{
-		throw (hr);
+		throw filterException(hr);
 	}
 
 	// Save filter characteristic, for access by the properties page, etc
@@ -85,7 +87,7 @@ nPartitions (nPartitions)
 			}
 			else
 			{
-				throw(E_INVALIDARG);
+				throw filterException("Subformat not PCM or IEEE Float");
 			}
 		}
 	}
@@ -94,7 +96,7 @@ nPartitions (nPartitions)
 	// Check that the filter is not too big ...
 	if ( nFilterLength > MAX_FILTER_SIZE )
 	{
-		throw std::length_error("Filter too big to handle");
+		throw filterException("Filter too long to handle");
 	}
 
 	// Setup the filter
@@ -104,7 +106,7 @@ nPartitions (nPartitions)
 	// .. or filter too small
 	if ( nHalfPartitionLength == 0 )
 	{
-		throw(E_INVALIDARG);
+		filterException("Filter too short");
 	}
 
 	if ( nHalfPartitionLength == 1 )
@@ -209,7 +211,7 @@ nPartitions (nPartitions)
 		}
 		else
 		{
-			throw std::length_error("Failed to read a frame");
+			throw filterException("Failed to read a frame");
 		};
 
 #else
@@ -218,12 +220,12 @@ nPartitions (nPartitions)
 			hr = pFilterWave->Read(&bSample[0], dwSizeToRead, &dwSizeRead);
 			if (FAILED(hr))
 			{
-				throw (E_ABORT);
+				throw filterException("Failed to read a block");
 			}
 
 			if (dwSizeRead != dwSizeToRead) // file corrupt, non-existent, etc
 			{
-				throw (E_FAIL);
+				throw filterException("Failed to read a complete block");
 			}
 
 			// Now convert bSample to the float sample
@@ -262,7 +264,7 @@ nPartitions (nPartitions)
 							i = (i << 8) | bSample[0];
 							break;
 						default:
-							throw(E_INVALIDARG);
+							throw filterException("Bit depth for 24-bit container must be 16, 20 or 24");
 						}
 						sample = static_cast<float>(i);
 					}
@@ -291,34 +293,42 @@ nPartitions (nPartitions)
 						case 32:
 							break;
 						default:
-							throw(E_INVALIDARG);
+							throw filterException("Bit depth for 32-bit container must be 16, 20, 24 or 32");
 						}
 						sample = static_cast<float>(i);
 					}
 					break;
 				default:
-					throw(E_NOTIMPL); // Unsupported it sample size
+					throw filterException("Unsupported PCM sample size"); // Unsupported it sample size
 				}
 				break;
 
 			case WAVE_FORMAT_IEEE_FLOAT:
 				switch (wfexFilterFormat.Format.wBitsPerSample)
 				{
+				case 16:
+					throw filterException("16-bit IEEE float sample size not implemented");
 				case 24:
-					throw(E_NOTIMPL);
+					throw filterException("24-bit IEEE float sample size not implemented");
 				case 32:
 					{
 						assert(dwSizeToRead == sizeof(float));
 						sample = *reinterpret_cast<float*>(&bSample[0]);
 					}  // case
 					break;
+				case 64:
+					{
+						assert(dwSizeToRead == sizeof(double));
+						sample = *reinterpret_cast<double*>(&bSample[0]);
+					}  // case
+					break;
 				default:
-					throw(E_NOTIMPL); // Unsupported it sample size
+					throw filterException("Invalid IEEE float sample size"); // Unsupported it sample size
 				}
 				break;
 
 			default:
-				throw(E_NOTIMPL);	// Filter file format is not supported
+				throw filterException("Only PCM and IEEE Float file formats supported"););	// Filter file format is not supported
 			}
 
 			coeffs[nPartition][nChannel][nFrame % nHalfPartitionLength] = sample;

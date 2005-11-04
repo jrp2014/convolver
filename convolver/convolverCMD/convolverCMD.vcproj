@@ -25,6 +25,7 @@
 				InlineFunctionExpansion="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\"

@@ -21,26 +21,206 @@
 
 #include "convolution\lrint.h"
 
-	long int
-	lrint (double flt)
-	{	int intgr ;
 
-		_asm
-		{	fld flt
-			fistp intgr
-			} ;
+// From the Intel Software Optimization Cookbook
 
-		return intgr ;
+void SIMDFlushToZero(void)
+{
+	DWORD SIMDCtrl;
+	_asm
+	{
+		STMXCSR SIMDCtrl
+			mov eax, SIMDCtrl
+			// flush-to-zero = bit 15
+			// mask underflow = bit 11
+			// denormals = 0 are bit 6
+			or eax, 08840h
+			mov SIMDCtrl, eax
+			LDMXCSR SIMDCtrl
 	}
+}
 
-	long int
-	lrintf (float flt)
-	{	int intgr ;
 
-		_asm
-		{	fld flt
+long int
+lrint (double flt)
+{
+	int intgr;
+	_asm
+	{
+		fld flt
 			fistp intgr
-			} ;
+	} ;
 
-		return intgr ;
+	return intgr;
+}
+
+long int
+lrintf (float flt)
+{
+	int intgr ;
+	_asm
+	{
+		fld flt
+	fistp intgr
+	} ;
+
+	return intgr;
+}
+
+// From Fast Rounding of Floating Point Numbers in C/C++ on Wintel Platform
+// Laurent de Soras
+// 2004.07.04
+// web: http://ldesoras.free.fr
+
+inline int conv_float_to_int (float x)
+{
+	int a;
+	__asm
+	{
+		fld x
+			fistp a
 	}
+	return (a);
+}
+
+inline int conv_float_to_int_mem (double x)
+{
+	const int p = 52;
+	const double c_p1 = static_cast <double> (1L << (p / 2));
+	const double c_p2 = static_cast <double> (1L << (p - p / 2));
+	const double c_mul = c_p1 * c_p2;
+	assert (x > -0.5 * c_mul - 1);
+	assert (x < 0.5 * c_mul);
+	assert (x > static_cast <double> (INT_MIN) - 1.0);
+	assert (x < static_cast <double> (INT_MAX) + 1.0);
+	const double cs = 1.5 * c_mul;
+	x += cs;
+	const int a = *(reinterpret_cast <const int *> (&x));
+	assert (a * x >= 0);
+	return (a);
+}
+
+int round_int (double x)
+{
+	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
+	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
+	const float round_to_nearest = 0.5f;
+	int i;
+	__asm
+	{
+		fld x
+			fadd st, st (0)
+			fadd round_to_nearest
+			fistp i
+			sar i, 1
+	}
+	return (i);
+}
+
+
+int floor_int (double x)
+{
+	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
+	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
+	const float round_towards_m_i = -0.5f;
+	int i;
+	__asm
+	{
+		fld x
+			fadd st, st (0)
+			fadd round_towards_m_i
+			fistp i
+			sar i, 1
+	}
+	return (i);
+}
+
+int ceil_int (double x)
+{
+	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
+	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
+	const float round_towards_p_i = -0.5f;
+	int i;
+	__asm
+	{
+		fld x
+			fadd st, st (0)
+			fsubr round_towards_p_i
+			fistp i
+			sar i, 1
+	}
+	return (-i);
+}
+
+//int truncate_int (double x)
+//{
+//	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
+//	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
+//	const float round_towards_p_i = -0.5f;
+//	int i;
+//	__asm
+//	{
+//		fld x
+//			fadd st, st (0)
+//			fabs st (0)
+//			fadd round_towards_p_i
+//			fistp i
+//			sar i, 1
+//	}
+//	if (x < 0)
+//	{
+//		i = -i;
+//	}
+//	return (i);
+//}
+
+//From Denormal numbers in floating point signal processing applications
+//Laurent de Soras
+//2005.04.19
+//web: http://ldesoras.free.fr
+
+void test_and_kill_denormal (float &val)
+{ // Requires 32-bit int
+	const int x = *reinterpret_cast <const INT32 *> (&val);
+	const int abs_mantissa = x & 0x007FFFFF;
+	const int biased_exponent = x & 0x7F800000;
+	if (biased_exponent == 0 && abs_mantissa != 0)
+	{
+		val = 0;
+	}
+}
+
+void kill_denormal_by_quantization (float &val)
+{
+	static const float anti_denormal = 1e-18;
+	val += anti_denormal;
+	val -= anti_denormal;
+}
+
+bool is_denormalized ()
+{
+	short int status;
+	__asm
+	{
+		fstsw word ptr [status] ; Retrieve FPU status word
+			fclex ; Clear FPU exceptions (denormal flag)
+	}
+	return ((status & 0x0002) != 0);
+}
+
+unsigned int rand_state = 1; // Needs 32-bit int
+void add_white_noise (float &val)
+{ 
+	rand_state = rand_state * 1234567UL + 890123UL;
+	int mantissa = rand_state & 0x807F0000; // Keep only most significant bits (or rand_state & 0x007F0000 for +ve nos only)
+	int flt_rnd = mantissa | 0x1E000000; // Set exponent
+	val += *reinterpret_cast <const float *> (&flt_rnd);
+}
+
+void add_dc (float &val)
+{
+	static const float anti_denormal = 1e-20;
+	val += anti_denormal;
+}
+
+

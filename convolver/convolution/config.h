@@ -19,10 +19,6 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-#ifndef STRICT
-#define STRICT
-#endif
-
 // If app hasn't choosen, set to work with Windows 98, Windows Me, Windows 2000, Windows XP and beyond
 #ifndef WINVER
 #define WINVER         0x0410
@@ -42,6 +38,8 @@
 #include <limits.h>      
 #include <stdio.h>
 
+#include "convolution\exception.h"
+
 // Debugging
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -54,7 +52,9 @@
 #include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 
-#define DIRAC_DELTA_FUNCTIONS
+
+
+#undef DIRAC_DELTA_FUNCTIONS
 
 #endif
 
@@ -91,7 +91,6 @@
 
 
 const DWORD MAX_ATTENUATION = 1000; // dB
-const int MAX_CHANNEL = 32; // Maximum number of channels (used just for sanity checking)
 
 // Number of filter lengths used to calculate optimum attenuation
 const int NSAMPLES = 10;

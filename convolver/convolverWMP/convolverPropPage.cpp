@@ -31,6 +31,7 @@
 #include "debugging\fastTiming.h"
 #include "convolution\waveformat.h"
 #include "convolverWMP\version.h"
+#include <exception>
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -87,8 +88,13 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	{
 		try
 		{
-			Holder< CConvolution<float> >	conv(new CConvolution<float>(szFilterFileName,  1));
+			Holder< CConvolution<float> >	conv(new CConvolution<float>(szFilterFileName,  1)); // TODO: Find a more efficient way of doing this
 			SetDlgItemText( IDC_STATUS, CA2CT(conv->Mixer.DisplayChannelPaths().c_str()));
+		}
+		catch (std::exception& error)
+		{
+			SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
+			hr = E_FAIL;
 		}
 		catch (...) // creating m_Convolution might throw
 		{
@@ -103,35 +109,6 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	}
 
 	return hr;
-
-	// Load the wave file
-//#ifdef LIBSNDFILE
-//	try
-//	{
-//		SF_INFO sfinfo;
-//		ZeroMemory(&sfinfo, sizeof(sfinfo));
-//		CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sfinfo);
-//		std::string description = waveFormatDescription(sfinfo, "Filter: ");
-//		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
-//	}
-//	catch (...)
-//	{
-//		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
-//	}
-//#else
-//	CWaveFileHandle pFilterWave = new CWaveFile();
-//	if( FAILED(hr = pFilterWave->Open( szFilterFileName, NULL, WAVEFILE_READ ) ) )
-//	{
-//		SetDlgItemText( IDC_STATUS, TEXT("Failed to open Filter file") );
-//	}
-//	else
-//	{
-//		// Put up a description of the filter format. CA2CT converts from a const char* to an LPCTSTR
-//		// TODO: internationalisation of Filter:
-//		std::string description = waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pFilterWave->GetFormat()), pFilterWave->GetSize() / pFilterWave->GetFormat()->nBlockAlign , "Filter: ");
-//		SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()) );
-//	}
-//#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -154,171 +131,172 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	DWORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
 	// to be used in the convolution algorithm
 	// Get the attenuation value from the dialog box.
-	GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
-	// atof does not work with Unicode
-	// TODO:: redo this in C++ style, with stringstream
+	try
+	{
+		GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
+		// atof does not work with Unicode
+		// TODO:: redo this in C++ style, with stringstream
 #ifdef UNICODE
-	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-	fAttenuation = atof(strTmp); 
+		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
+		fAttenuation = atof(strTmp); 
 #else 
-	fAttenuation = atof(szStr);
+		fAttenuation = atof(szStr);
 #endif 
 
-	// Make sure attenuation value is valid
-	if ((-fAttenuation > MAX_ATTENUATION) || (fAttenuation > MAX_ATTENUATION))
-	{
-		if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+		// Make sure attenuation value is valid
+		if ((-fAttenuation > MAX_ATTENUATION) || (fAttenuation > MAX_ATTENUATION))
 		{
-			MessageBox(szStr);
+			if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+			{
+				MessageBox(szStr);
+			}
+			return E_FAIL;
 		}
-		return E_FAIL;
-	}
-	else
-		dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
+		else
+			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
 
-	// Get the effects level value from the dialog box.
-	GetDlgItemText(IDC_WETMIX, szStr, sizeof(szStr) / sizeof(szStr[0]));
+		// Get the effects level value from the dialog box.
+		GetDlgItemText(IDC_WETMIX, szStr, sizeof(szStr) / sizeof(szStr[0]));
 #ifdef UNICODE 
-	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-	dwWetmix = static_cast<DWORD>(atof(strTmp)); 
+		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
+		dwWetmix = static_cast<DWORD>(atof(strTmp)); 
 #else 
-	dwWetmix = static_cast<DWORD>(atof(szStr));
+		dwWetmix = static_cast<DWORD>(atof(szStr));
 #endif 
 
-	// Make sure wet mix value is valid.
-	if (dwWetmix > 100)
-	{
-		if (::LoadString(_Module.GetResourceInstance(), IDS_MIXRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+		// Make sure wet mix value is valid.
+		if (dwWetmix > 100)
 		{
-			MessageBox(szStr);
+			if (::LoadString(_Module.GetResourceInstance(), IDS_MIXRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+			{
+				MessageBox(szStr);
+			}
+			return E_FAIL;
 		}
-		return E_FAIL;
-	}
-	else
-		fWetmix = static_cast<float>(dwWetmix) / 100.0f; // %
+		else
+			fWetmix = static_cast<float>(dwWetmix) / 100.0f; // %
 
-	// Get the number of partitions value from the dialog box.
-	GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
+		// Get the number of partitions value from the dialog box.
+		GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
 
 #ifdef UNICODE 
-	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-	nPartitions = static_cast<DWORD>(atoi(strTmp)); 
+		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
+		nPartitions = static_cast<DWORD>(atoi(strTmp)); 
 #else 
-	nPartitions = static_cast<DWORD>(atoi(szStr));
+		nPartitions = static_cast<DWORD>(atoi(szStr));
 #endif
 
-	// Allow nPartitions == 0, to use plain overlap-save
+		// update the registry
+		CRegKey key;
+		LONG    lResult;
 
-	// Check that we have a valid number of partitions
-	// TODO:: This should actually be a function of the size of the filter
-	//if (nPartitions < 1)
-	//{
-	//	if (::LoadString(_Module.GetResourceInstance(), IDS_PARTITIONSERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-	//	{
-	//		MessageBox(szStr);
-	//	}
-	//	return E_FAIL;
-	//}
-
-	// update the registry
-	CRegKey key;
-	LONG    lResult;
-
-	// Write the wet mix value to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
-	{
-		lResult = key.SetDWORDValue( kszPrefsWetmix, dwWetmix );
-		if (lResult != ERROR_SUCCESS)
+		// Write the wet mix value to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
 		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to save effect level to registry.") );
-			return lResult;
+			lResult = key.SetDWORDValue( kszPrefsWetmix, dwWetmix );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save effect level to registry.") );
+				return lResult;
+			}
+		}
+
+		// Write the attenuation value to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			lResult = key.SetDWORDValue( kszPrefsAttenuation, dwAttenuation );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save attenuation to registry.") );
+				return lResult;
+			}
+		}
+
+		// Write the filter filename to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			// Get the filter file name from the dialog box.
+			GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
+
+			lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save filename to registry.") );
+				return lResult;
+			}
+		}
+
+		// Write the number of partitions to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			lResult = key.SetDWORDValue( kszPrefsPartitions, nPartitions );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save number of partitions to registry") );
+				return lResult;
+			}
+		}
+
+		// update the plug-in
+		if (m_spConvolver)
+		{
+			HRESULT hr;
+
+			hr = m_spConvolver->put_wetmix(fWetmix);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_EFFECTSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
+
+			hr = m_spConvolver->put_attenuation(fAttenuation);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
+
+			hr = m_spConvolver->put_filterfilename(szFilterFileName);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_FILTERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
+
+			hr = m_spConvolver->put_partitions(nPartitions);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_PARTITIONSSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
 		}
 	}
-
-	// Write the attenuation value to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
+	catch (std::exception& error)
 	{
-		lResult = key.SetDWORDValue( kszPrefsAttenuation, dwAttenuation );
-		if (lResult != ERROR_SUCCESS)
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to save attenuation to registry.") );
-			return lResult;
-		}
+		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
+		return E_FAIL;
 	}
-
-	// Write the filter filename to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
+	catch (...) 
 	{
-		// Get the filter file name from the dialog box.
-		GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
 
-		lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
-		if (lResult != ERROR_SUCCESS)
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to save filename to registry.") );
-			return lResult;
-		}
-	}
-
-	// Write the number of partitions to the registry.
-	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	if (ERROR_SUCCESS == lResult)
-	{
-		lResult = key.SetDWORDValue( kszPrefsPartitions, nPartitions );
-		if (lResult != ERROR_SUCCESS)
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to save number of partitions to registry") );
-			return lResult;
-		}
-	}
-
-	// update the plug-in
-	if (m_spConvolver)
-	{
-		HRESULT hr;
-
-		hr = m_spConvolver->put_wetmix(fWetmix);
-		if (FAILED(hr))
-		{
-			if (::LoadString(_Module.GetResourceInstance(), IDS_EFFECTSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-			{
-				MessageBox(szStr);
-			}
-			return hr;
-		}
-
-		hr = m_spConvolver->put_attenuation(fAttenuation);
-		if (FAILED(hr))
-		{
-			if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-			{
-				MessageBox(szStr);
-			}
-			return hr;
-		}
-
-		hr = m_spConvolver->put_filterfilename(szFilterFileName);
-		if (FAILED(hr))
-		{
-			if (::LoadString(_Module.GetResourceInstance(), IDS_FILTERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-			{
-				MessageBox(szStr);
-			}
-			return hr;
-		}
-
-		hr = m_spConvolver->put_partitions(nPartitions);
-		if (FAILED(hr))
-		{
-			if (::LoadString(_Module.GetResourceInstance(), IDS_PARTITIONSSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-			{
-				MessageBox(szStr);
-			}
-			return hr;
-		}
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to apply settings.") );
+		return E_FAIL;
 	}
 
 	m_bDirty = FALSE; // Tell the property page to disable Apply.
@@ -345,82 +323,90 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 
 	try
 	{
+		// May throw
 		version v(TEXT("convolverWMP.dll"));
 		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("version ") + v.get_product_version()).c_str());
-	}
-	catch(const std::exception& e)
-	{
-		SetDlgItemText(IDC_STATIC_VERSION,  CA2CT(e.what()));
-	}
 
-	// read from plug-in if it is available
-	if (m_spConvolver)
-	{
-		m_spConvolver->get_wetmix(&fWetmix);
-		// Convert wet mix from float to DWORD.
-		dwWetmix = static_cast<DWORD>(fWetmix * 100);
-
-		m_spConvolver->get_attenuation(&fAttenuation);
-		dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
-
-		m_spConvolver->get_filterfilename(&szFilterFileName);
-
-		m_spConvolver->get_partitions(&nPartitions);
-	}	
-	else // otherwise read from registry
-	{
-		lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
-		if (ERROR_SUCCESS == lResult)
+		// read from plug-in if it is available
+		if (m_spConvolver)
 		{
-			// Read the wet mix value.
-			lResult = key.QueryDWORDValue(kszPrefsWetmix, dwValue );
+			m_spConvolver->get_wetmix(&fWetmix);
+			// Convert wet mix from float to DWORD.
+			dwWetmix = static_cast<DWORD>(fWetmix * 100);
+
+			m_spConvolver->get_attenuation(&fAttenuation);
+			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
+
+			m_spConvolver->get_filterfilename(&szFilterFileName);
+
+			m_spConvolver->get_partitions(&nPartitions);
+		}	
+		else // otherwise read from registry
+		{
+			lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
 			if (ERROR_SUCCESS == lResult)
 			{
-				dwWetmix = dwValue;
-			}
+				// Read the wet mix value.
+				lResult = key.QueryDWORDValue(kszPrefsWetmix, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					dwWetmix = dwValue;
+				}
 
-			// Read the attenuation value.
-			lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue );
-			if (ERROR_SUCCESS == lResult)
-			{
-				dwAttenuation = dwValue;
-				fAttenuation = m_spConvolver->decode_Attenuationdb(dwAttenuation);
-			}
+				// Read the attenuation value.
+				lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					dwAttenuation = dwValue;
+					fAttenuation = m_spConvolver->decode_Attenuationdb(dwAttenuation);
+				}
 
-			TCHAR szValue[MAX_PATH]	= TEXT("");
-			ULONG ulMaxPath			= MAX_PATH;
+				TCHAR szValue[MAX_PATH]	= TEXT("");
+				ULONG ulMaxPath			= MAX_PATH;
 
-			// Read the filter filename value.
-			lResult = key.QueryStringValue(kszPrefsFilterFileName, szValue, &ulMaxPath );
-			if (ERROR_SUCCESS == lResult)
-			{
-				_tcsncpy(szFilterFileName, szValue, ulMaxPath);
-			}
+				// Read the filter filename value.
+				lResult = key.QueryStringValue(kszPrefsFilterFileName, szValue, &ulMaxPath );
+				if (ERROR_SUCCESS == lResult)
+				{
+					_tcsncpy(szFilterFileName, szValue, ulMaxPath);
+				}
 
-			// Read the number of partitions
-			lResult = key.QueryDWORDValue(kszPrefsPartitions, dwValue );
-			if (ERROR_SUCCESS == lResult)
-			{
-				nPartitions = dwValue;
+				// Read the number of partitions
+				lResult = key.QueryDWORDValue(kszPrefsPartitions, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					nPartitions = dwValue;
+				}
 			}
 		}
+
+		DisplayFilterFormat(szFilterFileName);
+
+		TCHAR szStr[MAXSTRING];
+
+		// Display the effect level.
+		_stprintf(szStr, _T("%u"), dwWetmix);
+		SetDlgItemText(IDC_WETMIX, szStr);
+
+		// Display the attenuation.
+		_stprintf(szStr, _T("%.1f"), fAttenuation);
+		SetDlgItemText(IDC_ATTENUATION, szStr);
+
+		// Display the number of partitions
+		_stprintf(szStr, _T("%u"), nPartitions);
+		SetDlgItemText(IDC_PARTITIONS, szStr);
 	}
+	catch (std::exception& error)
+	{
+		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
+		return E_FAIL;
+	}
+	catch (...) 
+	{
 
-	DisplayFilterFormat(szFilterFileName);
-
-	TCHAR   szStr[MAXSTRING];
-
-	// Display the effect level.
-	_stprintf(szStr, _T("%u"), dwWetmix);
-	SetDlgItemText(IDC_WETMIX, szStr);
-
-	// Display the attenuation.
-	_stprintf(szStr, _T("%.1f"), fAttenuation);
-	SetDlgItemText(IDC_ATTENUATION, szStr);
-
-	// Display the number of partitions
-	_stprintf(szStr, _T("%u"), nPartitions);
-	SetDlgItemText(IDC_PARTITIONS, szStr);
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to initialize dialogue.") );
+		return E_FAIL;
+	}
 
 	return 0;
 }
@@ -512,49 +498,63 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	TCHAR*  szFilterFileName	= TEXT("");
 	HRESULT hr S_OK;
 
-	if(IsPageDirty() == S_OK) // Make sure that the currently-visible settings are used
+	try
 	{
-		hr = Apply();
+		if(IsPageDirty() == S_OK) // Make sure that the currently-visible settings are used
+		{
+			hr = Apply();
+			if (FAILED(hr))
+			{
+				//SetDlgItemText( IDC_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
+				return hr;
+			}
+		}
+
+		hr = m_spConvolver->get_filterfilename(&szFilterFileName);
 		if (FAILED(hr))
 		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to apply settings.") ); // TODO: internationalize
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
 			return hr;
 		}
-	}
 
-	hr = m_spConvolver->get_filterfilename(&szFilterFileName);
-	if (FAILED(hr))
+		hr = m_spConvolver->get_partitions(&nPartitions);
+		if (FAILED(hr))
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
+			return hr;
+		}
+
+		double fElapsed = 0;
+		apHiResElapsedTime t;
+		// TODO: the 8 should be derived
+		hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
+		fElapsed = t.sec();
+		if (FAILED(hr))
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
+			return hr;
+		}
+
+		// Display the attenuation.
+		TCHAR   szStr[MAXSTRING] = { 0 };
+		_stprintf(szStr, _T("%.1f"), fAttenuation);
+		SetDlgItemText(IDC_ATTENUATION, szStr);
+
+		// Display calculation time
+		_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
+		SetDlgItemText(IDC_STATUS, szStr);
+	}
+	catch (std::exception& error)
 	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
-		return hr;
+		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
+		return E_FAIL;
 	}
-
-	hr = m_spConvolver->get_partitions(&nPartitions);
-	if (FAILED(hr))
+	catch (...) 
 	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
-		return hr;
+
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );
+		return E_FAIL;
 	}
-
-	double fElapsed = 0;
-	apHiResElapsedTime t;
-	// TODO: the 8 should be derived
-	hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
-	fElapsed = t.sec();
-	if (FAILED(hr))
-	{
-		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
-		return hr;
-	}
-
-	// Display the attenuation.
-	TCHAR   szStr[MAXSTRING] = { 0 };
-	_stprintf(szStr, _T("%.1f"), fAttenuation);
-	SetDlgItemText(IDC_ATTENUATION, szStr);
-
-	// Display calculation time
-	_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
-	SetDlgItemText(IDC_STATUS, szStr);
 
 	SetDirty(TRUE);
 
