@@ -53,7 +53,7 @@ FFTOutputBuffer_(ChannelBuffer(Mixer.nFFTWPartitionLength)),
 nInputBufferIndex_(Mixer.nHalfPartitionLength),
 nPartitionIndex_(0),
 nPreviousPartitionIndex_(Mixer.nPartitions-1),
-bStartWritingOutput_(false)
+bStartWriting_(false)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "CConvolution" << std::endl;)
@@ -84,7 +84,7 @@ void CConvolution<T>::Flush()
 		nInputBufferIndex_ = Mixer.nHalfPartitionLength;// placeholder
 		nPartitionIndex_ = 0;							// for partitioned convolution
 		nPreviousPartitionIndex_ = Mixer.nPartitions-1;	// lags nPartitionIndex_ by 1
-		bStartWritingOutput_ = false;					// don't start outputting until we have some convolved output
+		bStartWriting_ = false;
 }
 
 
@@ -95,9 +95,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 										  const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
 										  const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
 										  DWORD dwBlocksToProcess,		// A block contains a sample for each channel
-										  const T fAttenuation_db,
-										  const T fWetMix,
-										  const T fDryMix)  // Returns bytes processed
+										  const T fAttenuation_db)  // Returns bytes processed
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "CConvolution<T>::doPartitionedConvolution" << std::endl;)
@@ -119,26 +117,19 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 	{
 		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
 
-
-		// Get the next frame from pbInputBuffer_ to InputBuffer_, copying the previous frame from OutputBuffer_ to pbOutputData
-		// Output lags input by half a partition length
-
-		if(bStartWritingOutput_)
+		if(bStartWriting_)
 		{
 #pragma loop count(6)
-#pragma ivdep
 			for (int nChannel = 0; nChannel<Mixer.nOutputChannels; ++nChannel)
 			{
-				// Mix the processed signal with the dry signal
-				// TODO: remove support for wet/drymix
-				output_sample_convertor->PutSample(pbOutputDataPointer,
-					InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + OutputBufferAccumulator_[nChannel][nInputBufferIndex_] * fWetMix,
+				output_sample_convertor->PutSample(pbOutputDataPointer, OutputBufferAccumulator_[nChannel][nInputBufferIndex_],
 					cbOutputBytesGenerated);
 			}
 		}
 
+		// Get the next frame from pbInputBuffer_ to InputBuffer_
+		// Output lags input by half a partition length
 #pragma loop count(6)
-#pragma ivdep
 		for (int nChannel = 0; nChannel<Mixer.nInputChannels; ++nChannel)
 		{
 			// Get the next input sample and convert it to a float, and scale it
@@ -167,17 +158,6 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 
 				// Mix the input samples for this filter path
 				mix_input(Mixer.Paths[nPath]);
-				//				InputBufferAccumulator_ = 0;
-				//#pragma loop count(6)
-				//				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
-				//				{
-				//#pragma loop count(65536)
-				//					for(int i=0; i<Mixer.nPartitionLength; ++i)
-				//					{
-				//						InputBufferAccumulator_[i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
-				//							Mixer.Paths[nPath].inChannel[nChannel].fScale;
-				//					}
-				//				}
 
 				// get DFT of InputBufferAccumulator_
 #ifdef FFTW
@@ -238,20 +218,6 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 #endif
 					Mixer.nHalfPartitionLength, Mixer.nPartitionLength);
 
-				//#pragma loop count(6)
-				//				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
-				//				{
-				//#pragma loop count(65536)
-				//					for(int i=0; i < Mixer.nHalfPartitionLength; ++i)
-				//					{
-				//						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] += Mixer.Paths[nPath].outChannel[nChannel].fScale *
-				//#ifdef FFTW
-				//							OutputBuffer_[i];
-				//#else
-				//							ComputationCircularBuffer_[nPartitionIndex_][nPath][i] ;
-				//#endif
-				//					} // i
-				//				} // nChannel
 			} // nPath
 
 			// Save the previous half partition; the first half will be read in over the next cycle
@@ -269,8 +235,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 			// Save the partition to be used for output
 			nPreviousPartitionIndex_ = nPartitionIndex_;
 			nPartitionIndex_ = (nPartitionIndex_ + 1) % Mixer.nPartitions;
-
-			bStartWritingOutput_ = true;
+			bStartWriting_ = true;
 		}
 		else
 			++ nInputBufferIndex_ ;		// get next frame
@@ -292,9 +257,7 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 							   const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
 							   const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
 							   DWORD dwBlocksToProcess,		// A block contains a sample for each channel
-							   const T fAttenuation_db,
-							   const T fWetMix,
-							   const T fDryMix)			// Returns bytes processed
+							   const T fAttenuation_db)			// Returns bytes processed
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "CConvolution<T>::doConvolution" << std::endl;)
@@ -323,29 +286,24 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		{
 			// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
 
-			// Get the next frame from pbInputBuffer_ to InputBuffer_, copying the previous frame from OutputBuffer_ to pbOutputData
-
-			if(bStartWritingOutput_)
+			if(bStartWriting_)
 			{
 #pragma loop count(6)
-#pragma ivdep
 				for (int nChannel = 0; nChannel<Mixer.nOutputChannels; ++nChannel)
 				{
-					// Mix the processed signal with the dry signal
-					// TODO: remove support for wet/drymix
-					output_sample_convertor->PutSample(pbOutputDataPointer,
-						InputBuffer_[nChannel][nInputBufferIndex_] * fDryMix + OutputBufferAccumulator_[nChannel][nInputBufferIndex_] * fWetMix,
+					output_sample_convertor->PutSample(pbOutputDataPointer,	OutputBufferAccumulator_[nChannel][nInputBufferIndex_],
 						cbOutputBytesGenerated);
 				}
 			}
 
+			// Get the next frame from pbInputBuffer_ to InputBuffer_
 #pragma loop count(6)
-#pragma ivdep
 			for (int nChannel = 0; nChannel<Mixer.nInputChannels; ++nChannel)
 			{
 				// Get the next input sample and convert it to a float, and scale it
 				input_sample_convertor->GetSample(InputBuffer_[nChannel][nInputBufferIndex_],
 					pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
+
 			} // nChannel
 
 			// Got a frame
@@ -366,16 +324,6 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				{
 					// Mix the input samples for this filter path into InputBufferAccumulator_
 					mix_input(Mixer.Paths[nPath]);
-					//				InputBufferAccumulator_ = 0;
-					//				for(int nChannel = 0; nChannel < Mixer.Paths[nPath].inChannel.size(); ++nChannel)
-					//				{
-					//#pragma loop count(65536)
-					//					for(int i=0; i<Mixer.nPartitionLength; ++i)
-					//					{
-					//						InputBufferAccumulator_[i] += InputBuffer_[Mixer.Paths[nPath].inChannel[nChannel].nChannel][i] *
-					//							Mixer.Paths[nPath].inChannel[nChannel].fScale;
-					//					}
-					//				}
 
 					// get DFT of InputBufferAccumulator_
 #ifdef FFTW
@@ -432,17 +380,6 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					// Mix the outputs (only use the last half, as the rest is junk)
 					mix_output(Mixer.Paths[nPath], OutputBufferAccumulator_, OutputBuffer_,
 						Mixer.nHalfPartitionLength, Mixer.nPartitionLength);
-
-					//#pragma loop count(6)
-					//				for(int nChannel=0; nChannel<Mixer.Paths[nPath].outChannel.size(); ++nChannel)
-					//				{
-					//#pragma loop count(65536)
-					//					for(int i=0; i<Mixer.nHalfPartitionLength; ++i)
-					//					{
-					//						OutputBufferAccumulator_[Mixer.Paths[nPath].outChannel[nChannel].nChannel][i] += 
-					//							OutputBuffer_[i] * Mixer.Paths[nPath].outChannel[nChannel].fScale;
-					//					}
-					//				}
 				} // nPath
 
 				// Save the previous half partition; the first half will be read in over the next cycle
@@ -453,9 +390,9 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				{
 					InputBuffer_[nChannel].shiftleft(Mixer.nHalfPartitionLength);
 				}
-				nInputBufferIndex_ = Mixer.nHalfPartitionLength;
 
-				bStartWritingOutput_ = true;
+				nInputBufferIndex_ = Mixer.nHalfPartitionLength;
+				bStartWriting_ = true;
 			}
 			else
 				++nInputBufferIndex_;
@@ -698,118 +635,125 @@ HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample
 		return E_POINTER;
 	}
 
-	WORD wFormatTag = pWave->wFormatTag;
-	WORD wValidBitsPerSample = pWave->wBitsPerSample;
-	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	try
 	{
-		WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-		wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
-		if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+		WORD wFormatTag = pWave->wFormatTag;
+		WORD wValidBitsPerSample = pWave->wBitsPerSample;
+		if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 		{
-			wFormatTag = WAVE_FORMAT_PCM;
-			// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
-		}
-		else
-			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+			wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
+			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 			{
-				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+				wFormatTag = WAVE_FORMAT_PCM;
+				// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
 			}
 			else
+				if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+				{
+					wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+				}
+				else
+				{
+					return E_INVALIDARG;
+				}
+		}
+
+		sample_convertor = NULL;
+
+		switch (wFormatTag)
+		{
+		case WAVE_FORMAT_PCM:
+			switch (pWave->wBitsPerSample)
 			{
-				return E_INVALIDARG;
+				// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+				// structure to determine the valid bits per sample. (See above)
+			case 8:
+				sample_convertor = new Sample_pcm8<T>();
+				break;
+
+			case 16:
+				sample_convertor = new Sample_pcm16<T>();
+				break;
+
+			case 24:
+				{
+					switch (wValidBitsPerSample)
+					{
+					case 16:
+						sample_convertor = new Sample_pcm24<T, 16>();
+						break;
+
+					case 20:
+						sample_convertor = new Sample_pcm24<T, 20>();
+						break;
+
+					case 24:
+						sample_convertor = new Sample_pcm24<T, 24>();
+						break;
+
+					default:
+						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+					}
+				}
+				break;
+
+			case 32:
+				{
+					switch (wValidBitsPerSample)
+					{
+					case 16:
+						sample_convertor = new Sample_pcm32<T, 16>();
+						break;
+
+					case 20:
+						sample_convertor = new Sample_pcm32<T, 20>();
+						break;
+
+					case 24:
+						sample_convertor = new Sample_pcm32<T, 24>();
+						break;
+
+					case 32:
+						sample_convertor = new Sample_pcm32<T, 32>();
+						break;
+
+					default:
+						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+					}
+				}
+				break;
+
+			default:  // Unprocessable PCM
+				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
 			}
+			break;
+
+		case WAVE_FORMAT_IEEE_FLOAT:
+			switch (pWave->wBitsPerSample)
+			{
+			case 32:
+				sample_convertor = new Sample_ieeefloat<T>();
+				break;
+
+			case 64:
+				sample_convertor = new Sample_ieeedouble<T>();
+				break;
+
+			default:  // Unprocessable IEEE float
+				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+				//break;
+			}
+			break;
+
+		default: // Not PCM or IEEE Float
+			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+		}
 	}
-
-	sample_convertor = NULL;
-
-	switch (wFormatTag)
+	catch(...)
 	{
-	case WAVE_FORMAT_PCM:
-		switch (pWave->wBitsPerSample)
-		{
-			// Note: for 8 and 16-bit samples, we assume the sample is the same size as
-			// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-			// structure to determine the valid bits per sample. (See above)
-		case 8:
-			sample_convertor = new Sample_pcm8<T>();
-			break;
-
-		case 16:
-			sample_convertor = new Sample_pcm16<T>();
-			break;
-
-		case 24:
-			{
-				switch (wValidBitsPerSample)
-				{
-				case 16:
-					sample_convertor = new Sample_pcm24<T, 16>();
-					break;
-
-				case 20:
-					sample_convertor = new Sample_pcm24<T, 20>();
-					break;
-
-				case 24:
-					sample_convertor = new Sample_pcm24<T, 24>();
-					break;
-
-				default:
-					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-				}
-			}
-			break;
-
-		case 32:
-			{
-				switch (wValidBitsPerSample)
-				{
-				case 16:
-					sample_convertor = new Sample_pcm32<T, 16>();
-					break;
-
-				case 20:
-					sample_convertor = new Sample_pcm32<T, 20>();
-					break;
-
-				case 24:
-					sample_convertor = new Sample_pcm32<T, 24>();
-					break;
-
-				case 32:
-					sample_convertor = new Sample_pcm32<T, 32>();
-					break;
-
-				default:
-					return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-				}
-			}
-			break;
-
-		default:  // Unprocessable PCM
-			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-		}
-		break;
-
-	case WAVE_FORMAT_IEEE_FLOAT:
-		switch (pWave->wBitsPerSample)
-		{
-		case 32:
-			sample_convertor = new Sample_ieeefloat<T>();
-			break;
-
-		case 64:
-			sample_convertor = new Sample_ieeedouble<T>();
-			break;
-
-		default:  // Unprocessable IEEE float
-			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-			//break;
-		}
-		break;
-
-	default: // Not PCM or IEEE Float
-		return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+		return E_ABORT;
 	}
 
 	return hr;
@@ -831,10 +775,11 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 	// that is equivalent to 0.1s to process a filter
 	// which means that the filter must be less than 44100 / .1 samples in length to keep up
 	const int nBlocks = nSamples * c.Mixer.nFilterLength;
-	const int nBufferLength = nBlocks * c.Mixer.nInputChannels;	// Channels are interleaved
+	const int nInputBufferLength = nBlocks * c.Mixer.nInputChannels;	// Channels are interleaved
+	const int nOutputBufferLength = nBlocks * c.Mixer.nOutputChannels;
 
-	std::vector<T>InputSamples(nBufferLength);
-	std::vector<T>OutputSamples(nBufferLength);
+	std::vector<T>InputSamples(nInputBufferLength);
+	std::vector<T>OutputSamples(nOutputBufferLength);
 
 	Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
 
@@ -847,7 +792,7 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 	// have been used
 	//do
 	//{
-	for(int i = 0; i < nBufferLength; ++i)
+	for(int i = 0; i < nInputBufferLength; ++i)
 	{
 		InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
 		//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
@@ -865,19 +810,15 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 		c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor, convertor,
 		/* dwBlocksToProcess */ nBlocks,
-		/* fAttenuation_db */ 0,
-		/* fWetMix,*/ 1.0L,
-		/* fDryMix */ 0.0L)
+		/* fAttenuation_db */ 0)
 		: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor, convertor,
 		/* dwBlocksToProcess */ nBlocks,
-		/* fAttenuation_db */ 0,
-		/* fWetMix,*/ 1.0L,
-		/* fDryMix */ 0.0L);
+		/* fAttenuation_db */ 0);
 
 		// The output will be missing the last half filter length, the first time around
 		assert (nBytesGenerated % sizeof(T) == 0);
-	assert (nBytesGenerated <= nBufferLength * sizeof(T));
+	assert (nBytesGenerated <= nOutputBufferLength * sizeof(T));
 
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(4,

@@ -52,11 +52,13 @@ public:
 
 	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions);
 #ifdef FFTW
-	// TODO: this does not work because if you have a number of filters of the same length they seem to point to the same thing
+	// // TODO: this does not work because if you have a number of filters of the same length they seem to point to the same thing
 	//~Filter()
 	//{
 	//	fftwf_destroy_plan(plan);
+	//	plan = NULL;
 	//	fftwf_destroy_plan(reverse_plan);
+	//	reverse_plan = NULL;
 	//}
 #endif
 

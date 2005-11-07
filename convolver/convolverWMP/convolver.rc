@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,5,0,0
- PRODUCTVERSION 2,5,0,0
+ FILEVERSION 2,6,0,0
+ PRODUCTVERSION 2,6,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "2, 5, 0, 0"
+            VALUE "FileVersion", "2, 6, 0, 0"
             VALUE "InternalName", "Convolver"
             VALUE "LegalCopyright", "Copyright GPL 2005"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "2, 5, 0, 0"
+            VALUE "ProductVersion", "2, 6, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -99,22 +99,19 @@ STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 EXSTYLE WS_EX_RIGHT
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    LTEXT           "Effect Level (%):",IDC_MIXLABEL,4,42,56,8
-    EDITTEXT        IDC_WETMIX,62,39,40,14,ES_RIGHT | ES_AUTOHSCROLL | 
-                    ES_NUMBER
-    PUSHBUTTON      "Get config ...",IDC_GETFILTER,4,0,50,14
+    PUSHBUTTON      "Get config ...",IDC_GETFILTER,4,0,56,14
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
                     WS_GROUP,62,2,149,11,WS_EX_CLIENTEDGE
-    LTEXT           "",IDC_STATUS,3,59,206,60,SS_NOPREFIX
-    LTEXT           "Attenuation (dB):",IDC_STATIC,4,22,57,8
-    EDITTEXT        IDC_ATTENUATION,62,19,40,14,ES_RIGHT | ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATUS,4,48,207,72,SS_NOPREFIX
+    LTEXT           "Attenuation (dB):",IDC_STATIC,4,18,56,8
+    EDITTEXT        IDC_ATTENUATION,62,15,40,14,ES_RIGHT | ES_AUTOHSCROLL
     PUSHBUTTON      "Calculate optimum attenuation",
-                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,109,19,102,14
-    LTEXT           "No of partitions:",IDC_PARTITIONSLABEL,111,42,56,8
-    EDITTEXT        IDC_PARTITIONS,171,39,40,14,ES_RIGHT | ES_AUTOHSCROLL | 
+                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,109,15,102,14
+    LTEXT           "No of partitions:",IDC_PARTITIONSLABEL,4,34,56,8
+    EDITTEXT        IDC_PARTITIONS,62,31,40,14,ES_RIGHT | ES_AUTOHSCROLL | 
                     ES_NUMBER
-    RTEXT           "Unknown version",IDC_STATIC_VERSION,154,109,59,8
+    RTEXT           "Unknown version",IDC_STATIC_VERSION,109,34,102,8
 END
 
 

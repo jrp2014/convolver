@@ -229,9 +229,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #endif
 				convertor, convertor,
 				/* dwBlocksToProcess */ dwBlocksToProcess,
-				/* fAttenuation_db */ fAttenuation,
-				/* fWetMix,*/ 1.0f,
-				/* fDryMix */ 0.0f)
+				/* fAttenuation_db */ fAttenuation)
 				:
 #ifdef LIBSNDFILE
 			conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
@@ -240,9 +238,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #endif
 				convertor, convertor,
 				/* dwBlocksToProcess */ dwBlocksToProcess,
-				/* fAttenuation_db */ fAttenuation,
-				/* fWetMix,*/ 1.0f,
-				/* fDryMix */ 0.0f);
+				/* fAttenuation_db */ fAttenuation);
 
 #if defined(DEBUG) | defined(_DEBUG)
 				//cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;

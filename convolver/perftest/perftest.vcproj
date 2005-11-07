@@ -27,7 +27,7 @@
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories=".."
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="TRUE"

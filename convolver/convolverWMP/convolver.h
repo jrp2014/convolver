@@ -56,7 +56,6 @@ const DWORD MAXSTRING = 1024;	// length
 // registry location for preferences
 const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
 const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
-const TCHAR kszPrefsWetmix[] = _T("Wetmix");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 const TCHAR kszPrefsPartitions[] = _T("Partitions");
 
@@ -71,10 +70,6 @@ DEFINE_GUID(CLSID_Convolver,
 interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver : IUnknown
 {
 public:
-
-	virtual HRESULT STDMETHODCALLTYPE get_wetmix(float *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_wetmix(float newVal) = 0;
-
 	virtual HRESULT STDMETHODCALLTYPE get_filterfilename(TCHAR* *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_filterfilename(TCHAR* newVal) = 0;
 
@@ -86,7 +81,6 @@ public:
 
 	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
-
 };
 
 
@@ -131,9 +125,6 @@ public:
 	void    FinalRelease();
 
 	// IConvolver methods
-	STDMETHOD(get_wetmix)(float *pVal);
-	STDMETHOD(put_wetmix)(float newVal);
-
 	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
 	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
 
@@ -305,8 +296,6 @@ private:
 	bool                    m_bValidTime;       // Is timestamp valid?
 	REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
 
-	float					m_fWetMix;			// proportion of effect
-	float					m_fDryMix;			// proportion of dry signal
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 

@@ -52,7 +52,7 @@ nFilterLength(0)
 #endif
 		config >> nOutputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
-		cdebug << nInputChannels << " output channels" << std::endl;
+		cdebug << nOutputChannels << " output channels" << std::endl;
 #endif
 		config.get();  // consume newline
 

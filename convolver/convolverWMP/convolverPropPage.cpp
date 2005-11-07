@@ -190,18 +190,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		CRegKey key;
 		LONG    lResult;
 
-		// Write the wet mix value to the registry.
-		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-		if (ERROR_SUCCESS == lResult)
-		{
-			lResult = key.SetDWORDValue( kszPrefsWetmix, dwWetmix );
-			if (lResult != ERROR_SUCCESS)
-			{
-				SetDlgItemText( IDC_STATUS, TEXT("Failed to save effect level to registry.") );
-				return lResult;
-			}
-		}
-
 		// Write the attenuation value to the registry.
 		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
 		if (ERROR_SUCCESS == lResult)
@@ -245,16 +233,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		if (m_spConvolver)
 		{
 			HRESULT hr;
-
-			hr = m_spConvolver->put_wetmix(fWetmix);
-			if (FAILED(hr))
-			{
-				if (::LoadString(_Module.GetResourceInstance(), IDS_EFFECTSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-				{
-					MessageBox(szStr);
-				}
-				return hr;
-			}
 
 			hr = m_spConvolver->put_attenuation(fAttenuation);
 			if (FAILED(hr))
@@ -330,7 +308,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		// read from plug-in if it is available
 		if (m_spConvolver)
 		{
-			m_spConvolver->get_wetmix(&fWetmix);
 			// Convert wet mix from float to DWORD.
 			dwWetmix = static_cast<DWORD>(fWetmix * 100);
 
@@ -346,13 +323,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 			lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
 			if (ERROR_SUCCESS == lResult)
 			{
-				// Read the wet mix value.
-				lResult = key.QueryDWORDValue(kszPrefsWetmix, dwValue );
-				if (ERROR_SUCCESS == lResult)
-				{
-					dwWetmix = dwValue;
-				}
-
 				// Read the attenuation value.
 				lResult = key.QueryDWORDValue(kszPrefsAttenuation, dwValue );
 				if (ERROR_SUCCESS == lResult)
@@ -407,14 +377,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to initialize dialogue.") );
 		return E_FAIL;
 	}
-
-	return 0;
-}
-
-LRESULT CConvolverPropPage::OnEnChangeWetmix(WORD wNotifyCode, WORD wID, HWND hWndCtl, BOOL& bHandled)
-{
-
-	SetDirty(TRUE); // Enable Apply.
 
 	return 0;
 }

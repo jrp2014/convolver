@@ -32,7 +32,7 @@
 
 // TODO: put the strings in this file into the resource file for internationalisation
 
-#ifdef LIBSNDFILE
+//#ifdef LIBSNDFILE
 
 const std::string channelDescription(const SF_INFO& sfinfo)
 {
@@ -79,7 +79,7 @@ std::string waveFormatDescription(const SF_INFO& sfinfo, const char* prefix)
 	return s.str();
 }
 
-#else
+//#else
 
 const std::string channelDescription(const WAVEFORMATEXTENSIBLE* w)
 {
@@ -202,4 +202,4 @@ std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD sam
 	return s.str();
 }
 
-#endif
+//#endif

@@ -34,11 +34,11 @@
 #include <sstream>
 #include <iomanip>
 
-#ifdef LIBSNDFILE
+//#ifdef LIBSNDFILE
 std::string waveFormatDescription(const SF_INFO& sf_info, const char* prefix);
-#else
+//#else
 std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix);
-#endif
+//#endif
 
 //// Used to distinguish the different encoding and decoding routines
 //class WaveFormatSignature

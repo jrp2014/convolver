@@ -64,7 +64,6 @@ BEGIN_COM_MAP(CConvolverPropPage)
 END_COM_MAP()
 
 BEGIN_MSG_MAP(CConvolverPropPage)
-	COMMAND_HANDLER(IDC_WETMIX, EN_CHANGE, OnEnChangeWetmix)
 	COMMAND_HANDLER(IDC_GETFILTER, BN_CLICKED, OnBnClickedGetfilter)
 	COMMAND_HANDLER(IDC_ATTENUATION, EN_CHANGE, OnEnChangeAttenuation)
 	COMMAND_HANDLER(IDC_BUTTON_CALCULATEOPTIMUMATTENUATION, BN_CLICKED, OnBnClickedButtonCalculateoptimumattenuation)
@@ -84,7 +83,6 @@ private:
     CComPtr<IConvolver> m_spConvolver;  // pointer to plug-in interface
 
 public:
-	LRESULT OnEnChangeWetmix(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnBnClickedGetfilter(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);

@@ -60,18 +60,14 @@ public:
 		const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
 		const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,		// A block contains a sample for each channel
-		const T fAttenuation_db,
-		const T fWetMix,
-		const T fDryMix);  // Returns bytes generated
+		const T fAttenuation_db);  // Returns bytes generated
 
 	// This version does straight overlap-save convolution
 	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
 		const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,
-		const T fAttenuation_db,
-		const T fWetMix,
-		const T fDryMix); // Returns bytes generated
+		const T fAttenuation_db); // Returns bytes generated
 
 	void Flush();								// zero buffers, reset pointers
 
@@ -98,8 +94,7 @@ private:
 	int					nInputBufferIndex_;			// placeholder
 	int					nPartitionIndex_;			// for partitioned convolution
 	int					nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
-	bool				bStartWritingOutput_;		// don't start outputting until we have some convolved output
-
+	bool				bStartWriting_;
 
 	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
