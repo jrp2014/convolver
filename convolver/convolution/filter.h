@@ -33,6 +33,7 @@ class Filter
 public:
 
 	int						nChannels;				// number of channels
+	int						nSampleRate;			// 44100, 48000, etc
 	PartitionedBuffer		coeffs;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat;		// The format of the filter file

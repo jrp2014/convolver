@@ -38,8 +38,9 @@ nPartitions (nPartitions)
 	::ZeroMemory(&sf_FilterFormat, sizeof(SF_INFO));
 	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat); // Throws, if file invalid
 
-	// Save number of channels for easy access
+	// Save number of channels and sample rate for easy access
 	nChannels = sf_FilterFormat.channels;
+	nSampleRate = sf_FilterFormat.samplerate;
 
 	nFilterLength = sf_FilterFormat.frames;
 
@@ -55,8 +56,9 @@ nPartitions (nPartitions)
 	::ZeroMemory(&wfexFilterFormat, sizeof(wfexFilterFormat));
 	wfexFilterFormat.Format = *pFilterWave->GetFormat();
 
-	// Save number of channels for easy access
+	// Save number of channels and sample rate for easy access
 	nChannels = wfexFilterFormat.Format.nChannels;
+	nSampleRate = wfexFilterFormat.Format.nSampleRate;
 
 	WORD wValidBitsPerSample = wfexFilterFormat.Format.wBitsPerSample;
 	WORD wFormatTag = wfexFilterFormat.Format.wFormatTag;

@@ -147,6 +147,7 @@ nFilterLength(0)
 				nPartitionLength = Paths[0].filter.nPartitionLength;			// in frames (a frame contains the interleaved samples for each channel)
 				nHalfPartitionLength = Paths[0].filter.nHalfPartitionLength;	// in frames
 				nFilterLength = Paths[0].filter.nFilterLength;					// nFilterLength = nPartitions * nPartitionLength
+				nSampleRate = Paths[0].filter.nSampleRate;
 #ifdef FFTW
 				nFFTWPartitionLength = 2 * (nPartitionLength / 2 + 1);			// Needs an extra element
 #endif
@@ -167,11 +168,8 @@ nFilterLength(0)
 				{
 					throw configException("Filters must all be of the same length");
 				}
-#ifdef LIBSNDFILE
-				if(Paths[0].filter.sf_FilterFormat.samplerate != Paths[i].filter.sf_FilterFormat.samplerate)
-#else
-				if(Paths[0].filter.wfewfexFilterFormat.nBytesPerSec != Paths[i].filter.wfexFilterFormat.nBytesPerSec)
-#endif
+
+				if(Paths[i].filter.nSampleRate != nSampleRate)
 				{
 					throw configException("Filters must all have the same sample rate");
 				}

@@ -61,6 +61,7 @@ public:
 public:
 	int	nInputChannels;			// number of input channels
 	int nOutputChannels;		// number of output channels
+	int nSampleRate;			// 44100, 48000, etc
 	int nPaths;					// number of Paths
 	int	nPartitions;
 	int	nPartitionLength;		// in blocks (a block contains the samples for each channel)

@@ -21,6 +21,24 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_46FCC0CE280DB6085556483BE6B5C262"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_50088B1D7DB527D9B2047C152B9D7290"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_62C2CC6C9607EEB26EB53A15F81A2094"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -57,6 +75,24 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
+        "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_A9F0E52D6CC84787834C2488088BDCA4"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -71,6 +107,30 @@
         {
         "MsmKey" = "8:_CC53F00C06CD4B279E4074AD3F42616C"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "OwnerKey" = "8:_B7383602C6A04D8682E86586F94146BD"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
         "MsmSig" = "8:_UNDEFINED"
         }
     }
@@ -131,6 +191,66 @@
         }
         "File"
         {
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_46FCC0CE280DB6085556483BE6B5C262"
+            {
+            "SourcePath" = "8:VERSION.dll"
+            "TargetName" = "8:VERSION.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_50088B1D7DB527D9B2047C152B9D7290"
+            {
+            "SourcePath" = "8:comdlg32.dll"
+            "TargetName" = "8:comdlg32.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_62C2CC6C9607EEB26EB53A15F81A2094"
+            {
+            "SourcePath" = "8:msdmo.dll"
+            "TargetName" = "8:msdmo.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{A582A373-4685-4296-BEFE-614B80A702C3}:_885DB8E7763546468CD93751E645FCA0"
             {
             "SourcePath" = "8:..\\multichan.ico"
@@ -171,6 +291,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_A332DF860C743B6F61EF90E18124EF00"
+            {
+            "SourcePath" = "8:fftw3.dll"
+            "TargetName" = "8:fftw3.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{A582A373-4685-4296-BEFE-614B80A702C3}:_CC53F00C06CD4B279E4074AD3F42616C"
             {
             "SourcePath" = "8:..\\gpl.txt"
@@ -189,6 +329,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+            {
+            "SourcePath" = "8:libsndfile.dll"
+            "TargetName" = "8:libsndfile.dll"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
         }
@@ -246,13 +406,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{92CB1C85-A78E-47C2-8B50-C82F3BFAB80A}"
-        "PackageCode" = "8:{D570C04B-1064-4B0B-91EC-E0F1089C4F3A}"
+        "ProductCode" = "8:{F4A41884-DBDF-471C-ADE3-74DC962D3D7D}"
+        "PackageCode" = "8:{87493CEC-F22A-4566-BD7A-67693D0E6DD4}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:2.6"
+        "ProductVersion" = "8:2.7"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
@@ -805,7 +965,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_1C05BCC636FD43EBB0AB2D0EC362223E"
             {
-            "SourcePath" = "8:..\\..\\..\\DScaler5\\debug\\ConvolverWrapper.dll"
+            "SourcePath" = "8:..\\..\\..\\DScaler5\\release\\ConvolverWrapper.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1002,7 +1162,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_7B653B8AB6A04A74B37B59458951A8E6"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\convolverCMD.exe"
+            "SourcePath" = "8:..\\bin\\Release\\convolverCMD.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1030,7 +1190,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_7C8CF7A10F524ED89B22A73258C218A4"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\perftest.exe"
+            "SourcePath" = "8:..\\bin\\Release\\perftest.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1058,7 +1218,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_80C0F7E810A34BFAB388567A56A338C8"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\comparewavs.exe"
+            "SourcePath" = "8:..\\bin\\Release\\comparewavs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1086,7 +1246,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_8CCFA8EB511742BF8789AFC81CB9800F"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\convolverWMP.dll"
+            "SourcePath" = "8:..\\bin\\Release\\convolverWMP.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1198,7 +1358,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_A9F0E52D6CC84787834C2488088BDCA4"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\generate_dirac_delta.exe"
+            "SourcePath" = "8:..\\bin\\Release\\generate_dirac_delta.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1282,7 +1442,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_B7383602C6A04D8682E86586F94146BD"
             {
-            "SourcePath" = "8:..\\bin\\Debug\\makeIR.exe"
+            "SourcePath" = "8:..\\bin\\Release\\makeIR.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"

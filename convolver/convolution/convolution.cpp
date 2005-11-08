@@ -756,6 +756,10 @@ HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample
 		return E_ABORT;
 	}
 
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "SelectSampleConvertor returned " << hr << std::endl;);
+#endif
+
 	return hr;
 }
 
