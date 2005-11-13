@@ -20,7 +20,6 @@
 #include  "convolution\convolution.h"
 
 template class CConvolution<float>;
-template HRESULT SelectSampleConvertor<float>(WAVEFORMATEX* & pWave, Holder< Sample<float> >& sample_convertor);
 template HRESULT calculateOptimumAttenuation<float>(float& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
 
 
@@ -92,8 +91,8 @@ void CConvolution<T>::Flush()
 template <typename T>
 DWORD
 CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-										  const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
-										  const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
+										  Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+										  Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 										  DWORD dwBlocksToProcess,		// A block contains a sample for each channel
 										  const T fAttenuation_db)  // Returns bytes processed
 {
@@ -254,8 +253,8 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 template <typename T>
 DWORD
 CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-							   const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
-							   const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
+							   Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+							   Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 							   DWORD dwBlocksToProcess,		// A block contains a sample for each channel
 							   const T fAttenuation_db)			// Returns bytes processed
 {
@@ -622,146 +621,146 @@ T CConvolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffe
 // The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
 // while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
 // See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-template <typename T>
-HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor)
-{
-#if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "SelectSampleConvertor" << std::endl;);
-#endif
-	HRESULT hr = S_OK;
-
-	if (NULL == pWave)
-	{
-		return E_POINTER;
-	}
-
-	try
-	{
-		WORD wFormatTag = pWave->wFormatTag;
-		WORD wValidBitsPerSample = pWave->wBitsPerSample;
-		if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-		{
-			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-			wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
-			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
-			{
-				wFormatTag = WAVE_FORMAT_PCM;
-				// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
-			}
-			else
-				if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-				{
-					wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-				}
-				else
-				{
-					return E_INVALIDARG;
-				}
-		}
-
-		sample_convertor = NULL;
-
-		switch (wFormatTag)
-		{
-		case WAVE_FORMAT_PCM:
-			switch (pWave->wBitsPerSample)
-			{
-				// Note: for 8 and 16-bit samples, we assume the sample is the same size as
-				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-				// structure to determine the valid bits per sample. (See above)
-			case 8:
-				sample_convertor = new Sample_pcm8<T>();
-				break;
-
-			case 16:
-				sample_convertor = new Sample_pcm16<T>();
-				break;
-
-			case 24:
-				{
-					switch (wValidBitsPerSample)
-					{
-					case 16:
-						sample_convertor = new Sample_pcm24<T, 16>();
-						break;
-
-					case 20:
-						sample_convertor = new Sample_pcm24<T, 20>();
-						break;
-
-					case 24:
-						sample_convertor = new Sample_pcm24<T, 24>();
-						break;
-
-					default:
-						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-					}
-				}
-				break;
-
-			case 32:
-				{
-					switch (wValidBitsPerSample)
-					{
-					case 16:
-						sample_convertor = new Sample_pcm32<T, 16>();
-						break;
-
-					case 20:
-						sample_convertor = new Sample_pcm32<T, 20>();
-						break;
-
-					case 24:
-						sample_convertor = new Sample_pcm32<T, 24>();
-						break;
-
-					case 32:
-						sample_convertor = new Sample_pcm32<T, 32>();
-						break;
-
-					default:
-						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-					}
-				}
-				break;
-
-			default:  // Unprocessable PCM
-				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-			}
-			break;
-
-		case WAVE_FORMAT_IEEE_FLOAT:
-			switch (pWave->wBitsPerSample)
-			{
-			case 32:
-				sample_convertor = new Sample_ieeefloat<T>();
-				break;
-
-			case 64:
-				sample_convertor = new Sample_ieeedouble<T>();
-				break;
-
-			default:  // Unprocessable IEEE float
-				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-				//break;
-			}
-			break;
-
-		default: // Not PCM or IEEE Float
-			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-		}
-	}
-	catch(...)
-	{
-		return E_ABORT;
-	}
-
-#if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "SelectSampleConvertor returned " << hr << std::endl;);
-#endif
-
-	return hr;
-}
+//template <typename T>
+//HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor)
+//{
+//#if defined(DEBUG) | defined(_DEBUG)
+//	DEBUGGING(3, cdebug << "SelectSampleConvertor" << std::endl;);
+//#endif
+//	HRESULT hr = S_OK;
+//
+//	if (NULL == pWave)
+//	{
+//		return E_POINTER;
+//	}
+//
+//	try
+//	{
+//		WORD wFormatTag = pWave->wFormatTag;
+//		WORD wValidBitsPerSample = pWave->wBitsPerSample;
+//		if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+//		{
+//			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+//			wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
+//			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+//			{
+//				wFormatTag = WAVE_FORMAT_PCM;
+//				// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
+//			}
+//			else
+//				if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+//				{
+//					wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+//				}
+//				else
+//				{
+//					return E_INVALIDARG;
+//				}
+//		}
+//
+//		sample_convertor = NULL;
+//
+//		switch (wFormatTag)
+//		{
+//		case WAVE_FORMAT_PCM:
+//			switch (pWave->wBitsPerSample)
+//			{
+//				// Note: for 8 and 16-bit samples, we assume the sample is the same size as
+//				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
+//				// structure to determine the valid bits per sample. (See above)
+//			case 8:
+//				sample_convertor = new Sample_pcm8<T>();
+//				break;
+//
+//			case 16:
+//				sample_convertor = new Sample_pcm16<T>();
+//				break;
+//
+//			case 24:
+//				{
+//					switch (wValidBitsPerSample)
+//					{
+//					case 16:
+//						sample_convertor = new Sample_pcm24<T, 16>();
+//						break;
+//
+//					case 20:
+//						sample_convertor = new Sample_pcm24<T, 20>();
+//						break;
+//
+//					case 24:
+//						sample_convertor = new Sample_pcm24<T, 24>();
+//						break;
+//
+//					default:
+//						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+//					}
+//				}
+//				break;
+//
+//			case 32:
+//				{
+//					switch (wValidBitsPerSample)
+//					{
+//					case 16:
+//						sample_convertor = new Sample_pcm32<T, 16>();
+//						break;
+//
+//					case 20:
+//						sample_convertor = new Sample_pcm32<T, 20>();
+//						break;
+//
+//					case 24:
+//						sample_convertor = new Sample_pcm32<T, 24>();
+//						break;
+//
+//					case 32:
+//						sample_convertor = new Sample_pcm32<T, 32>();
+//						break;
+//
+//					default:
+//						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+//					}
+//				}
+//				break;
+//
+//			default:  // Unprocessable PCM
+//				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+//			}
+//			break;
+//
+//		case WAVE_FORMAT_IEEE_FLOAT:
+//			switch (pWave->wBitsPerSample)
+//			{
+//			case 32:
+//				sample_convertor = new Sample_ieeefloat<T>();
+//				break;
+//
+//			case 64:
+//				sample_convertor = new Sample_ieeedouble<T>();
+//				break;
+//
+//			default:  // Unprocessable IEEE float
+//				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+//				//break;
+//			}
+//			break;
+//
+//		default: // Not PCM or IEEE Float
+//			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
+//		}
+//	}
+//	catch(...)
+//	{
+//		return E_ABORT;
+//	}
+//
+//#if defined(DEBUG) | defined(_DEBUG)
+//	DEBUGGING(3, cdebug << "SelectSampleConvertor returned " << hr << std::endl;);
+//#endif
+//
+//	return hr;
+//}
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
 template <typename T>
@@ -812,11 +811,11 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 	// nPartitions == 0 => use overlap-save version
 	DWORD nBytesGenerated = nPartitions == 0 ?
 		c.doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-		convertor, convertor,
+		convertor.get_ptr(), convertor.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0)
 		: c.doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-		convertor, convertor,
+		convertor.get_ptr(), convertor.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0);
 

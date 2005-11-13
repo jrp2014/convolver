@@ -15,6 +15,8 @@ template <typename T>
 inline Sample<T>::~Sample(){}
 
 // Specializations with the appropriate functions for accessing the sample buffer
+
+// TODO: float with wValidBitsPerSample = 18; //Top 18 bits have data
 template <typename T>
 class Sample_ieeefloat : public Sample<T>
 {
@@ -90,15 +92,15 @@ public:
 			srcSample = static_cast<T>(127);
 		}
 		else
-		if (srcSample < static_cast<T>(-128))
-		{
-			srcSample = static_cast<T>(-128);
-		}
+			if (srcSample < static_cast<T>(-128))
+			{
+				srcSample = static_cast<T>(-128);
+			}
 
-		*dstContainer = static_cast<BYTE>(srcSample + static_cast<T>(128));
+			*dstContainer = static_cast<BYTE>(srcSample + static_cast<T>(128));
 
-		++dstContainer;
-		++nBytesGenerated;
+			++dstContainer;
+			++nBytesGenerated;
 	}
 
 	virtual int nContainerSize() const
@@ -133,11 +135,11 @@ public:
 			{
 				srcSample =static_cast<T>(-32768);
 			}
-		*(INT16 *)dstContainer = static_cast<INT16>(srcSample);
-		//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
+			*(INT16 *)dstContainer = static_cast<INT16>(srcSample);
+			//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
 
-		dstContainer += 2;
-		nBytesGenerated += 2;
+			dstContainer += 2;
+			nBytesGenerated += 2;
 	}
 
 	virtual int nContainerSize() const
@@ -302,3 +304,97 @@ public:
 		return 4;
 	}
 };
+
+
+template <typename T>
+class CFormatSpecs
+{
+public:
+	static struct FormatSpec
+	{
+		GUID					SubFormat;
+		WORD					wFormatTag;
+		WORD					wBitsPerSample; // 
+		WORD					wValidBitsPerSample;
+		Sample<T>*				sample_convertor;
+	} const FormatSpecs_[];
+
+	CFormatSpecs() {}
+
+	const static int size = 15;
+
+	const FormatSpec& operator[](int i) const
+	{
+		assert(i >= 0 && i < size);
+		return FormatSpecs_[i];
+	}
+
+	HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Sample<T>* & sample_convertor)
+	{
+		if(pWave == NULL)
+		{
+			return E_POINTER;
+		}
+
+		// Formats that support more than two channels or sample sizes of more than 16 bits can be described
+		// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
+		if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+		{
+			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
+
+			for(int i = 0; i < size; ++i)
+			{
+				if(	pWave->wFormatTag == FormatSpecs_[i].wFormatTag &&
+					pWave->wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
+					pWaveXT->Samples.wValidBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
+				{
+					sample_convertor = FormatSpecs_[i].sample_convertor;
+					return S_OK;
+				}
+			}
+		}
+		else // WAVE_FORMAT_PCM (8, or 16-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
+		{
+			for(int i = 0; i < size; ++i)
+			{
+				if(	pWave->wFormatTag == FormatSpecs_[i].wFormatTag &&
+					pWave->wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
+					pWave->wBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
+				{
+					sample_convertor = FormatSpecs_[i].sample_convertor;
+					return S_OK;
+				}
+			}
+		}
+
+		sample_convertor = NULL;
+		return E_ABORT;
+	}
+
+private:
+	// No copying
+	CFormatSpecs& operator= (const CFormatSpecs&);
+	CFormatSpecs(const CFormatSpecs&);
+};
+
+template <typename T>
+const typename CFormatSpecs<T>::FormatSpec CFormatSpecs<T>::FormatSpecs_[CFormatSpecs<T>::size] =
+{
+	{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE, 32, 32, new Sample_ieeefloat<T>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 32, 32, new Sample_pcm32<T,32>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 24, 24, new Sample_pcm24<T,24>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 16, 16, new Sample_pcm16<T>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE,  8,  8, new Sample_pcm8<T>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 32, 24, new Sample_pcm32<T,24>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 32, 20, new Sample_pcm32<T,20>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 32, 16, new Sample_pcm32<T,16>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 24, 20, new Sample_pcm24<T,20>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_EXTENSIBLE, 24, 16, new Sample_pcm24<T,16>()},
+	{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE, 64, 64, new Sample_ieeedouble<T>()},
+	{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT, 32, 32, new Sample_ieeefloat<T>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_PCM,		  16, 16, new Sample_pcm16<T>()},
+	{KSDATAFORMAT_SUBTYPE_PCM,		  WAVE_FORMAT_PCM,		   8,  8, new Sample_pcm8<T>()},
+	{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT, 64, 64, new Sample_ieeedouble<T>()}
+};
+
+	//template class CFormatSpecs<float>;

@@ -12,25 +12,17 @@ template <typename T>
 class Holder {
 private:
 	T* ptr_;    // refers to the object it holds (if any)
+	bool owns_;
 
 public:
 	// default constructor: let the holder refer to nothing, and
 	// constructor for a pointer: let the holder refer to where the pointer refers
-	explicit Holder (T* p = 0) : ptr_(p) {}
+	explicit Holder (T* p = NULL) : ptr_(p), owns_(p != NULL) {}
 
 	// destructor: releases the object to which it refers (if any)
 	~Holder()
 	{ 
-		delete ptr_;
-		ptr_ = NULL;
-	}
-
-	// assignment of new pointer
-	Holder<T>& operator= (T* p)
-	{
-		delete ptr_;
-		ptr_ = p;
-		return *this;
+		kill();
 	}
 
 	// pointer operators
@@ -52,8 +44,47 @@ public:
         return ptr_;
     }
 
+	Holder& set_ptr(T* p)
+	{
+		if( ptr_ != p)
+		{
+			kill();
+			owns_ = (p != NULL);
+			ptr_ = p;
+		}
+		return *this;
+	}
+
+	Holder& refer_ptr(T* p)
+	{
+		if( ptr_ != p)
+		{
+			kill();
+			owns_ = false;
+			ptr_ = p;
+		}
+		return *this;
+	}
+
+	T* release_ptr()
+	{
+		owns_=false;
+		return ptr_;
+	}
+
 private:
-	// no copying and copy assignment allowed
-	Holder (Holder<T> const&);
-	Holder<T>& operator= (Holder<T> const&);
+
+	void kill()
+	{
+		if (owns_)
+		{
+			delete ptr_;
+		}
+		ptr_=NULL;
+		owns_=false;
+	}
+
+	// No copying
+		Holder(const Holder&);
+		const Holder& operator=(const Holder&);
 };

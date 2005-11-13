@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-
+#include "convolution\config.h"
 #include "Common\dxstdafx.h"
 #include <fstream>
 #include <ios>
@@ -231,7 +231,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		// Open the output file
 
 #ifdef LIBSNDFILE
-		CWaveFileHandle output(argv[2], SFM_WRITE, &sf_info);
+		CWaveFileHandle output(argv[2], SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 #if	defined(DEBUG) | defined(_DEBUG)
 		std::wcerr  << "Writing to " << std::basic_string< _TCHAR >(argv[2], _tcslen(argv[2])) << std::endl;

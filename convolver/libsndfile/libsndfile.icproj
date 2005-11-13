@@ -26,7 +26,7 @@
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\..\..\libsndfile-1.0.12\src"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="FALSE"

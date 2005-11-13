@@ -33,7 +33,7 @@ class Filter
 public:
 
 	int						nChannels;				// number of channels
-	int						nSampleRate;			// 44100, 48000, etc
+	DWORD					nSampleRate;			// 44100, 48000, etc
 	PartitionedBuffer		coeffs;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat;		// The format of the filter file
@@ -51,7 +51,7 @@ public:
 	PartitionedBuffer		fft_coeffs;
 #endif
 
-	Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions);
+	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate);
 #ifdef FFTW
 	// // TODO: this does not work because if you have a number of filters of the same length they seem to point to the same thing
 	//~Filter()

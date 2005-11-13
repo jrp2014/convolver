@@ -19,11 +19,11 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "convolution\config.h"
+#include "convolution\holder.h"
 #include "convolution\sample.h"
 #include "convolution\samplebuffer.h"
 #include "convolution\channelpaths.h"
 #include "convolution\waveformat.h"
-#include "convolution\holder.h"
 #include "convolution\lrint.h"
 
 // For random number seed
@@ -57,15 +57,15 @@ public:
 
 	// This version of the convolution routine does partitioned convolution
 	DWORD doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
+		Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+		Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,		// A block contains a sample for each channel
 		const T fAttenuation_db);  // Returns bytes generated
 
 	// This version does straight overlap-save convolution
 	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Holder< Sample<T> >& input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		const Holder< Sample<T> >& output_sample_convertor,	// The functionoid for converting between T and BYTE*
+		Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+		Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,
 		const T fAttenuation_db); // Returns bytes generated
 
@@ -73,7 +73,7 @@ public:
 
 	ChannelPaths		Mixer;				// Order dependent
 
-	int cbLookAhead(const Holder < Sample<T> >& sample_convertor)
+	int cbLookAhead(const Sample<T>* & sample_convertor)
 	{
 		return Mixer.nPartitionLength / 2 * sample_convertor->nContainerSize(); // The lag
 	}
@@ -98,7 +98,7 @@ private:
 
 	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-										const ChannelBuffer& restrict Output, const int from, const int  to);
+		const ChannelBuffer& restrict Output, const int from, const int  to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
@@ -125,7 +125,5 @@ private:
 };
 
 template <typename T>
-HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor);
-
-template <typename T>
 HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
+

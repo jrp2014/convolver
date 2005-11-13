@@ -107,7 +107,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 			{
 
 				t.reset();
-				conv = new CConvolution<float>(argv[3], nPartitions == 0 ? 1 : nPartitions); // Used to calculate nPartitionLength
+				conv.set_ptr(new CConvolution<float>(argv[3], nPartitions == 0 ? 1 : nPartitions)); // Used to calculate nPartitionLength
 				fElapsedLoad = t.sec();
 				fTotalElapsedLoad += fElapsedLoad;
 				

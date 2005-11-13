@@ -19,8 +19,9 @@
 
 #include "convolution\filter.h"
 
-Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const DWORD& nPartitions) : 
-nPartitions (nPartitions)
+Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate) : 
+nPartitions (nPartitions),
+nSampleRate(nSampleRate)
 {
 #ifndef LIBSNDFILE
 	HRESULT hr = S_OK;
@@ -36,11 +37,11 @@ nPartitions (nPartitions)
 	// Load the wave file
 #ifdef LIBSNDFILE
 	::ZeroMemory(&sf_FilterFormat, sizeof(SF_INFO));
-	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat); // Throws, if file invalid
+	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat, nSampleRate); // Throws, if file invalid
 
 	// Save number of channels and sample rate for easy access
 	nChannels = sf_FilterFormat.channels;
-	nSampleRate = sf_FilterFormat.samplerate;
+	this->nSampleRate = sf_FilterFormat.samplerate;
 
 	nFilterLength = sf_FilterFormat.frames;
 
@@ -58,7 +59,7 @@ nPartitions (nPartitions)
 
 	// Save number of channels and sample rate for easy access
 	nChannels = wfexFilterFormat.Format.nChannels;
-	nSampleRate = wfexFilterFormat.Format.nSampleRate;
+	this->nSampleRate = wfexFilterFormat.Format.nSampleRate;
 
 	WORD wValidBitsPerSample = wfexFilterFormat.Format.wBitsPerSample;
 	WORD wFormatTag = wfexFilterFormat.Format.wFormatTag;

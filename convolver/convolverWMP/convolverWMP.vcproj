@@ -25,6 +25,7 @@
 				InlineFunctionExpansion="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
@@ -316,6 +317,9 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
 					RelativePath="..\convolution\filter.cpp">
 				</File>
 				<File
@@ -389,6 +393,9 @@
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+			<File
+				RelativePath=".\convolver.bmp">
+			</File>
 			<File
 				RelativePath=".\convolver.rc">
 			</File>

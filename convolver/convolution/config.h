@@ -40,6 +40,21 @@
 
 #include "convolution\exception.h"
 
+//#include <dshow.h>
+////// Direct3D includes
+////#include <d3d9.h>
+////#include <d3dx9.h>
+////#include <dxerr9.h>
+////
+//// DirectSound includes
+#include <mmreg.h>
+//#include <dsound.h>
+//
+#include <ks.h>
+#include <ksmedia.h>
+
+
+
 // Debugging
 
 #if defined(DEBUG) | defined(_DEBUG)

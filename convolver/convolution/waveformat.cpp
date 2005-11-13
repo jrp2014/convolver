@@ -83,75 +83,105 @@ std::string waveFormatDescription(const SF_INFO& sfinfo, const char* prefix)
 
 const std::string channelDescription(const WAVEFORMATEXTENSIBLE* w)
 {
-	if (w->Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+	return channelDescription(w->Format.wFormatTag, w->dwChannelMask,  w->Format.nChannels);
+}
+
+const std::string channelDescription(const WORD wFormatTag, const DWORD& dwChannelMask, const WORD& nChannels)
+{
+	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
 		// Need to check number of channels as the likes of Audition sets the channel mask to 7.1 for 5.1 wav files, eg
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_7POINT1 && w->Format.nChannels == 8)
+		// Also, order dependent
+		// KSAUDIO_SPEAKER_7POINT1_SURROUND	0x63F
+#define KSAUDIO_SPEAKER_7POINT1_SURROUND	0x63F
+		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1_SURROUND) && nChannels == 8)
+			return "7.1 surround";
+		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1) && nChannels == 8)
 			return "7.1";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_5POINT1 && w->Format.nChannels == 6)
+		if ((dwChannelMask & KSAUDIO_SPEAKER_5POINT1) && nChannels == 6)
 			return "5.1";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_SURROUND && w->Format.nChannels == 4)
-			return "Surround";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_QUAD && w->Format.nChannels == 4)
+		if ((dwChannelMask & KSAUDIO_SPEAKER_QUAD) && nChannels == 4)
 			return "Quad";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_STEREO && w->Format.nChannels == 2)
+		if ((dwChannelMask & KSAUDIO_SPEAKER_SURROUND) && nChannels == 4)
+			return "Surround";
+		if ((dwChannelMask & KSAUDIO_SPEAKER_STEREO) && nChannels == 2)
 			return "Stereo";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_SUPER_WOOFER && w->Format.nChannels == 1)
+		if ((dwChannelMask & KSAUDIO_SPEAKER_SUPER_WOOFER) && nChannels == 1)
 			return "Sub";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_MONO && w->Format.nChannels == 1)
+		if ((dwChannelMask & KSAUDIO_SPEAKER_MONO) && nChannels == 1)
 			return "Mono";
-		if (w->dwChannelMask & KSAUDIO_SPEAKER_DIRECTOUT)
-			return "Direct";
 
 		std::ostringstream s;
 
-		s << w->Format.nChannels << "-channel( ";
-		if( w->dwChannelMask & SPEAKER_FRONT_LEFT)
-			s << "Front Left,";
-		if( w->dwChannelMask & SPEAKER_FRONT_RIGHT)
-			s <<  "Front Right,";
-		if( w->dwChannelMask & SPEAKER_FRONT_CENTER)
-			s <<  "Front Centre,";
-		if( w->dwChannelMask & SPEAKER_LOW_FREQUENCY)
-			s <<  "Low Frequency,";
-		if( w->dwChannelMask & SPEAKER_BACK_LEFT)
-			s <<  "Back Left,";
-		if( w->dwChannelMask & SPEAKER_BACK_RIGHT)
-			s <<  "Back Right,";
-		if( w->dwChannelMask & SPEAKER_FRONT_LEFT_OF_CENTER)
-			s <<  "Front Left of Centre,";
-		if( w->dwChannelMask & SPEAKER_FRONT_RIGHT_OF_CENTER)
-			s <<  "Front Right of Centre,";
-		if( w->dwChannelMask & SPEAKER_BACK_CENTER)
-			s <<  "Back Centre,";
-		if( w->dwChannelMask & SPEAKER_SIDE_LEFT)
-			s <<  "Side Left,";
-		if( w->dwChannelMask & SPEAKER_SIDE_RIGHT)
-			s <<  "Side Right,";
-		if( w->dwChannelMask & SPEAKER_TOP_CENTER)
-			s <<  "Top Centre,";
-		if( w->dwChannelMask & SPEAKER_TOP_FRONT_LEFT)
-			s <<  "Top Front Left,";
-		if( w->dwChannelMask & SPEAKER_TOP_FRONT_CENTER)
-			s <<  "Top Front Centre,";
-		if( w->dwChannelMask & SPEAKER_TOP_FRONT_RIGHT)
-			s <<  "Top Front Right,";
-		if( w->dwChannelMask & SPEAKER_TOP_BACK_LEFT)
-			s <<  "Top Back Left,";
-		if( w->dwChannelMask & SPEAKER_TOP_BACK_CENTER)
-			s <<  "Top Back Centre,";
-		if( w->dwChannelMask & SPEAKER_TOP_BACK_RIGHT)
-			s <<  "Top Back Right,";
+		if (nChannels == 1)
+		{
+			s << "Mono";
+		}
+		else if (nChannels == 2)
+		{
+			s << "Stereo";
+		}
+		else
+			s << nChannels << "-channel";
 
-		long pos = s.tellp();
-		s.seekp(pos - 1); // remove trailing ,
-		s << " )";
+		if(dwChannelMask == 0)
+		{
+			s << " direct";
+		}
+		else
+		{
+			s << " (";
+			if (dwChannelMask & SPEAKER_ALL)
+				s << "any speakers";
+
+			if( dwChannelMask & SPEAKER_FRONT_LEFT)
+				s << "Front Left,";
+			if( dwChannelMask & SPEAKER_FRONT_RIGHT)
+				s <<  "Front Right,";
+			if( dwChannelMask & SPEAKER_FRONT_CENTER)
+				s <<  "Front Centre,";
+			if( dwChannelMask & SPEAKER_LOW_FREQUENCY)
+				s <<  "Low Frequency,";
+			if( dwChannelMask & SPEAKER_BACK_LEFT)
+				s <<  "Back Left,";
+			if( dwChannelMask & SPEAKER_BACK_RIGHT)
+				s <<  "Back Right,";
+			if( dwChannelMask & SPEAKER_FRONT_LEFT_OF_CENTER)
+				s <<  "Front Left of Centre,";
+			if( dwChannelMask & SPEAKER_FRONT_RIGHT_OF_CENTER)
+				s <<  "Front Right of Centre,";
+			if( dwChannelMask & SPEAKER_BACK_CENTER)
+				s <<  "Back Centre,";
+			if( dwChannelMask & SPEAKER_SIDE_LEFT)
+				s <<  "Side Left,";
+			if( dwChannelMask & SPEAKER_SIDE_RIGHT)
+				s <<  "Side Right,";
+			if( dwChannelMask & SPEAKER_TOP_CENTER)
+				s <<  "Top Centre,";
+			if( dwChannelMask & SPEAKER_TOP_FRONT_LEFT)
+				s <<  "Top Front Left,";
+			if( dwChannelMask & SPEAKER_TOP_FRONT_CENTER)
+				s <<  "Top Front Centre,";
+			if( dwChannelMask & SPEAKER_TOP_FRONT_RIGHT)
+				s <<  "Top Front Right,";
+			if( dwChannelMask & SPEAKER_TOP_BACK_LEFT)
+				s <<  "Top Back Left,";
+			if( dwChannelMask & SPEAKER_TOP_BACK_CENTER)
+				s <<  "Top Back Centre,";
+			if( dwChannelMask & SPEAKER_TOP_BACK_RIGHT)
+				s <<  "Top Back Right,";
+
+			long pos = s.tellp();
+			s.seekp(pos - 1); // remove trailing ,
+			s << " )";
+		}
+
 		return s.str();
 	}
 	else
 	{
 		std::ostringstream s;
-		s << w->Format.nChannels << "-channel";
+		s << nChannels << "-channel";
 		return s.str();
 	}
 }

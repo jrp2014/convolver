@@ -50,8 +50,8 @@ public:
 		std::vector<ScaledChannel> outChannel;
 
 		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions,
-			std::vector<ScaledChannel>& inChannel, std::vector<ScaledChannel>& outChannel) :
-		filter(szConfigFileName, nPartitions), inChannel(inChannel), outChannel(outChannel){};
+			std::vector<ScaledChannel>& inChannel, std::vector<ScaledChannel>& outChannel, const DWORD& nSampleRate) :
+			filter(szConfigFileName, nPartitions, nSampleRate), inChannel(inChannel), outChannel(outChannel) {};
 
 #if defined(DEBUG) | defined(_DEBUG)
 		void Dump();
@@ -61,7 +61,8 @@ public:
 public:
 	int	nInputChannels;			// number of input channels
 	int nOutputChannels;		// number of output channels
-	int nSampleRate;			// 44100, 48000, etc
+	DWORD nSampleRate;			// 44100, 48000, etc
+	DWORD dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
 	int nPaths;					// number of Paths
 	int	nPartitions;
 	int	nPartitionLength;		// in blocks (a block contains the samples for each channel)

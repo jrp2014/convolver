@@ -30,6 +30,8 @@
 
 #include <atlbase.h>
 #include <libsndfile\sndfile.h>
+#include <locale>
+#include <algorithm>
 
 class CWaveFileHandle
 {
@@ -59,67 +61,31 @@ public:
 #endif
 	};
 
-	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo)
+	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo, const DWORD& nSampleRate)
 	{
 
 		if (mode == SFM_WRITE && sf_format_check (sfinfo) == false)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
-			cdebug << "Invalid output file format." << std::endl;
+			cdebug << "Invalid output file format specified." << std::endl;
 #endif
-			throw wavfileException("Invalid output file format", path, "");
+			throw wavfileException("Invalid output file format specified", path, "");
 		}
 		else if(mode == SFM_READ)
 		{
 			sfinfo->format = 0;
 
-//			// Look for .pcm
-//			if (path == NULL)
-//			{
-//				throw wavfileException("Null filename invalid");
-//			}
-//
-//			TCHAR* cptr = _tcsrchr (path,
-//#ifdef _UNICODE
-//				L'.'
-//#else
-//				'.'
-//#endif
-//				);
-//
-//			if (cptr != NULL)
-//			{
-//				TCHAR buffer[16];
-//				++cptr;	// points to the extension
-//				if (_tcslen (cptr) > sizeof (buffer) - 1)
-//					throw wavfileException("Filename extension too long");
-//
-//				_tcsncpy (buffer, cptr, sizeof (buffer));
-//				buffer [sizeof (buffer) - 1] = 0 ;
-//
-//				/* Convert everything in the buffer to lower case. */
-//				cptr = buffer ;
-//				while (*cptr)
-//				{	
-//					*cptr = 
-//#ifdef _UNICODE
-//						towlower (*cptr);
-//#else
-//						tolower (*cptr);
-//#endif
-//					++cptr;
-//				}
-//
-//				cptr = buffer;
-//
-//				if (_tcsncmp (cptr, "pcm") == 0)
-//				{
-//					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_FLOAT;	// RAW PCM data (32 bit IEEE floating point)
-//					sfinfo->channels = 1;								// Single channel
-//					sfinfo->samplerate = ??;
-//
-//				}
-//			}
+			const std::wstring spath = path;
+			std::wstring::size_type idx = spath.find('.');
+			if(idx != std::wstring::npos)
+			{
+				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM"))
+				{
+					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_FLOAT;	// RAW PCM data (32 bit IEEE floating point)
+					sfinfo->channels = 1;								// Single channel
+					sfinfo->samplerate = nSampleRate;
+				}
+			}
 		}
 
 	sndfile_ = sf_open(CT2CA(path), mode, sfinfo);
@@ -136,6 +102,10 @@ public:
 			cdebug << "Failed to open " << CT2CA(path) << std::endl;
 #endif
 			throw wavfileException("Failed to open", path, sf_strerror (NULL));
+		}
+		if(sfinfo->samplerate != nSampleRate)
+		{
+			throw wavfileException("Expected filter sample rate", path, "");
 		}
 	};
 

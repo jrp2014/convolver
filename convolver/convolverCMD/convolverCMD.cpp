@@ -81,12 +81,13 @@ int _tmain(int argc, _TCHAR* argv[])
 			std::wcerr << "Using partitioned convolution with " << nPartitions << " partition(s)" << std::endl;
 		}
 
+		conv.set_ptr(new CConvolution<float>(argv[2], nPartitions == 0 ? 1 : nPartitions)); // Sets conv. nPartitions==0 => use overlap-save
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
-		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info);
+		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info, conv->Mixer.nSampleRate);
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
-		conv = new CConvolution<float>(argv[2], nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
+
 		const DWORD cBufferLength = conv->Mixer.nFilterLength * SAMPLES;  // frames
 #else
 		CWaveFileHandle WavIn;
@@ -102,11 +103,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::cerr << waveFormatDescription(&wfexFilterFormat, WavIn->GetSize() / WavIn->GetFormat()->nBlockAlign, "Input file format: ") << std::endl;
 
 		WAVEFORMATEX* pWave = WavIn->GetFormat();
-		hr = SelectConvolution(pWave, conv, argv[2], nPartitions == 0 ? 1 : nPartitions); // Sets conv. nPartitions==0 => use overlap-save
-		if (FAILED(hr))
-		{
-			throw(hr);
-		}
 
 		std::cerr << waveFormatDescription(&(conv->FIR.wfexFilterFormat), conv->FIR.nFilterLength, "Filter format: ") << std::endl;
 
@@ -167,7 +163,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #ifdef	LIBSNDFILE
 		// Write out in the same format as the input file, but with the right number of output channels
 		sf_info.channels = conv->Mixer.nOutputChannels;
-		CWaveFileHandle WavOut(argv[4], SFM_WRITE, &sf_info);
+		CWaveFileHandle WavOut(argv[4], SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 		CWaveFileHandle WavOut;
 		if( FAILED( hr = WavOut->Open( argv[4], WavIn->GetFormat(), WAVEFILE_WRITE ) ) )
@@ -227,7 +223,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 				conv->doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
-				convertor, convertor,
+				convertor.get_ptr(), convertor.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation)
 				:
@@ -236,7 +232,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 			conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
-				convertor, convertor,
+				convertor.get_ptr(), convertor.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation);
 

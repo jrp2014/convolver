@@ -125,8 +125,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 #endif
 	float	fAttenuation = 0.0;													// Initialize a float for the attenuation
 	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
-	DWORD   dwWetmix = 50;														// Initialize a DWORD for effect level.
-	float  fWetmix = 0.50;														// Initialize a float for effect level.
 	TCHAR	szFilterFileName[MAX_PATH]	= { 0 };
 	DWORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
 	// to be used in the convolution algorithm
@@ -154,27 +152,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		}
 		else
 			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
-
-		// Get the effects level value from the dialog box.
-		GetDlgItemText(IDC_WETMIX, szStr, sizeof(szStr) / sizeof(szStr[0]));
-#ifdef UNICODE 
-		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-		dwWetmix = static_cast<DWORD>(atof(strTmp)); 
-#else 
-		dwWetmix = static_cast<DWORD>(atof(szStr));
-#endif 
-
-		// Make sure wet mix value is valid.
-		if (dwWetmix > 100)
-		{
-			if (::LoadString(_Module.GetResourceInstance(), IDS_MIXRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-			{
-				MessageBox(szStr);
-			}
-			return E_FAIL;
-		}
-		else
-			fWetmix = static_cast<float>(dwWetmix) / 100.0f; // %
 
 		// Get the number of partitions value from the dialog box.
 		GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
@@ -353,10 +330,6 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		DisplayFilterFormat(szFilterFileName);
 
 		TCHAR szStr[MAXSTRING];
-
-		// Display the effect level.
-		_stprintf(szStr, _T("%u"), dwWetmix);
-		SetDlgItemText(IDC_WETMIX, szStr);
 
 		// Display the attenuation.
 		_stprintf(szStr, _T("%.1f"), fAttenuation);

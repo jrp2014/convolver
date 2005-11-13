@@ -20,7 +20,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <convolution/config.h>
+#include "convolution/config.h"
 
 void SIMDFlushToZero(void);
 long int lrint (double flt);

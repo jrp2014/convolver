@@ -23,6 +23,8 @@
 ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
 nInputChannels(0),
 nOutputChannels(0),
+nSampleRate(0),
+dwChannelMask(0),
 nPaths(0),
 nPartitions(nPartitions),
 nPartitionLength(0),
@@ -46,6 +48,10 @@ nFilterLength(0)
 
 		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
 
+		config >> nSampleRate;
+#if defined(DEBUG) | defined(_DEBUG)
+		cdebug << nSampleRate << " sample rate" << std::endl;
+#endif
 		config >> nInputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nInputChannels << " input channels" << std::endl;
@@ -54,6 +60,15 @@ nFilterLength(0)
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nOutputChannels << " output channels" << std::endl;
 #endif
+		config.unsetf(std::ios_base::dec);
+		config.setf(std::ios_base::hex);
+		config >> dwChannelMask;
+		config.unsetf(std::ios_base::hex);
+		config.setf(std::ios_base::dec);
+#if defined(DEBUG) | defined(_DEBUG)
+		cdebug << std::hex << dwChannelMask << std::dec << " channel mask" << std::endl;
+#endif
+
 		config.get();  // consume newline
 
 		char szFilterFilename[MAX_PATH];
@@ -125,7 +140,7 @@ nFilterLength(0)
 					break;
 			}
 
-			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel));
+			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel, nSampleRate));
 			++nPaths;
 
 			got_path_spec = true;
@@ -170,7 +185,7 @@ nFilterLength(0)
 				}
 
 				if(Paths[i].filter.nSampleRate != nSampleRate)
-				{
+				{	// TODO: This is not necessary, as it is caught in CWaveFile
 					throw configException("Filters must all have the same sample rate");
 				}
 			}
@@ -257,34 +272,25 @@ const std::string ChannelPaths::DisplayChannelPaths()
 	{
 		if (nPaths == 1)
 		{
-			result << "1 path (";
+			result << "1 Path (";
 		}
 		else
 		{
-			result << nPaths << " paths (";
+			result << nPaths << " Paths (";
 		}
 
 		if (nInputChannels == 1)
 		{
-			result << "mono to ";
+			result << "Mono to ";
 		}
 		else if (nInputChannels == 2)
 		{
-			result << "stereo to ";
+			result << "Stereo to ";
 		}
 		else
-			result << nInputChannels << ") ";
+			result << nInputChannels << " channels to ";
 
-		if (nOutputChannels == 1)
-		{
-			result << "mono) ";
-		}
-		else if (nOutputChannels == 2)
-		{
-			result << "stereo) ";
-		}
-		else
-			result << nOutputChannels << ") ";
+		result << channelDescription(WAVE_FORMAT_EXTENSIBLE, dwChannelMask, nOutputChannels) << ") ";
 
 		result
 #ifdef LIBSNDFILE
