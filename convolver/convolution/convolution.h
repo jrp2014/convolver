@@ -73,9 +73,16 @@ public:
 
 	ChannelPaths		Mixer;				// Order dependent
 
-	int cbLookAhead(const Sample<T>* & sample_convertor)
+	int cbLookAhead(Sample<T>* & sample_convertor)
 	{
-		return Mixer.nPartitionLength / 2 * sample_convertor->nContainerSize(); // The lag
+		if(sample_convertor != NULL)
+		{
+			return Mixer.nPartitionLength / 2 * sample_convertor->nContainerSize(); // The lag
+		}
+		else
+		{
+			throw convolutionException("Internal Error: LookAhead incalculable");
+		}
 	}
 
 private:

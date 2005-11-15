@@ -34,12 +34,15 @@ nFilterLength(0)
 ,nFFTWPartitionLength(2)
 #endif
 {
+	USES_CONVERSION;
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ChannelPaths::ChannelPaths " << T2A(szConfigFileName) << " " << nPartitions << " " << std::endl;);
+#endif
 	std::ifstream config;
 	bool got_path_spec = false;
 
 	try
 	{
-		USES_CONVERSION;
 		config.open(T2A(szConfigFileName));
 		if (config == NULL)
 		{
@@ -52,17 +55,19 @@ nFilterLength(0)
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nSampleRate << " sample rate" << std::endl;
 #endif
+
 		config >> nInputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nInputChannels << " input channels" << std::endl;
 #endif
+
 		config >> nOutputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nOutputChannels << " output channels" << std::endl;
 #endif
 		config.unsetf(std::ios_base::dec);
 		config.setf(std::ios_base::hex);
-		config >> dwChannelMask;
+		config >> dwChannelMask;		// Read in hex
 		config.unsetf(std::ios_base::hex);
 		config.setf(std::ios_base::dec);
 #if defined(DEBUG) | defined(_DEBUG)

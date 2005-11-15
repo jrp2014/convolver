@@ -93,6 +93,9 @@ int	_tmain(int argc, _TCHAR* argv[])
 //			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
 //#endif
 
+		conv.set_ptr(new CConvolution<float>(argv[3], 1));
+		std::cerr << conv->Mixer.DisplayChannelPaths() << std::endl;
+
 		float fAttenuation	= 0;
 
 #ifdef LIBSNDFILE

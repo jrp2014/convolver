@@ -61,7 +61,7 @@ public:
 	version()
 	{
 		// Get application name
-		TCHAR buf[MAX_PATH] = TEXT("");
+		TCHAR buf[MAX_PATH * 2] = TEXT(""); // *2 for UNICODE
 
 		if(::GetModuleFileName(0, buf, sizeof(buf)))
 		{

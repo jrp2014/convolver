@@ -77,11 +77,13 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE get_attenuation(float *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_attenuation(float newVal) = 0;
 
-	virtual float	decode_Attenuationdb(const DWORD dwValue) = 0;
-	virtual DWORD	encode_Attenuationdb(const float fValue) = 0;
-
 	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_filter_description(std::string& description) = 0;
+
+	virtual float	decode_Attenuationdb(const DWORD dwValue) = 0;
+	virtual DWORD	encode_Attenuationdb(const float fValue) = 0;
 };
 
 
@@ -135,6 +137,8 @@ public:
 
 	STDMETHOD(get_partitions)(DWORD *pVal);
 	STDMETHOD(put_partitions)(DWORD newVal);
+
+	STDMETHOD(get_filter_description)(std::string& description);
 
 	// IMediaObject methods
 	STDMETHOD( GetStreamCount )( 
@@ -317,7 +321,7 @@ private:
 
 	CFormatSpecs<float>				m_FormatSpecs;
 
-	BOOL                    m_bEnabled;         // TRUE if enabled
+	BOOL							m_bEnabled;         // TRUE if enabled
 };
 
 #endif //__CCONVOLVER_H_

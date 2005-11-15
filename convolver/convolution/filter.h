@@ -52,15 +52,15 @@ public:
 #endif
 
 	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate);
+
 #ifdef FFTW
-	// // TODO: this does not work because if you have a number of filters of the same length they seem to point to the same thing
-	//~Filter()
-	//{
-	//	fftwf_destroy_plan(plan);
-	//	plan = NULL;
-	//	fftwf_destroy_plan(reverse_plan);
-	//	reverse_plan = NULL;
-	//}
+	~Filter()
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Filter::~Filter " << std::endl;);
+#endif
+		// Don't delete the plans from here, as it messes up copy construction
+	}
 #endif
 
 
@@ -73,7 +73,4 @@ private:
 													// strictly, length of ip >= 
 													//    2+(1<<(int)(log(n+0.5)/log(2))/2).
 #endif
-	//Filter(const Filter& other); // no impl.
-	//void operator=(const Filter& other); // no impl.
-	//Filter(Filter& other);                // discourage use of lvalue Filters
 };

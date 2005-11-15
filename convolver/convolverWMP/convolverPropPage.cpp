@@ -88,8 +88,14 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	{
 		try
 		{
-			Holder< CConvolution<float> >	conv(new CConvolution<float>(szFilterFileName,  1)); // TODO: Find a more efficient way of doing this
-			SetDlgItemText( IDC_STATUS, CA2CT(conv->Mixer.DisplayChannelPaths().c_str()));
+			std::string description = "";
+			hr = m_spConvolver->get_filter_description(description);
+			if (FAILED(hr))
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("No filter set"));
+				return hr;
+			}
+			SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()));
 		}
 		catch (std::exception& error)
 		{
@@ -254,7 +260,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		return E_FAIL;
 	}
 
-	m_bDirty = FALSE; // Tell the property page to disable Apply.
+	SetDirty(FALSE); // Tell the property page to disable Apply.
 
 	return S_OK;
 }
@@ -362,6 +368,8 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	TCHAR szFilterPath[MAX_PATH]		= TEXT("");
 	HRESULT hr = ERROR_SUCCESS;
 
+	try
+	{
 	// Setup the OPENFILENAME structure
 	OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
 		TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
@@ -381,7 +389,25 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
+	hr = m_spConvolver->put_filterfilename(szFilterFileName);
+	if(FAILED(hr))
+	{
+		return hr;
+	}
+
 	hr = DisplayFilterFormat(szFilterFileName);
+	}
+	catch (std::exception& error)
+	{
+		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
+		return E_FAIL;
+	}
+	catch (...) 
+	{
+
+		SetDlgItemText( IDC_STATUS, TEXT("Failed to load filter config file.") );
+		return E_FAIL;
+	}
 
 	//// Save the filter filename (without needing to apply)
 	//// update the registry
@@ -413,8 +439,9 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	//	}
 	//	return hr;
 	//}
+	//SetDirty(TRUE);
 
-	SetDirty(TRUE);
+	hr = Apply(); // apply the filter immediately; don't wait for apply button to be set, as we have 
 
 	return hr;
 }

@@ -23,10 +23,14 @@ Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const D
 nPartitions (nPartitions),
 nSampleRate(nSampleRate)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSampleRate << std::endl;);
+#endif
 #ifndef LIBSNDFILE
 	HRESULT hr = S_OK;
 #endif
 
+	 // TODO:: unclear whether this has any effect
 	SIMDFlushToZero();	// Set flush to zero processor mode for speed, with a loss of accuracy
 
 	if (nPartitions == 0)

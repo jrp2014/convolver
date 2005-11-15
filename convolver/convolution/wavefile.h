@@ -105,7 +105,7 @@ public:
 		}
 		if(sfinfo->samplerate != nSampleRate)
 		{
-			throw wavfileException("Expected filter sample rate", path, "");
+			throw wavfileException("Unexpected filter sample rate", path, "");
 		}
 	};
 

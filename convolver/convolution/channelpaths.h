@@ -38,7 +38,12 @@ public:
 			int nChannel;
 			float fScale;
 
-			ScaledChannel(int& nChannel, float& fScale) : nChannel(nChannel), fScale(fScale) {};
+			ScaledChannel(int& nChannel, float& fScale) : nChannel(nChannel), fScale(fScale)
+			{
+#if defined(DEBUG) | defined(_DEBUG)
+				DEBUGGING(3, cdebug << "ChannelPath::ChannelPath::ScaledChannel" << std::endl;);
+#endif
+			};
 
 #if defined(DEBUG) | defined(_DEBUG)
 			void Dump();
@@ -51,14 +56,18 @@ public:
 
 		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions,
 			std::vector<ScaledChannel>& inChannel, std::vector<ScaledChannel>& outChannel, const DWORD& nSampleRate) :
-			filter(szConfigFileName, nPartitions, nSampleRate), inChannel(inChannel), outChannel(outChannel) {};
+		filter(szConfigFileName, nPartitions, nSampleRate), inChannel(inChannel), outChannel(outChannel)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ChannelPath::ChannelPath" << std::endl;);
+#endif
+		};
 
 #if defined(DEBUG) | defined(_DEBUG)
 		void Dump();
 #endif
 	};
 
-public:
 	int	nInputChannels;			// number of input channels
 	int nOutputChannels;		// number of output channels
 	DWORD nSampleRate;			// 44100, 48000, etc
@@ -76,9 +85,28 @@ public:
 
 	ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
 
+	~ChannelPaths()
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ChannelPaths::~ChannelPaths " << std::endl;);
+#endif
+		// Delete the plans here to avoid problems with vector and copy constructors
+		for(int i=0; i < Paths.size(); ++i)
+		{
+			fftwf_destroy_plan(Paths[i].filter.plan);
+			Paths[i].filter.plan = NULL;
+			fftwf_destroy_plan(Paths[i].filter.reverse_plan);
+			Paths[i].filter.reverse_plan = NULL;
+		}
+	}
+
 	const std::string DisplayChannelPaths();
 
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump();
 #endif
+
+private:
+	ChannelPaths(const ChannelPaths&); // No copy ctor
+	ChannelPaths &operator =(const ChannelPaths&); // No copy assignment
 };
