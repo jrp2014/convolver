@@ -27,27 +27,29 @@ template HRESULT calculateOptimumAttenuation<float>(float& fAttenuation, TCHAR s
 template <typename T>
 CConvolution<T>::CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
 Mixer(szConfigFileName, nPartitions),
-#ifdef ARRAY
-InputBuffer_(Mixer.nInputChannels, Mixer.nPartitionLength),
-InputBufferAccumulator_(Mixer.nPartitionLength),
-OutputBuffer_(Mixer.nPartitionLength),
-OutputBufferAccumulator_(Mixer.nOutputChannels, Mixer.nPartitionLength),
-#else
-InputBuffer_(Mixer.nInputChannels, ChannelBuffer(Mixer.nPartitionLength)),
-InputBufferAccumulator_(Mixer.nPartitionLength),
-OutputBuffer_(Mixer.nPartitionLength), // NB. Actually, only need half partition length for DoPartitionedConvolution
-OutputBufferAccumulator_(Mixer.nOutputChannels, ChannelBuffer(Mixer.nPartitionLength)),
-#endif
 #ifdef FFTW
-#ifdef ARRAY
-ComputationCircularBuffer_(nPartitions, Mixer.nPaths, Mixer.nFFTWPartitionLength),
-FFTInputBufferAccumulator_(Mixer.nFFTWPartitionLength),
-FFTOutputBuffer_(Mixer.nFFTWPartitionLength),
+	InputBufferAccumulator_(Mixer.nFFTWPartitionLength),
+	OutputBuffer_(Mixer.nFFTWPartitionLength), // NB. Actually, only need half partition length for DoPartitionedConvolution
+	#ifdef ARRAY
+	ComputationCircularBuffer_(nPartitions, Mixer.nPaths, Mixer.nFFTWPartitionLength),
+	#else
+	ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.nPaths, ChannelBuffer(Mixer.nFFTWPartitionLength))),
+	#endif
 #else
-ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.nPaths, ChannelBuffer(Mixer.nFFTWPartitionLength))),
-FFTInputBufferAccumulator_(ChannelBuffer(Mixer.nFFTWPartitionLength)),
-FFTOutputBuffer_(ChannelBuffer(Mixer.nFFTWPartitionLength)),
+	InputBufferAccumulator_(Mixer.nPartitionLength),
+	OutputBuffer_(Mixer.nPartitionLength), // NB. Actually, only need half partition length for DoPartitionedConvolution
+	#ifdef ARRAY
+	ComputationCircularBuffer_(nPartitions, Mixer.nPaths, Mixer.nPartitionLength),
+	#else
+	ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.nPaths, ChannelBuffer(Mixer.nPartitionLength))),
+	#endif
 #endif
+#ifdef ARRAY
+		InputBuffer_(Mixer.nInputChannels, Mixer.nPartitionLength),
+		OutputBufferAccumulator_(Mixer.nOutputChannels, Mixer.nPartitionLength),
+#else
+		InputBuffer_(Mixer.nInputChannels, ChannelBuffer(Mixer.nPartitionLength)),
+		OutputBufferAccumulator_(Mixer.nOutputChannels, ChannelBuffer(Mixer.nPartitionLength)),
 #endif
 nInputBufferIndex_(Mixer.nHalfPartitionLength),
 nPartitionIndex_(0),
@@ -161,7 +163,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 				// get DFT of InputBufferAccumulator_
 #ifdef FFTW
 				fftwf_execute_dft_r2c(Mixer.Paths[0].filter.plan, &InputBufferAccumulator_[0],
-					reinterpret_cast<fftwf_complex*>(&FFTInputBufferAccumulator_[0]));
+					reinterpret_cast<fftwf_complex*>(&InputBufferAccumulator_[0]));
 #elif defined(SIMPLE_OOURA)
 				rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0]);
 #elif defined(OOURA)
@@ -178,8 +180,8 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 					// Complex vector multiplication of InputBufferAccumulator_ and Mixer.Paths[nPath].filter,
 					// added to ComputationCircularBuffer_
 #ifdef FFTW
-					complex_mul_add(reinterpret_cast<fftwf_complex*>(&FFTInputBufferAccumulator_[0]),
-						reinterpret_cast<fftwf_complex*>(&Mixer.Paths[nPath].filter.fft_coeffs[nPartitionIndex][0][0]),
+					complex_mul_add(reinterpret_cast<fftwf_complex*>(&InputBufferAccumulator_[0]),
+						reinterpret_cast<fftwf_complex*>(&Mixer.Paths[nPath].filter.coeffs[nPartitionIndex][0][0]),
 						reinterpret_cast<fftwf_complex*>(&ComputationCircularBuffer_[nPartitionIndex_][nPath][0]),
 						Mixer.nPartitionLength);
 #elif defined(__ICC) || defined(__INTEL_COMPILER)
@@ -198,7 +200,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 #ifdef FFTW
 				fftwf_execute_dft_c2r(Mixer.Paths[0].filter.reverse_plan,
 					reinterpret_cast<fftwf_complex*>(&ComputationCircularBuffer_[nPartitionIndex_][nPath][0]),
-					&OutputBuffer_[0]);
+					&ComputationCircularBuffer_[nPartitionIndex_][nPath][0]);
 #elif defined(SIMPLE_OOURA)
 				rdft(Mixer.nPartitionLength, OouraRBackward, &ComputationCircularBuffer_[nPartitionIndex_][nPath][0]);
 #elif defined(OOURA)
@@ -210,11 +212,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 
 				// Mix the outputs
 				mix_output(Mixer.Paths[nPath], OutputBufferAccumulator_, 
-#ifdef FFTW
-					OutputBuffer_,
-#else
 					ComputationCircularBuffer_[nPartitionIndex_][nPath],
-#endif
 					Mixer.nHalfPartitionLength, Mixer.nPartitionLength);
 
 			} // nPath
@@ -327,7 +325,7 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					// get DFT of InputBufferAccumulator_
 #ifdef FFTW
 					fftwf_execute_dft_r2c(Mixer.Paths[nPath].filter.plan, &InputBufferAccumulator_[0],
-						reinterpret_cast<fftwf_complex*>(&FFTInputBufferAccumulator_[0]));
+						reinterpret_cast<fftwf_complex*>(&InputBufferAccumulator_[0]));
 #elif defined(SIMPLE_OOURA)
 					rdft(Mixer.nPartitionLength, OouraRForward, &InputBufferAccumulator_[0]);
 #elif defined(OOURA)
@@ -339,9 +337,9 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 #endif
 
 #ifdef FFTW
-					complex_mul(reinterpret_cast<fftwf_complex*>(&FFTInputBufferAccumulator_[0]),
-						reinterpret_cast<fftwf_complex*>(&Mixer.Paths[nPath].filter.fft_coeffs[0][0][0]),
-						reinterpret_cast<fftwf_complex*>(&FFTOutputBuffer_[0]),
+					complex_mul(reinterpret_cast<fftwf_complex*>(&InputBufferAccumulator_[0]),
+						reinterpret_cast<fftwf_complex*>(&Mixer.Paths[nPath].filter.coeffs[0][0][0]),
+						reinterpret_cast<fftwf_complex*>(&OutputBuffer_[0]),
 						Mixer.nPartitionLength);
 #elif defined(__ICC) || defined(__INTEL_COMPILER)
 					// vectorized
@@ -357,7 +355,7 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef FFTW
 					fftwf_execute_dft_c2r(Mixer.Paths[nPath].filter.reverse_plan,
-						reinterpret_cast<fftwf_complex*>(&FFTOutputBuffer_[0]),
+						reinterpret_cast<fftwf_complex*>(&OutputBuffer_[0]),
 						&OutputBuffer_[0]);
 #elif defined(SIMPLE_OOURA)
 					rdft(Mixer.nPartitionLength, OouraRBackward, &OutputBuffer_[0]);
@@ -366,15 +364,6 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 						&Mixer.Paths[0].filter.ip[0], &Mixer.Paths[0].filter.w[0]);
 #else
 #error "No FFT package defined"
-#endif
-
-#if defined(DEBUG) || defined(_DEBUG)
-#ifdef FFTW
-					DEBUGGING(4, 
-						verify_convolution(InputBufferAccumulator_,
-						Mixer.Paths[nPath].filter.coeffs[0][0], OutputBuffer_,
-						Mixer.nHalfPartitionLength, Mixer.nPartitionLength););
-#endif
 #endif
 					// Mix the outputs (only use the last half, as the rest is junk)
 					mix_output(Mixer.Paths[nPath], OutputBufferAccumulator_, OutputBuffer_,

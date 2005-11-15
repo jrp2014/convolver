@@ -93,11 +93,6 @@ private:
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
-#ifdef FFTW
-	ChannelBuffer		FFTInputBufferAccumulator_;	// Intermediates, for out of place FFTs
-	ChannelBuffer		FFTOutputBuffer_;			
-#endif
-
 	int					nInputBufferIndex_;			// placeholder
 	int					nPartitionIndex_;			// for partitioned convolution
 	int					nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1

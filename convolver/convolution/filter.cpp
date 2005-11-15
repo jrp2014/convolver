@@ -143,38 +143,26 @@ nSampleRate(nSampleRate)
 #endif
 
 	// Initialise the Filter
+
+#ifdef FFTW
+	nFFTWPartitionLength = 2*(nPaddedPartitionLength/2+1);
+#ifdef ARRAY
+	coeffs = PartitionedBuffer(nPartitions, nChannels, nFFTWPartitionLength);
+#else
+	coeffs = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nFFTWPartitionLength)));
+#endif
+	plan =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
+		&coeffs[0][0][0], reinterpret_cast<fftwf_complex*>(&coeffs[0][0][0]),
+		FFTW_MEASURE);
+	reverse_plan =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
+		reinterpret_cast<fftwf_complex*>(&coeffs[0][0][0]), &coeffs[0][0][0],
+		FFTW_MEASURE);
+#else
 #ifdef ARRAY
 	coeffs = PartitionedBuffer(nPartitions, nChannels, nPaddedPartitionLength);
 #else
 	coeffs = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nPaddedPartitionLength)));
 #endif
-#ifdef FFTW
-	nFFTWPartitionLength = 2*(nPaddedPartitionLength/2+1);
-#ifdef ARRAY
-	fft_coeffs = PartitionedBuffer(nPartitions, nChannels, nFFTWPartitionLength);
-#else
-	fft_coeffs = PartitionedBuffer(nPartitions, SampleBuffer(nChannels, ChannelBuffer(nFFTWPartitionLength)));
-#endif
-	plan =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
-		&coeffs[0][0][0],
-		reinterpret_cast<fftwf_complex*>(&fft_coeffs[0][0][0]),
-		FFTW_MEASURE 
-#if defined(DEBUG) || defined(_DEBUG)
-		| FFTW_PRESERVE_INPUT
-#else
-		| FFTW_DESTROY_INPUT
-#endif
-		);
-	reverse_plan =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
-		reinterpret_cast<fftwf_complex*>(&fft_coeffs[0][0][0]),
-		&coeffs[0][0][0],
-		FFTW_MEASURE
-#if defined(DEBUG) || defined(_DEBUG)
-		| FFTW_PRESERVE_INPUT
-#else
-		| FFTW_DESTROY_INPUT
-#endif
-		);
 #endif
 
 #ifdef LIBSNDFILE
@@ -365,7 +353,7 @@ nSampleRate(nSampleRate)
 #ifdef FFTW
 				fftwf_execute_dft_r2c(plan, 
 					&coeffs[nPartition][nChannel][0], 
-					reinterpret_cast<fftwf_complex*>(&fft_coeffs[nPartition][nChannel][0]));
+					reinterpret_cast<fftwf_complex*>(&coeffs[nPartition][nChannel][0]));
 #elif defined(OOURA_SIMPLE)
 				rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0]);
 #elif defined(OOURA)
@@ -376,7 +364,7 @@ nSampleRate(nSampleRate)
 
 				// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-				fft_coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+				coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
 				coeffs[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
 #else
@@ -399,7 +387,7 @@ nSampleRate(nSampleRate)
 
 			// Take the DFT
 #ifdef FFTW
-			fftwf_execute_dft_r2c(plan, &coeffs[nPartition][nChannel][0], reinterpret_cast<fftwf_complex*>(&fft_coeffs[nPartition][nChannel][0]));
+			fftwf_execute_dft_r2c(plan, &coeffs[nPartition][nChannel][0], reinterpret_cast<fftwf_complex*>(&coeffs[nPartition][nChannel][0]));
 #elif defined(OOURA_SIMPLE)
 			rdft(nPaddedPartitionLength, OouraRForward, &coeffs[nPartition][nChannel][0]);
 #elif defined(OOURA)
@@ -410,7 +398,7 @@ nSampleRate(nSampleRate)
 
 			// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-			fft_coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+			coeffs[nPartition][nChannel] *= static_cast<float>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
 			coeffs[nPartition][nChannel] *= static_cast<float>(2.0L / nPaddedPartitionLength);
 #else
@@ -426,9 +414,6 @@ nSampleRate(nSampleRate)
 		for (int nChannel=0; nChannel < nChannels; ++nChannel)
 		{
 			coeffs[nPartition][nChannel] = 0;
-#ifdef FFTW
-			fft_coeffs[nPartition][nChannel] = 0;
-#endif
 		}
 	}
 
@@ -441,11 +426,7 @@ nSampleRate(nSampleRate)
 #if defined(DEBUG) | defined(_DEBUG)
 
 	cdebug << "FFT Filter: ";
-#ifdef FFTW
-	DumpPartitionedBuffer(fft_coeffs);
-	cdebug << std::endl << "Filter: ";
-#endif
-	 DumpPartitionedBuffer(coeffs);
+	DumpPartitionedBuffer(coeffs);
 
 
 #ifdef LIBSNDFILE

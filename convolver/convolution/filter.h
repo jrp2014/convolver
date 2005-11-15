@@ -48,7 +48,6 @@ public:
 	int						nFFTWPartitionLength;	// 2*(nPaddedPartitionLength/2+1);
 	fftwf_plan				plan;
 	fftwf_plan				reverse_plan;
-	PartitionedBuffer		fft_coeffs;
 #endif
 
 	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate);
