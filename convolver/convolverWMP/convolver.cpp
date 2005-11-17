@@ -1444,7 +1444,7 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 }
 
 // Property to get a filter description 
-STDMETHODIMP CConvolver::get_filter_description(std::string& description)
+STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
@@ -1452,12 +1452,12 @@ STDMETHODIMP CConvolver::get_filter_description(std::string& description)
 
 	if(m_Convolution.get_ptr() != NULL)
 	{
-		description = m_Convolution->Mixer.DisplayChannelPaths();
+		*description = m_Convolution->Mixer.DisplayChannelPaths();
 		return S_OK;
 	}
 	else
 	{
-		description = "No filter loaded";
+		*description = "No filter loaded";
 		return E_FAIL;
 	}
 }

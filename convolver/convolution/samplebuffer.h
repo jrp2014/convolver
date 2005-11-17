@@ -346,6 +346,95 @@ typedef	std::vector< SampleBuffer >  PartitionedBuffer;
 
 #else
 
+template<T>
+class Matrix
+
+public:
+	Matrix(unsigned rows, unsigned cols)
+		: rows_ (rows)
+		, cols_ (cols)
+		//data_ <--initialized below (after the 'if/throw' statement)
+	{
+		if (rows == 0 || cols == 0)
+			throw BadIndex("Matrix constructor has 0 size");
+		data_ = new double[rows * cols];
+	}
+
+	T& operator() (unsigned row, unsigned col)
+	{
+		if (row >= rows_ || col >= cols_)
+			throw BadIndex("Matrix subscript out of bounds");
+		return data_[cols_*row + col];
+	}
+
+	T operator() (unsigned row, unsigned col) const
+	{
+		if (row >= rows_ || col >= cols_)
+			throw BadIndex("const Matrix subscript out of bounds");
+		return data_[cols_*row + col];
+	} 
+
+	Row operator[](unsigned row)
+	{
+		assert(row >= 0 && row < rows_);
+		return Row(*this, row);
+	}
+
+	const ConstRow operator[](unsigned row)
+	{
+		assert(row >= 0 && row < rows_);
+		return ConstRow(*this, row);
+	}
+
+	~Matrix()
+	{
+		delete[] data_;
+	}
+
+	Matrix(const Matrix& m);               // Copy constructor
+	Matrix& operator= (const Matrix& m);   // Assignment operator
+
+
+	class Row
+	{
+	public:
+		Row(Matrix& matrix, unsigned row) : matrix_(matrix), row_(row) {}
+
+		Row operator[](unsigned col)
+		{ 
+			return matrix_(row_, col);
+		} 
+
+	private:
+		Matrix matrix_;
+		unsigned row_;
+	}
+
+	class ConstRow
+	{
+	public:
+		ConstRow(const Matrix& matrix, unsigned row) : matrix_(matrix), row_(row) {}
+
+		const ConstRow operator[](unsigned col)
+		{ 
+			return matrix_(row_, col);
+		} 
+
+	private:
+		const Matrix matrix_;
+		const unsigned row_;
+	}
+
+
+private:
+	unsigned rows_, cols_;
+	T* data_;
+};
+
+
+
+
+
 // None of these are suitable
 //#include "./Array.h"
 //
@@ -353,10 +442,10 @@ typedef	std::vector< SampleBuffer >  PartitionedBuffer;
 //typedef Array::array2<float> restrict SampleBuffer;
 //typedef Array::array3<float> restrict PartitionedBuffer;
 
-#include "stlsoft_fixed_array.h"
-typedef stlsoft::fixed_array_1d<float> restrict ChannelBuffer;
-typedef stlsoft::fixed_array_2d<float> restrict SampleBuffer;
-typedef stlsoft::fixed_array_3d<float> restrict PartitionedBuffer;
+//#include "stlsoft_fixed_array.h"
+//typedef stlsoft::fixed_array_1d<float> restrict ChannelBuffer;
+//typedef stlsoft::fixed_array_2d<float> restrict SampleBuffer;
+//typedef stlsoft::fixed_array_3d<float> restrict PartitionedBuffer;
 
 #endif
 

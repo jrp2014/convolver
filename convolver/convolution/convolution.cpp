@@ -788,6 +788,9 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 	{
 		InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
 		//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
+	}
+	for(int i = 0; i < nOutputBufferLength; ++i)
+	{
 		OutputSamples[i] = 0;  // silence
 	}
 

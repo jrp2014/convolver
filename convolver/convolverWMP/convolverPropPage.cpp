@@ -89,7 +89,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 		try
 		{
 			std::string description = "";
-			hr = m_spConvolver->get_filter_description(description);
+			hr = m_spConvolver->get_filter_description(&description);
 			if (FAILED(hr))
 			{
 				SetDlgItemText( IDC_STATUS, TEXT("No filter set"));
