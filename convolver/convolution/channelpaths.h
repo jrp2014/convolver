@@ -70,7 +70,7 @@ public:
 
 	int	nInputChannels;			// number of input channels
 	int nOutputChannels;		// number of output channels
-	DWORD nSampleRate;			// 44100, 48000, etc
+	DWORD nSamplesPerSec;		// 44100, 48000, etc
 	DWORD dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
 	int nPaths;					// number of Paths
 	int	nPartitions;

@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,11,0,0
- PRODUCTVERSION 2,11,0,0
+ FILEVERSION 2,12,0,0
+ PRODUCTVERSION 2,12,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -64,14 +64,14 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "Convolver"
-            VALUE "FileDescription", "Convolver Module"
-            VALUE "FileVersion", "2, 11, 0, 0"
-            VALUE "InternalName", "Convolver"
-            VALUE "LegalCopyright", "Copyright GPL 2005"
+            VALUE "FileDescription", "Convolver WMP plug-in Module"
+            VALUE "FileVersion", "2, 12, 0, 0"
+            VALUE "InternalName", "ConvolverWMP"
+            VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
-            VALUE "ProductName", "Convolver Module"
-            VALUE "ProductVersion", "2, 11, 0, 0"
+            VALUE "ProductName", "Convolver WMP plug-in Module"
+            VALUE "ProductVersion", "2, 12, 0, 0"
         END
     END
     BLOCK "VarFileInfo"

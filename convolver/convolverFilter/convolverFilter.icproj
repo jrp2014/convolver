@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject 
+	ProjectType="Intel C++ Project"
+	Version="9.0"
+	Name="convolverFilter"
+	ProjectGUID="{B2AEC2B0-2191-4347-A21F-C41A91F7BCC0}"
+	VCNestedProjectGUID="{90C47E62-931C-411D-9F16-0B877E34B415}"
+	VCNestedProjectFileName="convolverFilter.vcproj">
+	<Configurations>
+		<Configuration 
+			Name="Debug|Win32">
+			<Tool 
+				Name="GeneralTool"
+				OutputDirectory="..\bin\Debug"
+				IntermediateDirectory="Debug"
+				ConfigurationType="2"
+				UseOfATL="0"
+				ATLMinimizesCRunTimeLibraryUsage="1"
+				CharacterSet="1"/>
+			<Tool 
+				Name="DebugTool"/>
+			<Tool 
+				Name="CppCmplrTool"
+				Optimization="0"
+				EnableIntrinsicFunctions="1"
+				FavorSizeOrSpeed="1"
+				OptimizeForProcessor="3"
+				AdditionalIncludeDirectories="..\"
+				PreprocessorDefinitions="DEBUG;WIN32;_WINDOWS;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC;_WIN32_DCOM"
+				ExceptionHandling="1"
+				RuntimeLibrary="1"
+				ForceConformanceInForLoopScope="0"
+				UsePrecompiledHeader="2"
+				PrecompiledHeaderThrough="streams.h"
+				PrecompiledHeaderFile="./Debug/convolverFilter.pch"
+				WarningLevel="4"
+				Detect64BitPortabilityProblems="1"
+				DebugInformationFormat="4"
+				CallingConvention="0"
+				CompileAs="0"
+				OpenMP="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"/>
+			<Tool 
+				Name="LinkerTool"
+				DelayImpLib=""
+				RegisterOutput="1"
+				AdditionalDependencies="strmbasd.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib"
+				ShowProgress="2"
+				OutputFile="$(OutDir)\convolverFilter.ax"
+				LinkIncremental="0"
+				SuppressStartupBanner="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				IgnoreAllDefaultLibraries="0"
+				ModuleDefinitionFile="convolverFilter.def"
+				GenerateDebugInformation="1"
+				ProgramDatabaseFile="$(OutDir)/$(ProjectName).pdb"
+				SubSystem="2"
+				EntryPointSymbol=""
+				SupportUnloadOfDelayLoadedDLL="1"
+				TargetMachine="1"
+				FixedBaseAddress="1"/>
+			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
+			<Tool 
+				Name="BscMakeTool"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
+			<Tool 
+				Name="PostBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="CustomNodeTool"/>
+		</Configuration>
+		<Configuration 
+			Name="Release|Win32">
+			<Tool 
+				Name="GeneralTool"
+				OutputDirectory="..\bin\Release"
+				IntermediateDirectory="Release"
+				ConfigurationType="2"
+				UseOfATL="1"
+				ATLMinimizesCRunTimeLibraryUsage="1"
+				CharacterSet="1"
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="DebugTool"/>
+			<Tool 
+				Name="CppCmplrTool"
+				Optimization="1000"
+				GlobalOptimizations="1"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="1"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="1"
+				EnableFiberSafeOptimizations="1"
+				OptimizeForProcessor="3"
+				AdditionalIncludeDirectories="..\"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW3_IMPORTS;_WIN32_DCOM"
+				StringPooling="1"
+				ExceptionHandling="1"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="0"
+				StructMemberAlignment="5"
+				BufferSecurityCheck="0"
+				EnableFunctionLevelLinking="1"
+				EnableEnhancedInstructionSet="2"
+				ForceConformanceInForLoopScope="0"
+				UsePrecompiledHeader="0"
+				PrecompiledHeaderThrough="streams.h"
+				PrecompiledHeaderFile="./Release/convolverFilter.pch"
+				WarningLevel="3"
+				SuppressStartupBanner="0"
+				Detect64BitPortabilityProblems="1"
+				DebugInformationFormat="3"
+				CallingConvention="0"
+				CompileAs="0"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
+				OpenMP="1"
+				UseProcExt="4"
+				RequireProcExt="2"
+				Parallelization="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"
+				InitLocalVarToNaN="0"
+				SupportMultibyteCharSource="1"/>
+			<Tool 
+				Name="LinkerTool"
+				DelayImpLib=""
+				RegisterOutput="1"
+				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib"
+				OutputFile="$(OutDir)\convolverFilter.ax"
+				LinkIncremental="1"
+				SuppressStartupBanner="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				IgnoreAllDefaultLibraries="0"
+				IgnoreDefaultLibraryNames=""
+				ModuleDefinitionFile="convolverFilter.def"
+				SubSystem="2"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
+				EntryPointSymbol=""
+				SupportUnloadOfDelayLoadedDLL="1"
+				TargetMachine="1"
+				FixedBaseAddress="1"/>
+			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
+			<Tool 
+				Name="BscMakeTool"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
+			<Tool 
+				Name="PostBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="CustomNodeTool"/>
+		</Configuration>
+	</Configurations>
+	<Files>
+		<File 
+			RelativePath=".\convolverFilter.cpp"/>
+		<File 
+			RelativePath=".\convolverFilter.def"/>
+		<File 
+			RelativePath=".\convolverFilter.h"/>
+		<File 
+			RelativePath=".\convolverFilter.rc"/>
+		<File 
+			RelativePath=".\convolverFilterProp.cpp"/>
+		<File 
+			RelativePath=".\convolverFilterProp.h"/>
+		<File 
+			RelativePath=".\iconvolverFilter.h"/>
+		<File 
+			RelativePath=".\resource.h"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.cpp"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.h"/>
+		<File 
+			RelativePath="..\convolution\config.h"/>
+		<File 
+			RelativePath="..\convolution\convolution.cpp"/>
+		<File 
+			RelativePath="..\convolution\convolution.h"/>
+		<File 
+			RelativePath="..\convolution\exception.h"/>
+		<File 
+			RelativePath="..\convolution\filter.cpp"/>
+		<File 
+			RelativePath="..\convolution\filter.h"/>
+		<File 
+			RelativePath="..\convolution\holder.h"/>
+		<File 
+			RelativePath="..\convolution\lrint.cpp"/>
+		<File 
+			RelativePath="..\convolution\lrint.h"/>
+		<File 
+			RelativePath="..\convolution\sample.h"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.cpp"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.h"/>
+		<File 
+			RelativePath="..\convolution\wavefile.h"/>
+		<File 
+			RelativePath="..\convolution\waveformat.cpp"/>
+		<File 
+			RelativePath="..\convolution\waveformat.h"/>
+		<File 
+			RelativePath="..\debugging\debugging.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugging.h"/>
+		<File 
+			RelativePath="..\debugging\debugStream.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugStream.h"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.cpp"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amextra.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amextra.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amfilter.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amfilter.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amvideo.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cache.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\combase.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\combase.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cprop.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cprop.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ddmm.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ddmm.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllentry.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dsschedule.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\fourcc.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\measure.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\msgthrd.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\mtype.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\mtype.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\outputq.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\outputq.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pstream.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pstream.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pullpin.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pullpin.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\refclock.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\refclock.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\reftime.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\renbase.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\renbase.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\schedule.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\schedule.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\seekpt.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\seekpt.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\source.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\source.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\streams.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\strmctl.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\strmctl.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\sysclock.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\sysclock.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transfrm.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transfrm.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transip.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transip.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\videoctl.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\videoctl.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\vtrans.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\vtrans.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winctrl.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winctrl.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winutil.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winutil.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxlist.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxlist.h"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.cpp"/>
+		<File 
+			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.h"/>
+		<File 
+			RelativePath=".\readme.txt"/>
+	</Files>
+</VisualStudioProject>
+

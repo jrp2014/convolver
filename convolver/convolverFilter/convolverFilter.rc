@@ -1,0 +1,156 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include <windows.h>
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include <windows.h>\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_convolverFilterPROP DIALOGEX 0, 0, 215, 128
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+FONT 8, "MS Shell Dlg", 0, 0, 0x0
+BEGIN
+    EDITTEXT        IDC_CONFIGFILE,62,8,148,14,ES_AUTOHSCROLL,
+                    WS_EX_ACCEPTFILES
+    EDITTEXT        IDC_ATTENUATION,62,28,40,14,ES_AUTOHSCROLL
+    LTEXT           "Attenuation (db)",IDS_ATTENUATION,6,31,54,8
+    DEFPUSHBUTTON   "Get config ...",IDC_GETCONFIG,6,8,48,14,BS_NOTIFY
+    PUSHBUTTON      "Calculate optimum attenuation",
+                    IDC_CALCULATEOPTIMUMATTENUATION,108,28,102,14
+    LTEXT           "No of partitions:",IDS_NOOFPARTITIONS,6,48,53,8
+    EDITTEXT        IDC_NOOFPARTITIONS,62,45,40,14,ES_AUTOHSCROLL | 
+                    ES_NUMBER
+    LTEXT           "Status",IDS_STATUS,6,66,204,60,SS_WORDELLIPSIS
+    LTEXT           "Version",IDS_Version,108,48,102,8
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 2,12,0,0
+ PRODUCTVERSION 2,12,0,0
+ FILEFLAGSMASK 0x30003fL
+#ifdef _DEBUG
+ FILEFLAGS 0xbL
+#else
+ FILEFLAGS 0xaL
+#endif
+ FILEOS 0x10001L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "ActiveMovie", "Filter dll"
+            VALUE "CompanyName", "Convolver"
+            VALUE "FileDescription", "convolver DirectShow Transform Filter"
+            VALUE "FileVersion", "2.12"
+            VALUE "InternalName", "convolverFilter.ax"
+            VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
+            VALUE "LegalTrademarks", "GPL"
+            VALUE "OLESelfRegister", "AM20"
+            VALUE "OriginalFilename", "convolverFilter.ax"
+            VALUE "ProductName", "ConvolverFilter"
+            VALUE "ProductVersion", "2.12"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_convolverFilterPROP, DIALOG
+    BEGIN
+        BOTTOMMARGIN, 120
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_TITLE               "convolverFilter"
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

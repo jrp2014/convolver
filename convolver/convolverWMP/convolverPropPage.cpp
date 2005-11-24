@@ -271,8 +271,6 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	DWORD  dwWetmix			 = 100;									// Default wet mix DWORD.
-	float fWetmix			 = 1.0;									// Default wet mix float.
 	float fAttenuation		 = 0.0;									// Default attenuation float
 	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
 		m_spConvolver->encode_Attenuationdb(fAttenuation);
@@ -286,14 +284,11 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	{
 		// May throw
 		version v(TEXT("convolverWMP.dll"));
-		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("version ") + v.get_product_version()).c_str());
+		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("Version ") + v.get_product_version()).c_str());
 
 		// read from plug-in if it is available
 		if (m_spConvolver)
 		{
-			// Convert wet mix from float to DWORD.
-			dwWetmix = static_cast<DWORD>(fWetmix * 100);
-
 			m_spConvolver->get_attenuation(&fAttenuation);
 			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
 
@@ -370,32 +365,32 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 
 	try
 	{
-	// Setup the OPENFILENAME structure
-	OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
-		TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
-		0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
-		TEXT("Get filter file"),
-		OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY, 
-		0, 0, TEXT(".wav"), 0, NULL, NULL };
+		// Setup the OPENFILENAME structure
+		OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
+			TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
+			0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
+			TEXT("Get filter file"),
+			OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY, 
+			0, 0, TEXT(".txt"), 0, NULL, NULL };
 
-	SetDlgItemText( IDC_STATUS, TEXT("Configuration filename...") );
+		SetDlgItemText( IDC_STATUS, TEXT("Configuration filename...") );
 
-	// Display the SaveFileName dialog. Then, try to load the specified file
-	if( TRUE != GetSaveFileName( &ofn ) )
-	{
-		SetDlgItemText( IDC_STATUS, TEXT("Get filter aborted.") );
-		return CommDlgExtendedError();
-	}
+		// Display the SaveFileName dialog. Then, try to load the specified file
+		if( TRUE != GetOpenFileName( &ofn ) )
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Get filter aborted.") );
+			return CommDlgExtendedError();
+		}
 
-	SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
+		SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
 
-	hr = m_spConvolver->put_filterfilename(szFilterFileName);
-	if(FAILED(hr))
-	{
-		return hr;
-	}
+		hr = m_spConvolver->put_filterfilename(szFilterFileName);
+		if(FAILED(hr))
+		{
+			return hr;
+		}
 
-	hr = DisplayFilterFormat(szFilterFileName);
+		hr = DisplayFilterFormat(szFilterFileName);
 	}
 	catch (std::exception& error)
 	{

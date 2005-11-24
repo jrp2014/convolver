@@ -24,6 +24,20 @@
 #define _WIN32_WINNT   0x0500 
 #endif
 
+// #define DXUT_AUTOLIB to automatically include the libs needed for DXUT 
+#ifdef DXUT_AUTOLIB
+#pragma comment( lib, "dxerr9.lib" )
+#pragma comment( lib, "dxguid.lib" )
+#if defined(DEBUG) || defined(_DEBUG)
+#pragma comment( lib, "d3dx9d.lib" )
+#else
+#pragma comment( lib, "d3dx9.lib" )
+#endif
+#pragma comment( lib, "d3d9.lib" )
+#pragma comment( lib, "winmm.lib" )
+#pragma comment( lib, "comctl32.lib" )
+#endif
+
 #pragma warning( disable : 4100 ) // disable unreference formal parameter warnings for /W4 builds
 
 #include <windows.h>
@@ -36,20 +50,17 @@
 #include <math.h>      
 #include <limits.h>      
 #include <stdio.h>
-#include <multimon.h> 
+#include <XInput.h> // Header for XInput APIs
 
 // CRT's memory leak detection
-#if defined(DEBUG) | defined(_DEBUG)
-#define CRTDBG_MAP_ALLOC
-#include <stdlib.h>
+#if defined(DEBUG) || defined(_DEBUG)
 #include <crtdbg.h>
 #endif
-
 
 // Enable extra D3D debugging in debug builds if using the debug DirectX runtime.  
 // This makes D3D objects work well in the debugger watch window, but slows down 
 // performance slightly.
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
 #ifndef D3D_DEBUG_INFO
 #define D3D_DEBUG_INFO
 #endif
@@ -67,7 +78,7 @@
 
 // strsafe.h deprecates old unsecure string functions.  If you 
 // really do not want to it to (not recommended), then uncomment the next line 
-#define STRSAFE_NO_DEPRECATE
+//#define STRSAFE_NO_DEPRECATE
 
 #ifndef STRSAFE_NO_DEPRECATE
 #pragma deprecated("strncpy")
@@ -78,8 +89,9 @@
 #pragma deprecated("_tcsncat")
 #endif
 
-#include <tchar.h>
+#pragma warning( disable : 4996 ) // disable deprecated warning 
 #include <strsafe.h>
+#pragma warning( default : 4996 ) 
 
 #include "DXUT.h"
 #include "DXUTmisc.h"
@@ -88,8 +100,9 @@
 #include "DXUTgui.h"
 #include "DXUTsettingsDlg.h"
 #include "DXUTSound.h"
+#include "DXUTRes.h"
 
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
 #ifndef V
 #define V(x)           { hr = x; if( FAILED(hr) ) { DXUTTrace( __FILE__, (DWORD)__LINE__, hr, L#x, true ); } }
 #endif

@@ -29,6 +29,7 @@
 // EVENT_LISTBOX_SELECTION is fired off when the selection changes in
 // a single selection list box.
 #define EVENT_LISTBOX_SELECTION             0x0702
+#define EVENT_LISTBOX_SELECTION_END         0x0703
 
 
 //--------------------------------------------------------------------------------------
@@ -120,12 +121,16 @@ public:
 //-----------------------------------------------------------------------------
 class CDXUTDialog
 {
+    friend class CDXUTDialogResourceManager;
+
 public:
     CDXUTDialog();
     ~CDXUTDialog();
 
     // Need to call this now
-    void Init( CDXUTDialogResourceManager* pManager );
+    void Init( CDXUTDialogResourceManager* pManager, bool bRegisterDialog = true );
+    void Init( CDXUTDialogResourceManager* pManager, bool bRegisterDialog, LPCWSTR pszControlTextureFilename );
+    void Init( CDXUTDialogResourceManager* pManager, bool bRegisterDialog, LPCWSTR szControlTextureResourceName, HMODULE hControlTextureResourceModule );
 
     // Windows message handler
     bool MsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
@@ -196,8 +201,6 @@ public:
     int GetWidth() { return m_width; }
     int GetHeight() { return m_height; }
 
-    void SetNextDialog( CDXUTDialog* pNextDialog );
-
     static void SetRefreshTime( float fTime ){ s_fTimeRefresh = fTime; }
 
     static CDXUTControl* GetNextControl( CDXUTControl* pControl );
@@ -211,10 +214,11 @@ public:
     void EnableNonUserEvents( bool bEnable ) { m_bNonUserEvents = bEnable; }
     void EnableKeyboardInput( bool bEnable ) { m_bKeyboardInput = bEnable; }
     void EnableMouseInput( bool bEnable ) { m_bMouseInput = bEnable; }
+    bool IsKeyboardInputEnabled() const { return m_bKeyboardInput; }
 
     // Device state notification
     void Refresh();
-    HRESULT OnRender( float fElapsedTime );    
+    HRESULT OnRender( float fElapsedTime );
 
     // Shared resource access. Indexed fonts and textures are shared among
     // all the controls.
@@ -222,6 +226,7 @@ public:
     DXUTFontNode* GetFont( UINT index );
 
     HRESULT          SetTexture( UINT index, LPCWSTR strFilename );
+    HRESULT          SetTexture( UINT index, LPCWSTR strResourceName, HMODULE hResourceModule );
     DXUTTextureNode* GetTexture( UINT index );
 
     CDXUTDialogResourceManager* GetManager() { return m_pManager; }
@@ -232,6 +237,8 @@ public:
     bool m_bNonUserEvents;
     bool m_bKeyboardInput;
     bool m_bMouseInput;
+
+
 
 private:
     int m_nDefaultControlID;
@@ -246,6 +253,8 @@ private:
     void OnMouseMove( POINT pt );
     void OnMouseUp( POINT pt );
 
+    void SetNextDialog( CDXUTDialog* pNextDialog );
+
     // Control events
     bool OnCycleFocus( bool bForward );
 
@@ -257,6 +266,7 @@ private:
     bool m_bVisible;
     bool m_bCaption;
     bool m_bMinimized;
+    bool m_bDrag;
     WCHAR m_wszCaption[256];
 
     int m_x;
@@ -292,6 +302,9 @@ private:
 //--------------------------------------------------------------------------------------
 struct DXUTTextureNode
 {
+    bool bFileSource;  // True if this texture is loaded from a file. False if from resource.
+    HMODULE hResourceModule;
+    int nResourceID;   // Resource ID. If 0, string-based ID is used and stored in strFilename.
     WCHAR strFilename[MAX_PATH];
     IDirect3DTexture9* pTexture;
     DWORD dwWidth;
@@ -324,19 +337,26 @@ public:
     
     int AddFont( LPCWSTR strFaceName, LONG height, LONG weight );
     int AddTexture( LPCWSTR strFilename );
+    int AddTexture( LPCWSTR strResourceName, HMODULE hResourceModule );
 
     DXUTFontNode*     GetFontNode( int iIndex )     { return m_FontCache.GetAt( iIndex ); };
     DXUTTextureNode*  GetTextureNode( int iIndex )  { return m_TextureCache.GetAt( iIndex ); };
     IDirect3DDevice9* GetD3DDevice()                { return m_pd3dDevice; }
 
+    bool RegisterDialog( CDXUTDialog *pDialog );
+    void UnregisterDialog( CDXUTDialog *pDialog );
+    void EnableKeyboardInputForAllDialogs();
+
     // Shared between all dialogs
     IDirect3DStateBlock9* m_pStateBlock;
     ID3DXSprite*          m_pSprite;          // Sprite used for drawing
 
+    CGrowableArray< CDXUTDialog* > m_Dialogs;            // Dialogs registered
+
 protected:
     CGrowableArray< DXUTTextureNode* > m_TextureCache;   // Shared textures
     CGrowableArray< DXUTFontNode* > m_FontCache;         // Shared fonts
-    
+
     IDirect3DDevice9* m_pd3dDevice;
 
     // Resource creation helpers
@@ -468,7 +488,7 @@ public:
 
     virtual bool HandleKeyboard( UINT uMsg, WPARAM wParam, LPARAM lParam );
     virtual bool HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam );
-    virtual void OnHotkey() { m_pDialog->RequestFocus( this ); m_pDialog->SendEvent( EVENT_BUTTON_CLICKED, true, this ); }
+    virtual void OnHotkey() { if( m_pDialog->IsKeyboardInputEnabled() ) m_pDialog->RequestFocus( this ); m_pDialog->SendEvent( EVENT_BUTTON_CLICKED, true, this ); }
     
     virtual BOOL ContainsPoint( POINT pt ) { return PtInRect( &m_rcBoundingBox, pt ); }
     virtual bool CanHaveFocus() { return (m_bVisible && m_bEnabled); }
@@ -490,7 +510,7 @@ public:
 
     virtual bool HandleKeyboard( UINT uMsg, WPARAM wParam, LPARAM lParam );
     virtual bool HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam );
-    virtual void OnHotkey() { m_pDialog->RequestFocus( this ); SetCheckedInternal( !m_bChecked, true ); }
+    virtual void OnHotkey() { if( m_pDialog->IsKeyboardInputEnabled() ) m_pDialog->RequestFocus( this ); SetCheckedInternal( !m_bChecked, true ); }
 
     virtual BOOL ContainsPoint( POINT pt ); 
     virtual void UpdateRects(); 
@@ -519,7 +539,7 @@ public:
 
     virtual bool HandleKeyboard( UINT uMsg, WPARAM wParam, LPARAM lParam );
     virtual bool HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam );
-    virtual void OnHotkey() { m_pDialog->RequestFocus( this ); SetCheckedInternal( true, true, true ); }
+    virtual void OnHotkey() { if( m_pDialog->IsKeyboardInputEnabled() ) m_pDialog->RequestFocus( this ); SetCheckedInternal( true, true, true ); }
     
     void SetChecked( bool bChecked, bool bClearGroup=true ) { SetCheckedInternal( bChecked, bClearGroup, false ); }
     void SetButtonGroup( UINT nButtonGroup ) { m_nButtonGroup = nButtonGroup; }
@@ -542,8 +562,9 @@ public:
 
     virtual bool    HandleKeyboard( UINT uMsg, WPARAM wParam, LPARAM lParam );
     virtual bool    HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam );
+    virtual bool    MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam );
 
-    virtual void Render( IDirect3DDevice9* pd3dDevice, float fElapsedTime );
+    virtual void    Render( IDirect3DDevice9* pd3dDevice, float fElapsedTime );
     virtual void    UpdateRects();
 
     void SetTrackRange( int nStart, int nEnd );
@@ -568,6 +589,7 @@ protected:
     void Cap();  // Clips position at boundaries. Ensures it stays within legal range.
 
     bool m_bShowThumb;
+    bool m_bDrag;
     RECT m_rcUpButton;
     RECT m_rcDownButton;
     RECT m_rcTrack;
@@ -604,13 +626,15 @@ public:
     virtual bool    CanHaveFocus() { return (m_bVisible && m_bEnabled); }
     virtual bool    HandleKeyboard( UINT uMsg, WPARAM wParam, LPARAM lParam );
     virtual bool    HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam );
+    virtual bool    MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam );
 
-    virtual void Render( IDirect3DDevice9* pd3dDevice, float fElapsedTime );
+    virtual void    Render( IDirect3DDevice9* pd3dDevice, float fElapsedTime );
     virtual void    UpdateRects();
 
     DWORD GetStyle() const { return m_dwStyle; }
     int GetSize() const { return m_Items.GetSize(); }
     void SetStyle( DWORD dwStyle ) { m_dwStyle = dwStyle; }
+    int  GetScrollBarWidth() const { return m_nSBWidth; }
     void SetScrollBarWidth( int nWidth ) { m_nSBWidth = nWidth; UpdateRects(); }
     void SetBorder( int nBorder, int nMargin ) { m_nBorder = nBorder; m_nMargin = nMargin; }
     HRESULT AddItem( const WCHAR *wszText, void *pData );
@@ -684,6 +708,7 @@ public:
     void*   GetItemData( const WCHAR* strText );
     void*   GetItemData( int nIndex );
     void    SetDropHeight( UINT nHeight ) { m_nDropHeight = nHeight; UpdateRects(); }
+    int     GetScrollBarWidth() const { return m_nSBWidth; }
     void    SetScrollBarWidth( int nWidth ) { m_nSBWidth = nWidth; UpdateRects(); }
 
     void*   GetSelectedData();
@@ -1074,7 +1099,7 @@ protected:
     int            m_nIndicatorWidth;     // Width of the indicator symbol
     RECT           m_rcIndicator;         // Rectangle for drawing the indicator button
 
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
     static bool    m_bIMEStaticMsgProcCalled;
 #endif
 };

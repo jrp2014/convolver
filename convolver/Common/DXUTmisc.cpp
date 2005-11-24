@@ -6,6 +6,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved
 //--------------------------------------------------------------------------------------
 #include "dxstdafx.h"
+#define DXUT_GAMEPAD_TRIGGER_THRESHOLD      30
+#define DXUT_INPUT_DEADZONE                 ( 0.24f * FLOAT(0x7FFF) )  // Default to 24% of the +/- 32767 range.   This is a reasonable default value but can be altered if needed.
 #undef min // use __min instead
 #undef max // use __max instead
 
@@ -1271,7 +1273,9 @@ LRESULT CD3DArcBall::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 //--------------------------------------------------------------------------------------
 CBaseCamera::CBaseCamera()
 {
+    m_cKeysDown = 0;
     ZeroMemory( m_aKeys, sizeof(BYTE)*CAM_MAX_KEYS );
+    ZeroMemory( m_GamePad, sizeof(DXUT_GAMEPAD)*DXUT_MAX_CONTROLLERS );
 
     // Set attributes for the view matrix
     D3DXVECTOR3 vEyePt    = D3DXVECTOR3(0.0f,0.0f,0.0f);
@@ -1314,8 +1318,6 @@ CBaseCamera::CBaseCamera()
     m_bClipToBoundary = false;
     m_vMinBoundary = D3DXVECTOR3(-1,-1,-1);
     m_vMaxBoundary = D3DXVECTOR3(1,1,1);
-
-    m_bResetCursorAfterMove = false;
 }
 
 
@@ -1387,7 +1389,10 @@ LRESULT CBaseCamera::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             if( mappedKey != CAM_UNKNOWN )
             {
                 if( FALSE == IsKeyDown(m_aKeys[mappedKey]) )
+                {
                     m_aKeys[ mappedKey ] = KEY_WAS_DOWN_MASK | KEY_IS_DOWN_MASK;
+                    ++m_cKeysDown;
+                }
             }
             break;
         }
@@ -1398,7 +1403,10 @@ LRESULT CBaseCamera::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             // state of m_aKeys[] by removing the KEY_IS_DOWN_MASK mask.
             D3DUtil_CameraKeys mappedKey = MapKey( (UINT)wParam );
             if( mappedKey != CAM_UNKNOWN && (DWORD)mappedKey < 8 )
+            {
                 m_aKeys[ mappedKey ] &= ~KEY_IS_DOWN_MASK;
+                --m_cKeysDown;
+            }
             break;
         }
 
@@ -1456,55 +1464,127 @@ LRESULT CBaseCamera::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 }
 
 
-
-
 //--------------------------------------------------------------------------------------
-// Figure out the mouse delta based on mouse movement
+// Figure out the velocity based on keyboard input & drag if any
 //--------------------------------------------------------------------------------------
-void CBaseCamera::UpdateMouseDelta( float fElapsedTime )
+void CBaseCamera::GetInput( bool bGetKeyboardInput, bool bGetMouseInput, bool bGetGamepadInput, bool bResetCursorAfterMove )
 {
-    UNREFERENCED_PARAMETER( fElapsedTime );
-
-    POINT ptCurMouseDelta;
-    POINT ptCurMousePos;
-    
-    // Get current position of mouse
-    GetCursorPos( &ptCurMousePos );
-
-    // Calc how far it's moved since last frame
-    ptCurMouseDelta.x = ptCurMousePos.x - m_ptLastMousePosition.x;
-    ptCurMouseDelta.y = ptCurMousePos.y - m_ptLastMousePosition.y;
-
-    // Record current position for next time
-    m_ptLastMousePosition = ptCurMousePos;
-
-    if( m_bResetCursorAfterMove )
+    m_vKeyboardDirection = D3DXVECTOR3(0,0,0);
+    if( bGetKeyboardInput )
     {
-        // Set position of camera to center of desktop, 
-        // so it always has room to move.  This is very useful
-        // if the cursor is hidden.  If this isn't done and cursor is hidden, 
-        // then invisible cursor will hit the edge of the screen 
-        // and the user can't tell what happened
-        POINT ptCenter;
-        RECT rcDesktop;
-        GetWindowRect( GetDesktopWindow(), &rcDesktop );
-        ptCenter.x = (rcDesktop.right - rcDesktop.left) / 2;
-        ptCenter.y = (rcDesktop.bottom - rcDesktop.top) / 2;   
-        SetCursorPos( ptCenter.x, ptCenter.y );
-        m_ptLastMousePosition = ptCenter;
+        // Update acceleration vector based on keyboard state
+        if( IsKeyDown(m_aKeys[CAM_MOVE_FORWARD]) )
+            m_vKeyboardDirection.z += 1.0f;
+        if( IsKeyDown(m_aKeys[CAM_MOVE_BACKWARD]) )
+            m_vKeyboardDirection.z -= 1.0f;
+        if( m_bEnableYAxisMovement )
+        {
+            if( IsKeyDown(m_aKeys[CAM_MOVE_UP]) )
+                m_vKeyboardDirection.y += 1.0f;
+            if( IsKeyDown(m_aKeys[CAM_MOVE_DOWN]) )
+                m_vKeyboardDirection.y -= 1.0f;
+        }
+        if( IsKeyDown(m_aKeys[CAM_STRAFE_RIGHT]) )
+            m_vKeyboardDirection.x += 1.0f;
+        if( IsKeyDown(m_aKeys[CAM_STRAFE_LEFT]) )
+            m_vKeyboardDirection.x -= 1.0f;
     }
 
-    // Smooth the relative mouse data over a few frames so it isn't 
-    // jerky when moving slowly at low frame rates.
-    float fPercentOfNew =  1.0f / m_fFramesToSmoothMouseData;
-    float fPercentOfOld =  1.0f - fPercentOfNew;
-    m_vMouseDelta.x = m_vMouseDelta.x*fPercentOfOld + ptCurMouseDelta.x*fPercentOfNew;
-    m_vMouseDelta.y = m_vMouseDelta.y*fPercentOfOld + ptCurMouseDelta.y*fPercentOfNew;
+    if( bGetMouseInput )
+    {
+        // Get current position of mouse
+        POINT ptCurMouseDelta;
+        POINT ptCurMousePos;
+        
+        if( GetCursorPos( &ptCurMousePos ) )
+        {
+            // Calc how far it's moved since last frame
+            ptCurMouseDelta.x = ptCurMousePos.x - m_ptLastMousePosition.x;
+            ptCurMouseDelta.y = ptCurMousePos.y - m_ptLastMousePosition.y;
+            
+            // Record current position for next time
+            m_ptLastMousePosition = ptCurMousePos;
+        }
+        else
+        {
+            // If GetCursorPos() returns false, just set delta to zero
+            ptCurMouseDelta.x = 0;
+            ptCurMouseDelta.y = 0;
+        }
 
-    m_vRotVelocity = m_vMouseDelta * m_fRotationScaler;
+        if( bResetCursorAfterMove && DXUTIsActive() )
+        {
+            // Set position of camera to center of desktop, 
+            // so it always has room to move.  This is very useful
+            // if the cursor is hidden.  If this isn't done and cursor is hidden, 
+            // then invisible cursor will hit the edge of the screen 
+            // and the user can't tell what happened
+            POINT ptCenter;
+
+            // Get the center of the current monitor
+            MONITORINFO mi;
+            mi.cbSize = sizeof(MONITORINFO);
+            DXUTGetMonitorInfo( DXUTMonitorFromWindow(DXUTGetHWND(),MONITOR_DEFAULTTONEAREST), &mi );
+            ptCenter.x = (mi.rcMonitor.left + mi.rcMonitor.right) / 2;
+            ptCenter.y = (mi.rcMonitor.top + mi.rcMonitor.bottom) / 2;   
+            SetCursorPos( ptCenter.x, ptCenter.y );
+            m_ptLastMousePosition = ptCenter;
+        }
+
+        // Smooth the relative mouse data over a few frames so it isn't 
+        // jerky when moving slowly at low frame rates.
+        float fPercentOfNew =  1.0f / m_fFramesToSmoothMouseData;
+        float fPercentOfOld =  1.0f - fPercentOfNew;
+        m_vMouseDelta.x = m_vMouseDelta.x*fPercentOfOld + ptCurMouseDelta.x*fPercentOfNew;
+        m_vMouseDelta.y = m_vMouseDelta.y*fPercentOfOld + ptCurMouseDelta.y*fPercentOfNew;
+
+    }
+
+    if( bGetGamepadInput )
+    {
+        m_vGamePadLeftThumb = D3DXVECTOR3(0,0,0);
+        m_vGamePadRightThumb = D3DXVECTOR3(0,0,0);
+
+        // Get controller state
+        for( DWORD iUserIndex=0; iUserIndex<DXUT_MAX_CONTROLLERS; iUserIndex++ )
+        {
+            DXUTGetGamepadState( iUserIndex, &m_GamePad[iUserIndex], true, true );
+
+            // Mark time if the controller is in a non-zero state
+            if( m_GamePad[iUserIndex].wButtons || 
+                m_GamePad[iUserIndex].sThumbLX || m_GamePad[iUserIndex].sThumbLX || 
+                m_GamePad[iUserIndex].sThumbRX || m_GamePad[iUserIndex].sThumbRY || 
+                m_GamePad[iUserIndex].bLeftTrigger || m_GamePad[iUserIndex].bRightTrigger )
+            {
+                m_GamePadLastActive[iUserIndex] = DXUTGetTime();
+            }
+        }
+
+        // Find out which controller was non-zero last
+        int iMostRecentlyActive = -1;
+        double fMostRecentlyActiveTime = 0.0f;
+        for( DWORD iUserIndex=0; iUserIndex<DXUT_MAX_CONTROLLERS; iUserIndex++ )
+        {
+            if( m_GamePadLastActive[iUserIndex] > fMostRecentlyActiveTime )
+            {
+                fMostRecentlyActiveTime = m_GamePadLastActive[iUserIndex];
+                iMostRecentlyActive = iUserIndex;
+            }
+        }
+
+        // Use the most recent non-zero controller if its connected
+        if( iMostRecentlyActive >= 0 && m_GamePad[iMostRecentlyActive].bConnected )
+        {
+            m_vGamePadLeftThumb.x = m_GamePad[iMostRecentlyActive].fThumbLX;
+            m_vGamePadLeftThumb.y = 0.0f;
+            m_vGamePadLeftThumb.z = m_GamePad[iMostRecentlyActive].fThumbLY;
+
+            m_vGamePadRightThumb.x = m_GamePad[iMostRecentlyActive].fThumbRX;
+            m_vGamePadRightThumb.y = 0.0f;
+            m_vGamePadRightThumb.z = m_GamePad[iMostRecentlyActive].fThumbRY;
+        }
+    }
 }
-
-
 
 
 //--------------------------------------------------------------------------------------
@@ -1513,27 +1593,11 @@ void CBaseCamera::UpdateMouseDelta( float fElapsedTime )
 void CBaseCamera::UpdateVelocity( float fElapsedTime )
 {
     D3DXMATRIX mRotDelta;
-    D3DXVECTOR3 vAccel = D3DXVECTOR3(0,0,0);
 
-    if( m_bEnablePositionMovement )
-    {
-        // Update acceleration vector based on keyboard state
-        if( IsKeyDown(m_aKeys[CAM_MOVE_FORWARD]) )
-            vAccel.z += 1.0f;
-        if( IsKeyDown(m_aKeys[CAM_MOVE_BACKWARD]) )
-            vAccel.z -= 1.0f;
-        if( m_bEnableYAxisMovement )
-        {
-            if( IsKeyDown(m_aKeys[CAM_MOVE_UP]) )
-                vAccel.y += 1.0f;
-            if( IsKeyDown(m_aKeys[CAM_MOVE_DOWN]) )
-                vAccel.y -= 1.0f;
-        }
-        if( IsKeyDown(m_aKeys[CAM_STRAFE_RIGHT]) )
-            vAccel.x += 1.0f;
-        if( IsKeyDown(m_aKeys[CAM_STRAFE_LEFT]) )
-            vAccel.x -= 1.0f;
-    }
+    D3DXVECTOR2 vGamePadRightThumb = D3DXVECTOR2(m_vGamePadRightThumb.x, -m_vGamePadRightThumb.z);
+    m_vRotVelocity = m_vMouseDelta * m_fRotationScaler + vGamePadRightThumb * 0.02f;
+
+    D3DXVECTOR3 vAccel = m_vKeyboardDirection + m_vGamePadLeftThumb;
 
     // Normalize vector so if moving 2 dirs (left & forward), 
     // the camera doesn't move faster than if moving in 1 dir
@@ -1656,6 +1720,7 @@ VOID CBaseCamera::Reset()
 CFirstPersonCamera::CFirstPersonCamera() :
     m_nActiveButtonMask( 0x07 )
 {
+	m_bRotateWithoutButtonDown = false;
 }
 
 
@@ -1672,9 +1737,8 @@ VOID CFirstPersonCamera::FrameMove( FLOAT fElapsedTime )
     if( IsKeyDown(m_aKeys[CAM_RESET]) )
         Reset();
 
-    // Get the mouse movement (if any) if the mouse button are down
-    if( m_nActiveButtonMask & m_nCurrentButtonMask )
-        UpdateMouseDelta( fElapsedTime );
+    // Get keyboard/mouse/gamepad input
+    GetInput( m_bEnablePositionMovement, (m_nActiveButtonMask & m_nCurrentButtonMask) || m_bRotateWithoutButtonDown, true, m_bResetCursorAfterMove );
 
     // Get amount of velocity based on the keyboard input and drag (if any)
     UpdateVelocity( fElapsedTime );
@@ -1683,7 +1747,10 @@ VOID CFirstPersonCamera::FrameMove( FLOAT fElapsedTime )
     D3DXVECTOR3 vPosDelta = m_vVelocity * fElapsedTime;
 
     // If rotating the camera 
-    if( m_nActiveButtonMask & m_nCurrentButtonMask )
+    if( (m_nActiveButtonMask & m_nCurrentButtonMask) || 
+        m_bRotateWithoutButtonDown || 
+        m_vGamePadRightThumb.x != 0 || 
+        m_vGamePadRightThumb.z != 0 )
     {
         // Update the pitch & yaw angle based on mouse movement
         float fYawDelta   = m_vRotVelocity.x;
@@ -1740,11 +1807,12 @@ VOID CFirstPersonCamera::FrameMove( FLOAT fElapsedTime )
 //--------------------------------------------------------------------------------------
 // Enable or disable each of the mouse buttons for rotation drag.
 //--------------------------------------------------------------------------------------
-void CFirstPersonCamera::SetRotateButtons( bool bLeft, bool bMiddle, bool bRight )
+void CFirstPersonCamera::SetRotateButtons( bool bLeft, bool bMiddle, bool bRight, bool bRotateWithoutButtonDown )
 {
     m_nActiveButtonMask = ( bLeft ? MOUSE_LEFT_BUTTON : 0 ) |
                           ( bMiddle ? MOUSE_MIDDLE_BUTTON : 0 ) |
                           ( bRight ? MOUSE_RIGHT_BUTTON : 0 );
+	m_bRotateWithoutButtonDown = bRotateWithoutButtonDown;
 }
 
 
@@ -1785,15 +1853,13 @@ VOID CModelViewerCamera::FrameMove( FLOAT fElapsedTime )
         Reset();
 
     // If no dragged has happend since last time FrameMove is called,
-    // no need to handle again.
-    if( !m_bDragSinceLastUpdate )
+    // and no camera key is held down, then no need to handle again.
+    if( !m_bDragSinceLastUpdate && 0 == m_cKeysDown )
         return;
     m_bDragSinceLastUpdate = false;
 
-    // If no mouse button is held down, 
-    // Get the mouse movement (if any) if the mouse button are down
-    if( m_nCurrentButtonMask != 0 ) 
-        UpdateMouseDelta( fElapsedTime );
+    // Get keyboard/mouse/gamepad input
+    GetInput( m_bEnablePositionMovement, m_nCurrentButtonMask != 0, true, false );
 
     // Get amount of velocity based on the keyboard input and drag (if any)
     UpdateVelocity( fElapsedTime );
@@ -2126,7 +2192,7 @@ LPCWSTR DXUTD3DFormatToString( D3DFORMAT format, bool bWithPrefix )
 //--------------------------------------------------------------------------------------
 VOID DXUTOutputDebugStringW( LPCWSTR strMsg, ... )
 {
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
     WCHAR strBuffer[512];
     
     va_list args;
@@ -2147,7 +2213,7 @@ VOID DXUTOutputDebugStringW( LPCWSTR strMsg, ... )
 //--------------------------------------------------------------------------------------
 VOID DXUTOutputDebugStringA( LPCSTR strMsg, ... )
 {
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
     CHAR strBuffer[512];
     
     va_list args;
@@ -2520,26 +2586,65 @@ CDXUTDirectionWidget::CDXUTDirectionWidget()
 //--------------------------------------------------------------------------------------
 HRESULT CDXUTDirectionWidget::StaticOnCreateDevice( IDirect3DDevice9* pd3dDevice )
 {
-    WCHAR str[MAX_PATH];
     HRESULT hr;
 
     s_pd3dDevice = pd3dDevice;
-   
-    // Read the D3DX effect file
-    V_RETURN( DXUTFindDXSDKMediaFileCch( str, MAX_PATH, L"UI\\DXUTShared.fx" ) );
 
-    // If this fails, there should be debug output as to 
-    // why the .fx file failed to compile
-    V_RETURN( D3DXCreateEffectFromFile( s_pd3dDevice, str, NULL, NULL, D3DXFX_NOT_CLONEABLE, NULL, &s_pEffect, NULL ) );
+    const char* g_strBuffer = 
+    "float4 g_MaterialDiffuseColor;      // Material's diffuse color\r\n"
+    "float3 g_LightDir;                  // Light's direction in world space\r\n"
+    "float4x4 g_mWorld;                  // World matrix for object\r\n"
+    "float4x4 g_mWorldViewProjection;    // World * View * Projection matrix\r\n"
+    "\r\n"
+    "struct VS_OUTPUT\r\n"
+    "{\r\n"
+    "    float4 Position   : POSITION;   // vertex position\r\n"
+    "    float4 Diffuse    : COLOR0;     // vertex diffuse color\r\n"
+    "};\r\n"
+    "\r\n"
+    "VS_OUTPUT RenderWith1LightNoTextureVS( float4 vPos : POSITION,\r\n"
+    "                                       float3 vNormal : NORMAL )\r\n"
+    "{\r\n"
+    "    VS_OUTPUT Output;\r\n"
+    "\r\n"
+    "    // Transform the position from object space to homogeneous projection space\r\n"
+    "    Output.Position = mul(vPos, g_mWorldViewProjection);\r\n"
+    "\r\n"
+    "    // Transform the normal from object space to world space\r\n"
+    "    float3 vNormalWorldSpace;\r\n"
+    "    vNormalWorldSpace = normalize(mul(vNormal, (float3x3)g_mWorld)); // normal (world space)\r\n"
+    "\r\n"
+    "    // Compute simple directional lighting equation\r\n"
+    "    Output.Diffuse.rgb = g_MaterialDiffuseColor * max(0,dot(vNormalWorldSpace, g_LightDir));\r\n"
+    "    Output.Diffuse.a = 1.0f;\r\n"
+    "\r\n"
+    "    return Output;\r\n"
+    "}\r\n"
+    "\r\n"
+    "float4 RenderWith1LightNoTexturePS( float4 Diffuse : COLOR0 ) : COLOR0\r\n"
+    "{\r\n"
+    "    return Diffuse;\r\n"
+    "}\r\n"
+    "\r\n"
+    "technique RenderWith1LightNoTexture\r\n"
+    "{\r\n"
+    "    pass P0\r\n"
+    "    {\r\n"
+    "        VertexShader = compile vs_1_1 RenderWith1LightNoTextureVS();\r\n"
+    "        PixelShader  = compile ps_1_1 RenderWith1LightNoTexturePS();\r\n"
+    "    }\r\n"
+    "}\r\n"
+    "";
+
+    UINT dwBufferSize = (UINT)strlen(g_strBuffer) + 1; 
+
+    V_RETURN( D3DXCreateEffect( s_pd3dDevice, g_strBuffer, dwBufferSize, NULL, NULL, D3DXFX_NOT_CLONEABLE, NULL, &s_pEffect, NULL ) );
 
     // Load the mesh with D3DX and get back a ID3DXMesh*.  For this
     // sample we'll ignore the X file's embedded materials since we know 
     // exactly the model we're loading.  See the mesh samples such as
     // "OptimizedMesh" for a more generic mesh loading example.
-    V_RETURN( DXUTFindDXSDKMediaFileCch( str, MAX_PATH, L"UI\\arrow.x" ) );
-
-    V_RETURN( D3DXLoadMeshFromX( str, D3DXMESH_MANAGED, s_pd3dDevice, NULL, 
-                                 NULL, NULL, NULL, &s_pMesh) );
+    V_RETURN( DXUTCreateArrowMeshFromInternalArray( s_pd3dDevice, &s_pMesh ) );
 
     // Optimize the mesh for this graphics card's vertex cache 
     // so when rendering the mesh's triangle list the vertices will 
@@ -2833,4 +2938,376 @@ DWORD WINAPI DXUT_Dynamic_D3DPERF_GetStatus( void )
         return s_DynamicD3DPERF_GetStatus();
     else
         return 0;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Trace a string description of a decl 
+//--------------------------------------------------------------------------------------
+void DXUTTraceDecl( D3DVERTEXELEMENT9 decl[MAX_FVF_DECL_SIZE] )
+{
+    int iDecl=0;
+    for( iDecl=0; iDecl<MAX_FVF_DECL_SIZE; iDecl++ )
+    {
+        if( decl[iDecl].Stream == 0xFF )
+            break;
+
+        DXUTOutputDebugString( L"decl[%d]=Stream:%d, Offset:%d, %s, %s, %s, UsageIndex:%d\n", iDecl, 
+                    decl[iDecl].Stream,
+                    decl[iDecl].Offset,
+                    DXUTTraceD3DDECLTYPEtoString( decl[iDecl].Type ),
+                    DXUTTraceD3DDECLMETHODtoString( decl[iDecl].Method ),
+                    DXUTTraceD3DDECLUSAGEtoString( decl[iDecl].Usage ),
+                    decl[iDecl].UsageIndex );
+    }
+
+    DXUTOutputDebugString( L"decl[%d]=D3DDECL_END\n", iDecl );
+}
+
+
+//--------------------------------------------------------------------------------------
+WCHAR* DXUTTraceD3DDECLTYPEtoString( BYTE t )
+{
+    switch( t )
+    {
+        case D3DDECLTYPE_FLOAT1: return L"D3DDECLTYPE_FLOAT1";
+        case D3DDECLTYPE_FLOAT2: return L"D3DDECLTYPE_FLOAT2";
+        case D3DDECLTYPE_FLOAT3: return L"D3DDECLTYPE_FLOAT3";
+        case D3DDECLTYPE_FLOAT4: return L"D3DDECLTYPE_FLOAT4";
+        case D3DDECLTYPE_D3DCOLOR: return L"D3DDECLTYPE_D3DCOLOR";
+        case D3DDECLTYPE_UBYTE4: return L"D3DDECLTYPE_UBYTE4";
+        case D3DDECLTYPE_SHORT2: return L"D3DDECLTYPE_SHORT2";
+        case D3DDECLTYPE_SHORT4: return L"D3DDECLTYPE_SHORT4";
+        case D3DDECLTYPE_UBYTE4N: return L"D3DDECLTYPE_UBYTE4N";
+        case D3DDECLTYPE_SHORT2N: return L"D3DDECLTYPE_SHORT2N";
+        case D3DDECLTYPE_SHORT4N: return L"D3DDECLTYPE_SHORT4N";
+        case D3DDECLTYPE_USHORT2N: return L"D3DDECLTYPE_USHORT2N";
+        case D3DDECLTYPE_USHORT4N: return L"D3DDECLTYPE_USHORT4N";
+        case D3DDECLTYPE_UDEC3: return L"D3DDECLTYPE_UDEC3";
+        case D3DDECLTYPE_DEC3N: return L"D3DDECLTYPE_DEC3N";
+        case D3DDECLTYPE_FLOAT16_2: return L"D3DDECLTYPE_FLOAT16_2";
+        case D3DDECLTYPE_FLOAT16_4: return L"D3DDECLTYPE_FLOAT16_4";
+        case D3DDECLTYPE_UNUSED: return L"D3DDECLTYPE_UNUSED";
+        default: return L"D3DDECLTYPE Unknown";
+    }
+}
+
+WCHAR* DXUTTraceD3DDECLMETHODtoString( BYTE m )
+{
+    switch( m )
+    {
+        case D3DDECLMETHOD_DEFAULT: return L"D3DDECLMETHOD_DEFAULT";
+        case D3DDECLMETHOD_PARTIALU: return L"D3DDECLMETHOD_PARTIALU";
+        case D3DDECLMETHOD_PARTIALV: return L"D3DDECLMETHOD_PARTIALV";
+        case D3DDECLMETHOD_CROSSUV: return L"D3DDECLMETHOD_CROSSUV";
+        case D3DDECLMETHOD_UV: return L"D3DDECLMETHOD_UV";
+        case D3DDECLMETHOD_LOOKUP: return L"D3DDECLMETHOD_LOOKUP";
+        case D3DDECLMETHOD_LOOKUPPRESAMPLED: return L"D3DDECLMETHOD_LOOKUPPRESAMPLED";
+        default: return L"D3DDECLMETHOD Unknown";
+    }
+}
+
+WCHAR* DXUTTraceD3DDECLUSAGEtoString( BYTE u )
+{
+    switch( u )
+    {
+        case D3DDECLUSAGE_POSITION: return L"D3DDECLUSAGE_POSITION";
+        case D3DDECLUSAGE_BLENDWEIGHT: return L"D3DDECLUSAGE_BLENDWEIGHT";
+        case D3DDECLUSAGE_BLENDINDICES: return L"D3DDECLUSAGE_BLENDINDICES";
+        case D3DDECLUSAGE_NORMAL: return L"D3DDECLUSAGE_NORMAL";
+        case D3DDECLUSAGE_PSIZE: return L"D3DDECLUSAGE_PSIZE";
+        case D3DDECLUSAGE_TEXCOORD: return L"D3DDECLUSAGE_TEXCOORD";
+        case D3DDECLUSAGE_TANGENT: return L"D3DDECLUSAGE_TANGENT";
+        case D3DDECLUSAGE_BINORMAL: return L"D3DDECLUSAGE_BINORMAL";
+        case D3DDECLUSAGE_TESSFACTOR: return L"D3DDECLUSAGE_TESSFACTOR";
+        case D3DDECLUSAGE_POSITIONT: return L"D3DDECLUSAGE_POSITIONT";
+        case D3DDECLUSAGE_COLOR: return L"D3DDECLUSAGE_COLOR";
+        case D3DDECLUSAGE_FOG: return L"D3DDECLUSAGE_FOG";
+        case D3DDECLUSAGE_DEPTH: return L"D3DDECLUSAGE_DEPTH";
+        case D3DDECLUSAGE_SAMPLE: return L"D3DDECLUSAGE_SAMPLE";
+        default: return L"D3DDECLUSAGE Unknown";
+    }
+}
+
+
+//--------------------------------------------------------------------------------------
+// Multimon API handling for OSes with or without multimon API support
+//--------------------------------------------------------------------------------------
+#define DXUT_PRIMARY_MONITOR ((HMONITOR)0x12340042)
+typedef HMONITOR (WINAPI* LPMONITORFROMWINDOW)(HWND, DWORD);
+typedef BOOL     (WINAPI* LPGETMONITORINFO)(HMONITOR, LPMONITORINFO);
+
+BOOL DXUTGetMonitorInfo(HMONITOR hMonitor, LPMONITORINFO lpMonitorInfo)
+{
+    static bool s_bInited = false;
+    static LPGETMONITORINFO s_pFnGetMonitorInfo = NULL;
+    if( !s_bInited )        
+    {
+        s_bInited = true;
+        HMODULE hUser32 = GetModuleHandle( L"USER32" );
+        if (hUser32 ) 
+        {
+            OSVERSIONINFOA osvi = {0}; osvi.dwOSVersionInfoSize = sizeof(osvi); GetVersionExA((OSVERSIONINFOA*)&osvi);
+            bool bNT = (VER_PLATFORM_WIN32_NT == osvi.dwPlatformId);    
+            s_pFnGetMonitorInfo = (LPGETMONITORINFO) (bNT ? GetProcAddress(hUser32,"GetMonitorInfoW") : GetProcAddress(hUser32,"GetMonitorInfoA"));
+        }
+    }
+
+    if( s_pFnGetMonitorInfo ) 
+        return s_pFnGetMonitorInfo(hMonitor, lpMonitorInfo);
+
+    RECT rcWork;
+    if ((hMonitor == DXUT_PRIMARY_MONITOR) && lpMonitorInfo && (lpMonitorInfo->cbSize >= sizeof(MONITORINFO)) && SystemParametersInfoA(SPI_GETWORKAREA, 0, &rcWork, 0))
+    {
+        lpMonitorInfo->rcMonitor.left = 0;
+        lpMonitorInfo->rcMonitor.top  = 0;
+        lpMonitorInfo->rcMonitor.right  = GetSystemMetrics(SM_CXSCREEN);
+        lpMonitorInfo->rcMonitor.bottom = GetSystemMetrics(SM_CYSCREEN);
+        lpMonitorInfo->rcWork = rcWork;
+        lpMonitorInfo->dwFlags = MONITORINFOF_PRIMARY;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+
+HMONITOR DXUTMonitorFromWindow(HWND hWnd, DWORD dwFlags)
+{
+    static bool s_bInited = false;
+    static LPMONITORFROMWINDOW s_pFnGetMonitorFronWindow = NULL;
+    if( !s_bInited )        
+    {
+        s_bInited = true;
+        HMODULE hUser32 = GetModuleHandle( L"USER32" );
+        if (hUser32 ) s_pFnGetMonitorFronWindow = (LPMONITORFROMWINDOW) GetProcAddress(hUser32,"MonitorFromWindow");
+    }
+
+    if( s_pFnGetMonitorFronWindow ) 
+        return s_pFnGetMonitorFronWindow(hWnd, dwFlags);
+    if (dwFlags & (MONITOR_DEFAULTTOPRIMARY | MONITOR_DEFAULTTONEAREST))
+        return DXUT_PRIMARY_MONITOR;
+    return NULL;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Get the desktop resolution of an adapter. This isn't the same as the current resolution 
+// from GetAdapterDisplayMode since the device might be fullscreen 
+//--------------------------------------------------------------------------------------
+void DXUTGetDesktopResolution( UINT AdapterOrdinal, UINT* pWidth, UINT* pHeight )
+{
+    CD3DEnumeration* pd3dEnum = DXUTGetEnumeration();
+    CD3DEnumAdapterInfo* pAdapterInfo = pd3dEnum->GetAdapterInfo( AdapterOrdinal );                       
+    DEVMODE devMode;
+    ZeroMemory( &devMode, sizeof(DEVMODE) );
+    devMode.dmSize = sizeof(DEVMODE);
+    WCHAR strDeviceName[256];
+    MultiByteToWideChar( CP_ACP, 0, pAdapterInfo->AdapterIdentifier.DeviceName, -1, strDeviceName, 256 );
+    strDeviceName[255] = 0;
+    EnumDisplaySettings( strDeviceName, ENUM_REGISTRY_SETTINGS, &devMode );
+    
+    if( pWidth )
+        *pWidth = devMode.dmPelsWidth;
+    if( pHeight )
+        *pHeight = devMode.dmPelsHeight;
+}
+
+
+//--------------------------------------------------------------------------------------
+IDirect3DDevice9* DXUTCreateRefDevice( HWND hWnd, bool bNullRef )
+{
+    HRESULT hr;
+    IDirect3D9* pD3D = DXUT_Dynamic_Direct3DCreate9( D3D_SDK_VERSION );
+    if( NULL == pD3D )
+        return NULL;
+
+    D3DDISPLAYMODE Mode;
+    pD3D->GetAdapterDisplayMode(0, &Mode);
+
+    D3DPRESENT_PARAMETERS pp;
+    ZeroMemory( &pp, sizeof(D3DPRESENT_PARAMETERS) );
+    pp.BackBufferWidth  = 1;
+    pp.BackBufferHeight = 1;
+    pp.BackBufferFormat = Mode.Format;
+    pp.BackBufferCount  = 1;
+    pp.SwapEffect       = D3DSWAPEFFECT_COPY;
+    pp.Windowed         = TRUE;
+    pp.hDeviceWindow    = hWnd;
+
+    IDirect3DDevice9* pd3dDevice = NULL;
+    hr = pD3D->CreateDevice( D3DADAPTER_DEFAULT, bNullRef ? D3DDEVTYPE_NULLREF : D3DDEVTYPE_REF,
+                             hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &pd3dDevice );
+
+    SAFE_RELEASE( pD3D );
+    return pd3dDevice;
+}
+
+
+typedef DWORD (WINAPI* LPXINPUTGETSTATE)(DWORD dwUserIndex, XINPUT_STATE* pState );
+typedef DWORD (WINAPI* LPXINPUTSETSTATE)(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration );
+typedef DWORD (WINAPI* LPXINPUTGETCAPABILITIES)( DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES* pCapabilities );
+
+
+
+//--------------------------------------------------------------------------------------
+// Does extra processing on XInput data to make it slightly more convenient to use
+//--------------------------------------------------------------------------------------
+HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbstickDeadZone, bool bSnapThumbstickToCardinals )
+{
+    if( dwPort >= DXUT_MAX_CONTROLLERS || pGamePad == NULL )
+        return E_FAIL;
+
+    static LPXINPUTGETSTATE s_pXInputGetState = NULL;
+    static LPXINPUTGETCAPABILITIES s_pXInputGetCapabilities = NULL;
+    if( NULL == s_pXInputGetState || NULL == s_pXInputGetCapabilities )
+    {
+        WCHAR wszPath[MAX_PATH];
+        if( GetSystemDirectory( wszPath, MAX_PATH ) )
+        {
+            StringCchCat( wszPath, MAX_PATH, L"\\" );
+            StringCchCat( wszPath, MAX_PATH, XINPUT_DLL );
+            HINSTANCE hInst = LoadLibrary( wszPath );
+            if( hInst ) 
+            {
+                s_pXInputGetState = (LPXINPUTGETSTATE)GetProcAddress( hInst, "XInputGetState" );
+                s_pXInputGetCapabilities = (LPXINPUTGETCAPABILITIES)GetProcAddress( hInst, "XInputGetCapabilities" );
+            }
+        }
+    }
+    if( s_pXInputGetState == NULL )
+        return E_FAIL;
+
+    XINPUT_STATE InputState;
+    DWORD dwResult = s_pXInputGetState( dwPort, &InputState );
+
+    // Track insertion and removals
+    BOOL bWasConnected = pGamePad->bConnected;
+    pGamePad->bConnected = (dwResult == ERROR_SUCCESS);
+    pGamePad->bRemoved  = (  bWasConnected && !pGamePad->bConnected );
+    pGamePad->bInserted = ( !bWasConnected &&  pGamePad->bConnected );
+
+    // Don't update rest of the state if not connected
+    if( !pGamePad->bConnected )
+        return S_OK;
+
+    // Store the capabilities of the device
+    if( pGamePad->bInserted )
+    {
+        ZeroMemory( pGamePad, sizeof(DXUT_GAMEPAD) );
+        pGamePad->bConnected = true;
+        pGamePad->bInserted  = true;
+        if( s_pXInputGetCapabilities )
+            s_pXInputGetCapabilities( dwPort, XINPUT_DEVTYPE_GAMEPAD, &pGamePad->caps );
+    }
+
+    // Copy gamepad to local structure (assumes that XINPUT_GAMEPAD at the front in CONTROLER_STATE)
+    memcpy( pGamePad, &InputState.Gamepad, sizeof(XINPUT_GAMEPAD) );
+
+    if( bSnapThumbstickToCardinals )
+    {
+        // Apply deadzone to each axis independantly to slightly snap to up/down/left/right
+	    if( pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE )
+		    pGamePad->sThumbLX = 0;
+        if( pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE ) 
+		    pGamePad->sThumbLY = 0;
+        if( pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE )
+		    pGamePad->sThumbRX = 0;
+        if( pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE ) 
+		    pGamePad->sThumbRY = 0;
+    }
+    else if( bThumbstickDeadZone )
+    {
+        // Apply deadzone if centered
+	    if( (pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE) && 
+            (pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE) ) 
+	    {	
+		    pGamePad->sThumbLX = 0;
+		    pGamePad->sThumbLY = 0;
+	    }
+	    if( (pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE) && 
+            (pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE) ) 
+	    {
+		    pGamePad->sThumbRX = 0;
+		    pGamePad->sThumbRY = 0;
+	    }
+    }
+
+    // Convert [-1,+1] range
+    pGamePad->fThumbLX = pGamePad->sThumbLX / 32767.0f;
+    pGamePad->fThumbLY = pGamePad->sThumbLY / 32767.0f;
+    pGamePad->fThumbRX = pGamePad->sThumbRX / 32767.0f;
+    pGamePad->fThumbRY = pGamePad->sThumbRY / 32767.0f;
+
+    // Get the boolean buttons that have been pressed since the last call. 
+    // Each button is represented by one bit.
+    pGamePad->wPressedButtons = ( pGamePad->wLastButtons ^ pGamePad->wButtons ) & pGamePad->wButtons;
+    pGamePad->wLastButtons    = pGamePad->wButtons;
+
+    // Figure out if the left trigger has been pressed or released
+    bool bPressed = ( pGamePad->bLeftTrigger > DXUT_GAMEPAD_TRIGGER_THRESHOLD );
+    pGamePad->bPressedLeftTrigger = ( bPressed ) ? !pGamePad->bLastLeftTrigger : false;
+    pGamePad->bLastLeftTrigger = bPressed;
+
+    // Figure out if the right trigger has been pressed or released
+    bPressed = ( pGamePad->bRightTrigger > DXUT_GAMEPAD_TRIGGER_THRESHOLD );
+    pGamePad->bPressedRightTrigger = ( bPressed ) ? !pGamePad->bLastRightTrigger : false;
+    pGamePad->bLastRightTrigger = bPressed;
+
+    return S_OK;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Don't pause the game or deactive the window without first stopping rumble otherwise 
+// the controller will continue to rumble
+//--------------------------------------------------------------------------------------
+HRESULT DXUTStopRumbleOnAllControllers()
+{
+    static LPXINPUTSETSTATE s_pXInputSetState = NULL;
+    if( NULL == s_pXInputSetState )
+    {
+        WCHAR wszPath[MAX_PATH];
+        if( GetSystemDirectory( wszPath, MAX_PATH ) )
+        {
+            StringCchCat( wszPath, MAX_PATH, L"\\" );
+            StringCchCat( wszPath, MAX_PATH, XINPUT_DLL );
+            HINSTANCE hInst = LoadLibrary( wszPath );
+            if( hInst ) 
+                s_pXInputSetState = (LPXINPUTSETSTATE)GetProcAddress( hInst, "XInputSetState" );
+        }
+    }
+    if( s_pXInputSetState == NULL )
+        return E_FAIL;
+
+    XINPUT_VIBRATION vibration;
+    vibration.wLeftMotorSpeed  = 0;
+    vibration.wRightMotorSpeed = 0;
+    for( int iUserIndex=0; iUserIndex<DXUT_MAX_CONTROLLERS; iUserIndex++ )
+        s_pXInputSetState( iUserIndex, &vibration );
+
+    return S_OK;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Helper function to launch the Media Center UI after the program terminates
+//--------------------------------------------------------------------------------------
+bool DXUTReLaunchMediaCenter()
+{
+    // Skip if not running on a Media Center
+    if( GetSystemMetrics( 87 ) == 0 ) //  SM_MEDIACENTER == 87, but is only defined if _WIN32_WINNT >= 0x0501
+        return false;
+ 
+    // Get the path to Media Center
+    WCHAR szExpandedPath[MAX_PATH];
+    if( !ExpandEnvironmentStrings( L"%SystemRoot%\\ehome\\ehshell.exe", szExpandedPath, MAX_PATH) )
+        return false;
+
+    // Skip if ehshell.exe doesn't exist
+    if( GetFileAttributes( szExpandedPath ) == 0xFFFFFFFF )
+        return false;
+ 
+    // Launch ehshell.exe 
+    INT_PTR result = (INT_PTR)ShellExecute( NULL, TEXT("open"), szExpandedPath, NULL, NULL, SW_SHOWNORMAL);
+    return (result > 32);
 }

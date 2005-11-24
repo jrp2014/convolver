@@ -15,7 +15,8 @@
 			OutputDirectory="..\bin\Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="2"
-			UseOfATL="2"
+			UseOfATL="1"
+			ATLMinimizesCRunTimeLibraryUsage="TRUE"
 			CharacterSet="1"
 			WholeProgramOptimization="FALSE">
 			<Tool
@@ -27,9 +28,10 @@
 				FavorSizeOrSpeed="1"
 				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
-				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
+				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
+				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="TRUE"
 				RuntimeLibrary="1"
@@ -91,7 +93,7 @@
 			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="2"
-			UseOfATL="1"
+			UseOfATL="0"
 			ATLMinimizesCRunTimeLibraryUsage="FALSE"
 			CharacterSet="1"
 			WholeProgramOptimization="TRUE">
@@ -104,15 +106,17 @@
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="FALSE"
-				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
+				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
-				StructMemberAlignment="0"
+				StructMemberAlignment="5"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
@@ -250,6 +254,12 @@
 				</File>
 				<File
 					RelativePath="..\Common\DXUTmisc.h">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTRes.cpp">
+				</File>
+				<File
+					RelativePath="..\Common\DXUTRes.h">
 				</File>
 				<File
 					RelativePath="..\Common\DXUTSettingsDlg.cpp">

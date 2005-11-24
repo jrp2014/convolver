@@ -37,7 +37,8 @@
 #include <mmsystem.h>
 #include <limits.h>      
 #include <stdio.h>
-
+#include <atlbase.h>
+#include <atlcom.h>
 #include "convolution\exception.h"
 
 //#include <dshow.h>
@@ -50,10 +51,10 @@
 #include <mmreg.h>
 //#include <dsound.h>
 //
-#include <ks.h>
-#include <ksmedia.h>
+//#include <ks.h>
+//#include <ksmedia.h>
 
-
+const DWORD MAXSTRING = 1024;	// length
 
 // Debugging
 

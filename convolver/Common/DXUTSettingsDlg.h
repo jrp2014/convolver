@@ -31,6 +31,7 @@
 #define DXUTSETTINGSDLG_VERTEX_PROCESSING       17
 #define DXUTSETTINGSDLG_PRESENT_INTERVAL        18
 #define DXUTSETTINGSDLG_DEVICECLIP              19
+#define DXUTSETTINGSDLG_RESOLUTION_SHOW_ALL     20
 #define DXUTSETTINGSDLG_WINDOWED_GROUP          0x0100
 
 
@@ -46,6 +47,8 @@ public:
     ~CD3DSettingsDlg();
 
     void Init( CDXUTDialogResourceManager* pManager );
+    void Init( CDXUTDialogResourceManager* pManager, LPCWSTR szControlTextureFileName );
+	void Init( CDXUTDialogResourceManager* pManager, LPCWSTR pszControlTextureResourcename, HMODULE hModule);
 
     HRESULT OnCreateDevice( IDirect3DDevice9* pd3dDevice );
     HRESULT Refresh();
@@ -106,7 +109,6 @@ protected:
     void AddVertexProcessingType( DWORD dwType );
     DWORD GetSelectedVertexProcessingType();
 
-    void AddPresentInterval( DWORD dwInterval );
     DWORD GetSelectedPresentInterval();
 
     void SetDeviceClip( bool bDeviceClip );

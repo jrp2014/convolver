@@ -84,7 +84,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		conv.set_ptr(new CConvolution<float>(argv[2], nPartitions == 0 ? 1 : nPartitions)); // Sets conv. nPartitions==0 => use overlap-save
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
-		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info, conv->Mixer.nSampleRate);
+		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info, conv->Mixer.nSamplesPerSec);
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
 

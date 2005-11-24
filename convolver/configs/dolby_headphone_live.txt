@@ -1,0 +1,13 @@
+44100 2 2 0
+d:\projects\convolver\convolver\Media\dolby_headphone_live_44k_left.wav
+0.0
+0.0
+d:\projects\convolver\convolver\Media\dolby_headphone_live_44k_right.wav
+1.0
+0.0
+d:\projects\convolver\convolver\Media\dolby_headphone_live_44k_left.wav
+1.0
+1.0
+d:\projects\convolver\convolver\Media\dolby_headphone_live_44k_right.wav
+0.0
+1.0

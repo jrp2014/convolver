@@ -20,6 +20,9 @@
 // WAV format helper routines
 
 #include ".\waveformat.h"
+#include <ks.h>
+#include <ksmedia.h>
+
 //
 //class WaveFormat
 //{
@@ -92,8 +95,6 @@ const std::string channelDescription(const WORD wFormatTag, const DWORD& dwChann
 	{
 		// Need to check number of channels as the likes of Audition sets the channel mask to 7.1 for 5.1 wav files, eg
 		// Also, order dependent
-		// KSAUDIO_SPEAKER_7POINT1_SURROUND	0x63F
-#define KSAUDIO_SPEAKER_7POINT1_SURROUND	0x63F
 		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1_SURROUND) && nChannels == 8)
 			return "7.1 surround";
 		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1) && nChannels == 8)

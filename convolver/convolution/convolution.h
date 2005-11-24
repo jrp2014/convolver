@@ -85,6 +85,22 @@ public:
 		}
 	}
 
+	// Calculate the size in bytes of the output buffer corresponding to a given input buffer size
+	unsigned int cbOutputBuffer(const int cbInputBuffer, Sample<T>* & InputSampleConvertor, Sample<T>* & OutputSampleConvertor)
+	{
+		// Size of each input frame / block
+		const unsigned int cbInputFrame = InputSampleConvertor->nContainerSize() * Mixer.nInputChannels;
+		// Check that the input buffer size is a whole number of blocks / frames
+		assert(cbInputBuffer % cbInputFrame == 0);
+
+		const unsigned int nInputFrames = cbInputBuffer / cbInputFrame; // No of frames/blocks in each input buffer
+
+		// Size of each output frame
+		const unsigned int cbOutputFrame = OutputSampleConvertor->nContainerSize() * Mixer.nOutputChannels;;
+
+		return cbOutputFrame * nInputFrames;
+	}
+
 private:
 
 	SampleBuffer		InputBuffer_;

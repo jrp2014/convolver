@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ks.h>
+#include <ksmedia.h>
+
 template <typename T>
 class Sample
 {
@@ -312,7 +315,7 @@ class CFormatSpecs
 public:
 	static struct FormatSpec
 	{
-		GUID					SubFormat;
+		GUID					SubType;
 		WORD					wFormatTag;
 		WORD					wBitsPerSample; // 
 		WORD					wValidBitsPerSample;
@@ -321,7 +324,7 @@ public:
 
 	CFormatSpecs() {}
 
-	const static int size = 15;
+	static const int size = 15;
 
 	const FormatSpec& operator[](int i) const
 	{
@@ -329,7 +332,7 @@ public:
 		return FormatSpecs_[i];
 	}
 
-	HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Sample<T>* & sample_convertor)
+	HRESULT SelectSampleConvertor(const WAVEFORMATEX* & pWave, Sample<T>* & sample_convertor)
 	{
 		if(pWave == NULL)
 		{
@@ -340,12 +343,12 @@ public:
 		// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
 		if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 		{
-			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-
 			for(int i = 0; i < size; ++i)
 			{
-				if(	pWave->wFormatTag == FormatSpecs_[i].wFormatTag &&
-					pWave->wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
+
+				WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
+				if(	pWaveXT->Format.wFormatTag == FormatSpecs_[i].wFormatTag &&
+					pWaveXT->Format.wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
 					pWaveXT->Samples.wValidBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
 				{
 					sample_convertor = FormatSpecs_[i].sample_convertor;
@@ -368,7 +371,7 @@ public:
 		}
 
 		sample_convertor = NULL;
-		return E_ABORT;
+		return E_FAIL;
 	}
 
 private:

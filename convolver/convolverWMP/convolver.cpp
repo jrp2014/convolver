@@ -330,7 +330,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	}
 
 	pmt->majortype = MEDIATYPE_Audio;
-	pmt->subtype = m_FormatSpecs[dwTypeIndex].SubFormat;
+	pmt->subtype = m_FormatSpecs[dwTypeIndex].SubType;
 
 	if (NULL == m_Convolution.get_ptr())
 	{
@@ -341,7 +341,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	pmt->bTemporalCompression = false;
 	pmt->formattype = FORMAT_WaveFormatEx;
 	assert( m_FormatSpecs[dwTypeIndex].wBitsPerSample % 8 == 0);
-	pmt->lSampleSize = m_FormatSpecs[dwTypeIndex].wBitsPerSample / 8;
+	pmt->lSampleSize = nChannels * m_FormatSpecs[dwTypeIndex].wBitsPerSample / 8; // Block align
 
 
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
@@ -353,7 +353,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	pWave->cbSize = 0; // Size, in bytes, of extra format information appended to the end of the WAVEFORMATEX structure
 	pWave->wFormatTag = m_FormatSpecs[dwTypeIndex].wFormatTag;
 	pWave->nChannels = nChannels;
-	pWave->nSamplesPerSec = m_Convolution->Mixer.nSampleRate;
+	pWave->nSamplesPerSec = m_Convolution->Mixer.nSamplesPerSec;
 	pWave->wBitsPerSample = m_FormatSpecs[dwTypeIndex].wBitsPerSample;
 	pWave->nBlockAlign = pWave->nChannels * pmt->lSampleSize;
 	pWave->nAvgBytesPerSec = pWave->nSamplesPerSec * pWave->nBlockAlign;
@@ -369,7 +369,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 		}
 		pWaveXT->Samples.wValidBitsPerSample = m_FormatSpecs[dwTypeIndex].wValidBitsPerSample;
 		pWaveXT->dwChannelMask = dwChannelMask;
-		pWaveXT->SubFormat = m_FormatSpecs[dwTypeIndex].SubFormat;
+		pWaveXT->SubFormat = m_FormatSpecs[dwTypeIndex].SubType;
 	}
 
 	return hr;
@@ -482,7 +482,7 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 
 			// Check that the filter has the right number of channels and the same sample rate as our filter
 			if ((pWave->nChannels != m_Convolution->Mixer.nInputChannels) ||
-				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSampleRate))
+				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSamplesPerSec))
 			{
 				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 			}
@@ -567,7 +567,7 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 
 			// Check that the filter has the right number of channels and the same sample rate as our filter
 			if ((pWave->nChannels != m_Convolution->Mixer.nOutputChannels) ||
-				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSampleRate))
+				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSamplesPerSec))
 			{
 				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 			}
@@ -1380,7 +1380,7 @@ STDMETHODIMP CConvolver::get_filterfilename(TCHAR *pVal[])
 	DEBUGGING(3, cdebug << "get_filterfilename" << std::endl;);
 #endif
 
-	if ( NULL == pVal )
+	if( pVal == NULL)
 	{
 		return E_POINTER;
 	}
@@ -1501,7 +1501,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbInputBytesToProcess / pWave->nBlockAlign);
 
-	// Convolve the pbInputData to produce pbOutputData (of the same length)
+	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?
 		m_Convolution->doConvolution(pbInputData, pbOutputData,
 		m_InputSampleConvertor, m_OutputSampleConvertor,

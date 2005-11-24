@@ -23,7 +23,7 @@
 ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
 nInputChannels(0),
 nOutputChannels(0),
-nSampleRate(0),
+nSamplesPerSec(0),
 dwChannelMask(0),
 nPaths(0),
 nPartitions(nPartitions),
@@ -38,6 +38,12 @@ nFilterLength(0)
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "ChannelPaths::ChannelPaths " << T2A(szConfigFileName) << " " << nPartitions << " " << std::endl;);
 #endif
+
+	if(0 == *szConfigFileName)
+	{
+		throw configException("No config file specified");
+	}
+
 	std::ifstream config;
 	bool got_path_spec = false;
 
@@ -51,9 +57,9 @@ nFilterLength(0)
 
 		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
 
-		config >> nSampleRate;
+		config >> nSamplesPerSec;
 #if defined(DEBUG) | defined(_DEBUG)
-		cdebug << nSampleRate << " sample rate" << std::endl;
+		cdebug << nSamplesPerSec << " sample rate" << std::endl;
 #endif
 
 		config >> nInputChannels;
@@ -145,7 +151,7 @@ nFilterLength(0)
 					break;
 			}
 
-			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel, nSampleRate));
+			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel, nSamplesPerSec));
 			++nPaths;
 
 			got_path_spec = true;
@@ -167,7 +173,7 @@ nFilterLength(0)
 				nPartitionLength = Paths[0].filter.nPartitionLength;			// in frames (a frame contains the interleaved samples for each channel)
 				nHalfPartitionLength = Paths[0].filter.nHalfPartitionLength;	// in frames
 				nFilterLength = Paths[0].filter.nFilterLength;					// nFilterLength = nPartitions * nPartitionLength
-				nSampleRate = Paths[0].filter.nSampleRate;
+				nSamplesPerSec = Paths[0].filter.nSamplesPerSec;
 #ifdef FFTW
 				nFFTWPartitionLength = 2 * (nPartitionLength / 2 + 1);			// Needs an extra element
 #endif
@@ -189,7 +195,7 @@ nFilterLength(0)
 					throw configException("Filters must all be of the same length");
 				}
 
-				if(Paths[i].filter.nSampleRate != nSampleRate)
+				if(Paths[i].filter.nSamplesPerSec != nSamplesPerSec)
 				{	// TODO: This is not necessary, as it is caught in CWaveFile
 					throw configException("Filters must all have the same sample rate");
 				}

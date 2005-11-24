@@ -9,6 +9,57 @@
 #ifndef DXUT_MISC_H
 #define DXUT_MISC_H
 
+//--------------------------------------------------------------------------------------
+// XInput helper state/function
+// This performs extra processing on XInput gamepad data to make it slightly more convenient to use
+// 
+// Example usage:
+//
+//      DXUT_GAMEPAD gamepad[4];
+//      for( DWORD iPort=0; iPort<DXUT_MAX_CONTROLLERS; iPort++ )
+//          DXUTGetGamepadState( iPort, gamepad[iPort] );
+//
+//--------------------------------------------------------------------------------------
+#define DXUT_MAX_CONTROLLERS 4  // XInput handles up to 4 controllers 
+
+struct DXUT_GAMEPAD
+{
+    // From XINPUT_GAMEPAD
+    WORD    wButtons;
+    BYTE    bLeftTrigger;
+    BYTE    bRightTrigger;
+    SHORT   sThumbLX;
+    SHORT   sThumbLY;
+    SHORT   sThumbRX;
+    SHORT   sThumbRY;
+
+    // Device properties
+    XINPUT_CAPABILITIES caps;
+    bool    bConnected; // If the controller is currently connected
+    bool    bInserted;  // If the controller was inserted this frame
+    bool    bRemoved;   // If the controller was removed this frame
+
+    // Thumb stick values converted to range [-1,+1]
+    float   fThumbRX;
+    float   fThumbRY;
+    float   fThumbLX;
+    float   fThumbLY;
+
+    // Records which buttons were pressed this frame.
+    // These are only set on the first frame that the button is pressed
+    WORD    wPressedButtons;
+    bool    bPressedLeftTrigger;
+    bool    bPressedRightTrigger;
+
+    // Last state of the buttons
+    WORD    wLastButtons;
+    bool    bLastLeftTrigger;
+    bool    bLastRightTrigger;
+};
+
+HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbstickDeadZone = true, bool bSnapThumbstickToCardinals = true );
+HRESULT DXUTStopRumbleOnAllControllers();
+
 
 //--------------------------------------------------------------------------------------
 // A growable array
@@ -277,13 +328,14 @@ public:
     void SetClipToBoundary( bool bClipToBoundary, D3DXVECTOR3* pvMinBoundary, D3DXVECTOR3* pvMaxBoundary ) { m_bClipToBoundary = bClipToBoundary; if( pvMinBoundary ) m_vMinBoundary = *pvMinBoundary; if( pvMaxBoundary ) m_vMaxBoundary = *pvMaxBoundary; }
     void SetScalers( FLOAT fRotationScaler = 0.01f, FLOAT fMoveScaler = 5.0f )  { m_fRotationScaler = fRotationScaler; m_fMoveScaler = fMoveScaler; }
     void SetNumberOfFramesToSmoothMouseData( int nFrames ) { if( nFrames > 0 ) m_fFramesToSmoothMouseData = (float)nFrames; }
-    void SetResetCursorAfterMove( bool bResetCursorAfterMove ) { m_bResetCursorAfterMove = bResetCursorAfterMove; }
 
     // Functions to get state
     const D3DXMATRIX*  GetViewMatrix() const { return &m_mView; }
     const D3DXMATRIX*  GetProjMatrix() const { return &m_mProj; }
     const D3DXVECTOR3* GetEyePt() const      { return &m_vEye; }
     const D3DXVECTOR3* GetLookAtPt() const   { return &m_vLookAt; }
+    float GetNearClip() const { return m_fNearPlane; }
+    float GetFarClip() const { return m_fFarPlane; }
 
     bool IsBeingDragged() const         { return (m_bMouseLButtonDown || m_bMouseMButtonDown || m_bMouseRButtonDown); }
     bool IsMouseLButtonDown() const     { return m_bMouseLButtonDown; } 
@@ -297,13 +349,20 @@ protected:
     bool WasKeyDown( BYTE key ) const { return( (key & KEY_WAS_DOWN_MASK) == KEY_WAS_DOWN_MASK ); }
 
     void ConstrainToBoundary( D3DXVECTOR3* pV );
-    void UpdateMouseDelta( float fElapsedTime );
     void UpdateVelocity( float fElapsedTime );
+    void GetInput( bool bGetKeyboardInput, bool bGetMouseInput, bool bGetGamepadInput, bool bResetCursorAfterMove );
 
     D3DXMATRIX            m_mView;              // View matrix 
     D3DXMATRIX            m_mProj;              // Projection matrix
 
+    DXUT_GAMEPAD          m_GamePad[DXUT_MAX_CONTROLLERS]; // XInput controller state
+    D3DXVECTOR3           m_vGamePadLeftThumb;
+    D3DXVECTOR3           m_vGamePadRightThumb;
+    double                m_GamePadLastActive[DXUT_MAX_CONTROLLERS];
+
+    int                   m_cKeysDown;            // Number of camera keys that are down.
     BYTE                  m_aKeys[CAM_MAX_KEYS];  // State of input - KEY_WAS_DOWN_MASK|KEY_IS_DOWN_MASK
+    D3DXVECTOR3           m_vKeyboardDirection;   // Direction vector of keyboard input
     POINT                 m_ptLastMousePosition;  // Last absolute position of mouse cursor
     bool                  m_bMouseLButtonDown;    // True if left button is down 
     bool                  m_bMouseMButtonDown;    // True if middle button is down 
@@ -343,8 +402,6 @@ protected:
     bool                  m_bClipToBoundary;      // If true, then the camera will be clipped to the boundary
     D3DXVECTOR3           m_vMinBoundary;         // Min point in clip boundary
     D3DXVECTOR3           m_vMaxBoundary;         // Max point in clip boundary
-
-    bool                  m_bResetCursorAfterMove;// If true, the class will reset the cursor position so that the cursor always has space to move 
 };
 
 
@@ -363,7 +420,9 @@ public:
     virtual void FrameMove( FLOAT fElapsedTime );
 
     // Functions to change behavior
-    void SetRotateButtons( bool bLeft, bool bMiddle, bool bRight );
+    void SetRotateButtons( bool bLeft, bool bMiddle, bool bRight, bool bRotateWithoutButtonDown = false );
+
+    void SetResetCursorAfterMove( bool bResetCursorAfterMove ) { m_bResetCursorAfterMove = bResetCursorAfterMove; }
 
     // Functions to get state
     D3DXMATRIX*  GetWorldMatrix()            { return &m_mCameraWorld; }
@@ -377,6 +436,9 @@ protected:
     D3DXMATRIX m_mCameraWorld;       // World matrix of the camera (inverse of the view matrix)
 
     int        m_nActiveButtonMask;  // Mask to determine which button to enable for rotation
+	bool	   m_bRotateWithoutButtonDown;
+
+    bool       m_bResetCursorAfterMove;// If true, the class will reset the cursor position so that the cursor always has space to move 
 };
 
 
@@ -398,9 +460,10 @@ public:
     void Reset(); 
     void SetViewParams( D3DXVECTOR3* pvEyePt, D3DXVECTOR3* pvLookatPt );
     void SetButtonMasks( int nRotateModelButtonMask = MOUSE_LEFT_BUTTON, int nZoomButtonMask = MOUSE_WHEEL, int nRotateCameraButtonMask = MOUSE_RIGHT_BUTTON ) { m_nRotateModelButtonMask = nRotateModelButtonMask, m_nZoomButtonMask = nZoomButtonMask; m_nRotateCameraButtonMask = nRotateCameraButtonMask; }
+    
     void SetAttachCameraToModel( bool bEnable = false ) { m_bAttachCameraToModel = bEnable; }
     void SetWindow( int nWidth, int nHeight, float fArcballRadius=0.9f ) { m_WorldArcBall.SetWindow( nWidth, nHeight, fArcballRadius ); m_ViewArcBall.SetWindow( nWidth, nHeight, fArcballRadius ); }
-    void SetRadius( float fDefaultRadius=5.0f, float fMinRadius=1.0f, float fMaxRadius=FLT_MAX  ) { m_fDefaultRadius = m_fRadius = fDefaultRadius; m_fMinRadius = fMinRadius; m_fMaxRadius = fMaxRadius; }
+    void SetRadius( float fDefaultRadius=5.0f, float fMinRadius=1.0f, float fMaxRadius=FLT_MAX  ) { m_fDefaultRadius = m_fRadius = fDefaultRadius; m_fMinRadius = fMinRadius; m_fMaxRadius = fMaxRadius; m_bDragSinceLastUpdate = true; }
     void SetModelCenter( D3DXVECTOR3 vModelCenter ) { m_vModelCenter = vModelCenter; }
     void SetLimitPitch( bool bLimitPitch ) { m_bLimitPitch = bLimitPitch; }
     void SetViewQuat( D3DXQUATERNION q ) { m_ViewArcBall.SetQuatNow( q ); m_bDragSinceLastUpdate = true; }
@@ -570,12 +633,22 @@ D3DXMATRIX DXUTGetCubeMapViewMatrix( DWORD dwFace );
 
 
 //--------------------------------------------------------------------------------------
+// Helper function to launch the Media Center UI after the program terminates
+//--------------------------------------------------------------------------------------
+bool DXUTReLaunchMediaCenter();
+
+
+//--------------------------------------------------------------------------------------
 // Debug printing support
 // See dxerr9.h for more debug printing support
 //--------------------------------------------------------------------------------------
 void DXUTOutputDebugStringW( LPCWSTR strMsg, ... );
 void DXUTOutputDebugStringA( LPCSTR strMsg, ... );
 HRESULT WINAPI DXUTTrace( const CHAR* strFile, DWORD dwLine, HRESULT hr, const WCHAR* strMsg, bool bPopMsgBox );
+void DXUTTraceDecl( D3DVERTEXELEMENT9 decl[MAX_FVF_DECL_SIZE] );
+WCHAR* DXUTTraceD3DDECLUSAGEtoString( BYTE u );
+WCHAR* DXUTTraceD3DDECLMETHODtoString( BYTE m );
+WCHAR* DXUTTraceD3DDECLTYPEtoString( BYTE t );
 
 #ifdef UNICODE
 #define DXUTOutputDebugString DXUTOutputDebugStringW
@@ -585,7 +658,7 @@ HRESULT WINAPI DXUTTrace( const CHAR* strFile, DWORD dwLine, HRESULT hr, const W
 
 // These macros are very similar to dxerr9's but it special cases the HRESULT defined
 // by DXUT to pop better message boxes. 
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
 #define DXUT_ERR(str,hr)           DXUTTrace( __FILE__, (DWORD)__LINE__, hr, str, false )
 #define DXUT_ERR_MSGBOX(str,hr)    DXUTTrace( __FILE__, (DWORD)__LINE__, hr, str, true )
 #define DXUTTRACE                  DXUTOutputDebugString
@@ -659,6 +732,37 @@ public:
     CDXUTPerfEventGenerator( D3DCOLOR color, LPCWSTR pstrMessage ) { DXUT_BeginPerfEvent( color, pstrMessage ); }
     ~CDXUTPerfEventGenerator( void ) { DXUT_EndPerfEvent(); }
 };
+
+
+//--------------------------------------------------------------------------------------
+// Multimon handling to support OSes with or without multimon API support.  
+// Purposely avoiding the use of multimon.h so DXUT.lib doesn't require 
+// COMPILE_MULTIMON_STUBS and cause complication with MFC or other users of multimon.h
+//--------------------------------------------------------------------------------------
+#ifndef MONITOR_DEFAULTTOPRIMARY
+    #define MONITORINFOF_PRIMARY        0x00000001
+    #define MONITOR_DEFAULTTONULL       0x00000000
+    #define MONITOR_DEFAULTTOPRIMARY    0x00000001
+    #define MONITOR_DEFAULTTONEAREST    0x00000002
+    typedef struct tagMONITORINFO
+    {
+        DWORD   cbSize;
+        RECT    rcMonitor;
+        RECT    rcWork;
+        DWORD   dwFlags;
+    } MONITORINFO, *LPMONITORINFO;
+    typedef struct tagMONITORINFOEXW : public tagMONITORINFO
+    {
+        WCHAR       szDevice[CCHDEVICENAME];
+    } MONITORINFOEXW, *LPMONITORINFOEXW;
+    typedef MONITORINFOEXW MONITORINFOEX;
+    typedef LPMONITORINFOEXW LPMONITORINFOEX;
+#endif
+
+HMONITOR DXUTMonitorFromWindow( HWND hWnd, DWORD dwFlags );
+BOOL     DXUTGetMonitorInfo( HMONITOR hMonitor, LPMONITORINFO lpMonitorInfo );
+void     DXUTGetDesktopResolution( UINT AdapterOrdinal, UINT* pWidth, UINT* pHeight );
+
 
 //--------------------------------------------------------------------------------------
 // Implementation of CGrowableArray
@@ -884,6 +988,13 @@ HRESULT CGrowableArray<TYPE>::Remove( int nIndex )
 
     return S_OK;
 }
+
+
+//--------------------------------------------------------------------------------------
+// Creates a REF or NULLREF device and returns that device.  The caller should call
+// Release() when done with the device.
+//--------------------------------------------------------------------------------------
+IDirect3DDevice9* DXUTCreateRefDevice( HWND hWnd, bool bNullRef = true );
 
 
 #endif

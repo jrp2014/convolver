@@ -98,6 +98,7 @@
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="FALSE"
@@ -105,8 +106,9 @@
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
-				StructMemberAlignment="0"
+				StructMemberAlignment="5"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="2"
@@ -311,6 +313,12 @@
 			</File>
 			<File
 				RelativePath="..\Common\DXUTmisc.h">
+			</File>
+			<File
+				RelativePath="..\Common\DXUTRes.cpp">
+			</File>
+			<File
+				RelativePath="..\Common\DXUTRes.h">
 			</File>
 			<File
 				RelativePath="..\Common\DXUTSettingsDlg.cpp">

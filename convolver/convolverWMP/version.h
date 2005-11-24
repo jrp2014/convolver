@@ -133,6 +133,6 @@ private:
 				return static_cast<LPTSTR>(value);
 		}
 
-		return TEXT("Unknown");
+		return TEXT("Unknown version");
 	}
 };

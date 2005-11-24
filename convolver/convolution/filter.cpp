@@ -19,12 +19,12 @@
 
 #include "convolution\filter.h"
 
-Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate) : 
+Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSamplesPerSec) : 
 nPartitions (nPartitions),
-nSampleRate(nSampleRate)
+nSamplesPerSec(nSamplesPerSec)
 {
 #if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSampleRate << std::endl;);
+	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSamplesPerSec << std::endl;);
 #endif
 #ifndef LIBSNDFILE
 	HRESULT hr = S_OK;
@@ -41,11 +41,11 @@ nSampleRate(nSampleRate)
 	// Load the wave file
 #ifdef LIBSNDFILE
 	::ZeroMemory(&sf_FilterFormat, sizeof(SF_INFO));
-	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat, nSampleRate); // Throws, if file invalid
+	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat, nSamplesPerSec); // Throws, if file invalid
 
 	// Save number of channels and sample rate for easy access
 	nChannels = sf_FilterFormat.channels;
-	this->nSampleRate = sf_FilterFormat.samplerate;
+	this->nSamplesPerSec = sf_FilterFormat.samplerate;
 
 	nFilterLength = sf_FilterFormat.frames;
 

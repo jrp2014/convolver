@@ -34,8 +34,8 @@ CD3DEnumeration::CD3DEnumeration()
     m_pIsDeviceAcceptableFuncUserContext = NULL;
     m_bRequirePostPixelShaderBlending = true;
 
-    m_nMinWidth = 0;
-    m_nMinHeight = 0;
+    m_nMinWidth = 640;
+    m_nMinHeight = 480;
     m_nMaxWidth = UINT_MAX;
     m_nMaxHeight = UINT_MAX;
 
@@ -137,7 +137,7 @@ HRESULT CD3DEnumeration::Enumerate( IDirect3D9* pD3D,
             adapterFormatList.Add( displayMode.Format );
 
         // Sort displaymode list
-        qsort( pAdapterInfo->displayModeList.GetData(), 
+        ::qsort( pAdapterInfo->displayModeList.GetData(), 
                pAdapterInfo->displayModeList.GetSize(), sizeof( D3DDISPLAYMODE ),
                SortModesCallback );
 
@@ -230,11 +230,35 @@ HRESULT CD3DEnumeration::EnumerateDevices( CD3DEnumAdapterInfo* pAdapterInfo, CG
 
         // Store device caps
         if( FAILED( hr = m_pD3D->GetDeviceCaps( pAdapterInfo->AdapterOrdinal, pDeviceInfo->DeviceType, 
-                                              &pDeviceInfo->Caps ) ) )
+                                                &pDeviceInfo->Caps ) ) )
         {
             delete pDeviceInfo;
             continue;
         }
+
+        // Create a dummy device to verify that we really can create of this type.
+        D3DDISPLAYMODE Mode;
+        m_pD3D->GetAdapterDisplayMode(0, &Mode);
+        D3DPRESENT_PARAMETERS pp;
+        ZeroMemory( &pp, sizeof(D3DPRESENT_PARAMETERS) );
+        pp.BackBufferWidth  = 1;
+        pp.BackBufferHeight = 1;
+        pp.BackBufferFormat = Mode.Format;
+        pp.BackBufferCount  = 1;
+        pp.SwapEffect       = D3DSWAPEFFECT_COPY;
+        pp.Windowed         = TRUE;
+        pp.hDeviceWindow    = DXUTGetHWNDFocus();
+        IDirect3DDevice9 *pDevice;
+        if( FAILED( hr = m_pD3D->CreateDevice( pAdapterInfo->AdapterOrdinal, pDeviceInfo->DeviceType, DXUTGetHWNDFocus(),
+                                          D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &pDevice ) ) )
+        {
+            if( hr == D3DERR_NOTAVAILABLE )
+            {
+                delete pDeviceInfo;
+                continue;
+            }
+        }
+        SAFE_RELEASE( pDevice );
 
         // Get info for each devicecombo on this device
         if( FAILED( hr = EnumerateDeviceCombos( pAdapterInfo, pDeviceInfo, pAdapterFormatList ) ) )
@@ -298,8 +322,8 @@ HRESULT CD3DEnumeration::EnumerateDeviceCombos( CD3DEnumAdapterInfo* pAdapterInf
                     // then alpha test, pixel fog, render-target blending, color write enable, and dithering. 
                     // are not supported.
                     if( FAILED( m_pD3D->CheckDeviceFormat( pAdapterInfo->AdapterOrdinal, pDeviceInfo->DeviceType,
-                                                        adapterFormat, D3DUSAGE_QUERY_POSTPIXELSHADER_BLENDING, 
-                                                        D3DRTYPE_TEXTURE, backBufferFormat ) ) )
+                                                           adapterFormat, D3DUSAGE_QUERY_POSTPIXELSHADER_BLENDING, 
+                                                           D3DRTYPE_TEXTURE, backBufferFormat ) ) )
                     {
                         continue;
                     }

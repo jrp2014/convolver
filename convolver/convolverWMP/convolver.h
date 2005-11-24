@@ -48,11 +48,7 @@
 #include "convolution\waveformat.h"
 #include "convolution\convolution.h"
 
-// FFT routines
-#include "fft\fftsg_h.h"
-
 const DWORD UNITS = 10000000;	// 1 sec = 1 * UNITS
-const DWORD MAXSTRING = 1024;	// length
 
 // registry location for preferences
 const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
@@ -311,13 +307,14 @@ private:
 	bool                    m_bValidTime;       // Is timestamp valid?
 	REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
 
+	TCHAR					m_szFilterFileName[MAX_PATH * 2];
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 
 	Holder< CConvolution<float> >	m_Convolution;			// Processing class.  Handle manages resources
 	Sample<float>*					m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Sample<float>*					m_OutputSampleConvertor;	// float
-	TCHAR							m_szFilterFileName[MAX_PATH];
+
 
 	CFormatSpecs<float>				m_FormatSpecs;
 

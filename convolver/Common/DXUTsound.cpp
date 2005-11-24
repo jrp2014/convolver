@@ -41,16 +41,15 @@ CSoundManager::~CSoundManager()
 // Desc: Initializes the IDirectSound object and also sets the primary buffer
 //       format.  This function must be called before any others.
 //-----------------------------------------------------------------------------
-HRESULT CSoundManager::Initialize( GUID* pGUID,
-								   HWND  hWnd,
+HRESULT CSoundManager::Initialize( HWND  hWnd,
                                    DWORD dwCoopLevel )
 {
     HRESULT             hr;
 
     SAFE_RELEASE( m_pDS );
 
-    // Create IDirectSound using the sound device with the specified device
-    if( FAILED( hr = DirectSoundCreate8( pGUID, &m_pDS, NULL ) ) )
+    // Create IDirectSound using the primary sound device
+    if( FAILED( hr = DirectSoundCreate8( NULL, &m_pDS, NULL ) ) )
         return DXUT_ERR( L"DirectSoundCreate8", hr );
 
     // Set DirectSound coop level

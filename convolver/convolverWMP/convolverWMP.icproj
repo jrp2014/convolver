@@ -14,7 +14,8 @@
 				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
-				UseOfATL="2"
+				UseOfATL="1"
+				ATLMinimizesCRunTimeLibraryUsage="1"
 				CharacterSet="1"
 				WholeProgramOptimization="0"/>
 			<Tool 
@@ -28,9 +29,10 @@
 				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
-				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
+				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="1"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="1"
 				RuntimeLibrary="1"
@@ -96,8 +98,8 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
-				UseOfATL="1"
-				ATLMinimizesCRunTimeLibraryUsage="0"
+				UseOfATL="0"
+				ATLMinimizesCRunTimeLibraryUsage="1"
 				CharacterSet="1"
 				WholeProgramOptimization="1"/>
 			<Tool 
@@ -110,14 +112,16 @@
 				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="1"
+				EnableFiberSafeOptimizations="1"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="0"
-				AdditionalIncludeDirectories="..\;C:\Program Files\Microsoft DirectX 9.0 SDK (April 2005)\Include"
+				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
 				StringPooling="1"
 				ExceptionHandling="1"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
-				StructMemberAlignment="0"
+				StructMemberAlignment="5"
 				BufferSecurityCheck="0"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="2"
@@ -226,6 +230,10 @@
 		<File 
 			RelativePath="..\Common\DXUTmisc.h"/>
 		<File 
+			RelativePath="..\Common\DXUTRes.cpp"/>
+		<File 
+			RelativePath="..\Common\DXUTRes.h"/>
+		<File 
 			RelativePath="..\Common\DXUTSettingsDlg.cpp"/>
 		<File 
 			RelativePath="..\Common\DXUTSettingsDlg.h"/>
@@ -317,6 +325,8 @@
 			RelativePath=".\version.h"/>
 		<File 
 			RelativePath=".\wmpservices.h"/>
+		<File 
+			RelativePath=".\convolver.bmp"/>
 		<File 
 			RelativePath=".\convolver.rc"/>
 		<File 

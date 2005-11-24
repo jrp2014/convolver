@@ -53,9 +53,28 @@ CD3DSettingsDlg::~CD3DSettingsDlg()
 void CD3DSettingsDlg::Init( CDXUTDialogResourceManager* pManager )
 {
     assert( pManager );
-    m_Dialog.Init( pManager );
+    m_Dialog.Init( pManager, false );  // Don't register this dialog.
     CreateControls();
 }
+
+
+//--------------------------------------------------------------------------------------
+void CD3DSettingsDlg::Init( CDXUTDialogResourceManager* pManager, LPCWSTR szControlTextureFileName )
+{
+    assert( pManager );
+    m_Dialog.Init( pManager, false, szControlTextureFileName );  // Don't register this dialog.
+    CreateControls();
+}
+
+
+//--------------------------------------------------------------------------------------
+void CD3DSettingsDlg::Init( CDXUTDialogResourceManager* pManager, LPCWSTR pszControlTextureResourcename, HMODULE hModule )
+{
+    assert( pManager );
+    m_Dialog.Init( pManager, false, pszControlTextureResourcename, hModule );  // Don't register this dialog.
+    CreateControls();
+}
+
 
 //--------------------------------------------------------------------------------------
 void CD3DSettingsDlg::CreateControls()
@@ -97,8 +116,11 @@ void CD3DSettingsDlg::CreateControls()
 
     // DXUTSETTINGSDLG_RESOLUTION
     m_Dialog.AddStatic( DXUTSETTINGSDLG_RESOLUTION_LABEL, L"Resolution", 10, 205, 180, 23 );
-    m_Dialog.AddComboBox( DXUTSETTINGSDLG_RESOLUTION, 200, 205, 300, 23 );
+    m_Dialog.AddComboBox( DXUTSETTINGSDLG_RESOLUTION, 200, 205, 200, 23 );
     m_Dialog.GetComboBox( DXUTSETTINGSDLG_RESOLUTION )->SetDropHeight( 106 );
+
+    // DXUTSETTINGSDLG_RES_SHOW_ALL
+    m_Dialog.AddCheckBox( DXUTSETTINGSDLG_RESOLUTION_SHOW_ALL, L"Show All Aspect Ratios", 420, 205, 200, 23, false );
 
     // DXUTSETTINGSDLG_REFRESH_RATE
     m_Dialog.AddStatic( DXUTSETTINGSDLG_REFRESH_RATE_LABEL, L"Refresh Rate", 10, 230, 180, 23 );
@@ -125,7 +147,7 @@ void CD3DSettingsDlg::CreateControls()
     m_Dialog.AddComboBox( DXUTSETTINGSDLG_VERTEX_PROCESSING, 200, 365, 300, 23 );
 
      // DXUTSETTINGSDLG_PRESENT_INTERVAL
-    m_Dialog.AddStatic( DXUTSETTINGSDLG_STATIC, L"Present Interval", 10, 390, 180, 23 );
+    m_Dialog.AddStatic( DXUTSETTINGSDLG_STATIC, L"Vertical Sync", 10, 390, 180, 23 );
     m_Dialog.AddComboBox( DXUTSETTINGSDLG_PRESENT_INTERVAL, 200, 390, 300, 23 );
     
     // DXUTSETTINGSDLG_OK, DXUTSETTINGSDLG_CANCEL
@@ -177,9 +199,6 @@ HRESULT CD3DSettingsDlg::Refresh()
         AddVertexProcessingType( D3DCREATE_SOFTWARE_VERTEXPROCESSING );
     else if( g_DeviceSettings.BehaviorFlags & D3DCREATE_MIXED_VERTEXPROCESSING )
         AddVertexProcessingType( D3DCREATE_MIXED_VERTEXPROCESSING );
-
-    AddPresentInterval( g_DeviceSettings.pp.PresentationInterval );
-
 
     CD3DEnumDeviceSettingsCombo* pBestDeviceSettingsCombo = pD3DEnum->GetDeviceSettingsCombo( g_DeviceSettings.AdapterOrdinal, g_DeviceSettings.DeviceType, g_DeviceSettings.AdapterFormat, g_DeviceSettings.pp.BackBufferFormat, (g_DeviceSettings.pp.Windowed != 0) );
     if( NULL == pBestDeviceSettingsCombo )
@@ -278,7 +297,6 @@ HRESULT CD3DSettingsDlg::OnLostDevice()
 //--------------------------------------------------------------------------------------
 HRESULT CD3DSettingsDlg::OnDestroyDevice()
 {
-    m_Dialog.ClearFocus();
     return S_OK;
 }
 
@@ -304,6 +322,7 @@ void CD3DSettingsDlg::OnEvent( UINT nEvent, int nControlID,
         case DXUTSETTINGSDLG_WINDOWED:              OnWindowedFullScreenChanged(); break;
         case DXUTSETTINGSDLG_FULLSCREEN:            OnWindowedFullScreenChanged(); break;
         case DXUTSETTINGSDLG_ADAPTER_FORMAT:        OnAdapterFormatChanged(); break;
+        case DXUTSETTINGSDLG_RESOLUTION_SHOW_ALL:   OnAdapterFormatChanged(); break;
         case DXUTSETTINGSDLG_RESOLUTION:            OnResolutionChanged(); break;
         case DXUTSETTINGSDLG_REFRESH_RATE:          OnRefreshRateChanged(); break;
         case DXUTSETTINGSDLG_BACK_BUFFER_FORMAT:    OnBackBufferFormatChanged(); break;
@@ -518,6 +537,7 @@ HRESULT CD3DSettingsDlg::OnWindowedFullScreenChanged()
 
     m_Dialog.SetControlEnabled( DXUTSETTINGSDLG_ADAPTER_FORMAT, !bWindowed );
     m_Dialog.SetControlEnabled( DXUTSETTINGSDLG_RESOLUTION, !bWindowed );
+    m_Dialog.SetControlEnabled( DXUTSETTINGSDLG_RESOLUTION_SHOW_ALL, !bWindowed );
     m_Dialog.SetControlEnabled( DXUTSETTINGSDLG_REFRESH_RATE, !bWindowed );
     m_Dialog.SetControlEnabled( DXUTSETTINGSDLG_DEVICECLIP, bWindowed );
 
@@ -641,12 +661,27 @@ HRESULT CD3DSettingsDlg::OnAdapterFormatChanged()
     if( pAdapterInfo == NULL )
         return E_FAIL;
 
+    bool bShowAll = m_Dialog.GetCheckBox( DXUTSETTINGSDLG_RESOLUTION_SHOW_ALL )->GetChecked();
+
+    // Get the desktop aspect ratio
+    D3DDISPLAYMODE dmDesktop;
+    DXUTGetDesktopResolution( g_DeviceSettings.AdapterOrdinal, &dmDesktop.Width, &dmDesktop.Height );
+    float fDesktopAspectRatio = dmDesktop.Width / (float)dmDesktop.Height;
+
     for( int idm = 0; idm < pAdapterInfo->displayModeList.GetSize(); idm++ )
     {
         D3DDISPLAYMODE DisplayMode = pAdapterInfo->displayModeList.GetAt( idm );
+        float fAspect = (float)DisplayMode.Width / (float)DisplayMode.Height;
 
         if( DisplayMode.Format == adapterFormat )
-            AddResolution( DisplayMode.Width, DisplayMode.Height );    
+        {
+            // If "Show All" is not checked, then hide all resolutions
+            // that don't match the aspect ratio of the desktop resolution
+            if( bShowAll || (!bShowAll && fabsf(fDesktopAspectRatio - fAspect) < 0.05f) )
+            {
+                AddResolution( DisplayMode.Width, DisplayMode.Height );    
+            }
+        }
     }
 
     const DWORD dwCurResolution = MAKELONG( g_DeviceSettings.pp.BackBufferWidth, 
@@ -840,13 +875,8 @@ HRESULT CD3DSettingsDlg::OnBackBufferFormatChanged()
 
             CDXUTComboBox* pPresentIntervalComboBox = m_Dialog.GetComboBox( DXUTSETTINGSDLG_PRESENT_INTERVAL );
             pPresentIntervalComboBox->RemoveAllItems();
-
-            for( int ipi=0; ipi < pDeviceCombo->presentIntervalList.GetSize(); ipi++ )
-            {
-                UINT presentInterval = pDeviceCombo->presentIntervalList.GetAt( ipi );
-                
-                AddPresentInterval( presentInterval );
-            }
+            pPresentIntervalComboBox->AddItem( L"On", ULongToPtr(D3DPRESENT_INTERVAL_DEFAULT) );
+            pPresentIntervalComboBox->AddItem( L"Off", ULongToPtr(D3DPRESENT_INTERVAL_IMMEDIATE) );
 
             pPresentIntervalComboBox->SetSelectedByData( ULongToPtr( g_DeviceSettings.pp.PresentationInterval ) );
         
@@ -1227,16 +1257,6 @@ DWORD CD3DSettingsDlg::GetSelectedVertexProcessingType()
     CDXUTComboBox* pComboBox = m_Dialog.GetComboBox( DXUTSETTINGSDLG_VERTEX_PROCESSING );
     
     return PtrToUlong( pComboBox->GetSelectedData() ); 
-}
-
-
-//-------------------------------------------------------------------------------------
-void CD3DSettingsDlg::AddPresentInterval( DWORD dwInterval )
-{
-    CDXUTComboBox* pComboBox = m_Dialog.GetComboBox( DXUTSETTINGSDLG_PRESENT_INTERVAL );
-    
-    if( !pComboBox->ContainsItem( DXUTPresentIntervalToString(dwInterval) ) )
-        pComboBox->AddItem( DXUTPresentIntervalToString(dwInterval), ULongToPtr(dwInterval) );
 }
 
 

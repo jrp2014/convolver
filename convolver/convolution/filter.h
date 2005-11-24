@@ -33,7 +33,7 @@ class Filter
 public:
 
 	int						nChannels;				// number of channels
-	DWORD					nSampleRate;			// 44100, 48000, etc
+	DWORD					nSamplesPerSec;			// 44100, 48000, etc
 	PartitionedBuffer		coeffs;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat;		// The format of the filter file
@@ -50,7 +50,7 @@ public:
 	fftwf_plan				reverse_plan;
 #endif
 
-	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSampleRate);
+	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSamplesPerSec);
 
 #ifdef FFTW
 	~Filter()

@@ -91,7 +91,7 @@ void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUser
 //--------------------------------------------------------------------------------------
 // Initialization
 //--------------------------------------------------------------------------------------
-HRESULT DXUTInit( bool bParseCommandLine = true, bool bHandleDefaultHotkeys = true, bool bShowMsgBoxOnError = true );
+HRESULT DXUTInit( bool bParseCommandLine = true, bool bHandleDefaultHotkeys = true, bool bShowMsgBoxOnError = true, bool bHandleAltEnter = true );
 
 // Choose either DXUTCreateWindow or DXUTSetWindow.  If using DXUTSetWindow, consider using DXUTStaticWndProc
 HRESULT DXUTCreateWindow( const WCHAR* strWindowTitle = L"Direct3D Window", 
@@ -102,7 +102,7 @@ LRESULT CALLBACK DXUTStaticWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 
 // Choose either DXUTCreateDevice or DXUTSetDevice or DXUTCreateDeviceFromSettings
 HRESULT DXUTCreateDevice( UINT AdapterOrdinal = D3DADAPTER_DEFAULT, bool bWindowed = true, 
-                          int nSuggestedWidth = 640, int nSuggestedHeight = 480,
+                          int nSuggestedWidth = 0, int nSuggestedHeight = 0,
                           LPDXUTCALLBACKISDEVICEACCEPTABLE pCallbackIsDeviceAcceptable = NULL,
                           LPDXUTCALLBACKMODIFYDEVICESETTINGS pCallbackModifyDeviceSettings = NULL, 
                           void* pUserContext = NULL );
@@ -154,6 +154,7 @@ HRESULT DXUTFindValidDeviceSettings( DXUTDeviceSettings* pOut, DXUTDeviceSetting
 void    DXUTSetCursorSettings( bool bShowCursorWhenFullScreen, bool bClipCursorWhenFullScreen );
 void    DXUTSetMultimonSettings( bool bAutoChangeAdapter );
 void    DXUTSetShortcutKeySettings( bool bAllowWhenFullscreen = false, bool bAllowWhenWindowed = true ); // Controls the Windows key, and accessibility shortcut keys
+void    DXUTSetWindowSettings( bool bCallDefWindowProc = true );
 void    DXUTSetConstantFrameTime( bool bConstantFrameTime, float fTimePerFrame = 0.0333f );
 HRESULT DXUTSetTimer( LPDXUTCALLBACKTIMER pCallbackTimer, float fTimeoutInSecs = 1.0f, UINT* pnIDEvent = NULL, void* pCallbackUserContext = NULL );
 HRESULT DXUTKillTimer( UINT nIDEvent );
@@ -186,12 +187,14 @@ float                   DXUTGetElapsedTime();
 bool                    DXUTIsWindowed();
 float                   DXUTGetFPS();
 LPCWSTR                 DXUTGetWindowTitle();
-LPCWSTR                 DXUTGetFrameStats();
+LPCWSTR                 DXUTGetFrameStats( bool bIncludeFPS = false );
 LPCWSTR                 DXUTGetDeviceStats();
 bool                    DXUTIsRenderingPaused();
 bool                    DXUTIsTimePaused();
+bool                    DXUTIsActive();
 int                     DXUTGetExitCode();
 bool                    DXUTGetShowMsgBoxOnError();
+bool                    DXUTGetHandleDefaultHotkeys();
 bool                    DXUTIsKeyDown( BYTE vKey ); // Pass a virtual-key code, ex. VK_F1, 'A', VK_RETURN, VK_LSHIFT, etc
 bool                    DXUTIsMouseButtonDown( BYTE vButton ); // Pass a virtual-key code: VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2
 bool                    DXUTGetAutomation();  // Returns true if -automation parameter is used to launch the app

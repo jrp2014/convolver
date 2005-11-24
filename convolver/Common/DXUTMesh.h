@@ -21,12 +21,19 @@ class CDXUTMesh
 {
 public:
     WCHAR                   m_strName[512];
-
-    LPD3DXMESH              m_pSysMemMesh;    // SysMem mesh, lives through resize
-    LPD3DXMESH              m_pLocalMesh;     // Local mesh, rebuilt on resize
+    LPD3DXMESH              m_pMesh;   // Managed mesh
     
+    // Cache of data in m_pMesh for easy access
+    IDirect3DVertexBuffer9* m_pVB;
+    IDirect3DIndexBuffer9*  m_pIB;
+    IDirect3DVertexDeclaration9* m_pDecl;
+    DWORD                   m_dwNumVertices;
+    DWORD                   m_dwNumFaces;
+    DWORD                   m_dwBytesPerVertex;
+
     DWORD                   m_dwNumMaterials; // Materials for the mesh
     D3DMATERIAL9*           m_pMaterials;
+    CHAR					(*m_strMaterials)[MAX_PATH];
     IDirect3DBaseTexture9** m_pTextures;
     bool                    m_bUseMaterials;
 
@@ -46,13 +53,14 @@ public:
                     bool bDrawAlphaSubsets = true );
 
     // Mesh access
-    LPD3DXMESH GetSysMemMesh() { return m_pSysMemMesh; }
-    LPD3DXMESH GetLocalMesh()  { return m_pLocalMesh; }
+    LPD3DXMESH GetMesh() { return m_pMesh; }
 
     // Rendering options
     void    UseMeshMaterials( bool bFlag ) { m_bUseMaterials = bFlag; }
     HRESULT SetFVF( LPDIRECT3DDEVICE9 pd3dDevice, DWORD dwFVF );
-    HRESULT SetVertexDecl( LPDIRECT3DDEVICE9 pd3dDevice, const D3DVERTEXELEMENT9 *pDecl );
+    HRESULT SetVertexDecl( LPDIRECT3DDEVICE9 pd3dDevice, const D3DVERTEXELEMENT9 *pDecl, 
+                           bool bAutoComputeNormals = true, bool bAutoComputeTangents = true, 
+                           bool bSplitVertexForOptimalTangents = false );
 
     // Initializing
     HRESULT RestoreDeviceObjects( LPDIRECT3DDEVICE9 pd3dDevice );
@@ -61,7 +69,8 @@ public:
     // Creation/destruction
     HRESULT Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename );
     HRESULT Create( LPDIRECT3DDEVICE9 pd3dDevice, LPD3DXFILEDATA pFileData );
-    HRESULT CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevice, ID3DXBuffer *pAdjacencyBuffer, ID3DXBuffer *pMtrlBuffer );
+	HRESULT Create( LPDIRECT3DDEVICE9 pd3dDevice, ID3DXMesh* pInMesh, D3DXMATERIAL* pd3dxMaterials, DWORD dwMaterials );
+    HRESULT CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevice, D3DXMATERIAL* d3dxMtrls, DWORD dwNumMaterials );
     HRESULT Destroy();
 
     CDXUTMesh( LPCWSTR strName = L"CDXUTMeshFile_Mesh" );

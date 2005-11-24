@@ -17,14 +17,10 @@
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 CDXUTMesh::CDXUTMesh( LPCWSTR strName )
 {
     StringCchCopy( m_strName, 512, strName );
-    m_pSysMemMesh        = NULL;
-    m_pLocalMesh         = NULL;
+    m_pMesh              = NULL;
     m_dwNumMaterials     = 0L;
     m_pMaterials         = NULL;
     m_pTextures          = NULL;
@@ -35,9 +31,6 @@ CDXUTMesh::CDXUTMesh( LPCWSTR strName )
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 CDXUTMesh::~CDXUTMesh()
 {
     Destroy();
@@ -47,9 +40,6 @@ CDXUTMesh::~CDXUTMesh()
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename )
 {
     WCHAR        strPath[MAX_PATH];
@@ -57,19 +47,22 @@ HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename )
     LPD3DXBUFFER pMtrlBuffer = NULL;
     HRESULT      hr;
 
+    // Cleanup previous mesh if any
+    Destroy();
+
     // Find the path for the file, and convert it to ANSI (for the D3DX API)
     DXUTFindDXSDKMediaFileCch( strPath, sizeof(strPath) / sizeof(WCHAR), strFilename );
 
     // Load the mesh
-    if( FAILED( hr = D3DXLoadMeshFromX( strPath, D3DXMESH_SYSTEMMEM, pd3dDevice, 
+    if( FAILED( hr = D3DXLoadMeshFromX( strPath, D3DXMESH_MANAGED, pd3dDevice, 
                                         &pAdjacencyBuffer, &pMtrlBuffer, NULL,
-                                        &m_dwNumMaterials, &m_pSysMemMesh ) ) )
+                                        &m_dwNumMaterials, &m_pMesh ) ) )
     {
         return hr;
     }
 
     // Optimize the mesh for performance
-    if( FAILED( hr = m_pSysMemMesh->OptimizeInplace(
+    if( FAILED( hr = m_pMesh->OptimizeInplace(
                         D3DXMESHOPT_COMPACT | D3DXMESHOPT_ATTRSORT | D3DXMESHOPT_VERTEXCACHE,
                         (DWORD*)pAdjacencyBuffer->GetBufferPointer(), NULL, NULL, NULL ) ) )
     {
@@ -85,38 +78,47 @@ HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename )
     else
         *strPath = L'\0';
 
-    hr = CreateMaterials( strPath, pd3dDevice, pAdjacencyBuffer, pMtrlBuffer );
+    D3DXMATERIAL* d3dxMtrls = (D3DXMATERIAL*)pMtrlBuffer->GetBufferPointer();
+    hr = CreateMaterials( strPath, pd3dDevice, d3dxMtrls, m_dwNumMaterials );
 
     SAFE_RELEASE( pAdjacencyBuffer );
     SAFE_RELEASE( pMtrlBuffer );
+
+    // Extract data from m_pMesh for easy access
+    D3DVERTEXELEMENT9 decl[MAX_FVF_DECL_SIZE];
+    m_dwNumVertices    = m_pMesh->GetNumVertices();
+    m_dwNumFaces       = m_pMesh->GetNumFaces();
+    m_dwBytesPerVertex = m_pMesh->GetNumBytesPerVertex();
+    m_pMesh->GetIndexBuffer( &m_pIB );
+    m_pMesh->GetVertexBuffer( &m_pVB );
+    m_pMesh->GetDeclaration( decl );
+    pd3dDevice->CreateVertexDeclaration( decl, &m_pDecl );
 
     return hr;
 }
 
 
-
-
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice,
-                          LPD3DXFILEDATA pFileData )
+                           LPD3DXFILEDATA pFileData )
 {
     LPD3DXBUFFER pMtrlBuffer = NULL;
     LPD3DXBUFFER pAdjacencyBuffer = NULL;
     HRESULT      hr;
 
+    // Cleanup previous mesh if any
+    Destroy();
+
     // Load the mesh from the DXFILEDATA object
-    if( FAILED( hr = D3DXLoadMeshFromXof( pFileData, D3DXMESH_SYSTEMMEM, pd3dDevice,
+    if( FAILED( hr = D3DXLoadMeshFromXof( pFileData, D3DXMESH_MANAGED, pd3dDevice,
                                           &pAdjacencyBuffer, &pMtrlBuffer, NULL,
-                                          &m_dwNumMaterials, &m_pSysMemMesh ) ) )
+                                          &m_dwNumMaterials, &m_pMesh ) ) )
     {
         return hr;
     }
 
     // Optimize the mesh for performance
-    if( FAILED( hr = m_pSysMemMesh->OptimizeInplace(
+    if( FAILED( hr = m_pMesh->OptimizeInplace(
                         D3DXMESHOPT_COMPACT | D3DXMESHOPT_ATTRSORT | D3DXMESHOPT_VERTEXCACHE,
                         (DWORD*)pAdjacencyBuffer->GetBufferPointer(), NULL, NULL, NULL ) ) )
     {
@@ -125,28 +127,92 @@ HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice,
         return hr;
     }
 
-    hr = CreateMaterials( L"", pd3dDevice, pAdjacencyBuffer, pMtrlBuffer );
+    D3DXMATERIAL* d3dxMtrls = (D3DXMATERIAL*)pMtrlBuffer->GetBufferPointer();
+    hr = CreateMaterials( L"", pd3dDevice, d3dxMtrls, m_dwNumMaterials );
 
     SAFE_RELEASE( pAdjacencyBuffer );
     SAFE_RELEASE( pMtrlBuffer );
+
+    // Extract data from m_pMesh for easy access
+    D3DVERTEXELEMENT9 decl[MAX_FVF_DECL_SIZE];
+    m_dwNumVertices    = m_pMesh->GetNumVertices();
+    m_dwNumFaces       = m_pMesh->GetNumFaces();
+    m_dwBytesPerVertex = m_pMesh->GetNumBytesPerVertex();
+    m_pMesh->GetIndexBuffer( &m_pIB );
+    m_pMesh->GetVertexBuffer( &m_pVB );
+    m_pMesh->GetDeclaration( decl );
+    pd3dDevice->CreateVertexDeclaration( decl, &m_pDecl );
 
     return hr;
 }
 
 
-HRESULT CDXUTMesh::CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevice, ID3DXBuffer *pAdjacencyBuffer, ID3DXBuffer *pMtrlBuffer )
+//-----------------------------------------------------------------------------
+HRESULT CDXUTMesh::Create( LPDIRECT3DDEVICE9 pd3dDevice, ID3DXMesh* pInMesh, 
+                           D3DXMATERIAL* pd3dxMaterials, DWORD dwMaterials )
+{
+    // Cleanup previous mesh if any
+    Destroy();
+
+    // Optimize the mesh for performance
+    DWORD *rgdwAdjacency = NULL;
+    rgdwAdjacency = new DWORD[pInMesh->GetNumFaces() * 3];
+    if( rgdwAdjacency == NULL )
+        return E_OUTOFMEMORY;
+    pInMesh->GenerateAdjacency(1e-6f,rgdwAdjacency);
+
+    D3DVERTEXELEMENT9 decl[MAX_FVF_DECL_SIZE];
+    pInMesh->GetDeclaration( decl );
+
+    DWORD dwOptions = pInMesh->GetOptions();
+    dwOptions &= ~(D3DXMESH_32BIT | D3DXMESH_SYSTEMMEM | D3DXMESH_WRITEONLY);
+    dwOptions |= D3DXMESH_MANAGED;
+    dwOptions |= D3DXMESHOPT_COMPACT | D3DXMESHOPT_ATTRSORT | D3DXMESHOPT_VERTEXCACHE;
+
+    ID3DXMesh* pTempMesh = NULL;
+    if( FAILED( pInMesh->Optimize( dwOptions, rgdwAdjacency, NULL, NULL, NULL, &pTempMesh ) ) )
+    {
+        SAFE_DELETE_ARRAY( rgdwAdjacency );
+        return E_FAIL;
+    }
+
+    SAFE_DELETE_ARRAY( rgdwAdjacency );
+    SAFE_RELEASE( m_pMesh );
+    m_pMesh = pTempMesh;
+
+    HRESULT hr;
+    hr = CreateMaterials( L"", pd3dDevice, pd3dxMaterials, dwMaterials );
+
+    // Extract data from m_pMesh for easy access
+    m_dwNumVertices    = m_pMesh->GetNumVertices();
+    m_dwNumFaces       = m_pMesh->GetNumFaces();
+    m_dwBytesPerVertex = m_pMesh->GetNumBytesPerVertex();
+    m_pMesh->GetIndexBuffer( &m_pIB );
+    m_pMesh->GetVertexBuffer( &m_pVB );
+    m_pMesh->GetDeclaration( decl );
+    pd3dDevice->CreateVertexDeclaration( decl, &m_pDecl );
+
+    return hr;
+}
+
+
+//-----------------------------------------------------------------------------
+HRESULT CDXUTMesh::CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevice, D3DXMATERIAL* d3dxMtrls, DWORD dwNumMaterials )
 {
     // Get material info for the mesh
     // Get the array of materials out of the buffer
-    if( pMtrlBuffer && m_dwNumMaterials > 0 )
+    m_dwNumMaterials = dwNumMaterials;
+    if( d3dxMtrls && m_dwNumMaterials > 0 )
     {
         // Allocate memory for the materials and textures
-        D3DXMATERIAL* d3dxMtrls = (D3DXMATERIAL*)pMtrlBuffer->GetBufferPointer();
         m_pMaterials = new D3DMATERIAL9[m_dwNumMaterials];
         if( m_pMaterials == NULL )
             return E_OUTOFMEMORY;
         m_pTextures = new LPDIRECT3DBASETEXTURE9[m_dwNumMaterials];
         if( m_pTextures == NULL )
+            return E_OUTOFMEMORY;
+        m_strMaterials = new CHAR[m_dwNumMaterials][MAX_PATH];
+        if( m_strMaterials == NULL )
             return E_OUTOFMEMORY;
 
         // Copy each material and create its texture
@@ -159,6 +225,8 @@ HRESULT CDXUTMesh::CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevic
             // Create a texture
             if( d3dxMtrls[i].pTextureFilename )
             {
+                StringCchCopyA( m_strMaterials[i], MAX_PATH, d3dxMtrls[i].pTextureFilename );
+
                 WCHAR strTexture[MAX_PATH];
                 WCHAR strTextureTemp[MAX_PATH];
                 D3DXIMAGE_INFO ImgInfo;
@@ -226,50 +294,32 @@ HRESULT CDXUTMesh::CreateMaterials( LPCWSTR strPath, IDirect3DDevice9 *pd3dDevic
     return S_OK;
 }
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
+
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::SetFVF( LPDIRECT3DDEVICE9 pd3dDevice, DWORD dwFVF )
 {
-    LPD3DXMESH pTempSysMemMesh = NULL;
-    LPD3DXMESH pTempLocalMesh  = NULL;
+    LPD3DXMESH pTempMesh = NULL;
 
-    if( m_pSysMemMesh )
+    if( m_pMesh )
     {
-        if( FAILED( m_pSysMemMesh->CloneMeshFVF( m_pSysMemMesh->GetOptions(), dwFVF,
-                                                 pd3dDevice, &pTempSysMemMesh ) ) )
-            return E_FAIL;
-    }
-    if( m_pLocalMesh )
-    {
-        if( FAILED( m_pLocalMesh->CloneMeshFVF( m_pLocalMesh->GetOptions(), dwFVF, pd3dDevice,
-                                                &pTempLocalMesh ) ) )
+        if( FAILED( m_pMesh->CloneMeshFVF( m_pMesh->GetOptions(), dwFVF,
+                                           pd3dDevice, &pTempMesh ) ) )
         {
-            SAFE_RELEASE( pTempSysMemMesh );
+            SAFE_RELEASE( pTempMesh );
             return E_FAIL;
         }
-    }
 
-    DWORD dwOldFVF = 0;
+        DWORD dwOldFVF = 0;
+        dwOldFVF = m_pMesh->GetFVF();
+        SAFE_RELEASE( m_pMesh );
+        m_pMesh = pTempMesh;
 
-    if( m_pSysMemMesh )
-        dwOldFVF = m_pSysMemMesh->GetFVF();
-
-    SAFE_RELEASE( m_pSysMemMesh );
-    SAFE_RELEASE( m_pLocalMesh );
-
-    if( pTempSysMemMesh ) m_pSysMemMesh = pTempSysMemMesh;
-    if( pTempLocalMesh )  m_pLocalMesh  = pTempLocalMesh;
-
-    // Compute normals if they are being requested and
-    // the old mesh does not have them.
-    if( !(dwOldFVF & D3DFVF_NORMAL) && dwFVF & D3DFVF_NORMAL )
-    {
-        if( m_pSysMemMesh )
-            D3DXComputeNormals( m_pSysMemMesh, NULL );
-        if( m_pLocalMesh )
-            D3DXComputeNormals( m_pLocalMesh, NULL );
+        // Compute normals if they are being requested and
+        // the old mesh does not have them.
+        if( !(dwOldFVF & D3DFVF_NORMAL) && dwFVF & D3DFVF_NORMAL )
+        {
+            D3DXComputeNormals( m_pMesh, NULL );
+        }
     }
 
     return S_OK;
@@ -279,80 +329,118 @@ HRESULT CDXUTMesh::SetFVF( LPDIRECT3DDEVICE9 pd3dDevice, DWORD dwFVF )
 
 
 //-----------------------------------------------------------------------------
-// Name: CDXUTMesh::SetVertexDecl
-// Desc: Convert the mesh to the format specified by the given vertex
-//       declarations.
+// Convert the mesh to the format specified by the given vertex declarations.
 //-----------------------------------------------------------------------------
-HRESULT CDXUTMesh::SetVertexDecl( LPDIRECT3DDEVICE9 pd3dDevice, const D3DVERTEXELEMENT9 *pDecl )
+HRESULT CDXUTMesh::SetVertexDecl( LPDIRECT3DDEVICE9 pd3dDevice, const D3DVERTEXELEMENT9 *pDecl, 
+                                  bool bAutoComputeNormals, bool bAutoComputeTangents, 
+                                  bool bSplitVertexForOptimalTangents )
 {
-    LPD3DXMESH pTempSysMemMesh = NULL;
-    LPD3DXMESH pTempLocalMesh  = NULL;
+    LPD3DXMESH pTempMesh = NULL;
 
-    if( m_pSysMemMesh )
+    if( m_pMesh )
     {
-        if( FAILED( m_pSysMemMesh->CloneMesh( m_pSysMemMesh->GetOptions(), pDecl,
-                                              pd3dDevice, &pTempSysMemMesh ) ) )
-            return E_FAIL;
-    }
-
-    if( m_pLocalMesh )
-    {
-        if( FAILED( m_pLocalMesh->CloneMesh( m_pLocalMesh->GetOptions(), pDecl, pd3dDevice,
-                                             &pTempLocalMesh ) ) )
+        if( FAILED( m_pMesh->CloneMesh( m_pMesh->GetOptions(), pDecl,
+                                        pd3dDevice, &pTempMesh ) ) )
         {
-            SAFE_RELEASE( pTempSysMemMesh );
+            SAFE_RELEASE( pTempMesh );
             return E_FAIL;
         }
     }
 
+
     // Check if the old declaration contains a normal.
     bool bHadNormal = false;
+    bool bHadTangent = false;
     D3DVERTEXELEMENT9 aOldDecl[MAX_FVF_DECL_SIZE];
-    if( m_pSysMemMesh && SUCCEEDED( m_pSysMemMesh->GetDeclaration( aOldDecl ) ) )
+    if( m_pMesh && SUCCEEDED( m_pMesh->GetDeclaration( aOldDecl ) ) )
     {
         for( UINT index = 0; index < D3DXGetDeclLength( aOldDecl ); ++index )
+        {
             if( aOldDecl[index].Usage == D3DDECLUSAGE_NORMAL )
             {
                 bHadNormal = true;
-                break;
             }
+            if( aOldDecl[index].Usage == D3DDECLUSAGE_TANGENT )
+            {
+                bHadTangent = true;
+            }
+        }
     }
 
     // Check if the new declaration contains a normal.
     bool bHaveNormalNow = false;
+    bool bHaveTangentNow = false;
     D3DVERTEXELEMENT9 aNewDecl[MAX_FVF_DECL_SIZE];
-    if( pTempSysMemMesh && SUCCEEDED( pTempSysMemMesh->GetDeclaration( aNewDecl ) ) )
+    if( pTempMesh && SUCCEEDED( pTempMesh->GetDeclaration( aNewDecl ) ) )
     {
         for( UINT index = 0; index < D3DXGetDeclLength( aNewDecl ); ++index )
+        {
             if( aNewDecl[index].Usage == D3DDECLUSAGE_NORMAL )
             {
                 bHaveNormalNow = true;
-                break;
             }
-    }
-
-    SAFE_RELEASE( m_pSysMemMesh );
-    SAFE_RELEASE( m_pLocalMesh );
-
-    if( pTempSysMemMesh )
-    {
-        m_pSysMemMesh = pTempSysMemMesh;
-
-        if( !bHadNormal && bHaveNormalNow )
-        {
-            // Compute normals in case the meshes have them
-            D3DXComputeNormals( m_pSysMemMesh, NULL );
+            if( aNewDecl[index].Usage == D3DDECLUSAGE_TANGENT )
+            {
+                bHaveTangentNow = true;
+            }
         }
     }
 
-    if( pTempLocalMesh )
-    {
-        m_pLocalMesh = pTempLocalMesh;
+    SAFE_RELEASE( m_pMesh );
 
-        if( !bHadNormal && bHaveNormalNow )
+    if( pTempMesh )
+    {
+        m_pMesh = pTempMesh;
+
+        if( !bHadNormal && bHaveNormalNow && bAutoComputeNormals )
         {
             // Compute normals in case the meshes have them
-            D3DXComputeNormals( m_pLocalMesh, NULL );
+            D3DXComputeNormals( m_pMesh, NULL );
+        }
+
+        if( bHaveNormalNow && !bHadTangent && bHaveTangentNow && bAutoComputeTangents )
+        {
+            ID3DXMesh* pNewMesh;
+            HRESULT hr;
+
+            DWORD *rgdwAdjacency = NULL;
+            rgdwAdjacency = new DWORD[m_pMesh->GetNumFaces() * 3];
+            if( rgdwAdjacency == NULL )
+                return E_OUTOFMEMORY;
+            V( m_pMesh->GenerateAdjacency(1e-6f,rgdwAdjacency) );
+
+            float fPartialEdgeThreshold;
+            float fSingularPointThreshold;
+            float fNormalEdgeThreshold;
+            if( bSplitVertexForOptimalTangents )
+            {
+                fPartialEdgeThreshold = 0.01f;
+                fSingularPointThreshold = 0.25f;
+                fNormalEdgeThreshold = 0.01f;
+            }
+            else
+            {
+                fPartialEdgeThreshold = -1.01f;
+                fSingularPointThreshold = 0.01f;
+                fNormalEdgeThreshold = -1.01f;
+            }
+
+            // Compute tangents, which are required for normal mapping
+            hr = D3DXComputeTangentFrameEx( m_pMesh, 
+                                            D3DDECLUSAGE_TEXCOORD, 0, 
+                                            D3DDECLUSAGE_TANGENT, 0,
+                                            D3DX_DEFAULT, 0, 
+                                            D3DDECLUSAGE_NORMAL, 0,
+                                            0, rgdwAdjacency, 
+                                            fPartialEdgeThreshold, fSingularPointThreshold, fNormalEdgeThreshold, 
+                                            &pNewMesh, NULL );
+
+            SAFE_DELETE_ARRAY( rgdwAdjacency );
+            if( FAILED(hr) )
+                return hr;
+
+            SAFE_RELEASE( m_pMesh );
+            m_pMesh = pNewMesh;
         }
     }
 
@@ -362,35 +450,21 @@ HRESULT CDXUTMesh::SetVertexDecl( LPDIRECT3DDEVICE9 pd3dDevice, const D3DVERTEXE
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::RestoreDeviceObjects( LPDIRECT3DDEVICE9 pd3dDevice )
 {
-    if( NULL == m_pSysMemMesh )
-        return E_FAIL;
-
-    // Make a local memory version of the mesh. Note: because we are passing in
-    // no flags, the default behavior is to clone into local memory.
-    if( FAILED( m_pSysMemMesh->CloneMeshFVF( D3DXMESH_MANAGED | ( m_pSysMemMesh->GetOptions() & ~D3DXMESH_SYSTEMMEM ),
-                                             m_pSysMemMesh->GetFVF(), pd3dDevice, &m_pLocalMesh ) ) )
-        return E_FAIL;
-
     return S_OK;
-
 }
 
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::InvalidateDeviceObjects()
 {
-    SAFE_RELEASE( m_pLocalMesh );
+    SAFE_RELEASE( m_pIB );
+    SAFE_RELEASE( m_pVB );
+    SAFE_RELEASE( m_pDecl );
 
     return S_OK;
 }
@@ -398,9 +472,6 @@ HRESULT CDXUTMesh::InvalidateDeviceObjects()
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::Destroy()
 {
@@ -409,8 +480,9 @@ HRESULT CDXUTMesh::Destroy()
         SAFE_RELEASE( m_pTextures[i] );
     SAFE_DELETE_ARRAY( m_pTextures );
     SAFE_DELETE_ARRAY( m_pMaterials );
+    SAFE_DELETE_ARRAY( m_strMaterials );
 
-    SAFE_RELEASE( m_pSysMemMesh );
+    SAFE_RELEASE( m_pMesh );
 
     m_dwNumMaterials = 0L;
 
@@ -421,13 +493,10 @@ HRESULT CDXUTMesh::Destroy()
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSubsets,
                           bool bDrawAlphaSubsets )
 {
-    if( NULL == m_pLocalMesh )
+    if( NULL == m_pMesh )
         return E_FAIL;
 
     // Frist, draw the subsets without alpha
@@ -442,7 +511,7 @@ HRESULT CDXUTMesh::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSubsets
                 pd3dDevice->SetMaterial( &m_pMaterials[i] );
                 pd3dDevice->SetTexture( 0, m_pTextures[i] );
             }
-            m_pLocalMesh->DrawSubset( i );
+            m_pMesh->DrawSubset( i );
         }
     }
 
@@ -457,7 +526,7 @@ HRESULT CDXUTMesh::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSubsets
             // Set the material and texture
             pd3dDevice->SetMaterial( &m_pMaterials[i] );
             pd3dDevice->SetTexture( 0, m_pTextures[i] );
-            m_pLocalMesh->DrawSubset( i );
+            m_pMesh->DrawSubset( i );
         }
     }
 
@@ -467,9 +536,6 @@ HRESULT CDXUTMesh::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSubsets
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMesh::Render( ID3DXEffect *pEffect,
                            D3DXHANDLE hTexture,
@@ -481,7 +547,7 @@ HRESULT CDXUTMesh::Render( ID3DXEffect *pEffect,
                            bool bDrawOpaqueSubsets,
                            bool bDrawAlphaSubsets )
 {
-    if( NULL == m_pLocalMesh )
+    if( NULL == m_pMesh )
         return E_FAIL;
 
     UINT cPasses;
@@ -511,10 +577,10 @@ HRESULT CDXUTMesh::Render( ID3DXEffect *pEffect,
                     if( hEmissive )
                         pEffect->SetVector( hEmissive, (D3DXVECTOR4*)&m_pMaterials[i].Emissive );
                     if( hPower )
-                        pEffect->SetVector( hPower, (D3DXVECTOR4*)&m_pMaterials[i].Power );
+                        pEffect->SetFloat( hPower, m_pMaterials[i].Power );
                     pEffect->CommitChanges();
                 }
-                m_pLocalMesh->DrawSubset( i );
+                m_pMesh->DrawSubset( i );
             }
             pEffect->EndPass();
         }
@@ -547,10 +613,10 @@ HRESULT CDXUTMesh::Render( ID3DXEffect *pEffect,
                     if( hEmissive )
                         pEffect->SetVector( hEmissive, (D3DXVECTOR4*)&m_pMaterials[i].Emissive );
                     if( hPower )
-                        pEffect->SetVector( hPower, (D3DXVECTOR4*)&m_pMaterials[i].Power );
+                        pEffect->SetFloat( hPower, m_pMaterials[i].Power );
                     pEffect->CommitChanges();
                 }
-                m_pLocalMesh->DrawSubset( i );
+                m_pMesh->DrawSubset( i );
             }
             pEffect->EndPass();
         }
@@ -563,9 +629,6 @@ HRESULT CDXUTMesh::Render( ID3DXEffect *pEffect,
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 CDXUTMeshFrame::CDXUTMeshFrame( LPCWSTR strName )
 {
@@ -581,9 +644,6 @@ CDXUTMeshFrame::CDXUTMeshFrame( LPCWSTR strName )
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 CDXUTMeshFrame::~CDXUTMeshFrame()
 {
     SAFE_DELETE( m_pChild );
@@ -593,9 +653,6 @@ CDXUTMeshFrame::~CDXUTMeshFrame()
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 bool CDXUTMeshFrame::EnumMeshes( bool (*EnumMeshCB)(CDXUTMesh*,void*),
                             void* pContext )
@@ -613,9 +670,6 @@ bool CDXUTMeshFrame::EnumMeshes( bool (*EnumMeshCB)(CDXUTMesh*,void*),
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 CDXUTMesh* CDXUTMeshFrame::FindMesh( LPCWSTR strMeshName )
 {
@@ -640,9 +694,6 @@ CDXUTMesh* CDXUTMeshFrame::FindMesh( LPCWSTR strMeshName )
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 CDXUTMeshFrame* CDXUTMeshFrame::FindFrame( LPCWSTR strFrameName )
 {
     CDXUTMeshFrame* pFrame;
@@ -665,9 +716,6 @@ CDXUTMeshFrame* CDXUTMeshFrame::FindFrame( LPCWSTR strFrameName )
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFrame::Destroy()
 {
     if( m_pMesh )  m_pMesh->Destroy();
@@ -685,9 +733,6 @@ HRESULT CDXUTMeshFrame::Destroy()
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFrame::RestoreDeviceObjects( LPDIRECT3DDEVICE9 pd3dDevice )
 {
     if( m_pMesh )  m_pMesh->RestoreDeviceObjects( pd3dDevice );
@@ -700,9 +745,6 @@ HRESULT CDXUTMeshFrame::RestoreDeviceObjects( LPDIRECT3DDEVICE9 pd3dDevice )
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFrame::InvalidateDeviceObjects()
 {
     if( m_pMesh )  m_pMesh->InvalidateDeviceObjects();
@@ -714,9 +756,6 @@ HRESULT CDXUTMeshFrame::InvalidateDeviceObjects()
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFrame::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSubsets,
                            bool bDrawAlphaSubsets, D3DXMATRIX* pmatWorldMatrix )
@@ -751,9 +790,6 @@ HRESULT CDXUTMeshFrame::Render( LPDIRECT3DDEVICE9 pd3dDevice, bool bDrawOpaqueSu
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFile::LoadFrame( LPDIRECT3DDEVICE9 pd3dDevice,
                              LPD3DXFILEDATA pFileData,
@@ -830,9 +866,6 @@ HRESULT CDXUTMeshFile::LoadFrame( LPDIRECT3DDEVICE9 pd3dDevice,
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFile::LoadMesh( LPDIRECT3DDEVICE9 pd3dDevice,
                             LPD3DXFILEDATA pFileData,
                             CDXUTMeshFrame* pParentFrame )
@@ -864,9 +897,6 @@ HRESULT CDXUTMeshFile::LoadMesh( LPDIRECT3DDEVICE9 pd3dDevice,
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFile::CreateFromResource( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strResource, LPCWSTR strType )
 {
@@ -940,9 +970,6 @@ HRESULT CDXUTMeshFile::CreateFromResource( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR
 
 
 //-----------------------------------------------------------------------------
-// Name:
-// Desc:
-//-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFile::Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename )
 {
     LPD3DXFILE           pDXFile   = NULL;
@@ -1010,9 +1037,6 @@ HRESULT CDXUTMeshFile::Create( LPDIRECT3DDEVICE9 pd3dDevice, LPCWSTR strFilename
 
 
 
-//-----------------------------------------------------------------------------
-// Name:
-// Desc:
 //-----------------------------------------------------------------------------
 HRESULT CDXUTMeshFile::Render( LPDIRECT3DDEVICE9 pd3dDevice, D3DXMATRIX* pmatWorldMatrix )
 {
