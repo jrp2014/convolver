@@ -284,6 +284,12 @@
 					RelativePath="..\convolution\exception.h">
 				</File>
 				<File
+					RelativePath="..\convolution\ffthelp.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\ffthelp.h">
+				</File>
+				<File
 					RelativePath="..\convolution\filter.cpp">
 				</File>
 				<File
@@ -325,6 +331,12 @@
 				</File>
 				<File
 					RelativePath="..\fft\fftsg_h.h">
+				</File>
+			</Filter>
+			<Filter
+				Name="fftw">
+				<File
+					RelativePath="..\fftw\fftw3.h">
 				</File>
 			</Filter>
 		</Filter>

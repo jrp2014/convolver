@@ -2,7 +2,7 @@
 <VisualStudioProject 
 	ProjectType="Intel C++ Project"
 	Version="9.0"
-	Name="convolverFilter"
+	Name="ConvolverFilter"
 	ProjectGUID="{B2AEC2B0-2191-4347-A21F-C41A91F7BCC0}"
 	VCNestedProjectGUID="{90C47E62-931C-411D-9F16-0B877E34B415}"
 	VCNestedProjectFileName="convolverFilter.vcproj">
@@ -47,7 +47,7 @@
 				RegisterOutput="1"
 				AdditionalDependencies="strmbasd.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib"
 				ShowProgress="2"
-				OutputFile="$(OutDir)\convolverFilter.ax"
+				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="0"
 				SuppressStartupBanner="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -136,7 +136,7 @@
 				DelayImpLib=""
 				RegisterOutput="1"
 				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib"
-				OutputFile="$(OutDir)\convolverFilter.ax"
+				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
 				SuppressStartupBanner="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -221,6 +221,10 @@
 			RelativePath="..\convolution\waveformat.cpp"/>
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
 		<File 
 			RelativePath="..\debugging\debugging.cpp"/>
 		<File 
@@ -360,7 +364,11 @@
 		<File 
 			RelativePath="c:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.h"/>
 		<File 
+			RelativePath="..\fftw\fftw3.h"/>
+		<File 
 			RelativePath=".\readme.txt"/>
+		<File 
+			RelativePath=".\ConvolverFilter.filterdata"/>
 	</Files>
 </VisualStudioProject>
 

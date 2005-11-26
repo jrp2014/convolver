@@ -25,9 +25,6 @@
 #include "convolution\lrint.h"
 #include <vector>
 
-
-const DWORD MAX_FILTER_SIZE = 100000000; // Max impulse size.
-
 class Filter
 {
 public:

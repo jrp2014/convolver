@@ -1,0 +1,2 @@
+DefineFilter(convolverFilter.ax)
+AudioFilter(Name=ConvolverFilter,CLSID={2A0F29DC-2C05-4716-9522-3618687EAA5F},InPin=XForm In,OutPin=XForm Out)

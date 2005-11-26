@@ -330,6 +330,12 @@
 					RelativePath="..\convolution\exception.h">
 				</File>
 				<File
+					RelativePath="..\convolution\ffthelp.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\ffthelp.h">
+				</File>
+				<File
 					RelativePath="..\convolution\filter.cpp">
 				</File>
 				<File
@@ -373,6 +379,13 @@
 				</File>
 				<File
 					RelativePath="..\convolution\waveformat.h">
+				</File>
+			</Filter>
+			<Filter
+				Name="fftw"
+				Filter="">
+				<File
+					RelativePath="..\fftw\fftw3.h">
 				</File>
 			</Filter>
 		</Filter>
@@ -427,6 +440,9 @@
 		</File>
 		<File
 			RelativePath=".\ConvolverWrapper.filterdata">
+		</File>
+		<File
+			RelativePath=".\ConvolverWrapperDMO.filterdata">
 		</File>
 		<File
 			RelativePath=".\gpl.txt">

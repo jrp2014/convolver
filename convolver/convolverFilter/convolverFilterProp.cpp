@@ -261,7 +261,9 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 
 	case WM_NOTIFY:
 		{
+#if defined(DEBUG) | defined(_DEBUG)
 			SetDlgItemText( hwnd, IDS_STATUS, TEXT("Unexpected notification.") );
+#endif
 		}
 
 	default:

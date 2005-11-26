@@ -99,7 +99,7 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
 				UseOfATL="0"
-				ATLMinimizesCRunTimeLibraryUsage="1"
+				ATLMinimizesCRunTimeLibraryUsage="0"
 				CharacterSet="1"
 				WholeProgramOptimization="1"/>
 			<Tool 
@@ -314,6 +314,12 @@
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
 		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\fftw\fftw3.h"/>
+		<File 
 			RelativePath=".\convolver.h"/>
 		<File 
 			RelativePath=".\convolverPropPage.h"/>
@@ -343,6 +349,8 @@
 			RelativePath=".\ConvolverWrapper.filterdata"/>
 		<File 
 			RelativePath=".\gpl.txt"/>
+		<File 
+			RelativePath=".\ConvolverWrapperDMO.filterdata"/>
 	</Files>
 </VisualStudioProject>
 

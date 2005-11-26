@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="convolverFilter"
+	Name="ConvolverFilter"
 	ProjectGUID="{90C47E62-931C-411D-9F16-0B877E34B415}">
 	<Platforms>
 		<Platform
@@ -43,7 +43,7 @@
 				RegisterOutput="TRUE"
 				AdditionalDependencies="strmbasd.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib"
 				ShowProgress="2"
-				OutputFile="$(OutDir)\convolverFilter.ax"
+				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="0"
 				SuppressStartupBanner="TRUE"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -124,7 +124,7 @@
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
 				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib FFTW3.lib"
-				OutputFile="$(OutDir)\convolverFilter.ax"
+				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -216,6 +216,12 @@
 				</File>
 				<File
 					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
+					RelativePath="..\convolution\ffthelp.cpp">
+				</File>
+				<File
+					RelativePath="..\convolution\ffthelp.h">
 				</File>
 				<File
 					RelativePath="..\convolution\filter.cpp">
@@ -466,7 +472,16 @@
 					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.h">
 				</File>
 			</Filter>
+			<Filter
+				Name="fftw">
+				<File
+					RelativePath="..\fftw\fftw3.h">
+				</File>
+			</Filter>
 		</Filter>
+		<File
+			RelativePath=".\ConvolverFilter.filterdata">
+		</File>
 		<File
 			RelativePath=".\readme.txt">
 		</File>

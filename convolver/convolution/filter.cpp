@@ -17,6 +17,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+#include "convolution\ffthelp.h"
 #include "convolution\filter.h"
 
 Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSamplesPerSec) : 
@@ -100,15 +101,15 @@ nSamplesPerSec(nSamplesPerSec)
 	}
 #endif
 
-	// Check that the filter is not too big ...
-	if ( nFilterLength > MAX_FILTER_SIZE )
-	{
-		throw filterException("Filter too long to handle");
-	}
-
 	// Setup the filter
 	// A partition will contain half real data, and half zero padding.  Taking the DFT will, of course, overwrite that padding
 	nHalfPartitionLength = (nFilterLength + nPartitions - 1) / nPartitions;
+
+	// Check that the filter is not too big ...
+	if ( nHalfPartitionLength > HalfLargestDFTSize )
+	{
+		throw filterException("Filter too long to handle");
+	}
 
 	// .. or filter too small
 	if ( nHalfPartitionLength == 0 )
@@ -121,19 +122,8 @@ nSamplesPerSec(nSamplesPerSec)
 
 	nPartitionLength = nHalfPartitionLength * 2;
 
-#ifdef FFTW
-	// Don't need to pad to power of 2 for FFTW
-	int nPaddedPartitionLength = nPartitionLength;
-#else
-	int nPaddedPartitionLength = 4;	// Minimum length 4, to allow SIMD optimization
-	// Now make sure that the partition length is a power of two long for the Ooura FFT package. (Will 0 pad if necessary.)
-	while (nPaddedPartitionLength < nPartitionLength)
-	{
-		nPaddedPartitionLength *= 2;
-	}
-#endif
-
-	DWORD nHalfPaddedPartitionLength = nPaddedPartitionLength / 2;
+	int nHalfPaddedPartitionLength = GetOptimalDFTSize(nHalfPartitionLength);
+	int nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
 
 #ifdef OOURA
 	// Initialize the Oooura workspace;

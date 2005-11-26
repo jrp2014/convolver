@@ -187,8 +187,6 @@
 			</FileConfiguration>
 		</File>
 		<File 
-			RelativePath=".\stdafx.h"/>
-		<File 
 			RelativePath="..\debugging\debugging.cpp"/>
 		<File 
 			RelativePath="..\debugging\debugging.h"/>
@@ -233,6 +231,16 @@
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
 		<File 
+			RelativePath="..\convolution\exception.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\fft\fftsg.cpp"/>
+		<File 
+			RelativePath="..\fft\fftsg_h.h"/>
+		<File 
 			RelativePath="..\Common\dxstdafx.cpp"/>
 		<File 
 			RelativePath="..\Common\dxstdafx.h"/>
@@ -269,9 +277,9 @@
 		<File 
 			RelativePath="..\Common\DXUTsound.h"/>
 		<File 
-			RelativePath="..\fft\fftsg.cpp"/>
+			RelativePath="..\fftw\fftw3.h"/>
 		<File 
-			RelativePath="..\fft\fftsg_h.h"/>
+			RelativePath=".\stdafx.h"/>
 		<File 
 			RelativePath=".\ReadMe.txt"/>
 	</Files>

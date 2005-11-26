@@ -24,7 +24,7 @@
 #include <stdio.h>
 
 
-#define TRANSFORM_NAME L"convolverFilter Filter"
+#define TRANSFORM_NAME L"ConvolverFilter"
 
 // Setup information
 const REGPINTYPES sudPinTypes[] =
@@ -241,18 +241,6 @@ m_OutputSampleConvertor(NULL)
 			m_Convolution.set_ptr(NULL);
 		}
 	} 
-}
-
-//
-// WriteProfileInt
-//
-// Writes an integer to the profile.
-//
-void WriteProfileInt(TCHAR *section, TCHAR *key, int i)
-{
-	std::wstringstream str;
-	str << i;
-	WriteProfileString(section, key, str.str().c_str());
 }
 
 //
