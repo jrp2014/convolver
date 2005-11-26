@@ -355,7 +355,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	pWave->nChannels = nChannels;
 	pWave->nSamplesPerSec = m_Convolution->Mixer.nSamplesPerSec;
 	pWave->wBitsPerSample = m_FormatSpecs[dwTypeIndex].wBitsPerSample;
-	pWave->nBlockAlign = pWave->nChannels * pmt->lSampleSize;
+	pWave->nBlockAlign = pmt->lSampleSize;
 	pWave->nAvgBytesPerSec = pWave->nSamplesPerSec * pWave->nBlockAlign;
 
 	if(pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)

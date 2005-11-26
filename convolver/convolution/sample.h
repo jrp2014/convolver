@@ -313,7 +313,7 @@ template <typename T>
 class CFormatSpecs
 {
 public:
-	static struct FormatSpec
+	static const struct FormatSpec
 	{
 		GUID					SubType;
 		WORD					wFormatTag;
@@ -321,10 +321,19 @@ public:
 		WORD					wValidBitsPerSample;
 		Sample<T>*				sample_convertor;
 	} const FormatSpecs_[];
+public:
+
+	static const int size = 15;
 
 	CFormatSpecs() {}
 
-	static const int size = 15;
+	//~CFormatSpecs()
+	//{
+	//	for(int i=0; i< size; ++i)
+	//	{
+	//		delete FormatSpecs_[i].sample_convertor;
+	//	}
+	//}
 
 	const FormatSpec& operator[](int i) const
 	{
@@ -400,4 +409,4 @@ const typename CFormatSpecs<T>::FormatSpec CFormatSpecs<T>::FormatSpecs_[CFormat
 	{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT, 64, 64, new Sample_ieeedouble<T>()}
 };
 
-	//template class CFormatSpecs<float>;
+//template class CFormatSpecs<float>;
