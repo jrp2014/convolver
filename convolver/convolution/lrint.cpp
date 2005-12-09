@@ -152,20 +152,24 @@ int ceil_int (double x)
 	return (-i);
 }
 
+
+////Truncate mode is the default rounding mode in C. This consists in suppressing the decimals,
+////giving a towards minus infinity mode for positive numbers, and towards plus infinity mode for
+////negative numbers.
 //int truncate_int (double x)
 //{
-//	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
+//	assert (x > static_cast <double> (INT_MIN / 2) – 1.0);
 //	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
 //	const float round_towards_p_i = -0.5f;
 //	int i;
 //	__asm
 //	{
 //		fld x
-//			fadd st, st (0)
-//			fabs st (0)
-//			fadd round_towards_p_i
-//			fistp i
-//			sar i, 1
+//		fadd st, st (0)
+//		fabs st (0)
+//		fadd round_towards_m_i
+//		fistp i
+//		sar i, 1
 //	}
 //	if (x < 0)
 //	{
@@ -192,7 +196,7 @@ void test_and_kill_denormal (float &val)
 
 void kill_denormal_by_quantization (float &val)
 {
-	static const float anti_denormal = 1e-18;
+	static const float anti_denormal = 1e-18f;
 	val += anti_denormal;
 	val -= anti_denormal;
 }
@@ -219,7 +223,7 @@ void add_white_noise (float &val)
 
 void add_dc (float &val)
 {
-	static const float anti_denormal = 1e-20;
+	static const float anti_denormal = 1e-20f;
 	val += anti_denormal;
 }
 

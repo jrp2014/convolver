@@ -8,12 +8,12 @@ DEFINE_GUID(CLSID_convolverFilter,
 DEFINE_GUID(CLSID_convolverFilterPropertyPage, 
 			0xad837255, 0x8bc0, 0x42f4, 0xba, 0xb9, 0xf4, 0x8d, 0x3e, 0x1a, 0x22, 0x27);
 
-struct convolverFilterParameters 
-{
-	TCHAR szFilterFileName[MAX_PATH * 2];
-	float fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
-	DWORD nPartitions;		// Number of partitions to be used in convolution algorithm
-};
+//struct convolverFilterParameters 
+//{
+//	TCHAR szFilterFileName[MAX_PATH * 2];
+//	float fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
+//	WORD nPartitions;		// Number of partitions to be used in convolution algorithm
+//};
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,33 +25,19 @@ extern "C" {
 
 	DECLARE_INTERFACE_(IconvolverFilter, IUnknown)
 	{
-		STDMETHOD(get_filterfilename) (THIS_
-			TCHAR *pVal[]
-			) PURE;
+		STDMETHOD(get_filterfilename)(THIS_ TCHAR *pVal[]) PURE;
+		STDMETHOD(put_filterfilename)(THIS_ TCHAR newVal[]) PURE;
 
-		STDMETHOD(put_filterfilename) (THIS_
-			TCHAR newVal[]
-			) PURE;
+		STDMETHOD(get_attenuation)(THIS_ float *pVal) PURE;
+		STDMETHOD(put_attenuation)(THIS_ float newVal) PURE;
 
-		STDMETHOD(get_partitions) (THIS_
-			DWORD *pVal
-			) PURE;
+		STDMETHOD(get_partitions)(THIS_ WORD *pVal) PURE;
+		STDMETHOD(put_partitions)(THIS_ WORD newVal) PURE;
 
-		STDMETHOD(put_partitions) (THIS_
-			DWORD newVal
-			) PURE;
+		STDMETHOD(get_planning_rigour)(THIS_ unsigned int *pVal) PURE;
+		STDMETHOD(put_planning_rigour)(THIS_ unsigned int newVal) PURE;
 
-		STDMETHOD(get_filter_description)(THIS_
-			std::string* description
-			) PURE;
-
-		STDMETHOD(get_attenuation)(THIS_
-			float *pVal
-			) PURE;
-
-		STDMETHOD(put_attenuation)(THIS_
-			float newVal
-			) PURE;
+		STDMETHOD(get_filter_description)(THIS_ std::string* description) PURE;
 
 		// The following pair is needed because DWORD is unsigned
 		virtual float decode_Attenuationdb(const DWORD dwValue) PURE;

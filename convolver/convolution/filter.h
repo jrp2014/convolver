@@ -28,45 +28,51 @@
 class Filter
 {
 public:
-
-	int						nChannels;				// number of channels
 	DWORD					nSamplesPerSec;			// 44100, 48000, etc
-	PartitionedBuffer		coeffs;
+	SampleBuffer			coeffs;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat;		// The format of the filter file
 #else
 	WAVEFORMATEXTENSIBLE	wfexFilterFormat;		// The format of the filter file
 #endif
-	int						nPartitions;
-	int						nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	int						nHalfPartitionLength;	// in blocks
-	int						nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+	WORD					nPartitions;
+	DWORD					nPartitionLength;		// in blocks (a block contains the samples for each channel)
+	DWORD					nHalfPartitionLength;	// in blocks
+	DWORD					nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
 #ifdef FFTW
-	int						nFFTWPartitionLength;	// 2*(nPaddedPartitionLength/2+1);
+	DWORD					nFFTWPartitionLength;	// 2*(nPaddedPartitionLength/2+1);
 	fftwf_plan				plan;
 	fftwf_plan				reverse_plan;
 #endif
 
-	Filter(TCHAR szFilterFileName[MAX_PATH], const int& nPartitions, const DWORD& nSamplesPerSec);
+	// Constructor
+	Filter(TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
+			   const unsigned int& nPlanningRigour);
 
-#ifdef FFTW
-	~Filter()
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "Filter::~Filter " << std::endl;);
-#endif
-		// Don't delete the plans from here, as it messes up copy construction
-	}
-#endif
-
-
-private:
 #ifdef OOURA
 	// Workspace for the non-simple Ooura routines.  
 	std::vector<DLReal>		w;						// w[0...n/2-1]   :cos/sin table
 	std::vector<int>		ip;						// work area for bit reversal
-													// length of ip >= 2+sqrt(n)
-													// strictly, length of ip >= 
-													//    2+(1<<(int)(log(n+0.5)/log(2))/2).
+	// length of ip >= 2+sqrt(n)
+	// strictly, length of ip >= 
+	//    2+(1<<(int)(log(n+0.5)/log(2))/2).
 #endif
+
+
+	virtual ~Filter()
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+		DEBUGGING(3, cdebug << "Filter::~Filter " << std::endl;);
+#endif
+#ifdef FFTW
+		fftwf_destroy_plan(plan);
+		fftwf_destroy_plan(reverse_plan);
+#endif
+	}
+
+private:
+	// Disable default copy construction and assignment, as it FFTW plans cannot be copied
+	Filter();									// prevent construction
+	Filter(const Filter&);						// prevent copying
+	const Filter& operator =(const Filter&);	// prevent copying
 };

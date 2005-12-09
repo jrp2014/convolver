@@ -1,7 +1,9 @@
 44100 2 2 0
 D:\Projects\convolver\convolver\Media\cksde\ex2_imp2l.wav
+0
 0.0
 0.0
 D:\Projects\convolver\convolver\Media\cksde\ex2_imp2r.wav
+0
 1.0
 1.0

@@ -1,6 +1,6 @@
 #include "convolution\config.h"
 
-extern const int HalfLargestDFTSize;
-extern const int OptimalDFTSize[];
+extern const DWORD HalfLargestDFTSize;
+extern const DWORD OptimalDFTSize[];
 
-extern int GetOptimalDFTSize( int size0 );
+extern DWORD GetOptimalDFTSize( DWORD size0 );

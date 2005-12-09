@@ -1,9 +1,9 @@
 #include "convolution\ffthelp.h"
 
-static const int HalfLargestDFTSize = 1000000; // allow FFTs up to 2x this size
+static const DWORD HalfLargestDFTSize = 1000000; // allow FFTs up to 2x this size
 
 // 2^a * 2^b * 3^c * 5^d * 11^e * 13^f (e+f=0 or 1)
-static const int OptimalDFTSize[]  =
+static const DWORD OptimalDFTSize[]  =
 {
 				2,      3,      4,      5,      6,      7,      8,      9,     10, 
 		11,     12,     13,     14,     15,     16,     18,     20,     21,     22, 
@@ -268,19 +268,19 @@ static const int OptimalDFTSize[]  =
 
 
 
-int GetOptimalDFTSize( int size0 )
+DWORD GetOptimalDFTSize( DWORD size0 )
 {
 	if(size0 >= HalfLargestDFTSize)
 		throw convolutionException("Convolution too big to handle");
 #ifdef FFTW
-	int a = 0;
-	int b = sizeof(OptimalDFTSize)/sizeof(OptimalDFTSize[0]) - 1;
+	DWORD a = 0;
+	DWORD b = sizeof(OptimalDFTSize)/sizeof(OptimalDFTSize[0]) - 1;
 	assert( (unsigned)size0 < (unsigned)OptimalDFTSize[b] );
 
 
 	while( a < b )
 	{
-		int c = (a + b) >> 1;
+		DWORD c = (a + b) >> 1;
 		if( size0 <= OptimalDFTSize[c] )
 			b = c;
 		else
@@ -290,7 +290,7 @@ int GetOptimalDFTSize( int size0 )
 	return OptimalDFTSize[b];
 #else
 	// highest power of two greater than size0
-	int d = 2;
+	DWORD d = 2;
 	while(d < size0)
 	{
 		d*=2;

@@ -54,22 +54,30 @@ int _tmain(int argc, _TCHAR* argv[])
 	HRESULT hr = S_OK;
 	Holder< CConvolution<float> > conv;
 	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
+	PlanningRigour pr;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);
 #endif
 
-	if (argc != 5)
+	if (argc != 6)
 	{
-		std::wcerr << "Usage: convolverCMD nPartitions config.txt inputwavfile.wav outputwavfile.wav" << std::endl;
-		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std:: endl;
+		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt inputfile outputfile" << std::endl;
+		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std::endl;
+		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << std::endl;
+		std::wcerr << "       input and output files are, typically, .wav" << std::endl;
 		return 1;
 	}
+#define PARTITIONS argv[1]
+#define PLANNINGRIGOUR argv[2]
+#define CONFIG argv[3]
+#define INPUTFILE argv[4]
+#define OUTPUTFILE argv[5]
 
 	try
 	{
-		std::wistringstream szPartitions(argv[1]);
-		DWORD nPartitions;
+		std::wistringstream szPartitions(PARTITIONS);
+		WORD nPartitions;
 		szPartitions >> nPartitions;
 
 		if (nPartitions == 0)
@@ -81,19 +89,24 @@ int _tmain(int argc, _TCHAR* argv[])
 			std::wcerr << "Using partitioned convolution with " << nPartitions << " partition(s)" << std::endl;
 		}
 
-		conv.set_ptr(new CConvolution<float>(argv[2], nPartitions == 0 ? 1 : nPartitions)); // Sets conv. nPartitions==0 => use overlap-save
+		std::wistringstream szPlanningRigour(PLANNINGRIGOUR);
+		WORD nPlanningRigour;
+		szPartitions >> nPlanningRigour;
+
+		conv.set_ptr(new CConvolution<float>(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
+			nPlanningRigour)); // Sets conv. nPartitions==0 => use overlap-save
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
-		CWaveFileHandle WavIn(argv[3], SFM_READ, &sf_info, conv->Mixer.nSamplesPerSec);
+		CWaveFileHandle WavIn(INPUTFILE, SFM_READ, &sf_info, conv->Mixer.nSamplesPerSec);
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
 
 		const DWORD cBufferLength = conv->Mixer.nFilterLength * SAMPLES;  // frames
 #else
 		CWaveFileHandle WavIn;
-		if( FAILED( hr = WavIn->Open( argv[3], NULL, WAVEFILE_READ ) ) )
+		if( FAILED( hr = WavIn->Open(INPUTFILE, NULL, WAVEFILE_READ ) ) )
 		{
-			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(argv[3], _tcslen(argv[3])) << " for reading" << std::endl;
+			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(INPUTFILE, _tcslen(INPUTFILE)) << " for reading" << std::endl;
 			throw(hr);
 		}
 
@@ -124,7 +137,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		cdebug << "cBufferLength=" << cBufferLength << std::endl ;
 #endif
 
-
 		UINT dwSizeWrote = 0;
 		DWORD dwSizeRead = 0;
 		DWORD dwTotalSizeRead = 0;
@@ -141,7 +153,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		float fAttenuation = 0;
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = calculateOptimumAttenuation(fAttenuation, argv[2], nPartitions);
+		hr = calculateOptimumAttenuation(fAttenuation, INPUTFILE, nPartitions, nPlanningRigour);
 		fElapsed = t.msec();
 		if (FAILED(hr))
 		{
@@ -163,12 +175,12 @@ int _tmain(int argc, _TCHAR* argv[])
 #ifdef	LIBSNDFILE
 		// Write out in the same format as the input file, but with the right number of output channels
 		sf_info.channels = conv->Mixer.nOutputChannels;
-		CWaveFileHandle WavOut(argv[4], SFM_WRITE, &sf_info, sf_info.samplerate);
+		CWaveFileHandle WavOut(OUTPUTFILE, SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 		CWaveFileHandle WavOut;
-		if( FAILED( hr = WavOut->Open( argv[4], WavIn->GetFormat(), WAVEFILE_WRITE ) ) )
+		if( FAILED( hr = WavOut->Open(OUTPUTFILE, WavIn->GetFormat(), WAVEFILE_WRITE ) ) )
 		{
-			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(argv[4], _tcslen(argv[4])) << " for writing" << std::endl;
+			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE)) << " for writing" << std::endl;
 			throw(hr);
 		}
 #endif
@@ -259,7 +271,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 
 			dwTotalSizeWritten += dwSizeWrote;
-
 		} 
 
 		fElapsed = t.msec();
@@ -270,7 +281,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 			" bytes to " 
 #endif
-			<< std::basic_string< _TCHAR >(argv[4], _tcslen(argv[4]))
+			<< std::basic_string< _TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE))
 			<< " in " << fElapsed << " milliseconds" << std::endl;
 
 #ifndef LIBSNDFILE

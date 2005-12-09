@@ -20,7 +20,7 @@
 #include "convolution\samplebuffer.h"
 
 #if defined(DEBUG) | defined(_DEBUG)
-void DumpChannelBuffer(const ChannelBuffer &buffer )
+void DumpChannelBuffer(const ChannelBuffer &buffer)
 {
 	const size_t LIMIT = 16; // Don't print too much
 	size_t limit = buffer.size() > LIMIT ? LIMIT : buffer.size();

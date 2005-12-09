@@ -28,13 +28,31 @@
         "Entry"
         {
         "MsmKey" = "8:_1D3EF33E867CC3592CD8ECB27047DE35"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_1D3EF33E867CC3592CD8ECB27047DE35"
         "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_1FF073269EA4BE4EF9AA006A8F4419D8"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_1FF073269EA4BE4EF9AA006A8F4419D8"
         "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_439FDF119AFDEB43488845DA09B1D3E8"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -89,6 +107,12 @@
         {
         "MsmKey" = "8:_885DB8E7763546468CD93751E645FCA0"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_8BAE4D7E94D8694965ABCCC588791A52"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -486,13 +510,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{66A5F026-4D12-4740-B7FE-0A81AC133D6B}"
-        "PackageCode" = "8:{671DF627-4FDC-4707-9DCD-58B7D409A209}"
+        "ProductCode" = "8:{1AA77119-AC5E-423D-AA90-A7B04F912642}"
+        "PackageCode" = "8:{BB64D981-7910-4CB1-ADD0-D59126C6E1F4}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:2.14"
+        "ProductVersion" = "8:2.15"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"

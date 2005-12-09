@@ -21,7 +21,6 @@
 #include <iostream>
 #include <sstream>
 
-
 int	_tmain(int argc, _TCHAR* argv[])
 {
 #if defined(DEBUG) | defined(_DEBUG)
@@ -48,18 +47,17 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 	//CWaveFileHandle	FilterWav;
 
-	if (argc !=	4)
+	if (argc !=	5)
 	{
-		std::wcerr << "Usage: perftest MaxnPartitions nIterations config.txt" << std::endl;
+		std::wcerr << "Usage: perftest MaxnPartitions nIterations nTuningRigour config.txt" << std::endl;
 		return 1;
 	}
 
 	try
 	{
 		std::wistringstream	szPartitions(argv[1]);
-		int max_nPartitions;
+		WORD max_nPartitions;
 		szPartitions >>	max_nPartitions;
-
 		if (max_nPartitions	< 0 || max_nPartitions > 1000)
 		{
 			std::cerr << "max_nPartitions (" << max_nPartitions << ") must be between 0 and 1000" << std::endl;
@@ -75,14 +73,25 @@ int	_tmain(int argc, _TCHAR* argv[])
 			throw(std::length_error("invalid nIterations"));
 		}
 
+		PlanningRigour pr;
+		std::wistringstream	szPlanningRigour(argv[3]);
+		int nPlanningRigour;
+		szPlanningRigour >>	nPlanningRigour;
+		if (nPlanningRigour	< 0 || nPlanningRigour > pr.nDegrees - 1)
+		{
+			std::wcerr << "nTuningRigour (" << nPlanningRigour << ") must be between 0 and " << pr.nDegrees - 1 << std::endl;
+			throw(std::length_error("invalid nTuningRigour"));
+		}
+		
+
 //#ifdef LIBSNDFILE
 //		SF_INFO sfinfo;
 //		ZeroMemory(&sfinfo, sizeof(SF_INFO));
-//		CWaveFileHandle FilterWav(argv[3], SFM_READ, &sfinfo);
+//		CWaveFileHandle FilterWav(argv[4], SFM_READ, &sfinfo);
 //		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
 //#else
-//		std::basic_string< _TCHAR >FilterFileName(argv[3],	_tcslen(argv[3]));
-//		if(	FAILED(	hr = FilterWav->Open( argv[3], NULL, WAVEFILE_READ ) ) )
+//		std::basic_string< _TCHAR >FilterFileName(argv[4],	_tcslen(argv[4]));
+//		if(	FAILED(	hr = FilterWav->Open( argv[4], NULL, WAVEFILE_READ ) ) )
 //		{
 //			std::wcerr << "Failed to open "	<< FilterFileName << " for reading"	<< std::endl;
 //			throw(hr);
@@ -93,7 +102,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 //			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
 //#endif
 
-		conv.set_ptr(new CConvolution<float>(argv[3], 1));
+		conv.set_ptr(new CConvolution<float>(argv[4], 1, nPlanningRigour));
 		std::cerr << conv->Mixer.DisplayChannelPaths() << std::endl;
 
 		float fAttenuation	= 0;
@@ -104,18 +113,18 @@ int	_tmain(int argc, _TCHAR* argv[])
 		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 #endif
 
-		for (int nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
+		for (WORD nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
 		{
-			for (int nIteration = 1; nIteration<=nIterations; ++nIteration)
+			for (WORD nIteration = 1; nIteration<=nIterations; ++nIteration)
 			{
 
 				t.reset();
-				conv.set_ptr(new CConvolution<float>(argv[3], nPartitions == 0 ? 1 : nPartitions)); // Used to calculate nPartitionLength
+				conv.set_ptr(new CConvolution<float>(argv[4], nPartitions == 0 ? 1 : nPartitions, nPlanningRigour)); // Used to calculate nPartitionLength
 				fElapsedLoad = t.sec();
 				fTotalElapsedLoad += fElapsedLoad;
 				
 				t.reset();
-				hr = calculateOptimumAttenuation(fAttenuation, argv[3],	nPartitions);
+				hr = calculateOptimumAttenuation(fAttenuation, argv[4],	nPartitions, nPlanningRigour);
 				fElapsedCalc = t.sec();
 				fTotalElapsedCalc += fElapsedCalc;
 				

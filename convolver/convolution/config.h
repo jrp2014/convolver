@@ -96,6 +96,41 @@ const DWORD MAXSTRING = 1024;	// length
 #endif
 
 
+struct PlanningRigour
+{
+#ifdef FFTW
+	static const unsigned int nDegrees = 4;
+	static const unsigned int nStrLen = 11;
+#else
+	static const unsigned int nDegrees = 1;
+	static const unsigned int nStrLen = 8;
+#endif
+	TCHAR Rigour[nDegrees][nStrLen];
+	unsigned int Flag[nDegrees];
+
+	PlanningRigour()
+	{
+#ifdef FFTW
+		_tcsncpy(Rigour[0], TEXT("Estimate"), nStrLen);		Flag[0] = FFTW_ESTIMATE;
+		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[1] = FFTW_MEASURE;
+		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[2] = FFTW_PATIENT;
+		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[3] = FFTW_EXHAUSTIVE;
+#else
+		_tcsncpy(Rigour[0], TEXT("Default"), nStrLen);	Flag[0] = 0;
+#endif
+	}
+
+	unsigned int flag(const TCHAR* r) const
+	{
+		for(unsigned int i=0; i<nDegrees; ++i)
+		{
+			if(_tcsncicmp(r, Rigour[i], nStrLen) == 0)
+				return i;
+		}
+		throw std::range_error("Invalid rigour");
+	}
+};
+
 // using home grown array
 #define FASTARRAY
 // User array initialization, rather than vector initialization
@@ -109,4 +144,6 @@ const DWORD MAXSTRING = 1024;	// length
 const DWORD MAX_ATTENUATION = 1000; // dB
 
 // Number of filter lengths used to calculate optimum attenuation
+// The bigger the number the more accurate the calculation, but the
+// longer it takes
 const int NSAMPLES = 10;

@@ -8,6 +8,7 @@ const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DirectShow Filter");
 const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 const TCHAR kszPrefsPartitions[] = _T("Partitions");
+const TCHAR kszPrefsPlanningRigour[] = _T("PlanningRigour");
 
 class CconvolverFilter : public CTransformFilter,
 		 public IconvolverFilter,
@@ -28,19 +29,22 @@ public:
     HRESULT CheckTransform(const CMediaType *mtIn, const CMediaType *mtOut);
     HRESULT DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *pProperties);
     HRESULT GetMediaType(int iPosition, CMediaType *pMediaType);
-	HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType *pMediaType);
+	HRESULT SetMediaType(PIN_DIRECTION direction, const CMediaType *pMediaType);
 
     // These implement the custom IconvolverFilter interface
-	STDMETHODIMP get_filterfilename(TCHAR *pVal[]);
-	STDMETHODIMP put_filterfilename(TCHAR newVal[]);
+	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
+	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
 
-	STDMETHODIMP get_partitions(DWORD *pVal);
-	STDMETHODIMP put_partitions(DWORD newVal);
+	STDMETHOD(get_attenuation)(float *pVal);
+	STDMETHOD(put_attenuation)(float newVal);
 
-	STDMETHODIMP get_filter_description(std::string* description);
+	STDMETHOD(get_partitions)(WORD *pVal);
+	STDMETHOD(put_partitions)(WORD newVal);
 
-	STDMETHODIMP get_attenuation(float *pVal);
-	STDMETHODIMP put_attenuation(float newVal);
+	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
+	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+
+	STDMETHOD(get_filter_description)(std::string* description);
 
 	// The following pair is needed because DWORD is unsigned
 	float decode_Attenuationdb(const DWORD dwValue)
@@ -70,12 +74,16 @@ private:
 
 
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
-	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
-	TCHAR							m_szFilterFileName[MAX_PATH * 2];
+	WORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
+	TCHAR					m_szFilterFileName[MAX_PATH];
+	unsigned int			m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
+
 
 	Holder< CConvolution<float> >	m_Convolution;				// Processing class.  Handle manages resources
 	Sample<float>*					m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Sample<float>*					m_OutputSampleConvertor;	// float
+
+
 
 	CFormatSpecs<float>				m_FormatSpecs;				// Supported formats
 

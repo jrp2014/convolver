@@ -49,8 +49,8 @@ template <typename T>
 class CConvolution
 {
 public:
-	CConvolution(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
-	~CConvolution(void) {};
+	CConvolution(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
+//	virtual ~CConvolution(void) {};
 
 	// This version of the convolution routine does partitioned convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
@@ -102,33 +102,34 @@ public:
 	}
 
 private:
-
 	SampleBuffer		InputBuffer_;
-	ChannelBuffer		InputBufferAccumulator_;	// Only need to accumulate one channel at a time
+	ChannelBuffer		InputBufferAccumulator_;
 	ChannelBuffer		OutputBuffer_;				// The output for a particular path, before mixing
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
-	int					nInputBufferIndex_;			// placeholder
-	int					nPartitionIndex_;			// for partitioned convolution
-	int					nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
+	DWORD				nInputBufferIndex_;			// placeholder
+	WORD				nPartitionIndex_;			// for partitioned convolution
+	WORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWriting_;
 
 	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-		const ChannelBuffer& restrict Output, const int from, const int  to);
+		const ChannelBuffer& restrict Output, const DWORD from, const DWORD to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
-	void inline complex_mul(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count);
-	void inline complex_mul_add(fftwf_complex* restrict in1, fftwf_complex* restrict in2, fftwf_complex* restrict result, int count);
+	void inline complex_mul(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
+										 fftwf_complex* restrict result, const DWORD count);
+	void inline complex_mul_add(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
+											 fftwf_complex* restrict result, const DWORD count);
 #if defined(DEBUG) | defined(_DEBUG)
-	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, const int from, const int to) const;
+	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, const DWORD from, const DWORD to) const;
 #endif
 #elif !(defined(__ICC) || defined(__INTEL_COMPILER))
 	// non-vectorized complex array multiplication -- ordering specific to the Ooura routines. C = A * B
-	void inline cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const int N);
-	void inline cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const int N);
+	void inline cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const DWORD N);
+	void inline cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const DWORD N);
 #endif
 
 	// Used to check filter / partion lengths
@@ -143,5 +144,6 @@ private:
 };
 
 template <typename T>
-HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
+HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], 
+									const WORD& nPartitions, const unsigned int& nPlanningRigour);
 

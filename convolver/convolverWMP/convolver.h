@@ -55,6 +55,7 @@ const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\DSP Plugin");
 const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 const TCHAR kszPrefsPartitions[] = _T("Partitions");
+const TCHAR kszPrefsPlanningRigour[] = _T("PlanningRigour");
 
 /////////////////////////////////////////////////////////////////////////////
 // IConvolver
@@ -73,8 +74,11 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE get_attenuation(float *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_attenuation(float newVal) = 0;
 
-	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE get_partitions(WORD *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_partitions(WORD newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_planning_rigour(unsigned int *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_planning_rigour(unsigned int newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_filter_description(std::string* description) = 0;
 
@@ -131,10 +135,13 @@ public:
 	STDMETHOD(get_attenuation)(float *pVal);
 	STDMETHOD(put_attenuation)(float newVal);
 
-	STDMETHOD(get_filter_description)(std::string* description);
+	STDMETHOD(get_partitions)(WORD *pVal);
+	STDMETHOD(put_partitions)(WORD newVal);
 
-	STDMETHOD(get_partitions)(DWORD *pVal);
-	STDMETHOD(put_partitions)(DWORD newVal);
+	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
+	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+
+	STDMETHOD(get_filter_description)(std::string* description);
 
 	// IMediaObject methods
 	STDMETHOD( GetStreamCount )( 
@@ -307,14 +314,14 @@ private:
 	bool                    m_bValidTime;       // Is timestamp valid?
 	REFERENCE_TIME          m_rtTimestamp;      // Stores the input buffer timestamp
 
-	TCHAR					m_szFilterFileName[MAX_PATH * 2];
+	TCHAR					m_szFilterFileName[MAX_PATH];
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
+	unsigned int			m_nPlanningRigour;	
 
 	Holder< CConvolution<float> >	m_Convolution;			// Processing class.  Handle manages resources
 	Sample<float>*					m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Sample<float>*					m_OutputSampleConvertor;	// float
-
 
 	CFormatSpecs<float>				m_FormatSpecs;
 

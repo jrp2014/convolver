@@ -24,6 +24,8 @@
 #include "debugging\fastTiming.h"
 #include "convolverWMP\version.h"
 
+PlanningRigour pr;
+
 //
 // CreateInstance
 //
@@ -85,6 +87,7 @@ HRESULT CconvolverFilterProperties::DisplayFilterFormat(HWND hwnd, TCHAR* szFilt
 	else
 	{
 		SetDlgItemText( hwnd, IDS_STATUS, TEXT("Convolution filter initialization failed.") );
+		return E_FAIL;
 	}
 
 	return hr;
@@ -104,14 +107,8 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 	{
 	case WM_COMMAND:
 		{
-			if (m_bIsInitialized)
-			{
-				SetDirty();
-			}
-			else
-			{
-				break;
-			}
+			if (!m_bIsInitialized)
+					break;
 
 			switch(LOWORD(wParam))
 			{
@@ -181,7 +178,13 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 			case IDC_CALCULATEOPTIMUMATTENUATION:
 				{
 					float	fAttenuation = 0;
-					DWORD	nPartitions = 1;
+					WORD	nPartitions = 1;
+					unsigned int nPlanningRigour =
+#ifdef FFTW
+						1;		// Set "Measure" as the default
+#else
+						0;
+#endif
 					TCHAR*  szFilterFileName	= TEXT("");
 					HRESULT hr S_OK;
 
@@ -192,7 +195,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 							hr = Apply();
 							if (FAILED(hr))
 							{
-								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
+								//SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
 								return (INT_PTR)TRUE;
 							}
 						}
@@ -211,10 +214,16 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 							return (INT_PTR)TRUE;
 						}
 
+						hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
+						if (FAILED(hr))
+						{
+							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
+							return (INT_PTR)TRUE;
+						}
+
 						double fElapsed = 0;
 						apHiResElapsedTime t;
-						// TODO: the 8 should be derived
-						hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
+						hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
 						fElapsed = t.sec();
 						if (FAILED(hr))
 						{
@@ -249,10 +258,39 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 				}
 				break;
 
+			case IDC_ATTENUATION:
+				{
+					if(HIWORD(wParam) == EN_CHANGE)
+					{
+						SetDirty();
+						return (INT_PTR)TRUE;
+					}
+				}
+				break;
+
+			case IDC_NOOFPARTITIONS:
+				{
+					if(HIWORD(wParam) == EN_CHANGE)
+					{
+						SetDirty();
+						return (INT_PTR)TRUE;
+					}
+				}
+				break;
+
+			case IDC_COMBOPLANNINGRIGOUR:
+				{
+					if(HIWORD(wParam) == CBN_SELENDOK)
+					{
+						SetDirty();
+						return (INT_PTR)TRUE;
+					}
+				}
+
 			default:
 				{
 #if defined(DEBUG) | defined(_DEBUG)
-					cdebug << "LOWORD(wParam) " << LOWORD(wParam) << std::endl;
+			cdebug << "Unhandled Command: " << "LOWORD(wParam) " << LOWORD(wParam) << " HIWORD(wParam) " << HIWORD(wParam) << std::endl;
 #endif
 				}
 			} //switch wParam
@@ -261,13 +299,21 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 
 	case WM_NOTIFY:
 		{
+			if (!m_bIsInitialized)
+				break;
+
 #if defined(DEBUG) | defined(_DEBUG)
-			SetDlgItemText( hwnd, IDS_STATUS, TEXT("Unexpected notification.") );
+			cdebug << "Unhandled Notification: " << "LOWORD(wParam) " << LOWORD(wParam) << " HIWORD(wParam) " << HIWORD(wParam) << std::endl;
 #endif
+
 		}
+		break;
 
 	default:
 		{
+
+			if (!m_bIsInitialized)
+				break;
 		}
 		break;
 
@@ -321,24 +367,66 @@ HRESULT CconvolverFilterProperties::OnActivate()
 	CheckPointer(m_pIconvolverFilter, E_POINTER);
 	TCHAR sz[MAX_PATH] = {0};
 	TCHAR *szFilterFileName = NULL;
+	HRESULT hr = S_OK;
 
 			// May throw
 	version v(TEXT("convolverFilter.ax"));
 	SetDlgItemText(m_Dlg, IDS_Version, (TEXT("Version ") + v.get_product_version()).c_str());
 
-	m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
-	Edit_SetText(GetDlgItem(m_Dlg, IDC_CONFIGFILE), szFilterFileName);
-	DisplayFilterFormat(m_Dlg, szFilterFileName);
+	hr = m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve config filename.") );
+	}
+	else
+	{
+		Edit_SetText(GetDlgItem(m_Dlg, IDC_CONFIGFILE), szFilterFileName);
+		DisplayFilterFormat(m_Dlg, szFilterFileName);
+	}
 
 	float fAttenuation_db = 0;
-	m_pIconvolverFilter->get_attenuation(&fAttenuation_db);
-	_stprintf(sz, TEXT("%.1f"), fAttenuation_db);
-	Edit_SetText(GetDlgItem(m_Dlg, IDC_ATTENUATION), sz);
+	hr = m_pIconvolverFilter->get_attenuation(&fAttenuation_db);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve attenuation.") );
+	}
+	else
+	{
+		_stprintf(sz, TEXT("%.1f"), fAttenuation_db);
+		Edit_SetText(GetDlgItem(m_Dlg, IDC_ATTENUATION), sz);
+	}
 
-	DWORD nPartitions = 0;
-	m_pIconvolverFilter->get_partitions(&nPartitions);
-	_stprintf(sz, TEXT("%d"), nPartitions);
-	Edit_SetText(GetDlgItem(m_Dlg, IDC_NOOFPARTITIONS), sz);
+	WORD nPartitions = 0;
+	hr = m_pIconvolverFilter->get_partitions(&nPartitions);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve number of partitions.") );
+	}
+	else
+	{
+		_stprintf(sz, TEXT("%d"), nPartitions);
+		Edit_SetText(GetDlgItem(m_Dlg, IDC_NOOFPARTITIONS), sz);
+	}
+
+	unsigned int nPlanningRigour = 
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
+	hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve tuning rigour.") );
+	}
+	else
+	{
+		for(unsigned int i=0; i<pr.nDegrees; ++i)
+		{
+			SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)pr.Rigour[i]);
+		}
+		SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
+	}
 
 	m_bIsInitialized = TRUE;
 
@@ -357,8 +445,15 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 
 	float	fAttenuation = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
-	DWORD nPartitions = 0;
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions);
+	WORD nPartitions = 0;
+	unsigned int nPlanningRigour =
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
+
+	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
 
 	return NOERROR;
 }
@@ -372,9 +467,15 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 {
 	float	fAttenuation = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
-	DWORD nPartitions = 0;
+	WORD nPartitions = 0;
+	unsigned int nPlanningRigour =
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
 
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions);
+	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
 
 	// update the plug-in
 	if (m_pIconvolverFilter != NULL)
@@ -403,6 +504,13 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put config filename"));
 				return hr;
 			}
+
+			hr = m_pIconvolverFilter->put_planning_rigour(nPlanningRigour);
+			if (FAILED(hr))
+			{
+				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put tuning rigour"));
+				return hr;
+			}
 		}
 		catch (std::exception& error)
 		{
@@ -425,7 +533,8 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 //
 void CconvolverFilterProperties::GetControlValues(float& fAttenuation, 
 												  TCHAR szFilterFileName[MAX_PATH],
-												  DWORD& nPartitions)
+												  WORD& nPartitions,
+												  unsigned int& nPlanningRigour)
 {
 	// TODO:: redo this in C++ style, with stringstream
 
@@ -440,8 +549,14 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 	dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
 	szFilterFileName[0] = 0;
 	nPartitions = 0;													// Initialize a WORD for the number of partitions
-	// to be used in the convolution algorithm
+	nPlanningRigour = 
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
 
+	// to be used in the convolution algorithm
 
 	// Get the attenuation value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_ATTENUATION), szStr, sizeof(szStr) / sizeof(szStr[0]));
@@ -468,10 +583,14 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 
 #ifdef UNICODE 
 	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-	nPartitions = static_cast<DWORD>(atoi(strTmp)); 
+	nPartitions = static_cast<WORD>(atoi(strTmp)); 
 #else 
-	nPartitions = static_cast<DWORD>(atoi(szStr));
+	nPartitions = static_cast<WORD>(atoi(szStr));
 #endif
+
+	// Get the planning rigour value from the dialog box.
+	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBOPLANNINGRIGOUR), szStr, sizeof(szStr) / sizeof(szStr[0]));
+	nPlanningRigour = pr.flag(szStr);
 
 	// update the registry
 	CRegKey key;
@@ -510,6 +629,17 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 		if (lResult != ERROR_SUCCESS)
 		{
 			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to save number of partitions to registry") );
+		}
+	}
+
+	// Write the planning rigour to the registry.
+	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		lResult = key.SetDWORDValue( kszPrefsPlanningRigour, nPlanningRigour );
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to save tuning rigour to registry") );
 		}
 	}
 }

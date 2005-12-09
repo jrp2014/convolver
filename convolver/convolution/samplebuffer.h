@@ -24,7 +24,7 @@
 // Vector is slow when debugging
 #include <vector>
 #include <malloc.h>
-#include <windows.h>	// for ZeroMemory, CopyMemory, etc
+#include <windows.h>    // for ZeroMemory, CopyMemory, etc
 
 // The following undefs are needed to avoid conflicts
 #undef min
@@ -44,413 +44,717 @@
 #endif
 
 
-// T is normally float
-template <typename T>
-class fastarray
+// User vectors of vecors/arrays, as we need aligned data at the base.
+// Using projections onto a 1d array would not guarantee alignment other than of the first row
+
+// A simple aligned array
+template <class T>
+struct AlignedArray
 {
-protected:
-	class fastarray_impl		// Ensures cleanup after exception
+	typedef T value_type;
+	typedef DWORD size_type;
+
+	// Constructors
+	AlignedArray() :   first_(NULL), size_(0), bsize_(0)  {}
+
+	explicit AlignedArray(const size_type& n) : first_(NULL), size_(0), bsize_(0)
 	{
-	public:
-		explicit fastarray_impl(const int& size=0) :
-		v_(static_cast<T*>(ALIGNED_MALLOC(size * sizeof(T)))),		// 16-byte aligned for SIMD
-			//v_(new T[size]), // operator new ensures zero initialization
-			size_(size), bsize_(size * sizeof(T))
-		{
-			if(!v_)
-			{
-				throw(std::bad_alloc());
+		if (n != 0) {
+			first_ = static_cast<T*>(ALIGNED_MALLOC(n * sizeof(T)));
+			if (first_ == NULL) {
+				throw std::bad_alloc();
 			}
-		};
-
-		~fastarray_impl()
-		{
-			ALIGNED_FREE(v_);
-			//delete [] (v_);
-		};
-
-		void Swap(fastarray_impl& other)
-		{
-			std::swap(v_, other.v_);
-			std::swap(size_, other.size_);
-			std::swap(bsize_, other.bsize_);
+			size_  = n;
+			bsize_ = n * sizeof(T);
 		}
+		else {
+			first_ = NULL;
+			size_ = 0;
+			bsize_ = 0;
+		}   
+	}
 
-		T* v_;
-		int size_;		// size in elements
-		int bsize_;	// size in bytes
+	// Destructor
+	virtual ~AlignedArray()
+	{   
+		ALIGNED_FREE(first_);
+	}
 
-	private:
-		// No copying allowed
-		fastarray_impl(const fastarray_impl&);
-		fastarray_impl(fastarray_impl&);                // discourage use of lvalue fastarray_impls
-	};
+	// Member functions
 
-	fastarray_impl impl_;	// private implementation
-
-public:
-	explicit fastarray(const int& size = 0) : impl_(size) {};
-
-	explicit fastarray(const fastarray<T>& other) : impl_(other.impl_.size_)
+	T* first() const { return this->first_; }
+	size_type size() const { return this->size_; }
+	size_type bsize() const { return this->bsize_; }
+	T* restrict c_ptr(const size_type& n=0) const
 	{
-		assert(impl_.bsize_ == other.impl_.bsize_);
-		::CopyMemory(impl_.v_, other.impl_.v_, other.impl_.bsize_); // memcpy => overlap not allowed
+		assert (n >= 0 && n < size_);
+		return first_ + n;
 	}
 
-	operator T* () const
+	// Helper function for inherited = 
+	void Swap(AlignedArray& x)
 	{
-		return impl_.v_;
+		std::swap(first_, x.first_);
+		std::swap(size_, x.size_);
+		std::swap(bsize_, x.bsize_);
 	}
 
-	const T& operator[](int n) const
-	{ 
-		assert(n < impl_.size_ && n >= 0);
-		return *(impl_.v_ + n);
-	}
+protected:
+	T* restrict first_;
+	size_type size_;        // length in elements
+	size_type bsize_;       // length in bytes
 
-	T& operator[](int n)
-	{ 
-		assert(n < impl_.size_ && n >= 0);
-		return *(impl_.v_+ n);
-	}
+private:
+	// No copying
+	AlignedArray(const AlignedArray<T>&);
+	AlignedArray& operator=(const AlignedArray<T>&);
+};
 
-	fastarray<T>& operator=(const int& value)
+template <class T>
+struct FastArray : public AlignedArray<T>
+{
+	typedef typename AlignedArray<T>::value_type value_type;
+	typedef typename AlignedArray<T>::size_type size_type;
+
+	// Constructors
+	FastArray() : AlignedArray<T>() {}
+	explicit FastArray(const size_type& n) : AlignedArray<T>(n) {}
+	FastArray(const FastArray& other) : AlignedArray<T>(other.size_)
 	{
-		if( value == 0)
+		::CopyMemory(first_, other.first_, other.bsize_); // memcpy => overlap not allowed
+	}
+
+	// Element access
+	value_type  operator[](size_type n)  const
+	{
+		assert(n >= 0 && n < size_);
+		return *(first_ + n);
+	}
+	value_type& restrict operator[](size_type n)
+	{
+		assert(n >= 0 && n < size_);
+		return *(first_ + n);
+	}
+
+	// Basic assignment.  Note that assertions are stricter than necessary, as unequally-size
+	// arrays will be assigned correctly
+	FastArray<T>& operator=(const FastArray<T>& other)
+	{
+		assert(size_ == 0 || size_ == other.size_);
+		if (this != &other)
 		{
-			::ZeroMemory(impl_.v_, impl_.bsize_);
+			FastArray<T> temp(other);
+			Swap(temp);
+		}
+		return *this;
+	}
+
+	// Scalar assignment
+
+	FastArray<T>& operator=(const value_type& x)
+	{
+		if(x == 0)
+		{
+			::ZeroMemory(first_, bsize_);
 		}
 		else
 		{
-			//#pragma omp parallel for
+#pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-			for (int i = 0; i < impl_.size_; ++i)
-				impl_.v_[i] = static_cast<T>(value);				// TODO: optimize int->float
+			for (size_type i = 0; i < size_; ++i)
+				(*this)[i] = static_cast<T>(x);             // TODO: optimize int->float
 		}
 		return *this;
 	}
 
-	fastarray<T>& operator=(const T& value)
+	// Scalar computed assignment.
+	FastArray<T>& operator*= (const value_type& x)
 	{
-		//#pragma omp parallel for
-#pragma ivdep
-#pragma vector aligned
-		for (int i = 0; i < impl_.size_; ++i)
-			impl_.v_[i] = value;
-		return *this;
-	}
-
-	fastarray<T>& operator=(const fastarray<T>& rhs)
-	{
-		if (this != &rhs)
+		if(x != static_cast<T>(1))
 		{
-			if (impl_.bsize_ == rhs.impl_.bsize_)
-			{
-				::CopyMemory(impl_.v_, rhs.impl_.v_, impl_.bsize_); // memcpy => overlap not allowed
-			}
-			else
-			{
-				fastarray<T> temp(rhs);
-				impl_.Swap(temp.impl_);
-			}
+#pragma loop count(65536)
+#pragma ivdep
+#pragma vector aligned
+			for (size_type i = 0; i < size_; ++i)
+				(*this)[i] *= x;
 		}
 		return *this;
 	}
 
-	void shiftleft(const int n)
+	FastArray<T>& operator+= (const value_type& x)
 	{
-		::MoveMemory(&impl_.v_[0], &impl_.v_[n], n * sizeof(T));
-	}
-
-	int size() const
-	{
-		return impl_.size_;
-	}
-
-	fastarray<T>& operator*= (const float& value) // // TODO: optimize this
-	{
-		if (value != static_cast<T>(1.0))
-		{
-			//#pragma omp parallel for
+#pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-			for (int i = 0; i < impl_.size_; ++i)
-				impl_.v_[i] *= value;
-		}
+		for (size_type i = 0; i < size_; ++i)
+			(*this)[i] += x;
 		return *this;
 	}
 
-	fastarray<T>& operator+= (const fastarray<T>& other)	// TODO: optimize this
+	// Member functions
+
+	void shiftleft(const size_type& n)
 	{
-		assert(impl_.size_ == other.impl_.size_);
-#pragma ivdep
-#pragma vector aligned
-		for (int i = 0; i < this->size(); ++i)
-			impl_.v_[i] += other.impl_.v_[i];
-		return *this;
+		::MoveMemory(first_, first_ + n, n * sizeof(T));
 	}
 
-private:
-	fastarray(fastarray<T>&);                // discourage use of lvalue fastarrays
 };
 
-// The following experiment needs a proper copy constuctor to work, as filter needs one
-// It is not exception safe, as fastarray is, as it stands.
+template <typename T> 
+struct FastArray2D : public std::vector< FastArray<T> >
+{ 
+	typedef typename std::vector< FastArray<T> >::value_type value_type;
+	typedef typename std::vector< FastArray<T> >::size_type size_type;
+
+	// Constructors
+	FastArray2D() : std::vector< FastArray<T> >() {}
+	explicit FastArray2D(const size_type& n) : std::vector< FastArray<T> >(n) {}
+	FastArray2D(const FastArray2D& other) : std::vector< FastArray<T> >(other) {}
+	FastArray2D(const size_type& n, const FastArray<T>& x) : std::vector< FastArray<T> >(n, x) {}
+
+	// Assignment
+	FastArray2D<T>& operator=(const T& x)
+	{
+		for(size_type i=0; i < this->size(); ++i)
+		{
+			(*this)[i] = x;
+		}
+		return *this;
+	}
+
+	T* restrict c_ptr(const size_type& row=0, const size_type& column=0) const
+	{
+		assert (row < this->size() && (column < (*this)[row].size()));
+		return (*this)[row].c_ptr(column);
+	}
+}; 
+
+template <typename T> 
+struct FastArray3D : public std::vector< FastArray2D<T> >
+{ 
+	typedef typename std::vector< FastArray2D<T> >::value_type value_type;
+	typedef typename std::vector< FastArray2D<T> >::size_type size_type;
+
+	// Constructors
+	FastArray3D() : std::vector< FastArray2D<T> >() {}
+	explicit FastArray3D(const size_type& n) : std::vector< FastArray2D<T> >(n) {}
+	FastArray3D(const FastArray3D& other) : std::vector< FastArray2D<T> >(other) {}
+	FastArray3D(const size_type& n, const FastArray2D<T>& x) : std::vector< FastArray2D<T> >(n, x) {}
+
+	T* restrict c_ptr(const size_type& row=0, const size_type& column=0, const size_type& plane=0) const
+	{
+		assert (row < this->size() && (column < (*this)[row].size() && plane < (*this)[row][column].size()));
+		//return &(*this)[row][column][plane];
+		return (*this)[row][column].c_ptr(plane);
+	}
+
+	FastArray3D<T>& operator=(const T& x)
+	{
+		for(size_type i=0; i < this->size(); ++i)
+		{
+			(*this)[i] = x;
+		}
+		return *this;
+	}
+
+	//FastArray3D<T>& operator=(const int& x)
+	//{
+	//	*this = static_cast<T>(x);
+	//	return *this;
+	//}
+
+}; 
+
+
+
+typedef FastArray<float> ChannelBuffer;
+typedef FastArray2D<float> SampleBuffer;
+typedef FastArray3D<float> PartitionedBuffer;
+
+//#ifdef UNDEF
 //// T is normally float
 //template <typename T>
-//class fastarray2 : protected fastarray<fastarray<T>*>
+//class fastarray
 //{
-//private:
-//	T* v_;
-//	int sizex_, sizey_;
-//	bool allocated_here_;
+//protected:
+//  class fastarray_impl        // Ensures cleanup after exception
+//  {
+//  public:
+//      explicit fastarray_impl(const int& size=0) :
+//      v_(static_cast<T*>(ALIGNED_MALLOC(size * sizeof(T)))),      // 16-byte aligned for SIMD
+//          //v_(new T[size]), // operator new ensures zero initialization
+//          size_(size), bsize_(size * sizeof(T))
+//      {
+//          if(!v_)
+//          {
+//              throw(std::bad_alloc());
+//          }
+//      };
+//
+//      ~fastarray_impl()
+//      {
+//          ALIGNED_FREE(v_);
+//          //delete [] (v_);
+//      };
+//
+//      void Swap(fastarray_impl& other)
+//      {
+//          std::swap(v_, other.v_);
+//          std::swap(size_, other.size_);
+//          std::swap(bsize_, other.bsize_);
+//      }
+//
+//      T* v_;
+//      int size_;      // size in elements
+//      int bsize_; // size in bytes
+//
+//  private:
+//      // No copying allowed
+//      fastarray_impl(const fastarray_impl&);
+//      fastarray_impl(fastarray_impl&);                // discourage use of lvalue fastarray_impls
+//  };
+//
+//  fastarray_impl impl_;   // private implementation
 //
 //public:
+//  explicit fastarray(const int& size = 0) : impl_(size) {};
 //
-//	explicit fastarray2(const int& sizex=0, const int& sizey=0, T* values=NULL) : 
-//	fastarray<fastarray<T>*>(sizex), 
-//		v_(values ? values : new T[sizex * sizey]), allocated_here_(values == NULL), 
-//		sizex_(sizex), sizey_(sizey)
+//  explicit fastarray(const fastarray<T>& other) : impl_(other.impl_.size_)
+//  {
+//      assert(impl_.bsize_ == other.impl_.bsize_);
+//      ::CopyMemory(impl_.v_, other.impl_.v_, other.impl_.bsize_); // memcpy => overlap not allowed
+//  }
 //
-//	{
-//		assert(sizex >= 0 &&  sizey >=0);
+//  operator T* () const
+//  {
+//      return impl_.v_;
+//  }
 //
-//		cdebug << ">fastarray2 " << sizex_ << " " << sizey_ << " " << allocated_here_ << std::endl;
+//  const T& operator[](int n) const
+//  { 
+//      assert(n < impl_.size_ && n >= 0);
+//      return *(impl_.v_ + n);
+//  }
 //
-//		T* ptr = v_;
-//		for(int i = 0; i<sizex; ++i, ptr += sizey)
-//		{
-//			fastarray<fastarray<T>*>::operator[](i) = new fastarray<T>(sizey, ptr);
-//		}
+//  T& operator[](int n)
+//  { 
+//      assert(n < impl_.size_ && n >= 0);
+//      return *(impl_.v_+ n);
+//  }
 //
-//		cdebug << "<fastarray2 " << sizex_ << " " << sizey_ << " " << allocated_here_ << std::endl;
+//  fastarray<T>& operator=(const int& value)
+//  {
+//      if( value == 0)
+//      {
+//          ::ZeroMemory(impl_.v_, impl_.bsize_);
+//      }
+//      else
+//      {
+//          //#pragma omp parallel for
+//#pragma ivdep
+//#pragma vector aligned
+//          for (int i = 0; i < impl_.size_; ++i)
+//              impl_.v_[i] = static_cast<T>(value);                // TODO: optimize int->float
+//      }
+//      return *this;
+//  }
 //
-//	}
+//  fastarray<T>& operator=(const T& value)
+//  {
+//      //#pragma omp parallel for
+//#pragma ivdep
+//#pragma vector aligned
+//      for (int i = 0; i < impl_.size_; ++i)
+//          impl_.v_[i] = value;
+//      return *this;
+//  }
 //
-//	virtual ~fastarray2()
-//	{
-//		cdebug << ">~fastarray2 " << sizex_ << " " << sizey_ << " " << allocated_here_ << std::endl;
+//  fastarray<T>& operator=(const fastarray<T>& rhs)
+//  {
+//      if (this != &rhs)
+//      {
+//          if (impl_.bsize_ == rhs.impl_.bsize_)
+//          {
+//              ::CopyMemory(impl_.v_, rhs.impl_.v_, impl_.bsize_); // memcpy => overlap not allowed
+//          }
+//          else
+//          {
+//              fastarray<T> temp(rhs);
+//              impl_.Swap(temp.impl_);
+//          }
+//      }
+//      return *this;
+//  }
 //
-//		for(int i = 0; i<sizex_; ++i)
-//		{
-//			delete fastarray<fastarray<T>*>::operator[](i);
-//		}
+//  void shiftleft(const int n)
+//  {
+//      ::MoveMemory(&impl_.v_[0], &impl_.v_[n], n * sizeof(T));
+//  }
 //
-//		if(allocated_here_)
-//			delete[] v_;
+//  int size() const
+//  {
+//      return impl_.size_;
+//  }
 //
-//		cdebug << "<~fastarray2 " << sizex_ << " " << sizey_ << " " << allocated_here_ << std::endl;
-//	}
+//  fastarray<T>& operator*= (const float& value) // // TODO: optimize this
+//  {
+//      if (value != static_cast<T>(1.0))
+//      {
+//          //#pragma omp parallel for
+//#pragma ivdep
+//#pragma vector aligned
+//          for (int i = 0; i < impl_.size_; ++i)
+//              impl_.v_[i] *= value;
+//      }
+//      return *this;
+//  }
 //
-//	const fastarray<T>& operator[](const int& n) const
-//	{
-//		assert (n >=0 && n <= sizex_);
-//		return *(fastarray<fastarray<T>*>::operator[](n));
-//	}
+//  fastarray<T>& operator+= (const fastarray<T>& other)    // TODO: optimize this
+//  {
+//      assert(impl_.size_ == other.impl_.size_);
+//#pragma ivdep
+//#pragma vector aligned
+//      for (int i = 0; i < this->size(); ++i)
+//          impl_.v_[i] += other.impl_.v_[i];
+//      return *this;
+//  }
 //
-//	fastarray<T>& operator[](const int& n)
-//	{
-//		assert (n >=0 && n <= sizex_);
-//		return *(fastarray<fastarray<T>*>::operator[](n));
-//	}
-//
-//	int size() const
-//	{
-//		return sizex_;
-//	}
-//	private:
-//		// No copying allowed
-//		fastarray2(const fastarray2&);
-//		void operator=(const fastarray2&);
-//		fastarray2(fastarray2&);                // discourage use of lvalue fastarray3
-//};
-//
-//// T is normally float
-//template <typename T>
-//class fastarray3 :protected fastarray<fastarray2<T>*>
-//{
 //private:
-//	T* v_;
-//	int sizex_, sizey_, sizez_;
-//
-//public:
-//
-//	explicit fastarray3(const int& sizex=0, const int& sizey=0, const int& sizez=0) : 
-//	fastarray<fastarray2<T>*>(sizex), sizex_(sizex), sizey_(sizey), sizez_(sizez)
-//	{
-//		assert(sizex >= 0 &&  sizey >=0 && sizez >= 0);
-//
-//		cdebug << ">fastarray3 " << sizex_ << " " << sizey_ << " " << sizez_ << std::endl;
-//
-//		v_ = new T[sizex * sizey * sizez];
-//
-//		T* ptr = v_;
-//		for(int i = 0; i<sizex; ++i, ptr += sizey * sizez)
-//		{
-//			fastarray<fastarray2<T>*>::operator[](i) = new fastarray2<T>(sizey, sizez, ptr);
-//		}
-//
-//		cdebug << "<fastarray3 " << sizex_ << " " << sizey_ << " " << sizez_ << std::endl;
-//	}
-//
-//	virtual ~fastarray3()
-//	{
-//
-//		cdebug << ">~fastarray3 " << sizex_ << " " << sizey_ << " " << sizez_ << std::endl;
-//
-//		for(int i = 0; i<sizex_; ++i)
-//		{
-//			delete fastarray<fastarray2<T>*>::operator[](i);
-//		}
-//
-//		delete[] v_;
-//
-//		cdebug << "<~fastarray3 " << sizex_ << " " << sizey_ << " " << sizez_ << std::endl;
-//	}
-//
-//	const fastarray2<T>& operator[](const int& n) const
-//	{
-//		assert (n >=0 && n <= sizex_);
-//		return *(fastarray<fastarray2<T>*>::operator[](n));
-//	}
-//
-//	fastarray2<T>& operator[](const int& n)
-//	{
-//		assert (n >=0 && n <= sizex_);
-//		return *(fastarray<fastarray2<T>*>::operator[](n));
-//	}
-//
-//	int size() const
-//	{
-//		return sizex_;
-//	}
-//	private:
-//		// No copying allowed
-//		fastarray3(const fastarray3&);
-//		void operator=(const fastarray3&);
-//		fastarray3(fastarray3&);                // discourage use of lvalue fastarray3
+//  fastarray(fastarray<T>&);                // discourage use of lvalue fastarrays
 //};
-
-
-
-typedef	fastarray<float> ChannelBuffer;
-#ifdef UNDEF
-typedef	__declspec(align(16)) fastarray2<float> SampleBuffer;
-typedef	__declspec(align(16)) fastarray3<float> PartitionedBuffer;
-#else
-typedef	std::vector< ChannelBuffer >  SampleBuffer;
-typedef	std::vector< SampleBuffer >  PartitionedBuffer;
-#endif
-
-
-#else
-
-template<T>
-class Matrix
-
-public:
-	Matrix(unsigned rows, unsigned cols)
-		: rows_ (rows)
-		, cols_ (cols)
-		//data_ <--initialized below (after the 'if/throw' statement)
-	{
-		if (rows == 0 || cols == 0)
-			throw BadIndex("Matrix constructor has 0 size");
-		data_ = new double[rows * cols];
-	}
-
-	T& operator() (unsigned row, unsigned col)
-	{
-		if (row >= rows_ || col >= cols_)
-			throw BadIndex("Matrix subscript out of bounds");
-		return data_[cols_*row + col];
-	}
-
-	T operator() (unsigned row, unsigned col) const
-	{
-		if (row >= rows_ || col >= cols_)
-			throw BadIndex("const Matrix subscript out of bounds");
-		return data_[cols_*row + col];
-	} 
-
-	Row operator[](unsigned row)
-	{
-		assert(row >= 0 && row < rows_);
-		return Row(*this, row);
-	}
-
-	const ConstRow operator[](unsigned row)
-	{
-		assert(row >= 0 && row < rows_);
-		return ConstRow(*this, row);
-	}
-
-	~Matrix()
-	{
-		delete[] data_;
-	}
-
-	Matrix(const Matrix& m);               // Copy constructor
-	Matrix& operator= (const Matrix& m);   // Assignment operator
-
-
-	class Row
-	{
-	public:
-		Row(Matrix& matrix, unsigned row) : matrix_(matrix), row_(row) {}
-
-		Row operator[](unsigned col)
-		{ 
-			return matrix_(row_, col);
-		} 
-
-	private:
-		Matrix matrix_;
-		unsigned row_;
-	}
-
-	class ConstRow
-	{
-	public:
-		ConstRow(const Matrix& matrix, unsigned row) : matrix_(matrix), row_(row) {}
-
-		const ConstRow operator[](unsigned col)
-		{ 
-			return matrix_(row_, col);
-		} 
-
-	private:
-		const Matrix matrix_;
-		const unsigned row_;
-	}
-
-
-private:
-	unsigned rows_, cols_;
-	T* data_;
-};
-
-
-
-
-
-// None of these are suitable
-//#include "./Array.h"
 //
-//typedef Array::array1<float>::opt restrict ChannelBuffer;
-//typedef Array::array2<float> restrict SampleBuffer;
-//typedef Array::array3<float> restrict PartitionedBuffer;
-
-//#include "stlsoft_fixed_array.h"
-//typedef stlsoft::fixed_array_1d<float> restrict ChannelBuffer;
-//typedef stlsoft::fixed_array_2d<float> restrict SampleBuffer;
-//typedef stlsoft::fixed_array_3d<float> restrict PartitionedBuffer;
-
+//typedef   fastarray<float> ChannelBuffer;
+//#ifdef UNDEF
+//typedef   __declspec(align(16)) fastarray2<float> SampleBuffer;
+//typedef   __declspec(align(16)) fastarray3<float> PartitionedBuffer;
+//#else
+//typedef   std::vector< ChannelBuffer >  SampleBuffer;
+//typedef   std::vector< SampleBuffer >  PartitionedBuffer;
+//#endif
+//
+//
+//#else
+//
+////#include <iterator>
+////
+////template <class T>
+////class stride_iter
+////{
+////public:
+////    typedef typename std::iterator_traits<T>::value_type value_type;
+////    typedef typename std::iterator_traits<T>::reference reference;
+////    typedef typename std::iterator_traits<T>::difference_type difference_type;
+////    typedef typename std::iterator_traits<T>::pointer pointer;
+////    typedef std::random_access_iterator_tag iterator_category;
+////    typedef stride_iter self;
+////
+////    // constructors
+////    stride_iter(): m(NULL), step(0) {};
+////    stride_iter(const self& x) : m(x.m), step(x.step);
+////    stride_iter(T x, difference_type n) : m(x), step(n) {}
+////
+////    // operators
+////    self& operator++() {m += step; return *this;}
+////    self operator++(int) {self tmp = *this; m += step; return tmp;}
+////    self& operator+=(difference_type x) {m += x * step; return *this;}
+////    self& operator--() {m -= step; return *this;}
+////    self& operator--(int) {self tmp = *this; m -= step; return tmp;}
+////    self& operator-=(difference_type x) {m -= x * step; return *this;}
+////    reference operator[](difference_type n) {return [n * step];}
+////    reference operator*() {return *m;}
+////
+////    // friend operators
+////    friend bool operator==(const self& x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return x.m == y.m;
+////    }
+////    friend bool operator!=(const self& x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return x.m != y.m;
+////    }
+////    friend bool operator<(const self& x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return x.m < y.m;
+////    }
+////    friend difference_type operator-(const self& x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return (x.m - y.m) / x.step;
+////    }
+////    friend difference_type operator+(const self& x, difference_type y)
+////    {
+////        assert(x.step == y.step);
+////        return x += y * x.step;
+////    }
+////    friend difference_type operator+(difference_type x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return y += x * x.step;
+////    }
+////private:
+////    T m;
+////    difference_type step;
+////};
+//
+////#include <iterator> 
+////
+////template<class Iter_T> 
+////class stride_iter 
+////{ 
+////public: 
+////    // public typedefs 
+////    typedef typename std::iterator_traits<Iter_T>::value_type value_type; 
+////    typedef typename std::iterator_traits<Iter_T>::reference reference; 
+////    typedef typename std::iterator_traits<Iter_T>::difference_type difference_type; 
+////    typedef typename std::iterator_traits<Iter_T>::pointer pointer; 
+////    typedef std::random_access_iterator_tag iterator_category; 
+////    typedef stride_iter self; 
+////
+////
+////    // constructors 
+////    stride_iter() : m(null), step(0) { }; 
+////    explicit stride_iter(Iter_T x, difference_type n) : m(x), step(n) { } 
+////
+////
+////    // operators 
+////    self& operator++() { m += step; return *this; } 
+////    self operator++(int) { self tmp = *this; m += step; return tmp; } 
+////    self& operator+=(difference_type x) { m += x * step; return *this; } 
+////    self& operator--() { m -= step; return *this; } 
+////    self operator--(int) { self tmp = *this; m -= step; return tmp; } 
+////    self& operator-=(difference_type x) { m -= x * step; return *this; } 
+////    reference operator[](difference_type n) { return m[n * step]; } 
+////    reference operator*() { return *m; } 
+////
+////
+////    // friend operators 
+////    friend bool operator==(const self& x, const self& y)
+////    { 
+////        assert(x.step == y.step);
+////        return x.m == y.m;
+////    } 
+////    friend bool operator!=(const self& x, const self& y)
+////    { 
+////        assert(x.step == y.step);
+////        return x.m != y.m;
+////    } 
+////    friend bool operator<(const self& x, const self& y) 
+////    { 
+////        assert(x.step == y.step);
+////        return x.m < y.m;
+////    } 
+////    friend difference_type operator-(const self&x, const self& y)
+////    {
+////        assert(x.step == y.step);
+////        return (x.m - y.m) / x.step;
+////    } 
+////    friend self operator+(const self&x, difference_type y)
+////    { 
+////        assert(x.step == y.step);
+////        return x += y * x.step;
+////    } 
+////    friend self operator+(difference_type x, const self& y)
+////    { 
+////        assert(x.step == y.step);
+////        return y += x * x.step;
+////    } 
+////private: 
+////    Iter_T m; 
+////    difference_type step; 
+////}; 
+////
+////template<class Iter_T, int Step_N> 
+////class kstride_iter 
+////{ 
+////public: 
+////    // public typedefs 
+////    typedef typename std::iterator_traits<Iter_T>::value_type value_type; 
+////    typedef typename std::iterator_traits<Iter_T>::reference reference; 
+////    typedef typename std::iterator_traits<Iter_T>::difference_type difference_type; 
+////    typedef typename std::iterator_traits<Iter_T>::pointer pointer; 
+////    typedef std::random_access_iterator_tag iterator_category; 
+////    typedef kstride_iter self; 
+////
+////    // constructors 
+////    kstride_iter() : m(NULL) { } 
+////    kstride_iter(const self& x) : m(x.m) { }
+////    explicit kstride_iter(Iter_T x) : m(x) { } 
+////
+////    // operators 
+////    self& operator++() { m += Step_N; return *this; } 
+////    self operator++(int) { self tmp = *this; m += Step_N; return tmp; } 
+////    self& operator+=(difference_type x) { m += x * Step_N; return *this; } 
+////    self& operator--() { m -= Step_N; return *this; } 
+////    self operator--(int) { self tmp = *this; m -= Step_N; return tmp; } 
+////    self& operator-=(difference_type x) { m -= x * Step_N; return *this; } 
+////    reference operator[](difference_type n) { return m[n * Step_N]; } 
+////    reference operator*() { return *m; } 
+////
+////    // friend operators 
+////    friend bool operator==(self& x, self& y)
+////    { return x.m == y.m; } 
+////    friend bool operator!=(self& x, self& y)
+////    { return x.m != y.m; } 
+////    friend bool operator<(self& x, self& y)
+////    { return x.m < y.m; } 
+////    friend difference_type operator-(self&x, self& y)
+////    { return (x.m - y.m) / Step_N; } 
+////    friend self operator+(self& x, difference_type y)
+////    { return x += y * Step_N; } 
+////    friend self operator+(difference_type x, self& y)
+////    { return y += x * Step_N; } 
+////private: 
+////    Iter_T m; 
+////}; 
+////
+////#include <valarray>
+////#include <numeric>
+////#include <algorithm>
+////
+////template <class Value_T>
+////class matrix
+////{
+////public:
+////    // public typedefs
+////    typedef Value_T value_type;
+////    typedef matrix self;
+////    typedef value_type* iterator;
+////    typedef const value_type* const_iterator;
+////    typedef Value_T* row_type;
+////    typedef stride_iter<value_type*> col_type;
+////    typedef const value_type* const_row_type;
+////    typedef stride_iter<const value_type*> const_col_type;
+////
+////    // constructors
+////    matrix() : nrows(0), ncols(0), m(0) {}
+////    matrix( int r, int c ) : nrows(r), ncols(c), m(r*c) {}
+////    matrix(const self& x) : m(x.m), nrows(x.nrows), ncols(x.ncols) {}
+////
+////    template<typename T>
+////    explicit matrix(const std::valarray<T>& x) : m(x.size() + 1), nrows(x.size()), ncols(1)
+////    {
+////        for(int i=0; i < nrows; ++i)
+////            m[i] = x[i];
+////    }
+////
+////    // allow construction from matrixes of other types
+////    template<typename T>
+////        explicit matrix(const matrix<T>& x) : m(x.size() + 1), nrows(x.nrows), ncols(x.ncols)
+////    {
+////        copy(x.begin(), x.end(), m.begin());
+////    }
+////
+////    //public functions
+////    int rows() const { return nrows; }
+////    int cols() const { return ncols; }
+////    int size() const { return nrows * ncols; }
+////
+////    // element access
+////    row_type row_begin(int n) { return &m[n * ncols]; }
+////    row_type row_end(int n) { return row_begin() + ncols; }
+////    col_type col_begin(int n) { return col_type(&m[n], ncols); }
+////    col_type col_end(int n) { return col_begin(n) + ncols; } // TODO:: + nrows?
+////    const_row_type row_begin(int n) const { return &m[n * ncols]; }
+////    const_row_type row_end(int n) const { return row_begin() + ncols; }
+////    const_col_type col_begin(int n) const { return col_type(&m[n], ncols); }
+////    const_col_type col_end(int n) const { return col_begin(n) + ncols; } // TODO:: + nrows?
+////    iterator begin() { return &m[0]; }
+////    iterator end() { return &m[0] + nrows * ncols; }
+////    const_iterator begin() const { return &m[0]; }
+////    const_iterator end() const { return &m[0] + nrows * ncols; }
+////
+////    // operators
+////    self& operator=(const self& x)
+////    {
+////        m = x.m;
+////        nrows = x.nrows;
+////        ncols = x.ncols;
+////        return * this;
+////    }
+////    self& operator=(value_type x)
+////    {
+////        m = x;
+////        return *this;
+////    }
+////    
+////    //row_type operator[](int n) { return row_begin(n); }
+////    //const_row_type operator[](const int n) const { return row_begin(n); }
+////    std::valarray<Value_T> operator[](int n)
+////    {
+////        assert(n >= 0 && n < nrows);
+////        return std::valarray<Value_T>(&m[n * ncols], nrows);
+////    }
+////    const std::valarray<Value_T> operator[](int n) const
+////    {
+////        assert(n >= 0 && n < nrows);
+////        return std::valarray<Value_T>(&m[n * ncols], nrows);
+////    }
+////    self& operator+=(const self& x) { m+=x.m; return *this }
+////    self& operator-=(const self& x) { m-=x.m; return *this }
+////    self& operator+=(value_type x) { m+=x.m; return *this }
+////    self& operator-=(value_type x) { m-=x.m; return *this }
+////    self& operator*=(value_type x) { m*=x.m; return *this }
+////    self& operator/=(value_type x) { m/=x.m; return *this }
+////    self& operator%=(value_type x) { m%=x.m; return *this }
+////    self& operator-() { return -m; }
+////    self& operator+() { return +m; }
+////    self& operator!() { return !m; }
+////    self& operator~() { return ~m; }
+////
+////    // friend operators
+////    friend self operator+(const self& x, const self& y) { return self(x) += y; }
+////    friend self operator-(const self& x, const self& y) { return self(x) -= y; }
+////    friend self operator+(const self& x, value_type y) { return self(x) += y; }
+////    friend self operator-(const self& x, value_type y) { return self(x) -= y; }
+////    friend self operator*(const self& x, value_type y) { return self(x) *= y; }
+////    friend self operator/(const self& x, value_type y) { return self(x) /= y; }
+////    friend self operator%(const self& x, value_type y) { return self(x) %= y; }
+////
+////private:
+////    mutable std::valarray<Value_T> m;
+////    int nrows;
+////    int ncols;
+////};
+//
+//
+//// None of these are suitable
+////#include "./Array.h"
+////
+////typedef Array::array1<float>::opt restrict ChannelBuffer;
+////typedef Array::array2<float> restrict SampleBuffer;
+////typedef Array::array3<float> restrict PartitionedBuffer;
+//
+////typedef std::valarray<float> ChannelBuffer;
+////typedef matrix<float> SampleBuffer;
+////typedef std::vector<SampleBuffer> PartitionedBuffer;
+////
+////#include <xdebug>
+////#include <blitz/array.h>
+////typedef blitz::Array<float,1> ChannelBuffer;
+////typedef blitz::Array<float,2> SampleBuffer;
+////typedef blitz::Array<float,3> PartitionedBuffer;
+////#include <boost\multi_array.hpp>
+////using boost;
+////typedef boost::multi_array<float,1> ChannelBuffer;
+////typedef boost::multi_array<float,2> SampleBuffer;
+////typedef boost::multi_array<float,3> PartitionedBuffer;
+//
+////#include <APTL\Data\Array.h>
+////typedef APTL::Array<float> ChannelBuffer;
+////typedef APTL::Array2D<float> SampleBuffer;
+////typedef APTL::Array3D<float> PartitionedBuffer;
+//
+//#endif
+//
 #endif
+
 
 #if defined(DEBUG) | defined(_DEBUG)
-void DumpChannelBuffer(const ChannelBuffer& buffer );
 void DumpSampleBuffer(const SampleBuffer& buffer);
+void DumpChannelBuffer(const ChannelBuffer& buffer);
 void DumpPartitionedBuffer(const PartitionedBuffer& buffer);
 #endif

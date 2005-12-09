@@ -1,19 +1,25 @@
 48000 6 6 0
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 5.16667
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 4.16667
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 3.16667
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 2.16667
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 1.16667
 D:\Projects\convolver\convolver\Media\PerfectDiracDelta-48000-1-65535.wav
+0
 0.16667 1.16667 2.16667 3.16667 4.16667 5.16667
 0.16667

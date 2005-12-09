@@ -19,7 +19,7 @@
 				WholeProgramOptimization="0"/>
 			<Tool 
 				Name="DebugTool"
-				CommandArguments="4 2 d:\projects\convolver\convolver\configs\test.txt"/>
+				CommandArguments="4 2 d:\projects\convolver\convolver\configs\ex2.txt"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
@@ -28,7 +28,7 @@
 				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
-				AdditionalIncludeDirectories=".."
+				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1;D:\Projects\blitz-0.9"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
@@ -106,7 +106,7 @@
 				EnableFiberSafeOptimizations="1"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="1"
-				AdditionalIncludeDirectories=".."
+				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW3_IMPORTS"
 				StringPooling="1"
 				ExceptionHandling="1"
@@ -118,7 +118,7 @@
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
+				WarningLevel="4"
 				SuppressStartupBanner="0"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
@@ -244,6 +244,12 @@
 		<File 
 			RelativePath="..\convolution\exception.h"/>
 		<File 
+			RelativePath="..\convolution\fastarray.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
 			RelativePath="..\convolution\filter.cpp"/>
 		<File 
 			RelativePath="..\convolution\filter.h"/>
@@ -265,10 +271,6 @@
 			RelativePath="..\convolution\waveformat.cpp"/>
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.cpp"/>
 		<File 
 			RelativePath="..\fft\fftsg.cpp"/>
 		<File 

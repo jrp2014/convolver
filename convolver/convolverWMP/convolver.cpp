@@ -40,13 +40,14 @@
 /////////////////////////////////////////////////////////////////////////////
 
 CConvolver::CConvolver() :
-m_fAttenuation_db(0.0), // default attenuation
+m_fAttenuation_db(0), // default attenuation
 m_cbInputLength(0),
 m_pbInputData (NULL),
 m_bValidTime(false),
 m_rtTimestamp(0),
 m_bEnabled(TRUE),
 m_nPartitions(0), // default, just overlap-save
+m_nPlanningRigour(0),
 m_Convolution(NULL),
 m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
@@ -139,7 +140,6 @@ HRESULT CConvolver::FinalConstruct()
 
 		// Read the filter filename value.
 		lResult = key.QueryStringValue(kszPrefsFilterFileName, szValue, &ulMaxPath );
-
 		if (ERROR_SUCCESS == lResult)
 		{
 			_tcsncpy(m_szFilterFileName, szValue, ulMaxPath);
@@ -153,9 +153,17 @@ HRESULT CConvolver::FinalConstruct()
 			m_nPartitions = dwValue;
 		}
 
+		// Read the number of partitions that the convolution routine should use
+		lResult = key.QueryDWORDValue(kszPrefsPlanningRigour, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			// Convert the DWORD to a WORD.
+			m_nPlanningRigour = dwValue;
+		}
+
 		try // creating m_Convolution might throw
 		{
-			m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions)); // 0 partitions = overlap-save
+			m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 		}
 		catch (...) 
 		{
@@ -1402,14 +1410,15 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
 		// May throw
-		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions)); // 0 partitions = overlap-save
+		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  
+			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 	}
 
 	return S_OK;
 }
 
-// Property get to retrieve the wet mix value by using the public interface.
-STDMETHODIMP CConvolver::get_partitions(DWORD *pVal)
+// Property get to retrieve the number of partitions by using the public interface.
+STDMETHODIMP CConvolver::get_partitions(WORD *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_partitions" << std::endl;);
@@ -1426,7 +1435,7 @@ STDMETHODIMP CConvolver::get_partitions(DWORD *pVal)
 }
 
 // Property put to store the number of partitions by using the public interface.
-STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
+STDMETHODIMP CConvolver::put_partitions(WORD newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_partitions" << std::endl;);
@@ -1437,7 +1446,45 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 		m_nPartitions = newVal;
 
 		// May throw
-		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions)); // 0 partitions = overlap-save
+		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,
+			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+	}
+
+	return S_OK;
+}
+
+
+// Property get to retrieve the planning rigour by using the public interface.
+STDMETHODIMP CConvolver::get_planning_rigour(unsigned int *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_planning_rigour" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nPlanningRigour;
+
+	return S_OK;
+}
+
+// Property put to store the number of planning rigour by using the public interface.
+STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_planning_rigour" << std::endl;);
+#endif
+
+	if(m_nPlanningRigour != newVal)
+	{
+		m_nPlanningRigour = newVal;
+
+		// May throw
+		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,
+			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 	}
 
 	return S_OK;

@@ -20,7 +20,8 @@
 
 #include "convolution\channelpaths.h"
 
-ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions) :
+ChannelPaths::ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour) :
+config(szConfigFileName),
 nInputChannels(0),
 nOutputChannels(0),
 nSamplesPerSec(0),
@@ -35,123 +36,123 @@ nFilterLength(0)
 #endif
 {
 	USES_CONVERSION;
+
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "ChannelPaths::ChannelPaths " << T2A(szConfigFileName) << " " << nPartitions << " " << std::endl;);
 #endif
 
 	if(0 == *szConfigFileName)
 	{
-		throw configException("No config file specified");
+		throw configException("No config() file specified");
 	}
 
-	std::ifstream config;
 	bool got_path_spec = false;
 
 	try
 	{
-		config.open(T2A(szConfigFileName));
-		if (config == NULL)
-		{
-			throw configException("Failed to open config file");
-		}
-
-		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
-
-		config >> nSamplesPerSec;
+		config() >> nSamplesPerSec;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nSamplesPerSec << " sample rate" << std::endl;
 #endif
 
-		config >> nInputChannels;
+		config() >> nInputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nInputChannels << " input channels" << std::endl;
 #endif
 
-		config >> nOutputChannels;
+		config() >> nOutputChannels;
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << nOutputChannels << " output channels" << std::endl;
 #endif
-		config.unsetf(std::ios_base::dec);
-		config.setf(std::ios_base::hex);
-		config >> dwChannelMask;		// Read in hex
-		config.unsetf(std::ios_base::hex);
-		config.setf(std::ios_base::dec);
+		config().unsetf(std::ios_base::dec);
+		config().setf(std::ios_base::hex);
+		config() >> dwChannelMask;		// Read in hex
+		config().unsetf(std::ios_base::hex);
+		config().setf(std::ios_base::dec);
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << std::hex << dwChannelMask << std::dec << " channel mask" << std::endl;
 #endif
 
-		config.get();  // consume newline
+		config().get();  // consume newline
 
 		char szFilterFilename[MAX_PATH];
-		while(!config.eof())
+		while(!config().eof())
 		{
-			config.getline(szFilterFilename, MAX_PATH);
+			config().getline(szFilterFilename, MAX_PATH);
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Reading specification for " << szFilterFilename << std::endl;
 #endif
-
 			got_path_spec = false;
 
-			std::vector<ChannelPath::ScaledChannel> inChannel;
-			while(true)
+			WORD nFilterChannel=0;			// The channel to select from the filter file.
+			config() >> nFilterChannel;
+
+			int nextchar = config().get();
+			if (nextchar != '\n')
 			{
-				// Require at least one input channel
-				float scale;
-				config >> scale;
+				throw configException("Missing filter channel specification?");
+			}
 
-				if(scale < 0)
-					throw configException("Negative input channel number");
+			std::vector<ChannelPath::ScaledChannel> inChannel;
+			while(true) // Require at least one input channel
+			{
+				float scale=0; // The scaling factor to be applied
+				config() >> scale;
 
-				// The integer part designates the input channel
-				int channel = floor(scale);   
+				float fchannel=0;
+				// The modff function breaks down the floating-point value scale into fractional and integer parts,
+				// each of which has the same sign as scale.
+				// The signed fractional portion of scale is returned
+				// The integer portion is stored as a floating-point value at fchannel
+				scale = modff(scale, &fchannel);
+				const WORD channel = static_cast<WORD>(abs((fchannel)));
 
 				if(channel > nInputChannels - 1)
 					throw configException("Input channel number greater than the specified number of input channels");
 
-				// The fractional part is the scaling factor to be applied
-				scale -= channel;
-
 				// 0 implies no scaling to be applied (ie, scale = 1)
 				if(scale == 0)
-					scale = 1.0f;
+					scale = fchannel < 0 ? -1.0f : 1.0f;
 
 				inChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-				int nextchar = config.get();
-				if (nextchar == '\n' || nextchar == EOF)
+				int nextchar = config().get();
+				if (nextchar == '\n')
 					break;
+				else
+				{
+					if (nextchar == EOF)
+						throw configException("Missing output channels specification");
+				}
 			}
 
 			// Get the output channels for this filter
 			std::vector<ChannelPath::ScaledChannel> outChannel;
 			while(true)
 			{
-				float scale;
-				config >> scale;
+				float scale=0; // The scaling factor to be applied
+				config() >> scale;
 
-				if(scale < 0)
-					throw configException("Negative output channel number");
-
-				// The integer part designates the output channel
-				int channel = floor(scale);
+				float fchannel=0;
+				scale = modff(scale, &fchannel);
+				const WORD channel = static_cast<WORD>(abs(fchannel));
 
 				if(channel > nOutputChannels - 1)
 					throw configException("Output channel number greater than the specified number of output channels");
 
-				// The fractional part is the scaling factor to be applied
-				scale -= channel;
 				// 0 implies no scaling to be applied (ie, scale = 1)
 				if(scale == 0)
-					scale = 1.0f;
+					scale = fchannel < 0 ? -1.0f : 1.0f;
 
 				outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-				int nextchar = config.get();
+				int nextchar = config().get();
 				if (nextchar == '\n' || nextchar == EOF)
 					break;
 			}
 
-			Paths.push_back(ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel, nSamplesPerSec));
+			Paths.push_back(new ChannelPath(A2T(szFilterFilename), nPartitions, inChannel, outChannel, nFilterChannel, 
+				nSamplesPerSec, nPlanningRigour));
 			++nPaths;
 
 			got_path_spec = true;
@@ -159,9 +160,8 @@ nFilterLength(0)
 	}
 	catch(const std::ios_base::failure& error)
 	{
-		if(config.eof())
+		if(config().eof())
 		{
-
 			if(!got_path_spec)
 			{
 				throw configException("Premature end of configuration file.  Missing final blank line?");
@@ -183,13 +183,8 @@ nFilterLength(0)
 				throw configException("Must specify at least one filter");
 			}
 
-			for(int i = 0; i < nPaths; ++i)
+			for(WORD i = 0; i < nPaths; ++i)
 			{
-				if(Paths[i].filter.nChannels != 1)
-				{
-					throw configException("Filters must have exactly one channel");
-				}
-
 				if(Paths[i].filter.nFilterLength != nFilterLength)
 				{
 					throw configException("Filters must all be of the same length");
@@ -204,13 +199,13 @@ nFilterLength(0)
 			Dump();
 #endif
 		}
-		else if (config.fail())
+		else if (config().fail())
 		{
 			throw configException("Config file syntax is incorrect");
 		}
-		else if (config.bad())
+		else if (config().bad())
 		{
-			throw configException("Fatal error reading config file");
+			throw configException("Fatal error opening/reading config() file");
 		}
 		else
 		{
@@ -239,7 +234,7 @@ nFilterLength(0)
 }
 
 #if defined(DEBUG) | defined(_DEBUG)
-void ChannelPaths::Dump()
+const void ChannelPaths::Dump() const
 {
 	cdebug << "ChannelPaths: " << " nInputChannels:" << nInputChannels << " nOutputChannels:" << nOutputChannels <<
 		" nPartitions:" << nPartitions << " nPartitionLength:" << nPartitionLength <<
@@ -248,7 +243,7 @@ void ChannelPaths::Dump()
 		Paths[i].Dump();
 }
 
-void ChannelPaths::ChannelPath::Dump()
+const void ChannelPaths::ChannelPath::Dump() const
 {
 	cdebug << "inChannel:";
 	for(int i=0; i<inChannel.size(); ++i)
@@ -264,7 +259,7 @@ void ChannelPaths::ChannelPath::Dump()
 	cdebug << std::endl;
 }
 
-void ChannelPaths::ChannelPath::ScaledChannel::Dump()
+const void ChannelPaths::ChannelPath::ScaledChannel::Dump() const
 {
 	cdebug << nChannel << "/" << fScale;
 }

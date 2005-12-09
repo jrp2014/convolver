@@ -18,6 +18,7 @@
 #define IDS_FILTERSAVEERROR             110
 #define IDS_PARTITIONSERROR             111
 #define IDS_PARTITIONSSAVEERROR         112
+#define IDS_PLANNINGRIGOURSAVEERROR     113
 #define IDC_GETFILTER                   205
 #define IDC_FILTERFILELABEL             206
 #define IDC_STATUS                      207
@@ -27,14 +28,15 @@
 #define IDC_PARTITIONS                  211
 #define IDR_BITMAPWITHHEADER            212
 #define IDC_STATIC_VERSION              213
+#define IDC_COMBOPLANNINGRIGOUR         216
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        213
+#define _APS_NEXT_RESOURCE_VALUE        214
 #define _APS_NEXT_COMMAND_VALUE         32768
-#define _APS_NEXT_CONTROL_VALUE         214
+#define _APS_NEXT_CONTROL_VALUE         218
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

@@ -25,8 +25,9 @@
 				InlineFunctionExpansion="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
-				AdditionalIncludeDirectories=".."
+				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1;D:\Projects\blitz-0.9"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -98,7 +99,7 @@
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="TRUE"
-				AdditionalIncludeDirectories=".."
+				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW3_IMPORTS"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
@@ -110,7 +111,7 @@
 				EnableEnhancedInstructionSet="2"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
+				WarningLevel="4"
 				SuppressStartupBanner="FALSE"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"/>
@@ -282,6 +283,9 @@
 				</File>
 				<File
 					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
+					RelativePath="..\convolution\fastarray.h">
 				</File>
 				<File
 					RelativePath="..\convolution\ffthelp.cpp">

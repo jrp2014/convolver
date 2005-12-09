@@ -56,18 +56,26 @@ IDD_convolverFilterPROP DIALOGEX 0, 0, 215, 128
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    EDITTEXT        IDC_CONFIGFILE,62,8,148,14,ES_AUTOHSCROLL,
+    EDITTEXT        IDC_CONFIGFILE,62,1,148,14,ES_AUTOHSCROLL,
                     WS_EX_ACCEPTFILES
-    EDITTEXT        IDC_ATTENUATION,62,28,40,14,ES_AUTOHSCROLL
-    LTEXT           "Attenuation (db)",IDS_ATTENUATION,6,31,54,8
-    DEFPUSHBUTTON   "Get config ...",IDC_GETCONFIG,6,8,48,14,BS_NOTIFY
+    EDITTEXT        IDC_ATTENUATION,62,17,40,14,ES_AUTOHSCROLL
+    LTEXT           "Attenuation (db)",IDS_ATTENUATION,6,20,54,8
+    DEFPUSHBUTTON   "Get config ...",IDC_GETCONFIG,6,1,48,14,BS_NOTIFY
     PUSHBUTTON      "Calculate optimum attenuation",
-                    IDC_CALCULATEOPTIMUMATTENUATION,108,28,102,14
-    LTEXT           "No of partitions:",IDS_NOOFPARTITIONS,6,48,53,8
-    EDITTEXT        IDC_NOOFPARTITIONS,62,45,40,14,ES_AUTOHSCROLL | 
+                    IDC_CALCULATEOPTIMUMATTENUATION,108,17,102,14
+    LTEXT           "No of partitions:",IDS_NOOFPARTITIONS,6,36,53,8
+    EDITTEXT        IDC_NOOFPARTITIONS,62,33,40,14,ES_AUTOHSCROLL | 
                     ES_NUMBER
     LTEXT           "Status",IDS_STATUS,6,66,204,60,SS_WORDELLIPSIS
-    LTEXT           "Version",IDS_Version,108,48,102,8
+    LTEXT           "Version not set",IDS_Version,108,35,102,8,0,WS_EX_RIGHT
+    CONTROL         "http://convolver.sf.net",IDS_ATTENUATION,"Static",
+                    SS_SIMPLE | WS_GROUP,134,57,76,8,WS_EX_RIGHT
+    CONTROL         "jrp@dial.pipex.com",IDS_ATTENUATION,"Static",SS_SIMPLE | 
+                    WS_GROUP,148,46,62,8,WS_EX_RIGHT
+    COMBOBOX        IDC_COMBOPLANNINGRIGOUR,61,49,53,75,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Tuning rigour:",IDS_ATTENUATION,"Static",SS_SIMPLE | 
+                    WS_GROUP,4,51,46,8
 END
 
 
@@ -77,8 +85,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,14,0,0
- PRODUCTVERSION 2,14,0,0
+ FILEVERSION 2,15,0,0
+ PRODUCTVERSION 2,15,0,0
  FILEFLAGSMASK 0x30003fL
 #ifdef _DEBUG
  FILEFLAGS 0xbL
@@ -96,14 +104,14 @@ BEGIN
             VALUE "ActiveMovie", "Filter dll"
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "convolver DirectShow Transform Filter"
-            VALUE "FileVersion", "2.14"
+            VALUE "FileVersion", "2.15"
             VALUE "InternalName", "convolverFilter.ax"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OLESelfRegister", "AM20"
             VALUE "OriginalFilename", "convolverFilter.ax"
             VALUE "ProductName", "ConvolverFilter"
-            VALUE "ProductVersion", "2.14"
+            VALUE "ProductVersion", "2.15"
         END
     END
     BLOCK "VarFileInfo"

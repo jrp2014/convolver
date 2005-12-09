@@ -23,7 +23,44 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <boost\ptr_container\ptr_vector.hpp>
 
+class configFile
+{
+public:
+	configFile(TCHAR szConfigFileName[MAX_PATH]) : opened(false)
+	{
+		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
+		USES_CONVERSION;
+		config.open(T2A(szConfigFileName));
+
+		if (config == NULL)
+		{
+			throw configException("Failed to open config file");
+		}
+
+		opened=true;
+	}
+
+	std::ifstream& operator()()
+	{
+		return config;
+	}
+
+	~configFile()
+	{
+		if(opened)
+			config.close();
+	}
+
+private:
+	std::ifstream config;
+	bool opened;
+
+	configFile();									// No construction
+	configFile(const configFile&);				// No copy ctor
+	const configFile &operator =(const configFile&); // No copy assignment
+};
 
 class ChannelPaths
 {
@@ -35,10 +72,10 @@ public:
 		class ScaledChannel
 		{
 		public:
-			int nChannel;
+			WORD nChannel;
 			float fScale;
 
-			ScaledChannel(int& nChannel, float& fScale) : nChannel(nChannel), fScale(fScale)
+			ScaledChannel(const WORD& nChannel, const float& fScale) : nChannel(nChannel), fScale(fScale)
 			{
 #if defined(DEBUG) | defined(_DEBUG)
 				DEBUGGING(3, cdebug << "ChannelPath::ChannelPath::ScaledChannel" << std::endl;);
@@ -46,67 +83,76 @@ public:
 			};
 
 #if defined(DEBUG) | defined(_DEBUG)
-			void Dump();
+			const void Dump() const;
 #endif
+		private:
+			ScaledChannel();								// Prevent default construction
+			// Default copying OK
 		};
 
-		std::vector<ScaledChannel> inChannel;
-		Filter filter;
-		std::vector<ScaledChannel> outChannel;
+		const std::vector<ScaledChannel> inChannel;
+		const Filter filter;
+		const std::vector<ScaledChannel> outChannel;
 
-		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions,
-			std::vector<ScaledChannel>& inChannel, std::vector<ScaledChannel>& outChannel, const DWORD& nSampleRate) :
-		filter(szConfigFileName, nPartitions, nSampleRate), inChannel(inChannel), outChannel(outChannel)
+		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions,
+			const std::vector<ScaledChannel>& inChannel, const std::vector<ScaledChannel>& outChannel,
+			const WORD& nFilterChannel, const DWORD& nSampleRate, const unsigned int& nPlanningRigour) :
+		filter(szConfigFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
+			inChannel(inChannel), outChannel(outChannel)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "ChannelPath::ChannelPath" << std::endl;);
+			DEBUGGING(3, cdebug << "ChannelPath::ChannelPath" << std::endl;);
 #endif
 		};
 
 #if defined(DEBUG) | defined(_DEBUG)
-		void Dump();
+		const void Dump() const;
 #endif
 	};
 
-	int	nInputChannels;			// number of input channels
-	int nOutputChannels;		// number of output channels
-	DWORD nSamplesPerSec;		// 44100, 48000, etc
-	DWORD dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-	int nPaths;					// number of Paths
-	int	nPartitions;
-	int	nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	int	nHalfPartitionLength;	// in blocks
-	int	nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+	configFile	config;
+	WORD	nInputChannels;		// number of input channels
+	WORD	nOutputChannels;	// number of output channels
+	DWORD	nSamplesPerSec;		// 44100, 48000, etc
+	DWORD	dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+	WORD	nPaths;				// number of Paths
+	WORD	nPartitions;
+	DWORD	nPartitionLength;		// in blocks (a block contains the samples for each channel)
+	DWORD	nHalfPartitionLength;	// in blocks
+	DWORD	nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
 #ifdef FFTW
-	int	nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
+	DWORD	nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
 #endif
 
-	std::vector<ChannelPath> Paths;
+	// TODO: this is not right as copying of filter class is problematic as
+	// FFTW plans cannot just be copied without leading to memory leaks or
+	// multiple deletions
+	boost::ptr_vector<ChannelPath> Paths;
 
-	ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const int& nPartitions);
-
-	~ChannelPaths()
-	{
-#if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "ChannelPaths::~ChannelPaths " << std::endl;);
-#endif
-		// Delete the plans here to avoid problems with vector and copy constructors
-		for(int i=0; i < Paths.size(); ++i)
-		{
-			fftwf_destroy_plan(Paths[i].filter.plan);
-			Paths[i].filter.plan = NULL;
-			fftwf_destroy_plan(Paths[i].filter.reverse_plan);
-			Paths[i].filter.reverse_plan = NULL;
-		}
-	}
+	ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
 
 	const std::string DisplayChannelPaths();
 
 #if defined(DEBUG) | defined(_DEBUG)
-	void Dump();
+	const void Dump() const;
 #endif
 
+	virtual ~ChannelPaths() 
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+		DEBUGGING(3, cdebug << "ChannelPaths::~ChannelPaths " << std::endl;);
+#endif
+		//		// Delete the plans here to avoid problems with vector and copy constructors
+		//		for(int i=0; i < Paths.size(); ++i)
+		//		{
+		//			Paths[i].~ChannelPath();
+		//		}
+	}
+
 private:
-	ChannelPaths(const ChannelPaths&); // No copy ctor
-	ChannelPaths &operator =(const ChannelPaths&); // No copy assignment
+	ChannelPaths();									// No construction
+	ChannelPaths(const ChannelPaths&);				// No copy ctor
+	const ChannelPaths &operator =(const ChannelPaths&); // No copy assignment
 };
+
+

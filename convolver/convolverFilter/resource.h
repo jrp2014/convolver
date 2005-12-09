@@ -7,6 +7,7 @@
 #define VER_DEBUG                       0
 #define VERSION_RES_MAJOR_VER           1
 #define IDD_convolverFilterPROP         101
+#define IDC_COMBOPLANNINGRIGOUR         216
 #define IDC_convolverFilter             1000
 #define IDC_GETCONFIG                   1000
 #define IDB_DEFAULT                     1001

@@ -32,6 +32,11 @@
 #include "convolution\waveformat.h"
 #include "convolverWMP\version.h"
 #include <exception>
+#include ".\convolverproppage.h"
+
+
+PlanningRigour pr;
+
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -112,6 +117,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	else
 	{
 		SetDlgItemText( IDC_STATUS, TEXT("Convolution plug-in initialization failed.") );
+		return E_FAIL;
 	}
 
 	return hr;
@@ -132,9 +138,16 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	float	fAttenuation = 0.0;													// Initialize a float for the attenuation
 	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
 	TCHAR	szFilterFileName[MAX_PATH]	= { 0 };
-	DWORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
-	// to be used in the convolution algorithm
-	// Get the attenuation value from the dialog box.
+	WORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
+																				// to be used in the convolution algorithm
+																				// Get the attenuation value from the dialog box.
+	unsigned int nPlanningRigour =
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
+
 	try
 	{
 		GetDlgItemText(IDC_ATTENUATION, szStr, sizeof(szStr) / sizeof(szStr[0]));
@@ -159,15 +172,17 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		else
 			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
 
-		// Get the number of partitions value from the dialog box.
-		GetDlgItemText(IDC_PARTITIONS, szStr, sizeof(szStr) / sizeof(szStr[0]));
+		// Get the number of partitions value from the dialogue box.
+		nPartitions = GetDlgItemInt(IDC_PARTITIONS, NULL, FALSE); 
 
-#ifdef UNICODE 
-		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-		nPartitions = static_cast<DWORD>(atoi(strTmp)); 
-#else 
-		nPartitions = static_cast<DWORD>(atoi(szStr));
-#endif
+		// Get the planning rigour from the dialogue box
+		nPlanningRigour = GetDlgItemInt(IDC_COMBOPLANNINGRIGOUR, NULL, FALSE);
+
+		TCHAR* measure = new TCHAR[pr.nStrLen];
+		GetDlgItemText(IDC_COMBOPLANNINGRIGOUR, measure, pr.nStrLen);
+		nPlanningRigour = pr.flag(measure);
+		delete [] measure;
+
 
 		// update the registry
 		CRegKey key;
@@ -212,6 +227,18 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 			}
 		}
 
+		// Write the planning rigour to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			lResult = key.SetDWORDValue( kszPrefsPlanningRigour, nPlanningRigour );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save tuning rigour to registry") );
+				return lResult;
+			}
+		}
+
 		// update the plug-in
 		if (m_spConvolver)
 		{
@@ -246,6 +273,16 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 				}
 				return hr;
 			}
+
+			hr = m_spConvolver->put_planning_rigour(nPlanningRigour);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_PLANNINGRIGOURSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
 		}
 	}
 	catch (std::exception& error)
@@ -275,16 +312,28 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
 		m_spConvolver->encode_Attenuationdb(fAttenuation);
 	TCHAR*  szFilterFileName = TEXT("");
-	DWORD   nPartitions		 = 0;									// Default number of partitions
+	WORD   nPartitions		 = 0;									// Default number of partitions
 	CRegKey key;
 	LONG    lResult = 0;
 	DWORD   dwValue = 0;
+	unsigned int nPlanningRigour = 
+#ifdef FFTW
+		1;		// Set "Measure" as the default
+#else
+		0;
+#endif
 
 	try
 	{
 		// May throw
 		version v(TEXT("convolverWMP.dll"));
 		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("Version ") + v.get_product_version()).c_str());
+
+		for(unsigned int i=0; i<pr.nDegrees; ++i)
+		{
+			SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)pr.Rigour[i]);
+		}
+		SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 
 		// read from plug-in if it is available
 		if (m_spConvolver)
@@ -295,6 +344,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 			m_spConvolver->get_filterfilename(&szFilterFileName);
 
 			m_spConvolver->get_partitions(&nPartitions);
+			m_spConvolver->get_planning_rigour(&nPlanningRigour);
 		}	
 		else // otherwise read from registry
 		{
@@ -325,6 +375,12 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 				{
 					nPartitions = dwValue;
 				}
+				// Read the number of partitions
+				lResult = key.QueryDWORDValue(kszPrefsPlanningRigour, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					nPlanningRigour = dwValue;
+				}
 			}
 		}
 
@@ -339,20 +395,23 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		// Display the number of partitions
 		_stprintf(szStr, _T("%u"), nPartitions);
 		SetDlgItemText(IDC_PARTITIONS, szStr);
+
+		// Display the planning rigour
+		SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 	}
 	catch (std::exception& error)
 	{
 		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
-		return E_FAIL;
+		return TRUE;    // let the system set the focus
 	}
 	catch (...) 
 	{
 
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to initialize dialogue.") );
-		return E_FAIL;
+		return TRUE;    // let the system set the focus
 	}
 
-	return 0;
+	return TRUE;    // let the system set the focus
 }
 
 // This only sets the file name
@@ -361,7 +420,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 {
 	TCHAR szFilterFileName[MAX_PATH]	= TEXT("");
 	TCHAR szFilterPath[MAX_PATH]		= TEXT("");
-	HRESULT hr = ERROR_SUCCESS;
+	HRESULT hr = S_OK;
 
 	try
 	{
@@ -379,7 +438,8 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 		if( TRUE != GetOpenFileName( &ofn ) )
 		{
 			SetDlgItemText( IDC_STATUS, TEXT("Get filter aborted.") );
-			return CommDlgExtendedError();
+			//return CommDlgExtendedError();
+			return 0;
 		}
 
 		SetDlgItemText( IDC_FILTERFILELABEL, szFilterFileName );
@@ -387,7 +447,8 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 		hr = m_spConvolver->put_filterfilename(szFilterFileName);
 		if(FAILED(hr))
 		{
-			return hr;
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to save filter filename.") );
+			return 0;
 		}
 
 		hr = DisplayFilterFormat(szFilterFileName);
@@ -395,50 +456,21 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	catch (std::exception& error)
 	{
 		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
-		return E_FAIL;
+		return 0;
 	}
 	catch (...) 
 	{
-
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to load filter config file.") );
-		return E_FAIL;
+		return 0;
 	}
 
-	//// Save the filter filename (without needing to apply)
-	//// update the registry
-	//CRegKey key;
-
-	//// Write the filter filename to the registry.
-	//LONG lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
-	//if (ERROR_SUCCESS == lResult)
-	//{
-	//	// Get the filter file name from the dialog box.
-	//	GetDlgItemText(IDC_FILTERFILELABEL, szFilterFileName, sizeof(szFilterFileName) / sizeof(szFilterFileName[0]));
-
-	//	lResult = key.SetStringValue( kszPrefsFilterFileName, szFilterFileName );
-
-	//	if (lResult != ERROR_SUCCESS)
-	//	{
-	//		SetDlgItemText( IDC_STATUS, TEXT("Failed to save filename to registry.") );
-	//		return lResult;
-	//	}
-	//}
-
-	//hr = m_spConvolver->put_filterfilename(szFilterFileName);
-	//if (FAILED(hr))
-	//{
-	//	TCHAR   szStr[MAXSTRING] = { 0 };
-	//	if (::LoadString(_Module.GetResourceInstance(), IDS_FILTERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
-	//	{
-	//		MessageBox(szStr);
-	//	}
-	//	return hr;
-	//}
-	//SetDirty(TRUE);
-
 	hr = Apply(); // apply the filter immediately; don't wait for apply button to be set, as we have 
+	if(FAILED(hr))
+	{
+		return 0;
+	}
 
-	return hr;
+	return 0;
 }
 
 LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
@@ -451,7 +483,8 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
 	float	fAttenuation = 0;
-	DWORD	nPartitions = 1;
+	WORD	nPartitions = 1;
+	unsigned int nPlanningRigour = 0;
 	TCHAR*  szFilterFileName	= TEXT("");
 	HRESULT hr S_OK;
 
@@ -463,7 +496,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 			if (FAILED(hr))
 			{
 				//SetDlgItemText( IDC_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
-				return hr;
+				return 0;
 			}
 		}
 
@@ -471,25 +504,33 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 		if (FAILED(hr))
 		{
 			SetDlgItemText( IDC_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
-			return hr;
+			return 0;
 		}
 
 		hr = m_spConvolver->get_partitions(&nPartitions);
 		if (FAILED(hr))
 		{
 			SetDlgItemText( IDC_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
-			return hr;
+			return 0;
 		}
+
+		hr = m_spConvolver->get_planning_rigour(&nPlanningRigour);
+		if (FAILED(hr))
+		{
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
+			return 0;
+		}
+
 
 		double fElapsed = 0;
 		apHiResElapsedTime t;
 		// TODO: the 8 should be derived
-		hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions);
+		hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
 		fElapsed = t.sec();
 		if (FAILED(hr))
 		{
 			SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
-			return hr;
+			return 0;
 		}
 
 		// Display the attenuation.
@@ -504,21 +545,28 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 	catch (std::exception& error)
 	{
 		SetDlgItemText( IDC_STATUS, CA2CT(error.what()));
-		return E_FAIL;
+		return 0;
 	}
 	catch (...) 
 	{
 
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );
-		return E_FAIL;
+		return 0;
 	}
 
 	SetDirty(TRUE);
 
-	return hr;
+	return 0;
 }
 
 LRESULT CConvolverPropPage::OnEnChangePartitions(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	SetDirty(TRUE);
+
+	return 0;
+}
+
+LRESULT CConvolverPropPage::OnCbnSelendokCombofftwmeasure(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
 	SetDirty(TRUE);
 

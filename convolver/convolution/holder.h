@@ -17,7 +17,9 @@ private:
 public:
 	// default constructor: let the holder refer to nothing, and
 	// constructor for a pointer: let the holder refer to where the pointer refers
-	explicit Holder (T* p = NULL) : ptr_(p), owns_(p != NULL) {}
+	Holder() : ptr_(NULL), owns_(true) {}
+
+	explicit Holder (T* p) : ptr_(p), owns_(p != NULL) {}
 
 	// destructor: releases the object to which it refers (if any)
 	~Holder()
@@ -38,11 +40,11 @@ public:
 		return ptr_; 
 	}
 
-    // get referenced object (if any)
-    T* get_ptr() const
+	// get referenced object (if any)
+	T* get_ptr() const
 	{
-        return ptr_;
-    }
+		return ptr_;
+	}
 
 	Holder& set_ptr(T* p)
 	{
@@ -85,6 +87,6 @@ private:
 	}
 
 	// No copying
-		Holder(const Holder&);
-		const Holder& operator=(const Holder&);
+	Holder(const Holder&);
+	const Holder& operator=(const Holder&);
 };
