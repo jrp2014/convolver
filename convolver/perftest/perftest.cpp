@@ -56,7 +56,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 	try
 	{
 		std::wistringstream	szPartitions(argv[1]);
-		WORD max_nPartitions;
+		unsigned int max_nPartitions;	// Can't use WORD as that seems to break >>
 		szPartitions >>	max_nPartitions;
 		if (max_nPartitions	< 0 || max_nPartitions > 1000)
 		{
@@ -75,7 +75,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 		PlanningRigour pr;
 		std::wistringstream	szPlanningRigour(argv[3]);
-		int nPlanningRigour;
+		unsigned int nPlanningRigour;
 		szPlanningRigour >>	nPlanningRigour;
 		if (nPlanningRigour	< 0 || nPlanningRigour > pr.nDegrees - 1)
 		{

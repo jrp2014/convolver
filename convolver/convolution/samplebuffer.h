@@ -22,9 +22,11 @@
 #include "convolution\config.h"
 
 // Vector is slow when debugging
-#include <vector>
 #include <malloc.h>
-#include <windows.h>    // for ZeroMemory, CopyMemory, etc
+//#include <windows.h>    // for ZeroMemory, CopyMemory, etc
+#include <iterator>
+#include <vector>
+#include <algorithm>
 
 // The following undefs are needed to avoid conflicts
 #undef min
@@ -44,15 +46,16 @@
 #endif
 
 
-// User vectors of vecors/arrays, as we need aligned data at the base.
+// Use vectors of vecors/arrays, as we need aligned data at the base.
 // Using projections onto a 1d array would not guarantee alignment other than of the first row
 
 // A simple aligned array
 template <class T>
 struct AlignedArray
 {
-	typedef T value_type;
-	typedef DWORD size_type;
+
+	typedef T					value_type;
+	typedef std::size_t			size_type;
 
 	// Constructors
 	AlignedArray() :   first_(NULL), size_(0), bsize_(0)  {}
@@ -78,29 +81,15 @@ struct AlignedArray
 	virtual ~AlignedArray()
 	{   
 		ALIGNED_FREE(first_);
+		first_ = NULL;
+		size_ = 0;
+		bsize_ = 0;
 	}
-
-	// Member functions
-
-	T* first() const { return this->first_; }
-	size_type size() const { return this->size_; }
-	size_type bsize() const { return this->bsize_; }
-	T* restrict c_ptr(const size_type& n=0) const
-	{
-		assert (n >= 0 && n < size_);
-		return first_ + n;
-	}
-
-	// Helper function for inherited = 
-	void Swap(AlignedArray& x)
-	{
-		std::swap(first_, x.first_);
-		std::swap(size_, x.size_);
-		std::swap(bsize_, x.bsize_);
-	}
-
-protected:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+	_declspec(align(16)) T* restrict first_;
+#else
 	T* restrict first_;
+#endif
 	size_type size_;        // length in elements
 	size_type bsize_;       // length in bytes
 
@@ -110,30 +99,177 @@ private:
 	AlignedArray& operator=(const AlignedArray<T>&);
 };
 
-template <class T>
+// comparisons
+template<class T>
+bool operator== (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return std::equal(x.begin(), x.end(), y.begin());
+}
+template<class T>
+bool operator< (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return std::lexicographical_compare(x.begin(),x.end(),y.begin(),y.end());
+}
+template<class T>
+bool operator!= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return !(x==y);
+}
+template<class T>
+bool operator> (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return y<x;
+}
+template<class T>
+bool operator<= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return !(y<x);
+}
+template<class T>
+bool operator>= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
+    return !(x<y);
+}
+
+// global swap()
+template<class T>
+inline void swap (AlignedArray<T>& x, AlignedArray<T>& y) {
+	x.swap(y);
+}
+
+template <typename T> 
 struct FastArray : public AlignedArray<T>
 {
-	typedef typename AlignedArray<T>::value_type value_type;
-	typedef typename AlignedArray<T>::size_type size_type;
 
-	// Constructors
-	FastArray() : AlignedArray<T>() {}
-	explicit FastArray(const size_type& n) : AlignedArray<T>(n) {}
-	FastArray(const FastArray& other) : AlignedArray<T>(other.size_)
+	// type definitions
+
+	typedef typename AlignedArray<T>::value_type		value_type;
+
+	typedef value_type*									pointer;
+	typedef const value_type*							const_pointer;
+	typedef value_type*									iterator;
+	typedef const value_type*							const_iterator;
+	typedef value_type&									reference;
+	typedef const value_type&							const_reference;
+	typedef typename AlignedArray<T>::size_type			size_type;
+	typedef std::ptrdiff_t								difference_type;
+
+	// iterator support
+	iterator begin() { return first_; }
+	const_iterator begin() const { return first_; }
+	iterator end() { return first_ + size_; }
+	const_iterator end() const { return first + size_; }
+
+	// reverse iterator support
+	typedef std::reverse_iterator<iterator> reverse_iterator;
+	typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+
+	reverse_iterator rbegin() { return reverse_iterator(end()); }
+	const_reverse_iterator rbegin() const
 	{
-		::CopyMemory(first_, other.first_, other.bsize_); // memcpy => overlap not allowed
+		return const_reverse_iterator(end());
 	}
+	
+	reverse_iterator rend() { return reverse_iterator(begin()); }
+	const_reverse_iterator rend() const
+	{
+		return const_reverse_iterator(begin());
+	}
+
+	// Basic constructors
+	FastArray() : AlignedArray<T>() {}
+	explicit FastArray(size_type n) : AlignedArray<T>(n)
+	{ 
+		std::uninitialized_fill_n(first_, size_, 0);
+	}
+	FastArray(const_reference x, size_t n) : AlignedArray<T>(n)
+	{ 
+		std::uninitialized_fill_n(first_, size_, x);
+	}
+	FastArray(const_pointer p, size_t n) : AlignedArray<T>(n)
+	{
+		std::uninitialized_copy(p, p + n, first_);
+	}
+	FastArray(const FastArray<T>& other) : AlignedArray<T>(other.size_)
+	{
+		std::uninitialized_copy(other.first_, other.first_ + other.size_,
+			first_);
+	}
+
+	virtual ~FastArray() {};
 
 	// Element access
-	value_type  operator[](size_type n)  const
+
+	// operator[]
+	reference restrict operator[](size_type n)
 	{
 		assert(n >= 0 && n < size_);
 		return *(first_ + n);
 	}
-	value_type& restrict operator[](size_type n)
+	const_reference operator[](size_type n) const
 	{
 		assert(n >= 0 && n < size_);
 		return *(first_ + n);
+	}
+
+	// at() with range check
+	reference restrict at(size_type n)
+	{
+		rangecheck(i);
+		return *(first_ + n);
+	}
+
+	const_reference at(size_type i) const
+	{
+		rangecheck(i);
+		return *(first_ + n);
+	}
+
+	// front() and back()
+	reference front() { return *first_; }
+	const_reference front() const { return *first_; }
+	reference back() 
+	{
+		assert(!empty());
+		return *(first_ + size_ - 1);
+	}
+	const_reference back() const
+	{
+		assert(!empty());
+		return *(first_ + size_ - 1);
+	}
+
+	// size is constant
+	size_type size() const { return size_; }
+	size_type bsize() const { return bsize_; }
+	bool empty() const { return size_ == 0; }
+	size_type max_size() const { return size_; }
+	size_type static_size() const { return size_; }
+
+	// For use with C interface
+	pointer restrict c_ptr(const size_type& n=0) const
+	{
+		assert (n >= 0 && n < size_);
+		return empty() ? NULL : (first_ + n);
+	}
+
+	// swap (note: linear complexity in N, constant for given instantiation)
+	//void swap (FastArray<T>& y) {
+	//	std::swap_ranges(begin(),end(),y.begin());
+	//}
+
+	// Helper for =
+	void swap(FastArray& x)
+	{
+		std::swap(first_, x.first_);
+		std::swap(size_, x.size_);
+		std::swap(bsize_, x.bsize_);
+	}
+
+	// direct access to data (read-only)
+	const_pointer data() const { return first_; }
+
+	// use array as C array (direct read/write access to data)
+	pointer data() { return first_; }
+
+	// assign one value to all elements
+	void assign (const T& x)
+	{
+		std::fill_n(begin(), size(), x);
 	}
 
 	// Basic assignment.  Note that assertions are stricter than necessary, as unequally-size
@@ -144,14 +280,22 @@ struct FastArray : public AlignedArray<T>
 		if (this != &other)
 		{
 			FastArray<T> temp(other);
-			Swap(temp);
+			swap(temp);
 		}
+		return *this;
+	}
+
+	// assignment with type conversion
+	template <typename T2>
+	FastArray<T>& operator= (const FastArray<T2>& rhs)
+	{
+		std::copy(rhs.begin(),rhs.end(), begin());
 		return *this;
 	}
 
 	// Scalar assignment
 
-	FastArray<T>& operator=(const value_type& x)
+	FastArray<T>& operator=(const_reference x)
 	{
 		if(x == 0)
 		{
@@ -159,35 +303,38 @@ struct FastArray : public AlignedArray<T>
 		}
 		else
 		{
+			const size_type ss = size_;						// Improve chances of vectorization
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-			for (size_type i = 0; i < size_; ++i)
+			for (size_type i = 0; i < ss; ++i)
 				(*this)[i] = static_cast<T>(x);             // TODO: optimize int->float
 		}
 		return *this;
 	}
 
 	// Scalar computed assignment.
-	FastArray<T>& operator*= (const value_type& x)
+	FastArray<T>& operator*= (const_reference x)
 	{
 		if(x != static_cast<T>(1))
 		{
+			const size_type ss = size_;
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-			for (size_type i = 0; i < size_; ++i)
+			for (size_type i = 0; i < ss; ++i)
 				(*this)[i] *= x;
 		}
 		return *this;
 	}
 
-	FastArray<T>& operator+= (const value_type& x)
+	FastArray<T>& operator+= (const_reference x)
 	{
+		const size_type ss = size_;
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-		for (size_type i = 0; i < size_; ++i)
+		for (size_type i = 0; i < ss; ++i)
 			(*this)[i] += x;
 		return *this;
 	}
@@ -196,17 +343,25 @@ struct FastArray : public AlignedArray<T>
 
 	void shiftleft(const size_type& n)
 	{
+		//std::copy(begin() + n, begin() + 2 * n - 1, begin());
 		::MoveMemory(first_, first_ + n, n * sizeof(T));
 	}
 
+
+private:
+	// check range (may be private because it is static)
+	static void rangecheck (size_type n)
+	{
+		if (n < 0 || n >= size())
+		{ 
+			throw std::out_of_range("FastArray<>: index out of range");
+		}
+	}
 };
 
 template <typename T> 
 struct FastArray2D : public std::vector< FastArray<T> >
 { 
-	typedef typename std::vector< FastArray<T> >::value_type value_type;
-	typedef typename std::vector< FastArray<T> >::size_type size_type;
-
 	// Constructors
 	FastArray2D() : std::vector< FastArray<T> >() {}
 	explicit FastArray2D(const size_type& n) : std::vector< FastArray<T> >(n) {}
@@ -233,9 +388,6 @@ struct FastArray2D : public std::vector< FastArray<T> >
 template <typename T> 
 struct FastArray3D : public std::vector< FastArray2D<T> >
 { 
-	typedef typename std::vector< FastArray2D<T> >::value_type value_type;
-	typedef typename std::vector< FastArray2D<T> >::size_type size_type;
-
 	// Constructors
 	FastArray3D() : std::vector< FastArray2D<T> >() {}
 	explicit FastArray3D(const size_type& n) : std::vector< FastArray2D<T> >(n) {}

@@ -111,7 +111,7 @@
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="FALSE"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"

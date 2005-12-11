@@ -115,7 +115,7 @@ private:
 
 	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-		const ChannelBuffer& restrict Output, const DWORD from, const DWORD to);
+		const ChannelBuffer& restrict Output, const DWORD& from, const DWORD& to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW

@@ -116,7 +116,7 @@
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="0"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL; &quot;_WINDLL&quot;"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG"
 				StringPooling="1"
 				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
@@ -279,6 +279,10 @@
 		<File 
 			RelativePath="..\convolution\exception.h"/>
 		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
 			RelativePath="..\convolution\filter.cpp"/>
 		<File 
 			RelativePath="..\convolution\filter.h"/>
@@ -314,10 +318,6 @@
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
 		<File 
-			RelativePath="..\convolution\ffthelp.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.cpp"/>
-		<File 
 			RelativePath="..\fftw\fftw3.h"/>
 		<File 
 			RelativePath=".\convolver.h"/>
@@ -348,9 +348,9 @@
 		<File 
 			RelativePath=".\ConvolverWrapper.filterdata"/>
 		<File 
-			RelativePath=".\gpl.txt"/>
-		<File 
 			RelativePath=".\ConvolverWrapperDMO.filterdata"/>
+		<File 
+			RelativePath=".\gpl.txt"/>
 	</Files>
 </VisualStudioProject>
 

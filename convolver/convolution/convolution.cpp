@@ -210,7 +210,7 @@ CConvolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutpu
 			// containing both Next+Prev and Prev+Next input sample blocks
 #pragma loop count(8)
 #pragma ivdep
-			for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels; ++nChannel)
+			for(ChannelBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels; ++nChannel)
 			{
 				InputBuffer_[nChannel].shiftleft(Mixer.nHalfPartitionLength);
 			}
@@ -356,7 +356,7 @@ CConvolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				// TODO: avoid this copy by rotating the filter when it is read in?
 #pragma loop count(8)
 #pragma ivdep
-				for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels; ++nChannel)
+				for(ChannelBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels; ++nChannel)
 				{
 					InputBuffer_[nChannel].shiftleft(Mixer.nHalfPartitionLength);
 				}
@@ -383,6 +383,7 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict
 {
 	InputBufferAccumulator_ = 0;
 	const WORD nChannels = thisPath.inChannel.size();
+	const DWORD nPartitionLength = Mixer.nPartitionLength;
 #pragma loop count(6)
 #pragma ivdep
 	for(WORD nChannel = 0; nChannel < nChannels; ++nChannel)
@@ -393,7 +394,7 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict
 #pragma ivdep
 		// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
 		// because FFTW destroys its inputs.
-		for(ChannelBuffer::size_type i=0; i<Mixer.nPartitionLength; ++i)
+		for(ChannelBuffer::size_type i=0; i<nPartitionLength; ++i)
 		{
 			InputBufferAccumulator_[i] += fScale * InputSamples[i];
 		}
@@ -402,7 +403,7 @@ void inline CConvolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict
 
 template <typename T>
 void inline CConvolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-										const ChannelBuffer& restrict Output, const DWORD from, const DWORD  to)
+										const ChannelBuffer& restrict Output, const DWORD& from, const DWORD& to)
 {
 	// Don't zero the Accumulator as it can accumulate from more than one output
 	const WORD nChannels = thisPath.outChannel.size();
@@ -431,6 +432,7 @@ void inline CConvolution<T>::complex_mul(const fftwf_complex* restrict in1, cons
 	//__declspec(align( 16 )) float T2;
 #pragma ivdep
 #pragma loop count (65536)
+#pragma vector aligned
 	for (DWORD index = 0; index < count/2+1; ++index) {
 
 		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
@@ -453,6 +455,7 @@ void inline CConvolution<T>::complex_mul_add(const fftwf_complex* restrict in1, 
 	//__declspec(align( 16 )) float T2;
 #pragma ivdep
 #pragma loop count (65536)
+#pragma vector aligned
 	for (DWORD index = 0; index < count/2+1; ++index) {
 
 		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
@@ -560,7 +563,7 @@ T CConvolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffe
 
 	// Only compare the valid part of the output buffer
 	float diff = 0, diff2 = 0;
-	for(int n = from; n < to; ++n)
+	for(ChannelBuffer::size_type n = from; n < to; ++n)
 	{
 		diff = abs(Y[n] - y[n]);
 		diff2 += diff * diff;
@@ -774,10 +777,8 @@ HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_
 		InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
 		//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
 	}
-	for(DWORD i = 0; i < nOutputBufferLength; ++i)
-	{
-		OutputSamples[i] = 0;  // silence
-	}
+
+	fill(OutputSamples.begin(), OutputSamples.end(), 0);
 
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(4, 

@@ -1,6 +1,13 @@
 #include "convolution\config.h"
 
-extern const DWORD HalfLargestDFTSize;
-extern const DWORD OptimalDFTSize[];
 
-extern DWORD GetOptimalDFTSize( DWORD size0 );
+struct OptimalDFT
+{
+
+	static const DWORD HalfLargestDFTSize = 1000000; // allow FFTs up to 2x this size
+
+	static const DWORD OptimalDFTSize[];
+
+	DWORD GetOptimalDFTSize( DWORD size0 );
+
+};

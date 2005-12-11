@@ -99,7 +99,7 @@
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW3_IMPORTS;_WIN32_DCOM"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW3_IMPORTS;_WIN32_DCOM;NDEBUG"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"

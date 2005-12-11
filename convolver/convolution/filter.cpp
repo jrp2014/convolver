@@ -114,8 +114,9 @@ nSamplesPerSec(nSamplesPerSec)
 	// A partition will contain half real data, and half zero padding.  Taking the DFT will, of course, overwrite that padding
 	nHalfPartitionLength = (nFilterLength + nPartitions - 1) / nPartitions;
 
+	OptimalDFT oDFT;	// helper
 	// Check that the filter is not too big ...
-	if ( nHalfPartitionLength > HalfLargestDFTSize )
+	if ( nHalfPartitionLength > oDFT.HalfLargestDFTSize )
 	{
 		throw filterException("Filter too long to handle");
 	}
@@ -131,7 +132,7 @@ nSamplesPerSec(nSamplesPerSec)
 
 	nPartitionLength = nHalfPartitionLength * 2;
 
-	int nHalfPaddedPartitionLength = GetOptimalDFTSize(nHalfPartitionLength);
+	int nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength);
 	int nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
 
 #ifdef OOURA
@@ -151,6 +152,10 @@ nSamplesPerSec(nSamplesPerSec)
 #else
 	coeffs = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength));
 #endif
+	// If at least PATIENT, allow multithreaded
+	if(nPlanningRigour > 1)
+		fftwf_plan_with_nthreads(2);
+
 	plan =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
 		coeffs.c_ptr(), reinterpret_cast<fftwf_complex*>(coeffs.c_ptr()),
 		pr.Flag[nPlanningRigour]);
@@ -206,11 +211,10 @@ nSamplesPerSec(nSamplesPerSec)
 		{
 			throw filterException("Failed to read a frame");
 		};
-
 #else
 		for(WORD nChannel = 0; nChannel <= nFilterChannel; ++nChannel)
 		{
-			hr = pFilterWave->Read(&bSample[0], dwSizeToRead, &dwSizeRead);
+			hr = pFilterWave->Read(&bSample[nChannel], dwSizeToRead, &dwSizeRead);
 
 			if (FAILED(hr))
 			{
@@ -356,7 +360,7 @@ nSamplesPerSec(nSamplesPerSec)
 		if (nFrame % nHalfPartitionLength == 0)
 		{
 			// Pad partition
-			for (int nPadding = nHalfPartitionLength; nPadding < nPaddedPartitionLength; ++nPadding)
+			for (ChannelBuffer::size_type nPadding = nHalfPartitionLength; nPadding < nPaddedPartitionLength; ++nPadding)
 			{
 				coeffs[nPartition][nPadding] = 0;
 			}
@@ -389,7 +393,7 @@ nSamplesPerSec(nSamplesPerSec)
 	// Pad the current partition (if necessary)
 	if (nFrame % nHalfPartitionLength != 0)
 	{
-		for (int nSample = nFrame % nHalfPartitionLength; nSample < nPaddedPartitionLength; ++nSample)
+		for (ChannelBuffer::size_type nSample = nFrame % nHalfPartitionLength; nSample < nPaddedPartitionLength; ++nSample)
 		{
 			coeffs[nPartition][nSample] = 0;
 		}

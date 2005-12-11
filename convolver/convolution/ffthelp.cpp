@@ -1,9 +1,8 @@
 #include "convolution\ffthelp.h"
 
-static const DWORD HalfLargestDFTSize = 1000000; // allow FFTs up to 2x this size
 
 // 2^a * 2^b * 3^c * 5^d * 11^e * 13^f (e+f=0 or 1)
-static const DWORD OptimalDFTSize[]  =
+const DWORD OptimalDFT::OptimalDFTSize[]  =
 {
 				2,      3,      4,      5,      6,      7,      8,      9,     10, 
 		11,     12,     13,     14,     15,     16,     18,     20,     21,     22, 
@@ -268,7 +267,7 @@ static const DWORD OptimalDFTSize[]  =
 
 
 
-DWORD GetOptimalDFTSize( DWORD size0 )
+DWORD OptimalDFT::GetOptimalDFTSize( DWORD size0 )
 {
 	if(size0 >= HalfLargestDFTSize)
 		throw convolutionException("Convolution too big to handle");

@@ -285,9 +285,6 @@
 					RelativePath="..\convolution\exception.h">
 				</File>
 				<File
-					RelativePath="..\convolution\fastarray.h">
-				</File>
-				<File
 					RelativePath="..\convolution\ffthelp.cpp">
 				</File>
 				<File

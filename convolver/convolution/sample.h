@@ -90,15 +90,17 @@ public:
 		srcSample *= static_cast<T>(128);
 
 		// Truncate if exceeded full scale.
-		if (srcSample > static_cast<T>(127))
-		{
-			srcSample = static_cast<T>(127);
-		}
-		else
-			if (srcSample < static_cast<T>(-128))
-			{
-				srcSample = static_cast<T>(-128);
-			}
+		srcSample = (srcSample <= static_cast<T>(127)) ? ((srcSample >= static_cast<T>(-128)) ?  srcSample : -128) : 127;
+
+		//if (srcSample > static_cast<T>(127))
+		//{
+		//	srcSample = static_cast<T>(127);
+		//}
+		//else
+		//	if (srcSample < static_cast<T>(-128))
+		//	{
+		//		srcSample = static_cast<T>(-128);
+		//	}
 
 			*dstContainer = static_cast<BYTE>(srcSample + static_cast<T>(128));
 
@@ -129,15 +131,17 @@ public:
 		srcSample *= static_cast<T>(32768);
 
 		// Truncate if exceeded full scale.
-		if (srcSample > static_cast<T>(32767))
-		{
-			srcSample = static_cast<T>(32767);
-		}
-		else
-			if (srcSample < static_cast<T>(-32768))
-			{
-				srcSample =static_cast<T>(-32768);
-			}
+		srcSample = (srcSample <= static_cast<T>(32767)) ? ((srcSample >= static_cast<T>(-32768)) ?  srcSample : -32768) : 32767;
+
+		//if (srcSample > static_cast<T>(32767))
+		//{
+		//	srcSample = static_cast<T>(32767);
+		//}
+		//else
+		//	if (srcSample < static_cast<T>(-32768))
+		//	{
+		//		srcSample =static_cast<T>(-32768);
+		//	}
 			*(INT16 *)dstContainer = static_cast<INT16>(srcSample);
 			//*reinterpret_cast<INT16*>(dstContainer) = static_cast<INT16>(srcSample);
 

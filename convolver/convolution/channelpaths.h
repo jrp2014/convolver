@@ -111,17 +111,17 @@ public:
 	};
 
 	configFile	config;
-	WORD	nInputChannels;		// number of input channels
-	WORD	nOutputChannels;	// number of output channels
-	DWORD	nSamplesPerSec;		// 44100, 48000, etc
-	DWORD	dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-	WORD	nPaths;				// number of Paths
-	WORD	nPartitions;
-	DWORD	nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	DWORD	nHalfPartitionLength;	// in blocks
-	DWORD	nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+	WORD		nInputChannels;		// number of input channels
+	WORD		nOutputChannels;	// number of output channels
+	DWORD		nSamplesPerSec;		// 44100, 48000, etc
+	DWORD		dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+	WORD		nPaths;				// number of Paths
+	WORD		nPartitions;
+	DWORD		nPartitionLength;		// in blocks (a block contains the samples for each channel)
+	DWORD		nHalfPartitionLength;	// in blocks
+	DWORD		nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
 #ifdef FFTW
-	DWORD	nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
+	DWORD		nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
 #endif
 
 	// TODO: this is not right as copying of filter class is problematic as
@@ -142,11 +142,7 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 		DEBUGGING(3, cdebug << "ChannelPaths::~ChannelPaths " << std::endl;);
 #endif
-		//		// Delete the plans here to avoid problems with vector and copy constructors
-		//		for(int i=0; i < Paths.size(); ++i)
-		//		{
-		//			Paths[i].~ChannelPath();
-		//		}
+// TODO: check that this is enough (ptr_vector should do the work)
 	}
 
 private:

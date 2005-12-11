@@ -103,7 +103,7 @@
 				EnableFiberSafeOptimizations="1"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW3_IMPORTS;_WIN32_DCOM"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW3_IMPORTS;_WIN32_DCOM;NDEBUG"
 				StringPooling="1"
 				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
@@ -200,6 +200,10 @@
 		<File 
 			RelativePath="..\convolution\exception.h"/>
 		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
 			RelativePath="..\convolution\filter.cpp"/>
 		<File 
 			RelativePath="..\convolution\filter.h"/>
@@ -221,10 +225,6 @@
 			RelativePath="..\convolution\waveformat.cpp"/>
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.cpp"/>
 		<File 
 			RelativePath="..\debugging\debugging.cpp"/>
 		<File 
@@ -366,9 +366,9 @@
 		<File 
 			RelativePath="..\fftw\fftw3.h"/>
 		<File 
-			RelativePath=".\readme.txt"/>
-		<File 
 			RelativePath=".\ConvolverFilter.filterdata"/>
+		<File 
+			RelativePath=".\readme.txt"/>
 	</Files>
 </VisualStudioProject>
 

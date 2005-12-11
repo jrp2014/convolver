@@ -146,7 +146,7 @@ nFilterLength(0)
 
 				outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-				int nextchar = config().get();
+				nextchar = config().get();
 				if (nextchar == '\n' || nextchar == EOF)
 					break;
 			}
