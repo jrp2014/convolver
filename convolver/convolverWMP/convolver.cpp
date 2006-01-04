@@ -48,7 +48,7 @@ m_rtTimestamp(0),
 m_bEnabled(TRUE),
 m_nPartitions(0), // default, just overlap-save
 m_nPlanningRigour(0),
-m_Convolution(NULL),
+m_ConvolutionList(NULL),
 m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
 {
@@ -73,9 +73,8 @@ CConvolver::~CConvolver()
 	::MoFreeMediaType(&m_mtInput);
 	::MoFreeMediaType(&m_mtOutput);
 
-	// The following is probably unnecessary, as they Holder should destroy it
-	m_Convolution.set_ptr(NULL);
-
+	// Probably otiose
+	m_ConvolutionList.set_ptr(NULL);
 
 #if defined(DEBUG) | defined(_DEBUG)
 	const int	mode =   (1 * _CRTDBG_MODE_DEBUG) | (0 * _CRTDBG_MODE_WNDW);
@@ -161,9 +160,10 @@ HRESULT CConvolver::FinalConstruct()
 			m_nPlanningRigour = dwValue;
 		}
 
-		try // creating m_Convolution might throw
+		try // creating m_ConvolutionList might throw
 		{
-			m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
 		}
 		catch (...) 
 		{
@@ -188,7 +188,7 @@ void CConvolver::FinalRelease()
 	DEBUGGING(3, cdebug << "FinalRelease" << std::endl;);
 #endif
 
-	FreeStreamingResources();  // In case client does not call this.        
+	FreeStreamingResources();  // In case client does not call this. 
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -307,15 +307,28 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 		return DMO_E_INVALIDSTREAMINDEX;
 	}
 
-	if ( m_FormatSpecs.size <= dwTypeIndex )
+	if (NULL == m_ConvolutionList.get_ptr())
 	{
 		return DMO_E_NO_MORE_ITEMS;
 	}
 
+	// Number of Media types = number of available formats * number of different ChannelPaths
+	if ( m_FormatSpecs.size * m_ConvolutionList->nConvolutionList() <= dwTypeIndex )
+	{
+		return DMO_E_NO_MORE_ITEMS;
+	}
+
+	// Decompose the dwTypeIndex into dwPathIndex and dwFormatSpecIndex
+	DWORD dwPathIndex = dwTypeIndex %  m_ConvolutionList->nConvolutionList(); 
+	DWORD dwFormatSpecIndex = dwTypeIndex % m_FormatSpecs.size;
+#if defined(DEBUG) | defined(_DEBUG)
+	cdebug << "dwTypeIndex:" << dwTypeIndex << " dwPathIndex:" << dwPathIndex << " dwFormatSpecIndex:" << dwFormatSpecIndex << std::endl;
+#endif
+
 	if ( NULL == pmt ) 
 	{
 		hr = ::MoCreateMediaType(&pmt,
-			m_FormatSpecs[dwTypeIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
+			m_FormatSpecs[dwFormatSpecIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
 		if(FAILED(hr))
 		{
 			return hr;
@@ -330,7 +343,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 		}
 
 		hr = ::MoInitMediaType(pmt, 
-			m_FormatSpecs[dwTypeIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
+			m_FormatSpecs[dwFormatSpecIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
 		if(FAILED(hr))
 		{
 			return hr;
@@ -338,19 +351,12 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	}
 
 	pmt->majortype = MEDIATYPE_Audio;
-	pmt->subtype = m_FormatSpecs[dwTypeIndex].SubType;
-
-	if (NULL == m_Convolution.get_ptr())
-	{
-		return S_OK;
-	}
-
+	pmt->subtype = m_FormatSpecs[dwFormatSpecIndex].SubType;
 	pmt->bFixedSizeSamples = true;
 	pmt->bTemporalCompression = false;
 	pmt->formattype = FORMAT_WaveFormatEx;
-	assert( m_FormatSpecs[dwTypeIndex].wBitsPerSample % 8 == 0);
-	pmt->lSampleSize = nChannels * m_FormatSpecs[dwTypeIndex].wBitsPerSample / 8; // Block align
-
+	assert( m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample % 8 == 0);
+	pmt->lSampleSize = nChannels * m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8; // Block align
 
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
 	if(NULL == pWave)
@@ -359,10 +365,10 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	}
 
 	pWave->cbSize = 0; // Size, in bytes, of extra format information appended to the end of the WAVEFORMATEX structure
-	pWave->wFormatTag = m_FormatSpecs[dwTypeIndex].wFormatTag;
+	pWave->wFormatTag = m_FormatSpecs[dwFormatSpecIndex].wFormatTag;
 	pWave->nChannels = nChannels;
-	pWave->nSamplesPerSec = m_Convolution->Mixer.nSamplesPerSec;
-	pWave->wBitsPerSample = m_FormatSpecs[dwTypeIndex].wBitsPerSample;
+	pWave->nSamplesPerSec = m_ConvolutionList->Conv(dwPathIndex).Mixer.nSamplesPerSec();
+	pWave->wBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample;
 	pWave->nBlockAlign = pmt->lSampleSize;
 	pWave->nAvgBytesPerSec = pWave->nSamplesPerSec * pWave->nBlockAlign;
 
@@ -375,9 +381,9 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 		{
 			return E_OUTOFMEMORY;
 		}
-		pWaveXT->Samples.wValidBitsPerSample = m_FormatSpecs[dwTypeIndex].wValidBitsPerSample;
+		pWaveXT->Samples.wValidBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wValidBitsPerSample;
 		pWaveXT->dwChannelMask = dwChannelMask;
-		pWaveXT->SubFormat = m_FormatSpecs[dwTypeIndex].SubType;
+		pWaveXT->SubFormat = m_FormatSpecs[dwFormatSpecIndex].SubType;
 	}
 
 	return hr;
@@ -397,13 +403,14 @@ STDMETHODIMP CConvolver::GetInputType (DWORD dwInputStreamIndex,
 	DEBUGGING(3, cdebug << "GetInputType " << dwTypeIndex << std::endl;);
 #endif
 
-	if(m_Convolution.get_ptr() == NULL)
+	if(m_ConvolutionList.get_ptr() == NULL)
 	{
-		return GetMediaType(dwInputStreamIndex, dwTypeIndex, pmt, 0, 0);
+		return DMO_E_NO_MORE_ITEMS;
 	}
 	else
 	{
-		return GetMediaType(dwInputStreamIndex, dwTypeIndex, pmt, m_Convolution->Mixer.nInputChannels, 0);
+		return GetMediaType(dwInputStreamIndex, dwTypeIndex, pmt, 
+			m_ConvolutionList->Conv(dwTypeIndex %  m_ConvolutionList->nConvolutionList()).Mixer.nInputChannels(), 0);
 	}
 }
 
@@ -421,13 +428,15 @@ STDMETHODIMP CConvolver::GetOutputType(DWORD dwOutputStreamIndex,
 	DEBUGGING(3, cdebug << "GetOutputType " << dwTypeIndex << std::endl;);
 #endif
 
-	if(m_Convolution.get_ptr() == NULL)
+	if(m_ConvolutionList.get_ptr() == NULL)
 	{
-		return GetMediaType(dwOutputStreamIndex, dwTypeIndex, pmt, 0, 0);
+		return DMO_E_NO_MORE_ITEMS;
 	}
 	else
 	{
-		return GetMediaType(dwOutputStreamIndex, dwTypeIndex, pmt, m_Convolution->Mixer.nOutputChannels, m_Convolution->Mixer.dwChannelMask);
+		return GetMediaType(dwOutputStreamIndex, dwTypeIndex, pmt,
+			m_ConvolutionList->Conv(dwTypeIndex %  m_ConvolutionList->nConvolutionList()).Mixer.nOutputChannels(),
+			m_ConvolutionList->Conv(dwTypeIndex %  m_ConvolutionList->nConvolutionList()).Mixer.dwChannelMask());
 	}
 }
 
@@ -474,43 +483,49 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 	}
 	else 
 	{
-		// TODO: Can't signal failure to get a convolution filter in FinalizeConstruction without
-		// breaking access to the properties page
-		if(m_Convolution.get_ptr() == NULL)
+		if(DMO_SET_TYPEF_TEST_ONLY & dwFlags) // Gone far enough
 		{
-			return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : E_ABORT;
+			return S_OK;
+		}
+
+		// Set the input type
+
+		// TODO: Can't signal failure to get a convolution filter in FinalizeConstruction without
+		// breaking access to the properties page, so m_ConvolutionList might be null
+		if(m_ConvolutionList.get_ptr() == NULL)
+		{
+			return DMO_E_TYPE_NOT_ACCEPTED;
 		}
 		else
 		{
-			WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
-			if (NULL == pWave)
+			const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) pmt->pbFormat;
+			if (NULL == pWaveIn)
 			{
-				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : E_POINTER;
+				return E_POINTER;
 			}
 
-			// Check that the filter has the right number of channels and the same sample rate as our filter
-			if ((pWave->nChannels != m_Convolution->Mixer.nInputChannels) ||
-				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSamplesPerSec))
+			const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+			if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
 			{
-				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
+				return DMO_E_TYPE_NOT_ACCEPTED;
 			}
 			else // Acceptable type
 			{
-				if ( 0 == dwFlags ) // set the type
-				{
-					// free any existing media type
-					::MoFreeMediaType(&m_mtInput);
-					::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
+				// set the type
 
-					// copy new media type
-					hr = ::MoCopyMediaType( &m_mtInput, pmt );
-					if (FAILED(hr))
-					{
-						return hr;
-					}
+				// free any existing media type
+				::MoFreeMediaType(&m_mtInput);
+				::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
+
+				// copy new media type
+				hr = ::MoCopyMediaType( &m_mtInput, pmt );
+				if (FAILED(hr))
+				{
+					return hr;
 				}
 
-				return m_FormatSpecs.SelectSampleConvertor(pWave, m_InputSampleConvertor);
+				return m_FormatSpecs.SelectSampleConvertor(pWaveIn, m_InputSampleConvertor);
 			}
 		}
 	}
@@ -552,49 +567,55 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 
 	// validate that the output media type is acceptable, and sample rate is compatible with the input type
 	// and matches our input type (if set)
-	hr = ValidateMediaType(pmt, &m_mtInput);
+	hr = ValidateMediaType(&m_mtInput, pmt);
 	if (FAILED(hr))
 	{
 		return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 	}
 	else
 	{
-		// TODO: Can't signal failure to get a convolution filter in FinalizeConstruction without
-		// breaking access to the properties page
-		if(m_Convolution.get_ptr() == NULL)
+		if(DMO_SET_TYPEF_TEST_ONLY & dwFlags) // Gone far enough
 		{
-			return E_POINTER;
+			return S_OK;
+		}
+
+		// Set the input type
+		// TODO: Can't signal failure to get a convolution filter in FinalizeConstruction without
+		// breaking access to the properties page, so m_ConvolutionList might be null
+		if(m_ConvolutionList.get_ptr() == NULL)
+		{
+			return DMO_E_TYPE_NOT_ACCEPTED;
 		}
 		else
 		{
-			WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
-			if (NULL == pWave)
+			const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * )  m_mtInput.pbFormat;
+
+			const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) pmt->pbFormat;
+			if (NULL == pWaveOut)
 			{
-				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : E_ABORT;
+				return E_POINTER;
 			}
 
-			// Check that the filter has the right number of channels and the same sample rate as our filter
-			if ((pWave->nChannels != m_Convolution->Mixer.nOutputChannels) ||
-				(pWave->nSamplesPerSec != m_Convolution->Mixer.nSamplesPerSec))
+			if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
 			{
-				return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
+				return DMO_E_TYPE_NOT_ACCEPTED;
 			}
 			else // Acceptable type
 			{
-				if ( 0 == dwFlags )
-				{
-					// free existing media type
-					::MoFreeMediaType(&m_mtOutput);
-					::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
+				// set the type
 
-					// copy new media type
-					hr = ::MoCopyMediaType( &m_mtOutput, pmt );
-					if (FAILED(hr))
-					{
-						return hr;
-					}
+				// free any existing media type
+				::MoFreeMediaType(&m_mtOutput);
+				::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
+
+				// copy new media type
+				hr = ::MoCopyMediaType( &m_mtOutput, pmt );
+				if (FAILED(hr))
+				{
+					return hr;
 				}
-				return m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor);
+
+				return m_FormatSpecs.SelectSampleConvertor(pWaveOut, m_OutputSampleConvertor);
 			}
 		}
 	}
@@ -722,21 +743,22 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	// Default to the input sample size, in bytes.
 	*pcbSize = m_mtInput.lSampleSize;
 
-	if(m_Convolution.get_ptr() != NULL && m_InputSampleConvertor != NULL)
-	{
-		// For optimization, require data to be presented in half-partition lengths
-		// TODO: This seems to have no effect.  May need to allocate a new IMediaBuffer, copy
-		// the bits there, and return that buffer in ProcessOutput.
-		*pcbSize = m_Convolution->cbLookAhead(m_InputSampleConvertor);
+	// TODO: There may be no SelectedConvolution
+	//if(m_ConvolutionList.get_ptr() != NULL && m_InputSampleConvertor != NULL)
+	//{
+	//	// For optimization, require data to be presented in half-partition lengths
+	//	// TODO: This seems to have no effect.  May need to allocate a new IMediaBuffer, copy
+	//	// the bits there, and return that buffer in ProcessOutput.
+	//	*pcbSize = m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor);
 
-		// This plug-in lags its output by half a partition length
-		*pcbMaxLookahead = m_Convolution->cbLookAhead(m_InputSampleConvertor);
-	}
-	else
-	{
+	//	// This plug-in lags its output by half a partition length
+	//	*pcbMaxLookahead = m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor);
+	//}
+	//else
+	//{
 		*pcbMaxLookahead = 0;
-		return E_FAIL; // May be too strict
-	}
+	//	return E_FAIL; // May be too strict
+	//}
 
 	return S_OK;
 }
@@ -807,7 +829,7 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 		return DMO_E_INVALIDSTREAMINDEX;
 	}
 
-	if(m_Convolution.get_ptr() != NULL)
+	if(m_ConvolutionList.get_ptr() != NULL)
 	{
 		// Not clear when this routine is called.
 		WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
@@ -817,7 +839,7 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 		}
 
 		//// Latency is half a partition length
-		*prtMaxLatency = ::MulDiv( m_Convolution->cbLookAhead(m_InputSampleConvertor), UNITS, pWave->nAvgBytesPerSec);
+		*prtMaxLatency = ::MulDiv( m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor), UNITS, pWave->nAvgBytesPerSec);
 
 		return S_OK;
 	}
@@ -873,9 +895,23 @@ STDMETHODIMP CConvolver::Flush( void )
 	m_bValidTime = false;
 	m_rtTimestamp = 0;
 
-	if (m_Convolution.get_ptr())
+	if (m_ConvolutionList.get_ptr() != NULL)
 	{
-		m_Convolution->Flush();
+
+
+		// Flush may be called after a new filter is selected via properties, but without
+		// calling SetInputType / SetOutputType
+		if(!m_ConvolutionList->ConvolutionSelected())
+		{
+			HRESULT hr = m_ConvolutionList->SelectConvolution(( WAVEFORMATEX * ) m_mtOutput.pbFormat, ( WAVEFORMATEX * ) m_mtOutput.pbFormat);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+			if(!m_ConvolutionList->ConvolutionSelected())
+				return DMO_E_TYPE_NOT_ACCEPTED;
+		}
+		m_ConvolutionList->SelectedConvolution().Flush();
 	}
 
 	return S_OK;
@@ -973,7 +1009,7 @@ STDMETHODIMP CConvolver::FreeStreamingResources( void )
 	m_rtTimestamp = 0;
 
 	// Don't delete this here; only when filter name or partition number changes
-	//m_Convolution = NULL;
+	//m_ConvolutionList = NULL;
 
 	return S_OK;
 }
@@ -1410,7 +1446,7 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
 		// May throw
-		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,  
+		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  
 			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 	}
 
@@ -1446,7 +1482,7 @@ STDMETHODIMP CConvolver::put_partitions(WORD newVal)
 		m_nPartitions = newVal;
 
 		// May throw
-		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,
+		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
 			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 	}
 
@@ -1483,7 +1519,7 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 		m_nPlanningRigour = newVal;
 
 		// May throw
-		m_Convolution.set_ptr(new CConvolution<float>(m_szFilterFileName,
+		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
 			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 	}
 
@@ -1497,9 +1533,9 @@ STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
-	if(m_Convolution.get_ptr() != NULL)
+	if(m_ConvolutionList.get_ptr() != NULL)
 	{
-		*description = m_Convolution->Mixer.DisplayChannelPaths();
+		*description = m_ConvolutionList->DisplayConvolutionList();
 		return S_OK;
 	}
 	else
@@ -1509,6 +1545,37 @@ STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 	}
 }
 
+// Property to get a filter description 
+STDMETHODIMP CConvolver::calculateOptimumAttenuation(float & fAttenuation)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;);
+#endif
+
+	if(m_ConvolutionList.get_ptr() != NULL)
+	{
+		float min_fAttenuation = MAX_ATTENUATION;
+		for(unsigned int i=0; i<m_ConvolutionList->nConvolutionList(); ++i)
+		{
+			HRESULT hr = m_ConvolutionList->Conv(i).calculateOptimumAttenuation(fAttenuation);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+			if(fAttenuation < min_fAttenuation)
+			{
+				min_fAttenuation = fAttenuation;
+			}
+		}
+		fAttenuation = min_fAttenuation;
+		return S_OK;
+	}
+	else
+	{
+		fAttenuation = 0;
+		return E_FAIL;
+	}
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolver::DoProcessOutput
@@ -1536,7 +1603,7 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 		return S_OK;
 	}
 
-	if(m_Convolution.get_ptr() == NULL)
+	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return E_FAIL;
 	}
@@ -1550,11 +1617,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 
 	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?
-		m_Convolution->doConvolution(pbInputData, pbOutputData,
+		m_ConvolutionList->SelectedConvolution().doConvolution(pbInputData, pbOutputData,
 		m_InputSampleConvertor, m_OutputSampleConvertor,
 		dwBlocksToProcess,
 		m_fAttenuation_db)
-		: 	m_Convolution->doPartitionedConvolution(pbInputData, pbOutputData,
+		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbInputData, pbOutputData,
 		m_InputSampleConvertor, m_OutputSampleConvertor,
 		dwBlocksToProcess,
 		m_fAttenuation_db);
@@ -1568,193 +1635,92 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 // Validate that the media type is acceptable
 /////////////////////////////////////////////////////////////////////////////
 
-HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO_MEDIA_TYPE *pmtPartner)
+HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_MEDIA_TYPE *pmtOutput)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "ValidateMediaType" << std::endl;);
 #endif
 
-	if (pmtPartner == NULL || pmtTarget == NULL)
+	HRESULT hr = S_OK;
+
+	if (pmtOutput == NULL || pmtInput == NULL)
 	{
 		return E_POINTER;
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
-	if (GUID_NULL != pmtTarget->majortype && GUID_NULL != pmtTarget->subtype)
+	if (GUID_NULL != pmtInput->majortype && GUID_NULL != pmtInput->subtype)
 	{
-		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtTarget->pbFormat, 0, "Target:") << std::endl;
+		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtInput->pbFormat, 0, "Input:") << std::endl;
 	}
 	else
 	{
-		cdebug << "Null Target" << std::endl;
+		cdebug << "Null Input" << std::endl;
 	}
-	if (GUID_NULL != pmtPartner->majortype && GUID_NULL != pmtPartner->subtype)
+	if (GUID_NULL != pmtOutput->majortype && GUID_NULL != pmtOutput->subtype)
 	{
-		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtPartner->pbFormat, 0, "Partner:") << std::endl;
+		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtOutput->pbFormat, 0, "Output:") << std::endl;
 	}
 	else
 	{
-		cdebug << "Null Partner" << std::endl;
+		cdebug << "Null Output" << std::endl;
 	}
 #endif
 
-	// make sure the target media type has the fields we require
-	if( ( MEDIATYPE_Audio != pmtTarget->majortype ) ||
-		( KSDATAFORMAT_SUBTYPE_PCM != pmtTarget->subtype && KSDATAFORMAT_SUBTYPE_IEEE_FLOAT != pmtTarget->subtype ) ||
-		( FORMAT_WaveFormatEx != pmtTarget->formattype ) ||
-		( pmtTarget->cbFormat < sizeof( WAVEFORMATEX )) ||
-		( NULL == pmtTarget->pbFormat) )
+	WAVEFORMATEX *pInputWave = NULL;
+
+	if (GUID_NULL != pmtInput->majortype || GUID_NULL != pmtInput->subtype)
+	{
+		if( ( MEDIATYPE_Audio != pmtInput->majortype ) ||
+			( KSDATAFORMAT_SUBTYPE_PCM != pmtInput->subtype && KSDATAFORMAT_SUBTYPE_IEEE_FLOAT != pmtInput->subtype ) ||
+			( FORMAT_WaveFormatEx != pmtInput->formattype ) )
+		{
+			return DMO_E_TYPE_NOT_ACCEPTED;
+		}
+		else
+		{
+			pInputWave = (WAVEFORMATEX *) pmtInput->pbFormat;
+			hr = m_FormatSpecs.CheckSampleFormat(pInputWave);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+		}
+	}
+
+	WAVEFORMATEX *pOutputWave = NULL;
+
+	if (GUID_NULL != pmtOutput->majortype || GUID_NULL != pmtOutput->subtype)
+	{
+		if( ( MEDIATYPE_Audio != pmtOutput->majortype ) ||
+			( KSDATAFORMAT_SUBTYPE_PCM != pmtOutput->subtype && KSDATAFORMAT_SUBTYPE_IEEE_FLOAT != pmtOutput->subtype ) ||
+			( FORMAT_WaveFormatEx != pmtOutput->formattype ) )
+		{
+			return DMO_E_TYPE_NOT_ACCEPTED;
+		}
+		else
+		{
+			pOutputWave = (WAVEFORMATEX *) pmtOutput->pbFormat;
+			hr = m_FormatSpecs.CheckSampleFormat(pOutputWave);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+		}
+	}
+
+	// Check that there is a compatible filter path
+	if(m_ConvolutionList.get_ptr() != NULL)
+	{
+		hr = m_ConvolutionList->CheckConvolutionList(pInputWave, pOutputWave);
+		if(FAILED(hr))
+		{
+			return hr;
+		}
+	}
+	else
 	{
 		return DMO_E_TYPE_NOT_ACCEPTED;
-	}
-
-	// make sure the wave header has the fields we require
-	WAVEFORMATEX *pTargetWave = (WAVEFORMATEX *) pmtTarget->pbFormat;
-
-	if ((0 == pTargetWave->nChannels) ||
-		(0 == pTargetWave->nSamplesPerSec) ||
-		(0 == pTargetWave->nAvgBytesPerSec) ||
-		(0 == pTargetWave->nBlockAlign) ||
-		(0 == pTargetWave->wBitsPerSample))
-	{
-		return DMO_E_TYPE_NOT_ACCEPTED;
-	}
-
-	if ((pTargetWave->nBlockAlign != pTargetWave->nChannels * pTargetWave->wBitsPerSample / 8) ||
-		(pTargetWave->nAvgBytesPerSec != pTargetWave->nBlockAlign * pTargetWave->nSamplesPerSec))
-	{
-		return DMO_E_INVALIDTYPE;
-	}
-
-
-	// make sure the wave format is acceptable
-	switch (pTargetWave->wFormatTag)
-	{
-	case WAVE_FORMAT_PCM:
-
-		// make sure sample size is 8 or 16-bit
-		if (((8  != pTargetWave->wBitsPerSample) &&
-			(16 != pTargetWave->wBitsPerSample)) ||
-			(pmtTarget->cbFormat != sizeof(WAVEFORMATEX)))
-		{
-			return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-
-		// channel-to-speaker specification for WAVE_FORMAT_PCM is undefined for the case of nChannels > 2
-		// But let it through
-		// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-		if (pTargetWave->nChannels > 2)
-		{
-			//return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-		break;
-
-	case WAVE_FORMAT_IEEE_FLOAT:
-		// make sure sample size is 32- or 64-bit
-		if (((32 != pTargetWave->wBitsPerSample) &&
-			(64 != pTargetWave->wBitsPerSample)) ||
-			(pmtTarget->cbFormat != sizeof(WAVEFORMATEX)))
-		{
-			return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-
-		// channel-to-speaker specification for WAVE_FORMAT_IEEE_FLOAT is undefined for the case of nChannels > 2
-		// But let it through
-		// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-		if (pTargetWave->nChannels > 2)
-		{
-			//return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-		break;
-
-	case WAVE_FORMAT_EXTENSIBLE:
-		{
-			WAVEFORMATEXTENSIBLE *pTargetWaveXT = (WAVEFORMATEXTENSIBLE *) pTargetWave;
-
-			if(pTargetWaveXT->Format.cbSize < 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
-			{
-				return DMO_E_INVALIDTYPE;
-			}
-
-			if(pTargetWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
-			{
-				// for 8 or 16-bit, the container and sample size must match
-				if ((8  == pTargetWave->wBitsPerSample) ||
-					(16 == pTargetWave->wBitsPerSample))
-				{
-					if (pTargetWave->wBitsPerSample != pTargetWaveXT->Samples.wValidBitsPerSample)
-					{
-						return DMO_E_TYPE_NOT_ACCEPTED;
-					}
-				}
-				else 
-				{
-					// for any other container size, make sure the valid
-					// bits per sample is a value we support
-					if (((16 != pTargetWaveXT->Samples.wValidBitsPerSample) &&
-						(20 != pTargetWaveXT->Samples.wValidBitsPerSample) &&
-						(24 != pTargetWaveXT->Samples.wValidBitsPerSample) &&
-						(32 != pTargetWaveXT->Samples.wValidBitsPerSample)) ||
-						(pTargetWaveXT->Samples.wValidBitsPerSample > pTargetWave->wBitsPerSample))
-					{
-						return DMO_E_TYPE_NOT_ACCEPTED;
-					}
-				}
-			}
-			else if(pTargetWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-			{
-				if (((32 != pTargetWave->wBitsPerSample) ||
-					( 32 != pTargetWaveXT->Samples.wValidBitsPerSample))  &&
-					((64 != pTargetWave->wBitsPerSample) ||
-					 (64 != pTargetWaveXT->Samples.wValidBitsPerSample)))
-				{
-					return DMO_E_TYPE_NOT_ACCEPTED;
-				}
-			}
-			else // Not a recognised SubFormat
-				return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-		break;
-
-	default:
-		return DMO_E_TYPE_NOT_ACCEPTED;
-	}
-
-	// if the partner media type is configured, make sure it is compatible the target.
-	if (GUID_NULL != pmtPartner->majortype)
-	{
-		// make sure the target media type has the fields we require
-		if( ( MEDIATYPE_Audio != pmtPartner->majortype ) ||
-			( KSDATAFORMAT_SUBTYPE_PCM != pmtPartner->subtype && KSDATAFORMAT_SUBTYPE_IEEE_FLOAT != pmtPartner->subtype) ||
-			( FORMAT_WaveFormatEx != pmtPartner->formattype ) ||
-			( pmtPartner->cbFormat < sizeof( WAVEFORMATEX )) ||
-			( NULL == pmtPartner->pbFormat) )
-		{
-			return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-
-		// make sure the wave header has the fields we require
-		WAVEFORMATEX *pPartnerWave = (WAVEFORMATEX *) pmtPartner->pbFormat;
-
-		if ((0 == pPartnerWave->nChannels) ||
-			(0 == pPartnerWave->nSamplesPerSec) ||
-			(0 == pPartnerWave->nAvgBytesPerSec) ||
-			(0 == pPartnerWave->nBlockAlign) ||
-			(0 == pPartnerWave->wBitsPerSample))
-		{
-			return DMO_E_TYPE_NOT_ACCEPTED;
-		}
-
-		if ((pPartnerWave->nBlockAlign != pPartnerWave->nChannels * pPartnerWave->wBitsPerSample / 8) ||
-			(pPartnerWave->nAvgBytesPerSec != pPartnerWave->nBlockAlign * pPartnerWave->nSamplesPerSec))
-		{
-			return DMO_E_INVALIDTYPE;
-		}
-
-		if (pTargetWave->nSamplesPerSec != pPartnerWave->nSamplesPerSec)
-		{
-			return DMO_E_TYPE_NOT_ACCEPTED;
-		}
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -1762,7 +1728,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtTarget, const DMO
 #endif
 
 	// media type is valid
-	return S_OK;
+	return hr;
 }
 
 #ifdef IPROPERTYBAG

@@ -2,6 +2,7 @@
 
 #include <ks.h>
 #include <ksmedia.h>
+#include <mediaerr.h>
 
 template <typename T>
 class Sample
@@ -321,39 +322,115 @@ private:
 	{
 		GUID					SubType;
 		WORD					wFormatTag;
-		WORD					wBitsPerSample; // 
+		WORD					wBitsPerSample; 
 		WORD					wValidBitsPerSample;
 		Sample<T>*				sample_convertor;
 	} FormatSpecs_[];
 public:
 
-	static const int size = 15;
+	static const DWORD size = 15;
 
 	CFormatSpecs() {}
 
-	virtual ~CFormatSpecs() {}
-
-	const FormatSpec& operator[](int i) const
+	virtual ~CFormatSpecs()
 	{
-		assert(i >= 0 && i < size);
+		//for(WORD i=0; i<size; ++i)
+		//{
+		//	FormatSpecs_[i].sample_convertor->~Sample();
+		//}
+	}
+
+	const FormatSpec& operator[](DWORD i) const
+	{
+		assert(i < size);
 		return FormatSpecs_[i];
 	}
 
-	HRESULT SelectSampleConvertor(const WAVEFORMATEX* & pWave, Sample<T>* & sample_convertor)
+	// Check that this is a sample type that we support
+	HRESULT CheckSampleFormat(const WAVEFORMATEX* pWave) const
 	{
 		if(pWave == NULL)
 		{
 			return E_POINTER;
 		}
 
+		if ((pWave->nBlockAlign != pWave->nChannels * pWave->wBitsPerSample / 8) ||
+			(pWave->nAvgBytesPerSec != pWave->nBlockAlign * pWave->nSamplesPerSec))
+		{
+			return DMO_E_INVALIDTYPE;
+		}
+
 		// Formats that support more than two channels or sample sizes of more than 16 bits can be described
 		// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
 		if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 		{
-			for(int i = 0; i < size; ++i)
-			{
+			const WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
 
-				WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
+			if(pWaveXT->Format.cbSize < 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
+			{
+				return DMO_E_INVALIDTYPE;
+			}
+			assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
+
+			for(WORD i = 0; i < size; ++i)
+			{
+				if(	pWaveXT->Format.wFormatTag == FormatSpecs_[i].wFormatTag &&
+					pWaveXT->Format.wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
+					pWaveXT->Samples.wValidBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
+				{
+					return S_OK;
+				}
+			}
+		}
+		else // WAVE_FORMAT_PCM (8, or 16-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
+		{
+			if(pWave->cbSize != 0)
+			{
+				return DMO_E_INVALIDTYPE;
+			}
+
+			for(WORD i = 0; i < size; ++i)
+			{
+				if(	pWave->wFormatTag == FormatSpecs_[i].wFormatTag &&
+					pWave->wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
+					pWave->wBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
+				{
+					return S_OK;
+				}
+			}
+		}
+
+		return DMO_E_TYPE_NOT_ACCEPTED;
+	}
+
+	// Same as CheckSampleFormat, but sets sample_convertor
+	HRESULT SelectSampleConvertor(const WAVEFORMATEX* pWave, Sample<T>* & sample_convertor) const
+	{
+		if(pWave == NULL)
+		{
+			return E_POINTER;
+		}
+
+		if ((pWave->nBlockAlign != pWave->nChannels * pWave->wBitsPerSample / 8) ||
+			(pWave->nAvgBytesPerSec != pWave->nBlockAlign * pWave->nSamplesPerSec))
+		{
+			return DMO_E_INVALIDTYPE;
+		}
+
+		// Formats that support more than two channels or sample sizes of more than 16 bits can be described
+		// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
+		if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+		{
+			const WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
+
+			if(pWaveXT->Format.cbSize < 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
+			{
+				return DMO_E_INVALIDTYPE;
+			}
+			assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
+
+			for(WORD i = 0; i < size; ++i)
+			{
 				if(	pWaveXT->Format.wFormatTag == FormatSpecs_[i].wFormatTag &&
 					pWaveXT->Format.wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
 					pWaveXT->Samples.wValidBitsPerSample == FormatSpecs_[i].wValidBitsPerSample)
@@ -365,7 +442,12 @@ public:
 		}
 		else // WAVE_FORMAT_PCM (8, or 16-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
 		{
-			for(int i = 0; i < size; ++i)
+			if(pWave->cbSize != 0)
+			{
+				return DMO_E_INVALIDTYPE;
+			}
+
+			for(WORD i = 0; i < size; ++i)
 			{
 				if(	pWave->wFormatTag == FormatSpecs_[i].wFormatTag &&
 					pWave->wBitsPerSample == FormatSpecs_[i].wBitsPerSample &&
@@ -378,7 +460,7 @@ public:
 		}
 
 		sample_convertor = NULL;
-		return E_FAIL;
+		return DMO_E_TYPE_NOT_ACCEPTED;
 	}
 
 private:

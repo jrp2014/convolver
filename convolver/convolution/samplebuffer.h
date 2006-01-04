@@ -51,9 +51,9 @@
 
 // A simple aligned array
 template <class T>
-struct AlignedArray
+class AlignedArray
 {
-
+public:
 	typedef T					value_type;
 	typedef std::size_t			size_type;
 
@@ -85,6 +85,9 @@ struct AlignedArray
 		size_ = 0;
 		bsize_ = 0;
 	}
+
+protected:
+
 #if defined(__ICC) || defined(__INTEL_COMPILER)
 	_declspec(align(16)) T* restrict first_;
 #else
@@ -94,6 +97,7 @@ struct AlignedArray
 	size_type bsize_;       // length in bytes
 
 private:
+
 	// No copying
 	AlignedArray(const AlignedArray<T>&);
 	AlignedArray& operator=(const AlignedArray<T>&);
@@ -101,35 +105,21 @@ private:
 
 // comparisons
 template<class T>
-bool operator== (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return std::equal(x.begin(), x.end(), y.begin());
-}
+bool operator== (const AlignedArray<T>& x, const AlignedArray<T>& y);
 template<class T>
-bool operator< (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return std::lexicographical_compare(x.begin(),x.end(),y.begin(),y.end());
-}
+bool operator< (const AlignedArray<T>& x, const AlignedArray<T>& y);
 template<class T>
-bool operator!= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return !(x==y);
-}
+bool operator!= (const AlignedArray<T>& x, const AlignedArray<T>& y);
 template<class T>
-bool operator> (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return y<x;
-}
+bool operator> (const AlignedArray<T>& x, const AlignedArray<T>& y);
 template<class T>
-bool operator<= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return !(y<x);
-}
+bool operator<= (const AlignedArray<T>& x, const AlignedArray<T>& y);
 template<class T>
-bool operator>= (const AlignedArray<T>& x, const AlignedArray<T>& y) {
-    return !(x<y);
-}
+bool operator>= (const AlignedArray<T>& x, const AlignedArray<T>& y);
 
 // global swap()
 template<class T>
-inline void swap (AlignedArray<T>& x, AlignedArray<T>& y) {
-	x.swap(y);
-}
+inline void swap (AlignedArray<T>& x, AlignedArray<T>& y);
 
 template <typename T> 
 struct FastArray : public AlignedArray<T>
@@ -152,7 +142,7 @@ struct FastArray : public AlignedArray<T>
 	iterator begin() { return first_; }
 	const_iterator begin() const { return first_; }
 	iterator end() { return first_ + size_; }
-	const_iterator end() const { return first + size_; }
+	const_iterator end() const { return first_ + size_; }
 
 	// reverse iterator support
 	typedef std::reverse_iterator<iterator> reverse_iterator;
@@ -172,15 +162,16 @@ struct FastArray : public AlignedArray<T>
 
 	// Basic constructors
 	FastArray() : AlignedArray<T>() {}
-	explicit FastArray(size_type n) : AlignedArray<T>(n)
+	explicit FastArray(const size_type n) : AlignedArray<T>(n)
 	{ 
+		// TODO: we probably don't need to do this
 		std::uninitialized_fill_n(first_, size_, 0);
 	}
-	FastArray(const_reference x, size_t n) : AlignedArray<T>(n)
+	FastArray(const_reference x, const size_t n) : AlignedArray<T>(n)
 	{ 
 		std::uninitialized_fill_n(first_, size_, x);
 	}
-	FastArray(const_pointer p, size_t n) : AlignedArray<T>(n)
+	FastArray(const_pointer p, const size_t n) : AlignedArray<T>(n)
 	{
 		std::uninitialized_copy(p, p + n, first_);
 	}
@@ -200,6 +191,7 @@ struct FastArray : public AlignedArray<T>
 		assert(n >= 0 && n < size_);
 		return *(first_ + n);
 	}
+
 	const_reference operator[](size_type n) const
 	{
 		assert(n >= 0 && n < size_);
@@ -241,10 +233,9 @@ struct FastArray : public AlignedArray<T>
 	size_type static_size() const { return size_; }
 
 	// For use with C interface
-	pointer restrict c_ptr(const size_type& n=0) const
+	pointer restrict c_ptr() const
 	{
-		assert (n >= 0 && n < size_);
-		return empty() ? NULL : (first_ + n);
+		return empty() ? NULL : first_;
 	}
 
 	// swap (note: linear complexity in N, constant for given instantiation)
@@ -289,6 +280,12 @@ struct FastArray : public AlignedArray<T>
 	template <typename T2>
 	FastArray<T>& operator= (const FastArray<T2>& rhs)
 	{
+#ifdef FFTW
+		assert(size() == rhs.size() || size() == 2*(rhs.size()/2+1));
+#else
+		assert(size() == rhs.size());
+#endif
+		assert(size() == rhs->size()));
 		std::copy(rhs.begin(),rhs.end(), begin());
 		return *this;
 	}
@@ -297,19 +294,20 @@ struct FastArray : public AlignedArray<T>
 
 	FastArray<T>& operator=(const_reference x)
 	{
-		if(x == 0)
-		{
-			::ZeroMemory(first_, bsize_);
-		}
-		else
-		{
-			const size_type ss = size_;						// Improve chances of vectorization
-#pragma loop count(65536)
-#pragma ivdep
-#pragma vector aligned
-			for (size_type i = 0; i < ss; ++i)
-				(*this)[i] = static_cast<T>(x);             // TODO: optimize int->float
-		}
+		std::uninitialized_fill_n(first_, size_, x);
+//		if(x == 0)
+//		{
+//			::ZeroMemory(first_, bsize_);
+//		}
+//		else
+//		{
+//			const size_type ss = size_;						// Improve chances of vectorization
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//			for (size_type i = 0; i < ss; ++i)
+//				(*this)[i] = static_cast<T>(x);             // TODO: optimize int->float
+//		}
 		return *this;
 	}
 
@@ -330,23 +328,44 @@ struct FastArray : public AlignedArray<T>
 
 	FastArray<T>& operator+= (const_reference x)
 	{
-		const size_type ss = size_;
+		if(x != 0)
+		{
+			const size_type ss = size_;
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned
-		for (size_type i = 0; i < ss; ++i)
-			(*this)[i] += x;
+			for (size_type i = 0; i < ss; ++i)
+				(*this)[i] += x;
+		}
+		return *this;
+	}
+
+	template <typename T2>
+		FastArray<T>& operator+= (const FastArray<T2>& rhs)
+	{
+#ifdef FFTW
+		assert(size() == rhs.size() || size() == 2*(rhs.size()/2+1));
+#else
+		assert(size() == rhs.size());
+#endif
+		// Optimization
+		const size_type rhs_size = rhs.size();
+#pragma loop count(65536)
+#pragma ivdep
+#pragma vector aligned
+		for (size_type i = 0; i < rhs_size; ++i)
+			(*this)[i] += rhs[i];
+
 		return *this;
 	}
 
 	// Member functions
 
-	void shiftleft(const size_type& n)
+	void shiftleft(const size_type n)
 	{
 		//std::copy(begin() + n, begin() + 2 * n - 1, begin());
 		::MoveMemory(first_, first_ + n, n * sizeof(T));
 	}
-
 
 private:
 	// check range (may be private because it is static)
@@ -359,70 +378,100 @@ private:
 	}
 };
 
-template <typename T> 
-struct FastArray2D : public std::vector< FastArray<T> >
-{ 
-	// Constructors
-	FastArray2D() : std::vector< FastArray<T> >() {}
-	explicit FastArray2D(const size_type& n) : std::vector< FastArray<T> >(n) {}
-	FastArray2D(const FastArray2D& other) : std::vector< FastArray<T> >(other) {}
-	FastArray2D(const size_type& n, const FastArray<T>& x) : std::vector< FastArray<T> >(n, x) {}
-
-	// Assignment
-	FastArray2D<T>& operator=(const T& x)
-	{
-		for(size_type i=0; i < this->size(); ++i)
-		{
-			(*this)[i] = x;
-		}
-		return *this;
-	}
-
-	T* restrict c_ptr(const size_type& row=0, const size_type& column=0) const
-	{
-		assert (row < this->size() && (column < (*this)[row].size()));
-		return (*this)[row].c_ptr(column);
-	}
-}; 
-
-template <typename T> 
-struct FastArray3D : public std::vector< FastArray2D<T> >
-{ 
-	// Constructors
-	FastArray3D() : std::vector< FastArray2D<T> >() {}
-	explicit FastArray3D(const size_type& n) : std::vector< FastArray2D<T> >(n) {}
-	FastArray3D(const FastArray3D& other) : std::vector< FastArray2D<T> >(other) {}
-	FastArray3D(const size_type& n, const FastArray2D<T>& x) : std::vector< FastArray2D<T> >(n, x) {}
-
-	T* restrict c_ptr(const size_type& row=0, const size_type& column=0, const size_type& plane=0) const
-	{
-		assert (row < this->size() && (column < (*this)[row].size() && plane < (*this)[row][column].size()));
-		//return &(*this)[row][column][plane];
-		return (*this)[row][column].c_ptr(plane);
-	}
-
-	FastArray3D<T>& operator=(const T& x)
-	{
-		for(size_type i=0; i < this->size(); ++i)
-		{
-			(*this)[i] = x;
-		}
-		return *this;
-	}
-
-	//FastArray3D<T>& operator=(const int& x)
-	//{
-	//	*this = static_cast<T>(x);
-	//	return *this;
-	//}
-
-}; 
+//template <typename T> 
+//struct FastArray2D : public std::vector< FastArray<T> >
+//{ 
+//	// Constructors
+//	FastArray2D() : std::vector< FastArray<T> >() {}
+//	explicit FastArray2D(const size_type n) : std::vector< FastArray<T> >(n) {}
+//	FastArray2D(const FastArray2D& other) : std::vector< FastArray<T> >(other) {}
+//	FastArray2D(const size_type n, const FastArray<T>& x) : std::vector< FastArray<T> >(n, x) {}
+//
+//	// Assignment
+//	FastArray2D<T>& operator=(const T x)
+//	{
+//		for(size_type i=0; i < this->size(); ++i)
+//		{
+//			(*this)[i] = x;
+//		}
+//		return *this;
+//	}
+//
+//	FastArray2D<T>& operator+=(const T x)
+//	{
+//		for(size_type i=0; i < this->size(); ++i)
+//		{
+//			(*this)[i] += x;
+//		}
+//		return *this;
+//	}
+//
+//	template <typename T2>
+//	FastArray2D<T>& operator+= (const FastArray2D<T2>& rhs)
+//	{
+//		assert(this->size() == rhs->size()));
+//		for(size_type i=0; i < this->size(); ++i)
+//		{
+//			(*this)[i] += rhs[i];
+//		}
+//		return *this;
+//	}
+//
+//
+//	T* restrict c_ptr(const size_type& row=0) const
+//	{
+//		assert (row < this->size());
+//		return (*this)[row].c_ptr();
+//	}
+//}; 
+//
+//template <typename T> 
+//struct FastArray3D : public std::vector< FastArray2D<T> >
+//{ 
+//	// Constructors
+//	FastArray3D() : std::vector< FastArray2D<T> >() {}
+//	explicit FastArray3D(const size_type n) : std::vector< FastArray2D<T> >(n) {}
+//	FastArray3D(const FastArray3D& other) : std::vector< FastArray2D<T> >(other) {}
+//	FastArray3D(const size_type n, const FastArray2D<T>& x) : std::vector< FastArray2D<T> >(n, x) {}
+//
+//	T* restrict c_ptr(const size_type row=0, const size_type column=0) const
+//	{
+//		assert (row < this->size() && (column < (*this)[row].size()));
+//		//return &(*this)[row][column][plane];
+//		return (*this)[row][column].c_ptr();
+//	}
+//
+//	FastArray3D<T>& operator=(const T x)
+//	{
+//		for(size_type i=0; i < this->size(); ++i)
+//		{
+//			(*this)[i] = x;
+//		}
+//		return *this;
+//	}
+//
+//	//FastArray3D<T>& operator=(const int& x)
+//	//{
+//	//	*this = static_cast<T>(x);
+//	//	return *this;
+//	//}
+//
+//}; 
 
 
 
 typedef FastArray<float> ChannelBuffer;
-typedef FastArray2D<float> SampleBuffer;
-typedef FastArray3D<float> PartitionedBuffer;
+typedef std::vector<ChannelBuffer> SampleBuffer;
+typedef std::vector<SampleBuffer> PartitionedBuffer;
+
+// float must be the same as the FastArray base type
+extern float* restrict c_ptr(const ChannelBuffer& x);
+extern float* restrict c_ptr(const SampleBuffer& x, const ChannelBuffer::size_type row=0);
+extern float* restrict c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row=0, const ChannelBuffer::size_type column=0);
+
+// zero all the elements
+extern void Zero (SampleBuffer& x);
+extern void Zero (PartitionedBuffer& x);
 
 //#ifdef UNDEF
 //// T is normally float

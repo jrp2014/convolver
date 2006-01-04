@@ -38,7 +38,7 @@ extern "C" void cmuladd(float *, float *, float *, int);
 #endif
 #endif
 
-// CConvolution does the work
+// Convolution does the work
 // The data path is:
 // pbInputData (raw bytes) ->  AttenuatedSample(const float fAttenuation_db, GetSample(const BYTE* & container)) ->
 // m_InputBuffer (FFT_type) -> [convolve] ->
@@ -46,38 +46,40 @@ extern "C" void cmuladd(float *, float *, float *, int);
 // pbOuputData (raw bytes)
 
 template <typename T>
-class CConvolution
+class Convolution
 {
 public:
-	CConvolution(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
-//	virtual ~CConvolution(void) {};
+	Convolution(const TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
+	//	virtual ~Convolution(void) {};
 
 	// This version of the convolution routine does partitioned convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
 
 	// This version of the convolution routine does partitioned convolution
 	DWORD doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+		const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+		const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,		// A block contains a sample for each channel
 		const T fAttenuation_db);  // Returns bytes generated
 
 	// This version does straight overlap-save convolution
 	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+		const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+		const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,
 		const T fAttenuation_db); // Returns bytes generated
 
 	void Flush();								// zero buffers, reset pointers
 
-	ChannelPaths		Mixer;				// Order dependent
+	const ChannelPaths		Mixer;				// Order dependent
 
-	int cbLookAhead(Sample<T>* & sample_convertor)
+	HRESULT calculateOptimumAttenuation(T& fAttenuation);
+
+	int cbLookAhead(Sample<T>* & sample_convertor) const
 	{
 		if(sample_convertor != NULL)
 		{
-			return Mixer.nPartitionLength / 2 * sample_convertor->nContainerSize(); // The lag
+			return Mixer.nPartitionLength() / 2 * sample_convertor->nContainerSize(); // The lag
 		}
 		else
 		{
@@ -86,17 +88,18 @@ public:
 	}
 
 	// Calculate the size in bytes of the output buffer corresponding to a given input buffer size
-	unsigned int cbOutputBuffer(const int cbInputBuffer, Sample<T>* & InputSampleConvertor, Sample<T>* & OutputSampleConvertor)
+	unsigned int cbOutputBuffer(const int cbInputBuffer, 
+		Sample<T>* & InputSampleConvertor, Sample<T>* & OutputSampleConvertor) const
 	{
 		// Size of each input frame / block
-		const unsigned int cbInputFrame = InputSampleConvertor->nContainerSize() * Mixer.nInputChannels;
+		const unsigned int cbInputFrame = InputSampleConvertor->nContainerSize() * Mixer.nInputChannels();
 		// Check that the input buffer size is a whole number of blocks / frames
 		assert(cbInputBuffer % cbInputFrame == 0);
 
 		const unsigned int nInputFrames = cbInputBuffer / cbInputFrame; // No of frames/blocks in each input buffer
 
 		// Size of each output frame
-		const unsigned int cbOutputFrame = OutputSampleConvertor->nContainerSize() * Mixer.nOutputChannels;;
+		const unsigned int cbOutputFrame = OutputSampleConvertor->nContainerSize() * Mixer.nOutputChannels();
 
 		return cbOutputFrame * nInputFrames;
 	}
@@ -108,6 +111,7 @@ private:
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
+	const WORD			nPartitions_;
 	DWORD				nInputBufferIndex_;			// placeholder
 	WORD				nPartitionIndex_;			// for partitioned convolution
 	WORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
@@ -115,21 +119,24 @@ private:
 
 	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-		const ChannelBuffer& restrict Output, const DWORD& from, const DWORD& to);
+		const ChannelBuffer& restrict Output, const DWORD from, const DWORD to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
 	void inline complex_mul(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-										 fftwf_complex* restrict result, const DWORD count);
+		fftwf_complex* restrict result, const ChannelBuffer::size_type count);
 	void inline complex_mul_add(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-											 fftwf_complex* restrict result, const DWORD count);
+		fftwf_complex* restrict result, const ChannelBuffer::size_type count);
 #if defined(DEBUG) | defined(_DEBUG)
-	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, const DWORD from, const DWORD to) const;
+	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, 
+		const ChannelBuffer::size_type from, const ChannelBuffer::size_type to) const;
 #endif
 #elif !(defined(__ICC) || defined(__INTEL_COMPILER))
 	// non-vectorized complex array multiplication -- ordering specific to the Ooura routines. C = A * B
-	void inline cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const DWORD N);
-	void inline cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const DWORD N);
+	void inline cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C,
+		const ChannelBuffer::size_type N);
+	void inline cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C,
+		const ChannelBuffer::size_type N);
 #endif
 
 	// Used to check filter / partion lengths
@@ -138,12 +145,89 @@ private:
 		return i > 0 && (i & (i - 1)) == 0;
 	};
 
-	CConvolution(const CConvolution& other); // no impl.
-	void operator=(const CConvolution& other); // no impl.
-	CConvolution(CConvolution& other);                // discourage use of lvalue Filters
+	Convolution(); // no implementation
+	Convolution(const Convolution& other); // no impl.
+	const Convolution& operator=(const Convolution& other); // no impl.
 };
 
 template <typename T>
-HRESULT calculateOptimumAttenuation(T& fAttenuation, TCHAR szConfigFileName[MAX_PATH], 
-									const WORD& nPartitions, const unsigned int& nPlanningRigour);
+class ConvolutionList
+{
+public:
+	ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions,
+		const unsigned int& nPlanningRigour);
 
+	virtual ~ConvolutionList() 
+	{
+#if defined(DEBUG) | defined(_DEBUG)
+		DEBUGGING(3, cdebug << "ConvolutionList::~ConvolutionList " << std::endl;);
+#endif
+		// TODO: check that this is enough (ptr_vector should do the work)
+	}
+
+	typedef typename boost::ptr_vector< Convolution<T> >::size_type size_type;
+	enum SelectedState {Unselected, InputSelected, OutputSelected, Selected};
+
+	// Accessor functions
+
+	WORD nConvolutionList() const
+	{
+		assert(nConvolutionList_ == ConvolutionList_.size());
+		return nConvolutionList_;
+	}
+
+	void selectConvolutionIndex(const size_type& pathsIndex)
+	{
+		assert(pathsIndex < nConvolutionList_);
+		state_ = Selected;
+		selectedConvolutionIndex_ = pathsIndex;
+	}
+
+	bool ConvolutionSelected() const
+	{
+		return state_ == Selected;
+	}
+
+	Convolution<T>& SelectedConvolution()
+	{
+		if(state_ != Selected)
+			throw convolutionListException("Internal error: no filter paths selected", TEXT(""));
+		return ConvolutionList_[selectedConvolutionIndex_];
+	}
+
+	const Convolution<T>& operator[](size_type n) const
+	{
+		assert(n >= 0 && n < nConvolutionList());
+		return ConvolutionList_[n];
+	}
+
+	Convolution<T>& Conv(size_type n)
+	{
+		assert(n >= 0 && n < nConvolutionList());
+		return ConvolutionList_[n];
+	}
+
+	HRESULT CheckConvolutionList(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut, 
+		bool select=false);
+
+	HRESULT SelectConvolution(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut);
+
+	const std::string DisplayConvolutionList() const;
+
+#if defined(DEBUG) | defined(_DEBUG)
+	void Dump() const;
+#endif
+
+private:
+	configFile	config_;
+
+	SelectedState state_;
+	size_type selectedConvolutionIndex_;
+	boost::ptr_vector< Convolution<T> > ConvolutionList_;
+	WORD	nConvolutionList_;
+	WORD	nPartitions_;
+
+	ConvolutionList();											// No default ctor
+	ConvolutionList(const ConvolutionList&);					// No copy ctor
+	const ConvolutionList &operator =(const ConvolutionList&);	// No copy assignment
+};

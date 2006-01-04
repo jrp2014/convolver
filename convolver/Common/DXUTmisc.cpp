@@ -129,7 +129,6 @@ INT_PTR CALLBACK DisplaySwitchToREFWarningProc(HWND hDlg, UINT message, WPARAM w
 //--------------------------------------------------------------------------------------
 CDXUTTimer::CDXUTTimer()
 {
-    m_bUsingQPF         = false;
     m_bTimerStopped     = true;
     m_llQPFTicksPerSec  = 0;
 
@@ -137,9 +136,9 @@ CDXUTTimer::CDXUTTimer()
     m_llLastElapsedTime = 0;
     m_llBaseTime        = 0;
 
-    // Use QueryPerformanceFrequency() to get frequency of timer.  
+    // Use QueryPerformanceFrequency to get the frequency of the counter
     LARGE_INTEGER qwTicksPerSec;
-    m_bUsingQPF = (bool) (QueryPerformanceFrequency( &qwTicksPerSec ) != 0);
+    QueryPerformanceFrequency( &qwTicksPerSec );
     m_llQPFTicksPerSec = qwTicksPerSec.QuadPart;
 }
 
@@ -147,16 +146,8 @@ CDXUTTimer::CDXUTTimer()
 //--------------------------------------------------------------------------------------
 void CDXUTTimer::Reset()
 {
-    if( !m_bUsingQPF )
-        return;
-
-    // Get either the current time or the stop time
-    LARGE_INTEGER qwTime;
-    if( m_llStopTime != 0 )
-        qwTime.QuadPart = m_llStopTime;
-    else
-        QueryPerformanceCounter( &qwTime );
-
+    LARGE_INTEGER qwTime = GetAdjustedCurrentTime();
+    
     m_llBaseTime        = qwTime.QuadPart;
     m_llLastElapsedTime = qwTime.QuadPart;
     m_llStopTime        = 0;
@@ -167,9 +158,6 @@ void CDXUTTimer::Reset()
 //--------------------------------------------------------------------------------------
 void CDXUTTimer::Start()
 {
-    if( !m_bUsingQPF )
-        return;
-
     // Get the current time
     LARGE_INTEGER qwTime;
     QueryPerformanceCounter( &qwTime );
@@ -185,18 +173,10 @@ void CDXUTTimer::Start()
 //--------------------------------------------------------------------------------------
 void CDXUTTimer::Stop()
 {
-    if( !m_bUsingQPF )
-        return;
-
     if( !m_bTimerStopped )
     {
-        // Get either the current time or the stop time
         LARGE_INTEGER qwTime;
-        if( m_llStopTime != 0 )
-            qwTime.QuadPart = m_llStopTime;
-        else
-            QueryPerformanceCounter( &qwTime );
-
+        QueryPerformanceCounter( &qwTime );
         m_llStopTime = qwTime.QuadPart;
         m_llLastElapsedTime = qwTime.QuadPart;
         m_bTimerStopped = TRUE;
@@ -207,9 +187,6 @@ void CDXUTTimer::Stop()
 //--------------------------------------------------------------------------------------
 void CDXUTTimer::Advance()
 {
-    if( !m_bUsingQPF )
-        return;
-
     m_llStopTime += m_llQPFTicksPerSec/10;
 }
 
@@ -217,15 +194,8 @@ void CDXUTTimer::Advance()
 //--------------------------------------------------------------------------------------
 double CDXUTTimer::GetAbsoluteTime()
 {
-    if( !m_bUsingQPF )
-        return -1.0;
-
-    // Get either the current time or the stop time
     LARGE_INTEGER qwTime;
-    if( m_llStopTime != 0 )
-        qwTime.QuadPart = m_llStopTime;
-    else
-        QueryPerformanceCounter( &qwTime );
+    QueryPerformanceCounter( &qwTime );
 
     double fTime = qwTime.QuadPart / (double) m_llQPFTicksPerSec;
 
@@ -236,15 +206,7 @@ double CDXUTTimer::GetAbsoluteTime()
 //--------------------------------------------------------------------------------------
 double CDXUTTimer::GetTime()
 {
-    if( !m_bUsingQPF )
-        return -1.0;
-
-    // Get either the current time or the stop time
-    LARGE_INTEGER qwTime;
-    if( m_llStopTime != 0 )
-        qwTime.QuadPart = m_llStopTime;
-    else
-        QueryPerformanceCounter( &qwTime );
+    LARGE_INTEGER qwTime = GetAdjustedCurrentTime();
 
     double fAppTime = (double) ( qwTime.QuadPart - m_llBaseTime ) / (double) m_llQPFTicksPerSec;
 
@@ -253,31 +215,65 @@ double CDXUTTimer::GetTime()
 
 
 //--------------------------------------------------------------------------------------
+void CDXUTTimer::GetTimeValues( double* pfTime, double* pfAbsoluteTime, float* pfElapsedTime )
+{
+    assert( pfTime && pfAbsoluteTime && pfElapsedTime );    
+
+    LARGE_INTEGER qwTime = GetAdjustedCurrentTime();
+
+    float fElapsedTime = (float) ((double) ( qwTime.QuadPart - m_llLastElapsedTime ) / (double) m_llQPFTicksPerSec);
+    m_llLastElapsedTime = qwTime.QuadPart;
+
+    // Clamp the timer to non-negative values to ensure the timer is accurate.
+    // fElapsedTime can be outside this range if processor goes into a 
+    // power save mode or we somehow get shuffled to another processor.  
+    // However, the main thread should call SetThreadAffinityMask to ensure that 
+    // we don't get shuffled to another processor.  Other worker threads should NOT call 
+    // SetThreadAffinityMask, but use a shared copy of the timer data gathered from 
+    // the main thread.
+    if( fElapsedTime < 0.0f )
+        fElapsedTime = 0.0f;
+    
+    *pfAbsoluteTime = qwTime.QuadPart / (double) m_llQPFTicksPerSec;
+    *pfTime = ( qwTime.QuadPart - m_llBaseTime ) / (double) m_llQPFTicksPerSec;   
+    *pfElapsedTime = fElapsedTime;
+}
+
+
+//--------------------------------------------------------------------------------------
 double CDXUTTimer::GetElapsedTime()
 {
-    if( !m_bUsingQPF )
-        return -1.0;
-
-    // Get either the current time or the stop time
-    LARGE_INTEGER qwTime;
-    if( m_llStopTime != 0 )
-        qwTime.QuadPart = m_llStopTime;
-    else
-        QueryPerformanceCounter( &qwTime );
+    LARGE_INTEGER qwTime = GetAdjustedCurrentTime();
 
     double fElapsedTime = (double) ( qwTime.QuadPart - m_llLastElapsedTime ) / (double) m_llQPFTicksPerSec;
     m_llLastElapsedTime = qwTime.QuadPart;
+
+    // See the explanation about clamping in CDXUTTimer::GetTimeValues()
+    if( fElapsedTime < 0.0f )
+        fElapsedTime = 0.0f;
 
     return fElapsedTime;
 }
 
 
 //--------------------------------------------------------------------------------------
+// If stopped, returns time when stopped otherwise returns current time
+//--------------------------------------------------------------------------------------
+LARGE_INTEGER CDXUTTimer::GetAdjustedCurrentTime()
+{
+    LARGE_INTEGER qwTime;
+    if( m_llStopTime != 0 )
+        qwTime.QuadPart = m_llStopTime;
+    else
+        QueryPerformanceCounter( &qwTime );
+    return qwTime;
+}
+
+//--------------------------------------------------------------------------------------
 bool CDXUTTimer::IsStopped()
 {
     return m_bTimerStopped;
 }
-
 
 //--------------------------------------------------------------------------------------
 // Returns pointer to static media search buffer
@@ -1218,6 +1214,14 @@ LRESULT CD3DArcBall::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             OnEnd();
             return TRUE;
 
+        case WM_CAPTURECHANGED:
+            if( (HWND)lParam != hWnd )
+            {
+                ReleaseCapture();
+                OnEnd();
+            }
+            return TRUE;
+
         case WM_RBUTTONDOWN:
         case WM_RBUTTONDBLCLK:
         case WM_MBUTTONDOWN:
@@ -1450,6 +1454,26 @@ LRESULT CBaseCamera::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 !m_bMouseMButtonDown )
             {
                 ReleaseCapture();
+            }
+            break;
+        }
+
+        case WM_CAPTURECHANGED:
+        {
+            if( (HWND)lParam != hWnd )
+            {
+                if( (m_nCurrentButtonMask & MOUSE_LEFT_BUTTON) ||
+                    (m_nCurrentButtonMask & MOUSE_MIDDLE_BUTTON) ||
+                    (m_nCurrentButtonMask & MOUSE_RIGHT_BUTTON) )
+                {
+                    m_bMouseLButtonDown = false;
+                    m_bMouseMButtonDown = false;
+                    m_bMouseRButtonDown = false;
+                    m_nCurrentButtonMask &= ~MOUSE_LEFT_BUTTON;
+                    m_nCurrentButtonMask &= ~MOUSE_MIDDLE_BUTTON;
+                    m_nCurrentButtonMask &= ~MOUSE_RIGHT_BUTTON;
+                    ReleaseCapture();
+                }
             }
             break;
         }
@@ -1720,7 +1744,7 @@ VOID CBaseCamera::Reset()
 CFirstPersonCamera::CFirstPersonCamera() :
     m_nActiveButtonMask( 0x07 )
 {
-	m_bRotateWithoutButtonDown = false;
+    m_bRotateWithoutButtonDown = false;
 }
 
 
@@ -1812,7 +1836,7 @@ void CFirstPersonCamera::SetRotateButtons( bool bLeft, bool bMiddle, bool bRight
     m_nActiveButtonMask = ( bLeft ? MOUSE_LEFT_BUTTON : 0 ) |
                           ( bMiddle ? MOUSE_MIDDLE_BUTTON : 0 ) |
                           ( bRight ? MOUSE_RIGHT_BUTTON : 0 );
-	m_bRotateWithoutButtonDown = bRotateWithoutButtonDown;
+    m_bRotateWithoutButtonDown = bRotateWithoutButtonDown;
 }
 
 
@@ -2046,6 +2070,26 @@ LRESULT CModelViewerCamera::HandleMessages( HWND hWnd, UINT uMsg, WPARAM wParam,
         (uMsg == WM_RBUTTONUP && m_nRotateCameraButtonMask & MOUSE_RIGHT_BUTTON) )
     {
         m_ViewArcBall.OnEnd();
+    }
+
+    if( uMsg == WM_CAPTURECHANGED )
+    {
+        if( (HWND)lParam != hWnd )
+        {
+            if( (m_nRotateModelButtonMask & MOUSE_LEFT_BUTTON) ||
+                (m_nRotateModelButtonMask & MOUSE_MIDDLE_BUTTON) ||
+                (m_nRotateModelButtonMask & MOUSE_RIGHT_BUTTON) )
+            {
+                m_WorldArcBall.OnEnd();
+            }
+        
+            if( (m_nRotateCameraButtonMask & MOUSE_LEFT_BUTTON) ||
+                (m_nRotateCameraButtonMask & MOUSE_MIDDLE_BUTTON) ||
+                (m_nRotateCameraButtonMask & MOUSE_RIGHT_BUTTON) )
+            {
+                m_ViewArcBall.OnEnd();
+            }
+        }
     }
 
     if( uMsg == WM_LBUTTONDOWN ||
@@ -2734,6 +2778,22 @@ LRESULT CDXUTDirectionWidget::HandleMessages( HWND hWnd, UINT uMsg,
             UpdateLightDir();
             return TRUE;
         }
+
+        case WM_CAPTURECHANGED:
+        {
+            if( (HWND)lParam != hWnd )
+            {
+                if( (m_nRotateMask & MOUSE_LEFT_BUTTON) ||
+                    (m_nRotateMask & MOUSE_MIDDLE_BUTTON) ||
+                    (m_nRotateMask & MOUSE_RIGHT_BUTTON) )
+                {
+                    m_ArcBall.OnEnd();
+                    ReleaseCapture();
+                }
+            }
+
+            return TRUE;
+        }
     }
 
     return 0;
@@ -3206,30 +3266,30 @@ HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbst
     if( bSnapThumbstickToCardinals )
     {
         // Apply deadzone to each axis independantly to slightly snap to up/down/left/right
-	    if( pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE )
-		    pGamePad->sThumbLX = 0;
+        if( pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE )
+            pGamePad->sThumbLX = 0;
         if( pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE ) 
-		    pGamePad->sThumbLY = 0;
+            pGamePad->sThumbLY = 0;
         if( pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE )
-		    pGamePad->sThumbRX = 0;
+            pGamePad->sThumbRX = 0;
         if( pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE ) 
-		    pGamePad->sThumbRY = 0;
+            pGamePad->sThumbRY = 0;
     }
     else if( bThumbstickDeadZone )
     {
         // Apply deadzone if centered
-	    if( (pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE) && 
+        if( (pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE) && 
             (pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE) ) 
-	    {	
-		    pGamePad->sThumbLX = 0;
-		    pGamePad->sThumbLY = 0;
-	    }
-	    if( (pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE) && 
+        {   
+            pGamePad->sThumbLX = 0;
+            pGamePad->sThumbLY = 0;
+        }
+        if( (pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE) && 
             (pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE) ) 
-	    {
-		    pGamePad->sThumbRX = 0;
-		    pGamePad->sThumbRY = 0;
-	    }
+        {
+            pGamePad->sThumbRX = 0;
+            pGamePad->sThumbRY = 0;
+        }
     }
 
     // Convert [-1,+1] range

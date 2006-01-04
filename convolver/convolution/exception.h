@@ -40,18 +40,25 @@ protected:
 	std::string diagnostic_;
 };
 
-class configException : public convolutionException
+class channelPathsException : public convolutionException
 {
 public:
-	configException(std::string what="") : convolutionException("Problem with config file: " + what) {}
+	channelPathsException(std::string what, const TCHAR* path) : 
+	  convolutionException("Problem with filter paths: "  + std::string(CT2CA(path)) + ": " + what) {}
 };
 
+class convolutionListException : public convolutionException
+{
+public:
+	convolutionListException(std::string what, const TCHAR* path) :
+	  convolutionException("Problem with filter paths list: " + std::string(CT2CA(path)) + ": " + what) {}
+};
 
 class wavfileException : public convolutionException
 {
 public:
 	wavfileException(std::string what, const TCHAR* path, const char* strerror) :
-	  convolutionException("Problem with sound file: " + what + " " + std::string(CT2CA(path)) + " " + std::string(strerror)) {}
+	  convolutionException("Problem with sound file: " + std::string(CT2CA(path)) + ": " + what + " " + std::string(strerror)) {}
 };
 
 

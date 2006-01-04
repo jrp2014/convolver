@@ -3,6 +3,8 @@
 * by David Vandevoorde and Nicolai M. Josuttis, Addison-Wesley, 2002
 *
 * (C) Copyright David Vandevoorde and Nicolai M. Josuttis 2002
+*
+* It is comparable to boost::scoped_ptr
 * 
 */
 
@@ -13,6 +15,7 @@ class Holder {
 private:
 	T* ptr_;    // refers to the object it holds (if any)
 	bool owns_;
+	
 
 public:
 	// default constructor: let the holder refer to nothing, and
@@ -41,7 +44,7 @@ public:
 	}
 
 	// get referenced object (if any)
-	T* get_ptr() const
+	const T* get_ptr() const
 	{
 		return ptr_;
 	}

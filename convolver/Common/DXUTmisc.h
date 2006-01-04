@@ -121,14 +121,17 @@ public:
     void Advance(); // advance the timer by 0.1 seconds
     double GetAbsoluteTime(); // get the absolute system time
     double GetTime(); // get the current time
-    double GetElapsedTime(); // get the time that elapsed between GetElapsedTime() calls
+    double GetElapsedTime(); // get the time that elapsed between Get*ElapsedTime() calls
+    void GetTimeValues( double* pfTime, double* pfAbsoluteTime, float* pfElapsedTime ); // get all time values at once
     bool IsStopped(); // returns true if timer stopped
 
 protected:
+    LARGE_INTEGER GetAdjustedCurrentTime();
+
     bool m_bUsingQPF;
     bool m_bTimerStopped;
     LONGLONG m_llQPFTicksPerSec;
-
+    
     LONGLONG m_llStopTime;
     LONGLONG m_llLastElapsedTime;
     LONGLONG m_llBaseTime;
@@ -436,7 +439,7 @@ protected:
     D3DXMATRIX m_mCameraWorld;       // World matrix of the camera (inverse of the view matrix)
 
     int        m_nActiveButtonMask;  // Mask to determine which button to enable for rotation
-	bool	   m_bRotateWithoutButtonDown;
+    bool       m_bRotateWithoutButtonDown;
 
     bool       m_bResetCursorAfterMove;// If true, the class will reset the cursor position so that the cursor always has space to move 
 };
@@ -640,7 +643,7 @@ bool DXUTReLaunchMediaCenter();
 
 //--------------------------------------------------------------------------------------
 // Debug printing support
-// See dxerr9.h for more debug printing support
+// See dxerr.h for more debug printing support
 //--------------------------------------------------------------------------------------
 void DXUTOutputDebugStringW( LPCWSTR strMsg, ... );
 void DXUTOutputDebugStringA( LPCSTR strMsg, ... );
@@ -656,7 +659,7 @@ WCHAR* DXUTTraceD3DDECLTYPEtoString( BYTE t );
 #define DXUTOutputDebugString DXUTOutputDebugStringA
 #endif
 
-// These macros are very similar to dxerr9's but it special cases the HRESULT defined
+// These macros are very similar to dxerr's but it special cases the HRESULT defined
 // by DXUT to pop better message boxes. 
 #if defined(DEBUG) || defined(_DEBUG)
 #define DXUT_ERR(str,hr)           DXUTTrace( __FILE__, (DWORD)__LINE__, hr, str, false )

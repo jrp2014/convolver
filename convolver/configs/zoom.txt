@@ -1,0 +1,2 @@
+D:\Projects\convolver\convolver\configs\zoom5.txt
+D:\Projects\convolver\convolver\configs\zoom2.txt

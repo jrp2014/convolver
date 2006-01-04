@@ -108,7 +108,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 	case WM_COMMAND:
 		{
 			if (!m_bIsInitialized)
-					break;
+				break;
 
 			switch(LOWORD(wParam))
 			{
@@ -126,10 +126,10 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 						{
 							// Setup the OPENFILENAME structure
 							OPENFILENAME ofn = { sizeof(OPENFILENAME), hwnd, NULL,
-								TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
+								TEXT("Config Text Files\0*.txt\0Config Files\0*.cfg\0WAV Impulse Respose Files\0*.WAV\0PCM Impulse Response Files (32-bit IEEE float)\0*.PCM\0All Files\0*.*\0\0"), NULL,
 								0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
 								TEXT("Get filter file"),
-								OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY, 
+								OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY | OFN_HIDEREADONLY | OFN_EXPLORER, 
 								0, 0, TEXT(".txt"), 0, NULL, NULL };
 
 							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Configuration filename...") );
@@ -137,7 +137,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 							// Display the SaveFileName dialog. Then, try to load the specified file
 							if( TRUE != GetOpenFileName( &ofn ) )
 							{
-								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get filter aborted.") );
+								//SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get filter aborted.") );
 								return (INT_PTR)TRUE;
 							}
 
@@ -166,7 +166,8 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 						hr = Apply(); // apply the filter immediately; don't wait for apply button to be set
 						if(FAILED(hr))
 						{
-							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply new filter filename.") );
+							// Apply provides its own diagnostics
+							//SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply new filter filename.") );
 							return (INT_PTR)TRUE;
 						}
 
@@ -175,86 +176,106 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 				}
 				break;
 
+			case IDC_CONFIGFILE:
+				{
+					if(HIWORD(wParam) == EN_CHANGE)
+					{
+						SetDirty();
+						return (INT_PTR)TRUE;
+					}
+				}
+				break;
+
 			case IDC_CALCULATEOPTIMUMATTENUATION:
 				{
-					float	fAttenuation = 0;
-					WORD	nPartitions = 1;
-					unsigned int nPlanningRigour =
-#ifdef FFTW
-						1;		// Set "Measure" as the default
-#else
-						0;
-#endif
-					TCHAR*  szFilterFileName	= TEXT("");
-					HRESULT hr S_OK;
-
-					try
+					if(HIWORD(wParam) == BN_CLICKED)
 					{
-						if(IsPageDirty() == S_OK) // Make sure that the currently-visible settings are used
+						float	fAttenuation = 0;
+						WORD	nPartitions = 1;
+						unsigned int nPlanningRigour =
+#ifdef FFTW
+							1;		// Set "Measure" as the default
+#else
+							0;
+#endif
+						TCHAR*  szFilterFileName	= TEXT("");
+						HRESULT hr S_OK;
+
+						try
 						{
-							hr = Apply();
+							if(IsPageDirty() == S_OK) // Make sure that the currently-visible settings are used
+							{
+								hr = Apply();
+								if (FAILED(hr))
+								{
+									//SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
+									return (INT_PTR)TRUE;
+								}
+							}
+
+							hr = m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
 							if (FAILED(hr))
 							{
-								//SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to apply settings.") ); // Apply supplies its own diagnostics
+								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
 								return (INT_PTR)TRUE;
 							}
-						}
 
-						hr = m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
-						if (FAILED(hr))
+							hr = m_pIconvolverFilter->get_partitions(&nPartitions);
+							if (FAILED(hr))
+							{
+								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
+								return (INT_PTR)TRUE;
+							}
+
+							hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
+							if (FAILED(hr))
+							{
+								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
+								return (INT_PTR)TRUE;
+							}
+
+							double fElapsed = 0;
+							apHiResElapsedTime t;
+							hr = m_pIconvolverFilter->calculateOptimumAttenuation(fAttenuation);
+							fElapsed = t.sec();
+							if (FAILED(hr))
+							{
+								SetDlgItemText( hwnd,  IDS_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
+								return (INT_PTR)TRUE;
+							}
+
+							// Save the calculated attenuation
+							hr = m_pIconvolverFilter->put_attenuation(fAttenuation);
+							if (FAILED(hr))
+							{
+								SetDlgItemText( hwnd,  IDS_STATUS, TEXT("Failed to save optimum attenuation.") );  // TODO: internationalize
+								return (INT_PTR)TRUE;
+							}
+
+							// Display the attenuation.
+							TCHAR   szStr[MAXSTRING] = { 0 };
+							_stprintf(szStr, _T("%.1f"), fAttenuation);
+							SetDlgItemText( hwnd, IDC_ATTENUATION, szStr);
+
+							// Display calculation time
+							_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
+							SetDlgItemText( hwnd, IDS_STATUS, szStr);
+							return (INT_PTR)TRUE;
+						}
+						catch (std::exception& error)
 						{
-							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
+							SetDlgItemText( hwnd, IDS_STATUS, CA2CT(error.what()));
+							return (INT_PTR)TRUE;
+						}
+						catch (...) 
+						{
+
+							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to calculate optimum attenuation.") );
 							return (INT_PTR)TRUE;
 						}
 
-						hr = m_pIconvolverFilter->get_partitions(&nPartitions);
-						if (FAILED(hr))
-						{
-							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
-							return (INT_PTR)TRUE;
-						}
-
-						hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
-						if (FAILED(hr))
-						{
-							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
-							return (INT_PTR)TRUE;
-						}
-
-						double fElapsed = 0;
-						apHiResElapsedTime t;
-						hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
-						fElapsed = t.sec();
-						if (FAILED(hr))
-						{
-							SetDlgItemText( hwnd,  IDS_STATUS, TEXT("Failed to calculate optimum attenuation. Check filter filename.") );  // TODO: internationalize
-							return (INT_PTR)TRUE;
-						}
-
-						// Display the attenuation.
-						TCHAR   szStr[MAXSTRING] = { 0 };
-						_stprintf(szStr, _T("%.1f"), fAttenuation);
-						SetDlgItemText( hwnd, IDC_ATTENUATION, szStr);
-
-						// Display calculation time
-						_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
-						SetDlgItemText( hwnd, IDS_STATUS, szStr);
-					}
-					catch (std::exception& error)
-					{
-						SetDlgItemText( hwnd, IDS_STATUS, CA2CT(error.what()));
 						return (INT_PTR)TRUE;
 					}
-					catch (...) 
-					{
-
-						SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to calculate optimum attenuation.") );
-						return (INT_PTR)TRUE;
-					}
-
-					SetDirty();
-
-					return (INT_PTR)TRUE;
 				}
 				break;
 
@@ -290,7 +311,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 			default:
 				{
 #if defined(DEBUG) | defined(_DEBUG)
-			cdebug << "Unhandled Command: " << "LOWORD(wParam) " << LOWORD(wParam) << " HIWORD(wParam) " << HIWORD(wParam) << std::endl;
+					cdebug << "Unhandled Command: " << "LOWORD(wParam) " << LOWORD(wParam) << " HIWORD(wParam) " << HIWORD(wParam) << std::endl;
 #endif
 				}
 			} //switch wParam
@@ -369,7 +390,7 @@ HRESULT CconvolverFilterProperties::OnActivate()
 	TCHAR *szFilterFileName = NULL;
 	HRESULT hr = S_OK;
 
-			// May throw
+	// May throw
 	version v(TEXT("convolverFilter.ax"));
 	SetDlgItemText(m_Dlg, IDS_Version, (TEXT("Version ") + v.get_product_version()).c_str());
 
@@ -511,6 +532,8 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put tuning rigour"));
 				return hr;
 			}
+
+			DisplayFilterFormat(m_Dlg, szFilterFileName);
 		}
 		catch (std::exception& error)
 		{

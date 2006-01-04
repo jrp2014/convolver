@@ -24,42 +24,76 @@
 #include <fstream>
 #include <vector>
 #include <boost\ptr_container\ptr_vector.hpp>
+#include <mediaerr.h>
 
 class configFile
 {
 public:
-	configFile(TCHAR szConfigFileName[MAX_PATH]) : opened(false)
+	configFile(const TCHAR szConfigFileName[MAX_PATH]) : opened(false)
 	{
 		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
-		USES_CONVERSION;
-		config.open(T2A(szConfigFileName));
+		//USES_CONVERSION;
 
-		if (config == NULL)
+		try
 		{
-			throw configException("Failed to open config file");
+			config.open(CT2A(szConfigFileName));
+		}
+		catch (...)
+		{
+			throw convolutionException("Failed to open file:" + std::string(CT2CA(szConfigFileName)));
+		}
+
+		if (config == NULL) // Should never happen, as the exceptions are set
+		{
+			throw convolutionException("Unexpectedly failed to open file:" + std::string(CT2CA(szConfigFileName)));
 		}
 
 		opened=true;
 	}
 
-	std::ifstream& operator()()
+	std::basic_ifstream<TCHAR>& operator()()
 	{
 		return config;
 	}
 
-	~configFile()
+	void close()
 	{
 		if(opened)
-			config.close();
+		{
+			try
+			{
+				config.close();
+				opened = false;
+			}
+			catch (...)
+			{
+				throw convolutionException("Failed to close config file");
+			}
+		}
+	}
+
+	virtual ~configFile()
+	{
+		try
+		{
+			if(opened)
+				config.close();
+		}
+		catch (...)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Unexpected exception closing config file" << std::endl;
+#endif
+		}
 	}
 
 private:
-	std::ifstream config;
+	std::basic_ifstream<TCHAR> config;
 	bool opened;
 
-	configFile();									// No construction
-	configFile(const configFile&);				// No copy ctor
-	const configFile &operator =(const configFile&); // No copy assignment
+	configFile();										// No default ctor
+	configFile(const configFile&);						// No copy ctor
+	const configFile &operator =(const configFile&);	// No copy assignment
 };
 
 class ChannelPaths
@@ -75,7 +109,7 @@ public:
 			WORD nChannel;
 			float fScale;
 
-			ScaledChannel(const WORD& nChannel, const float& fScale) : nChannel(nChannel), fScale(fScale)
+			ScaledChannel(const WORD nChannel, const float fScale) : nChannel(nChannel), fScale(fScale)
 			{
 #if defined(DEBUG) | defined(_DEBUG)
 				DEBUGGING(3, cdebug << "ChannelPath::ChannelPath::ScaledChannel" << std::endl;);
@@ -83,21 +117,24 @@ public:
 			};
 
 #if defined(DEBUG) | defined(_DEBUG)
-			const void Dump() const;
+			void Dump() const;
 #endif
 		private:
 			ScaledChannel();								// Prevent default construction
 			// Default copying OK
 		};
 
+		typedef std::vector<ScaledChannel>::size_type size_type;
+
+		// A ChannelPath associates a filter with a set of scaled input and output channels
 		const std::vector<ScaledChannel> inChannel;
 		const Filter filter;
 		const std::vector<ScaledChannel> outChannel;
 
-		ChannelPath(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions,
+		ChannelPath(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions,
 			const std::vector<ScaledChannel>& inChannel, const std::vector<ScaledChannel>& outChannel,
 			const WORD& nFilterChannel, const DWORD& nSampleRate, const unsigned int& nPlanningRigour) :
-		filter(szConfigFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
+		filter(szChannelPathsFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
 			inChannel(inChannel), outChannel(outChannel)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
@@ -106,35 +143,77 @@ public:
 		};
 
 #if defined(DEBUG) | defined(_DEBUG)
-		const void Dump() const;
+	void Dump() const;
 #endif
 	};
 
-	configFile	config;
-	WORD		nInputChannels;		// number of input channels
-	WORD		nOutputChannels;	// number of output channels
-	DWORD		nSamplesPerSec;		// 44100, 48000, etc
-	DWORD		dwChannelMask;		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-	WORD		nPaths;				// number of Paths
-	WORD		nPartitions;
-	DWORD		nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	DWORD		nHalfPartitionLength;	// in blocks
-	DWORD		nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
+	typedef boost::ptr_vector<ChannelPath>::size_type size_type;
+
+	const boost::ptr_vector<ChannelPath>& Paths() const
+	{
+		assert(Paths_.size() > 0);
+		return Paths_;
+	}
+
+	const WORD nPartitions;
+
+	DWORD nInputChannels() const	// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
+	{
+		return nInputChannels_;
+	}
+
+	DWORD nOutputChannels()	const	// number of output channels
+	{
+		return nOutputChannels_;
+	}
+
+	DWORD nSamplesPerSec() const	// 44100, 48000, etc
+	{
+		return nSamplesPerSec_;
+	}
+
+	DWORD	dwChannelMask()	const		// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+	{
+		return dwChannelMask_;
+	}
+
+	unsigned int nPaths() const				// number of Paths
+	{
+		return nPaths_;
+	}
+
+	DWORD nPartitionLength() const		// in frames (a frame/block contains the samples for each channel)
+	{
+		assert(nPartitionLength_ == 2 * nHalfPartitionLength_);
+		return nPartitionLength_;
+	}
+
+	DWORD nHalfPartitionLength() const	// in frames
+	{
+		assert(nPartitionLength_ == 2 * nHalfPartitionLength_);
+		return nHalfPartitionLength_;
+	}
+
+	DWORD nFilterLength() const			// nFilterLength = nPartitions * nPartitionLength
+	{
+		assert(nFilterLength_ == nPartitions * nPartitionLength());
+		return nFilterLength_;
+	}
+
 #ifdef FFTW
-	DWORD		nFFTWPartitionLength;	// 2*(nPartitionLength / 2 + 1)
+	DWORD nFFTWPartitionLength() const
+	{
+		assert(nFFTWPartitionLength_ == 2*(nPartitionLength() / 2 + 1));
+		return nFFTWPartitionLength_;
+	}
 #endif
 
-	// TODO: this is not right as copying of filter class is problematic as
-	// FFTW plans cannot just be copied without leading to memory leaks or
-	// multiple deletions
-	boost::ptr_vector<ChannelPath> Paths;
+	ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
 
-	ChannelPaths(TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
-
-	const std::string DisplayChannelPaths();
+	const std::string DisplayChannelPaths() const;
 
 #if defined(DEBUG) | defined(_DEBUG)
-	const void Dump() const;
+	void Dump() const;
 #endif
 
 	virtual ~ChannelPaths() 
@@ -142,13 +221,29 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 		DEBUGGING(3, cdebug << "ChannelPaths::~ChannelPaths " << std::endl;);
 #endif
-// TODO: check that this is enough (ptr_vector should do the work)
+		// TODO: check that this is enough (ptr_vector should do the work)
 	}
 
 private:
-	ChannelPaths();									// No construction
-	ChannelPaths(const ChannelPaths&);				// No copy ctor
-	const ChannelPaths &operator =(const ChannelPaths&); // No copy assignment
+	configFile	config_;
+
+	// FFTW plans cannot just be copied without leading to memory leaks or
+	// multiple deletions, so use pointers
+	boost::ptr_vector<ChannelPath> Paths_;
+
+	DWORD	nInputChannels_;		// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
+	DWORD	nOutputChannels_;		// number of output channels
+	DWORD	nSamplesPerSec_;		// 44100, 48000, etc
+	DWORD	dwChannelMask_;			// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+	unsigned int	nPaths_;				// number of Paths
+	DWORD	nPartitionLength_;		// in frames (a frame/block contains the samples for each channel)
+	DWORD	nHalfPartitionLength_;	// in frames
+	DWORD	nFilterLength_;			// nFilterLength = nPartitions * nPartitionLength
+#ifdef FFTW
+	DWORD		nFFTWPartitionLength_;	// 2*(nPartitionLength / 2 + 1)
+#endif
+
+	ChannelPaths();											// No construction
+	ChannelPaths(const ChannelPaths&);						// No copy ctor
+	const ChannelPaths &operator =(const ChannelPaths&);	// No copy assignment
 };
-
-

@@ -61,7 +61,7 @@ public:
 #endif
 	};
 
-	CWaveFileHandle (TCHAR* path, int mode, SF_INFO *sfinfo, const DWORD& nSampleRate)
+	CWaveFileHandle (const TCHAR path[MAX_PATH], int mode, SF_INFO *sfinfo, const DWORD& nSampleRate)
 	{
 
 		if (mode == SFM_WRITE && sf_format_check (sfinfo) == false)
@@ -79,7 +79,7 @@ public:
 			std::wstring::size_type idx = spath.find('.');
 			if(idx != std::wstring::npos)
 			{
-				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM"))
+				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM") || spath.substr(idx+1) == TEXT("Pcm"))
 				{
 					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_FLOAT;	// RAW PCM data (32 bit IEEE floating point)
 					sfinfo->channels = 1;								// Single channel
@@ -92,7 +92,7 @@ public:
 
 #if defined(DEBUG) | defined(_DEBUG)
 		char  buffer [2048];
-		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer)) ;
+		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer));
 
 		cdebug << "Opening " << CT2CA(path) << ": " << std::endl << buffer;
 #endif

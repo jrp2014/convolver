@@ -38,6 +38,7 @@ extern "C" {
 		STDMETHOD(put_planning_rigour)(THIS_ unsigned int newVal) PURE;
 
 		STDMETHOD(get_filter_description)(THIS_ std::string* description) PURE;
+		STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation) PURE;
 
 		// The following pair is needed because DWORD is unsigned
 		virtual float decode_Attenuationdb(const DWORD dwValue) PURE;

@@ -52,7 +52,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time{
 
 	HRESULT hr = S_OK;
-	Holder< CConvolution<float> > conv;
 	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
 	PlanningRigour pr;
 
@@ -62,7 +61,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (argc != 6)
 	{
-		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt inputfile outputfile" << std::endl;
+		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt|IR.wav inputfile outputfile" << std::endl;
 		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std::endl;
 		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << std::endl;
 		std::wcerr << "       input and output files are, typically, .wav" << std::endl;
@@ -93,15 +92,20 @@ int _tmain(int argc, _TCHAR* argv[])
 		WORD nPlanningRigour;
 		szPartitions >> nPlanningRigour;
 
-		conv.set_ptr(new CConvolution<float>(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
-			nPlanningRigour)); // Sets conv. nPartitions==0 => use overlap-save
+		ConvolutionList<float> conv(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
+			nPlanningRigour); // Sets conv. nPartitions==0 => use overlap-save
+
+		if(conv.nConvolutionList() != 1)
+			throw convolutionException("Only single filter path specification acceptable");
+
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
-		CWaveFileHandle WavIn(INPUTFILE, SFM_READ, &sf_info, conv->Mixer.nSamplesPerSec);
+		// TODO: The following uses the sample rate of the first filter path for .PCM files
+		conv.selectConvolutionIndex(0);  // Select the one and only filter path
+		CWaveFileHandle WavIn(INPUTFILE, SFM_READ, &sf_info, conv.SelectedConvolution().Mixer.nSamplesPerSec());
 		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
 
-
-		const DWORD cBufferLength = conv->Mixer.nFilterLength * SAMPLES;  // frames
+		const DWORD cBufferLength = conv.SelectedConvolution().Mixer.nFilterLength() * SAMPLES;  // frames
 #else
 		CWaveFileHandle WavIn;
 		if( FAILED( hr = WavIn->Open(INPUTFILE, NULL, WAVEFILE_READ ) ) )
@@ -153,7 +157,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		float fAttenuation = 0;
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = calculateOptimumAttenuation(fAttenuation, INPUTFILE, nPartitions, nPlanningRigour);
+		hr = conv.SelectedConvolution().calculateOptimumAttenuation(fAttenuation);
 		fElapsed = t.msec();
 		if (FAILED(hr))
 		{
@@ -174,7 +178,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 #ifdef	LIBSNDFILE
 		// Write out in the same format as the input file, but with the right number of output channels
-		sf_info.channels = conv->Mixer.nOutputChannels;
+		sf_info.channels = conv.SelectedConvolution().Mixer.nOutputChannels();	// select the first filter path
 		CWaveFileHandle WavOut(OUTPUTFILE, SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 		CWaveFileHandle WavOut;
@@ -214,7 +218,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			for(int i = dwSizeRead; i < cBufferLength; ++i)
 				pfInputSamples[i]=0;
 #else
-			if (dwSizeRead % conv->Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
+			if (dwSizeRead % conv.Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
 			{
 				std::wcerr << "Failed to read a whole number of blocks. Read " << dwSizeRead << " bytes." << std::endl;
 				throw(std::length_error("Failed to read a whole number of blocks"));
@@ -224,25 +228,25 @@ int _tmain(int argc, _TCHAR* argv[])
 			for(int i = dwSizeRead; i < cBufferLength; ++i)
 				pfInputSamples[i]=0;
 
-			DWORD dwBlocksToProcess = cBufferLength / conv->Mixer.wfexFilterFormat.Format.nBlockAlign;
+			DWORD dwBlocksToProcess = cBufferLength / conv.Mixer.wfexFilterFormat.Format.nBlockAlign;
 
 #endif
 
 			// nPartitions == 0 => use overlap-save version
 			DWORD dwBufferSizeGenerated = nPartitions == 0 ?
 #ifdef LIBSNDFILE
-				conv->doConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+				conv.SelectedConvolution().doConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
-				conv->doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
+				conv.SelectedConvolution().doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation)
 				:
 #ifdef LIBSNDFILE
-			conv->doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+			conv.SelectedConvolution().doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
-			conv->doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
+			conv.SelectedConvolution().doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,

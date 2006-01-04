@@ -34,11 +34,13 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_CHECK_ALWAYS_DF)
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
+	// 3 = function call trace
+	apDebug::gOnly().set(4);
+
 	debugstream.sink (apDebugSinkConsole::sOnly);
 #endif
 
 	HRESULT	hr = S_OK;
-	Holder< CConvolution<float> > conv;
 	double fElapsedLoad	= 0;
 	double fTotalElapsedLoad = 0;
 	double fElapsedCalc = 0;
@@ -49,7 +51,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 	if (argc !=	5)
 	{
-		std::wcerr << "Usage: perftest MaxnPartitions nIterations nTuningRigour config.txt" << std::endl;
+		std::wcerr << "Usage: perftest MaxnPartitions nIterations nTuningRigour config.txt|IR.wav" << std::endl;
 		return 1;
 	}
 
@@ -82,78 +84,91 @@ int	_tmain(int argc, _TCHAR* argv[])
 			std::wcerr << "nTuningRigour (" << nPlanningRigour << ") must be between 0 and " << pr.nDegrees - 1 << std::endl;
 			throw(std::length_error("invalid nTuningRigour"));
 		}
-		
 
-//#ifdef LIBSNDFILE
-//		SF_INFO sfinfo;
-//		ZeroMemory(&sfinfo, sizeof(SF_INFO));
-//		CWaveFileHandle FilterWav(argv[4], SFM_READ, &sfinfo);
-//		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
-//#else
-//		std::basic_string< _TCHAR >FilterFileName(argv[4],	_tcslen(argv[4]));
-//		if(	FAILED(	hr = FilterWav->Open( argv[4], NULL, WAVEFILE_READ ) ) )
-//		{
-//			std::wcerr << "Failed to open "	<< FilterFileName << " for reading"	<< std::endl;
-//			throw(hr);
-//		}
-//
-//		WAVEFORMATEX *pWave	= FilterWav->GetFormat();
-//		std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pWave), 
-//			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
-//#endif
 
-		conv.set_ptr(new CConvolution<float>(argv[4], 1, nPlanningRigour));
-		std::cerr << conv->Mixer.DisplayChannelPaths() << std::endl;
+		//#ifdef LIBSNDFILE
+		//		SF_INFO sfinfo;
+		//		ZeroMemory(&sfinfo, sizeof(SF_INFO));
+		//		CWaveFileHandle FilterWav(argv[4], SFM_READ, &sfinfo);
+		//		std::cerr << waveFormatDescription(sfinfo, 	"Filter file format: ") << std::endl;
+		//#else
+		//		std::basic_string< _TCHAR >FilterFileName(argv[4],	_tcslen(argv[4]));
+		//		if(	FAILED(	hr = FilterWav->Open( argv[4], NULL, WAVEFILE_READ ) ) )
+		//		{
+		//			std::wcerr << "Failed to open "	<< FilterFileName << " for reading"	<< std::endl;
+		//			throw(hr);
+		//		}
+		//
+		//		WAVEFORMATEX *pWave	= FilterWav->GetFormat();
+		//		std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(pWave), 
+		//			FilterWav->GetSize() / FilterWav->GetFormat()->nBlockAlign,	"Filter file format: ") << std::endl;
+		//#endif
+
+		ConvolutionList<float> conv(argv[4], 1, nPlanningRigour);
+		std::cerr << conv.DisplayConvolutionList() << std::endl;
 
 		float fAttenuation	= 0;
 
-#ifdef LIBSNDFILE
-		std::cout << std::endl << "Partitions\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
-#else
-		std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
-#endif
-
-		for (WORD nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
+		for(int i=0; i<conv.nConvolutionList(); ++i)
 		{
-			for (WORD nIteration = 1; nIteration<=nIterations; ++nIteration)
-			{
 
-				t.reset();
-				conv.set_ptr(new CConvolution<float>(argv[4], nPartitions == 0 ? 1 : nPartitions, nPlanningRigour)); // Used to calculate nPartitionLength
-				fElapsedLoad = t.sec();
-				fTotalElapsedLoad += fElapsedLoad;
-				
-				t.reset();
-				hr = calculateOptimumAttenuation(fAttenuation, argv[4],	nPartitions, nPlanningRigour);
-				fElapsedCalc = t.sec();
-				fTotalElapsedCalc += fElapsedCalc;
-				
-				if (FAILED(hr))
-				{
-					std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
-					throw (hr);
-				}
-				std::cout  << std::setprecision(3) << nPartitions << "\t"
+			conv.selectConvolutionIndex(i);
+			std::cerr << std::endl << conv.SelectedConvolution().Mixer.DisplayChannelPaths();
+
 #ifdef LIBSNDFILE
-					<< (static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.frames * NSAMPLES) / fElapsedCalc) /
-						static_cast<float>(conv->Mixer.Paths[0].filter.sf_FilterFormat.samplerate) << "\t"
+			std::cout << std::endl << "Partitions\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
+#else
+			std::cout << std::endl << "Partitions\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;
 #endif
-					<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
-					<< fAttenuation << "\t" << conv->Mixer.nFilterLength << "\t" 
-					<< conv->Mixer.nPartitionLength << "\t" << nIteration  << std::endl;
+
+			fTotalElapsedLoad = 0;
+			fTotalElapsedCalc = 0;
+
+			for (WORD nPartitions = 0; nPartitions <= max_nPartitions; ++nPartitions)
+			{
+				for (WORD nIteration = 1; nIteration<=nIterations; ++nIteration)
+				{
+					t.reset();
+					ConvolutionList<float> convp(argv[4], 
+						nPartitions == 0 ? 1 : nPartitions, 
+						nPlanningRigour); // Used to calculate nPartitionLength
+					fElapsedLoad = t.sec();
+					fTotalElapsedLoad += fElapsedLoad;
+
+					convp.selectConvolutionIndex(i);
+
+					t.reset();
+					hr = convp.SelectedConvolution().calculateOptimumAttenuation(fAttenuation);
+					fElapsedCalc = t.sec();
+					fTotalElapsedCalc += fElapsedCalc;
+
+					if (FAILED(hr))
+					{
+						std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
+						throw (hr);
+					}
+					std::cout  << std::setprecision(3) << nPartitions << "\t"
+#ifdef LIBSNDFILE
+						<< (static_cast<float>(convp.SelectedConvolution().Mixer.Paths()[0].filter.sf_FilterFormat().frames * NSAMPLES) / fElapsedCalc) /
+						static_cast<float>(convp.SelectedConvolution().Mixer.Paths()[0].filter.sf_FilterFormat().samplerate) << "\t"
+#endif
+						<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
+						<< fAttenuation << "\t" << convp.SelectedConvolution().Mixer.nFilterLength() << "\t" 
+						<< convp.SelectedConvolution().Mixer.nPartitionLength() << "\t" << nIteration  << std::endl;
+				}
 			}
+
+			std::cout << std::endl << "Total load time: " << fTotalElapsedLoad  << "s" << std::endl;
+			std::cout << "Total execution time: " << fTotalElapsedCalc << "s" << std::endl;
+
 		}
-
-		std::cout << std::endl << "Total load time: " << fTotalElapsedLoad  << "s" << std::endl;
-		std::cout << "Total execution time: " << fTotalElapsedCalc << "s" << std::endl;
-
 	}
 
 	catch (convolutionException& error)
 	{
 		std::wcerr << "Convolver error: " << error.what() << std::endl;
 	}
-	catch (HRESULT& hr) // from CConvolution
+	catch (HRESULT& hr) // from Convolution
 	{
 		std::wcerr << "Failed to calculate optimum attenuation (" << std::hex << hr	<< std::dec << ")" << std::endl;
 		return hr;

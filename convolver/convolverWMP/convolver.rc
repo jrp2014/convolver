@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,16,0,0
- PRODUCTVERSION 2,16,0,0
+ FILEVERSION 2,17,0,0
+ PRODUCTVERSION 2,17,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver WMP plug-in Module"
-            VALUE "FileVersion", "2, 16, 0, 0"
+            VALUE "FileVersion", "2, 17, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"
-            VALUE "ProductVersion", "2, 16, 0, 0"
+            VALUE "ProductVersion", "2, 17, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -99,11 +99,11 @@ STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 EXSTYLE WS_EX_RIGHT
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    PUSHBUTTON      "Get config ...",IDC_GETFILTER,4,0,55,14
+    PUSHBUTTON      "Get config or IR",IDC_GETFILTER,4,0,55,14
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
                     WS_GROUP,62,2,149,11,WS_EX_CLIENTEDGE
-    LTEXT           "",IDC_STATUS,4,61,207,59,SS_NOPREFIX
+    LTEXT           "Status",IDC_STATUS,4,61,207,59,SS_NOPREFIX
     CONTROL         "Attenuation (dB):",IDC_STATIC,"Static",SS_SIMPLE | 
                     WS_GROUP,4,18,57,8
     EDITTEXT        IDC_ATTENUATION,62,15,28,14,ES_RIGHT | ES_AUTOHSCROLL

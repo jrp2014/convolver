@@ -25,6 +25,10 @@ CDXUTMesh::CDXUTMesh( LPCWSTR strName )
     m_pMaterials         = NULL;
     m_pTextures          = NULL;
     m_bUseMaterials      = TRUE;
+    m_pVB                = NULL;
+    m_pIB                = NULL;
+    m_pDecl              = NULL;
+    m_strMaterials       = NULL;
 }
 
 

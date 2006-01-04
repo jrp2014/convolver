@@ -116,7 +116,7 @@
 				SuppressStartupBanner="0"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist"
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"

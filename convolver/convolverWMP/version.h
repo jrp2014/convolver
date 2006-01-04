@@ -61,9 +61,9 @@ public:
 	version()
 	{
 		// Get application name
-		TCHAR buf[MAX_PATH * 2] = TEXT(""); // *2 for UNICODE
+		TCHAR buf[MAXSTRING] = TEXT("");
 
-		if(::GetModuleFileName(0, buf, sizeof(buf)))
+		if(::GetModuleFileName(0, buf, MAXSTRING))
 		{
 			std::wstring app_name = buf;
 			app_name = app_name.substr(app_name.rfind(TEXT("\\")) + 1);

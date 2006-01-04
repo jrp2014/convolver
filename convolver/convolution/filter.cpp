@@ -20,7 +20,7 @@
 #include "convolution\ffthelp.h"
 #include "convolution\filter.h"
 
-Filter::Filter(TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
+Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
 			   const unsigned int& nPlanningRigour) : 
 nPartitions (nPartitions),
 nSamplesPerSec(nSamplesPerSec)
@@ -42,19 +42,19 @@ nSamplesPerSec(nSamplesPerSec)
 
 	// Load the wave file
 #ifdef LIBSNDFILE
-	::ZeroMemory(&sf_FilterFormat, sizeof(SF_INFO));
-	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat, nSamplesPerSec); // Throws, if file invalid
+	::ZeroMemory(&sf_FilterFormat_, sizeof(SF_INFO));
+	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat_, nSamplesPerSec); // Throws, if file invalid
 
-	if(sf_FilterFormat.channels - 1 < nFilterChannel)
+	if(sf_FilterFormat_.channels - 1 < nFilterChannel)
 	{
 		throw filterException("Filter channel number too big");
 	}
 
-	if(nSamplesPerSec != sf_FilterFormat.samplerate)
+	if(nSamplesPerSec != sf_FilterFormat_.samplerate)
 	{
 		throw filterException("Filter does not have the specified sample rate");
 	}
-	nFilterLength = sf_FilterFormat.frames;
+	nFilterLength_ = sf_FilterFormat_.frames;
 
 #else
 	CWaveFileHandle pFilterWave;
@@ -65,40 +65,40 @@ nSamplesPerSec(nSamplesPerSec)
 	}
 
 	// Save filter characteristic, for access by the properties page, etc
-	::ZeroMemory(&wfexFilterFormat, sizeof(wfexFilterFormat));
-	wfexFilterFormat.Format = *pFilterWave->GetFormat();
+	::ZeroMemory(&wfexFilterFormat_, sizeof(wfexFilterFormat_));
+	wfexFilterFormat_.Format = *pFilterWave->GetFormat();
 
-	if(wfexFilterFormat.Format.nChannels - 1 < nFilterChannel)
+	if(wfexFilterFormat_.Format.nChannels - 1 < nFilterChannel)
 	{
 		throw filterException("Filter channel number too big");
 	}
 
-	this->nSampleRate = wfexFilterFormat.Format.nSampleRate;
+	this->nSampleRate = wfexFilterFormat_.Format.nSampleRate;
 
-	WORD wValidBitsPerSample = wfexFilterFormat.Format.wBitsPerSample;
-	WORD wFormatTag = wfexFilterFormat.Format.wFormatTag;
+	WORD wValidBitsPerSample = wfexFilterFormat_.Format.wBitsPerSample;
+	WORD wFormatTag = wfexFilterFormat_.Format.wFormatTag;
 
 	// nBlockAlign should equal nChannels * wBitsPerSample / 8 (bits per byte) for 
 	// WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT and WAVE_FORMAT_EXTENSIBLE
-	nFilterLength = pFilterWave->GetSize() / (wfexFilterFormat.Format.nChannels * wfexFilterFormat.Format.wBitsPerSample / 8);
+	nFilterLength_ = pFilterWave->GetSize() / (wfexFilterFormat_.Format.nChannels * wfexFilterFormat_.Format.wBitsPerSample / 8);
 
 	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
-		wfexFilterFormat = *(WAVEFORMATEXTENSIBLE*) pFilterWave->GetFormat();  // TODO: Check that this works
+		wfexFilterFormat_ = *(WAVEFORMATEXTENSIBLE*) pFilterWave->GetFormat();  // TODO: Check that this works
 		// wValidBitsPerSample: usually equal to WAVEFORMATEX.wBitsPerSample, 
 		// but can store 20 bits in a 32-bit container, for example
-		wValidBitsPerSample = wfexFilterFormat.Samples.wValidBitsPerSample;
+		wValidBitsPerSample = wfexFilterFormat_.Samples.wValidBitsPerSample;
 
-		if (wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
+		if (wfexFilterFormat_.SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
 		{
 			wFormatTag = WAVE_FORMAT_PCM;
 			//// HACK: for Audition -- doesn't work
-			//wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+			//wfexFilterFormat_.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 			//wFormatTag = WAVE_FORMAT_IEEE_FLOAT; // For Audition-generated files
 		}
 		else
 		{
-			if (wfexFilterFormat.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+			if (wfexFilterFormat_.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
 			{
 				wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
 			}
@@ -112,69 +112,69 @@ nSamplesPerSec(nSamplesPerSec)
 
 	// Setup the filter
 	// A partition will contain half real data, and half zero padding.  Taking the DFT will, of course, overwrite that padding
-	nHalfPartitionLength = (nFilterLength + nPartitions - 1) / nPartitions;
+	nHalfPartitionLength_ = (nFilterLength_ + nPartitions - 1) / nPartitions;
 
 	OptimalDFT oDFT;	// helper
 	// Check that the filter is not too big ...
-	if ( nHalfPartitionLength > oDFT.HalfLargestDFTSize )
+	if ( nHalfPartitionLength_ > oDFT.HalfLargestDFTSize )
 	{
 		throw filterException("Filter too long to handle");
 	}
 
 	// .. or filter too small
-	if ( nHalfPartitionLength == 0 )
+	if ( nHalfPartitionLength_ == 0 )
 	{
 		filterException("Filter too short");
 	}
 
-	if ( nHalfPartitionLength == 1 )
-		nHalfPartitionLength = 2; // Make sure that the minimum partition length is 4
+	if ( nHalfPartitionLength_ == 1 )
+		nHalfPartitionLength_ = 2; // Make sure that the minimum partition length is 4
 
-	nPartitionLength = nHalfPartitionLength * 2;
+	nPartitionLength_ = nHalfPartitionLength_ * 2;
 
-	int nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength);
+	int nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength_);
 	int nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
 
 #ifdef OOURA
 	// Initialize the Oooura workspace;
-	ip.resize(static_cast<int>(sqrt(static_cast<float>(nPaddedPartitionLength)) + 2));
-	ip[0]=0; // signal the need to initialize
-	w.resize(nHalfPaddedPartitionLength);	// w[0..nPaddedPartitionLength/2 - 1]
+	ip_.resize(static_cast<int>(sqrt(static_cast<float>(nPaddedPartitionLength)) + 2));
+	ip_[0]=0; // signal the need to initialize
+	w_.resize(nHalfPaddedPartitionLength);	// w_[0..nPaddedPartitionLength/2 - 1]
 #endif
 
 	// Initialise the Filter
 
 	PlanningRigour pr;
 #ifdef FFTW
-	nFFTWPartitionLength = 2*(nPaddedPartitionLength/2+1);
+	nFFTWPartitionLength_ = 2*(nPaddedPartitionLength/2+1);
 #ifdef ARRAY
-	coeffs = SampleBuffer(nPartitions, nFFTWPartitionLength);
+	coeffs_ = SampleBuffer(nPartitions, nFFTWPartitionLength_);
 #else
-	coeffs = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength));
+	coeffs_ = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength_));
 #endif
 	// If at least PATIENT, allow multithreaded
 	if(nPlanningRigour > 1)
 		fftwf_plan_with_nthreads(2);
 
-	plan =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
-		coeffs.c_ptr(), reinterpret_cast<fftwf_complex*>(coeffs.c_ptr()),
+	plan_ =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
+		c_ptr(coeffs_), reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_)),
 		pr.Flag[nPlanningRigour]);
-	reverse_plan =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
-		reinterpret_cast<fftwf_complex*>(coeffs.c_ptr()), coeffs.c_ptr(),
+	reverse_plan_ =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
+		reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_)), c_ptr(coeffs_),
 		pr.Flag[nPlanningRigour]);
 #else
 #ifdef ARRAY
-	coeffs = SampleBuffer(nPartitions, nPaddedPartitionLength);
+	coeffs_ = SampleBuffer(nPartitions, nPaddedPartitionLength);
 #else
-	coeffs = SampleBuffer(nPartitions, ChannelBuffer(nPaddedPartitionLength));
+	coeffs_ = SampleBuffer(nPartitions, ChannelBuffer(nPaddedPartitionLength));
 #endif
 #endif
 
 #ifdef LIBSNDFILE
-	std::vector<float> item(sf_FilterFormat.channels);
+	std::vector<float> item(sf_FilterFormat_.channels);
 #else
-	assert(wfexFilterFormat.Format.wBitsPerSample >= wValidBitsPerSample);
-	const DWORD dwSizeToRead = wfexFilterFormat.Format.wBitsPerSample / 8;  // container size, in bytes
+	assert(wfexFilterFormat_.Format.wBitsPerSample >= wValidBitsPerSample);
+	const DWORD dwSizeToRead = wfexFilterFormat_.Format.wBitsPerSample / 8;  // container size, in bytes
 
 	assert (dwSizeToRead <= 8);
 	std::vector<BYTE> bSample(8,0); // 8 is the biggest sample size (64-bit)
@@ -192,14 +192,14 @@ nSamplesPerSec(nSamplesPerSec)
 	// Read the filter file
 	WORD nPartition = 0;
 	DWORD nFrame = 0;					// LibSndFile refers to blocks as frames
-	while (nFrame < nFilterLength)
+	while (nFrame < nFilterLength_)
 	{
 #ifdef LIBSNDFILE
 		if (1 == pFilterWave.readf_float(&item[0], 1))		// 1 = 1 frame = nChannel items
 		{
 			// Got a frame / block (ie, the items / samples for each channel)
 			// Pick the sample corresponding to the selected channel
-			coeffs[nPartition][nFrame % nHalfPartitionLength] = item[nFilterChannel];
+			coeffs_[nPartition][nFrame % nHalfPartitionLength_] = item[nFilterChannel];
 #if defined(DEBUG) | defined(_DEBUG)
 			if (item[nFilterChannel] > maxSample)
 				maxSample = item[nFilterChannel];
@@ -230,7 +230,7 @@ nSamplesPerSec(nSamplesPerSec)
 		switch (wFormatTag)
 		{
 		case WAVE_FORMAT_PCM:
-			switch (wfexFilterFormat.Format.wBitsPerSample)	// container size
+			switch (wfexFilterFormat_.Format.wBitsPerSample)	// container size
 			{
 			case 8:
 				{
@@ -302,7 +302,7 @@ nSamplesPerSec(nSamplesPerSec)
 			break;
 
 		case WAVE_FORMAT_IEEE_FLOAT:
-			switch (wfexFilterFormat.Format.wBitsPerSample)
+			switch (wfexFilterFormat_.Format.wBitsPerSample)
 			{
 			case 16:
 				throw filterException("16-bit IEEE float sample size not implemented");
@@ -329,7 +329,7 @@ nSamplesPerSec(nSamplesPerSec)
 			throw filterException("Only PCM and IEEE Float file formats supported"););	// Filter file format is not supported
 		}
 
-		coeffs[nPartition][nFrame % nHalfPartitionLength] = sample;
+		coeffs_[nPartition][nFrame % nHalfPartitionLength_] = sample;
 
 #if defined(DEBUG) | defined(_DEBUG)
 		if (sample > maxSample)
@@ -339,7 +339,7 @@ nSamplesPerSec(nSamplesPerSec)
 #endif
 
 		// skip the rest of the block
-		for(;nChannel < wfexFilterFormat.Format.nChannels ; ++ nChannel)
+		for(;nChannel < wfexFilterFormat_.Format.nChannels ; ++ nChannel)
 		{
 			hr = pFilterWave->Read(&bSample[0], dwSizeToRead, &dwSizeRead);
 
@@ -357,32 +357,32 @@ nSamplesPerSec(nSamplesPerSec)
 #endif
 
 		++nFrame;
-		if (nFrame % nHalfPartitionLength == 0)
+		if (nFrame % nHalfPartitionLength_ == 0)
 		{
 			// Pad partition
-			for (ChannelBuffer::size_type nPadding = nHalfPartitionLength; nPadding < nPaddedPartitionLength; ++nPadding)
+			for (ChannelBuffer::size_type nPadding = nHalfPartitionLength_; nPadding < nPaddedPartitionLength; ++nPadding)
 			{
-				coeffs[nPartition][nPadding] = 0;
+				coeffs_[nPartition][nPadding] = 0;
 			}
 
 			// Take the DFT
 #ifdef FFTW
-			fftwf_execute_dft_r2c(plan, 
-				coeffs.c_ptr(nPartition), 
-				reinterpret_cast<fftwf_complex*>(coeffs.c_ptr(nPartition)));
+			fftwf_execute_dft_r2c(plan_, 
+				c_ptr(coeffs_, nPartition), 
+				reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_, nPartition)));
 #elif defined(OOURA_SIMPLE)
-			rdft(nPaddedPartitionLength, OouraRForward, coeffs.c_ptr(nPartition));
+			rdft(nPaddedPartitionLength, OouraRForward, c_ptr(coeffs_, nPartition));
 #elif defined(OOURA)
-			rdft(nPaddedPartitionLength, OouraRForward, coeffs.c_ptr(nPartition), &ip[0], &w[0]);
+			rdft(nPaddedPartitionLength, OouraRForward, c_ptr(coeffs_, nPartition), &ip_[0], &w_[0]);
 #else
 #error "No FFT package defined"
 #endif
 
 			// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-			coeffs[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+			coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
-			coeffs[nPartition] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+			coeffs_[nPartition] *= static_cast<float>(2.0L / nPaddedPartitionLength);
 #else
 #error "No FFT package defined"
 #endif
@@ -391,29 +391,29 @@ nSamplesPerSec(nSamplesPerSec)
 	} // while
 
 	// Pad the current partition (if necessary)
-	if (nFrame % nHalfPartitionLength != 0)
+	if (nFrame % nHalfPartitionLength_ != 0)
 	{
-		for (ChannelBuffer::size_type nSample = nFrame % nHalfPartitionLength; nSample < nPaddedPartitionLength; ++nSample)
+		for (ChannelBuffer::size_type nSample = nFrame % nHalfPartitionLength_; nSample < nPaddedPartitionLength; ++nSample)
 		{
-			coeffs[nPartition][nSample] = 0;
+			coeffs_[nPartition][nSample] = 0;
 		}
 
 		// Take the DFT
 #ifdef FFTW
-		fftwf_execute_dft_r2c(plan, coeffs.c_ptr(nPartition), reinterpret_cast<fftwf_complex*>(coeffs.c_ptr(nPartition)));
+		fftwf_execute_dft_r2c(plan_, c_ptr(coeffs_, nPartition), reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_, nPartition)));
 #elif defined(OOURA_SIMPLE)
-		rdft(nPaddedPartitionLength, OouraRForward, coeffs.c_ptr(nPartition));
+		rdft(nPaddedPartitionLength, OouraRForward, c_ptr(coeffs_, nPartition));
 #elif defined(OOURA)
-		rdft(nPaddedPartitionLength, OouraRForward, coeffs.c_ptr(nPartition), &ip[0], &w[0]);
+		rdft(nPaddedPartitionLength, OouraRForward, c_ptr(coeffs_, nPartition), &ip_[0], &w_[0]);
 #else
 #error "No FFT package defined"
 #endif
 
 		// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-		coeffs[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+		coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
-		coeffs[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+		coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
 #else
 #error "No FFT package defined"
 #endif
@@ -423,25 +423,26 @@ nSamplesPerSec(nSamplesPerSec)
 	// Zero any further partitions
 	for (;nPartition < nPartitions; ++nPartition)
 	{
-		coeffs[nPartition] = 0;
+		coeffs_[nPartition] = 0;
 	}
 
 	// The padded lengths become the actual lengths that we are going to work with
-	nPartitionLength = nPaddedPartitionLength;
-	nHalfPartitionLength = nHalfPaddedPartitionLength;
-	nFilterLength = nPartitions * nPartitionLength;
+	nPartitionLength_ = nPaddedPartitionLength;
+	nHalfPartitionLength_ = nHalfPaddedPartitionLength;
+	nFilterLength_ = nPartitions * nPartitionLength_;
 
 
 #if defined(DEBUG) | defined(_DEBUG)
 
 	cdebug << "FFT Filter: ";
-	DumpSampleBuffer(coeffs);
+	DumpSampleBuffer(coeffs_);
+	cdebug << std::endl;
 
 
 #ifdef LIBSNDFILE
-	cdebug << waveFormatDescription(sf_FilterFormat, "FFT Filter: ") << std::endl;
+	cdebug << waveFormatDescription(sf_FilterFormat(), "FFT Filter: ") << std::endl;
 #else
-	cdebug << waveFormatDescription(&wfexFilterFormat, nFilterLength, "FFT Filter:") << std::endl;
+	cdebug << waveFormatDescription(&wfexFilterFormat_, nFilterLength_, "FFT Filter:") << std::endl;
 #endif
 
 	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;

@@ -45,6 +45,7 @@ public:
 	STDMETHOD(put_planning_rigour)(unsigned int newVal);
 
 	STDMETHOD(get_filter_description)(std::string* description);
+	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
 
 	// The following pair is needed because DWORD is unsigned
 	float decode_Attenuationdb(const DWORD dwValue)
@@ -79,15 +80,15 @@ private:
 	unsigned int			m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
 
 
-	Holder< CConvolution<float> >	m_Convolution;				// Processing class.  Handle manages resources
-	Sample<float>*					m_InputSampleConvertor;		// functionoid conversion between BYTE and 
-	Sample<float>*					m_OutputSampleConvertor;	// float
+	Holder< ConvolutionList<float> >	m_ConvolutionList;				// Processing class.  Handle manages resources
+	Sample<float>*						m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Sample<float>*						m_OutputSampleConvertor;	// float
 
 
 
-	CFormatSpecs<float>				m_FormatSpecs;				// Supported formats
+	CFormatSpecs<float>					m_FormatSpecs;				// Supported formats
 
-	WAVEFORMATEXTENSIBLE			m_pWaveInXT;				// The current formats;
-	WAVEFORMATEXTENSIBLE			m_pWaveOutXT;
+	WAVEFORMATEXTENSIBLE				m_WaveInXT;					// The current formats;
+	WAVEFORMATEXTENSIBLE				m_WaveOutXT;
 };
 

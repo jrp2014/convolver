@@ -122,7 +122,7 @@
 				DebugInformationFormat="3"
 				CallingConvention="0"
 				CompileAs="0"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist"
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"

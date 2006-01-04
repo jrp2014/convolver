@@ -9,7 +9,6 @@
 #undef min // use __min instead inside this source file
 #undef max // use __max instead inside this source file
 
-
 //--------------------------------------------------------------------------------------
 // Thread safety 
 //--------------------------------------------------------------------------------------
@@ -90,6 +89,7 @@ protected:
         bool  m_IgnoreSizeChange;           // if true, DXUT won't reset the device upon HWND size change
 
         double m_Time;                      // current time in seconds
+        double m_AbsoluteTime;              // absolute time in seconds
         float m_ElapsedTime;                // time elapsed since last frame
 
         HINSTANCE m_HInstance;              // handle to the app instance
@@ -255,6 +255,7 @@ public:
     GET_SET_ACCESSOR( bool, IgnoreSizeChange );   
 
     GET_SET_ACCESSOR( double, Time );
+    GET_SET_ACCESSOR( double, AbsoluteTime );
     GET_SET_ACCESSOR( float, ElapsedTime );
 
     GET_SET_ACCESSOR( HINSTANCE, HInstance );
@@ -374,6 +375,7 @@ DXUTState& GetDXUTState()
 typedef IDirect3D9* (WINAPI* LPDIRECT3DCREATE9)(UINT SDKVersion);
 typedef DECLSPEC_IMPORT UINT (WINAPI* LPTIMEBEGINPERIOD)( UINT uPeriod );
 int     DXUTMapButtonToArrayIndex( BYTE vButton );
+void    DXUTSetProcessorAffinity();
 void    DXUTParseCommandLine();
 CD3DEnumeration* DXUTPrepareEnumerationObject( bool bEnumerate = false );
 void    DXUTBuildOptimalDeviceSettings( DXUTDeviceSettings* pOptimalDeviceSettings, DXUTDeviceSettings* pDeviceSettingsIn, DXUTMatchOptions* pMatchOptions );
@@ -421,7 +423,6 @@ void DXUTSetCallbackFrameRender( LPDXUTCALLBACKFRAMERENDER pCallbackFrameRender,
 void DXUTSetCallbackKeyboard( LPDXUTCALLBACKKEYBOARD pCallbackKeyboard, void* pUserContext )                { GetDXUTState().SetKeyboardFunc( pCallbackKeyboard );  GetDXUTState().SetKeyboardFuncUserContext( pUserContext ); }
 void DXUTSetCallbackMouse( LPDXUTCALLBACKMOUSE pCallbackMouse, bool bIncludeMouseMove, void* pUserContext ) { GetDXUTState().SetMouseFunc( pCallbackMouse ); GetDXUTState().SetNotifyOnMouseMove( bIncludeMouseMove );  GetDXUTState().SetMouseFuncUserContext( pUserContext ); }
 void DXUTSetCallbackMsgProc( LPDXUTCALLBACKMSGPROC pCallbackMsgProc, void* pUserContext )                   { GetDXUTState().SetWindowMsgFunc( pCallbackMsgProc );  GetDXUTState().SetWindowMsgFuncUserContext( pUserContext ); }
-
 
 //--------------------------------------------------------------------------------------
 // Optionally parses the command line and sets if default hotkeys are handled
@@ -528,6 +529,37 @@ HRESULT DXUTInit( bool bParseCommandLine, bool bHandleDefaultHotkeys, bool bShow
     GetDXUTState().SetDXUTInited( true );
 
     return S_OK;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Assign the current thread to one processor. This ensures that timing code runs 
+// on only one processor, and will not suffer any ill effects from power management.
+//--------------------------------------------------------------------------------------
+void DXUTSetProcessorAffinity()
+{
+    HANDLE hCurrentProcess = GetCurrentProcess();
+    
+    // Get the processor affinity mask for this process
+    DWORD_PTR dwProcessAffinityMask = 0;
+    DWORD_PTR dwSystemAffinityMask = 0;
+    
+    if( GetProcessAffinityMask( hCurrentProcess, &dwProcessAffinityMask, &dwSystemAffinityMask ) != 0 && dwProcessAffinityMask )
+    {
+        // Find the lowest processor that our process is allows to run against
+        DWORD_PTR dwAffinityMask = ( dwProcessAffinityMask & ((~dwProcessAffinityMask) + 1 ) );
+
+        // Set this as the processor that our thread must always run against
+        // This must be a subset of the process affinity mask
+        HANDLE hCurrentThread = GetCurrentThread();
+        if( INVALID_HANDLE_VALUE != hCurrentThread )
+        {
+            SetThreadAffinityMask( hCurrentThread, dwAffinityMask );
+            CloseHandle( hCurrentThread );
+        }
+    }
+
+    CloseHandle( hCurrentProcess );
 }
 
 
@@ -3073,6 +3105,16 @@ HRESULT DXUTChangeDevice( DXUTDeviceSettings* pNewDeviceSettings, IDirect3DDevic
     if( !IsWindowVisible( DXUTGetHWND() ) )
         ShowWindow( DXUTGetHWND(), SW_SHOW );
 
+    // Make the window visible
+    if( !IsWindowVisible( DXUTGetHWND() ) )
+        ShowWindow( DXUTGetHWND(), SW_SHOW );
+
+    // Ensure that the display doesn't power down when fullscreen but does when windowed
+    if( !DXUTIsWindowed() )
+        SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_CONTINUOUS ); 
+    else
+        SetThreadExecutionState( ES_CONTINUOUS );   
+
     SAFE_DELETE( pOldDeviceSettings );
     GetDXUTState().SetIgnoreSizeChange( false );
     DXUTPause( false, false );
@@ -3629,7 +3671,7 @@ void DXUTRender3DEnvironment()
             if( D3DERR_DEVICELOST == hr )
             {
                 // The device has been lost but cannot be reset at this time.  
-				// So wait until it can be reset.
+                // So wait until it can be reset.
                 return;
             }
 
@@ -3718,8 +3760,8 @@ void DXUTRender3DEnvironment()
     }
 
     // Get the app's time, in seconds. Skip rendering if no time elapsed
-    double fTime        = DXUTGetGlobalTimer()->GetTime();
-    float fElapsedTime  = (float) DXUTGetGlobalTimer()->GetElapsedTime();
+    double fTime, fAbsTime; float fElapsedTime;
+    DXUTGetGlobalTimer()->GetTimeValues( &fTime, &fAbsTime, &fElapsedTime );
 
     // Store the time for the app
     if( GetDXUTState().GetConstantFrameTime() )
@@ -3729,6 +3771,7 @@ void DXUTRender3DEnvironment()
     }
 
     GetDXUTState().SetTime( fTime );
+    GetDXUTState().SetAbsoluteTime( fAbsTime );
     GetDXUTState().SetElapsedTime( fElapsedTime );
 
     // Update the FPS stats
@@ -3897,16 +3940,16 @@ void DXUTUpdateFrameStats()
     // Keep track of the frame count
     double fLastTime = GetDXUTState().GetLastStatsUpdateTime();
     DWORD dwFrames  = GetDXUTState().GetLastStatsUpdateFrames();
-    double fTime = DXUTGetGlobalTimer()->GetAbsoluteTime();
+    double fAbsTime = GetDXUTState().GetAbsoluteTime();
     dwFrames++;
     GetDXUTState().SetLastStatsUpdateFrames( dwFrames );
 
     // Update the scene stats once per second
-    if( fTime - fLastTime > 1.0f )
+    if( fAbsTime - fLastTime > 1.0f )
     {
-        float fFPS = (float) (dwFrames / (fTime - fLastTime));
+        float fFPS = (float) (dwFrames / (fAbsTime - fLastTime));
         GetDXUTState().SetFPS( fFPS );
-        GetDXUTState().SetLastStatsUpdateTime( fTime );
+        GetDXUTState().SetLastStatsUpdateTime( fAbsTime );
         GetDXUTState().SetLastStatsUpdateFrames( 0 );
 
         WCHAR* pstrFPS = GetDXUTState().GetFPSStats();
@@ -4315,14 +4358,13 @@ LRESULT CALLBACK DXUTStaticWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
             break;
 
         case WM_SYSCOMMAND:
-            // Prevent moving/sizing and power loss in full screen mode
+            // Prevent moving/sizing in full screen mode
             switch( wParam )
             {
                 case SC_MOVE:
                 case SC_SIZE:
                 case SC_MAXIMIZE:
                 case SC_KEYMENU:
-                case SC_MONITORPOWER:
                     if( !DXUTIsWindowed() )
                         return 0;
                     break;
@@ -4672,7 +4714,7 @@ LPCWSTR DXUTGetWindowTitle()                        { return GetDXUTState().GetW
 LPCWSTR DXUTGetDeviceStats()                        { return GetDXUTState().GetDeviceStats(); }
 bool DXUTIsRenderingPaused()                        { return GetDXUTState().GetPauseRenderingCount() > 0; }
 bool DXUTIsTimePaused()                             { return GetDXUTState().GetPauseTimeCount() > 0; }
-bool DXUTIsActive()									{ return GetDXUTState().GetActive(); }
+bool DXUTIsActive()                                 { return GetDXUTState().GetActive(); }
 int DXUTGetExitCode()                               { return GetDXUTState().GetExitCode(); }
 bool DXUTGetShowMsgBoxOnError()                     { return GetDXUTState().GetShowMsgBoxOnError(); }
 bool DXUTGetAutomation()                            { return GetDXUTState().GetAutomation(); }
@@ -4953,17 +4995,17 @@ int DXUTMapButtonToArrayIndex( BYTE vButton )
 //--------------------------------------------------------------------------------------
 void DXUTSetupCursor()
 {
-	// Show the cursor again if returning to fullscreen 
-	IDirect3DDevice9* pd3dDevice = DXUTGetD3DDevice();
-	if( !DXUTIsWindowed() && pd3dDevice )
+    // Show the cursor again if returning to fullscreen 
+    IDirect3DDevice9* pd3dDevice = DXUTGetD3DDevice();
+    if( !DXUTIsWindowed() && pd3dDevice )
     {
         if( GetDXUTState().GetShowCursorWhenFullScreen() )
-	    {
+        {
             SetCursor( NULL ); // Turn off Windows cursor in full screen mode
-		    HCURSOR hCursor = (HCURSOR)(ULONG_PTR)GetClassLongPtr( DXUTGetHWNDDeviceFullScreen(), GCLP_HCURSOR );
-		    DXUTSetDeviceCursor( pd3dDevice, hCursor, false );
+            HCURSOR hCursor = (HCURSOR)(ULONG_PTR)GetClassLongPtr( DXUTGetHWNDDeviceFullScreen(), GCLP_HCURSOR );
+            DXUTSetDeviceCursor( pd3dDevice, hCursor, false );
             DXUTGetD3DDevice()->ShowCursor( true );
-	    }
+        }
         else
         {
             SetCursor( NULL ); // Turn off Windows cursor in full screen mode
@@ -4971,18 +5013,18 @@ void DXUTSetupCursor()
         }
     }
 
-	// Clip cursor if requested
-	if( !DXUTIsWindowed() && GetDXUTState().GetClipCursorWhenFullScreen() )
-	{
-		// Confine cursor to full screen window
-		RECT rcWindow;
-		GetWindowRect( DXUTGetHWNDDeviceFullScreen(), &rcWindow );
-		ClipCursor( &rcWindow );
-	}
-	else
-	{
-		ClipCursor( NULL );
-	}
+    // Clip cursor if requested
+    if( !DXUTIsWindowed() && GetDXUTState().GetClipCursorWhenFullScreen() )
+    {
+        // Confine cursor to full screen window
+        RECT rcWindow;
+        GetWindowRect( DXUTGetHWNDDeviceFullScreen(), &rcWindow );
+        ClipCursor( &rcWindow );
+    }
+    else
+    {
+        ClipCursor( NULL );
+    }
 }
 
 //--------------------------------------------------------------------------------------

@@ -1,0 +1,3 @@
+D:\Projects\convolver\convolver\configs\4.txt
+D:\Projects\convolver\convolver\configs\benchmark.txt
+D:\Projects\convolver\convolver\configs\ex2.txt

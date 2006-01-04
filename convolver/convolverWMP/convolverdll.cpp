@@ -19,6 +19,8 @@
 //
 // convolverdll.cpp : Implementation of DLL Exports.
 
+#include "convolution\config.h"
+
 #include "stdafx.h"
 #include "resource.h"
 #include <initguid.h>
@@ -26,7 +28,6 @@
 #include "convolver.h"
 #include "ConvolverPropPage.h"
 
-#define CRTDBG_MAP_ALLOC
 #include <stdlib.h>
 #include <crtdbg.h>     // Debug header
 #include <uuids.h>      // DirectX SDK media types and subtyes

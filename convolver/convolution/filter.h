@@ -28,36 +28,79 @@
 class Filter
 {
 public:
-	DWORD					nSamplesPerSec;			// 44100, 48000, etc
-	SampleBuffer			coeffs;
+	const WORD	nPartitions;
+	const DWORD	nSamplesPerSec;			// 44100, 48000, etc
+
+	// Accessor functions
+	const SampleBuffer& coeffs() const
+	{
+		return coeffs_;
+	}
+
 #ifdef LIBSNDFILE
-	SF_INFO					sf_FilterFormat;		// The format of the filter file
+	const SF_INFO& sf_FilterFormat() const		// The format of the filter file
+	{
+		return sf_FilterFormat_;
+	}
 #else
-	WAVEFORMATEXTENSIBLE	wfexFilterFormat;		// The format of the filter file
-#endif
-	WORD					nPartitions;
-	DWORD					nPartitionLength;		// in blocks (a block contains the samples for each channel)
-	DWORD					nHalfPartitionLength;	// in blocks
-	DWORD					nFilterLength;			// nFilterLength = nPartitions * nPartitionLength
-#ifdef FFTW
-	DWORD					nFFTWPartitionLength;	// 2*(nPaddedPartitionLength/2+1);
-	fftwf_plan				plan;
-	fftwf_plan				reverse_plan;
+	const WAVEFORMATEXTENSIBLE&	wfexFilterFormat() const		// The format of the filter file
+	{
+		return wfexFilterFormat_;
+	}
 #endif
 
-	// Constructor
-	Filter(TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
-			   const unsigned int& nPlanningRigour);
+	DWORD nPartitionLength() const		// in blocks (a block contains the samples for each channel)
+	{
+		assert(nPartitionLength_ == nHalfPartitionLength_ * 2);
+		return nPartitionLength_;
+	}
 
-#ifdef OOURA
+	DWORD nHalfPartitionLength() const	// in blocks
+	{
+		assert(nPartitionLength_ == nHalfPartitionLength_ * 2);
+		return nHalfPartitionLength_;
+	}
+
+	DWORD nFilterLength() const
+	{
+		assert(nFilterLength_ == nPartitions * nPartitionLength());
+		return nFilterLength_;
+	}
+
+#if defined(FFTW)
+	DWORD nFFTWPartitionLength() const
+	{
+		assert(nFFTWPartitionLength_ == 2*(nPartitionLength()/2+1));
+		return nFFTWPartitionLength_;
+	}
+
+	const fftwf_plan& plan() const
+	{
+		return plan_;
+	}
+
+	const fftwf_plan& reverse_plan() const
+	{
+		return reverse_plan_;
+	}
+#elif defined(OOURA)
 	// Workspace for the non-simple Ooura routines.  
-	std::vector<DLReal>		w;						// w[0...n/2-1]   :cos/sin table
-	std::vector<int>		ip;						// work area for bit reversal
+	const std::vector<DLReal>& w()						// w[0...n/2-1]   :cos/sin table
+	{
+		return w_;
+	}
+	const std::vector<int> ip()					// work area for bit reversal
+	{
+		return ip_;
+	}
 	// length of ip >= 2+sqrt(n)
 	// strictly, length of ip >= 
 	//    2+(1<<(int)(log(n+0.5)/log(2))/2).
 #endif
 
+	// Constructor
+	Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
+			   const unsigned int& nPlanningRigour);
 
 	virtual ~Filter()
 	{
@@ -65,12 +108,35 @@ public:
 		DEBUGGING(3, cdebug << "Filter::~Filter " << std::endl;);
 #endif
 #ifdef FFTW
-		fftwf_destroy_plan(plan);
-		fftwf_destroy_plan(reverse_plan);
+		fftwf_destroy_plan(plan_);
+		fftwf_destroy_plan(reverse_plan_);
 #endif
 	}
 
 private:
+
+	SampleBuffer			coeffs_;
+#ifdef LIBSNDFILE
+	SF_INFO					sf_FilterFormat_;		// The format of the filter file
+#else
+	WAVEFORMATEXTENSIBLE	wfexFilterFormat_;		// The format of the filter file
+#endif
+	DWORD					nPartitionLength_;		// in blocks (a block contains the samples for each channel)
+	DWORD					nHalfPartitionLength_;	// in blocks
+	DWORD					nFilterLength_;			// nFilterLength = nPartitions * nPartitionLength
+#if defined(FFTW)
+	DWORD					nFFTWPartitionLength_;	// 2*(nPaddedPartitionLength/2+1);
+	fftwf_plan				plan_;
+	fftwf_plan				reverse_plan_;
+#elif defined(OOURA)
+	// Workspace for the non-simple Ooura routines.  
+	std::vector<DLReal>		w_;						// w[0...n/2-1]   :cos/sin table
+	std::vector<int>		ip_;					// work area for bit reversal
+	// length of ip >= 2+sqrt(n)
+	// strictly, length of ip >= 
+	//    2+(1<<(int)(log(n+0.5)/log(2))/2).
+#endif
+
 	// Disable default copy construction and assignment, as it FFTW plans cannot be copied
 	Filter();									// prevent construction
 	Filter(const Filter&);						// prevent copying

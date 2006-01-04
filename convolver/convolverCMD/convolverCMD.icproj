@@ -125,7 +125,7 @@
 				SuppressStartupBanner="0"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch "
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist"
 				OpenMP="1"
 				UseProcExt="4"
 				RequireProcExt="2"
@@ -209,6 +209,12 @@
 		<File 
 			RelativePath="..\convolution\convolution.h"/>
 		<File 
+			RelativePath="..\convolution\exception.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
 			RelativePath="..\convolution\filter.cpp"/>
 		<File 
 			RelativePath="..\convolution\filter.h"/>
@@ -230,12 +236,6 @@
 			RelativePath="..\convolution\waveformat.cpp"/>
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
-		<File 
-			RelativePath="..\convolution\exception.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.h"/>
-		<File 
-			RelativePath="..\convolution\ffthelp.cpp"/>
 		<File 
 			RelativePath="..\fft\fftsg.cpp"/>
 		<File 

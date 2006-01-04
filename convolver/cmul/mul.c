@@ -20,7 +20,7 @@ void cmul(c32* restrict a, c32* restrict b, c32* restrict c, int n)
 	int n2;
 	n2 = n/2;
 	c[0] = crealf(a[0]) * crealf(b[0]) + __I__ * cimagf(a[0]) * cimagf(b[0]);
-#pragma omp parallel for
+//#pragma omp parallel for
 #pragma ivdep
 #pragma vector aligned
 	for (i = 1; i < n2; ++i)
@@ -33,7 +33,7 @@ void cmuladd(c32* restrict a, c32* restrict b, c32* restrict c, int n)
 	int n2;
 	n2 = n/2;
 	c[0] += crealf(a[0]) * crealf(b[0]) + __I__ * cimagf(a[0]) * cimagf(b[0]);
-#pragma omp parallel for
+//#pragma omp parallel for
 #pragma ivdep
 #pragma vector aligned
 	for (i = 1; i < n2; ++i)

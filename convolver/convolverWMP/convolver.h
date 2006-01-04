@@ -81,6 +81,7 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE put_planning_rigour(unsigned int newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_filter_description(std::string* description) = 0;
+	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation(float & fAttenuation) = 0;
 
 	virtual float	decode_Attenuationdb(const DWORD dwValue) = 0;
 	virtual DWORD	encode_Attenuationdb(const float fValue) = 0;
@@ -142,6 +143,7 @@ public:
 	STDMETHOD(put_planning_rigour)(unsigned int newVal);
 
 	STDMETHOD(get_filter_description)(std::string* description);
+	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
 
 	// IMediaObject methods
 	STDMETHOD( GetStreamCount )( 
@@ -316,16 +318,16 @@ private:
 
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
-	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
+	WORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	unsigned int			m_nPlanningRigour;	
 
-	Holder< CConvolution<float> >	m_Convolution;			// Processing class.  Handle manages resources
-	Sample<float>*					m_InputSampleConvertor;		// functionoid conversion between BYTE and 
-	Sample<float>*					m_OutputSampleConvertor;	// float
+	Holder< ConvolutionList<float> >	m_ConvolutionList;			// Processing class.
+	Sample<float>*						m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Sample<float>*						m_OutputSampleConvertor;	// float
 
-	CFormatSpecs<float>				m_FormatSpecs;
+	CFormatSpecs<float>		m_FormatSpecs;
 
-	BOOL							m_bEnabled;         // TRUE if enabled
+	BOOL					m_bEnabled;         // TRUE if enabled
 };
 
 #endif //__CCONVOLVER_H_

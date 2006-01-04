@@ -1066,7 +1066,8 @@ bool CDXUTDialog::MsgProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
             // a WM_MOUSEUP when capture changed. Reset
             // m_bDrag so that the dialog does not mistakenly
             // think the mouse button is still held down.
-            m_bDrag = false;
+            if( (HWND)lParam != hWnd )
+                m_bDrag = false;
         }
     }
 
@@ -2033,7 +2034,7 @@ HRESULT CDXUTDialogResourceManager::CreateTexture( UINT iTexture )
     DXUTTextureNode* pTextureNode = m_TextureCache.GetAt( iTexture );
 
     
-	D3DXIMAGE_INFO info;
+    D3DXIMAGE_INFO info;
 
     if( !pTextureNode->bFileSource )
     {
@@ -2058,9 +2059,9 @@ HRESULT CDXUTDialogResourceManager::CreateTexture( UINT iTexture )
     }
     else
     {
-		// Make sure there's a texture to create
-		if( pTextureNode->strFilename[0] == 0 )
-			return S_OK;
+        // Make sure there's a texture to create
+        if( pTextureNode->strFilename[0] == 0 )
+            return S_OK;
 
         // Find the texture on the hard drive
         WCHAR strPath[MAX_PATH];
@@ -2079,7 +2080,7 @@ HRESULT CDXUTDialogResourceManager::CreateTexture( UINT iTexture )
         {
             return DXTRACE_ERR( L"D3DXCreateTextureFromFileEx", hr );
         }
-	}
+    }
 
     // Store dimensions
     pTextureNode->dwWidth = info.Width;
@@ -3914,12 +3915,12 @@ bool CDXUTSlider::HandleMouse( UINT uMsg, POINT pt, WPARAM wParam, LPARAM lParam
             break;
         }
 
-	    case WM_MOUSEWHEEL:
-	    {
-	        int nScrollAmount = int((short)HIWORD(wParam)) / WHEEL_DELTA;
+        case WM_MOUSEWHEEL:
+        {
+            int nScrollAmount = int((short)HIWORD(wParam)) / WHEEL_DELTA;
             SetValueInternal( m_nValue - nScrollAmount, true );
-	        return true;
-	    }
+            return true;
+        }
     };
     
     return false;
@@ -4245,7 +4246,8 @@ bool CDXUTScrollBar::MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam )
     {
         // The application just lost mouse capture. We may not have gotten
         // the WM_MOUSEUP message, so reset m_bDrag here.
-        m_bDrag = false;
+        if( (HWND)lParam != DXUTGetHWND() )
+            m_bDrag = false;
     }
 
     return false;
@@ -4926,7 +4928,8 @@ bool CDXUTListBox::MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam )
     {
         // The application just lost mouse capture. We may not have gotten
         // the WM_MOUSEUP message, so reset m_bDrag here.
-        m_bDrag = false;
+        if( (HWND)lParam != DXUTGetHWND() )
+            m_bDrag = false;
     }
 
     return false;
@@ -5455,6 +5458,12 @@ bool CDXUTEditBox::MsgProc( UINT uMsg, WPARAM wParam, LPARAM lParam )
 
     switch( uMsg )
     {
+        // Make sure that while editing, the keyup and keydown messages associated with 
+        // WM_CHAR messages don't go to any non-focused controls or cameras
+        case WM_KEYUP:
+        case WM_KEYDOWN:
+            return true;
+
         case WM_CHAR:
         {
             switch( (WCHAR)wParam )

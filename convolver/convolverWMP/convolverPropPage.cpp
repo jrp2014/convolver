@@ -426,10 +426,10 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	{
 		// Setup the OPENFILENAME structure
 		OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
-			TEXT("Text files\0*.txt\0Config Files\0*.cfg\0All Files\0*.*\0\0"), NULL,
+			TEXT("Config Text Files\0*.txt\0Config Files\0*.cfg\0WAV Impulse Respose Files\0*.WAV\0PCM Impulse Response Files (32-bit IEEE float)\0*.PCM\0All Files\0*.*\0\0"), NULL,
 			0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
 			TEXT("Get filter file"),
-			OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY, 
+			OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY | OFN_HIDEREADONLY | OFN_EXPLORER, 
 			0, 0, TEXT(".txt"), 0, NULL, NULL };
 
 		SetDlgItemText( IDC_STATUS, TEXT("Configuration filename...") );
@@ -437,7 +437,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 		// Display the SaveFileName dialog. Then, try to load the specified file
 		if( TRUE != GetOpenFileName( &ofn ) )
 		{
-			SetDlgItemText( IDC_STATUS, TEXT("Get filter aborted.") );
+			//SetDlgItemText( IDC_STATUS, TEXT("Get filter aborted.") );
 			//return CommDlgExtendedError();
 			return 0;
 		}
@@ -483,9 +483,6 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
 	float	fAttenuation = 0;
-	WORD	nPartitions = 1;
-	unsigned int nPlanningRigour = 0;
-	TCHAR*  szFilterFileName	= TEXT("");
 	HRESULT hr S_OK;
 
 	try
@@ -500,32 +497,9 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 			}
 		}
 
-		hr = m_spConvolver->get_filterfilename(&szFilterFileName);
-		if (FAILED(hr))
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
-			return 0;
-		}
-
-		hr = m_spConvolver->get_partitions(&nPartitions);
-		if (FAILED(hr))
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
-			return 0;
-		}
-
-		hr = m_spConvolver->get_planning_rigour(&nPlanningRigour);
-		if (FAILED(hr))
-		{
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
-			return 0;
-		}
-
-
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		// TODO: the 8 should be derived
-		hr = calculateOptimumAttenuation(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
+		hr = m_spConvolver->calculateOptimumAttenuation(fAttenuation);
 		fElapsed = t.sec();
 		if (FAILED(hr))
 		{
@@ -537,6 +511,8 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 		TCHAR   szStr[MAXSTRING] = { 0 };
 		_stprintf(szStr, _T("%.1f"), fAttenuation);
 		SetDlgItemText(IDC_ATTENUATION, szStr);
+
+		SetDirty(TRUE);
 
 		// Display calculation time
 		_stprintf(szStr, _T("Elapsed calculation time: %.2f seconds"), fElapsed);
@@ -553,8 +529,6 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 		SetDlgItemText( IDC_STATUS, TEXT("Failed to calculate optimum attenuation.") );
 		return 0;
 	}
-
-	SetDirty(TRUE);
 
 	return 0;
 }

@@ -30,6 +30,36 @@
 #define _WIN32_WINNT   0x0500 
 #endif
 
+// For STLport
+#define _STLP_NO_ANACHRONISMS 1
+#define _STLP_NEW_PLATFORM_SDK 1
+//#define _STLP_USING_PLATFORM_SDK_COMPILER 1
+#define _STLP_VERBOSE_AUTO_LINK 1
+//#define _STLP_USE_BOOST_SUPPORT 1
+
+#if defined(DEBUG) || defined(_DEBUG)
+
+// For VC++ 2005
+#define _HAS_ITERATOR_DEBUGGING 1
+#define _SECURE_SCL 1
+
+// For STLport std::
+//#define _STLP_DEBUG 1
+//#define   _STLP_DEBUG_LEVEL _STLP_STANDARD_DBG_LEVEL
+//#define _STLP_DEBUG_UNINITIALIZED 1
+//#define _STLP_DEBUG_ALLOC 1
+#endif
+
+
+#define _CRT_SECURE_NO_DEPRECATE	1
+#define _SECURE_SCL_DEPRECATE		0
+
+// CRT's memory leak detection
+// use command line to define the following
+//#define CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#include <stdlib.h>
+
 #include <assert.h>
 #include <wchar.h>
 #include <math.h>
@@ -58,27 +88,28 @@ const DWORD MAXSTRING = 1024;	// length
 
 // Debugging
 
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(DEBUG) || defined(_DEBUG)
 
-// CRT's memory leak detection
-//#define CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
+// For VC++ 2005
+//#define _HAS_ITERATOR_DEBUGGING 1
+#define _SECURE_SCL 1
+
+// For STLport std::
+//#define _STLP_DEBUG 1
+//#define   _STLP_DEBUG_LEVEL _STLP_STANDARD_DBG_LEVEL
+//#define _STLP_DEBUG_UNINITIALIZED 1
+//#define _STLP_DEBUG_ALLOC 1
+
+#undef DIRAC_DELTA_FUNCTIONS
 
 #include "debugging\debugging.h"
 #include "debugging\debugStream.h"
 
-
-
-#undef DIRAC_DELTA_FUNCTIONS
-
 #endif
 
-#ifndef __INTEL_COMPILER
+#if !defined(__INTEL_COMPILER) || (defined(_MSC_VER) && _MSC_VER < 1400)
 #define restrict
 #endif
-
-
 
 // FFT routines
 //#define OOURA	1

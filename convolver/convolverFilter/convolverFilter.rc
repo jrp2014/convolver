@@ -59,14 +59,14 @@ BEGIN
     EDITTEXT        IDC_CONFIGFILE,62,1,148,14,ES_AUTOHSCROLL,
                     WS_EX_ACCEPTFILES
     EDITTEXT        IDC_ATTENUATION,62,17,40,14,ES_AUTOHSCROLL
-    LTEXT           "Attenuation (db)",IDS_ATTENUATION,6,20,54,8
-    DEFPUSHBUTTON   "Get config ...",IDC_GETCONFIG,6,1,48,14,BS_NOTIFY
+    LTEXT           "Attenuation (db)",IDS_ATTENUATION,4,20,54,8
+    DEFPUSHBUTTON   "Get config or IR",IDC_GETCONFIG,4,1,56,14,BS_NOTIFY
     PUSHBUTTON      "Calculate optimum attenuation",
                     IDC_CALCULATEOPTIMUMATTENUATION,108,17,102,14
-    LTEXT           "No of partitions:",IDS_NOOFPARTITIONS,6,36,53,8
+    LTEXT           "No of partitions:",IDS_NOOFPARTITIONS,4,36,53,8
     EDITTEXT        IDC_NOOFPARTITIONS,62,33,40,14,ES_AUTOHSCROLL | 
                     ES_NUMBER
-    LTEXT           "Status",IDS_STATUS,6,66,204,60,SS_WORDELLIPSIS
+    LTEXT           "Status",IDS_STATUS,4,66,206,60,SS_NOPREFIX
     LTEXT           "Version not set",IDS_Version,108,35,102,8,0,WS_EX_RIGHT
     CONTROL         "http://convolver.sf.net",IDS_ATTENUATION,"Static",
                     SS_SIMPLE | WS_GROUP,134,57,76,8,WS_EX_RIGHT
@@ -85,8 +85,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,16,0,0
- PRODUCTVERSION 2,16,0,0
+ FILEVERSION 2,17,0,0
+ PRODUCTVERSION 2,17,0,0
  FILEFLAGSMASK 0x30003fL
 #ifdef _DEBUG
  FILEFLAGS 0xbL
@@ -104,14 +104,14 @@ BEGIN
             VALUE "ActiveMovie", "Filter dll"
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "convolver DirectShow Transform Filter"
-            VALUE "FileVersion", "2.16"
+            VALUE "FileVersion", "2.17"
             VALUE "InternalName", "convolverFilter.ax"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OLESelfRegister", "AM20"
             VALUE "OriginalFilename", "convolverFilter.ax"
             VALUE "ProductName", "ConvolverFilter"
-            VALUE "ProductVersion", "2.16"
+            VALUE "ProductVersion", "2.17"
         END
     END
     BLOCK "VarFileInfo"
