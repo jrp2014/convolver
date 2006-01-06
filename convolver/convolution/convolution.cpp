@@ -391,7 +391,7 @@ void inline Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict 
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
 	const DWORD nPartitionLength = Mixer.nPartitionLength();
 	assert(nPartitionLength %2 ==0);
-#pragma loop count(6)
+#pragma loop count(8)
 #pragma ivdep
 	for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
 	{
@@ -822,15 +822,15 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
 	std::generate_n(InputSamples.begin(), nInputBufferLength, uni);
 	//for(DWORD i = 0; i < nInputBufferLength; ++i)
 	//{
-	//	InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
-	//	//InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
+	//	//InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
+	//	InputSamples[i] = 1.0 / (i / 8 + 1.0);  // For testing algorithm
 	//}
 
 	std::fill_n(OutputSamples.begin(), nOutputBufferLength, 0.0f);
 
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(4, 
-		cdebug << "InputSamples (:" << nInputBufferLength << ") ";
+		cdebug << "InputSamples (" << nInputBufferLength << ") ";
 	copy(InputSamples.begin(), InputSamples.end(), std::ostream_iterator<float>(cdebug, ", "));
 	cdebug << std::endl;);
 #endif
@@ -880,6 +880,10 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
 	{
 		fAttenuation = -1.0L * MAX_ATTENUATION;
 	}
+
+#if defined(DEBUG) | defined(_DEBUG)
+	cdebug << "fAttenuation:" << fAttenuation << " maxSample: " << maxSample << std::endl;
+#endif
 
 	return hr;
 }

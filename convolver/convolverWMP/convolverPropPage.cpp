@@ -63,6 +63,11 @@ CConvolverPropPage::~CConvolverPropPage()
 STDMETHODIMP CConvolverPropPage::SetObjects(ULONG nObjects, IUnknown** ppUnk)
 {
 	// find our plug-in object, if it was passed in
+	m_spConvolver = NULL;
+
+	if(NULL == ppUnk)
+		return E_POINTER;
+
 	for (DWORD i = 0; i < nObjects; ++i)
 	{
 		CComPtr<IConvolver> pPlugin;
@@ -97,7 +102,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 			hr = m_spConvolver->get_filter_description(&description);
 			if (FAILED(hr))
 			{
-				SetDlgItemText( IDC_STATUS, TEXT("No filter set"));
+				SetDlgItemText( IDC_STATUS, TEXT("Get config file."));
 				return hr;
 			}
 			SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()));

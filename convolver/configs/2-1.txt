@@ -1,0 +1,9 @@
+44100 2 2 0
+D:\Projects\convolver\convolver\Media\PerfectDiracDelta-44100-2-1.wav
+0
+0.0
+0.0
+D:\Projects\convolver\convolver\Media\PerfectDiracDelta-44100-2-1.wav
+1
+1.0
+1.0

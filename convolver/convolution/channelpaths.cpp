@@ -69,22 +69,14 @@ config_(szChannelPathsFileName)
 		nSamplesPerSec_ = wfex.nSamplesPerSec_;
 #endif
 
-		std::vector<ChannelPath::ScaledChannel> inChannel;
-		inChannel.reserve(2);
-		for(WORD nChannel=0; nChannel < nInputChannels_; ++nChannel)
-			inChannel.push_back(ChannelPath::ScaledChannel(nChannel, 1));
-
-		std::vector<ChannelPath::ScaledChannel> outChannel;
-		outChannel.reserve(2);
-		for(WORD nChannel=0; nChannel < nOutputChannels_; ++nChannel)
-			outChannel.push_back(ChannelPath::ScaledChannel(nChannel, 1));
-
 		for(WORD nChannel=0; nChannel < nInputChannels_; ++nChannel)
 		{
+			std::vector<ChannelPath::ScaledChannel> inChannel(1, ChannelPath::ScaledChannel(nChannel, 1.0f));
+			std::vector<ChannelPath::ScaledChannel> outChannel(1, ChannelPath::ScaledChannel(nChannel, 1.0f));
 			Paths_.push_back(new ChannelPath(szChannelPathsFileName, nPartitions, inChannel, outChannel, nChannel, 
 				nSamplesPerSec_, nPlanningRigour));
+			++nPaths_;
 		}
-		++nPaths_;
 	}
 	catch(const wavfileException&)
 	{

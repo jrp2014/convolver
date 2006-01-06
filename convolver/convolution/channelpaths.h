@@ -152,6 +152,7 @@ public:
 	const boost::ptr_vector<ChannelPath>& Paths() const
 	{
 		assert(Paths_.size() > 0);
+		assert(nPaths_ == Paths_.size());
 		return Paths_;
 	}
 
@@ -179,6 +180,7 @@ public:
 
 	unsigned int nPaths() const				// number of Paths
 	{
+		assert(nPaths_ == Paths_.size());
 		return nPaths_;
 	}
 

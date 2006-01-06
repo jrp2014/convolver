@@ -1441,7 +1441,7 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 	DEBUGGING(3, cdebug << "put_filterfilename" << std::endl;);
 #endif
 
-	if (_tcscmp(newVal, m_szFilterFileName) != 0) // if new filename set
+	if (m_ConvolutionList.get_ptr() == NULL || (_tcscmp(newVal, m_szFilterFileName) != 0)) // if new filename set
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
