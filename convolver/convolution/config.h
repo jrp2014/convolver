@@ -142,10 +142,10 @@ struct PlanningRigour
 	PlanningRigour()
 	{
 #ifdef FFTW
-		_tcsncpy(Rigour[0], TEXT("Estimate"), nStrLen);		Flag[0] = FFTW_ESTIMATE;
-		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[1] = FFTW_MEASURE;
-		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[2] = FFTW_PATIENT;
-		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[3] = FFTW_EXHAUSTIVE;
+		_tcsncpy(Rigour[0], TEXT("Estimate"), nStrLen);		Flag[0] = FFTW_ESTIMATE|FFTW_DESTROY_INPUT;
+		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[1] = FFTW_MEASURE|FFTW_DESTROY_INPUT;
+		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[2] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
+		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[3] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT;
 #else
 		_tcsncpy(Rigour[0], TEXT("Default"), nStrLen);	Flag[0] = 0;
 #endif

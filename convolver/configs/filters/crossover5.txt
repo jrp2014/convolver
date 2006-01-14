@@ -1,13 +1,17 @@
 44100 2 4 33
 D:\Projects\convolver\convolver\Media\filters\mid_low.wav
+0
 0.0
 0.0
 D:\Projects\convolver\convolver\Media\filters\mid_low.wav
+0
 1.0
 1.0
 D:\Projects\convolver\convolver\Media\filters\sub_low.wav
+0
 0.0
 2.0
 D:\Projects\convolver\convolver\Media\filters\sub_low.wav
+0
 1.0
 3.0

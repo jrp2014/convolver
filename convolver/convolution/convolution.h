@@ -79,7 +79,7 @@ public:
 	{
 		if(sample_convertor != NULL)
 		{
-			return Mixer.nPartitionLength() / 2 * sample_convertor->nContainerSize(); // The lag
+			return Mixer.nHalfPartitionLength() * sample_convertor->nContainerSize(); // The lag
 		}
 		else
 		{

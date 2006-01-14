@@ -152,7 +152,7 @@ nSamplesPerSec(nSamplesPerSec)
 #else
 	coeffs_ = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength_));
 #endif
-	// If at least PATIENT, allow multithreaded
+	// PATIENT will disable multithreading, if it's not faster
 	if(nPlanningRigour > 1)
 		fftwf_plan_with_nthreads(2);
 
