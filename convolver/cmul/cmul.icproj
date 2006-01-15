@@ -35,7 +35,7 @@
 				StructMemberAlignment="5"
 				BufferSecurityCheck="1"
 				EnableFunctionLevelLinking="1"
-				EnableEnhancedInstructionSet="2"
+				EnableEnhancedInstructionSet="0"
 				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"

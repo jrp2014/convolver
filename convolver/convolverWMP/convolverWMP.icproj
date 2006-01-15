@@ -30,7 +30,7 @@
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW_DLL;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="1"
 				ExceptionHandling="1"
 				BasicRuntimeChecks="3"
@@ -39,7 +39,7 @@
 				StructMemberAlignment="5"
 				BufferSecurityCheck="1"
 				EnableFunctionLevelLinking="1"
-				EnableEnhancedInstructionSet="2"
+				EnableEnhancedInstructionSet="0"
 				ForceConformanceInForLoopScope="1"
 				RuntimeTypeInfo="1"
 				UsePrecompiledHeader="0"
@@ -57,7 +57,7 @@
 				Name="LinkerTool"
 				DelayImpLib=""
 				RegisterOutput="1"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
 				ShowProgress="0"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
 				SuppressStartupBanner="0"
@@ -116,7 +116,7 @@
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="0"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG;FFTW_DLL"
 				StringPooling="1"
 				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
@@ -144,7 +144,7 @@
 				Name="LinkerTool"
 				DelayImpLib=""
 				RegisterOutput="1"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib FFTW3.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -205,42 +205,6 @@
 			RelativePath="..\fft\fftsg.cpp"/>
 		<File 
 			RelativePath="..\fft\fftsg_h.h"/>
-		<File 
-			RelativePath="..\Common\dxstdafx.cpp"/>
-		<File 
-			RelativePath="..\Common\dxstdafx.h"/>
-		<File 
-			RelativePath="..\Common\DXUT.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUT.h"/>
-		<File 
-			RelativePath="..\Common\DXUTenum.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTenum.h"/>
-		<File 
-			RelativePath="..\Common\DXUTgui.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTgui.h"/>
-		<File 
-			RelativePath="..\Common\DXUTMesh.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTMesh.h"/>
-		<File 
-			RelativePath="..\Common\DXUTmisc.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTmisc.h"/>
-		<File 
-			RelativePath="..\Common\DXUTRes.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTRes.h"/>
-		<File 
-			RelativePath="..\Common\DXUTSettingsDlg.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTSettingsDlg.h"/>
-		<File 
-			RelativePath="..\Common\DXUTsound.cpp"/>
-		<File 
-			RelativePath="..\Common\DXUTsound.h"/>
 		<File 
 			RelativePath="..\debugging\debugging.cpp"/>
 		<File 

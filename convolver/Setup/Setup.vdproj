@@ -28,7 +28,7 @@
         "Entry"
         {
         "MsmKey" = "8:_27C1A8EC7941C4448B1AB561ADFEE62E"
-        "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
+        "OwnerKey" = "8:_80C0F7E810A34BFAB388567A56A338C8"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -41,24 +41,6 @@
         {
         "MsmKey" = "8:_27C1A8EC7941C4448B1AB561ADFEE62E"
         "OwnerKey" = "8:_A9F0E52D6CC84787834C2488088BDCA4"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_27C1A8EC7941C4448B1AB561ADFEE62E"
-        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_27C1A8EC7941C4448B1AB561ADFEE62E"
-        "OwnerKey" = "8:_80C0F7E810A34BFAB388567A56A338C8"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_27C1A8EC7941C4448B1AB561ADFEE62E"
-        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -135,30 +117,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
-        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
-        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
-        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_A332DF860C743B6F61EF90E18124EF00"
-        "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_A9F0E52D6CC84787834C2488088BDCA4"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -167,6 +125,30 @@
         {
         "MsmKey" = "8:_B7383602C6A04D8682E86586F94146BD"
         "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B8C577D4ED6EE45D8651396DF7102102"
+        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B8C577D4ED6EE45D8651396DF7102102"
+        "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B8C577D4ED6EE45D8651396DF7102102"
+        "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B8C577D4ED6EE45D8651396DF7102102"
+        "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -409,10 +391,10 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_A332DF860C743B6F61EF90E18124EF00"
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_B8C577D4ED6EE45D8651396DF7102102"
             {
-            "SourcePath" = "8:fftw3.dll"
-            "TargetName" = "8:fftw3.dll"
+            "SourcePath" = "8:fftw31.dll"
+            "TargetName" = "8:fftw31.dll"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
             "Condition" = "8:"
@@ -544,13 +526,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{E19FB391-4941-4168-8C91-E54A4BF8F772}"
-        "PackageCode" = "8:{D4FDE208-94D3-4F62-886D-2C9438971EE1}"
+        "ProductCode" = "8:{10DFFF47-4F48-48FC-8394-55DAB9AEB95C}"
+        "PackageCode" = "8:{58F04C6B-A9BD-4575-B73D-6536444E4DF9}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:2.19"
+        "ProductVersion" = "8:2.20"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"

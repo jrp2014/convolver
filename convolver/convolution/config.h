@@ -126,12 +126,11 @@ const DWORD MAXSTRING = 1024;	// length
 #error "No FFT package defined"
 #endif
 
-
 struct PlanningRigour
 {
 #ifdef FFTW
-	static const unsigned int nDegrees = 4;
-	static const unsigned int nStrLen = 11;
+	static const unsigned int nDegrees = 5;
+	static const unsigned int nStrLen = 15;
 #else
 	static const unsigned int nDegrees = 1;
 	static const unsigned int nStrLen = 8;
@@ -146,6 +145,8 @@ struct PlanningRigour
 		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[1] = FFTW_MEASURE|FFTW_DESTROY_INPUT;
 		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[2] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
 		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[3] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT;
+		fftwf_timelimit = 60;
+		_tcsncpy(Rigour[4], TEXT("Take 1 minute"), nStrLen);	Flag[4] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT|FFTW_TIMELIMIT;
 #else
 		_tcsncpy(Rigour[0], TEXT("Default"), nStrLen);	Flag[0] = 0;
 #endif

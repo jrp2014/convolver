@@ -466,6 +466,11 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 		::MoFreeMediaType(&m_mtInput);
 		::ZeroMemory(&m_mtInput, sizeof(m_mtInput));
 
+		if(m_ConvolutionList.get_ptr() != NULL)
+		{
+			m_ConvolutionList->ClearInputSelection();
+		}
+
 		return S_OK;
 	}
 
@@ -556,6 +561,11 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 	{
 		::MoFreeMediaType( &m_mtOutput );
 		::ZeroMemory(&m_mtOutput, sizeof(m_mtOutput));
+
+		if(m_ConvolutionList.get_ptr() != NULL)
+		{
+			m_ConvolutionList->ClearOutputSelection();
+		}
 
 		return S_OK;
 	}
@@ -1651,7 +1661,14 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_
 #if defined(DEBUG) | defined(_DEBUG)
 	if (GUID_NULL != pmtInput->majortype && GUID_NULL != pmtInput->subtype)
 	{
-		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtInput->pbFormat, 0, "Input:") << std::endl;
+		if(FORMAT_WaveFormatEx != pmtInput->formattype)
+		{
+			cdebug << "Non WaveFormat Input" << std::endl;
+		}
+		else
+		{
+			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtInput->pbFormat, 0, "Input:") << std::endl;
+		}
 	}
 	else
 	{
@@ -1659,7 +1676,16 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_
 	}
 	if (GUID_NULL != pmtOutput->majortype && GUID_NULL != pmtOutput->subtype)
 	{
-		cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtOutput->pbFormat, 0, "Output:") << std::endl;
+
+
+		if(FORMAT_WaveFormatEx != pmtOutput->formattype)
+		{
+			cdebug << "Non WaveFormat Output" << std::endl;
+		}
+		else
+		{
+			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtOutput->pbFormat, 0, "Output:") << std::endl;
+		}
 	}
 	else
 	{

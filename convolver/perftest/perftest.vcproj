@@ -28,7 +28,7 @@
 				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1;D:\Projects\blitz-0.9"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW3_IMPORTS;CRTDBG_MAP_ALLOC"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW_DLL;CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="TRUE"
@@ -36,7 +36,7 @@
 				StructMemberAlignment="5"
 				BufferSecurityCheck="TRUE"
 				EnableFunctionLevelLinking="TRUE"
-				EnableEnhancedInstructionSet="2"
+				EnableEnhancedInstructionSet="0"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
@@ -46,7 +46,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib fftw3.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib fftw31.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -100,7 +100,7 @@
 				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="TRUE"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW3_IMPORTS"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW_DLL"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
@@ -120,7 +120,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw3.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -204,64 +204,6 @@
 				</File>
 				<File
 					RelativePath="..\debugging\fastTiming.h">
-				</File>
-			</Filter>
-			<Filter
-				Name="Common"
-				Filter="">
-				<File
-					RelativePath="..\Common\dxstdafx.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\dxstdafx.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUT.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUT.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTenum.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTenum.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTgui.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTgui.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTMesh.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTMesh.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTmisc.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTmisc.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTRes.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTRes.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTSettingsDlg.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTSettingsDlg.h">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTsound.cpp">
-				</File>
-				<File
-					RelativePath="..\Common\DXUTsound.h">
 				</File>
 			</Filter>
 			<Filter

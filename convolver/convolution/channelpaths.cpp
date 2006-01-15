@@ -317,12 +317,9 @@ const std::string ChannelPaths::DisplayChannelPaths() const
 		result << channelDescription(WAVE_FORMAT_EXTENSIBLE, dwChannelMask(), nOutputChannels()) << ") ";
 
 		result
-#ifdef LIBSNDFILE
-			<< Paths()[0].filter.sf_FilterFormat().samplerate/1000.0f << "kHz " 
-#else
-			<< Paths()[0].filter.wfexFilterFormat().Format.nSamplesPerSec/1000.0f << "kHz " 
-#endif
-			<< Paths()[0].filter.nFilterLength() << " taps";
+			<< nSamplesPerSec()/1000.0f << "kHz, " 
+			<< nFilterLength() << " taps, " 
+			<< (nPartitionLength() / nSamplesPerSec()) << "s lag";
 	}
 	return result.str();
 }

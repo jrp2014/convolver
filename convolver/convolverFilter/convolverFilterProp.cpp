@@ -67,7 +67,7 @@ HRESULT CconvolverFilterProperties::DisplayFilterFormat(HWND hwnd, TCHAR* szFilt
 			hr = m_pIconvolverFilter->get_filter_description(&description);
 			if (FAILED(hr))
 			{
-				SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get a config file."));
+				SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get a config file or Impulse Response sound file."));
 				return hr;
 			}
 			SetDlgItemText( hwnd, IDS_STATUS, CA2CT(description.c_str()));

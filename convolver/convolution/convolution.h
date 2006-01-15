@@ -195,6 +195,8 @@ public:
 		return ConvolutionList_[selectedConvolutionIndex_];
 	}
 
+
+
 	const Convolution<T>& operator[](size_type n) const
 	{
 		assert(n >= 0 && n < nConvolutionList());
@@ -211,6 +213,30 @@ public:
 		bool select=false);
 
 	HRESULT SelectConvolution(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut);
+
+	void ClearInputSelection()
+	{
+		if(state_ == InputSelected)
+		{
+			state_ = Unselected;
+		}
+		else if (state_ == Selected)
+		{
+			state_ = OutputSelected;
+		}
+	}
+
+	void ClearOutputSelection()
+	{
+		if(state_ == OutputSelected)
+		{
+			state_ = Unselected;
+		}
+		else if (state_ == Selected)
+		{
+			state_ = InputSelected;
+		}
+	}
 
 	const std::string DisplayConvolutionList() const;
 

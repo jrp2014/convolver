@@ -368,7 +368,7 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 		m_InputSampleConvertor, m_OutputSampleConvertor,
 		dwBlocksToProcess,
 		m_fAttenuation_db)
-		: 	m_ConvolutionList->SelectedConvolution().doConvolution(pbSrc, pbDst,
+		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbSrc, pbDst,
 		m_InputSampleConvertor, m_OutputSampleConvertor,
 		dwBlocksToProcess,
 		m_fAttenuation_db);

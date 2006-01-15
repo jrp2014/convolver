@@ -1020,6 +1020,10 @@ template <typename T>
 HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut, 
 												  bool select /*=false*/)
 {
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "ConvolutionList::CheckConvolutionList " << select << std::endl;);
+#endif
+
 	// The complexity here is because the calling routines may set/check input and output formats separately, and
 	// a pWave of NULL can be used to not set/check
 
