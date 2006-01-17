@@ -94,7 +94,7 @@
 				WholeProgramOptimization="1"/>
 			<Tool 
 				Name="DebugTool"
-				CommandArguments="4 2 d:\projects\convolver\convolver\configs\config.txt"/>
+				CommandArguments="4 2 4 d:\projects\convolver\convolver\configs\benchmark.txt"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="1000"

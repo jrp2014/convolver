@@ -65,7 +65,7 @@ public:
 class filterException : public convolutionException
 {
 public:
-	filterException(std::string what="") : convolutionException("Problem with filter: " + what) {}
+	filterException(std::string what, const TCHAR* path) : convolutionException("Problem with filter: " + std::string(CT2CA(path)) + ": " + what) {}
 	filterException(HRESULT& hr) : convolutionException("Problem with filter: ")
 	{
 		std::ostringstream ss;

@@ -526,13 +526,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{10DFFF47-4F48-48FC-8394-55DAB9AEB95C}"
-        "PackageCode" = "8:{58F04C6B-A9BD-4575-B73D-6536444E4DF9}"
+        "ProductCode" = "8:{463D5388-D8E5-426B-A9B5-D7885B1D2DBC}"
+        "PackageCode" = "8:{439CEC91-AAD1-4E2A-9C33-D69D3B4BD797}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:2.20"
+        "ProductVersion" = "8:2.21"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
@@ -1085,7 +1085,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_17210C20EFD44B1AA3780B36282C79A5"
             {
-            "SourcePath" = "8:..\\bin\\Release\\ConvolverFilter.ax"
+            "SourcePath" = "8:..\\bin\\Debug\\ConvolverFilter.ax"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1113,7 +1113,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_1C05BCC636FD43EBB0AB2D0EC362223E"
             {
-            "SourcePath" = "8:..\\..\\..\\DScaler5\\release\\ConvolverWrapper.dll"
+            "SourcePath" = "8:..\\..\\..\\DScaler5\\debug\\ConvolverWrapper.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1338,7 +1338,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_7B653B8AB6A04A74B37B59458951A8E6"
             {
-            "SourcePath" = "8:..\\bin\\Release\\convolverCMD.exe"
+            "SourcePath" = "8:..\\bin\\Debug\\convolverCMD.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1366,7 +1366,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_7C8CF7A10F524ED89B22A73258C218A4"
             {
-            "SourcePath" = "8:..\\bin\\Release\\perftest.exe"
+            "SourcePath" = "8:..\\bin\\Debug\\perftest.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1394,7 +1394,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_80C0F7E810A34BFAB388567A56A338C8"
             {
-            "SourcePath" = "8:..\\bin\\Release\\comparewavs.exe"
+            "SourcePath" = "8:..\\bin\\Debug\\comparewavs.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1422,7 +1422,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_8CCFA8EB511742BF8789AFC81CB9800F"
             {
-            "SourcePath" = "8:..\\bin\\Release\\convolverWMP.dll"
+            "SourcePath" = "8:..\\bin\\Debug\\convolverWMP.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1534,7 +1534,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_A9F0E52D6CC84787834C2488088BDCA4"
             {
-            "SourcePath" = "8:..\\bin\\Release\\generate_dirac_delta.exe"
+            "SourcePath" = "8:..\\bin\\Debug\\generate_dirac_delta.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
@@ -1618,7 +1618,7 @@
             }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_B7383602C6A04D8682E86586F94146BD"
             {
-            "SourcePath" = "8:..\\bin\\Release\\makeIR.exe"
+            "SourcePath" = "8:..\\bin\\Debug\\makeIR.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"

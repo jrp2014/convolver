@@ -158,6 +158,11 @@ HRESULT CConvolver::FinalConstruct()
 		{
 			// Convert the DWORD to a WORD.
 			m_nPlanningRigour = dwValue;
+			// limit planning rigour to avoid long startup times.
+			if (m_nPlanningRigour > 1)
+			{
+				m_nPlanningRigour = 1;
+			}
 		}
 
 		try // creating m_ConvolutionList might throw

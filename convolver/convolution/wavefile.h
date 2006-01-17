@@ -101,11 +101,11 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Failed to open " << CT2CA(path) << std::endl;
 #endif
-			throw wavfileException("Failed to open", path, sf_strerror (NULL));
+			throw wavfileException("Failed to open filter sound file", path, "");
 		}
 		if(sfinfo->samplerate != nSampleRate)
 		{
-			throw wavfileException("Unexpected filter sample rate", path, "");
+			throw wavfileException("Inconsistent filter sound file sample rate", path, "");
 		}
 	};
 

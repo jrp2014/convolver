@@ -85,8 +85,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,20,0,0
- PRODUCTVERSION 2,20,0,0
+ FILEVERSION 2,21,0,0
+ PRODUCTVERSION 2,21,0,0
  FILEFLAGSMASK 0x30003fL
 #ifdef _DEBUG
  FILEFLAGS 0xbL
@@ -104,14 +104,14 @@ BEGIN
             VALUE "ActiveMovie", "Filter dll"
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "convolver DirectShow Transform Filter"
-            VALUE "FileVersion", "2.20"
+            VALUE "FileVersion", "2.21"
             VALUE "InternalName", "convolverFilter.ax"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OLESelfRegister", "AM20"
             VALUE "OriginalFilename", "convolverFilter.ax"
             VALUE "ProductName", "ConvolverFilter"
-            VALUE "ProductVersion", "2.20"
+            VALUE "ProductVersion", "2.21"
         END
     END
     BLOCK "VarFileInfo"

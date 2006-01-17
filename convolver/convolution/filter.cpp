@@ -37,7 +37,7 @@ nSamplesPerSec(nSamplesPerSec)
 
 	if (nPartitions == 0)
 	{
-		throw filterException("Number of partitions must be at least one");
+		throw filterException("Number of partitions must be at least one", szFilterFileName);
 	}
 
 	// Load the wave file
@@ -47,12 +47,12 @@ nSamplesPerSec(nSamplesPerSec)
 
 	if(sf_FilterFormat_.channels - 1 < nFilterChannel)
 	{
-		throw filterException("Filter channel number too big");
+		throw filterException("Filter channel number too big", szFilterFileName);
 	}
 
 	if(nSamplesPerSec != sf_FilterFormat_.samplerate)
 	{
-		throw filterException("Filter does not have the specified sample rate");
+		throw filterException("Filter does not have the specified sample rate", szFilterFileName);
 	}
 	nFilterLength_ = sf_FilterFormat_.frames;
 
@@ -118,13 +118,13 @@ nSamplesPerSec(nSamplesPerSec)
 	// Check that the filter is not too big ...
 	if ( nHalfPartitionLength_ > oDFT.HalfLargestDFTSize )
 	{
-		throw filterException("Filter too long to handle");
+		throw filterException("Filter too long to handle", szFilterFileName);
 	}
 
 	// .. or filter too small
 	if ( nHalfPartitionLength_ == 0 )
 	{
-		filterException("Filter too short");
+		filterException("Filter too short", szFilterFileName);
 	}
 
 	if ( nHalfPartitionLength_ == 1 )
@@ -209,7 +209,7 @@ nSamplesPerSec(nSamplesPerSec)
 		}
 		else
 		{
-			throw filterException("Failed to read a frame");
+			throw filterException("Failed to read a frame", szFilterFileName);
 		};
 #else
 		for(WORD nChannel = 0; nChannel <= nFilterChannel; ++nChannel)
@@ -218,12 +218,12 @@ nSamplesPerSec(nSamplesPerSec)
 
 			if (FAILED(hr))
 			{
-				throw filterException("Failed to read a block");
+				throw filterException("Failed to read a block", szFilterFileName);
 			}
 
 			if (dwSizeRead != dwSizeToRead) // file corrupt, non-existent, etc
 			{
-				throw filterException("Failed to read a complete block");
+				throw filterException("Failed to read a complete block", szFilterFileName);
 			}
 		}
 		// Now convert bSample to the float sample
@@ -262,7 +262,7 @@ nSamplesPerSec(nSamplesPerSec)
 						i = (i << 8) | bSample[0];
 						break;
 					default:
-						throw filterException("Bit depth for 24-bit container must be 16, 20 or 24");
+						throw filterException("Bit depth for 24-bit container must be 16, 20 or 24", szFilterFileName);
 					}
 					sample = static_cast<float>(i);
 				}
@@ -291,13 +291,13 @@ nSamplesPerSec(nSamplesPerSec)
 					case 32:
 						break;
 					default:
-						throw filterException("Bit depth for 32-bit container must be 16, 20, 24 or 32");
+						throw filterException("Bit depth for 32-bit container must be 16, 20, 24 or 32", szFilterFileName);
 					}
 					sample = static_cast<float>(i);
 				}
 				break;
 			default:
-				throw filterException("Unsupported PCM sample size"); // Unsupported it sample size
+				throw filterException("Unsupported PCM sample size", szFilterFileName); // Unsupported it sample size
 			}
 			break;
 
@@ -305,9 +305,9 @@ nSamplesPerSec(nSamplesPerSec)
 			switch (wfexFilterFormat_.Format.wBitsPerSample)
 			{
 			case 16:
-				throw filterException("16-bit IEEE float sample size not implemented");
+				throw filterException("16-bit IEEE float sample size not implemented", szFilterFileName);
 			case 24:
-				throw filterException("24-bit IEEE float sample size not implemented");
+				throw filterException("24-bit IEEE float sample size not implemented", szFilterFileName);
 			case 32:
 				{
 					assert(dwSizeToRead == sizeof(float));
@@ -321,12 +321,12 @@ nSamplesPerSec(nSamplesPerSec)
 				}  // case
 				break;
 			default:
-				throw filterException("Invalid IEEE float sample size"); // Unsupported it sample size
+				throw filterException("Invalid IEEE float sample size", szFilterFileName); // Unsupported it sample size
 			}
 			break;
 
 		default:
-			throw filterException("Only PCM and IEEE Float file formats supported"););	// Filter file format is not supported
+			throw filterException("Only PCM and IEEE Float file formats supported", szFilterFileName););	// Filter file format is not supported
 		}
 
 		coeffs_[nPartition][nFrame % nHalfPartitionLength_] = sample;
@@ -345,12 +345,12 @@ nSamplesPerSec(nSamplesPerSec)
 
 			if (FAILED(hr))
 			{
-				throw filterException("Failed to read a block");
+				throw filterException("Failed to read a block", szFilterFileName);
 			}
 
 			if (dwSizeRead != dwSizeToRead) // file corrupt, non-existent, etc
 			{
-				throw filterException("Failed to read a complete block");
+				throw filterException("Failed to read a complete block", szFilterFileName);
 			}
 		}
 

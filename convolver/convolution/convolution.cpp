@@ -959,7 +959,7 @@ nPartitions_(nPartitions)
 			{
 				if(nConvolutionList_ == 0)
 				{
-					throw convolutionListException("At least one filter path configuration file must be specified", szConfigFileName);
+					throw convolutionListException("At least one filter path configuration file must be specified. Missing final blank line?", szConfigFileName);
 				}
 #if defined(DEBUG) | defined(_DEBUG)
 				Dump();
