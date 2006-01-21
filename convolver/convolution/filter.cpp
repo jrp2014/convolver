@@ -32,8 +32,10 @@ nSamplesPerSec(nSamplesPerSec)
 	HRESULT hr = S_OK;
 #endif
 
-	// TODO:: unclear whether this has any effect
+#ifdef UNDEFINED
+	// TODO:: unclear whether this has any effect other than breaking Athlon
 	SIMDFlushToZero();	// Set flush to zero processor mode for speed, with a loss of accuracy
+#endif
 
 	if (nPartitions == 0)
 	{
@@ -420,7 +422,7 @@ nSamplesPerSec(nSamplesPerSec)
 		++nPartition;
 	}
 
-	// Zero any further partitions
+	// Zero any further partitions;
 	for (;nPartition < nPartitions; ++nPartition)
 	{
 		coeffs_[nPartition] = 0;
@@ -431,6 +433,23 @@ nSamplesPerSec(nSamplesPerSec)
 	nHalfPartitionLength_ = nHalfPaddedPartitionLength;
 	nFilterLength_ = nPartitions * nPartitionLength_;
 
+#ifdef UNDEFINED
+	// Only works for float. Seems to have no performance benefit
+	for(WORD nPartition=0; nPartition<nPartitions; ++ nPartition)
+	{
+		for(DWORD nSample=0; nSample<nPartitionLength_; ++nSample)
+		{
+			// Kill denormal. Requires 32-bit int
+			const int x = *reinterpret_cast <const int*> (&coeffs_[nPartition][nSample]);
+			const int abs_mantissa = x & 0x007FFFFF;
+			const int biased_exponent = x & 0x7F800000;
+			if (biased_exponent == 0 && abs_mantissa != 0)
+			{
+				coeffs_[nPartition][nSample] = 0;
+			}
+		}
+	}
+#endif
 
 #if defined(DEBUG) | defined(_DEBUG)
 

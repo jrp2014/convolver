@@ -16,44 +16,44 @@
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
 				CharacterSet="2"
-				WholeProgramOptimization="0"/>
-			<Tool 
-				Name="DebugTool"/>
+				WholeProgramOptimization="FALSE"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
-				GlobalOptimizations="0"
+				GlobalOptimizations="FALSE"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="1"
+				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\..\..\libsndfile-1.0.12\src"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline;CRTDBG_MAP_ALLOC"
-				MinimalRebuild="1"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline;CRTDBG_MAP_ALLOC;DLL_EXPORT"
+				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="0"
+				SmallerTypeCheck="FALSE"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="1"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="TRUE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="1"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="1"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"
-				OpenMP="1"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"/>
+				RecognizeRestrictKeyword="1"
+				OpenMP="1"/>
+			<Tool 
+				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				DelayImpLib=""
 				OutputFile="$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
-				GenerateDebugInformation="1"
+				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/libsndfile.pdb"
 				SubSystem="2"
 				OptimizeReferences="0"
@@ -61,23 +61,27 @@
 				ImportLibrary="$(OutDir)/libsndfile.lib"
 				TargetMachine="1"/>
 			<Tool 
-				Name="LibrarianTool"/>
-			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebDeploymentTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
@@ -87,254 +91,362 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
 				CharacterSet="2"
-				WholeProgramOptimization="1"/>
-			<Tool 
-				Name="DebugTool"/>
+				WholeProgramOptimization="TRUE"/>
 			<Tool 
 				Name="CppCmplrTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="1"
+				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="1"
+				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="1"
-				EnableFiberSafeOptimizations="1"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\..\..\libsndfile-1.0.12\src"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;inline=__inline"
-				StringPooling="1"
-				ExceptionHandling="1"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;LIBSNDFILE_EXPORTS;DLL_EXPORT;inline=__inline"
+				StringPooling="TRUE"
+				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="0"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="1"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="0"
-				Detect64BitPortabilityProblems="1"
+				SuppressStartupBanner="FALSE"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Wcheck /Qsox"
-				OpenMP="1"
 				UseProcExt="0"
 				RequireProcExt="0"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"/>
+				SupportMultibyteCharSource="1"
+				OpenMP="1"/>
+			<Tool 
+				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				DelayImpLib=""
 				OutputFile="$(OutDir)/libsndfile.dll"
 				LinkIncremental="1"
 				ModuleDefinitionFile="libsndfile.def"
-				GenerateDebugInformation="1"
+				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				ImportLibrary="$(OutDir)/libsndfile.lib"
 				TargetMachine="1"/>
 			<Tool 
-				Name="LibrarianTool"/>
-			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebDeploymentTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
+		<Filter 
+			Name="Source Files"
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\aiff.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\alaw.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\au.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\au.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\au_g72x.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\avr.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\caf.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\command.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\common.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\common.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\config.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\dither.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\double64.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\dwd.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\dwvw.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\file_io.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\flac.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\float32.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\float_cast.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\gsm610.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\htk.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\ima_adpcm.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\interleave.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\ircam.c">
+			</File>
+			<File 
+				RelativePath=".\libsndfile.cpp">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\macbinary3.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\mat4.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\mat5.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\ms_adpcm.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\nist.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\ogg.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\paf.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\pcm.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\pvf.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\raw.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\rx2.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sd2.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sds.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sf_unistd.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sfconfig.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sfendian.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sndfile.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\sndfile.h">
+			</File>
+			<File 
+				RelativePath=".\stdafx.cpp">
+				<FileConfiguration 
+					Name="Debug|Win32">
+					<Tool 
+						Name="CppCmplrTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+				<FileConfiguration 
+					Name="Release|Win32">
+					<Tool 
+						Name="CppCmplrTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\strings.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\svx.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\txw.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\ulaw.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\voc.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\vox_adpcm.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\w64.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\wav.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\wav_w64.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\wav_w64.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\wve.c">
+			</File>
+			<File 
+				RelativePath="..\..\..\libsndfile-1.0.12\src\xi.c">
+			</File>
+			<Filter 
+				Name="GSM610"
+				Filter="">
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\add.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\code.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\config.h">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\decode.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm.h">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm610_priv.h">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_create.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_decode.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_destroy.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_encode.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_option.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\long_term.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\lpc.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\preprocess.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\rpe.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\short_term.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\table.c">
+				</File>
+			</Filter>
+			<Filter 
+				Name="G72x"
+				Filter="">
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g721.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_16.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_24.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_40.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x.c">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x.h">
+				</File>
+				<File 
+					RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x_priv.h">
+				</File>
+			</Filter>
+		</Filter>
+		<Filter 
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+			<File 
+				RelativePath=".\stdafx.h">
+			</File>
+		</Filter>
+		<Filter 
+			Name="Resource Files"
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+		</Filter>
 		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\aiff.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\alaw.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\au.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\au.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\au_g72x.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\avr.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\caf.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\command.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\common.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\common.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\config.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\dither.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\double64.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\dwd.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\dwvw.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\file_io.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\flac.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\float32.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\float_cast.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\gsm610.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\htk.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\ima_adpcm.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\interleave.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\ircam.c"/>
-		<File 
-			RelativePath=".\libsndfile.cpp"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\macbinary3.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\mat4.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\mat5.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\ms_adpcm.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\nist.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\ogg.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\paf.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\pcm.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\pvf.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\raw.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\rx2.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sd2.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sds.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sf_unistd.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sfconfig.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sfendian.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sndfile.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\sndfile.h"/>
-		<File 
-			RelativePath=".\stdafx.cpp">
-			<FileConfiguration 
-				Name="Debug|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					UsePrecompiledHeader="1"/>
-			</FileConfiguration>
-			<FileConfiguration 
-				Name="Release|Win32">
-				<Tool 
-					Name="CppCmplrTool"
-					UsePrecompiledHeader="1"/>
-			</FileConfiguration>
+			RelativePath=".\ReadMe.txt">
 		</File>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\strings.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\svx.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\txw.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\ulaw.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\voc.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\vox_adpcm.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\w64.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\wav.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\wav_w64.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\wav_w64.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\wve.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\xi.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\add.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\code.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\config.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\decode.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm610_priv.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_create.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_decode.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_destroy.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_encode.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\gsm_option.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\long_term.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\lpc.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\preprocess.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\rpe.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\short_term.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\Gsm610\table.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g721.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_16.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_24.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g723_40.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x.c"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x.h"/>
-		<File 
-			RelativePath="..\..\..\libsndfile-1.0.12\src\G72x\g72x_priv.h"/>
-		<File 
-			RelativePath=".\stdafx.h"/>
-		<File 
-			RelativePath=".\ReadMe.txt"/>
 	</Files>
 </VisualStudioProject>
 

@@ -8,8 +8,8 @@ template <typename T>
 class __declspec(novtable) Sample
 {
 public:
-	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const = 0;			// returns number of bytes processed
+	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const = 0;			// returns number of bytes processed
 	virtual int nContainerSize() const = 0;
 
 	virtual ~Sample(void) = 0;
@@ -26,14 +26,14 @@ class Sample_ieeefloat : public Sample<T>
 {
 public:
 
-	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const
+	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		dstSample = *reinterpret_cast<float *>(srcContainer) * fAttenuationFactor;
 		srcContainer += sizeof(float);
 		nBytesProcessed += sizeof(float);
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const 
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const 
 	{ 
 		*((float *) dstContainer) = srcSample;
 		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
@@ -52,14 +52,14 @@ class Sample_ieeedouble : public Sample<T>
 {
 public:
 
-	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const
+	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		dstSample = *reinterpret_cast<double *>(srcContainer) * fAttenuationFactor;
 		srcContainer += sizeof(double);
 		nBytesProcessed += sizeof(double);
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const 
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const 
 	{ 
 		*((double *) dstContainer) = srcSample;
 		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
@@ -79,14 +79,14 @@ template <typename T>
 class Sample_pcm8 : public Sample<T>
 {
 public:
-	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const
+	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		dstSample = static_cast<T>((*srcContainer - static_cast<T>(128)) / static_cast<T>(128)) * fAttenuationFactor;  // Normalize to [-1..1]
 		++srcContainer;
 		++nBytesProcessed;
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const
 	{   
 		srcSample *= static_cast<T>(128);
 
@@ -120,14 +120,14 @@ template <typename T>
 class Sample_pcm16 : public Sample<T>
 {
 public:
-	virtual void  GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const 
+	virtual void  GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const 
 	{ 
 		dstSample = static_cast<T>(*reinterpret_cast<const INT16*>(srcContainer) / static_cast<T>(32768)) * fAttenuationFactor; // TODO: find a cleaner way to do this
 		srcContainer += 2;
 		nBytesProcessed += 2;
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const
 	{   
 		srcSample *= static_cast<T>(32768);
 
@@ -161,7 +161,7 @@ template <typename T, int validBits>
 class Sample_pcm24 : public Sample<T>
 {
 public:
-	virtual void  GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const
+	virtual void  GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		int i = srcContainer[2];
 		i = ( i << 8 ) | srcContainer[1];
@@ -184,7 +184,7 @@ public:
 		nBytesProcessed += 3;
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const
 	{   
 		int iClip = 0;
 		switch (validBits)
@@ -236,7 +236,7 @@ template <typename T, int validBits>
 class Sample_pcm32 : public Sample<T>
 {
 public:
-	virtual void GetSample(T& dstSample, BYTE* & srcContainer, const float& fAttenuationFactor, DWORD& nBytesProcessed) const
+	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		INT32 i = *reinterpret_cast<const INT32*>(srcContainer);
 		switch (validBits)
@@ -261,7 +261,7 @@ public:
 		nBytesProcessed += 4;
 	}
 
-	virtual void PutSample(BYTE* & dstContainer, T srcSample, DWORD& nBytesGenerated) const
+	virtual void PutSample(BYTE*& dstContainer, T srcSample, DWORD& nBytesGenerated) const
 	{   
 		INT32 iClip = 0;
 		switch (validBits)

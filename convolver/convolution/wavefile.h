@@ -79,12 +79,20 @@ public:
 			std::wstring::size_type idx = spath.find('.');
 			if(idx != std::wstring::npos)
 			{
-				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM") || spath.substr(idx+1) == TEXT("Pcm"))
+				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM") || spath.substr(idx+1) == TEXT("Pcm") ||
+					spath.substr(idx+1) == TEXT("raw") || spath.substr(idx+1) == TEXT("RAW") || spath.substr(idx+1) == TEXT("Raw"))
 				{
 					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_FLOAT;	// RAW PCM data (32 bit IEEE floating point)
 					sfinfo->channels = 1;								// Single channel
 					sfinfo->samplerate = nSampleRate;
 				}
+				if(spath.substr(idx+1) == TEXT("dbl") || spath.substr(idx+1) == TEXT("DBL") || spath.substr(idx+1) == TEXT("Dbl"))
+				{
+					sfinfo->format = SF_FORMAT_RAW | SF_FORMAT_DOUBLE;	// RAW PCM data (64 bit IEEE floating point)
+					sfinfo->channels = 1;								// Single channel
+					sfinfo->samplerate = nSampleRate;
+				}
+
 			}
 		}
 
