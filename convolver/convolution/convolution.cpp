@@ -128,7 +128,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 			}
 		}
 
-		// Get the next frame from pbInputBuffer_ to InputBuffer_
+		// Get the next frame from pbInputDataPointer to InputBuffer_
 		// Output lags input by half a partition length
 #pragma loop count (8)
 		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
@@ -286,7 +286,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				}
 			}
 
-			// Get the next frame from pbInputBuffer_ to InputBuffer_
+			// Get the next frame from pbInputDataPointer to InputBuffer_
 #pragma loop count(8)
 			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
 			{
@@ -297,6 +297,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 			} // nChannel
 
 			// Got a frame
+
 			if (nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
 			{
 				// Apply the filters
@@ -390,7 +391,7 @@ void inline Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict 
 	InputBufferAccumulator_ = 0;
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
 	const DWORD nPartitionLength = Mixer.nPartitionLength();
-	assert(nPartitionLength %2 ==0);
+	assert(nPartitionLength % 2 ==0);
 #pragma loop count(8)
 #pragma ivdep
 	for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
@@ -462,20 +463,20 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const
 										fftwf_complex* restrict result, const ChannelBuffer::size_type count)
 {
 
-	//__declspec(align( 16 )) float T1;
-	//__declspec(align( 16 )) float T2;
+	__declspec(align( 16 )) float T1;
+	__declspec(align( 16 )) float T2;
 #pragma ivdep
 #pragma loop count (65536)
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
 
-		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
+		//result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		//result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		//T1 = in1[index][0] * in2[index][0];
-		//T2 = in1[index][1] * in2[index][1];
-		//result[index][0] = T1 - T2;
-		//result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		T1 = in1[index][0] * in2[index][0];
+		T2 = in1[index][1] * in2[index][1];
+		result[index][0] = T1 - T2;
+		result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
 	}
 }
@@ -485,20 +486,20 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, c
 											fftwf_complex* restrict result, const ChannelBuffer::size_type count)
 {
 
-	//__declspec(align( 16 )) float T1;
-	//__declspec(align( 16 )) float T2;
+	__declspec(align( 16 )) float T1;
+	__declspec(align( 16 )) float T2;
 #pragma ivdep
 #pragma loop count (65536)
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
 
-		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
+		//result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		//result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		//T1 = in1[index][0] * in2[index][0];
-		//T2 = in1[index][1] * in2[index][1];
-		//result[index][0] = T1 - T2;
-		//result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		T1 = in1[index][0] * in2[index][0];
+		T2 = in1[index][1] * in2[index][1];
+		result[index][0] = T1 - T2;
+		result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
 	}
 }

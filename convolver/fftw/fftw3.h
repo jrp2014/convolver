@@ -116,7 +116,6 @@ struct fftw_iodim_do_not_use_me {
 FFTW_DEFINE_COMPLEX(R, C);						   \
 									   \
 typedef struct X(plan_s) *X(plan);					   \
-FFTW_EXTERN double X(timelimit);					   \
 									   \
 typedef struct fftw_iodim_do_not_use_me X(iodim);			   \
 									   \
@@ -258,6 +257,8 @@ FFTW_EXTERN void X(destroy_plan)(X(plan) p);				   \
 FFTW_EXTERN void X(forget_wisdom)(void);				   \
 FFTW_EXTERN void X(cleanup)(void);					   \
 									   \
+FFTW_EXTERN void X(set_timelimit)(double);				   \
+									   \
 FFTW_EXTERN void X(plan_with_nthreads)(int nthreads);			   \
 FFTW_EXTERN int X(init_threads)(void);					   \
 FFTW_EXTERN void X(cleanup_threads)(void);				   \
@@ -295,6 +296,8 @@ FFTW_DEFINE_API(FFTW_MANGLE_LONG_DOUBLE, long double, fftwl_complex)
 #define FFTW_FORWARD (-1)
 #define FFTW_BACKWARD (+1)
 
+#define FFTW_NO_TIMELIMIT (-1.0)
+
 /* documented flags */
 #define FFTW_MEASURE (0U)
 #define FFTW_DESTROY_INPUT (1U << 0)
@@ -304,7 +307,6 @@ FFTW_DEFINE_API(FFTW_MANGLE_LONG_DOUBLE, long double, fftwl_complex)
 #define FFTW_PRESERVE_INPUT (1U << 4) /* cancels FFTW_DESTROY_INPUT */
 #define FFTW_PATIENT (1U << 5) /* IMPATIENT is default */
 #define FFTW_ESTIMATE (1U << 6)
-#define FFTW_TIMELIMIT (1U << 30)
 
 /* undocumented beyond-guru flags */
 #define FFTW_ESTIMATE_PATIENT (1U << 7)

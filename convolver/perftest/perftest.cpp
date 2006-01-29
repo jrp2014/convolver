@@ -35,9 +35,18 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
 	// 3 = function call trace
-	apDebug::gOnly().set(4);
+	apDebug::gOnly().set(3);
 
 	debugstream.sink (apDebugSinkConsole::sOnly);
+
+
+	_clear87();
+	cdebug << std::hex <<_control87(_EM_INVALID | _EM_DENORMAL | _EM_ZERODIVIDE | _EM_OVERFLOW | _EM_UNDERFLOW | _EM_INEXACT, _MCW_EM ) << std::dec << std::endl;
+
+	_clearfp();
+	cdebug << std::hex <<_controlfp(_EM_INVALID | _EM_DENORMAL | _EM_ZERODIVIDE | _EM_OVERFLOW | _EM_UNDERFLOW | _EM_INEXACT, _MCW_EM ) << std::dec << std::endl;
+
+
 #endif
 
 	HRESULT	hr = S_OK;

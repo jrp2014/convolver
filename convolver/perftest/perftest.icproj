@@ -16,47 +16,49 @@
 				IntermediateDirectory="Debug"
 				ConfigurationType="1"
 				CharacterSet="1"
-				WholeProgramOptimization="FALSE"/>
+				WholeProgramOptimization="0"/>
+			<Tool 
+				Name="DebugTool"
+				CommandArguments="4 1 1 d:\projects\convolver\convolver\configs\benchmark.txt"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
-				GlobalOptimizations="FALSE"
+				GlobalOptimizations="0"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="1"
-				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1;D:\Projects\blitz-0.9"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW_DLL;CRTDBG_MAP_ALLOC"
-				MinimalRebuild="TRUE"
+				MinimalRebuild="1"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="1"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="TRUE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="1"
+				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="TRUE"
+				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="4"
+				AdditionalOptions="/fp:strict"
+				OpenMP="1"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
-				InitLocalVarToNaN="1"
-				OpenMP="1"/>
-			<Tool 
-				Name="CustomTool"/>
+				InitLocalVarToNaN="1"/>
 			<Tool 
 				Name="LinkerTool"
+				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib fftw31.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
 				ModuleDefinitionFile=""
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="1"
 				ProgramDatabaseFile="$(OutDir)/perftest.pdb"
 				SubSystem="1"
 				OptimizeReferences="0"
@@ -64,28 +66,23 @@
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="CustomTool"/>
 			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool 
-				Name="VCWebDeploymentTool"/>
-			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="DebugTool"
-				CommandArguments="4 2 d:\projects\convolver\convolver\configs\ex2.txt"/>
+				Name="CustomNodeTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
@@ -95,227 +92,250 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="DebugTool"
+				CommandArguments="4 2 4 d:\projects\convolver\convolver\configs\benchmark.txt"/>
 			<Tool 
 				Name="CppCmplrTool"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
+				GlobalOptimizations="1"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="1"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
+				OmitFramePointers="1"
+				EnableFiberSafeOptimizations="1"
 				OptimizeForProcessor="3"
-				OptimizeForWindowsApplication="TRUE"
+				OptimizeForWindowsApplication="1"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW_DLL"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="1"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="0"
+				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="TRUE"
+				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="0"
+				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
 				CallingConvention="0"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
+				OpenMP="1"
 				UseProcExt="0"
 				RequireProcExt="0"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
-			<Tool 
-				Name="CustomTool"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
 				Name="LinkerTool"
+				DelayImpLib=""
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				IgnoreAllDefaultLibraries="FALSE"
-				GenerateDebugInformation="TRUE"
+				IgnoreAllDefaultLibraries="0"
+				GenerateDebugInformation="1"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="CustomTool"/>
 			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="CustomNodeTool"/>
+		</Configuration>
+		<Configuration 
+			Name="Release PIII|Win32">
 			<Tool 
-				Name="VCWebDeploymentTool"/>
-			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="GeneralTool"
+				OutputDirectory="..\bin\Release"
+				IntermediateDirectory="Release"
+				ConfigurationType="1"
+				CharacterSet="1"
+				WholeProgramOptimization="1"/>
 			<Tool 
 				Name="DebugTool"
 				CommandArguments="4 2 4 d:\projects\convolver\convolver\configs\benchmark.txt"/>
+			<Tool 
+				Name="CppCmplrTool"
+				Optimization="1000"
+				GlobalOptimizations="1"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="1"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="1"
+				EnableFiberSafeOptimizations="1"
+				OptimizeForProcessor="0"
+				OptimizeForWindowsApplication="1"
+				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW_DLL"
+				StringPooling="1"
+				ExceptionHandling="1"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="0"
+				StructMemberAlignment="0"
+				BufferSecurityCheck="0"
+				EnableFunctionLevelLinking="1"
+				EnableEnhancedInstructionSet="0"
+				ForceConformanceInForLoopScope="1"
+				UsePrecompiledHeader="0"
+				WarningLevel="4"
+				SuppressStartupBanner="0"
+				Detect64BitPortabilityProblems="1"
+				DebugInformationFormat="3"
+				CallingConvention="0"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox"
+				OpenMP="1"
+				UseProcExt="1"
+				RequireProcExt="0"
+				LoopUnrolling=" "
+				Parallelization="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"
+				InitLocalVarToNaN="0"
+				SupportMultibyteCharSource="1"/>
+			<Tool 
+				Name="LinkerTool"
+				DelayImpLib=""
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
+				OutputFile="$(OutDir)/perftest.exe"
+				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				IgnoreAllDefaultLibraries="0"
+				GenerateDebugInformation="1"
+				SubSystem="1"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
+				TargetMachine="1"
+				FixedBaseAddress="1"/>
+			<Tool 
+				Name="LibrarianTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
+			<Tool 
+				Name="BscMakeTool"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
+			<Tool 
+				Name="PostBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="CustomNodeTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
-		<Filter 
-			Name="Source Files"
-			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
-			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
-			<File 
-				RelativePath=".\perftest.cpp">
-			</File>
-			<File 
-				RelativePath=".\stdafx.cpp">
-				<FileConfiguration 
-					Name="Debug|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration 
-					Name="Release|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-			</File>
-			<Filter 
-				Name="debugging"
-				Filter="">
-				<File 
-					RelativePath="..\debugging\debugging.cpp">
-				</File>
-				<File 
-					RelativePath="..\debugging\debugging.h">
-				</File>
-				<File 
-					RelativePath="..\debugging\debugStream.cpp">
-				</File>
-				<File 
-					RelativePath="..\debugging\debugStream.h">
-				</File>
-				<File 
-					RelativePath="..\debugging\fastTiming.cpp">
-				</File>
-				<File 
-					RelativePath="..\debugging\fastTiming.h">
-				</File>
-			</Filter>
-			<Filter 
-				Name="convolution"
-				Filter="">
-				<File 
-					RelativePath="..\convolution\channelpaths.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\channelpaths.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\config.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\convolution.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\convolution.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\exception.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\ffthelp.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\ffthelp.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\filter.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\filter.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\holder.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\lrint.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\lrint.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\sample.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\samplebuffer.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\samplebuffer.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\wavefile.h">
-				</File>
-				<File 
-					RelativePath="..\convolution\waveformat.cpp">
-				</File>
-				<File 
-					RelativePath="..\convolution\waveformat.h">
-				</File>
-			</Filter>
-			<Filter 
-				Name="fft"
-				Filter="">
-				<File 
-					RelativePath="..\fft\fftsg.cpp">
-				</File>
-				<File 
-					RelativePath="..\fft\fftsg_h.h">
-				</File>
-			</Filter>
-			<Filter 
-				Name="fftw">
-				<File 
-					RelativePath="..\fftw\fftw3.h">
-				</File>
-			</Filter>
-		</Filter>
-		<Filter 
-			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc;xsd"
-			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
-			<File 
-				RelativePath=".\stdafx.h">
-			</File>
-		</Filter>
-		<Filter 
-			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
-			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
-		</Filter>
 		<File 
-			RelativePath=".\VTune\perftest.vpj">
+			RelativePath=".\perftest.cpp"/>
+		<File 
+			RelativePath=".\stdafx.cpp">
+			<FileConfiguration 
+				Name="Debug|Win32">
+				<Tool 
+					Name="CppCmplrTool"
+					UsePrecompiledHeader="1"/>
+			</FileConfiguration>
+			<FileConfiguration 
+				Name="Release|Win32">
+				<Tool 
+					Name="CppCmplrTool"
+					UsePrecompiledHeader="1"/>
+			</FileConfiguration>
+			<FileConfiguration 
+				Name="Release PIII|Win32">
+				<Tool 
+					Name="CppCmplrTool"
+					UsePrecompiledHeader="1"/>
+			</FileConfiguration>
 		</File>
 		<File 
-			RelativePath=".\ReadMe.txt">
-		</File>
+			RelativePath="..\debugging\debugging.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugging.h"/>
+		<File 
+			RelativePath="..\debugging\debugStream.cpp"/>
+		<File 
+			RelativePath="..\debugging\debugStream.h"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.cpp"/>
+		<File 
+			RelativePath="..\debugging\fastTiming.h"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.cpp"/>
+		<File 
+			RelativePath="..\convolution\channelpaths.h"/>
+		<File 
+			RelativePath="..\convolution\config.h"/>
+		<File 
+			RelativePath="..\convolution\convolution.cpp"/>
+		<File 
+			RelativePath="..\convolution\convolution.h"/>
+		<File 
+			RelativePath="..\convolution\exception.h"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.cpp"/>
+		<File 
+			RelativePath="..\convolution\ffthelp.h"/>
+		<File 
+			RelativePath="..\convolution\filter.cpp"/>
+		<File 
+			RelativePath="..\convolution\filter.h"/>
+		<File 
+			RelativePath="..\convolution\holder.h"/>
+		<File 
+			RelativePath="..\convolution\lrint.cpp"/>
+		<File 
+			RelativePath="..\convolution\lrint.h"/>
+		<File 
+			RelativePath="..\convolution\sample.h"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.cpp"/>
+		<File 
+			RelativePath="..\convolution\samplebuffer.h"/>
+		<File 
+			RelativePath="..\convolution\wavefile.h"/>
+		<File 
+			RelativePath="..\convolution\waveformat.cpp"/>
+		<File 
+			RelativePath="..\convolution\waveformat.h"/>
+		<File 
+			RelativePath="..\fft\fftsg.cpp"/>
+		<File 
+			RelativePath="..\fft\fftsg_h.h"/>
+		<File 
+			RelativePath="..\fftw\fftw3.h"/>
+		<File 
+			RelativePath=".\stdafx.h"/>
+		<File 
+			RelativePath=".\VTune\perftest.vpj"/>
+		<File 
+			RelativePath=".\ReadMe.txt"/>
 	</Files>
 </VisualStudioProject>
 

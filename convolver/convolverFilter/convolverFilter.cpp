@@ -373,6 +373,7 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 
+	assert(pOut->GetSize() >= cbBytesGenerated);
 	// Set the size of the valid data in the output buffer.
 	hr = pOut->SetActualDataLength(cbBytesGenerated);
 	if (FAILED(hr))
@@ -704,7 +705,7 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 	// Number of Media types = number of available formats * number of different Convolutions available
 	if ( m_FormatSpecs.size * m_ConvolutionList->nConvolutionList() <= iPosition )
 	{
-		return DMO_E_NO_MORE_ITEMS;
+		return VFW_S_NO_MORE_ITEMS;
 	}
 
 	// Decompose the dwTypeIndex into dwPathIndex and dwFormatSpecIndex

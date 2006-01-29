@@ -158,6 +158,9 @@ nSamplesPerSec(nSamplesPerSec)
 	if(nPlanningRigour > 1)
 		fftwf_plan_with_nthreads(2);
 
+	if(nPlanningRigour == 3)
+		fftwf_set_timelimit(pr.nTimeLimit);
+
 	plan_ =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
 		c_ptr(coeffs_), reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_)),
 		pr.Flag[nPlanningRigour]);

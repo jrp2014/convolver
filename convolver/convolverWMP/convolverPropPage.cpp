@@ -431,7 +431,7 @@ LRESULT CConvolverPropPage::OnBnClickedGetfilter(WORD wNotifyCode, WORD wID, HWN
 	{
 		// Setup the OPENFILENAME structure
 		OPENFILENAME ofn = { sizeof(OPENFILENAME), hWndCtl, NULL,
-			TEXT("Config Text Files\0*.txt\0Config Files\0*.cfg\0WAV Impulse Respose Files\0*.WAV\0PCM Impulse Response Files (32-bit IEEE float)\0*.PCM\0All Files\0*.*\0\0"), NULL,
+			TEXT("Filter sound/Config text files\0*.txt;*.cfg;*.WAV;*.PCM;*.DBL\0All Files\0*.*\0\0"), NULL,
 			0, 1, szFilterFileName, MAX_PATH, NULL, 0, szFilterPath,
 			TEXT("Get filter file"),
 			OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_READONLY | OFN_HIDEREADONLY | OFN_EXPLORER, 

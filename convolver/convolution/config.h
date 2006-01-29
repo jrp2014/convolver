@@ -96,7 +96,6 @@ const DWORD MAXSTRING = 1024;	// length
 
 // For STLport std::
 //#define _STLP_DEBUG 1
-//#define   _STLP_DEBUG_LEVEL _STLP_STANDARD_DBG_LEVEL
 //#define _STLP_DEBUG_UNINITIALIZED 1
 //#define _STLP_DEBUG_ALLOC 1
 
@@ -131,6 +130,7 @@ struct PlanningRigour
 #ifdef FFTW
 	static const unsigned int nDegrees = 5;
 	static const unsigned int nStrLen = 15;
+	static const int nTimeLimit = 30; // 30s -> 1min, for user, as a forward and reverse plan are optimized
 #else
 	static const unsigned int nDegrees = 1;
 	static const unsigned int nStrLen = 8;
@@ -145,8 +145,7 @@ struct PlanningRigour
 		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[1] = FFTW_MEASURE|FFTW_DESTROY_INPUT;
 		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[2] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
 		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[3] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT;
-		fftwf_timelimit = 30; // seconds (= 1 minute as applied to forward and reverse transforms)
-		_tcsncpy(Rigour[4], TEXT("Take 1 minute"), nStrLen);	Flag[4] = FFTW_PATIENT|FFTW_DESTROY_INPUT|FFTW_TIMELIMIT;
+		_tcsncpy(Rigour[4], TEXT("Take 1 minute"), nStrLen);	Flag[4] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
 #else
 		_tcsncpy(Rigour[0], TEXT("Default"), nStrLen);	Flag[0] = 0;
 #endif

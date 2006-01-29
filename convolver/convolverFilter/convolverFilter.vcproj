@@ -19,6 +19,7 @@
 			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/fp:strict"
 				Optimization="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
@@ -99,6 +100,88 @@
 				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="3"
+				AdditionalIncludeDirectories="..\"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;NDEBUG"
+				StringPooling="TRUE"
+				ExceptionHandling="TRUE"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="0"
+				StructMemberAlignment="0"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
+				EnableEnhancedInstructionSet="0"
+				ForceConformanceInForLoopScope="FALSE"
+				UsePrecompiledHeader="0"
+				PrecompiledHeaderThrough="streams.h"
+				PrecompiledHeaderFile="./Release/convolverFilter.pch"
+				WarningLevel="3"
+				SuppressStartupBanner="FALSE"
+				Detect64BitPortabilityProblems="TRUE"
+				DebugInformationFormat="3"
+				CallingConvention="0"
+				CompileAs="0"/>
+			<Tool
+				Name="VCCustomBuildTool"/>
+			<Tool
+				Name="VCLinkerTool"
+				RegisterOutput="TRUE"
+				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib fftw31.lib"
+				OutputFile="$(OutDir)\ConvolverFilter.ax"
+				LinkIncremental="1"
+				SuppressStartupBanner="TRUE"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreDefaultLibraryNames=""
+				ModuleDefinitionFile="convolverFilter.def"
+				SubSystem="2"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="2"
+				EntryPointSymbol=""
+				SupportUnloadOfDelayLoadedDLL="TRUE"
+				TargetMachine="1"
+				FixedBaseAddress="1"/>
+			<Tool
+				Name="VCMIDLTool"/>
+			<Tool
+				Name="VCPostBuildEventTool"/>
+			<Tool
+				Name="VCPreBuildEventTool"/>
+			<Tool
+				Name="VCPreLinkEventTool"/>
+			<Tool
+				Name="VCResourceCompilerTool"/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+		</Configuration>
+		<Configuration
+			Name="Release PIII|Win32"
+			OutputDirectory="..\bin\Release"
+			IntermediateDirectory="Release"
+			ConfigurationType="2"
+			UseOfATL="1"
+			ATLMinimizesCRunTimeLibraryUsage="TRUE"
+			CharacterSet="1"
+			WholeProgramOptimization="TRUE">
+			<Tool
+				Name="VCCLCompilerTool"
+				AdditionalOptions="/Qipo /fp:strict /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox"
+				Optimization="2"
+				GlobalOptimizations="TRUE"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="2"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
+				WholeProgramOptimization="TRUE"
+				OptimizeForProcessor="0"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;NDEBUG"
 				StringPooling="TRUE"
