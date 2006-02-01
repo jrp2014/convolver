@@ -330,7 +330,7 @@ struct FastArray : public AlignedArray<T>
 	{
 		if(x != 0)
 		{
-			const size_type ss = size_;
+//			const size_type ss = size_;
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned

@@ -117,7 +117,9 @@ private:
 	WORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWriting_;
 
-	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
+	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
+	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, const SampleBuffer& restrict InputBuffer, 
+		ChannelBuffer& restrict InputBufferAccumulator);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
 		const ChannelBuffer& restrict Output, const DWORD from, const DWORD to);
 

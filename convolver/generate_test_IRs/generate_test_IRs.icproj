@@ -99,7 +99,7 @@
 				FavorSizeOrSpeed="2"
 				OmitFramePointers="1"
 				EnableFiberSafeOptimizations="1"
-				OptimizeForProcessor="3"
+				OptimizeForProcessor="0"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				StringPooling="1"
@@ -119,7 +119,7 @@
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				OpenMP="1"
 				UseProcExt="0"
-				RequireProcExt="0"
+				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
@@ -163,7 +163,8 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
 				CharacterSet="1"
-				WholeProgramOptimization="1"/>
+				WholeProgramOptimization="1"
+				PGOPhase="3"/>
 			<Tool 
 				Name="DebugTool"/>
 			<Tool 
@@ -176,6 +177,7 @@
 				OmitFramePointers="1"
 				EnableFiberSafeOptimizations="1"
 				OptimizeForProcessor="0"
+				OptimizeForWindowsApplication="1"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				StringPooling="1"
@@ -192,7 +194,8 @@
 				SuppressStartupBanner="0"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox"
+				CompileAs="0"
+				AdditionalOptions="/Qipo /fp:strict /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox  /Qssp"
 				OpenMP="1"
 				UseProcExt="1"
 				RequireProcExt="0"

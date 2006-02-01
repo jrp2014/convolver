@@ -35,7 +35,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
 	// 3 = function call trace
-	apDebug::gOnly().set(3);
+	apDebug::gOnly().set(4);
 
 	debugstream.sink (apDebugSinkConsole::sOnly);
 

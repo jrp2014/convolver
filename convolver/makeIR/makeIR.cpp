@@ -66,31 +66,34 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::string sFormatTag;
 		input >> sFormatTag;
 
+#ifndef LIBSNDFILE
+
+		input >> Wave.Format.wBitsPerSample;
+#if	defined(DEBUG) | defined(_DEBUG)
+		cdebug << "wBitsPerSample " << Wave.Format.wBitsPerSample << std::endl;
+#endif
+
+
 		if(sFormatTag == "PCM")
 		{
-#ifdef LIBSNDFILE
-			sf_info.format = SF_FORMAT_WAV;
-#else
 			wFormatTag = Wave.Format.wFormatTag = WAVE_FORMAT_PCM;
-#endif
+			if (Wave.Format.wBitsPerSample % 8 != 0 && Wave.Format.wBitsPerSample > 32 )
+			{
+				std::cerr << "Bits per sample (" << Wave.Format.wBitsPerSample << ") must be a multiple of 8 less than or equal to 32" << std::endl;
+				return 1;
+			}
 		}
 		else
 		{
 			if(sFormatTag == "IEEE")
 			{
-#ifdef LIBSNDFILE
-				sf_info.format = SF_FORMAT_WAV;
-#else
 				wFormatTag = Wave.Format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-#endif
+				if (Wave.Format.wBitsPerSample != 32 ||  Wave.Format.wBitsPerSample != 64)
+				{
+					std::cerr << "Bits per sample (" << Wave.Format.wBitsPerSample << ") must be 32 or 64" << std::endl;
+					return 1;
+				}
 			}
-#ifdef LIBSNDFILE
-			else
-			{
-				std::cerr << "Unrecognised format: " << sFormatTag << ". Should be PCM or IEEE" << std::endl;
-				return 1;
-			}
-#else
 			else
 			{
 				if (sFormatTag == "ExtensiblePCM")
@@ -98,6 +101,12 @@ int _tmain(int argc, _TCHAR* argv[])
 					Wave.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
 					Wave.SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
 					wFormatTag = WAVE_FORMAT_PCM;
+					Wave.Samples.wValidBitsPerSample = Wave.Format.wBitsPerSample;
+					if (Wave.Format.wBitsPerSample % 8 != 0 && Wave.Format.wBitsPerSample > 32 )
+					{
+						std::cerr << "Bits per sample (" << Wave.Format.wBitsPerSample << ") must be a multiple of 8 less than or equal to 32" << std::endl;
+						return 1;
+					}
 				}
 				else
 				{
@@ -106,6 +115,12 @@ int _tmain(int argc, _TCHAR* argv[])
 						Wave.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
 						Wave.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 						wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+						Wave.Samples.wValidBitsPerSample = Wave.Format.wBitsPerSample;
+						if (Wave.Format.wBitsPerSample != 32 ||  Wave.Format.wBitsPerSample != 64)
+						{
+							std::cerr << "Bits per sample (" << Wave.Format.wBitsPerSample << ") must be 32 or 64" << std::endl;
+							return 1;
+						}
 					}
 					else
 					{
@@ -114,8 +129,10 @@ int _tmain(int argc, _TCHAR* argv[])
 					}
 				}
 			}
-#endif
 		}
+
+#endif
+
 #if	defined(DEBUG) | defined(_DEBUG)
 		cdebug << "sFormatTag " << sFormatTag << std::endl;
 #endif
@@ -162,21 +179,50 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 			else
 			{
-				std::cerr << "Unrecognised format tag: " << sFormatTag << ". Should be PCM or IEEE." << std::endl;
+				if(sFormatTag == "ExtensiblePCM")
+				{
+					switch (wBitsPerSample)
+					{
+					case 8:
+						sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_PCM_S8;
+						break;
+					case 16:
+						sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_PCM_16;
+						break;
+					case 24:
+						sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_PCM_24;
+						break;
+					case 32:
+						sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_PCM_32;
+						break;
+					default:
+						std::cerr << "Unrecognised bits per sample: " << wBitsPerSample << ". Should be 8, 16, 24 or 32" << std::endl;
+					}
+				}
+				else
+				{
+					if(sFormatTag == "ExtensibleIEEE")
+					{
+						switch (wBitsPerSample)
+						{
+						case 32:
+							sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_FLOAT;
+							break;
+						case 64:
+							sf_info.format = SF_FORMAT_WAVEX | SF_FORMAT_DOUBLE;
+							break;
+						default:
+							std::cerr << "Unrecognised bits per sample: " << wBitsPerSample << ". Should be 32 or 64" << std::endl;
+						}
+					}
+					else
+					{
+						std::cerr << "Unrecognised format: " << sFormatTag << ". Should be PCM or IEEE or ExtensiblePCM or ExtensibleIEEE" << std::endl;
+						return 1;
+					}
+				}
 			}
 		}
-
-#else
-		input >> Wave.Format.wBitsPerSample;
-#if	defined(DEBUG) | defined(_DEBUG)
-		cdebug << "wBitsPerSample " << Wave.Format.wBitsPerSample << std::endl;
-#endif
-		if (Wave.Samples.wValidBitsPerSample % 8 != 0)
-		{
-			std::cerr << "Bits per sample (" << Wave.Format.wBitsPerSample << ") must be a multiple of 8" << std::endl;
-			return 1;
-		}
-		Wave.Samples.wValidBitsPerSample = Wave.Format.wBitsPerSample;
 #endif
 
 #ifdef LIBSNDFILE
@@ -484,6 +530,17 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 #ifdef LIBSNDFILE
+	std::cerr << waveFormatDescription(sf_info, "Output format: ") << std::endl;
+
+	if (nSamples % sf_info.channels != 0)
+	{
+		sf_info.frames = nSamples / sf_info.channels;
+
+		std::cerr << "The number of samples (" << nSamples << ") was not a multiple of the number of channels (" << sf_info.channels  << 
+			"). Invalid output file produced." << std::endl;
+		return 1;
+	}
+
 #else
 	std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(&Wave), nSamples, "Output format: ") << std::endl;
 

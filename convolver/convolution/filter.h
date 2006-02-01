@@ -83,6 +83,7 @@ public:
 	{
 		return reverse_plan_;
 	}
+
 #elif defined(OOURA)
 	// Workspace for the non-simple Ooura routines.  
 	const std::vector<DLReal>& w()						// w[0...n/2-1]   :cos/sin table

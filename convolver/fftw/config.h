@@ -82,7 +82,7 @@
 #define HAVE_ABORT 1
 
 /* Define to 1 if you have `alloca', as a function or macro. */
-/* #under HAVE_ALLOCA */
+#define HAVE_ALLOCA 1
 
 /* Define to 1 if you have <alloca.h> and it should be used (not on Ultrix).
    */
@@ -284,13 +284,13 @@
 #define PACKAGE_NAME "fftw"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "fftw 3.1-beta1"
+#define PACKAGE_STRING "fftw 3.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "fftw"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "3.1-beta1"
+#define PACKAGE_VERSION "3.1"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -338,7 +338,7 @@
 /* /undef USING_POSIX_THREADS */
 
 /* Version number of package */
-#define VERSION "3.1-beta1"
+#define VERSION "3.1"
 
 /* Use common Windows Fortran mangling styles for the Fortran interfaces. */
 /* #undef WINDOWS_F77_MANGLING */

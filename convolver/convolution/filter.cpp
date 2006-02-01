@@ -155,10 +155,10 @@ nSamplesPerSec(nSamplesPerSec)
 	coeffs_ = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength_));
 #endif
 	// PATIENT will disable multithreading, if it's not faster
-	if(nPlanningRigour > 1)
+	if(nPlanningRigour > pr.Measure)
 		fftwf_plan_with_nthreads(2);
 
-	if(nPlanningRigour == 3)
+	if(nPlanningRigour == pr.TimeLimited)
 		fftwf_set_timelimit(pr.nTimeLimit);
 
 	plan_ =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
