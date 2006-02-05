@@ -36,6 +36,7 @@
 				BufferSecurityCheck="TRUE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
+				TreatWChar_tAsBuiltInType="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
@@ -132,12 +133,12 @@
 			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/Qipo /fp:strict /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox  /Qssp"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				Optimization="2"
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="1"
+				FavorSizeOrSpeed="2"
 				OmitFramePointers="TRUE"
 				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"

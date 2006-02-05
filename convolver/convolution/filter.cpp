@@ -20,10 +20,11 @@
 #include "convolution\ffthelp.h"
 #include "convolution\filter.h"
 
+// nSamplesPerSec is a default, for raw pcm files,.  nSamplesPerSec_ will be reset to the actual rate of the sound file for other formats
 Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
 			   const unsigned int& nPlanningRigour) : 
 nPartitions (nPartitions),
-nSamplesPerSec(nSamplesPerSec)
+nSamplesPerSec_(nSamplesPerSec)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSamplesPerSec << std::endl;);
@@ -47,15 +48,12 @@ nSamplesPerSec(nSamplesPerSec)
 	::ZeroMemory(&sf_FilterFormat_, sizeof(SF_INFO));
 	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat_, nSamplesPerSec); // Throws, if file invalid
 
-	if(sf_FilterFormat_.channels - 1 < nFilterChannel)
+	if(sf_FilterFormat_.channels < nFilterChannel + 1)
 	{
 		throw filterException("Filter channel number too big", szFilterFileName);
 	}
 
-	if(nSamplesPerSec != sf_FilterFormat_.samplerate)
-	{
-		throw filterException("Filter does not have the specified sample rate", szFilterFileName);
-	}
+	nSamplesPerSec_ = sf_FilterFormat_.samplerate;
 	nFilterLength_ = sf_FilterFormat_.frames;
 
 #else
@@ -70,12 +68,12 @@ nSamplesPerSec(nSamplesPerSec)
 	::ZeroMemory(&wfexFilterFormat_, sizeof(wfexFilterFormat_));
 	wfexFilterFormat_.Format = *pFilterWave->GetFormat();
 
-	if(wfexFilterFormat_.Format.nChannels - 1 < nFilterChannel)
+	if(wfexFilterFormat_.Format.nChannels < nFilterChannel + 1)
 	{
 		throw filterException("Filter channel number too big");
 	}
 
-	this->nSampleRate = wfexFilterFormat_.Format.nSampleRate;
+	nSamplesPerSec_ = wfexFilterFormat_.Format.nSampleRate;
 
 	WORD wValidBitsPerSample = wfexFilterFormat_.Format.wBitsPerSample;
 	WORD wFormatTag = wfexFilterFormat_.Format.wFormatTag;

@@ -61,7 +61,7 @@ config_(szChannelPathsFileName)
 
 		if( FAILED(pFilterWave->Open( szChannelPathsFileName, NULL, WAVEFILE_READ )) )
 		{
-			throw wavfileException("Failed to open WAV file", szFilterFileName, "test open failed");
+			throw wavfileException("Failed to open WAV file", CT2A(szFilterFileName), "test open failed");
 		}
 
 		nInputChannels_ = wfex.nChannels;
@@ -112,11 +112,16 @@ config_(szChannelPathsFileName)
 			config_().get();  // consume newline
 
 			TCHAR szFilterFilename[MAX_PATH];
+			szFilterFilename[0] = 0;
 			while(!config_().eof())
 			{
-				config_().getline(szFilterFilename, MAX_PATH);
+				szFilterFilename[0] = 0;
+				while(szFilterFilename[0] == 0)
+				{
+					config_().getline(szFilterFilename, MAX_PATH);
+				}
 #if defined(DEBUG) | defined(_DEBUG)
-				cdebug << "Reading specification for " << szFilterFilename << std::endl;
+				cdebug << "Reading specification for " << CT2A(szFilterFilename) << std::endl;
 #endif
 				got_path_spec = false;
 
@@ -143,7 +148,7 @@ config_(szChannelPathsFileName)
 					scale = modff(scale, &fchannel);
 					const WORD channel = static_cast<WORD>(abs((fchannel)));
 
-					if(channel > nInputChannels_ - 1)
+					if(channel + 1 > nInputChannels_)
 						throw channelPathsException("Input channel number greater than the specified number of input channels",
 						szChannelPathsFileName);
 
@@ -165,10 +170,25 @@ config_(szChannelPathsFileName)
 
 				// Get the output channels for this filter
 				std::vector<ChannelPath::ScaledChannel> outChannel;
-				while(true)
+				bool end_of_file = false;
+				while(!end_of_file)
 				{
 					float scale=0; // The scaling factor to be applied
-					config_() >> scale;
+					try
+					{
+						config_() >> scale;
+					}
+					catch(const std::ios_base::failure& error)
+					{
+						if(config_().eof())
+						{
+							end_of_file = true;
+						}
+						else
+						{
+							throw;
+						}
+					}
 
 					float fchannel=0;
 					scale = modff(scale, &fchannel);
@@ -184,9 +204,12 @@ config_(szChannelPathsFileName)
 
 					outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
-					nextchar = config_().get();
-					if (nextchar == '\n' || nextchar == std::char_traits<TCHAR>::eof())
-						break;
+					if(!end_of_file)
+					{
+						nextchar = config_().get();
+						if (nextchar == '\n' || nextchar == std::char_traits<TCHAR>::eof())
+							break;
+					}
 				}
 
 				Paths_.push_back(new ChannelPath(szFilterFilename, nPartitions, inChannel, outChannel, nFilterChannel, 
@@ -202,13 +225,13 @@ config_(szChannelPathsFileName)
 			{
 				if(!got_path_spec)
 				{
-					throw channelPathsException("Premature end of filter path configuration file.  Missing final blank line?",
+					throw channelPathsException("Premature end of filter path configuration file.",
 						szChannelPathsFileName);
 				}
 			}
 			else if (config_().fail())
 			{
-				throw channelPathsException("Filter path file syntax is incorrect", szChannelPathsFileName);
+				throw channelPathsException("Bad filter sound file or filter path file syntax is incorrect", szChannelPathsFileName);
 			}
 			else if (config_().bad())
 			{
@@ -257,7 +280,7 @@ config_(szChannelPathsFileName)
 		nPartitionLength_ = Paths_[0].filter.nPartitionLength();			// in frames (a frame contains the interleaved samples for each channel)
 		nHalfPartitionLength_ = Paths_[0].filter.nHalfPartitionLength();	// in frames
 		nFilterLength_ = Paths_[0].filter.nFilterLength();				// nFilterLength_ = nPartitions_ * nPartitionLength_
-		nSamplesPerSec_ = Paths_[0].filter.nSamplesPerSec;
+		nSamplesPerSec_ = Paths_[0].filter.nSamplesPerSec();
 #ifdef FFTW
 		nFFTWPartitionLength_ = Paths_[0].filter.nFFTWPartitionLength();	// Needs an extra element
 #endif
@@ -274,7 +297,7 @@ config_(szChannelPathsFileName)
 			throw channelPathsException("Filters must all be of the same length", szChannelPathsFileName);
 		}
 
-		if(Paths_[i].filter.nSamplesPerSec != nSamplesPerSec_)
+		if(Paths_[i].filter.nSamplesPerSec() != nSamplesPerSec_)
 		{
 			throw channelPathsException("Filters must all have the same sample rate", szChannelPathsFileName);
 		}

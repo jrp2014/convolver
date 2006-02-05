@@ -111,10 +111,6 @@ public:
 #endif
 			throw wavfileException("Failed to open filter sound file", path, "");
 		}
-		if(sfinfo->samplerate != nSampleRate)
-		{
-			throw wavfileException("Inconsistent filter sound file sample rate", path, "");
-		}
 	};
 
 	sf_count_t readf_float(float *ptr, sf_count_t frames) const

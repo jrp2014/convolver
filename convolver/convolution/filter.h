@@ -29,9 +29,14 @@ class Filter
 {
 public:
 	const WORD	nPartitions;
-	const DWORD	nSamplesPerSec;			// 44100, 48000, etc
 
 	// Accessor functions
+
+	DWORD nSamplesPerSec() const
+	{
+		return nSamplesPerSec_;
+	}
+
 	const SampleBuffer& coeffs() const
 	{
 		return coeffs_;
@@ -116,6 +121,7 @@ public:
 
 private:
 
+	DWORD					nSamplesPerSec_;		// 44100, 48000, etc
 	SampleBuffer			coeffs_;
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat_;		// The format of the filter file

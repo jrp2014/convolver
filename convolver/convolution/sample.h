@@ -5,7 +5,7 @@
 #include <mediaerr.h>
 
 template <typename T>
-class __declspec(novtable) Sample
+class __declspec(novtable) __single_inheritance Sample
 {
 public:
 	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]

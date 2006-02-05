@@ -102,7 +102,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 			hr = m_spConvolver->get_filter_description(&description);
 			if (FAILED(hr))
 			{
-				SetDlgItemText( IDC_STATUS, TEXT("Get config file or filter sound file."));
+				SetDlgItemText( IDC_STATUS, TEXT("Get valid config file or filter sound file."));
 				return hr;
 			}
 			SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()));
@@ -115,7 +115,7 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 		catch (...) // creating m_Convolution might throw
 		{
 
-			SetDlgItemText( IDC_STATUS, TEXT("Failed to load filter.") );
+			SetDlgItemText( IDC_STATUS, TEXT("Failed to load config or filter sound file.") );
 			hr = E_FAIL;
 		}
 	}

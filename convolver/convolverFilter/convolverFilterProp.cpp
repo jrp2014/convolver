@@ -67,7 +67,7 @@ HRESULT CconvolverFilterProperties::DisplayFilterFormat(HWND hwnd, TCHAR* szFilt
 			hr = m_pIconvolverFilter->get_filter_description(&description);
 			if (FAILED(hr))
 			{
-				SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get a config file or Impulse Response sound file."));
+				SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get a config file or filter sound file."));
 				return hr;
 			}
 			SetDlgItemText( hwnd, IDS_STATUS, CA2CT(description.c_str()));
@@ -80,13 +80,13 @@ HRESULT CconvolverFilterProperties::DisplayFilterFormat(HWND hwnd, TCHAR* szFilt
 		catch (...) // creating m_Convolution might throw
 		{
 
-			SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to load filter.") );
+			SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to load config or filter sound file.") );
 			hr = E_FAIL;
 		}
 	}
 	else
 	{
-		SetDlgItemText( hwnd, IDS_STATUS, TEXT("Convolution filter initialization failed.") );
+		SetDlgItemText( hwnd, IDS_STATUS, TEXT("ConvolverFiler initialization failed.") );
 		return E_FAIL;
 	}
 

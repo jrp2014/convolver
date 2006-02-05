@@ -21,6 +21,16 @@
 #include <iostream>
 #include <sstream>
 
+#ifdef MINGW_FFTW
+// For MinGW-compile FFTW, which does not do its own initialization
+static void my_fftwf_write_char(char c, void *f) { fputc(c, (FILE *) f); }
+#define fftwf_export_wisdom_to_file(f) fftwf_export_wisdom(my_fftwf_write_char, (void*) (f))
+
+static int my_fftwf_read_char(void *f) { return fgetc((FILE *) f); } 
+#define fftwf_import_wisdom_from_file(f) fftwf_import_wisdom(my_fftwf_read_char, (void*) (f))
+#endif
+
+
 int	_tmain(int argc, _TCHAR* argv[])
 {
 #if defined(DEBUG) | defined(_DEBUG)
@@ -66,6 +76,26 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 	try
 	{
+
+#ifdef MINGW_FFTW
+// For MinGW-compile FFTW, which does not do its own initialization
+#define WISDOM_FILENAME	"wisdom.fftw"
+
+		if (fftwf_init_threads() == 0)
+			return FALSE;	// failed to initialize threads
+
+		FILE* wisdom = fopen (WISDOM_FILENAME,"r");
+		if (wisdom!=NULL)
+		{
+			if(fftwf_import_wisdom_from_file(wisdom) != 1)
+			{
+				std::wcerr << "Failed to import wisdom" << std::endl;
+			}
+			fclose (wisdom);
+		}
+#endif
+
+
 		std::wistringstream	szPartitions(argv[1]);
 		unsigned int max_nPartitions;	// Can't use WORD as that seems to break >>
 		szPartitions >>	max_nPartitions;
@@ -171,6 +201,23 @@ int	_tmain(int argc, _TCHAR* argv[])
 			std::cout << "Total execution time: " << fTotalElapsedCalc << "s" << std::endl;
 
 		}
+
+#ifdef MINGW_FFTW
+// For MinGW-compile FFTW, which does not do its own initialization
+		wisdom = fopen (WISDOM_FILENAME,"w");
+		if (wisdom!=NULL)
+		{
+			fftwf_export_wisdom_to_file(wisdom);
+			fflush(wisdom);		// needed as WIN32 fclose does not do it as it should
+			fclose (wisdom);
+		}
+		else
+		{
+			std::wcerr << "Failed to export wisdom" << std::endl;
+		}
+		fftwf_cleanup_threads();
+#endif
+
 	}
 
 	catch (convolutionException& error)

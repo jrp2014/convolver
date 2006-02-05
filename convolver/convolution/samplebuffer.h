@@ -186,29 +186,32 @@ struct FastArray : public AlignedArray<T>
 	// Element access
 
 	// operator[]
-	reference restrict operator[](size_type n)
+	reference restrict operator[](const size_type n)
 	{
 		assert(n >= 0 && n < size_);
 		return *(first_ + n);
 	}
 
-	const_reference operator[](size_type n) const
+	const_reference operator[](const size_type n) const
 	{
 		assert(n >= 0 && n < size_);
-		return *(first_ + n);
+		//return *(first_ + n);
+		return first_[n];
 	}
 
 	// at() with range check
-	reference restrict at(size_type n)
+	reference restrict at(const size_type n)
 	{
 		rangecheck(i);
-		return *(first_ + n);
+		//return *(first_ + n);
+		return first_[n];
 	}
 
-	const_reference at(size_type i) const
+	const_reference at(const size_type n) const
 	{
-		rangecheck(i);
-		return *(first_ + n);
+		rangecheck(n);
+		//return *(first_ + n);
+		return first_[n];
 	}
 
 	// front() and back()
@@ -267,12 +270,19 @@ struct FastArray : public AlignedArray<T>
 	// arrays will be assigned correctly
 	FastArray<T>& operator=(const FastArray<T>& other)
 	{
-		assert(size_ == 0 || size_ == other.size_);
-		if (this != &other)
-		{
-			FastArray<T> temp(other);
-			swap(temp);
-		}
+#ifdef FFTW
+		// Don't demand equality as arrays for FFTW are a bit longer to hold complex transforms
+		assert(size_ >= other.size_);
+#else
+		assert(size_ == other.size_);
+#endif
+		//if (this != &other)
+		//{
+		//	FastArray<T> temp(other);
+		//	swap(temp);
+		//}
+		if( this != &other)
+			std::uninitialized_copy(other.first_, other.first_ + other.size_, first_);
 		return *this;
 	}
 
@@ -330,7 +340,7 @@ struct FastArray : public AlignedArray<T>
 	{
 		if(x != 0)
 		{
-//			const size_type ss = size_;
+			const size_type ss = size_;
 #pragma loop count(65536)
 #pragma ivdep
 #pragma vector aligned

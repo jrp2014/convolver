@@ -22,6 +22,7 @@
 // For calculate optimum attenuation
 #include <boost/random.hpp>
 #include <boost/generator_iterator.hpp>
+#include <winnt.h>
 
 template class Convolution<float>;
 template class ConvolutionList<float>;
@@ -39,17 +40,17 @@ Mixer(szConfigFileName, nPartitions, nPlanningRigour),
 	InputBufferAccumulator_(Mixer.nFFTWPartitionLength()),
 	OutputBuffer_(Mixer.nFFTWPartitionLength()), // NB. Actually, only need half partition length for DoPartitionedConvolution
 	#ifdef ARRAY
-	ComputationCircularBuffer_(nPartitions, Mixer.nPaths(), Mixer.nFFTWPartitionLength()),
+	ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nFFTWPartitionLength()),
 	#else
-	ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.nPaths(), ChannelBuffer(Mixer.nFFTWPartitionLength()))),
+	ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nFFTWPartitionLength()))),
 	#endif
 #else
 	InputBufferAccumulator_(Mixer.nPartitionLength()),
 	OutputBuffer_(Mixer.nPartitionLength()), // NB. Actually, only need half partition length for DoPartitionedConvolution
 	#ifdef ARRAY
-	ComputationCircularBuffer_(nPartitions, Mixer.nPaths(), Mixer.nPartitionLength()),
+	ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nPartitionLength()),
 	#else
-	ComputationCircularBuffer_(nPartitions, SampleBuffer(Mixer.nPaths(), ChannelBuffer(Mixer.nPartitionLength()))),
+	ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nPartitionLength()))),
 	#endif
 #endif
 #ifdef ARRAY
@@ -149,7 +150,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 			for (SampleBuffer::size_type nPath = 0; nPath < Mixer.nPaths(); ++nPath)
 			{
 				// Zero the partition from circular coeffs that we have just used, for the next cycle
-				ComputationCircularBuffer_[nPreviousPartitionIndex_][nPath] = 0;
+				ComputationCircularBuffer_[nPath][nPreviousPartitionIndex_] = 0;
 
 				// Mix the input samples for this filter path
 				mix_input(Mixer.Paths()[nPath], InputBuffer_, InputBufferAccumulator_);
@@ -176,16 +177,16 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 #ifdef FFTW
 					complex_mul_add(reinterpret_cast<fftwf_complex*>(c_ptr(InputBufferAccumulator_)),
 						reinterpret_cast<fftwf_complex*>(c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex)),
-						reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath)),
+						reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_)),
 						Mixer.nPartitionLength());
 #elif defined(__ICC) || defined(__INTEL_COMPILER)
 					// Vectorizable
 					cmuladd(c_ptr(InputBufferAccumulator_), c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
-						c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath), Mixer.nPartitionLength());
+						c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_), Mixer.nPartitionLength());
 #else
 					// Non-vectorizable
 					cmultadd(InputBufferAccumulator_, c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
-						c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath), Mixer.nPartitionLength());
+						c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_), Mixer.nPartitionLength());
 #endif
 					nPartitionIndex_ = (nPartitionIndex_ + 1) % nPartitions_;	// circular
 				} // nPartitionIndex
@@ -193,19 +194,19 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef FFTW
 				fftwf_execute_dft_c2r(Mixer.Paths()[0].filter.reverse_plan(),
-					reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath)),
-					c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath));
+					reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_)),
+					c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_));
 #elif defined(SIMPLE_OOURA)
-				rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath));
+				rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_));
 #elif defined(OOURA)
-				rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(ComputationCircularBuffer_, nPartitionIndex_, nPath),
+				rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_),
 					&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
 #else
 #error "No FFT package defined"
 #endif
 				// Mix the outputs
 				mix_output(Mixer.Paths()[nPath], OutputBufferAccumulator_, 
-					ComputationCircularBuffer_[nPartitionIndex_][nPath],
+					ComputationCircularBuffer_[nPath][nPartitionIndex_],
 					Mixer.nHalfPartitionLength(), Mixer.nPartitionLength());
 
 			} // nPath
@@ -383,34 +384,36 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		return cbOutputBytesGenerated;
 }
 
-
-// TODO: optimize as the previous half-partition is in the accumulator
 template <typename T>
 void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
-									  const SampleBuffer& restrict InputBuffer,
-									  ChannelBuffer& restrict InputBufferAccumulator)
+							   const SampleBuffer& restrict InputBuffer,
+							   ChannelBuffer& restrict InputBufferAccumulator)
 {
 
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
 	const DWORD nPartitionLength = Mixer.nPartitionLength();
+
 	assert(nPartitionLength % 2 ==0);
 
-	//if (nChannels == 1)
-	//{
-	//	const ChannelBuffer& InputSamples = InputBuffer_[thisPath.inChannel[0].nChannel];
-	//	InputBufferAccumulator_ = InputSamples;
-	//}
-	//else
-	//{
+	if (nChannels == 1 && thisPath.inChannel[0].fScale == 1.0f)
+	{
+		InputBufferAccumulator = InputBuffer_[thisPath.inChannel[0].nChannel];
+	}
+	else
+	{
+
 		InputBufferAccumulator = 0;
 #pragma loop count(8)
 #pragma ivdep
 		for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
 		{
-			const float fScale = thisPath.inChannel[nChannel].fScale;
+			__declspec(align( 16 )) const float fScale = thisPath.inChannel[nChannel].fScale;
 			const WORD thisChannel = thisPath.inChannel[nChannel].nChannel;
-			const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
-	
+			__declspec(align( 16 )) const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
+			//static T preftech1 = InputSamples[0];
+			//static T prefetch2 = InputSamples[nPartitionLength/2];
+			//static T preftech3 = InputSamples[nPartitionLength];
+
 			// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
 			// because FFTW destroys its inputs.
 			if(fScale == 1.0f)
@@ -420,14 +423,27 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 			else
 			{
 				// TODO:: performance killer
+
+				//for(ChannelBuffer::size_type i=0; i<nPartitionLength; ++i)
+				//{
+				//	InputBufferAccumulator[i] += InputSamples[i] * fScale;
+				//}
+
+				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
 #pragma loop count(65536)
 #pragma ivdep
-				for(ChannelBuffer::size_type i=0; i<nPartitionLength; ++i)
+#pragma vector aligned
+#pragma prefetch pInputSamples
+				for(T* pInputBufferAccumulator = InputBufferAccumulator.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
+					pInputBufferAccumulator != pInputBufferAccumulatorEnd;)
 				{
-					InputBufferAccumulator[i] += fScale * InputSamples[i];
+					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
+					//PreFetchCacheLine(PF_NON_TEMPORAL_LEVEL_ALL, pInputSamples+16);
+					//PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, pInputBufferAccumulator+16);
 				}
 
-				//for(ChannelBuffer::iterator iterInputSamples = InputSamples.begin(),
+
+				//for(ChannelBuffer::iterator iterInputSamples = const_cast<ChannelBuffer::iterator>(InputSamples.begin()),
 				//	iterInputBufferAccumulator = InputBufferAccumulator_.begin();
 				//	iterInputSamples != InputSamples.end();)
 				//{
@@ -435,7 +451,7 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 				//}
 			}
 		}
-	//}
+	}
 }
 
 template <typename T>
@@ -466,7 +482,7 @@ void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPa
 #pragma ivdep
 			for(ChannelBuffer::size_type i=from; i < to; ++i)
 			{
-				thisAccumulator[i] += fScale * Output[i];
+				thisAccumulator[i] += Output[i] * fScale;
 			} // i
 		}
 	} // nChannel
@@ -632,157 +648,6 @@ T Convolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffer
 }
 #endif
 
-// Pick the correct version of the processing class
-//
-// TODO: build this into the Factory class.  (Probably more trouble than it is worth)
-//
-// Note that this allows multi-channel and high-resolution WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT.
-// Strictly speaking these should be WAVE_FORMAT_EXTENSIBLE, if we want to avoid ambiguity.
-// The code below assumes that for WAVE_FORMAT_PCM and WAVE_FORMAT_IEEE_FLOAT, wBitsPerSample is the container size.
-// The code below will not work with streams where wBitsPerSample is used to indicate the bits of actual valid data,
-// while the container size is to be inferred from nBlockAlign and nChannels (eg, wBitsPerSample = 20, nBlockAlign = 8, nChannels = 2).
-// See http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-//template <typename T>
-//HRESULT SelectSampleConvertor(WAVEFORMATEX* & pWave, Holder< Sample<T> >& sample_convertor)
-//{
-//#if defined(DEBUG) | defined(_DEBUG)
-//	DEBUGGING(3, cdebug << "SelectSampleConvertor" << std::endl;);
-//#endif
-//	HRESULT hr = S_OK;
-//
-//	if (NULL == pWave)
-//	{
-//		return E_POINTER;
-//	}
-//
-//	try
-//	{
-//		WORD wFormatTag = pWave->wFormatTag;
-//		WORD wValidBitsPerSample = pWave->wBitsPerSample;
-//		if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-//		{
-//			WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE *) pWave;
-//			wValidBitsPerSample = pWaveXT->Samples.wValidBitsPerSample;
-//			if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
-//			{
-//				wFormatTag = WAVE_FORMAT_PCM;
-//				// TODO: cross-check pWaveXT->Samples.wSamplesPerBlock
-//			}
-//			else
-//				if (pWaveXT->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-//				{
-//					wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-//				}
-//				else
-//				{
-//					return E_INVALIDARG;
-//				}
-//		}
-//
-//		sample_convertor = NULL;
-//
-//		switch (wFormatTag)
-//		{
-//		case WAVE_FORMAT_PCM:
-//			switch (pWave->wBitsPerSample)
-//			{
-//				// Note: for 8 and 16-bit samples, we assume the sample is the same size as
-//				// the samples. For > 16-bit samples, we need to use the WAVEFORMATEXTENSIBLE
-//				// structure to determine the valid bits per sample. (See above)
-//			case 8:
-//				sample_convertor = new Sample_pcm8<T>();
-//				break;
-//
-//			case 16:
-//				sample_convertor = new Sample_pcm16<T>();
-//				break;
-//
-//			case 24:
-//				{
-//					switch (wValidBitsPerSample)
-//					{
-//					case 16:
-//						sample_convertor = new Sample_pcm24<T, 16>();
-//						break;
-//
-//					case 20:
-//						sample_convertor = new Sample_pcm24<T, 20>();
-//						break;
-//
-//					case 24:
-//						sample_convertor = new Sample_pcm24<T, 24>();
-//						break;
-//
-//					default:
-//						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-//					}
-//				}
-//				break;
-//
-//			case 32:
-//				{
-//					switch (wValidBitsPerSample)
-//					{
-//					case 16:
-//						sample_convertor = new Sample_pcm32<T, 16>();
-//						break;
-//
-//					case 20:
-//						sample_convertor = new Sample_pcm32<T, 20>();
-//						break;
-//
-//					case 24:
-//						sample_convertor = new Sample_pcm32<T, 24>();
-//						break;
-//
-//					case 32:
-//						sample_convertor = new Sample_pcm32<T, 32>();
-//						break;
-//
-//					default:
-//						return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-//					}
-//				}
-//				break;
-//
-//			default:  // Unprocessable PCM
-//				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-//			}
-//			break;
-//
-//		case WAVE_FORMAT_IEEE_FLOAT:
-//			switch (pWave->wBitsPerSample)
-//			{
-//			case 32:
-//				sample_convertor = new Sample_ieeefloat<T>();
-//				break;
-//
-//			case 64:
-//				sample_convertor = new Sample_ieeedouble<T>();
-//				break;
-//
-//			default:  // Unprocessable IEEE float
-//				return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-//				//break;
-//			}
-//			break;
-//
-//		default: // Not PCM or IEEE Float
-//			return E_INVALIDARG; // Should have been filtered out by ValidateMediaType
-//		}
-//	}
-//	catch(...)
-//	{
-//		return E_ABORT;
-//	}
-//
-//#if defined(DEBUG) | defined(_DEBUG)
-//	DEBUGGING(3, cdebug << "SelectSampleConvertor returned " << hr << std::endl;);
-//#endif
-//
-//	return hr;
-//}
-
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
 template <typename T>
 HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
@@ -931,18 +796,17 @@ nPartitions_(nPartitions)
 		}
 #endif
 
-		// We have a single wav format impulse file, so pick it up
+		// We have a single sound impulse file, so pick it up
 		ConvolutionList_.push_back(new Convolution<T>(szConfigFileName, nPartitions_, nPlanningRigour));
 		++nConvolutionList_;
 	}
 	catch(const wavfileException&)
 	{
+		// Assume that we have a text config file
 		try
 		{
-			// Assume that we have a text config_ file
-
-			// if the first character is a number, we have a config containing a list of filter path filenames,
-			// rather than config containing a filter path specification
+			// if the first character is a number, we have a config containing a list of filter paths,
+			// rather than config containing list of config files and filter sound files
 			std::basic_ifstream<TCHAR>::int_type nextchar = config_().peek();
 			if (std::isdigit<TCHAR>(nextchar, std::locale()))
 			{
@@ -951,15 +815,33 @@ nPartitions_(nPartitions)
 			}
 			else
 			{
+				// we have a config file containing a list of config files / filter sound files
+				// TODO:: should do this by unsetting the eof exception bit
 				TCHAR szConvolutionListFilename[MAX_PATH];
+				szConvolutionListFilename[0] = 0;
 				while(!config_().eof())
 				{
-					config_().getline(szConvolutionListFilename, MAX_PATH);
+					try
+					{
+						szConvolutionListFilename[0] = 0;
+						while(szConvolutionListFilename[0] == 0)
+						{
+							config_().getline(szConvolutionListFilename, MAX_PATH);
+						}
+					}
+					catch(const std::ios_base::failure& error)
+					{
+						if(!config_().eof())
+							throw;
+					}
+					if(!config_().eof())
+					{
 #if defined(DEBUG) | defined(_DEBUG)
-					cdebug << "Reading ConvolutionList from " << szConvolutionListFilename << std::endl;
+						cdebug << "Reading ConvolutionList from " << szConvolutionListFilename << std::endl;
 #endif
-					ConvolutionList_.push_back(new Convolution<T>(szConvolutionListFilename, nPartitions, nPlanningRigour));
-					++nConvolutionList_;
+						ConvolutionList_.push_back(new Convolution<T>(szConvolutionListFilename, nPartitions, nPlanningRigour));
+						++nConvolutionList_;
+					}
 				}
 			}
 		}
@@ -977,11 +859,11 @@ nPartitions_(nPartitions)
 			}
 			else if (config_().fail())
 			{
-				throw convolutionListException("Config file syntax is incorrect", szConfigFileName);
+				throw convolutionListException("Bad sound file or config file syntax is incorrect", szConfigFileName);
 			}
 			else if (config_().bad())
 			{
-				throw convolutionListException("Fatal error opening/reading config_ file", szConfigFileName);
+				throw convolutionListException("Fatal error opening/reading config file", szConfigFileName);
 			}
 			else
 			{
@@ -990,11 +872,10 @@ nPartitions_(nPartitions)
 #endif
 				throw convolutionListException(error.what(), szConfigFileName);
 			}
-			// else fall through
 		}
 		catch(const convolutionException& ex)	// self-generated exception
 		{
-			throw convolutionException(ex.what());
+			throw convolutionListException(ex.what(), szConfigFileName);
 		}
 		catch(const std::exception& error)
 		{

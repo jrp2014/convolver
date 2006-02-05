@@ -31,7 +31,7 @@ class configFile
 public:
 	configFile(const TCHAR szConfigFileName[MAX_PATH]) : opened(false)
 	{
-		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit | std::ios::badbit);
+		config.exceptions(std::ios::badbit | std::ios::failbit | std::ios::eofbit);
 		//USES_CONVERSION;
 
 		try

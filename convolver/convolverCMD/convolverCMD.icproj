@@ -179,7 +179,7 @@
 				ATLMinimizesCRunTimeLibraryUsage="0"
 				CharacterSet="1"
 				WholeProgramOptimization="1"
-				PGOPhase="3"/>
+				PGOPhase="0"/>
 			<Tool 
 				Name="DebugTool"/>
 			<Tool 
@@ -191,7 +191,7 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="1"
 				EnableFiberSafeOptimizations="1"
-				OptimizeForProcessor="0"
+				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="1"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW_DLL"
@@ -211,10 +211,10 @@
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="3"
 				CompileAs="0"
-				AdditionalOptions="/Qipo /fp:strict /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox  /Qssp"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				OpenMP="1"
-				UseProcExt="1"
-				RequireProcExt="0"
+				UseProcExt="0"
+				RequireProcExt="3"
 				LoopUnrolling=" "
 				Parallelization="1"
 				C99Support="1"

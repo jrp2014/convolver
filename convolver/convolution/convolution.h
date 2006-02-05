@@ -197,8 +197,6 @@ public:
 		return ConvolutionList_[selectedConvolutionIndex_];
 	}
 
-
-
 	const Convolution<T>& operator[](size_type n) const
 	{
 		assert(n >= 0 && n < nConvolutionList());

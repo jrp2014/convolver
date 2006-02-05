@@ -489,7 +489,7 @@ STDMETHODIMP CConvolver::SetInputType(DWORD dwInputStreamIndex,
 	hr = ValidateMediaType(pmt, &m_mtOutput);
 	if (FAILED(hr))
 	{
-		return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : hr;
+		return (DMO_SET_TYPEF_TEST_ONLY & dwFlags) ? S_FALSE : hr;
 	}
 	else 
 	{
@@ -585,7 +585,7 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 	hr = ValidateMediaType(&m_mtInput, pmt);
 	if (FAILED(hr))
 	{
-		return DMO_SET_TYPEF_TEST_ONLY & dwFlags ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
+		return (DMO_SET_TYPEF_TEST_ONLY & dwFlags) ? S_FALSE : DMO_E_TYPE_NOT_ACCEPTED;
 	}
 	else
 	{
@@ -912,21 +912,12 @@ STDMETHODIMP CConvolver::Flush( void )
 
 	if (m_ConvolutionList.get_ptr() != NULL)
 	{
-
-
 		// Flush may be called after a new filter is selected via properties, but without
 		// calling SetInputType / SetOutputType
-		if(!m_ConvolutionList->ConvolutionSelected())
+		if(m_ConvolutionList->ConvolutionSelected())
 		{
-			HRESULT hr = m_ConvolutionList->SelectConvolution(( WAVEFORMATEX * ) m_mtOutput.pbFormat, ( WAVEFORMATEX * ) m_mtOutput.pbFormat);
-			if(FAILED(hr))
-			{
-				return hr;
-			}
-			if(!m_ConvolutionList->ConvolutionSelected())
-				return DMO_E_TYPE_NOT_ACCEPTED;
+			m_ConvolutionList->SelectedConvolution().Flush();
 		}
-		m_ConvolutionList->SelectedConvolution().Flush();
 	}
 
 	return S_OK;
@@ -1052,6 +1043,18 @@ STDMETHODIMP CConvolver::GetInputStatus(DWORD dwInputStreamIndex,
 		return E_POINTER;
 	}
 
+	if(m_ConvolutionList.get_ptr() == NULL)
+	{
+		*pdwFlags = 0;
+		return DMO_E_TYPE_NOT_SET;
+	}
+
+	if(!m_ConvolutionList->ConvolutionSelected())
+	{
+		*pdwFlags = 0;
+		return DMO_E_TYPE_NOT_SET;
+	}
+
 	if ( m_spInputBuffer )
 	{
 		*pdwFlags = 0; //The buffer still contains data; return zero.
@@ -1093,6 +1096,16 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 	}
 
 	if (GUID_NULL == m_mtInput.majortype)
+	{
+		return DMO_E_TYPE_NOT_SET;
+	}
+	
+	if(m_ConvolutionList.get_ptr() == NULL)
+	{
+		return DMO_E_TYPE_NOT_SET;
+	}
+
+	if(!m_ConvolutionList->ConvolutionSelected())
 	{
 		return DMO_E_TYPE_NOT_SET;
 	}
@@ -1161,6 +1174,16 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	}
 
 	if (GUID_NULL == m_mtOutput.majortype)
+	{
+		return DMO_E_TYPE_NOT_SET;
+	}
+
+	if(m_ConvolutionList.get_ptr() == NULL)
+	{
+		return DMO_E_TYPE_NOT_SET;
+	}
+
+	if(!m_ConvolutionList->ConvolutionSelected())
 	{
 		return DMO_E_TYPE_NOT_SET;
 	}
@@ -1463,6 +1486,17 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 		// May throw
 		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  
 			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+		// Get the pointer to the input and output format structures.
+		const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+		const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+		if(pWaveIn != NULL && pWaveOut != NULL && FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
+		{
+			std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+				"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+			throw convolutionException(diagnostic);
+		}
 	}
 
 	return S_OK;
