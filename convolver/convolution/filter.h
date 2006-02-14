@@ -105,8 +105,8 @@ public:
 #endif
 
 	// Constructor
-	Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
-			   const unsigned int& nPlanningRigour);
+	Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD nPartitions, const WORD nFilterChannel, const DWORD nSamplesPerSec,
+			   const unsigned int nPlanningRigour);
 
 	virtual ~Filter()
 	{

@@ -21,8 +21,8 @@
 #include "convolution\filter.h"
 
 // nSamplesPerSec is a default, for raw pcm files,.  nSamplesPerSec_ will be reset to the actual rate of the sound file for other formats
-Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD& nPartitions, const WORD& nFilterChannel, const DWORD& nSamplesPerSec,
-			   const unsigned int& nPlanningRigour) : 
+Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD nPartitions, const WORD nFilterChannel, const DWORD nSamplesPerSec,
+			   const unsigned int nPlanningRigour) : 
 nPartitions (nPartitions),
 nSamplesPerSec_(nSamplesPerSec)
 {
@@ -43,7 +43,7 @@ nSamplesPerSec_(nSamplesPerSec)
 		throw filterException("Number of partitions must be at least one", szFilterFileName);
 	}
 
-	// Load the wave file
+	// Load the sound file
 #ifdef LIBSNDFILE
 	::ZeroMemory(&sf_FilterFormat_, sizeof(SF_INFO));
 	CWaveFileHandle pFilterWave(szFilterFileName, SFM_READ, &sf_FilterFormat_, nSamplesPerSec); // Throws, if file invalid
@@ -104,7 +104,7 @@ nSamplesPerSec_(nSamplesPerSec)
 			}
 			else
 			{
-				throw filterException("Subformat not PCM or IEEE Float");
+				throw filterException("Subformat not PCM or IEEE Float", szFilterFileName);
 			}
 		}
 	}

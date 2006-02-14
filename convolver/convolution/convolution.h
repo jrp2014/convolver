@@ -73,13 +73,13 @@ public:
 
 	const ChannelPaths		Mixer;				// Order dependent
 
-	HRESULT calculateOptimumAttenuation(T& fAttenuation);
+	HRESULT calculateOptimumAttenuation(T& fAttenuation, const bool overlapsave = false);
 
 	int cbLookAhead(Sample<T>* & sample_convertor) const
 	{
 		if(sample_convertor != NULL)
 		{
-			return Mixer.nHalfPartitionLength() * sample_convertor->nContainerSize(); // The lag
+			return Mixer.nPartitionLength() * sample_convertor->nContainerSize(); // The lag
 		}
 		else
 		{
@@ -105,7 +105,8 @@ public:
 	}
 
 private:
-	SampleBuffer		InputBuffer_;
+	SampleBuffer		InputBuffer_;				// Circular buffer holding the current and previous half partition's
+													// worth of samples
 	ChannelBuffer		InputBufferAccumulator_;
 	ChannelBuffer		OutputBuffer_;				// The output for a particular path, before mixing
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
@@ -118,10 +119,11 @@ private:
 	bool				bStartWriting_;
 
 	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
-	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, const SampleBuffer& restrict InputBuffer, 
-		ChannelBuffer& restrict InputBufferAccumulator);
+	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
+							   const SampleBuffer& restrict InputBuffer,
+							   ChannelBuffer& restrict InputBufferAccumulator);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-		const ChannelBuffer& restrict Output, const DWORD from, const DWORD to);
+		const ChannelBuffer& restrict Output, const DWORD to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
@@ -235,6 +237,14 @@ public:
 		else if (state_ == Selected)
 		{
 			state_ = InputSelected;
+		}
+	}
+
+	void Flush()
+	{
+		if(ConvolutionSelected())
+		{
+			SelectedConvolution().Flush();
 		}
 	}
 

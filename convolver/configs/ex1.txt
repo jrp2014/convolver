@@ -1,3 +1,7 @@
-D:\Projects\convolver\convolver\Media\cksde\ex1_imp1.wav
+44100 1 1 0
+0
+0
+D:\Projects\convolver\Media\cksde\ex1_imp1.wav
+0
 0.0
 0.0

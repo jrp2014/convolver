@@ -69,12 +69,24 @@ config_(szChannelPathsFileName)
 		nSamplesPerSec_ = wfex.nSamplesPerSec_;
 #endif
 
+		nInputSamplesDelay_.reserve(nInputChannels());
+		for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
+		{
+			nInputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
+		}
+
+		nOutputSamplesDelay_.reserve(nOutputChannels());
+		for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
+		{
+			nOutputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
+		}
+
 		for(WORD nChannel=0; nChannel < nInputChannels_; ++nChannel)
 		{
 			std::vector<ChannelPath::ScaledChannel> inChannel(1, ChannelPath::ScaledChannel(nChannel, 1.0f));
 			std::vector<ChannelPath::ScaledChannel> outChannel(1, ChannelPath::ScaledChannel(nChannel, 1.0f));
 			Paths_.push_back(new ChannelPath(szChannelPathsFileName, nPartitions, inChannel, outChannel, nChannel, 
-				nSamplesPerSec_, nPlanningRigour));
+				nSamplesPerSec_, nPlanningRigour));  // 0 = no delay
 			++nPaths_;
 		}
 	}
@@ -108,8 +120,47 @@ config_(szChannelPathsFileName)
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << std::hex << dwChannelMask_ << std::dec << " channel mask" << std::endl;
 #endif
+			  // consume newline
+			if (config_().get() != '\n')
+			{
+				throw channelPathsException("Config file syntax error: initial line should contain sample rate, number of input and of output channels, and a channel mask followed by a newline", szChannelPathsFileName);
+			}
 
-			config_().get();  // consume newline
+
+			nInputSamplesDelay_.reserve(nInputChannels());
+			for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
+			{
+				float fDelayMS = 0;
+				config_() >> fDelayMS;			// Delay in ms
+				if (fDelayMS < 0)
+				{
+					throw channelPathsException("Input delay cannot be negative", szChannelPathsFileName);
+				}
+				nInputSamplesDelay_.push_back(nSamplesPerSec_ * fDelayMS / 1000.0);  // Convert ms to samples
+			}
+
+			if (config_().get() != '\n')
+			{
+				throw channelPathsException("Inconsistent input channels delay specification line?", szChannelPathsFileName);
+			}
+
+			nOutputSamplesDelay_.reserve(nOutputChannels());
+			for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
+			{
+				float fDelayMS = 0;
+				config_() >> fDelayMS;			// Delay in ms
+				if (fDelayMS < 0)
+				{
+					throw channelPathsException("Output delay cannot be negative", szChannelPathsFileName);
+				}
+				nOutputSamplesDelay_.push_back(nSamplesPerSec_ * fDelayMS / 1000.0);  // Convert ms to samples
+			}
+
+			if (config_().get() != '\n')
+			{
+				throw channelPathsException("Inconsistent output channels delay specification line?", szChannelPathsFileName);
+			}
+
 
 			TCHAR szFilterFilename[MAX_PATH];
 			szFilterFilename[0] = 0;
@@ -131,7 +182,7 @@ config_(szChannelPathsFileName)
 				std::basic_ifstream<TCHAR>::int_type nextchar = config_().peek();
 				if (nextchar != '\n')
 				{
-					throw channelPathsException("Missing filter channel specification?", szChannelPathsFileName);
+					throw channelPathsException("Missing filter file channel selection?", szChannelPathsFileName);
 				}
 
 				std::vector<ChannelPath::ScaledChannel> inChannel;
@@ -231,7 +282,7 @@ config_(szChannelPathsFileName)
 			}
 			else if (config_().fail())
 			{
-				throw channelPathsException("Bad filter sound file or filter path file syntax is incorrect", szChannelPathsFileName);
+				throw channelPathsException("Bad filter sound file or config file syntax is incorrect", szChannelPathsFileName);
 			}
 			else if (config_().bad())
 			{
@@ -290,11 +341,40 @@ config_(szChannelPathsFileName)
 		throw channelPathsException("Must specify at least one filter", szChannelPathsFileName);
 	}
 
+
+	for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
+	{
+		if(nInputSamplesDelay()[nInputChannel] >= nHalfPartitionLength())
+		{
+			throw channelPathsException("Input channel delay too long.", szChannelPathsFileName);
+		}
+	}
+
+	for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
+	{
+		if(nOutputSamplesDelay()[nOutputChannel] >= nHalfPartitionLength())
+		{
+			throw channelPathsException("Output channel delay too long", szChannelPathsFileName);
+		}
+	}
+
 	for(WORD i = 0; i < nPaths_; ++i)
 	{
 		if(Paths_[i].filter.nFilterLength() != nFilterLength_)
 		{
 			throw channelPathsException("Filters must all be of the same length", szChannelPathsFileName);
+		}
+
+		if(Paths_[0].filter.nPartitionLength() != nPartitionLength_)
+		{
+			// It should be impossible for this to happen, if nFilterLength is OK
+			throw channelPathsException("Internal error: inconsistent partition length", szChannelPathsFileName);
+		}
+
+		if(Paths_[0].filter.nHalfPartitionLength() != nHalfPartitionLength_)
+		{
+			// It should be impossible for this to happen, if nFilterLength is OK
+			throw channelPathsException("Internal error: inconsistent half partition length", szChannelPathsFileName);
 		}
 
 		if(Paths_[i].filter.nSamplesPerSec() != nSamplesPerSec_)
@@ -353,8 +433,23 @@ void ChannelPaths::Dump() const
 	cdebug << "ChannelPaths: " << " nInputChannels_:" << nInputChannels_ << " nOutputChannels_:" << nOutputChannels_ <<
 		" nPartitions:" << nPartitions << " nPartitionLength:" << nPartitionLength_ <<
 		" nHalfPartitionLength:" << nHalfPartitionLength_ << " nFilterLength:" << nFilterLength_ << std::endl;
-	for(int i = 0; i < nPaths_; ++i) 
-		Paths_[i].Dump();
+
+	cdebug << "Input channel delay (samples): ";
+	for(DWORD nInputChannel=0; nInputChannel < nInputChannels(); ++nInputChannel)
+	{
+		cdebug << nInputSamplesDelay()[nInputChannel] << " ";
+	}
+	cdebug << std::endl;
+
+	cdebug << "Output channel delay (samples): ";
+	for(DWORD nOutputChannel=0; nOutputChannel < nOutputChannels(); ++nOutputChannel)
+	{
+		cdebug << nOutputSamplesDelay()[nOutputChannel] << " ";
+	}
+	cdebug << std::endl;
+
+	for(int i = 0; i < nPaths(); ++i) 
+		Paths()[i].Dump();
 }
 
 void ChannelPaths::ChannelPath::Dump() const

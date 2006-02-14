@@ -49,7 +49,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 #endif
 
-	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time{
+	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time
 
 	HRESULT hr = S_OK;
 	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
@@ -89,8 +89,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 
 		std::wistringstream szPlanningRigour(PLANNINGRIGOUR);
-		WORD nPlanningRigour;
-		szPartitions >> nPlanningRigour;
+		DWORD nPlanningRigour;
+		szPlanningRigour >> nPlanningRigour;
 
 		ConvolutionList<float> conv(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
 			nPlanningRigour); // Sets conv. nPartitions==0 => use overlap-save
@@ -138,7 +138,7 @@ int _tmain(int argc, _TCHAR* argv[])
 #endif		
 
 #if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "cBufferLength=" << cBufferLength << std::endl ;
+		//cdebug << "cBufferLength=" << cBufferLength << std::endl ;
 #endif
 
 		UINT dwSizeWrote = 0;
@@ -157,7 +157,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		float fAttenuation = 0;
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = conv.SelectedConvolution().calculateOptimumAttenuation(fAttenuation);
+		hr = conv.SelectedConvolution().calculateOptimumAttenuation(fAttenuation, nPartitions == 0);
 		fElapsed = t.msec();
 		if (FAILED(hr))
 		{
@@ -168,12 +168,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		//fAttenuation = 0;
 		std::wcerr << "Using attenuation of " << fAttenuation << std::endl;
 
+		const int nInputChannels = conv.SelectedConvolution().Mixer.nInputChannels();
+
 #ifdef LIBSNDFILE
-		std::vector<float> pfInputSamples(cBufferLength * sf_info.channels);
-		std::vector<float> pfOutputSamples(cBufferLength * sf_info.channels);
+		std::vector<float> pfInputSamples(cBufferLength * nInputChannels);
+		std::vector<float> pfOutputSamples(cBufferLength * nInputChannels);
 #else
-		std::vector<BYTE> pbInputSamples(cBufferLength);
-		std::vector<BYTE> pbOutputSamples(cBufferLength);
+		std::vector<BYTE> pbInputSamples(cBufferLength,0);
+		std::vector<BYTE> pbOutputSamples(cBufferLength,0);
 #endif
 
 #ifdef	LIBSNDFILE
@@ -182,7 +184,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		CWaveFileHandle WavOut(OUTPUTFILE, SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 		CWaveFileHandle WavOut;
-		if( FAILED( hr = WavOut->Open(OUTPUTFILE, WavIn->GetFormat(), WAVEFILE_WRITE ) ) )
+		if( FAILED( hr = WavOut->Open(OUTPUTFILE, WavIn->GetFormat(), WAVEFILE_WRITE ) ) )  // TODO:: fix for when different no of i/o channels
 		{
 			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE)) << " for writing" << std::endl;
 			throw(hr);
@@ -209,14 +211,11 @@ int _tmain(int argc, _TCHAR* argv[])
 			dwTotalSizeRead += dwSizeRead;
 
 #ifdef LIBSNDFILE
-			// Pad with zeros, to flush
-			for(int i = dwSizeRead * sf_info.channels; i < cBufferLength * sf_info.channels; ++i)
+			// Pad with zeros, to flush.  TODO: Won't work with 8-bit samples
+			for(int i = dwSizeRead * nInputChannels; i < cBufferLength * nInputChannels; ++i)
 				pfInputSamples[i]=0;
 
 			DWORD dwBlocksToProcess = cBufferLength;
-			// Pad with zeros, to flush
-			for(int i = dwSizeRead; i < cBufferLength; ++i)
-				pfInputSamples[i]=0;
 #else
 			if (dwSizeRead % conv.Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
 			{
@@ -253,8 +252,9 @@ int _tmain(int argc, _TCHAR* argv[])
 				/* fAttenuation_db */ fAttenuation);
 
 #if defined(DEBUG) | defined(_DEBUG)
-				//cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;
+				cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;
 #endif
+
 
 #ifdef LIBSNDFILE
 			dwSizeWrote = WavOut.writef_float(&pfOutputSamples[0], dwBufferSizeGenerated / (sizeof(float) * sf_info.channels)); // dwSizeWrote is in frames

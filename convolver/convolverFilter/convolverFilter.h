@@ -30,6 +30,7 @@ public:
     HRESULT DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *pProperties);
     HRESULT GetMediaType(int iPosition, CMediaType *pMediaType);
 	HRESULT SetMediaType(PIN_DIRECTION direction, const CMediaType *pMediaType);
+	HRESULT CconvolverFilter::BeginFlush(void);
 
     // These implement the custom IconvolverFilter interface
 	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);

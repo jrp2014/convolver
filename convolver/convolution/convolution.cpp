@@ -37,28 +37,28 @@ Convolution<T>::Convolution(const TCHAR szConfigFileName[MAX_PATH],
 nPartitions_(nPartitions),
 Mixer(szConfigFileName, nPartitions, nPlanningRigour),
 #ifdef FFTW
-	InputBufferAccumulator_(Mixer.nFFTWPartitionLength()),
-	OutputBuffer_(Mixer.nFFTWPartitionLength()), // NB. Actually, only need half partition length for DoPartitionedConvolution
-	#ifdef ARRAY
-	ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nFFTWPartitionLength()),
-	#else
-	ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nFFTWPartitionLength()))),
-	#endif
+InputBufferAccumulator_(Mixer.nFFTWPartitionLength()),
+OutputBuffer_(Mixer.nFFTWPartitionLength()),
+#ifdef ARRAY
+ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nFFTWPartitionLength()),
 #else
-	InputBufferAccumulator_(Mixer.nPartitionLength()),
-	OutputBuffer_(Mixer.nPartitionLength()), // NB. Actually, only need half partition length for DoPartitionedConvolution
-	#ifdef ARRAY
-	ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nPartitionLength()),
-	#else
-	ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nPartitionLength()))),
-	#endif
+ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nFFTWPartitionLength()))),
+#endif
+#else
+InputBufferAccumulator_(Mixer.nPartitionLength()),
+OutputBuffer_(Mixer.nPartitionLength()), // NB. Actually, only need half partition length for DoPartitionedConvolution
+#ifdef ARRAY
+ComputationCircularBuffer_(Mixer.nPaths(), nPartitions, Mixer.nPartitionLength()),
+#else
+ComputationCircularBuffer_(Mixer.nPaths(), SampleBuffer(nPartitions, ChannelBuffer(Mixer.nPartitionLength()))),
+#endif
 #endif
 #ifdef ARRAY
-		InputBuffer_(Mixer.nInputChannels(), Mixer.nPartitionLength()),
-		OutputBufferAccumulator_(Mixer.nOutputChannels(), Mixer.nPartitionLength()),
+InputBuffer_(Mixer.nInputChannels(), Mixer.nPartitionLength()),
+OutputBufferAccumulator_(Mixer.nOutputChannels(), Mixer.nPartitionLength()),
 #else
-		InputBuffer_(Mixer.nInputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
-		OutputBufferAccumulator_(Mixer.nOutputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
+InputBuffer_(Mixer.nInputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
+OutputBufferAccumulator_(Mixer.nOutputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
 #endif
 nInputBufferIndex_(Mixer.nHalfPartitionLength()),
 nPartitionIndex_(0),
@@ -80,13 +80,15 @@ void Convolution<T>::Flush()
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "Convolution<T>::Flush" << std::endl;)
 #endif
-		Zero(InputBuffer_);
-		Zero(ComputationCircularBuffer_);
+	Zero(InputBuffer_);
+	Zero(InputBufferAccumulator_);
+	Zero(ComputationCircularBuffer_);
+	Zero(OutputBufferAccumulator_);
 
-		nInputBufferIndex_ = Mixer.nHalfPartitionLength();// placeholder
-		nPartitionIndex_ = 0;							// for partitioned convolution
-		nPreviousPartitionIndex_ = nPartitions_-1;	// lags nPartitionIndex_ by 1
-		bStartWriting_ = false;
+	nInputBufferIndex_ = 0; //Mixer.nHalfPartitionLength();// placeholder
+	nPartitionIndex_ = 0;							// for partitioned convolution
+	nPreviousPartitionIndex_ = nPartitions_ - 1;	// lags nPartitionIndex_ by 1
+	bStartWriting_ = false;
 }
 
 
@@ -94,17 +96,17 @@ void Convolution<T>::Flush()
 template <typename T>
 DWORD
 Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-										  const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-										  const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
-										  DWORD dwBlocksToProcess,					// A block contains a sample for each channel
-										  const T fAttenuation_db)					// Returns bytes processed
+										 const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+										 const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+										 DWORD dwBlocksToProcess,					// A block contains a sample for each channel
+										 const T fAttenuation_db)					// Returns bytes processed
 {
 #if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "Convolution<T>::doPartitionedConvolution" << std::endl;)
+	DEBUGGING(3, cdebug << "Convolution<T>::doPartitionedConvolution" << std::endl;);
 #endif
 #ifndef FFTW
-		// FFTW takes arbitrararily-sized args
-		assert(isPowerOf2(Mixer.nPartitionLength()));
+	// FFTW takes arbitrararily-sized args
+	assert(isPowerOf2(Mixer.nPartitionLength()));
 #endif
 
 	DWORD cbInputBytesProcessed = 0;
@@ -121,10 +123,15 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 
 		if(bStartWriting_)
 		{
-#pragma loop count (8)
 			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
 			{
-				output_sample_convertor->PutSample(pbOutputDataPointer, OutputBufferAccumulator_[nChannel][nInputBufferIndex_],
+				int nDelayedIndex = nInputBufferIndex_ - Mixer.nOutputSamplesDelay()[nChannel];
+				if(nDelayedIndex < 0)
+				{
+					nDelayedIndex += Mixer.nPartitionLength();
+				}
+				output_sample_convertor->PutSample(pbOutputDataPointer,
+					OutputBufferAccumulator_[nChannel][nDelayedIndex],
 					cbOutputBytesGenerated);
 			}
 		}
@@ -134,17 +141,37 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 #pragma loop count (8)
 		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
 		{
-			// Get the next input sample and convert it to a float, and scale it
-			input_sample_convertor->GetSample(InputBuffer_[nChannel][nInputBufferIndex_],
+			// Get the next input sample and convert it to a float, and scale it and delay it circularly
+			DWORD nDelayedIndex = nInputBufferIndex_ + Mixer.nInputSamplesDelay()[nChannel];
+			if(nDelayedIndex >= Mixer.nPartitionLength())
+			{
+				nDelayedIndex -= Mixer.nPartitionLength();
+			}
+			input_sample_convertor->GetSample(InputBuffer_[nChannel][nDelayedIndex],
 				pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
 		} // nChannel
 
 		// Got a frame
-		if (nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
-		{	
-			// Apply the filter paths
 
-			Zero(OutputBufferAccumulator_);
+		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength() - 1 ||
+			nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
+		{		
+			++nInputBufferIndex_;
+			if(nInputBufferIndex_ == Mixer.nPartitionLength())
+			{
+				nInputBufferIndex_ = 0;
+			};
+
+			// Apply the filters
+
+			// Initialize the OutputBufferAccumulator_
+#pragma loop count(8)
+#pragma ivdep
+			for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nOutputChannels(); ++nChannel)
+			{
+				// void Zero(const size_type start, const size_type len)
+				OutputBufferAccumulator_[nChannel].Zero(nInputBufferIndex_, Mixer.nHalfPartitionLength());
+			}
 
 #pragma loop count (8)
 			for (SampleBuffer::size_type nPath = 0; nPath < Mixer.nPaths(); ++nPath)
@@ -157,13 +184,13 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 
 				// get DFT of InputBufferAccumulator_
 #ifdef FFTW
-				fftwf_execute_dft_r2c(Mixer.Paths()[0].filter.plan(), c_ptr(InputBufferAccumulator_),
-					reinterpret_cast<fftwf_complex*>(c_ptr(InputBufferAccumulator_)));
+				fftwf_execute_dft_r2c(Mixer.Paths()[nPath].filter.plan(), InputBufferAccumulator_.c_ptr(),
+					reinterpret_cast<fftwf_complex*>(InputBufferAccumulator_.c_ptr()));
 #elif defined(SIMPLE_OOURA)
-				rdft(Mixer.nPartitionLength(), OouraRForward, c_ptr(InputBufferAccumulator_);
+				rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr();
 #elif defined(OOURA)
 				// TODO: rationalize the ip, w references
-				rdft(Mixer.nPartitionLength(), OouraRForward, c_ptr(InputBufferAccumulator_), 
+				rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr(), 
 					&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
 #else
 #error "No FFT package defined"
@@ -175,17 +202,17 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 					// Complex vector multiplication of InputBufferAccumulator_ and Mixer.Paths()[nPath].filter,
 					// added to ComputationCircularBuffer_
 #ifdef FFTW
-					complex_mul_add(reinterpret_cast<fftwf_complex*>(c_ptr(InputBufferAccumulator_)),
+					complex_mul_add(reinterpret_cast<fftwf_complex*>(InputBufferAccumulator_.c_ptr()),
 						reinterpret_cast<fftwf_complex*>(c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex)),
 						reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_)),
 						Mixer.nPartitionLength());
 #elif defined(__ICC) || defined(__INTEL_COMPILER)
 					// Vectorizable
-					cmuladd(c_ptr(InputBufferAccumulator_), c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
+					cmuladd(InputBufferAccumulator_.c_ptr(), c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
 						c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_), Mixer.nPartitionLength());
 #else
 					// Non-vectorizable
-					cmultadd(InputBufferAccumulator_, c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
+					cmultadd(InputBufferAccumulator_.c_ptr(), c_ptr(Mixer.Paths()[nPath].filter.coeffs(), nPartitionIndex),
 						c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_), Mixer.nPartitionLength());
 #endif
 					nPartitionIndex_ = (nPartitionIndex_ + 1) % nPartitions_;	// circular
@@ -193,7 +220,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 
 				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
 #ifdef FFTW
-				fftwf_execute_dft_c2r(Mixer.Paths()[0].filter.reverse_plan(),
+				fftwf_execute_dft_c2r(Mixer.Paths()[nPath].filter.reverse_plan(),
 					reinterpret_cast<fftwf_complex*>(c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_)),
 					c_ptr(ComputationCircularBuffer_, nPath, nPartitionIndex_));
 #elif defined(SIMPLE_OOURA)
@@ -207,29 +234,22 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 				// Mix the outputs
 				mix_output(Mixer.Paths()[nPath], OutputBufferAccumulator_, 
 					ComputationCircularBuffer_[nPath][nPartitionIndex_],
-					Mixer.nHalfPartitionLength(), Mixer.nPartitionLength());
+					nInputBufferIndex_);
 
 			} // nPath
 
-			// Save the previous half partition; the first half will be read in over the next cycle
-			// TODO: figure out how to use the circular input buffer method used in doConvolution:
-			// it does not work straightforwardly, as the ComputationCircularBuffer can't accumulate sums
-			// containing both Next+Prev and Prev+Next input sample blocks
-#pragma loop count(8)
-#pragma ivdep
-			for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels(); ++nChannel)
-			{
-				InputBuffer_[nChannel].shiftleft(Mixer.nHalfPartitionLength());
-			}
-			nInputBufferIndex_ = Mixer.nHalfPartitionLength();
-
 			// Save the partition to be used for output
 			nPreviousPartitionIndex_ = nPartitionIndex_;
-			nPartitionIndex_ = (nPartitionIndex_ + 1) % nPartitions_;
+			++nPartitionIndex_;
+			if(nPartitionIndex_ == nPartitions_)
+			{
+				nPartitionIndex_ = 0;
+			}
+
 			bStartWriting_ = true;
 		}
 		else
-			++ nInputBufferIndex_ ;		// get next frame
+			++nInputBufferIndex_ ;		// get next frame
 
 	} // while
 
@@ -245,143 +265,164 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 template <typename T>
 DWORD
 Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-							   const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-							   const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
-							   DWORD dwBlocksToProcess,						// A block contains a sample for each channel
-							   const T fAttenuation_db)						// Returns bytes processed
+							  const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+							  const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+							  DWORD dwBlocksToProcess,						// A block contains a sample for each channel
+							  const T fAttenuation_db)						// Returns bytes processed
 {
 #if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "Convolution<T>::doConvolution" << std::endl;)
+	DEBUGGING(3, cdebug << "Convolution<T>::doConvolution" << std::endl;);
 #endif
 
-		// This convolution algorithm assumes that the filter is stored in the first, and only, partition
-		if(nPartitions_ != 1)
-		{
-			throw convolutionException("Internal error: attempted to execute plain overlap-save without using 1 partition");
-		}
+	// This convolution algorithm assumes that the filter is stored in the first, and only, partition
+	if(nPartitions_ != 1)
+	{
+		throw convolutionException("Internal error: attempted to execute plain overlap-save without using 1 partition");
+	}
 #ifndef FFTW
-		// FFTW does not need powers of 2
-		assert(isPowerOf2(Mixer.nPartitionLength()));
+	// FFTW does not need powers of 2
+	assert(isPowerOf2(Mixer.nPartitionLength()));
 #endif
-		assert(Mixer.nPartitionLength() == Mixer.nFilterLength());
+	assert(Mixer.nPartitionLength() == Mixer.nFilterLength());
 
-		DWORD cbInputBytesProcessed = 0;
-		DWORD cbOutputBytesGenerated = 0;
+	DWORD cbInputBytesProcessed = 0;
+	DWORD cbOutputBytesGenerated = 0;
 
-		BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
-		BYTE* pbOutputDataPointer = pbOutputData;
+	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
+	BYTE* pbOutputDataPointer = pbOutputData;
 
-		const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
+	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
-		while (dwBlocksToProcess--)
+	while (dwBlocksToProcess--)
+	{
+		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
+
+		if(bStartWriting_)
 		{
-			// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
-
-			if(bStartWriting_)
-			{
 #pragma loop count(8)
-				for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
+			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
+			{
+				int nDelayedIndex = nInputBufferIndex_ - Mixer.nOutputSamplesDelay()[nChannel];
+				if(nDelayedIndex < 0)
 				{
-					output_sample_convertor->PutSample(pbOutputDataPointer,	OutputBufferAccumulator_[nChannel][nInputBufferIndex_],
-						cbOutputBytesGenerated);
+					nDelayedIndex += Mixer.nPartitionLength();
 				}
+				output_sample_convertor->PutSample(pbOutputDataPointer,
+					OutputBufferAccumulator_[nChannel][nDelayedIndex],
+					cbOutputBytesGenerated);
 			}
+		}
 
-			// Get the next frame from pbInputDataPointer to InputBuffer_
+		// Get the next frame from pbInputDataPointer to InputBuffer_
 #pragma loop count(8)
-			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
+		{
+			// Get the next input sample and convert it to a float, and scale it and delay it circularly
+			DWORD nDelayedIndex = nInputBufferIndex_ + Mixer.nInputSamplesDelay()[nChannel];
+			if(nDelayedIndex >= Mixer.nPartitionLength())
 			{
-				// Get the next input sample and convert it to a float, and scale it
-				input_sample_convertor->GetSample(InputBuffer_[nChannel][nInputBufferIndex_],
-					pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
+				nDelayedIndex -= Mixer.nPartitionLength();
+			}
+			input_sample_convertor->GetSample(InputBuffer_[nChannel][nDelayedIndex],
+				pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
+		} // nChannel
 
-			} // nChannel
+		// Got a frame
 
-			// Got a frame
+		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength() - 1 ||
+			nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
+		{
 
-			if (nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
+			++nInputBufferIndex_;
+			if(nInputBufferIndex_ == Mixer.nPartitionLength())
 			{
-				// Apply the filters
+				nInputBufferIndex_ = 0;
+			};
 
-				// Initialize the OutputBufferAccumulator_
-				Zero(OutputBufferAccumulator_);
+			// Apply the filters
 
-#pragma loop count(8)
-				for (SampleBuffer::size_type nPath = 0; nPath < Mixer.nPaths(); ++nPath)
-				{
-					// Mix the input samples for this filter path into InputBufferAccumulator_
-					mix_input(Mixer.Paths()[nPath], InputBuffer_, InputBufferAccumulator_);
-
-					// get DFT of InputBufferAccumulator_
-#ifdef FFTW
-					fftwf_execute_dft_r2c(Mixer.Paths()[nPath].filter.plan(), InputBufferAccumulator_.c_ptr(),
-						reinterpret_cast<fftwf_complex*>(InputBufferAccumulator_.c_ptr()));
-#elif defined(SIMPLE_OOURA)
-					rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr());
-#elif defined(OOURA)
-					// TODO: rationalize the ip, w references
-					rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr(), 
-						&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
-#else
-#error "No FFT package defined"
-#endif
-
-#ifdef FFTW
-					complex_mul(reinterpret_cast<fftwf_complex*>(c_ptr(InputBufferAccumulator_)),
-						reinterpret_cast<fftwf_complex*>(c_ptr(Mixer.Paths()[nPath].filter.coeffs())),
-						reinterpret_cast<fftwf_complex*>(c_ptr(OutputBuffer_)),
-						Mixer.nPartitionLength());
-#elif defined(__ICC) || defined(__INTEL_COMPILER)
-					// vectorized
-					cmul(InputBufferAccumulator_.c_ptr(), 
-						&Mixer.Paths()[nPath].filter.coeffs.c_ptr(),					// use the first partition and channel only
-						&FFTOutputBuffer_[0], Mixer.nPartitionLength());	
-#else
-					// Non-vectorizable
-					cmult(InputBufferAccumulator_,
-						Mixer.Paths()[nPath].filter.coeffs.c_ptr(),					// use the first partition and channel only
-						OutputBuffer_, Mixer.nPartitionLength());	
-#endif
-					//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
-#ifdef FFTW
-					fftwf_execute_dft_c2r(Mixer.Paths()[nPath].filter.reverse_plan(),
-						reinterpret_cast<fftwf_complex*>(c_ptr(OutputBuffer_)),
-						c_ptr(OutputBuffer_));
-#elif defined(SIMPLE_OOURA)
-					rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(OutputBuffer_));
-#elif defined(OOURA)
-					rdft(Mixer.nPartitionLength(), OouraRBackward, c_ptr(OutputBuffer_),
-						&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
-#else
-#error "No FFT package defined"
-#endif
-					// Mix the outputs (only use the last half, as the rest is junk)
-					mix_output(Mixer.Paths()[nPath], OutputBufferAccumulator_, OutputBuffer_,
-						Mixer.nHalfPartitionLength(), Mixer.nPartitionLength());
-				} // nPath
-
-				// Save the previous half partition; the first half will be read in over the next cycle
-				// TODO: avoid this copy by rotating the filter when it is read in?
+			// Initialize the OutputBufferAccumulator_
 #pragma loop count(8)
 #pragma ivdep
-				for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nInputChannels(); ++nChannel)
-				{
-					InputBuffer_[nChannel].shiftleft(Mixer.nHalfPartitionLength());
-				}
-
-				nInputBufferIndex_ = Mixer.nHalfPartitionLength();
-				bStartWriting_ = true;
+			for(SampleBuffer::size_type nChannel = 0; nChannel < Mixer.nOutputChannels(); ++nChannel)
+			{
+				// void Zero(const size_type start, const size_type len)
+				OutputBufferAccumulator_[nChannel].Zero(nInputBufferIndex_, Mixer.nHalfPartitionLength());
 			}
-			else
-				++nInputBufferIndex_;
 
-		} // while
+#pragma loop count(8)
+			for (SampleBuffer::size_type nPath = 0; nPath < Mixer.nPaths(); ++nPath)
+			{
+				// Mix the input samples for this filter path into InputBufferAccumulator_
+				mix_input(Mixer.Paths()[nPath], InputBuffer_, InputBufferAccumulator_);
 
-#if defined(DEBUG) | defined(_DEBUG)
-		cdebug << "cbInputBytesProcessed: " << cbInputBytesProcessed  << ", cbOutputBytesGenerated: " << cbOutputBytesGenerated << std::endl;
+				// get DFT of InputBufferAccumulator_
+#ifdef FFTW
+				fftwf_execute_dft_r2c(Mixer.Paths()[nPath].filter.plan(), InputBufferAccumulator_.c_ptr(),
+					reinterpret_cast<fftwf_complex*>(InputBufferAccumulator_.c_ptr()));
+#elif defined(SIMPLE_OOURA)
+				rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr());
+#elif defined(OOURA)
+				// TODO: rationalize the ip, w references
+				rdft(Mixer.nPartitionLength(), OouraRForward, InputBufferAccumulator_.c_ptr(), 
+					&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
+#else
+#error "No FFT package defined"
 #endif
 
-		return cbOutputBytesGenerated;
+#ifdef FFTW
+				complex_mul(reinterpret_cast<fftwf_complex*>(InputBufferAccumulator_.c_ptr()),
+					reinterpret_cast<fftwf_complex*>(c_ptr(Mixer.Paths()[nPath].filter.coeffs())),
+					reinterpret_cast<fftwf_complex*>(OutputBuffer_.c_ptr()),
+					Mixer.nPartitionLength());
+#elif defined(__ICC) || defined(__INTEL_COMPILER)
+				// vectorized
+				cmul(InputBufferAccumulator_.c_ptr(), 
+					c_ptr(Mixer.Paths()[nPath].filter.coeffs()),					// use the first partition and channel only
+					OutputBuffer_.c_ptr(), Mixer.nPartitionLength());	
+#else
+				// Non-vectorizable
+				cmult(InputBufferAccumulator_,
+					Mixer.Paths()[nPath].filter.coeffs.c_ptr(),					// use the first partition and channel only
+					OutputBuffer_, Mixer.nPartitionLength());	
+#endif
+				//get back the yi: take the Inverse DFT. Not necessary to scale here, as did so when reading filter
+#ifdef FFTW
+				fftwf_execute_dft_c2r(Mixer.Paths()[nPath].filter.reverse_plan(),
+					reinterpret_cast<fftwf_complex*>(OutputBuffer_.c_ptr()),
+					OutputBuffer_.c_ptr());
+#elif defined(SIMPLE_OOURA)
+				rdft(Mixer.nPartitionLength(), OouraRBackward, OutputBuffer_.c_ptr());
+#elif defined(OOURA)
+				rdft(Mixer.nPartitionLength(), OouraRBackward, OutputBuffer_.c_ptr()),
+					&Mixer.Paths()[0].filter.ip[0], &Mixer.Paths()[0].filter.w[0]);
+#else
+#error "No FFT package defined"
+#endif
+				// Mix the outputs (only use the last half, as the rest is junk)
+				mix_output(Mixer.Paths()[nPath], OutputBufferAccumulator_, OutputBuffer_, nInputBufferIndex_);
+			} // nPath
+
+			// Save the partition to be used for output
+			nPreviousPartitionIndex_ = nPartitionIndex_;
+			++nPartitionIndex_;
+			if(nPartitionIndex_ == nPartitions_)
+			{
+				nPartitionIndex_ = 0;
+			}
+
+			bStartWriting_ = true;
+		}
+		else
+			++nInputBufferIndex_;
+
+	} // while
+
+#if defined(DEBUG) | defined(_DEBUG)
+	cdebug << "cbInputBytesProcessed: " << cbInputBytesProcessed  << ", cbOutputBytesGenerated: " << cbOutputBytesGenerated << std::endl;
+#endif
+
+	return cbOutputBytesGenerated;
 }
 
 template <typename T>
@@ -392,55 +433,75 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
 	const DWORD nPartitionLength = Mixer.nPartitionLength();
+	const DWORD nHalfPartitionLength = Mixer.nHalfPartitionLength();
 
 	assert(nPartitionLength % 2 ==0);
 
-	if (nChannels == 1 && thisPath.inChannel[0].fScale == 1.0f)
+	assert(nInputBufferIndex_ == nHalfPartitionLength ||
+		nInputBufferIndex_ == 0);
+
+	// NB InputBuffer_ is circular
+
+	if (nChannels == 1 && thisPath.inChannel[0].fScale == 1.0f && nInputBufferIndex_ == 0)
 	{
 		InputBufferAccumulator = InputBuffer_[thisPath.inChannel[0].nChannel];
 	}
 	else
-	{
-
+	{	
 		InputBufferAccumulator = 0;
 #pragma loop count(8)
 #pragma ivdep
 		for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
 		{
-			__declspec(align( 16 )) const float fScale = thisPath.inChannel[nChannel].fScale;
+			const float fScale = thisPath.inChannel[nChannel].fScale;
 			const WORD thisChannel = thisPath.inChannel[nChannel].nChannel;
-			__declspec(align( 16 )) const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
-			//static T preftech1 = InputSamples[0];
-			//static T prefetch2 = InputSamples[nPartitionLength/2];
-			//static T preftech3 = InputSamples[nPartitionLength];
+			const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
 
 			// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
 			// because FFTW destroys its inputs.
+
+			// untangle [Xn, Xn-1] and [Xn-1,Xn] -> [Yn-1,Yn]
+			// TODO: Do this by pointers to make it faster
 			if(fScale == 1.0f)
 			{
-				InputBufferAccumulator += InputSamples;
+				ChannelBuffer::size_type j = nHalfPartitionLength;
+				for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				{
+					InputBufferAccumulator[j++] += InputSamples[i];
+				}
+				j = 0;
+				for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				{
+					InputBufferAccumulator[j++] += InputSamples[i];
+				}
 			}
 			else
 			{
 				// TODO:: performance killer
 
-				//for(ChannelBuffer::size_type i=0; i<nPartitionLength; ++i)
-				//{
-				//	InputBufferAccumulator[i] += InputSamples[i] * fScale;
-				//}
-
-				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
-#pragma loop count(65536)
-#pragma ivdep
-#pragma vector aligned
-#pragma prefetch pInputSamples
-				for(T* pInputBufferAccumulator = InputBufferAccumulator.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
-					pInputBufferAccumulator != pInputBufferAccumulatorEnd;)
+				ChannelBuffer::size_type j = nHalfPartitionLength;
+				for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
 				{
-					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
-					//PreFetchCacheLine(PF_NON_TEMPORAL_LEVEL_ALL, pInputSamples+16);
-					//PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, pInputBufferAccumulator+16);
+					InputBufferAccumulator[j++] += InputSamples[i] * fScale;
 				}
+				j = 0;
+				for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				{
+					InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				}
+
+//				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//#pragma prefetch pInputSamples
+//				for(T* pInputBufferAccumulator = InputBufferAccumulator.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
+//					pInputBufferAccumulator != pInputBufferAccumulatorEnd;)
+//				{
+//					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
+//					//PreFetchCacheLine(PF_NON_TEMPORAL_LEVEL_ALL, pInputSamples+16);
+//					//PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, pInputBufferAccumulator+16);
+//				}
 
 
 				//for(ChannelBuffer::iterator iterInputSamples = const_cast<ChannelBuffer::iterator>(InputSamples.begin()),
@@ -456,10 +517,15 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 
 template <typename T>
 void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-									   const ChannelBuffer& restrict Output, const DWORD from, const DWORD to)
+								const ChannelBuffer& restrict Output, const DWORD to)
 {
 	// Don't zero the Accumulator as it can accumulate from more than one output
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.outChannel.size();
+	const DWORD nPartitionLength = Mixer.nPartitionLength();
+	const DWORD nHalfPartitionLength = Mixer.nHalfPartitionLength();
+
+	assert(to == 0 || to == nHalfPartitionLength);
+
 #pragma loop count(6)
 #pragma ivdep
 	for(SampleBuffer::size_type nChannel=0; nChannel<nChannels; ++nChannel)
@@ -469,20 +535,23 @@ void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPa
 		ChannelBuffer& thisAccumulator = Accumulator[thisChannel];
 		if(fScale == 1.0f)
 		{
+			// the output is in the second half of Output; Accumulate to the specified part of thisAccumulator
+			DWORD j = to;
 #pragma loop count(65536)
 #pragma ivdep
-			for(ChannelBuffer::size_type i=from; i < to; ++i)
+			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
 			{
-				thisAccumulator[i] += Output[i];
+				thisAccumulator[j++] += Output[i];
 			} // i
 		}
 		else
 		{
+			DWORD j = to;
 #pragma loop count(65536)
 #pragma ivdep
-			for(ChannelBuffer::size_type i=from; i < to; ++i)
+			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
 			{
-				thisAccumulator[i] += Output[i] * fScale;
+				thisAccumulator[j++] += Output[i] * fScale;
 			} // i
 		}
 	} // nChannel
@@ -498,13 +567,13 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
 
-		//result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		//result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
+		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		result[index][0] = T1 - T2;
-		result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		//__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		//__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		//result[index][0] = T1 - T2;
+		//result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
 	}
 }
@@ -518,13 +587,13 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, c
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
 
-		//result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		//result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
+		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		result[index][0] += T1 - T2;
-		result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		//__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		//__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		//result[index][0] += T1 - T2;
+		//result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
 	}
 }
@@ -650,12 +719,16 @@ T Convolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffer
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
 template <typename T>
-HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
+HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool overlapsave)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;)
 #endif
-	HRESULT hr = S_OK;
+		HRESULT hr = S_OK;
+
+	assert(!overlapsave || nPartitions_ == 1);
+
+	Flush();	// Start from a known point
 
 	const WORD nSamples = NSAMPLES; // length of the test sample, in filter lengths
 	// So if you are using a 44.1kHz sample rate and it takes 1s to calculate optimum attenuation,
@@ -710,7 +783,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
 	cdebug << std::endl;);
 #endif
 	// nPartitions == 0 => use overlap-save version
-	DWORD nBytesGenerated = nPartitions_ == 0 ?
+	DWORD nBytesGenerated = overlapsave && nPartitions_ == 1 ?
 		doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor.get_ptr(), convertor.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
@@ -759,6 +832,8 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation)
 #if defined(DEBUG) | defined(_DEBUG)
 	cdebug << "fAttenuation:" << fAttenuation << " maxSample: " << maxSample << std::endl;
 #endif
+
+	Flush(); // Reset, so that residual noise cleared
 
 	return hr;
 }
@@ -909,7 +984,7 @@ nPartitions_(nPartitions)
 
 template <typename T>
 HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut, 
-												  bool select /*=false*/)
+												 bool select /*=false*/)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "ConvolutionList::CheckConvolutionList " << select << std::endl;);

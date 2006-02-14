@@ -131,11 +131,11 @@ public:
 		const Filter filter;
 		const std::vector<ScaledChannel> outChannel;
 
-		ChannelPath(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions,
+		ChannelPath(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD nPartitions,
 			const std::vector<ScaledChannel>& inChannel, const std::vector<ScaledChannel>& outChannel,
-			const WORD& nFilterChannel, const DWORD& nSampleRate, const unsigned int& nPlanningRigour) :
-		filter(szChannelPathsFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
-			inChannel(inChannel), outChannel(outChannel)
+			const WORD nFilterChannel, const DWORD nSampleRate, const unsigned int nPlanningRigour) :
+				filter(szChannelPathsFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
+					inChannel(inChannel), outChannel(outChannel)
 		{
 #if defined(DEBUG) | defined(_DEBUG)
 			DEBUGGING(3, cdebug << "ChannelPath::ChannelPath" << std::endl;);
@@ -145,6 +145,9 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump() const;
 #endif
+
+private:
+		ChannelPath();					// No implementation
 	};
 
 	typedef boost::ptr_vector<ChannelPath>::size_type size_type;
@@ -168,6 +171,20 @@ public:
 		return nOutputChannels_;
 	}
 
+	const std::vector<DWORD>& nInputSamplesDelay() const
+	{
+		assert(nInputSamplesDelay_.size() > 0);
+		assert(nInputChannels() == nInputSamplesDelay_.size());
+		return nInputSamplesDelay_;
+	}
+
+	const std::vector<DWORD>& nOutputSamplesDelay() const
+	{
+		assert(nOutputSamplesDelay_.size() > 0);
+		assert(nOutputChannels() == nOutputSamplesDelay_.size());
+		return nOutputSamplesDelay_;
+	}
+
 	DWORD nSamplesPerSec() const	// 44100, 48000, etc
 	{
 		return nSamplesPerSec_;
@@ -178,7 +195,7 @@ public:
 		return dwChannelMask_;
 	}
 
-	unsigned int nPaths() const				// number of Paths
+	unsigned int nPaths() const			// number of Paths
 	{
 		assert(nPaths_ == Paths_.size());
 		return nPaths_;
@@ -233,14 +250,16 @@ private:
 	// multiple deletions, so use pointers
 	boost::ptr_vector<ChannelPath> Paths_;
 
-	DWORD	nInputChannels_;		// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
-	DWORD	nOutputChannels_;		// number of output channels
-	DWORD	nSamplesPerSec_;		// 44100, 48000, etc
-	DWORD	dwChannelMask_;			// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
-	unsigned int	nPaths_;				// number of Paths
-	DWORD	nPartitionLength_;		// in frames (a frame/block contains the samples for each channel)
-	DWORD	nHalfPartitionLength_;	// in frames
-	DWORD	nFilterLength_;			// nFilterLength = nPartitions * nPartitionLength
+	DWORD	nInputChannels_;				// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
+	DWORD	nOutputChannels_;				// number of output channels
+	std::vector<DWORD> nInputSamplesDelay_;	// the number of samples by which to delay each output channel
+	std::vector<DWORD> nOutputSamplesDelay_;// the number of samples by which to delay each output channel
+	DWORD	nSamplesPerSec_;				// 44100, 48000, etc
+	DWORD	dwChannelMask_;					// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
+	unsigned int nPaths_;					// number of Paths
+	DWORD	nPartitionLength_;				// in frames (a frame/block contains the samples for each channel)
+	DWORD	nHalfPartitionLength_;			// in frames
+	DWORD	nFilterLength_;					// nFilterLength = nPartitions * nPartitionLength
 #ifdef FFTW
 	DWORD		nFFTWPartitionLength_;	// 2*(nPartitionLength / 2 + 1)
 #endif

@@ -361,7 +361,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	pmt->bTemporalCompression = false;
 	pmt->formattype = FORMAT_WaveFormatEx;
 	assert( m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample % 8 == 0);
-	pmt->lSampleSize = nChannels * m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8; // Block align
+	pmt->lSampleSize = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8; // Block align
 
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
 	if(NULL == pWave)
@@ -374,7 +374,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	pWave->nChannels = nChannels;
 	pWave->nSamplesPerSec = m_ConvolutionList->Conv(dwPathIndex).Mixer.nSamplesPerSec();
 	pWave->wBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample;
-	pWave->nBlockAlign = pmt->lSampleSize;
+	pWave->nBlockAlign = nChannels * pmt->lSampleSize;
 	pWave->nAvgBytesPerSec = pWave->nSamplesPerSec * pWave->nBlockAlign;
 
 	if(pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
@@ -758,22 +758,8 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	// Default to the input sample size, in bytes.
 	*pcbSize = m_mtInput.lSampleSize;
 
-	// TODO: There may be no SelectedConvolution
-	//if(m_ConvolutionList.get_ptr() != NULL && m_InputSampleConvertor != NULL)
-	//{
-	//	// For optimization, require data to be presented in half-partition lengths
-	//	// TODO: This seems to have no effect.  May need to allocate a new IMediaBuffer, copy
-	//	// the bits there, and return that buffer in ProcessOutput.
-	//	*pcbSize = m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor);
-
-	//	// This plug-in lags its output by half a partition length
-	//	*pcbMaxLookahead = m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor);
-	//}
-	//else
-	//{
-		*pcbMaxLookahead = 0;
-	//	return E_FAIL; // May be too strict
-	//}
+	//No look ahead, as the Convolution class buffers the input for itself
+	*pcbMaxLookahead = 0;
 
 	return S_OK;
 }
@@ -853,8 +839,15 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 			return E_FAIL;
 		}
 
-		//// Latency is half a partition length
-		*prtMaxLatency = ::MulDiv( m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor), UNITS, pWave->nAvgBytesPerSec);
+		if(m_ConvolutionList->ConvolutionSelected())
+		{
+			//// Latency is a partition length
+			*prtMaxLatency = ::MulDiv( m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor), UNITS, pWave->nAvgBytesPerSec);
+		}
+		else
+		{
+			*prtMaxLatency=0;
+		}
 
 		return S_OK;
 	}
@@ -914,10 +907,7 @@ STDMETHODIMP CConvolver::Flush( void )
 	{
 		// Flush may be called after a new filter is selected via properties, but without
 		// calling SetInputType / SetOutputType
-		if(m_ConvolutionList->ConvolutionSelected())
-		{
-			m_ConvolutionList->SelectedConvolution().Flush();
-		}
+		m_ConvolutionList->Flush();
 	}
 
 	return S_OK;
@@ -1479,23 +1469,31 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 	DEBUGGING(3, cdebug << "put_filterfilename" << std::endl;);
 #endif
 
-	if (m_ConvolutionList.get_ptr() == NULL || (_tcscmp(newVal, m_szFilterFileName) != 0)) // if new filename set
+	if (_tcscmp(newVal, m_szFilterFileName) != 0)  // if new filename set
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-		// May throw
-		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  
-			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-		// Get the pointer to the input and output format structures.
-		const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-		const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-
-		if(pWaveIn != NULL && pWaveOut != NULL && FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
+		if (m_ConvolutionList.get_ptr() != NULL )
 		{
-			std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-				"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-			throw convolutionException(diagnostic);
+			const bool selected = m_ConvolutionList->ConvolutionSelected();
+
+			// May throw
+			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+			if(selected)
+			{
+				// Get the pointer to the input and output format structures.
+				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
+				{
+					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+					throw convolutionException(diagnostic);
+				}
+			}
 		}
 	}
 
@@ -1530,9 +1528,29 @@ STDMETHODIMP CConvolver::put_partitions(WORD newVal)
 	{
 		m_nPartitions = newVal;
 
-		// May throw
-		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
-			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+		if(m_ConvolutionList.get_ptr() != NULL)
+		{
+
+			const bool selected = m_ConvolutionList->ConvolutionSelected();
+
+			// May throw
+			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+			if(selected)
+			{
+				// Get the pointer to the input and output format structures.
+				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
+				{
+					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+					throw convolutionException(diagnostic);
+				}
+			}
+		}
 	}
 
 	return S_OK;
@@ -1567,9 +1585,29 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 	{
 		m_nPlanningRigour = newVal;
 
-		// May throw
-		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
-			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+		if(m_ConvolutionList.get_ptr() != NULL)
+		{
+
+			const bool selected = m_ConvolutionList->ConvolutionSelected();
+
+			// May throw
+			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+			if(selected)
+			{
+				// Get the pointer to the input and output format structures.
+				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
+				{
+					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+					throw convolutionException(diagnostic);
+				}
+			}
+		}
 	}
 
 	return S_OK;

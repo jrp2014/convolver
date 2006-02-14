@@ -247,7 +247,7 @@ struct FastArray : public AlignedArray<T>
 	//}
 
 	// Helper for =
-	void swap(FastArray& x)
+	void swap(reference x)
 	{
 		std::swap(first_, x.first_);
 		std::swap(size_, x.size_);
@@ -261,7 +261,7 @@ struct FastArray : public AlignedArray<T>
 	pointer data() { return first_; }
 
 	// assign one value to all elements
-	void assign (const T& x)
+	void assign (const T x)
 	{
 		std::fill_n(begin(), size(), x);
 	}
@@ -272,7 +272,7 @@ struct FastArray : public AlignedArray<T>
 	{
 #ifdef FFTW
 		// Don't demand equality as arrays for FFTW are a bit longer to hold complex transforms
-		assert(size_ >= other.size_);
+		assert(size() == other.size() || size() == 2*(other.size()/2+1));
 #else
 		assert(size_ == other.size_);
 #endif
@@ -295,14 +295,13 @@ struct FastArray : public AlignedArray<T>
 #else
 		assert(size() == rhs.size());
 #endif
-		assert(size() == rhs->size()));
-		std::copy(rhs.begin(),rhs.end(), begin());
+		std::uninitialized_copy(rhs.begin(), rhs.end(), begin());
 		return *this;
 	}
 
 	// Scalar assignment
 
-	FastArray<T>& operator=(const_reference x)
+	FastArray<T>& operator=(const T x)
 	{
 		std::uninitialized_fill_n(first_, size_, x);
 //		if(x == 0)
@@ -322,30 +321,43 @@ struct FastArray : public AlignedArray<T>
 	}
 
 	// Scalar computed assignment.
-	FastArray<T>& operator*= (const_reference x)
+	FastArray<T>& operator*= (const T x)
 	{
 		if(x != static_cast<T>(1))
 		{
-			const size_type ss = size_;
-#pragma loop count(65536)
-#pragma ivdep
-#pragma vector aligned
-			for (size_type i = 0; i < ss; ++i)
-				(*this)[i] *= x;
+//			const size_type ss = size_;
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//			for (size_type i = 0; i < ss; ++i)
+//				(*this)[i] *= x;
+
+			const pointer last = first_ + size_;
+			for(pointer p = first_; p != last;)
+			{
+				*p++ *= x;
+			}
 		}
 		return *this;
 	}
 
-	FastArray<T>& operator+= (const_reference x)
+	FastArray<T>& operator+= (const T x)
 	{
 		if(x != 0)
 		{
-			const size_type ss = size_;
-#pragma loop count(65536)
-#pragma ivdep
-#pragma vector aligned
-			for (size_type i = 0; i < ss; ++i)
-				(*this)[i] += x;
+//			const size_type ss = size_;
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//			for (size_type i = 0; i < ss; ++i)
+//				(*this)[i] += x;
+
+			const pointer last = first_ + size_;
+			for(pointer p = first_; p != last)
+			{
+				*p++ += x;
+			}
+
 		}
 		return *this;
 	}
@@ -359,22 +371,39 @@ struct FastArray : public AlignedArray<T>
 		assert(size() == rhs.size());
 #endif
 		// Optimization
-		const size_type rhs_size = rhs.size();
-#pragma loop count(65536)
-#pragma ivdep
-#pragma vector aligned
-		for (size_type i = 0; i < rhs_size; ++i)
-			(*this)[i] += rhs[i];
+//		const size_type rhs_size = rhs.size();
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//		for (size_type i = 0; i < rhs_size; ++i)
+//			(*this)[i] += rhs[i];
+		const pointer last = first_ + size_;
+		for(pointer p = first_, q = rhs.first_; p != last;)
+		{
+			*p++ += *q++;
+		}
 
 		return *this;
 	}
 
 	// Member functions
 
-	void shiftleft(const size_type n)
+	void ShiftLeft(const size_type dst, const size_type src, const size_type len)
 	{
-		//std::copy(begin() + n, begin() + 2 * n - 1, begin());
-		::MoveMemory(first_, first_ + n, n * sizeof(T));
+		assert(src > 0);
+		assert(src + len <= size());
+		// void CopyMemory(PVOID Destination, const VOID* Source, SIZE_T Length);
+		if(len > 0)
+		{
+			assert(dst + len < src + 1);  // No overlapping
+			::CopyMemory(first_ + dst, first_ + src, len * sizeof(T));
+		}
+	}
+
+	void Zero(const size_type start, const size_type len)
+	{
+		assert(start + len <= size());
+		::ZeroMemory(first_ + start, len * sizeof(T));
 	}
 
 private:
@@ -474,6 +503,7 @@ extern float* restrict c_ptr(const SampleBuffer& x, const ChannelBuffer::size_ty
 extern float* restrict c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row=0, const ChannelBuffer::size_type column=0);
 
 // zero all the elements
+extern void Zero (ChannelBuffer& x);
 extern void Zero (SampleBuffer& x);
 extern void Zero (PartitionedBuffer& x);
 

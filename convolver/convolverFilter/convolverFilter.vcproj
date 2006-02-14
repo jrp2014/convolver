@@ -19,7 +19,7 @@
 			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/fp:strict"
+				AdditionalOptions="/fp:fast"
 				Optimization="0"
 				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"

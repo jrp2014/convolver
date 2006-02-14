@@ -76,11 +76,18 @@ inline float* restrict c_ptr(const PartitionedBuffer& x, const SampleBuffer::siz
 	return x[row][column].c_ptr();
 }
 
+inline void Zero (ChannelBuffer& x)
+{
+	x.Zero(0, x.size()); 
+}
+
 inline void Zero (SampleBuffer& x)
 {
 	for(SampleBuffer::size_type i=0; i < x.size(); ++i)
 	{
-		x[i] = 0;
+		//x[i] = 0;
+		//x[i].Zero(0, x.size());
+		Zero(x[i]);
 	}
 }
 
