@@ -4,9 +4,6 @@
 #include "stdafx.h"
 #include "convolution\config.h"
 
-// TODO: fix
-#define NCHANNELS 8
-
 #ifdef LIBSNDFILE
 #include "libsndfile\sndfile.h"
 #else
@@ -177,7 +174,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 					convp.selectConvolutionIndex(i);
 
 					t.reset();
-					hr = convp.SelectedConvolution().calculateOptimumAttenuation(fAttenuation);
+					hr = convp.SelectedConvolution().calculateOptimumAttenuation(fAttenuation, nPartitions == 0);
 					fElapsedCalc = t.sec();
 					fTotalElapsedCalc += fElapsedCalc;
 
