@@ -98,6 +98,8 @@ DWORD
 Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 										 const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
 										 const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+										 NoiseShape<T>* noiseshaper,				// not const because noise shaper has changeable state
+										 Dither<T>* ditherer,
 										 DWORD dwBlocksToProcess,					// A block contains a sample for each channel
 										 const T fAttenuation_db)					// Returns bytes processed
 {
@@ -132,7 +134,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 				}
 				output_sample_convertor->PutSample(pbOutputDataPointer,
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					cbOutputBytesGenerated);
+					cbOutputBytesGenerated, noiseshaper, ditherer);
 			}
 		}
 
@@ -156,8 +158,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength() - 1 ||
 			nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
 		{		
-			++nInputBufferIndex_;
-			if(nInputBufferIndex_ == Mixer.nPartitionLength())
+			if(++nInputBufferIndex_ == Mixer.nPartitionLength())
 			{
 				nInputBufferIndex_ = 0;
 			};
@@ -240,8 +241,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 
 			// Save the partition to be used for output
 			nPreviousPartitionIndex_ = nPartitionIndex_;
-			++nPartitionIndex_;
-			if(nPartitionIndex_ == nPartitions_)
+			if(++nPartitionIndex_ == nPartitions_)
 			{
 				nPartitionIndex_ = 0;
 			}
@@ -266,7 +266,9 @@ template <typename T>
 DWORD
 Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 							  const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-							  const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+							  const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+							  NoiseShape<T>* noiseshaper,					// not const because noise shaper has changeable state
+							  Dither<T>* ditherer,
 							  DWORD dwBlocksToProcess,						// A block contains a sample for each channel
 							  const T fAttenuation_db)						// Returns bytes processed
 {
@@ -309,7 +311,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				}
 				output_sample_convertor->PutSample(pbOutputDataPointer,
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					cbOutputBytesGenerated);
+					cbOutputBytesGenerated, noiseshaper, ditherer);
 			}
 		}
 
@@ -332,9 +334,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 		if (nInputBufferIndex_ == Mixer.nHalfPartitionLength() - 1 ||
 			nInputBufferIndex_ == Mixer.nPartitionLength() - 1) // Got half a partition-length's worth of frames
 		{
-
-			++nInputBufferIndex_;
-			if(nInputBufferIndex_ == Mixer.nPartitionLength())
+			if(++nInputBufferIndex_ == Mixer.nPartitionLength())
 			{
 				nInputBufferIndex_ = 0;
 			};
@@ -405,8 +405,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 
 			// Save the partition to be used for output
 			nPreviousPartitionIndex_ = nPartitionIndex_;
-			++nPartitionIndex_;
-			if(nPartitionIndex_ == nPartitions_)
+			if(++nPartitionIndex_ == nPartitions_)
 			{
 				nPartitionIndex_ = 0;
 			}
@@ -461,34 +460,63 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 			// because FFTW destroys its inputs.
 
 			// untangle [Xn, Xn-1] and [Xn-1,Xn] -> [Yn-1,Yn]
+
+			ChannelBuffer::const_iterator pInputSamples = InputSamples.begin();
+			ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
+			ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator.begin() + nHalfPartitionLength;
+
 			// TODO: Do this by pointers to make it faster
 			if(fScale == 1.0f)
 			{
-				ChannelBuffer::size_type j = nHalfPartitionLength;
-				for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				while(pInputSamples != pInputSamplesEnd)
 				{
-					InputBufferAccumulator[j++] += InputSamples[i];
+					*pInputBufferAccumulator++ += *pInputSamples++;
 				}
-				j = 0;
-				for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+				pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				pInputBufferAccumulator = InputBufferAccumulator.begin();
+				while(pInputSamples != pInputSamplesEnd)
 				{
-					InputBufferAccumulator[j++] += InputSamples[i];
+					*pInputBufferAccumulator++ += *pInputSamples++;
 				}
+
+				//ChannelBuffer::size_type j = nHalfPartitionLength;
+				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//}
+				//j = 0;
+				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//}
 			}
 			else
 			{
 				// TODO:: performance killer
 
-				ChannelBuffer::size_type j = nHalfPartitionLength;
-				for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				while(pInputSamples != pInputSamplesEnd)
 				{
-					InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
 				}
-				j = 0;
-				for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+				pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				pInputBufferAccumulator = InputBufferAccumulator.begin();
+				while(pInputSamples != pInputSamplesEnd)
 				{
-					InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
 				}
+
+				//ChannelBuffer::size_type j = nHalfPartitionLength;
+				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//}
+				//j = 0;
+				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//}
 
 //				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
 //#pragma loop count(65536)
@@ -533,26 +561,39 @@ void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPa
 		const float fScale = thisPath.outChannel[nChannel].fScale;
 		const WORD thisChannel = thisPath.outChannel[nChannel].nChannel;
 		ChannelBuffer& thisAccumulator = Accumulator[thisChannel];
+
+		ChannelBuffer::iterator pAccumulator = thisAccumulator.begin() + to;
+		ChannelBuffer::const_iterator pOutput = Output.begin() + nHalfPartitionLength;
+		const ChannelBuffer::const_iterator pOutputEnd = Output.begin() + nPartitionLength;
+
 		if(fScale == 1.0f)
 		{
 			// the output is in the second half of Output; Accumulate to the specified part of thisAccumulator
-			DWORD j = to;
-#pragma loop count(65536)
-#pragma ivdep
-			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+			while(pOutput != pOutputEnd)
 			{
-				thisAccumulator[j++] += Output[i];
-			} // i
+				*pAccumulator++ += *pOutput++;
+			}
+//		DWORD j = to;
+//#pragma loop count(65536)
+//#pragma ivdep
+//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+//			{
+//				thisAccumulator[j++] += Output[i];
+//			} // i
 		}
 		else
 		{
-			DWORD j = to;
-#pragma loop count(65536)
-#pragma ivdep
-			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+			while(pOutput != pOutputEnd)
 			{
-				thisAccumulator[j++] += Output[i] * fScale;
-			} // i
+				*pAccumulator++ += *pOutput++ * fScale;
+			}
+//			DWORD j = to;
+//#pragma loop count(65536)
+//#pragma ivdep
+//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+//			{
+//				thisAccumulator[j++] += Output[i] * fScale;
+//			} // i
 		}
 	} // nChannel
 }
@@ -570,8 +611,8 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const
 		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
 		result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		//__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		//__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		//const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		//const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
 		//result[index][0] = T1 - T2;
 		//result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
@@ -590,8 +631,8 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, c
 		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
 		result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		//__declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		//__declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		//const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		//const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
 		//result[index][0] += T1 - T2;
 		//result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 
@@ -741,7 +782,9 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	std::vector<T>InputSamples(nInputBufferLength);
 	std::vector<T>OutputSamples(nOutputBufferLength);
 
-	const Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
+	Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
+	Holder< Dither<T> > nodither(new NoDither<T>());				// since using float, there is no dithering
+	Holder< NoiseShape<T> > nonoiseshaping(new NoNoiseShape<T,32>());	// or noise shaping
 
 	// This is a typedef for a random number generator.
 	// Try boost:: minstd_rand or boost::ecuyer1988 instead of boost::mt19937
@@ -786,10 +829,14 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	DWORD nBytesGenerated = overlapsave && nPartitions_ == 1 ?
 		doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor.get_ptr(), convertor.get_ptr(),
+		nonoiseshaping.get_ptr(),
+		nodither.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0)
 		: doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor.get_ptr(), convertor.get_ptr(),
+		nonoiseshaping.get_ptr(),
+		nodither.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0);
 
@@ -839,7 +886,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 }
 
 template <typename T>
-ConvolutionList<T>::ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour) :
+ConvolutionList<T>::ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD& nPartitions, const unsigned int& nPlanningRigour) :
 config_(szConfigFileName),
 state_(Unselected),
 selectedConvolutionIndex_(0),
@@ -1178,10 +1225,17 @@ template <typename T>
 const std::string ConvolutionList<T>::DisplayConvolutionList() const
 {
 	std::string result = "";
-	for(size_type i=0; i<nConvolutionList_ - 1; ++i)
-		result += ConvolutionList_[i].Mixer.DisplayChannelPaths() + "\n";
 	if(nConvolutionList_ > 0)
+	{
+		for(size_type i=1; i<nConvolutionList_ - 1; ++i)
+			result += ConvolutionList_[i-1].Mixer.DisplayChannelPaths() + "\n";
+
 		result += ConvolutionList_[nConvolutionList_ - 1].Mixer.DisplayChannelPaths();
+	}
+	else
+	{
+		result = "Invalid or empty filter";
+	}
 	return result;
 }
 

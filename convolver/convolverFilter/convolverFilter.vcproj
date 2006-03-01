@@ -252,6 +252,9 @@
 			ReferencedProjectIdentifier="{C7F502CA-8C1A-4AE7-9CCA-976C096D4DE0}"
 			Name="cmul"/>
 		<ProjectReference
+			ReferencedProjectIdentifier="{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"
+			Name="convolverWMP"/>
+		<ProjectReference
 			ReferencedProjectIdentifier="{F74DDA88-5683-459B-B0B5-F77EAEE8AEE8}"
 			Name="libsndfile"/>
 	</References>
@@ -302,7 +305,13 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\dither.h">
+				</File>
+				<File
 					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
+					RelativePath="..\convolution\factory.h">
 				</File>
 				<File
 					RelativePath="..\convolution\ffthelp.cpp">
@@ -324,6 +333,9 @@
 				</File>
 				<File
 					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File
+					RelativePath="..\convolution\sample.cpp">
 				</File>
 				<File
 					RelativePath="..\convolution\sample.h">

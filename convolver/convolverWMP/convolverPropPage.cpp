@@ -33,10 +33,12 @@
 #include "convolverWMP\version.h"
 #include <exception>
 #include ".\convolverproppage.h"
+#include "convolution\dither.h"
 
 
-PlanningRigour pr;
-
+static PlanningRigour pr;
+static Ditherer<float> dither;
+static NoiseShaper<float> noiseshaping;
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -143,7 +145,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	float	fAttenuation = 0.0;													// Initialize a float for the attenuation
 	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
 	TCHAR	szFilterFileName[MAX_PATH]	= { 0 };
-	WORD	nPartitions = 0;													// Initialize a WORD for the number of partitions
+	DWORD	nPartitions = 0;													// Initialize a DWORD for the number of partitions
 																				// to be used in the convolution algorithm
 																				// Get the attenuation value from the dialog box.
 	unsigned int nPlanningRigour =
@@ -152,6 +154,9 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 #else
 		0;
 #endif
+
+	unsigned int nDither = 0;
+	unsigned int nNoiseShaping = 0;
 
 	try
 	{
@@ -181,12 +186,25 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		nPartitions = GetDlgItemInt(IDC_PARTITIONS, NULL, FALSE); 
 
 		// Get the planning rigour from the dialogue box
-		nPlanningRigour = GetDlgItemInt(IDC_COMBOPLANNINGRIGOUR, NULL, FALSE);
+		//nPlanningRigour = GetDlgItemInt(IDC_COMBOPLANNINGRIGOUR, NULL, FALSE); // Doesn't work
+		TCHAR* szMeasure = new TCHAR[pr.nStrLen];
+		GetDlgItemText(IDC_COMBOPLANNINGRIGOUR, szMeasure, pr.nStrLen);
+		nPlanningRigour = pr.Lookup(szMeasure);
+		delete [] szMeasure;
 
-		TCHAR* measure = new TCHAR[pr.nStrLen];
-		GetDlgItemText(IDC_COMBOPLANNINGRIGOUR, measure, pr.nStrLen);
-		nPlanningRigour = pr.flag(measure);
-		delete [] measure;
+		// Get the dither from the dialogue box
+		// nDither = GetDlgItemInt(IDC_COMBODITHER, NULL, FALSE); // Doesn't work
+		TCHAR* szDither = new TCHAR[dither.nStrLen];
+		GetDlgItemText(IDC_COMBODITHER, szDither, dither.nStrLen);
+		nDither = dither.Lookup(szDither);
+		delete [] szDither;
+
+		// Get the shaping from the dialogue box
+		// nDither = GetDlgItemInt(IDC_COMBODITHER, NULL, FALSE); // Doesn't work
+		TCHAR* szShaping = new TCHAR[noiseshaping.nStrLen];
+		GetDlgItemText(IDC_COMBONOISESHAPING, szShaping, noiseshaping.nStrLen);
+		nNoiseShaping = noiseshaping.Lookup(szShaping);
+		delete [] szShaping;
 
 
 		// update the registry
@@ -244,6 +262,31 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 			}
 		}
 
+		// Write the dither value to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			lResult = key.SetDWORDValue( kszPrefsDither, nDither );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save dither to registry") );
+				return lResult;
+			}
+		}
+
+		// Write the noise shaping value to the registry.
+		lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+		if (ERROR_SUCCESS == lResult)
+		{
+			lResult = key.SetDWORDValue( kszPrefsNoiseShaping, nNoiseShaping );
+			if (lResult != ERROR_SUCCESS)
+			{
+				SetDlgItemText( IDC_STATUS, TEXT("Failed to save noise shaping to registry") );
+				return lResult;
+			}
+		}
+
+
 		// update the plug-in
 		if (m_spConvolver)
 		{
@@ -288,6 +331,27 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 				}
 				return hr;
 			}
+
+			hr = m_spConvolver->put_dither(nDither);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_DITHERSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
+
+			hr = m_spConvolver->put_noiseshaping(nNoiseShaping);
+			if (FAILED(hr))
+			{
+				if (::LoadString(_Module.GetResourceInstance(), IDS_NOISESHAPINGSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
+				{
+					MessageBox(szStr);
+				}
+				return hr;
+			}
+
 		}
 	}
 	catch (std::exception& error)
@@ -317,16 +381,17 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
 		m_spConvolver->encode_Attenuationdb(fAttenuation);
 	TCHAR*  szFilterFileName = TEXT("");
-	WORD   nPartitions		 = 0;									// Default number of partitions
+	DWORD   nPartitions		 = 0;									// Default number of partitions
 	CRegKey key;
-	LONG    lResult = 0;
-	DWORD   dwValue = 0;
+	DWORD   dwValue			 = 0;
 	unsigned int nPlanningRigour = 
 #ifdef FFTW
 		1;		// Set "Measure" as the default
 #else
 		0;
 #endif
+	unsigned int nDither = 0;
+	unsigned int nNoiseShaping = 0;
 
 	try
 	{
@@ -340,20 +405,42 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		}
 		SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 
+		for(unsigned int i=0; i<dither.nDitherers; ++i)
+		{
+			SendDlgItemMessage(IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)dither.Description[i]);
+		}
+		SendDlgItemMessage(IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
+
+		for(unsigned int i=0; i<noiseshaping.nNoiseShapers; ++i)
+		{
+			SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)noiseshaping.Description[i]);
+		}
+		SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_SETCURSEL, nNoiseShaping, 0);
+
+
 		// read from plug-in if it is available
 		if (m_spConvolver)
 		{
-			m_spConvolver->get_attenuation(&fAttenuation);
+			HRESULT hr = S_OK;
+			hr = m_spConvolver->get_attenuation(&fAttenuation);
+			if(FAILED(hr)) return hr;
 			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
 
-			m_spConvolver->get_filterfilename(&szFilterFileName);
+			hr = m_spConvolver->get_filterfilename(&szFilterFileName);
+			if(FAILED(hr)) return hr;
 
-			m_spConvolver->get_partitions(&nPartitions);
-			m_spConvolver->get_planning_rigour(&nPlanningRigour);
+			hr = m_spConvolver->get_partitions(&nPartitions);
+			if(FAILED(hr)) return hr;
+			hr = m_spConvolver->get_planning_rigour(&nPlanningRigour);
+			if(FAILED(hr)) return hr;
+			hr = m_spConvolver->get_dither(&nDither);
+			if(FAILED(hr)) return hr;
+			hr = m_spConvolver->get_noiseshaping(&nNoiseShaping);
+			if(FAILED(hr)) return hr;
 		}	
 		else // otherwise read from registry
 		{
-			lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
+			LONG lResult = key.Open(HKEY_CURRENT_USER, kszPrefsRegKey, KEY_READ);
 			if (ERROR_SUCCESS == lResult)
 			{
 				// Read the attenuation value.
@@ -380,11 +467,23 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 				{
 					nPartitions = dwValue;
 				}
-				// Read the number of partitions
+				// Read the planning rigour
 				lResult = key.QueryDWORDValue(kszPrefsPlanningRigour, dwValue );
 				if (ERROR_SUCCESS == lResult)
 				{
 					nPlanningRigour = dwValue;
+				}
+				// Read the dither
+				lResult = key.QueryDWORDValue(kszPrefsDither, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					nDither = dwValue;
+				}
+				// Read the noise shaping value
+				lResult = key.QueryDWORDValue(kszPrefsNoiseShaping, dwValue );
+				if (ERROR_SUCCESS == lResult)
+				{
+					nNoiseShaping = dwValue;
 				}
 			}
 		}
@@ -403,6 +502,12 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 
 		// Display the planning rigour
 		SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
+
+		// Display the dither
+		SendDlgItemMessage(IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
+
+		// Display the noise shaping
+		SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_SETCURSEL, nNoiseShaping, 0);
 	}
 	catch (std::exception& error)
 	{
@@ -546,6 +651,23 @@ LRESULT CConvolverPropPage::OnEnChangePartitions(WORD /*wNotifyCode*/, WORD /*wI
 }
 
 LRESULT CConvolverPropPage::OnCbnSelendokCombofftwmeasure(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	SetDirty(TRUE);
+
+	return 0;
+}
+
+
+LRESULT CConvolverPropPage::OnCbnSelendokCombodither(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+
+	SetDirty(TRUE);
+
+	return 0;
+}
+
+
+LRESULT CConvolverPropPage::OnCbnSelendokCombonoiseshaping(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
 	SetDirty(TRUE);
 

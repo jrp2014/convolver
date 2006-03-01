@@ -48,6 +48,8 @@ m_rtTimestamp(0),
 m_bEnabled(TRUE),
 m_nPartitions(0), // default, just overlap-save
 m_nPlanningRigour(0),
+m_nDither(Ditherer<float>::None),
+m_nNoiseShaping(NoiseShaper<float>::None),
 m_ConvolutionList(NULL),
 m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
@@ -148,21 +150,33 @@ HRESULT CConvolver::FinalConstruct()
 		lResult = key.QueryDWORDValue(kszPrefsPartitions, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			// Convert the DWORD to a WORD.
 			m_nPartitions = dwValue;
 		}
 
-		// Read the number of partitions that the convolution routine should use
+		// Read the planning rigour
 		lResult = key.QueryDWORDValue(kszPrefsPlanningRigour, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			// Convert the DWORD to a WORD.
 			m_nPlanningRigour = dwValue;
 			// limit planning rigour to avoid long startup times.
 			if (m_nPlanningRigour > 1)
 			{
 				m_nPlanningRigour = 1;
 			}
+		}
+
+		// Read the dither
+		lResult = key.QueryDWORDValue(kszPrefsDither, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			m_nDither = static_cast<Ditherer<float>::DitherType>(dwValue);
+		}
+
+		// Read the noise shaping type
+		lResult = key.QueryDWORDValue(kszPrefsNoiseShaping, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			m_nNoiseShaping = static_cast<NoiseShaper<float>::NoiseShapingType>(dwValue);
 		}
 
 		try // creating m_ConvolutionList might throw
@@ -318,14 +332,14 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	}
 
 	// Number of Media types = number of available formats * number of different ChannelPaths
-	if ( m_FormatSpecs.size * m_ConvolutionList->nConvolutionList() <= dwTypeIndex )
+	if ( m_FormatSpecs.size() * m_ConvolutionList->nConvolutionList() <= dwTypeIndex )
 	{
 		return DMO_E_NO_MORE_ITEMS;
 	}
 
 	// Decompose the dwTypeIndex into dwPathIndex and dwFormatSpecIndex
 	DWORD dwPathIndex = dwTypeIndex %  m_ConvolutionList->nConvolutionList(); 
-	DWORD dwFormatSpecIndex = dwTypeIndex % m_FormatSpecs.size;
+	DWORD dwFormatSpecIndex = dwTypeIndex % m_FormatSpecs.size();
 #if defined(DEBUG) | defined(_DEBUG)
 	cdebug << "dwTypeIndex:" << dwTypeIndex << " dwPathIndex:" << dwPathIndex << " dwFormatSpecIndex:" << dwFormatSpecIndex << std::endl;
 #endif
@@ -625,6 +639,22 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 
 				// copy new media type
 				hr = ::MoCopyMediaType( &m_mtOutput, pmt );
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				// Set the dither generator, defined by the dither type (m_nDither) and the nChannels
+				// and valid bits per sample, defined in pWaveOut
+				hr = m_Ditherer.SelectDither(m_nDither, pWaveOut);
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				// Set the noise shaper, defined by the dither type (m_nNoiseShaping) and the nChannels
+				// and valid bits per sample, defined in pWaveOut
+				hr = m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWaveOut);
 				if (FAILED(hr))
 				{
 					return hr;
@@ -1501,7 +1531,7 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 }
 
 // Property get to retrieve the number of partitions by using the public interface.
-STDMETHODIMP CConvolver::get_partitions(WORD *pVal)
+STDMETHODIMP CConvolver::get_partitions(DWORD *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_partitions" << std::endl;);
@@ -1518,7 +1548,7 @@ STDMETHODIMP CConvolver::get_partitions(WORD *pVal)
 }
 
 // Property put to store the number of partitions by using the public interface.
-STDMETHODIMP CConvolver::put_partitions(WORD newVal)
+STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_partitions" << std::endl;);
@@ -1613,6 +1643,85 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 	return S_OK;
 }
 
+// Property get to retrieve the dither value by using the public interface.
+STDMETHODIMP CConvolver::get_dither(unsigned int *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_dither" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nDither;
+
+	return S_OK;
+}
+
+
+// Property put to store the dither value by using the public interface.
+STDMETHODIMP CConvolver::put_dither(unsigned int newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_dither" << std::endl;);
+#endif
+
+	m_nDither = static_cast<Ditherer<float>::DitherType>(newVal);
+
+	const WAVEFORMATEX * pWave =  ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+	if(pWave == NULL)
+	{
+		return S_OK;
+	}
+	else
+	{
+		return m_Ditherer.SelectDither(m_nDither, ( WAVEFORMATEX * ) m_mtOutput.pbFormat);
+	}
+}
+
+
+// Property get to retrieve the noise shaper value by using the public interface.
+STDMETHODIMP CConvolver::get_noiseshaping(unsigned int *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_noiseshaping" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nNoiseShaping;
+
+	return S_OK;
+}
+
+// Property put to store the noise shaper value by using the public interface.
+STDMETHODIMP CConvolver::put_noiseshaping(unsigned int newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_noiseshaping" << std::endl;);
+#endif
+
+	m_nNoiseShaping = static_cast<NoiseShaper<float>::NoiseShapingType>(newVal);
+
+	const WAVEFORMATEX * pWave =  ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+	if(pWave == NULL)
+	{
+		return S_OK;
+	}
+	else
+	{
+		return m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWave);
+	}
+}
+
+
 // Property to get a filter description 
 STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 {
@@ -1620,16 +1729,8 @@ STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
-	if(m_ConvolutionList.get_ptr() != NULL)
-	{
-		*description = m_ConvolutionList->DisplayConvolutionList();
-		return S_OK;
-	}
-	else
-	{
-		*description = "No filter loaded";
-		return E_FAIL;
-	}
+	*description = m_ConvolutionList.get_ptr() == NULL ? "No filter loaded" : m_ConvolutionList->DisplayConvolutionList();
+	return S_OK;
 }
 
 // Property to get a filter description 
@@ -1705,11 +1806,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?
 		m_ConvolutionList->SelectedConvolution().doConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor, m_OutputSampleConvertor,
+		m_InputSampleConvertor, m_OutputSampleConvertor, m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(),
 		dwBlocksToProcess,
 		m_fAttenuation_db)
 		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor, m_OutputSampleConvertor,
+		m_InputSampleConvertor, m_OutputSampleConvertor, m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(),
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 

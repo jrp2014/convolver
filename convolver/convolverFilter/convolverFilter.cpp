@@ -167,6 +167,8 @@ CTransformFilter(tszName, punk, CLSID_convolverFilter),
 m_fAttenuation_db(0),
 m_nPartitions(0),
 m_nPlanningRigour(0),
+m_nDither(Ditherer<float>::None),
+m_nNoiseShaping(NoiseShaper<float>::None),
 m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
 {
@@ -239,6 +241,21 @@ m_OutputSampleConvertor(NULL)
 		{
 			// Convert the DWORD to a unsigned int.
 			m_nPlanningRigour = dwValue;
+		}
+
+		// Read the dither that the convolution routine should use
+		lResult = key.QueryDWORDValue(kszPrefsDither, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			m_nDither = Ditherer<float>::DitherType(dwValue);
+		}
+
+		
+		// Read the noise shaping that the convolution routine should use
+		lResult = key.QueryDWORDValue(kszPrefsNoiseShaping, dwValue);
+		if (ERROR_SUCCESS == lResult)
+		{
+			m_nNoiseShaping = NoiseShaper<float>::NoiseShapingType(dwValue);
 		}
 
 		try // creating m_ConvolutionList might throw
@@ -366,10 +383,12 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	DWORD cbBytesGenerated = m_nPartitions == 0 ?
 		m_ConvolutionList->SelectedConvolution().doConvolution(pbSrc, pbDst,
 		m_InputSampleConvertor, m_OutputSampleConvertor,
+		m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(), 
 		dwBlocksToProcess,
 		m_fAttenuation_db)
 		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbSrc, pbDst,
 		m_InputSampleConvertor, m_OutputSampleConvertor,
+		m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(), 
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 
@@ -715,14 +734,14 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 	}
 
 	// Number of Media types = number of available formats * number of different Convolutions available
-	if ( m_FormatSpecs.size * m_ConvolutionList->nConvolutionList() <= iPosition )
+	if ( m_FormatSpecs.size() * m_ConvolutionList->nConvolutionList() <= iPosition )
 	{
 		return VFW_S_NO_MORE_ITEMS;
 	}
 
 	// Decompose the dwTypeIndex into dwPathIndex and dwFormatSpecIndex
 	DWORD dwPathIndex = iPosition %  m_ConvolutionList->nConvolutionList(); 
-	DWORD dwFormatSpecIndex = iPosition % m_FormatSpecs.size;
+	DWORD dwFormatSpecIndex = iPosition % m_FormatSpecs.size();
 #if defined(DEBUG) | defined(_DEBUG)
 	cdebug << "iPosition:" << iPosition << " dwPathIndex:" << dwPathIndex << " dwFormatSpecIndex:" << dwFormatSpecIndex << std::endl;
 #endif
@@ -745,7 +764,7 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 			return E_OUTOFMEMORY;
 		}
 		pWaveXT->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX); // Should be 22
-		pWaveXT->Format.wFormatTag = m_FormatSpecs[dwFormatSpecIndex].wFormatTag;
+		pWaveXT->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE; // m_FormatSpecs[dwFormatSpecIndex].wFormatTag;
 		pWaveXT->Format.nChannels = m_ConvolutionList->Conv(dwPathIndex).Mixer.nOutputChannels();
 		pWaveXT->Format.nSamplesPerSec = m_ConvolutionList->Conv(dwPathIndex).Mixer.nSamplesPerSec();
 		pWaveXT->Format.wBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample;
@@ -840,6 +859,18 @@ HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType
 			return hr;
 		}
 		hr = m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor);
+		if(FAILED(hr))
+		{
+			return hr;
+		}
+
+		hr = m_Ditherer.SelectDither(m_nDither, pWave);
+		if(FAILED(hr))
+		{
+			return hr;
+		}
+
+		hr = m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWave);
 		if(FAILED(hr))
 		{
 			return hr;
@@ -1069,7 +1100,7 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 }
 
 // Property get to retrieve the number of partitions by using the public interface.
-STDMETHODIMP CconvolverFilter::get_partitions(WORD *pVal)
+STDMETHODIMP CconvolverFilter::get_partitions(DWORD *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_partitions" << std::endl;);
@@ -1086,7 +1117,7 @@ STDMETHODIMP CconvolverFilter::get_partitions(WORD *pVal)
 }
 
 // Property put to store the number of partitions by using the public interface.
-STDMETHODIMP CconvolverFilter::put_partitions(WORD newVal)
+STDMETHODIMP CconvolverFilter::put_partitions(DWORD newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_partitions" << std::endl;);
@@ -1169,6 +1200,81 @@ STDMETHODIMP CconvolverFilter::put_planning_rigour(unsigned int newVal)
 	return S_OK;
 }
 
+
+// Property get to retrieve the dither value by using the public interface.
+STDMETHODIMP CconvolverFilter::get_dither(unsigned int *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_dither" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nDither;
+
+	return S_OK;
+}
+
+
+// Property put to store the dither value by using the public interface.
+STDMETHODIMP CconvolverFilter::put_dither(unsigned int newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_dither" << std::endl;);
+#endif
+
+	m_nDither = static_cast<Ditherer<float>::DitherType>(newVal);
+
+	if(m_WaveOutXT.Format.wFormatTag == 0)
+	{
+		return S_OK;
+	}
+	else
+	{
+		return m_Ditherer.SelectDither(m_nDither, (WAVEFORMATEX*)(&m_WaveOutXT));
+	}
+}
+
+
+// Property get to retrieve the noise shaper value by using the public interface.
+STDMETHODIMP CconvolverFilter::get_noiseshaping(unsigned int *pVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "get_noiseshaping" << std::endl;);
+#endif
+
+	if ( NULL == pVal )
+	{
+		return E_POINTER;
+	}
+
+	*pVal = m_nNoiseShaping;
+
+	return S_OK;
+}
+
+// Property put to store the noise shaper value by using the public interface.
+STDMETHODIMP CconvolverFilter::put_noiseshaping(unsigned int newVal)
+{
+#if defined(DEBUG) | defined(_DEBUG)
+	DEBUGGING(3, cdebug << "put_noiseshaping" << std::endl;);
+#endif
+
+	m_nNoiseShaping = static_cast<NoiseShaper<float>::NoiseShapingType>(newVal);
+
+	if(m_WaveOutXT.Format.wFormatTag == 0)
+	{
+		return S_OK;
+	}
+	else
+	{
+		return m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, (WAVEFORMATEX*)(&m_WaveOutXT));
+	}
+}
+
 // Property to get a filter description 
 STDMETHODIMP CconvolverFilter::get_filter_description(std::string* description)
 {
@@ -1176,16 +1282,8 @@ STDMETHODIMP CconvolverFilter::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
-	if(m_ConvolutionList.get_ptr() != NULL)
-	{
-		*description = m_ConvolutionList->DisplayConvolutionList();
-		return S_OK;
-	}
-	else
-	{
-		*description = "No filter loaded";
-		return E_FAIL;
-	}
+	*description = m_ConvolutionList.get_ptr() == NULL ? "No filter loaded" : m_ConvolutionList->DisplayConvolutionList();
+	return S_OK;
 }
 
 // Property get to retrieve the wet mix value by using the public interface.

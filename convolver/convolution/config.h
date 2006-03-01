@@ -125,45 +125,6 @@ const DWORD MAXSTRING = 1024;	// length
 #error "No FFT package defined"
 #endif
 
-struct PlanningRigour
-{
-#ifdef FFTW
-	enum Degree {Estimate=0, Measure=1, Patient=2, Exhaustive=3, TimeLimited=4};
-	static const unsigned int nDegrees = 5;
-	static const unsigned int nStrLen = 15;
-	static const int nTimeLimit = 30; // 30s -> 1min, for user, as a forward and reverse plan are optimized
-#else
-	enum Degree {Default=0};
-	static const unsigned int nDegrees = 1;
-	static const unsigned int nStrLen = 8;
-#endif
-	TCHAR Rigour[nDegrees][nStrLen];
-	unsigned int Flag[nDegrees];
-
-	PlanningRigour()
-	{
-#ifdef FFTW
-		_tcsncpy(Rigour[0], TEXT("Estimate"), nStrLen);		Flag[Estimate] = FFTW_ESTIMATE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[1], TEXT("Measure"), nStrLen);		Flag[Measure] = FFTW_MEASURE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[2], TEXT("Patient"), nStrLen);		Flag[Patient] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[3], TEXT("Exhaustive"), nStrLen);	Flag[Exhaustive] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[4], TEXT("Take 1 minute"), nStrLen);	Flag[TimeLimited] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
-#else
-		_tcsncpy(Rigour[0], TEXT("Default"), nStrLen);	Flag[0] = 0;
-#endif
-	}
-
-	unsigned int flag(const TCHAR* r) const
-	{
-		for(unsigned int i=0; i<nDegrees; ++i)
-		{
-			if(_tcsncicmp(r, Rigour[i], nStrLen) == 0)
-				return i;
-		}
-		throw std::range_error("Invalid rigour");
-	}
-};
-
 // using home grown array
 #define FASTARRAY
 // User array initialization, rather than vector initialization

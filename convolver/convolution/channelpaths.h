@@ -18,13 +18,14 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
+
 #include "convolution\config.h"
-#include "convolution\filter.h"
 #include <string>
 #include <fstream>
 #include <vector>
 #include <boost\ptr_container\ptr_vector.hpp>
 #include <mediaerr.h>
+#include "convolution\filter.h"
 
 class configFile
 {
@@ -131,9 +132,9 @@ public:
 		const Filter filter;
 		const std::vector<ScaledChannel> outChannel;
 
-		ChannelPath(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD nPartitions,
+		ChannelPath(const TCHAR szChannelPathsFileName[MAX_PATH], const DWORD nPartitions,
 			const std::vector<ScaledChannel>& inChannel, const std::vector<ScaledChannel>& outChannel,
-			const WORD nFilterChannel, const DWORD nSampleRate, const unsigned int nPlanningRigour) :
+			const DWORD nFilterChannel, const DWORD nSampleRate, const unsigned int nPlanningRigour) :
 				filter(szChannelPathsFileName, nPartitions, nFilterChannel, nSampleRate, nPlanningRigour),
 					inChannel(inChannel), outChannel(outChannel)
 		{
@@ -159,14 +160,14 @@ private:
 		return Paths_;
 	}
 
-	const WORD nPartitions;
+	const DWORD nPartitions;
 
-	DWORD nInputChannels() const	// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
+	WORD nInputChannels() const	// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
 	{
 		return nInputChannels_;
 	}
 
-	DWORD nOutputChannels()	const	// number of output channels
+	WORD nOutputChannels()	const	// number of output channels
 	{
 		return nOutputChannels_;
 	}

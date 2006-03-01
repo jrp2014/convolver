@@ -1,3 +1,21 @@
+// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
 #include "convolution\config.h"
@@ -9,6 +27,8 @@ const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 const TCHAR kszPrefsPartitions[] = _T("Partitions");
 const TCHAR kszPrefsPlanningRigour[] = _T("PlanningRigour");
+const TCHAR kszPrefsDither[] = _T("Dither");
+const TCHAR kszPrefsNoiseShaping[] = _T("NoiseShaping");
 
 class CconvolverFilter : public CTransformFilter,
 		 public IconvolverFilter,
@@ -39,11 +59,17 @@ public:
 	STDMETHOD(get_attenuation)(float *pVal);
 	STDMETHOD(put_attenuation)(float newVal);
 
-	STDMETHOD(get_partitions)(WORD *pVal);
-	STDMETHOD(put_partitions)(WORD newVal);
+	STDMETHOD(get_partitions)(DWORD *pVal);
+	STDMETHOD(put_partitions)(DWORD newVal);
 
 	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
 	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+
+	STDMETHOD(get_dither)(unsigned int *pVal);
+	STDMETHOD(put_dither)(unsigned int newVal);
+
+	STDMETHOD(get_noiseshaping)(unsigned int *pVal);
+	STDMETHOD(put_noiseshaping)(unsigned int newVal);
 
 	STDMETHOD(get_filter_description)(std::string* description);
 	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
@@ -85,9 +111,13 @@ private:
 	Sample<float>*						m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Sample<float>*						m_OutputSampleConvertor;	// float
 
+	Ditherer<float>::DitherType			m_nDither;
+	Ditherer<float>						m_Ditherer;
 
+	NoiseShaper<float>::NoiseShapingType m_nNoiseShaping;
+	NoiseShaper<float>					m_NoiseShaping;
 
-	CFormatSpecs<float>					m_FormatSpecs;				// Supported formats
+	SampleMaker<float>					m_FormatSpecs;				// Supported formats
 
 	WAVEFORMATEXTENSIBLE				m_WaveInXT;					// The current formats;
 	WAVEFORMATEXTENSIBLE				m_WaveOutXT;

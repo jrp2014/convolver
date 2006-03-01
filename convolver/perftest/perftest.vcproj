@@ -310,6 +310,9 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\dither.h">
+				</File>
+				<File
 					RelativePath="..\convolution\exception.h">
 				</File>
 				<File
@@ -332,6 +335,9 @@
 				</File>
 				<File
 					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File
+					RelativePath="..\convolution\sample.cpp">
 				</File>
 				<File
 					RelativePath="..\convolution\sample.h">

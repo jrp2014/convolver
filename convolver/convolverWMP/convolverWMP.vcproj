@@ -44,6 +44,7 @@
 				ForceConformanceInForLoopScope="TRUE"
 				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="0"
+				ExpandAttributedSource="FALSE"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"
@@ -366,7 +367,13 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\dither.h">
+				</File>
+				<File
 					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
+					RelativePath="..\convolution\factory.h">
 				</File>
 				<File
 					RelativePath="..\convolution\ffthelp.cpp">
@@ -388,6 +395,9 @@
 				</File>
 				<File
 					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File
+					RelativePath="..\convolution\sample.cpp">
 				</File>
 				<File
 					RelativePath="..\convolution\sample.h">

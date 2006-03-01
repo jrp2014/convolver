@@ -24,6 +24,9 @@
 
 #include "stdafx.h"
 #include "convolution\config.h"
+#include "convolution\convolution.h"
+#include "convolution\waveformat.h"
+
 #ifndef LIBSNDFILE
 #include "Common\dxstdafx.h"
 #endif
@@ -49,10 +52,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 #endif
 
-	const WORD SAMPLES = 1; // how many filter lengths to convolve at a time
+	const DWORD SAMPLES = 1; // how many filter lengths to convolve at a time
 
 	HRESULT hr = S_OK;
 	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
+	Holder< Dither<float> > dither(new NoDither<float>());
+	Holder< NoiseShape<float> > noiseshape(new NoNoiseShape<float,32>());
+
 	PlanningRigour pr;
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -61,10 +67,17 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if (argc != 6)
 	{
+		USES_CONVERSION;
+
 		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt|IR.wav inputfile outputfile" << std::endl;
 		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std::endl;
-		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << std::endl;
-		std::wcerr << "       input and output files are, typically, .wav" << std::endl;
+		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << " (";
+		for(int i = 0; i < pr.nDegrees - 1; ++i)
+			std::wcerr << pr.Rigour[i] << "|";
+		std::wcerr <<  pr.Rigour[pr.nDegrees - 1] << ")" << std::endl;
+		std::wcerr << "       config.txt|IR.wav = a config text file specifying a single filter path" << std::endl;
+		std::wcerr << "				or a sound file to be used as a filter" << std::endl;
+		std::wcerr << "       input and output sound files are, typically, .wav" << std::endl;
 		return 1;
 	}
 #define PARTITIONS argv[1]
@@ -76,7 +89,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	try
 	{
 		std::wistringstream szPartitions(PARTITIONS);
-		WORD nPartitions;
+		DWORD nPartitions;
 		szPartitions >> nPartitions;
 
 		if (nPartitions == 0)
@@ -95,6 +108,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		ConvolutionList<float> conv(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
 			nPlanningRigour); // Sets conv. nPartitions==0 => use overlap-save
 
+		// TODO:: allow SF_INFO as well as WAVEFILEEX to select convolutions
 		if(conv.nConvolutionList() != 1)
 			throw convolutionException("Only single filter path specification acceptable");
 
@@ -234,20 +248,24 @@ int _tmain(int argc, _TCHAR* argv[])
 			// nPartitions == 0 => use overlap-save version
 			DWORD dwBufferSizeGenerated = nPartitions == 0 ?
 #ifdef LIBSNDFILE
-				conv.SelectedConvolution().doConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+				conv.SelectedConvolution().doConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
+				reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
 				conv.SelectedConvolution().doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
+				 noiseshape.get_ptr(), dither.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation)
 				:
 #ifdef LIBSNDFILE
-			conv.SelectedConvolution().doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]), reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
+			conv.SelectedConvolution().doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
+				reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
 			conv.SelectedConvolution().doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
+				noiseshape.get_ptr(), dither.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation);
 

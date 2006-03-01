@@ -16,59 +16,62 @@
 				IntermediateDirectory="Debug"
 				ConfigurationType="4"
 				CharacterSet="1"
-				WholeProgramOptimization="0"/>
-			<Tool 
-				Name="DebugTool"/>
+				WholeProgramOptimization="FALSE"/>
 			<Tool 
 				Name="CppCmplrTool"
+				AdditionalOptions="/fp:fast"
 				Optimization="0"
-				GlobalOptimizations="0"
+				GlobalOptimizations="FALSE"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="1"
+				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="1"
+				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;CRTDBG_MAP_ALLOC"
-				MinimalRebuild="1"
+				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="1"
+				SmallerTypeCheck="TRUE"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="1"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="TRUE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="1"
+				TreatWChar_tAsBuiltInType="TRUE"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="1"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="4"
-				AdditionalOptions="/fp:strict"
-				OpenMP="1"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"/>
+				RecognizeRestrictKeyword="1"
+				OpenMP="1"/>
 			<Tool 
-				Name="LinkerTool"
-				DelayImpLib=""/>
+				Name="CustomTool"/>
 			<Tool 
 				Name="LibrarianTool"
 				OutputFile="$(OutDir)/cmul.lib"/>
 			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
@@ -78,65 +81,67 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="4"
 				CharacterSet="1"
-				WholeProgramOptimization="1"/>
-			<Tool 
-				Name="DebugTool"/>
+				WholeProgramOptimization="TRUE"/>
 			<Tool 
 				Name="CppCmplrTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="1"
+				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="1"
+				EnableIntrinsicFunctions="TRUE"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="1"
-				EnableFiberSafeOptimizations="1"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
+				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="0"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
-				StringPooling="1"
-				ExceptionHandling="1"
+				StringPooling="TRUE"
+				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="0"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="1"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="0"
-				Detect64BitPortabilityProblems="1"
+				SuppressStartupBanner="FALSE"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
-				OpenMP="1"
 				UseProcExt="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"/>
+				SupportMultibyteCharSource="1"
+				OpenMP="1"/>
 			<Tool 
-				Name="LinkerTool"
-				DelayImpLib=""/>
+				Name="CustomTool"/>
 			<Tool 
 				Name="LibrarianTool"
 				OutputFile="$(OutDir)/cmul.lib"/>
 			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release PIII|Win32">
@@ -146,38 +151,36 @@
 				IntermediateDirectory="Release"
 				ConfigurationType="4"
 				CharacterSet="1"
-				WholeProgramOptimization="1"
+				WholeProgramOptimization="TRUE"
 				PGOPhase="0"/>
 			<Tool 
-				Name="DebugTool"/>
-			<Tool 
 				Name="CppCmplrTool"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				Optimization="1000"
-				GlobalOptimizations="1"
+				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="1"
-				FavorSizeOrSpeed="1"
-				OmitFramePointers="1"
-				EnableFiberSafeOptimizations="1"
-				OptimizeForProcessor="3"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="2"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
+				WholeProgramOptimization="TRUE"
+				OptimizeForProcessor="0"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
-				StringPooling="1"
-				ExceptionHandling="1"
+				StringPooling="TRUE"
+				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="0"
-				EnableFunctionLevelLinking="1"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				ForceConformanceInForLoopScope="1"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="0"
-				Detect64BitPortabilityProblems="1"
+				SuppressStartupBanner="FALSE"
+				Detect64BitPortabilityProblems="TRUE"
 				DebugInformationFormat="3"
 				CompileAs="0"
-				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
-				OpenMP="1"
 				UseProcExt="0"
 				RequireProcExt="3"
 				LoopUnrolling=" "
@@ -185,36 +188,57 @@
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"/>
+				SupportMultibyteCharSource="1"
+				OpenMP="1"/>
 			<Tool 
-				Name="LinkerTool"
-				DelayImpLib=""/>
+				Name="CustomTool"/>
 			<Tool 
 				Name="LibrarianTool"
 				OutputFile="$(OutDir)/cmul.lib"/>
 			<Tool 
-				Name="ResCmplrTool"/>
-			<Tool 
 				Name="MidlCmplrTool"/>
 			<Tool 
-				Name="BscMakeTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="PreBuildEventTool"/>
 			<Tool 
 				Name="PreLinkEventTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="ResCmplrTool"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool 
-				Name="CustomNodeTool"/>
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+			<Tool 
+				Name="DebugTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
+		<Filter 
+			Name="Source Files"
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
+			<File 
+				RelativePath=".\mul.c">
+			</File>
+		</Filter>
+		<Filter 
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+		</Filter>
+		<Filter 
+			Name="Resource Files"
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+		</Filter>
 		<File 
-			RelativePath=".\mul.c"/>
-		<File 
-			RelativePath=".\ReadMe.txt"/>
+			RelativePath=".\ReadMe.txt">
+		</File>
 	</Files>
 </VisualStudioProject>
 

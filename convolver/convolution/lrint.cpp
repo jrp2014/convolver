@@ -61,7 +61,7 @@ lrintf (float flt)
 	_asm
 	{
 		fld flt
-	fistp intgr
+		fistp intgr
 	} ;
 
 	return intgr;
@@ -72,13 +72,16 @@ lrintf (float flt)
 // 2004.07.04
 // web: http://ldesoras.free.fr
 
-inline int conv_float_to_int (float x)
+// IntType may be Int16, 32, or 64; FloatType may be float or double
+// Uses current rounding mode, assumed to be round to nearest
+template <typename IntType, typename FloatType>
+inline IntType conv_float_to_int (FloatType x)
 {
-	int a;
+	IntType a;
 	__asm
 	{
 		fld x
-			fistp a
+		fistp a
 	}
 	return (a);
 }
@@ -117,13 +120,15 @@ int round_int (double x)
 	return (i);
 }
 
-
-int floor_int (double x)
+// IntType may be Int16, 32, or 64; FloatType may be float or double
+// Uses current rounding mode, assumed to be round to nearest
+template <typename IntType, typename FloatType>
+IntType floor_int (FloatType x)
 {
-	assert (x > static_cast <double> (INT_MIN / 2) - 1.0);
-	assert (x < static_cast <double> (INT_MAX / 2) + 1.0);
-	const float round_towards_m_i = -0.5f;
-	int i;
+	assert (x > static_cast <FloatType> (INT_MIN / 2) - 1.0);
+	assert (x < static_cast <FloatType> (INT_MAX / 2) + 1.0);
+	static const FloatType round_towards_m_i = FloatType(-0.5);
+	IntType i;
 	__asm
 	{
 		fld x

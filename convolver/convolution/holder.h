@@ -44,12 +44,12 @@ public:
 	}
 
 	// get referenced object (if any)
-	const T* get_ptr() const
+	T* get_ptr() const
 	{
 		return ptr_;
 	}
 
-	Holder& set_ptr(T* p)
+	const Holder& set_ptr(T* p)
 	{
 		if( ptr_ != p)
 		{
@@ -60,7 +60,7 @@ public:
 		return *this;
 	}
 
-	Holder& refer_ptr(T* p)
+	const Holder& refer_ptr(T* p)
 	{
 		if( ptr_ != p)
 		{
@@ -71,7 +71,7 @@ public:
 		return *this;
 	}
 
-	T* release_ptr()
+	const T* release_ptr()
 	{
 		owns_=false;
 		return ptr_;

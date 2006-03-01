@@ -69,6 +69,8 @@ BEGIN_MSG_MAP(CConvolverPropPage)
 	COMMAND_HANDLER(IDC_BUTTON_CALCULATEOPTIMUMATTENUATION, BN_CLICKED, OnBnClickedButtonCalculateoptimumattenuation)
 	COMMAND_HANDLER(IDC_PARTITIONS, EN_CHANGE, OnEnChangePartitions)
 	COMMAND_HANDLER(IDC_COMBOPLANNINGRIGOUR, CBN_SELENDOK, OnCbnSelendokCombofftwmeasure)
+	COMMAND_HANDLER(IDC_COMBODITHER, CBN_SELENDOK, OnCbnSelendokCombodither)
+	COMMAND_HANDLER(IDC_COMBONOISESHAPING, CBN_SELENDOK, OnCbnSelendokCombonoiseshaping)
 	CHAIN_MSG_MAP(IPropertyPageImpl<CConvolverPropPage>)
 	MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
 END_MSG_MAP()
@@ -89,6 +91,8 @@ public:
 	LRESULT OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnEnChangePartitions(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCbnSelendokCombofftwmeasure(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnCbnSelendokCombodither(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnCbnSelendokCombonoiseshaping(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 #endif // __CCONVOLVERPROPPAGE_H_

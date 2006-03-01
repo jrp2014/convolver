@@ -26,10 +26,19 @@ void SIMDFlushToZero(void);
 long int lrint (double flt);
 long int lrintf (float flt);
 
+template <class IntType, class FloatType>
+IntType conv_float_to_int (FloatType x);
+
 inline int conv_float_to_int (float x);
 inline int conv_float_to_int_mem (double x);
 int round_int (double x);
-int floor_int (double x);
+
+template <typename IntType, typename FloatType>
+IntType floor_int (FloatType x);
+
+template
+int floor_int<int,float>(float);
+
 int ceil_int (double x);
 //int truncate_int (double x);
 

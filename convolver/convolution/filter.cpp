@@ -21,7 +21,7 @@
 #include "convolution\filter.h"
 
 // nSamplesPerSec is a default, for raw pcm files,.  nSamplesPerSec_ will be reset to the actual rate of the sound file for other formats
-Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD nPartitions, const WORD nFilterChannel, const DWORD nSamplesPerSec,
+Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, const DWORD nFilterChannel, const DWORD nSamplesPerSec,
 			   const unsigned int nPlanningRigour) : 
 nPartitions (nPartitions),
 nSamplesPerSec_(nSamplesPerSec)
@@ -193,7 +193,7 @@ nSamplesPerSec_(nSamplesPerSec)
 #endif
 
 	// Read the filter file
-	WORD nPartition = 0;
+	DWORD nPartition = 0;
 	DWORD nFrame = 0;					// LibSndFile refers to blocks as frames
 	while (nFrame < nFilterLength_)
 	{

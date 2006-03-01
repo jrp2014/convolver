@@ -31,11 +31,17 @@ extern "C" {
 		STDMETHOD(get_attenuation)(THIS_ float *pVal) PURE;
 		STDMETHOD(put_attenuation)(THIS_ float newVal) PURE;
 
-		STDMETHOD(get_partitions)(THIS_ WORD *pVal) PURE;
-		STDMETHOD(put_partitions)(THIS_ WORD newVal) PURE;
+		STDMETHOD(get_partitions)(THIS_ DWORD *pVal) PURE;
+		STDMETHOD(put_partitions)(THIS_ DWORD newVal) PURE;
 
 		STDMETHOD(get_planning_rigour)(THIS_ unsigned int *pVal) PURE;
 		STDMETHOD(put_planning_rigour)(THIS_ unsigned int newVal) PURE;
+
+		STDMETHOD(get_dither)(THIS_ unsigned int *pVal) PURE;
+		STDMETHOD(put_dither)(THIS_ unsigned int newVal) PURE;
+
+		STDMETHOD(get_noiseshaping)(THIS_ unsigned int *pVal) PURE;
+		STDMETHOD(put_noiseshaping)(THIS_ unsigned int newVal) PURE;
 
 		STDMETHOD(get_filter_description)(THIS_ std::string* description) PURE;
 		STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation) PURE;

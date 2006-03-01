@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,1,0,0
- PRODUCTVERSION 3,1,0,0
+ FILEVERSION 3,2,0,0
+ PRODUCTVERSION 3,2,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver WMP plug-in Module"
-            VALUE "FileVersion", "3, 1, 0, 0"
+            VALUE "FileVersion", "3, 2, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"
-            VALUE "ProductVersion", "3, 1, 0, 0"
+            VALUE "ProductVersion", "3, 2, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -99,30 +99,32 @@ STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 EXSTYLE WS_EX_RIGHT
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    PUSHBUTTON      "Get config or IR",IDC_GETFILTER,4,0,55,14
+    PUSHBUTTON      "Get config or IR",IDC_GETFILTER,0,0,55,14
     CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
                     SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
-                    WS_GROUP,62,2,149,11,WS_EX_CLIENTEDGE
-    LTEXT           "Status",IDC_STATUS,4,61,207,59,SS_NOPREFIX
+                    WS_GROUP,58,2,153,11,WS_EX_CLIENTEDGE
+    LTEXT           "Status",IDC_STATUS,0,61,213,59,SS_NOPREFIX
     CONTROL         "Attenuation (dB):",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,4,18,57,8
-    EDITTEXT        IDC_ATTENUATION,62,15,28,14,ES_RIGHT | ES_AUTOHSCROLL
+                    WS_GROUP,0,17,57,8
+    EDITTEXT        IDC_ATTENUATION,58,15,28,12,ES_RIGHT | ES_AUTOHSCROLL
     PUSHBUTTON      "Calculate optimum attenuation",
-                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,93,15,102,14
+                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,88,15,102,12
     CONTROL         "No of partitions:",IDC_PARTITIONSLABEL,"Static",
-                    SS_SIMPLE | WS_GROUP,4,34,53,8
-    EDITTEXT        IDC_PARTITIONS,62,31,28,14,ES_RIGHT | ES_AUTOHSCROLL | 
+                    SS_SIMPLE | WS_GROUP,0,31,53,8
+    EDITTEXT        IDC_PARTITIONS,58,29,28,12,ES_RIGHT | ES_AUTOHSCROLL | 
                     ES_NUMBER
     CONTROL         "Version not set",IDC_STATIC_VERSION,"Static",SS_SIMPLE | 
-                    WS_GROUP,140,34,71,8,WS_EX_RIGHT
-    COMBOBOX        IDC_COMBOPLANNINGRIGOUR,61,47,53,75,CBS_DROPDOWNLIST | 
+                    WS_GROUP,142,51,71,8,WS_EX_RIGHT
+    COMBOBOX        IDC_COMBOPLANNINGRIGOUR,58,44,53,75,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
     CONTROL         "Tuning rigour:",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,4,49,46,8
+                    WS_GROUP,0,48,46,8
     CONTROL         "http://convolver.sf.net",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,135,50,76,8,WS_EX_RIGHT
-    CONTROL         "jrp@dial.pipex.com",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,149,42,62,8,WS_EX_RIGHT
+                    WS_GROUP,137,43,76,8,WS_EX_RIGHT
+    COMBOBOX        IDC_COMBODITHER,88,29,62,14,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBONOISESHAPING,151,29,62,16,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
 END
 
 
@@ -141,6 +143,16 @@ BEGIN
 0x6150, 0x6974, 0x6e65, 0x0074, 
     IDC_COMBOPLANNINGRIGOUR, 0x403, 11, 0
 0x7845, 0x6168, 0x7375, 0x6974, 0x6576, "\000" 
+    IDC_COMBODITHER, 0x403, 10, 0
+0x6f4e, 0x6420, 0x7469, 0x6568, 0x0072, 
+    IDC_COMBODITHER, 0x403, 11, 0
+0x7254, 0x6169, 0x676e, 0x6c75, 0x7261, "\000" 
+    IDC_COMBODITHER, 0x403, 12, 0
+0x6552, 0x7463, 0x6e61, 0x7567, 0x616c, 0x0072, 
+    IDC_COMBONOISESHAPING, 0x403, 11, 0
+0x6f4e, 0x7320, 0x6168, 0x6970, 0x676e, "\000" 
+    IDC_COMBONOISESHAPING, 0x403, 15, 0
+0x6953, 0x706d, 0x656c, 0x7320, 0x6168, 0x6970, 0x676e, "\000" 
     0
 END
 
@@ -169,8 +181,10 @@ END
 
 STRINGTABLE 
 BEGIN
-    IDS_PARTITIONSSAVEERROR "Failed to save number of partitions to registry"
-    IDS_PLANNINGRIGOURSAVEERROR "Failed to save tuning rigour to registry"
+    IDS_PARTITIONSSAVEERROR "Failed to save number of partitions to convolver"
+    IDS_PLANNINGRIGOURSAVEERROR "Failed to save tuning rigour to convolver"
+    IDS_DITHERSAVEERROR     "Failed to save dither to convolver"
+    IDS_NOISESHAPINGSAVEERROR "Failed to save noise shaping to convolver"
 END
 
 #endif    // English (U.S.) resources

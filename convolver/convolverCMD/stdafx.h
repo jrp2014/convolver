@@ -14,7 +14,3 @@
 
 // TODO: reference additional headers your program requires here
 
-#include "convolution\convolution.h"
-#include "convolution\waveformat.h"
-#include "fft\fftsg_h.h"
-

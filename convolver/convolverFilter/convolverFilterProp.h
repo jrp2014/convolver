@@ -20,8 +20,11 @@ private:
 
 	void	GetControlValues(float& fAttenuation, 
 		TCHAR szFilterFileName[MAX_PATH],
-		WORD& nPartitions,
-		unsigned int& nPlanningRigour);
+		DWORD& nPartitions,
+		unsigned int& nPlanningRigour,
+		unsigned int& nDither, 
+		unsigned int& nNoiseShaping
+		);
 
 	void	SetDirty();
 

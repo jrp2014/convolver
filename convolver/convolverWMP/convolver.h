@@ -56,6 +56,8 @@ const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
 const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
 const TCHAR kszPrefsPartitions[] = _T("Partitions");
 const TCHAR kszPrefsPlanningRigour[] = _T("PlanningRigour");
+const TCHAR kszPrefsDither[] = _T("Dither");
+const TCHAR kszPrefsNoiseShaping[] = _T("NoiseShaping");
 
 /////////////////////////////////////////////////////////////////////////////
 // IConvolver
@@ -74,11 +76,17 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE get_attenuation(float *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_attenuation(float newVal) = 0;
 
-	virtual HRESULT STDMETHODCALLTYPE get_partitions(WORD *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_partitions(WORD newVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_planning_rigour(unsigned int *pVal) = 0;
 	virtual HRESULT STDMETHODCALLTYPE put_planning_rigour(unsigned int newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_dither(unsigned int *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_dither(unsigned int newVal) = 0;
+
+	virtual HRESULT STDMETHODCALLTYPE get_noiseshaping(unsigned int *pVal) = 0;
+	virtual HRESULT STDMETHODCALLTYPE put_noiseshaping(unsigned int newVal) = 0;
 
 	virtual HRESULT STDMETHODCALLTYPE get_filter_description(std::string* description) = 0;
 	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation(float & fAttenuation) = 0;
@@ -136,11 +144,17 @@ public:
 	STDMETHOD(get_attenuation)(float *pVal);
 	STDMETHOD(put_attenuation)(float newVal);
 
-	STDMETHOD(get_partitions)(WORD *pVal);
-	STDMETHOD(put_partitions)(WORD newVal);
+	STDMETHOD(get_partitions)(DWORD *pVal);
+	STDMETHOD(put_partitions)(DWORD newVal);
 
 	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
 	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+
+	STDMETHOD(get_dither)(unsigned int *pVal);
+	STDMETHOD(put_dither)(unsigned int newVal);
+
+	STDMETHOD(get_noiseshaping)(unsigned int *pVal);
+	STDMETHOD(put_noiseshaping)(unsigned int newVal);
 
 	STDMETHOD(get_filter_description)(std::string* description);
 	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
@@ -318,14 +332,20 @@ private:
 
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
-	WORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
-	unsigned int			m_nPlanningRigour;	
+	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
+	unsigned int			m_nPlanningRigour;
+
+	Ditherer<float>::DitherType m_nDither;
+	Ditherer<float>			m_Ditherer;
+
+	NoiseShaper<float>::NoiseShapingType m_nNoiseShaping;
+	NoiseShaper<float>		m_NoiseShaping;
 
 	Holder< ConvolutionList<float> >	m_ConvolutionList;			// Processing class.
-	Sample<float>*						m_InputSampleConvertor;		// functionoid conversion between BYTE and 
-	Sample<float>*						m_OutputSampleConvertor;	// float
+	Sample<float>*			m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Sample<float>*			m_OutputSampleConvertor;	// float
 
-	CFormatSpecs<float>		m_FormatSpecs;
+	SampleMaker<float>		m_FormatSpecs;
 
 	BOOL					m_bEnabled;         // TRUE if enabled
 };

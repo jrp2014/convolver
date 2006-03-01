@@ -24,7 +24,9 @@
 #include "debugging\fastTiming.h"
 #include "convolverWMP\version.h"
 
-PlanningRigour pr;
+static PlanningRigour pr;
+static Ditherer<float> dither;
+static NoiseShaper<float> noiseshaping;
 
 //
 // CreateInstance
@@ -191,7 +193,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 					if(HIWORD(wParam) == BN_CLICKED)
 					{
 						float	fAttenuation = 0;
-						WORD	nPartitions = 1;
+						DWORD	nPartitions = 1;
 						unsigned int nPlanningRigour =
 #ifdef FFTW
 							1;		// Set "Measure" as the default
@@ -300,6 +302,8 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 				break;
 
 			case IDC_COMBOPLANNINGRIGOUR:
+			case IDC_COMBODITHER:
+			case IDC_COMBONOISESHAPING:
 				{
 					if(HIWORD(wParam) == CBN_SELENDOK)
 					{
@@ -417,7 +421,7 @@ HRESULT CconvolverFilterProperties::OnActivate()
 		Edit_SetText(GetDlgItem(m_Dlg, IDC_ATTENUATION), sz);
 	}
 
-	WORD nPartitions = 0;
+	DWORD nPartitions = 0;
 	hr = m_pIconvolverFilter->get_partitions(&nPartitions);
 	if(FAILED(hr))
 	{
@@ -449,6 +453,36 @@ HRESULT CconvolverFilterProperties::OnActivate()
 		SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 	}
 
+	unsigned int nDither = 0;
+	hr = m_pIconvolverFilter->get_dither(&nDither);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve dither.") );
+	}
+	else
+	{
+		for(unsigned int i=0; i<dither.nDitherers; ++i)
+		{
+			SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)dither.Description[i]);
+		}
+		SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
+	}
+
+	unsigned int nNoiseShaping = 0;
+	hr = m_pIconvolverFilter->get_noiseshaping(&nNoiseShaping);
+	if(FAILED(hr))
+	{
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve noise shaping.") );
+	}
+	else
+	{
+		for(unsigned int i=0; i<noiseshaping.nNoiseShapers; ++i)
+		{
+			SendDlgItemMessage(m_Dlg, IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)noiseshaping.Description[i]);
+		}
+		SendDlgItemMessage(m_Dlg, IDC_COMBONOISESHAPING, CB_SETCURSEL, nNoiseShaping, 0);
+	}
+
 	m_bIsInitialized = TRUE;
 
 	return NOERROR;
@@ -466,7 +500,7 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 
 	float	fAttenuation = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
-	WORD nPartitions = 0;
+	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
 #ifdef FFTW
 		1;		// Set "Measure" as the default
@@ -474,7 +508,10 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 		0;
 #endif
 
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
+	unsigned int nDither = 0;
+	unsigned int nNoiseShaping =0;
+
+	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
 	return NOERROR;
 }
@@ -488,7 +525,7 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 {
 	float	fAttenuation = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
-	WORD nPartitions = 0;
+	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
 #ifdef FFTW
 		1;		// Set "Measure" as the default
@@ -496,7 +533,10 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 		0;
 #endif
 
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour);
+	unsigned int nDither = 0;
+	unsigned int nNoiseShaping = 0;
+
+	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
 	// update the plug-in
 	if (m_pIconvolverFilter != NULL)
@@ -526,14 +566,28 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 				return hr;
 			}
 
+			DisplayFilterFormat(m_Dlg, szFilterFileName);
+
 			hr = m_pIconvolverFilter->put_planning_rigour(nPlanningRigour);
 			if (FAILED(hr))
 			{
 				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put tuning rigour"));
 				return hr;
 			}
-
-			DisplayFilterFormat(m_Dlg, szFilterFileName);
+			
+			hr = m_pIconvolverFilter->put_dither(nDither);
+			if (FAILED(hr))
+			{
+				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put dither"));
+				return hr;
+			}
+			
+			hr = m_pIconvolverFilter->put_noiseshaping(nNoiseShaping);
+			if (FAILED(hr))
+			{
+				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put noise shaping"));
+				return hr;
+			}
 		}
 		catch (std::exception& error)
 		{
@@ -542,7 +596,6 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 		}
 		catch (...) 
 		{
-
 			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to apply settings."));
 			return E_FAIL;
 		}
@@ -556,8 +609,10 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 //
 void CconvolverFilterProperties::GetControlValues(float& fAttenuation, 
 												  TCHAR szFilterFileName[MAX_PATH],
-												  WORD& nPartitions,
-												  unsigned int& nPlanningRigour)
+												  DWORD& nPartitions,
+												  unsigned int& nPlanningRigour,
+												  unsigned int& nDither,
+												  unsigned int& nNoiseShaping)
 {
 	// TODO:: redo this in C++ style, with stringstream
 
@@ -578,6 +633,8 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 #else
 		0;
 #endif
+	nDither = 0;
+	nNoiseShaping = 0;
 
 	// to be used in the convolution algorithm
 
@@ -613,7 +670,15 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 
 	// Get the planning rigour value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBOPLANNINGRIGOUR), szStr, sizeof(szStr) / sizeof(szStr[0]));
-	nPlanningRigour = pr.flag(szStr);
+	nPlanningRigour = pr.Lookup(szStr);
+
+	// Get the planning rigour value from the dialog box.
+	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBODITHER), szStr, sizeof(szStr) / sizeof(szStr[0]));
+	nDither = dither.Lookup(szStr);
+
+	// Get the planning rigour value from the dialog box.
+	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBONOISESHAPING), szStr, sizeof(szStr) / sizeof(szStr[0]));
+	nNoiseShaping = noiseshaping.Lookup(szStr);
 
 	// update the registry
 	CRegKey key;
@@ -663,6 +728,28 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 		if (lResult != ERROR_SUCCESS)
 		{
 			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to save tuning rigour to registry") );
+		}
+	}
+
+	// Write the dither to the registry.
+	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		lResult = key.SetDWORDValue( kszPrefsDither, nDither );
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to save dither to registry") );
+		}
+	}
+
+	// Write the noise shaping to the registry.
+	lResult = key.Create(HKEY_CURRENT_USER, kszPrefsRegKey);
+	if (ERROR_SUCCESS == lResult)
+	{
+		lResult = key.SetDWORDValue( kszPrefsNoiseShaping, nNoiseShaping );
+		if (lResult != ERROR_SUCCESS)
+		{
+			SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to save noise shaping to registry") );
 		}
 	}
 }

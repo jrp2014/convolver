@@ -14,9 +14,53 @@
 #include "convolution\waveformat.h"
 #include "convolution\exception.h"
 
+#include "boost\program_options.hpp"
+
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+
+
+	//boost::program_options::options_description desc("Options");
+
+	//desc.add_options()
+	//	("help", "generate this help message")
+	//	("input", boost::program_options::value<std::wstring>(), "input text file")
+	//	("output", boost::program_options::value<std::wstring>(), "input WAV sound filename")
+	//	;
+
+	//boost::program_options::positional_options_description p;
+	//p.add("input", -1);
+	//p.add("output", -1);
+
+	//boost::program_options::variables_map vm;
+	//boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+	//boost::program_options::notify(vm);    
+
+	//if (vm.count("help"))
+	//{
+	//	desc.print(std::cerr);
+	//	return 1;
+	//}
+
+	//if (vm.count("input") == 1)
+	//{
+	//	std::wcerr << "Using speccification from" << vm["input"].as<std::wstring>() << std::endl;
+	//}
+	//else
+	//{
+	//	std::wcerr << "Exactly one input text file must be specified"  << std::endl;
+	//}
+
+	//if (vm.count("output") == 1)
+	//{
+	//	std::wcerr << "Outputting to" << vm["output"].as<std::wstring>() << std::endl;
+	//}
+	//else
+	//{
+	//	std::wcerr << "Exactly one output WAV filename must be specified"  << std::endl;
+	//}
+
 
 	HRESULT	hr = S_OK;
 

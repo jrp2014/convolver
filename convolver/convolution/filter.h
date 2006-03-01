@@ -18,17 +18,18 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+
 #include "convolution\config.h"
+#include <vector>
 #include "convolution\samplebuffer.h"
 #include "convolution\wavefile.h"
 #include "convolution\waveformat.h"
-#include "convolution\lrint.h"
-#include <vector>
+#include "convolution\ffthelp.h"
 
 class Filter
 {
 public:
-	const WORD	nPartitions;
+	const DWORD	nPartitions;
 
 	// Accessor functions
 
@@ -105,7 +106,7 @@ public:
 #endif
 
 	// Constructor
-	Filter(const TCHAR szFilterFileName[MAX_PATH], const WORD nPartitions, const WORD nFilterChannel, const DWORD nSamplesPerSec,
+	Filter(const TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, const DWORD nFilterChannel, const DWORD nSamplesPerSec,
 			   const unsigned int nPlanningRigour);
 
 	virtual ~Filter()

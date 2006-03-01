@@ -40,14 +40,16 @@
 				BufferSecurityCheck="1"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="0"
+				TreatWChar_tAsBuiltInType="1"
 				ForceConformanceInForLoopScope="1"
 				RuntimeTypeInfo="1"
 				UsePrecompiledHeader="0"
+				ExpandAttributedSource="0"
 				WarningLevel="4"
 				Detect64BitPortabilityProblems="1"
 				DebugInformationFormat="4"
 				CallingConvention="0"
-				AdditionalOptions="/fp:strict"
+				AdditionalOptions="/fp:fast"
 				OpenMP="1"
 				RequireProcExt="2"
 				Parallelization="1"
@@ -126,6 +128,7 @@
 				BufferSecurityCheck="0"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="0"
+				TreatWChar_tAsBuiltInType="1"
 				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -199,10 +202,10 @@
 				GlobalOptimizations="1"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="1"
-				FavorSizeOrSpeed="1"
+				FavorSizeOrSpeed="2"
 				OmitFramePointers="1"
 				EnableFiberSafeOptimizations="1"
-				OptimizeForProcessor="3"
+				OptimizeForProcessor="0"
 				OptimizeForWindowsApplication="0"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG;FFTW_DLL"
@@ -214,6 +217,7 @@
 				BufferSecurityCheck="0"
 				EnableFunctionLevelLinking="1"
 				EnableEnhancedInstructionSet="0"
+				TreatWChar_tAsBuiltInType="1"
 				ForceConformanceInForLoopScope="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -344,7 +348,11 @@
 		<File 
 			RelativePath="..\convolution\convolution.h"/>
 		<File 
+			RelativePath="..\convolution\dither.h"/>
+		<File 
 			RelativePath="..\convolution\exception.h"/>
+		<File 
+			RelativePath="..\convolution\factory.h"/>
 		<File 
 			RelativePath="..\convolution\ffthelp.cpp"/>
 		<File 
@@ -390,6 +398,8 @@
 			RelativePath="..\convolution\waveformat.cpp"/>
 		<File 
 			RelativePath="..\convolution\waveformat.h"/>
+		<File 
+			RelativePath="..\convolution\sample.cpp"/>
 		<File 
 			RelativePath="..\fftw\fftw3.h"/>
 		<File 

@@ -25,6 +25,7 @@
 #include "convolution\channelpaths.h"
 #include "convolution\waveformat.h"
 #include "convolution\lrint.h"
+#include "convolution\ffthelp.h"
 
 // For random number seed
 #include <time.h>
@@ -39,11 +40,6 @@ extern "C" void cmuladd(float *, float *, float *, int);
 #endif
 
 // Convolution does the work
-// The data path is:
-// pbInputData (raw bytes) ->  AttenuatedSample(const float fAttenuation_db, GetSample(const BYTE* & container)) ->
-// m_InputBuffer (FFT_type) -> [convolve] ->
-// m_OutputBuffer (FFT_type) -> NormalizeSample(BYTE* dstContainer, float& srcSample) ->
-// pbOuputData (raw bytes)
 
 template <typename T>
 class Convolution
@@ -54,20 +50,23 @@ public:
 
 	// This version of the convolution routine does partitioned convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
-
-	// This version of the convolution routine does partitioned convolution
 	DWORD doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
-		DWORD dwBlocksToProcess,		// A block contains a sample for each channel
-		const T fAttenuation_db);  // Returns bytes generated
+		const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+		const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+		NoiseShape<T>* noiseshaper,						// not const because noise shaper has changeable state
+		Dither<T>* ditherer,							// not const because dither has changeable state
+		DWORD dwBlocksToProcess,						// A block contains a sample for each channel
+		const T fAttenuation_db);						// Returns bytes generated
 
 	// This version does straight overlap-save convolution
+	// Returns number of bytes processed  (== number of output bytes, too)
 	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-		const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+		const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+		const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+		NoiseShape<T>* noiseshaper,						// not const because noise shaper has changeable state
+		Dither<T>* ditherer,
 		DWORD dwBlocksToProcess,
-		const T fAttenuation_db); // Returns bytes generated
+		const T fAttenuation_db);						// Returns bytes generated
 
 	void Flush();								// zero buffers, reset pointers
 
@@ -112,10 +111,10 @@ private:
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
 
-	const WORD			nPartitions_;
+	const DWORD			nPartitions_;
 	DWORD				nInputBufferIndex_;			// placeholder
-	WORD				nPartitionIndex_;			// for partitioned convolution
-	WORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
+	DWORD				nPartitionIndex_;			// for partitioned convolution
+	DWORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWriting_;
 
 	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
@@ -158,7 +157,7 @@ template <typename T>
 class ConvolutionList
 {
 public:
-	ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions,
+	ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD& nPartitions,
 		const unsigned int& nPlanningRigour);
 
 	virtual ~ConvolutionList() 
@@ -174,7 +173,7 @@ public:
 
 	// Accessor functions
 
-	WORD nConvolutionList() const
+	size_type nConvolutionList() const
 	{
 		assert(nConvolutionList_ == ConvolutionList_.size());
 		return nConvolutionList_;
@@ -257,11 +256,12 @@ public:
 private:
 	configFile	config_;
 
+
 	SelectedState state_;
 	size_type selectedConvolutionIndex_;
 	boost::ptr_vector< Convolution<T> > ConvolutionList_;
-	WORD	nConvolutionList_;
-	WORD	nPartitions_;
+	size_type	nConvolutionList_;
+	DWORD	nPartitions_;
 
 	ConvolutionList();											// No default ctor
 	ConvolutionList(const ConvolutionList&);					// No copy ctor
