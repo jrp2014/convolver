@@ -30,6 +30,9 @@
 #define _WIN32_WINNT   0x0500 
 #endif
 
+
+#define STRSAFE_NO_DEPRECATE	1
+
 // For STLport
 #define _STLP_NO_ANACHRONISMS 1
 #define _STLP_NEW_PLATFORM_SDK 1

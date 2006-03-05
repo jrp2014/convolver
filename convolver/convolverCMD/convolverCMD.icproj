@@ -56,10 +56,12 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib libsndfile.lib"
+				ShowProgress="2"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/convolverCMD.pdb"
 				SubSystem="1"
@@ -144,7 +146,7 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib  libsndfile.lib"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -235,7 +237,7 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib  libsndfile.lib"
 				OutputFile="$(OutDir)/convolverCMD.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -346,6 +348,9 @@
 					RelativePath="..\convolution\exception.h">
 				</File>
 				<File 
+					RelativePath="..\convolution\factory.h">
+				</File>
+				<File 
 					RelativePath="..\convolution\ffthelp.cpp">
 				</File>
 				<File 
@@ -365,6 +370,9 @@
 				</File>
 				<File 
 					RelativePath="..\convolution\lrint.h">
+				</File>
+				<File 
+					RelativePath="..\convolution\sample.cpp">
 				</File>
 				<File 
 					RelativePath="..\convolution\sample.h">

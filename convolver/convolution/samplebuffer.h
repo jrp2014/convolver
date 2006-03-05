@@ -323,7 +323,7 @@ struct FastArray : public AlignedArray<T>
 	// Scalar computed assignment.
 	FastArray<T>& operator*= (const T x)
 	{
-		if(x != static_cast<T>(1))
+		if(x != T(1))
 		{
 //			const size_type ss = size_;
 //#pragma loop count(65536)

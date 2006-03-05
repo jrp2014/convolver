@@ -132,8 +132,8 @@ nSamplesPerSec_(nSamplesPerSec)
 
 	nPartitionLength_ = nHalfPartitionLength_ * 2;
 
-	int nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength_);
-	int nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
+	DWORD nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength_);
+	DWORD nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
 
 #ifdef OOURA
 	// Initialize the Oooura workspace;

@@ -1,5 +1,30 @@
 #include "convolution\ffthelp.h"
 
+const TCHAR PlanningRigour::Rigour[PlanningRigour::nDegrees][PlanningRigour::nStrLen] =
+{
+#ifdef FFTW
+	TEXT("Estimate"),
+		TEXT("Measure"),
+		TEXT("Patient"),
+		TEXT("Exhaustive"),
+		TEXT("Take 1 minute")
+#else
+	TEXT("Default"), nStrLen)
+#endif
+};
+
+const unsigned int PlanningRigour::Flag[PlanningRigour::nDegrees] =
+{
+#ifdef FFTW
+	FFTW_ESTIMATE|FFTW_DESTROY_INPUT,
+		FFTW_MEASURE|FFTW_DESTROY_INPUT,
+		FFTW_PATIENT|FFTW_DESTROY_INPUT,
+		FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT,
+		FFTW_PATIENT|FFTW_DESTROY_INPUT
+#else
+	0
+#endif
+};
 
 // 2^a * 2^b * 3^c * 5^d * 11^e * 13^f (e+f=0 or 1)
 const DWORD OptimalDFT::OptimalDFTSize[]  =

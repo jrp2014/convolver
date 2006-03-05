@@ -14,7 +14,7 @@
 #include "convolution\waveformat.h"
 #include "convolution\exception.h"
 
-#include "boost\program_options.hpp"
+//#include "boost\program_options.hpp"
 
 
 int _tmain(int argc, _TCHAR* argv[])

@@ -448,7 +448,7 @@ void ChannelPaths::Dump() const
 	}
 	cdebug << std::endl;
 
-	for(int i = 0; i < nPaths(); ++i) 
+	for(unsigned int i = 0; i < nPaths(); ++i) 
 		Paths()[i].Dump();
 }
 

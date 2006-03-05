@@ -32,7 +32,7 @@ template class ConvolutionList<float>;
 // Convolution Constructor
 template <typename T>
 Convolution<T>::Convolution(const TCHAR szConfigFileName[MAX_PATH], 
-							const WORD& nPartitions,
+							const DWORD& nPartitions,
 							const unsigned int& nPlanningRigour) :
 nPartitions_(nPartitions),
 Mixer(szConfigFileName, nPartitions, nPlanningRigour),
@@ -96,10 +96,8 @@ void Convolution<T>::Flush()
 template <typename T>
 DWORD
 Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-										 const Sample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-										 const Sample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
-										 NoiseShape<T>* noiseshaper,				// not const because noise shaper has changeable state
-										 Dither<T>* ditherer,
+										 const ConvertSample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
+										 const ConvertSample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
 										 DWORD dwBlocksToProcess,					// A block contains a sample for each channel
 										 const T fAttenuation_db)					// Returns bytes processed
 {
@@ -134,7 +132,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 				}
 				output_sample_convertor->PutSample(pbOutputDataPointer,
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					cbOutputBytesGenerated, noiseshaper, ditherer);
+					nChannel, cbOutputBytesGenerated);
 			}
 		}
 
@@ -265,10 +263,8 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 template <typename T>
 DWORD
 Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-							  const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-							  const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
-							  NoiseShape<T>* noiseshaper,					// not const because noise shaper has changeable state
-							  Dither<T>* ditherer,
+							  const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+							  const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
 							  DWORD dwBlocksToProcess,						// A block contains a sample for each channel
 							  const T fAttenuation_db)						// Returns bytes processed
 {
@@ -311,7 +307,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 				}
 				output_sample_convertor->PutSample(pbOutputDataPointer,
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					cbOutputBytesGenerated, noiseshaper, ditherer);
+					nChannel, cbOutputBytesGenerated);
 			}
 		}
 
@@ -782,9 +778,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	std::vector<T>InputSamples(nInputBufferLength);
 	std::vector<T>OutputSamples(nOutputBufferLength);
 
-	Holder< Sample<T> > convertor(new Sample_ieeefloat<T>());
-	Holder< Dither<T> > nodither(new NoDither<T>());				// since using float, there is no dithering
-	Holder< NoiseShape<T> > nonoiseshaping(new NoNoiseShape<T,32>());	// or noise shaping
+	Holder< ConvertSample<T> > convertor(new ConvertSample_ieeefloat<T>());
 
 	// This is a typedef for a random number generator.
 	// Try boost:: minstd_rand or boost::ecuyer1988 instead of boost::mt19937
@@ -829,14 +823,10 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	DWORD nBytesGenerated = overlapsave && nPartitions_ == 1 ?
 		doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor.get_ptr(), convertor.get_ptr(),
-		nonoiseshaping.get_ptr(),
-		nodither.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0)
 		: doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
 		convertor.get_ptr(), convertor.get_ptr(),
-		nonoiseshaping.get_ptr(),
-		nodither.get_ptr(),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0);
 

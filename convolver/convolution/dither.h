@@ -108,15 +108,38 @@
 #include <ks.h>
 #include <ksmedia.h>
 #include <mediaerr.h>
-
+#include <time.h>
 #include <boost\random.hpp>
+#include <limits>
+
+// IntType may be Int16, 32, or 64; T may be float or double
+// Uses current rounding mode, assumed to be round to nearest
+template <typename IntType, typename T>
+inline IntType floor_int (const T x)
+{
+#undef min
+#undef max
+	assert (x > static_cast <T> (std::numeric_limits<IntType>::min() / 2) - 1.0);
+	assert (x < static_cast <T> (std::numeric_limits<IntType>::max() / 2) + 1.0);
+	static const T round_towards_m_i = T(-0.5);
+	IntType i;
+	__asm
+	{
+		fld x
+			fadd st, st (0)
+			fadd round_towards_m_i
+			fistp i
+			sar i, 1
+	}
+	return (i);
+}
 
 template <typename T>
 class Dither
 {
 public:
 	// Generate the dither
-	virtual T dither() = 0;
+	virtual T dither(const WORD nChannel) = 0;
 
 	virtual ~Dither(void) = 0;
 };
@@ -132,7 +155,7 @@ public:
 	NoDither() {}
 
 	// Generate the dither
-	T dither()
+	T dither(const WORD nChannel)
 	{
 		return 0;
 	}
@@ -149,18 +172,13 @@ class SimpleDither : public Dither<T>
 {
 public:
 
-	SimpleDither() : gen_dither_(generator_, distribution_type(-Qover2, Qover2))
-	{};
-
 	// Dithering may vary or be optimizable by the number of channels or sample rate
-	SimpleDither(WORD nChannels) : gen_dither_(generator_, distribution_type(-Qover2, Qover2))
-	{};
+	SimpleDither(const WORD nChannels) : nChannels_(nChannels),
+	  generator_(unsigned int(std::time(NULL))), gen_dither_(generator_, distribution_type(-Qover2, Qover2))
+	{}
 
 	// Generate the dither
-	virtual T dither()
-	{
-		return 0;
-	}
+	virtual T dither(const WORD nChannel) = 0;
 
 	virtual ~SimpleDither(void) {};
 
@@ -171,26 +189,29 @@ protected:
 	typedef boost::variate_generator<base_generator_type&, distribution_type> gen_type;
 	gen_type gen_dither_;
 	base_generator_type generator_;
+
+	const WORD nChannels_;
 };
 
 template <typename T, unsigned short validBits,
 typename distribution_type, typename base_generator_type >
-const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Q = 2.0 / ((1 << validBits) - 1);
+const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Q = 2.0 / ((1 << (validBits-2)) - 1 + (1 << (validBits-2)));
 
 template <typename T, unsigned short validBits,
 typename distribution_type, typename base_generator_type >
-const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Qover2 = 1.0 / ((1 << validBits) - 1);
+const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Qover2 = 1.0 / ((1 << (validBits-2)) - 1 + (1 << (validBits-2)));
 
 template <typename T, unsigned short validBits> 
 class RectangularDither : public SimpleDither<T, validBits>
 {
 public:
-	RectangularDither() : SimpleDither<T, validBits>()
+	RectangularDither(WORD nChannels) : SimpleDither<T, validBits>(nChannels)
 	{};
 
 	// Generate the dither
-	T dither()
+	T dither(const WORD nChannel)
 	{
+		assert(nChannel < nChannels_);
 		return gen_dither_();
 	}
 };
@@ -200,17 +221,56 @@ template <typename T, unsigned short validBits>
 class TriangularDither : public SimpleDither<T, validBits>
 {
 public:
-	TriangularDither(WORD nChannel) : SimpleDither<T, validBits>(nChannel)
+	TriangularDither(WORD nChannels) : SimpleDither<T, validBits>(nChannels), prev_dither_(nChannels, gen_dither_())
 	{};
 
-	// Generate the dither
-	T dither()
+	// Generate the triangular dither by differencing successive rectangular dither values
+	T dither(const WORD nChannel)
 	{
-		return gen_dither_() + gen_dither_();		// TODO:: Optimize this
+		assert(nChannel < nChannels_);
+		const T dither = gen_dither_();
+		const T result = dither - prev_dither_[nChannel];
+		prev_dither_[nChannel] = dither;
+		return result;
 	}
+
+private:
+	std::vector<T> prev_dither_;
 };
 
-// TODO:: turn into a factory class
+// Optimization for 2 channels; requires only 1 extra random number per channel cycle
+template <typename T, unsigned short validBits>
+class StereoTriangularDither : public SimpleDither<T, validBits>
+{
+public:
+	StereoTriangularDither() : SimpleDither<T, validBits>(2), prev_dither_(gen_dither_()), right_dither_(gen_dither_())
+	{};
+
+	// Generate the triangular dither by summing and differencing successive rectangular dither values
+	T dither(const WORD nChannel)
+	{
+		assert(nChannels_ == 2);
+		assert(nChannel < nChannels_);
+		if(nChannel == 0)
+		{
+			const T dither = gen_dither_();
+			const T left_dither = dither - prev_dither_;
+			right_dither_ = dither + prev_dither_;
+			prev_dither_ = dither;
+			return left_dither;
+		}
+		else
+		{
+			return right_dither_;
+		}
+	}
+
+private:
+	T prev_dither_;
+	T right_dither_;
+};
+
+
 template <typename T>
 class Ditherer
 {
@@ -220,24 +280,11 @@ public:
 	enum DitherType { None = 0, Triangular= 1,  Rectangular = 2 };
 
 	static const unsigned int nDitherers = 3;
-	static const unsigned int nStrLen = 15;
+	static const unsigned int nStrLen = sizeof(TEXT("Rectangular")) / sizeof(TCHAR) + 1;
 
-	TCHAR Description[nDitherers][nStrLen];
+	static const TCHAR Description[nDitherers][nStrLen];
 
 	HRESULT SelectDither(DitherType dt, const WAVEFORMATEX* pWave);
-
-	/// Default constructor
-	Ditherer() : ditherer_(NULL)
-	{
-		_tcsncpy(Description[None], TEXT("None"), nStrLen);
-		_tcsncpy(Description[Triangular], TEXT("Triangular"), nStrLen);
-		_tcsncpy(Description[Rectangular], TEXT("Rectangular"), nStrLen);
-	}
-
-	Dither<T>* ditherer() const
-	{
-		return ditherer_.get_ptr();
-	}
 
 	unsigned int Lookup(const TCHAR* r) const
 	{
@@ -248,122 +295,40 @@ public:
 		}
 		throw std::range_error("Internal Error: Invalid dither");
 	}
-private:
-	Holder< Dither<T> > ditherer_;
+};
+template <typename T>
+const TCHAR Ditherer<T>::Description[Ditherer<T>::nDitherers][Ditherer<T>::nStrLen] =
+{
+	TEXT("None"),
+	TEXT("Triangular"),
+	TEXT("Rectangular")
 };
 
-template <typename T>
-HRESULT Ditherer<T>::SelectDither(DitherType dt, const WAVEFORMATEX* pWave)
+
+template <typename T, typename IntType>
+struct NoiseShape
 {
-	if(pWave == NULL)
-	{
-		ditherer_.set_ptr(new NoDither<T>()); // Equivalent to no dither
-		return S_OK;
-	}
+	NoiseShape(const WORD nChannels) {}
 
-	if ((pWave->nBlockAlign != pWave->nChannels * pWave->wBitsPerSample / 8) ||
-		(pWave->nAvgBytesPerSec != pWave->nBlockAlign * pWave->nSamplesPerSec))
-	{
-		return DMO_E_INVALIDTYPE;
-	}
-
-	WORD validBits = 0;
-	WORD nChannels = 0;
-
-	// Formats that support more than two channels or sample sizes of more than 16 bits can be described
-	// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
-	if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-	{
-		const WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
-
-		if(pWaveXT->Format.cbSize < 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
-		{
-			return DMO_E_INVALIDTYPE;
-		}
-		assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
-
-		validBits = pWaveXT->Samples.wValidBitsPerSample;
-		nChannels = pWaveXT->Format.nChannels;
-	}
-	else // WAVE_FORMAT_PCM (8, 16 or 32-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
-	{
-		// TODO:: reject WAVE_FORMAT_IEEE_FLOAT ??
-
-		if(pWave->cbSize != 0)
-		{
-			return DMO_E_INVALIDTYPE;
-		}
-
-		validBits = pWave->wBitsPerSample;
-		nChannels = pWave->nChannels;
-	}
-
-	switch (dt)
-	{
-	case None:
-		ditherer_.set_ptr(new NoDither<T>());
-		break;
-	case Triangular:
-		switch (validBits)
-		{
-		case 16:
-			ditherer_.set_ptr(new TriangularDither<T, 16>(nChannels));
-			break;
-		case 20:
-			ditherer_.set_ptr(new TriangularDither<T, 20>(nChannels));
-			break;
-		case 24:
-			ditherer_.set_ptr(new TriangularDither<T, 24>(nChannels)); 
-			break;
-		default:
-			ditherer_.set_ptr(new NoDither<T>());
-		}
-		break;
-	case Rectangular:
-		switch (validBits)
-		{
-		case 16:
-			ditherer_.set_ptr(new RectangularDither<T, 16>());
-			break;
-		case 20:
-			ditherer_.set_ptr(new RectangularDither<T, 20>());
-			break;
-		case 24:
-			ditherer_.set_ptr(new RectangularDither<T, 24>()); 
-			break;
-		default:
-			ditherer_.set_ptr(new NoDither<T>());
-		}
-		break;
-	default:
-		throw std::range_error("Internal error: Invalid SelectDitherer type");
-	}
-
-	return S_OK;
-}
-
-template <typename T>
-class NoiseShape
-{
-public:
 	// Generate the dither
-	virtual INT32 shapenoise(T sample, Dither<T>* dither) = 0;
+	virtual IntType shapenoise(const T sample, Dither<T> * dither, const WORD nChannel) = 0;
 
 	virtual ~NoiseShape(void) = 0;
 };
-template <typename T>
-inline NoiseShape<T>::~NoiseShape(){}
+template <typename T, typename IntType>
+inline NoiseShape<T,IntType>::~NoiseShape(void){}
 
-template <typename T, int validBits>
-class NoNoiseShape : public NoiseShape<T>
+template <typename T, typename IntType, int validBits>
+class NoNoiseShape : public NoiseShape<T,IntType>
 {
 public:
-	NoNoiseShape() {}
+	NoNoiseShape(const WORD nChannels) : NoiseShape<T,IntType>(nChannels)
+	{}
 
 	// Generate the dither
-	virtual INT32 shapenoise(T sample, Dither<T>* dither)
+	virtual IntType shapenoise(const T sample, Dither<T> * dither, const WORD nChannel)
 	{
-		return floor_int<INT32,T>((dither->dither() + sample) * q_);	// just scale (eg from float to INT32)
+		return floor_int<IntType,T>((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to INT32)
 	}
 
 	virtual ~NoNoiseShape(void) {}
@@ -374,33 +339,63 @@ protected:
 	static const T q_;
 };
 
-template <typename T, int validBits>
-const T  NoNoiseShape<T, validBits>::Q_ = 1.0 / ((1 << (validBits-1)) - 0.5);
+template <typename T, typename IntType, int validBits>
+const T  NoNoiseShape<T, IntType, validBits>::Q_ = 1.0 / ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
 
-template <typename T, int validBits>
-const T  NoNoiseShape<T, validBits>::Qover2_ = 0.5 / ((1 << (validBits-1)) - 0.5);
+template <typename T, typename IntType, int validBits>
+const T  NoNoiseShape<T, IntType, validBits>::Qover2_ = 0.5 / ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
 
-template <typename T, int validBits>
-const T  NoNoiseShape<T, validBits>::q_ = ((1 << (validBits-1)) - 0.5);
+template <typename T, typename IntType, int validBits>
+const T  NoNoiseShape<T, IntType, validBits>::q_ = ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
+
+// Specialization needed because the templated floor_int function is invalid for BYTEs
+template <typename T>
+class NoNoiseShape<T, BYTE, 8> : public NoiseShape<T,BYTE>
+{
+public:
+	NoNoiseShape(const WORD nChannels) : NoiseShape<T,BYTE>(nChannels)
+	{}
+
+	// Generate the dither
+	virtual BYTE shapenoise(const T sample, Dither<T> * dither, const WORD nChannel)
+	{
+		return floor_int((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to INT32)
+	}
+
+	virtual ~NoNoiseShape(void) {}
+
+protected:
+	static const T Q_;				// Least significant bit
+	static const T Qover2_;
+	static const T q_;
+};
+
+template <typename T>
+const T  NoNoiseShape<T, BYTE, 8>::Q_ = 1.0 / ((1 << (8-2)) - 0.5 + (1 << (8-2)));
+
+template <typename T>
+const T  NoNoiseShape<T, BYTE, 8>::Qover2_ = 0.5 / ((1 << (8-2)) - 0.5 + (1 << (8-2)));
+
+template <typename T>
+const T  NoNoiseShape<T, BYTE, 8>::q_ = ((1 << (8-2)) - 0.5 + (1 << (8-2)));
 
 
 // SimpleShaping 
-template <typename T, int validBits>
-class SimpleNoiseShape : public NoNoiseShape<T, validBits>
+template <typename T, typename IntType, int validBits>
+class SimpleNoiseShape : public NoNoiseShape<T, IntType, validBits>
 {
 public:
-	SimpleNoiseShape(WORD nChannels) : NoNoiseShape<T, validBits>(), e_(nChannels, 0), nChannels_(nChannels), nChannel_(0)
+	SimpleNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), e_(nChannels, 0), nChannels_(nChannels)
 	{}
 
 	// Generate shaped sample
-	virtual INT32 shapenoise(T sample, Dither<T>* dither)
+	virtual IntType shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
 	{
-		const T d = dither->dither();
-		const T y = sample + d - e_[nChannel_];
-		const INT32 yint = floor_int<INT32,T>(y * q_);			// just scale (eg from float to INT32)
-		e_[nChannel_] = Q_ * (yint + T(0.5)) - (y - d);			// generate the feedback for this channel
-		if(nChannel_++ == nChannels_)
-			nChannel_ = 0;	
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+		const T y = sample + d - e_[nChannel];
+		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - e_[nChannel]);			// generate the feedback for this channel
 		return yint;	
 	}
 
@@ -409,37 +404,201 @@ public:
 private:
 	std::vector<T> e_;				// error feedback
 	const WORD nChannels_;
-	WORD nChannel_;
+};
+
+template <typename T>
+class SimpleNoiseShape<T, BYTE, 8> : public NoNoiseShape<T, BYTE, 8>
+{
+public:
+	SimpleNoiseShape(const WORD nChannels) : NoNoiseShape<T, BYTE, 8>(nChannels), e_(nChannels, 0), nChannels_(nChannels)
+	{}
+
+	// Generate shaped sample
+	virtual BYTE shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
+	{
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+		const T y = sample + d - e_[nChannel];
+		const BYTE yint = floor_int(y * q_);		// just scale (eg from float to INT32)
+		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - e_[nChannel]);			// generate the feedback for this channel
+		return yint;	
+	}
+
+	virtual ~SimpleNoiseShape(void) {}
+
+private:
+	std::vector<T> e_;				// error feedback
+	const WORD nChannels_;
+};
+
+// 2nd order Shaping 
+template <typename T, typename IntType, int validBits>
+class SecondOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
+{
+public:
+	SecondOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
+		pos_(nChannels, 0), e_(nChannels,std::vector<T>(4, 0)), nChannels_(nChannels)
+	{}
+
+	// Generate shaped sample
+	virtual IntType shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
+	{
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+
+		unsigned int pos = pos_[nChannel];
+
+		const T H = e_[nChannel][pos] * T(1.287) + e_[nChannel][pos+1]*T(-0.651);
+		const T y = sample + d - H;
+	
+		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+
+		pos = 1 - pos;
+		e_[nChannel][pos+2] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
+		pos_[nChannel] = pos;
+
+		return yint;	
+	}
+
+	virtual ~SecondOrderNoiseShape(void) {}
+
+private:
+	std::vector<unsigned int> pos_;
+	std::vector<std::vector<T> > e_;				// error feedback
+	const WORD nChannels_;
 };
 
 
-// TODO:: turn into a factory class
+// 3rd order Shaping 
+template <typename T, typename IntType, int validBits>
+class ThirdOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
+{
+public:
+	ThirdOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
+		pos_(nChannels, 0), e_(nChannels,std::vector<T>(6, 0)), nChannels_(nChannels)
+	{}
+
+	// Generate shaped sample
+	virtual IntType shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
+	{
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+
+		unsigned int pos = pos_[nChannel];
+
+		const T H = e_[nChannel][pos] * T(1.329) + e_[nChannel][pos+1]*T(-0.735) + e_[nChannel][pos+2]*T(0.0646);
+		const T y = sample + d - H;
+	
+		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+
+		if(++pos == 3) pos = 0;
+		e_[nChannel][pos+3] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
+		pos_[nChannel] = pos;
+
+		return yint;	
+	}
+
+	virtual ~ThirdOrderNoiseShape(void) {}
+
+private:
+	std::vector<unsigned int> pos_;
+	std::vector<std::vector<T> > e_;				// error feedback
+	const WORD nChannels_;
+};
+
+// 9th order Shaping 
+template <typename T, typename IntType, int validBits>
+class NinthOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
+{
+public:
+	NinthOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
+		pos_(nChannels, 0), e_(nChannels,std::vector<T>(18, 0)), nChannels_(nChannels)
+	{}
+
+	// Generate shaped sample
+	virtual IntType shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
+	{
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+
+		unsigned int pos = pos_[nChannel];
+
+		const T H = e_[nChannel][pos]*T(2.203) + e_[nChannel][pos+1]*T(-3.210) + e_[nChannel][pos+2]*T(3.970) +
+			e_[nChannel][pos+3]*T(-4.404) + e_[nChannel][pos+4]*T(3.668) + e_[nChannel][pos+5]*T(-2.656) +
+			e_[nChannel][pos+6]*T(1.644) + e_[nChannel][pos+7]*T(-0.767) + e_[nChannel][pos+8]*T(0.118);
+
+		const T y = sample + d - H;
+	
+		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+
+		if(++pos == 9) pos = 0;
+		e_[nChannel][pos+9] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
+		pos_[nChannel] = pos;
+
+		return yint;	
+	}
+
+	virtual ~NinthOrderNoiseShape(void) {}
+
+private:
+	std::vector<unsigned int> pos_;
+	std::vector<std::vector<T> > e_;				// error feedback
+	const WORD nChannels_;
+};
+
+// Pseudo Sony SBM(TM) 
+template <typename T, typename IntType, int validBits>
+class SonySBM : public NoNoiseShape<T, IntType, validBits>
+{
+public:
+	SonySBM(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
+		pos_(nChannels, 0), e_(nChannels,std::vector<T>(24, 0)), nChannels_(nChannels)
+	{}
+
+	// Generate shaped sample
+	virtual IntType shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
+	{
+		assert(nChannel < nChannels_);
+		const T d = dither->dither(nChannel);
+
+		unsigned int pos = pos_[nChannel];
+
+		const T H = e_[nChannel][pos]*T(1.47933) + e_[nChannel][pos+1]*T(-1.59032) + e_[nChannel][pos+2]*T(1.64436) +
+			e_[nChannel][pos+3]*T(-1.36613) + e_[nChannel][pos+4]*T(0.926704) + e_[nChannel][pos+5]*T(-0.557931) +
+			e_[nChannel][pos+6]*T(-0.267859) + e_[nChannel][pos+7]*T(-0.106726) + e_[nChannel][pos+8]*T(-0.0285161) +
+			e_[nChannel][pos+9]*T(0.00123066) + e_[nChannel][pos+10]*T(-0.00616555) + e_[nChannel][pos+11]*T(0.003067);
+
+		const T y = sample + d - H;
+	
+		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+
+		if(++pos == 12) pos = 0;
+		e_[nChannel][pos+12] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
+		pos_[nChannel] = pos;
+
+		return yint;	
+	}
+
+	virtual ~SonySBM(void) {}
+
+private:
+	std::vector<unsigned int> pos_;
+	std::vector<std::vector<T> > e_;				// error feedback
+	const WORD nChannels_;
+};
+
 template <typename T>
 class NoiseShaper
 {
 public:
 
 	/// These ditherers are currently available:
-	enum NoiseShapingType { None = 0, Simple= 1 };
+	enum NoiseShapingType { None=0, Simple=1, SecondOrder=2, ThirdOrder=3, NinthOrder=4, SonySBM=5};
 
-	static const unsigned int nNoiseShapers = 2;
-	static const unsigned int nStrLen = 21;
+	static const unsigned int nNoiseShapers = 6;
+	static const unsigned int nStrLen = sizeof(TEXT("Simple noise shaping")) / sizeof(TCHAR) + 1;
 
-	TCHAR Description[nNoiseShapers][nStrLen];
-
-	HRESULT SelectNoiseShaper(NoiseShapingType nt, const WAVEFORMATEX* pWave);
-
-	/// Default constructor
-	NoiseShaper() : noiseshape_(NULL)
-	{
-		_tcsncpy(Description[None], TEXT("No noise shaping"), nStrLen);
-		_tcsncpy(Description[Simple], TEXT("Simple noise shaping"), nStrLen);
-	}
-
-	NoiseShape<T>* noiseshaper() const
-	{
-		return noiseshape_.get_ptr();
-	}
+	static const TCHAR Description[nNoiseShapers][nStrLen];
 
 	unsigned int Lookup(const TCHAR* r) const
 	{
@@ -450,144 +609,15 @@ public:
 		}
 		throw std::range_error("Invalid Noise Shaper");
 	}
-private:
-	Holder< NoiseShape<T> > noiseshape_;
 };
 
-
 template <typename T>
-HRESULT NoiseShaper<T>::SelectNoiseShaper(NoiseShapingType nt, const WAVEFORMATEX* pWave)
+const TCHAR NoiseShaper<T>::Description[NoiseShaper<T>::nNoiseShapers][NoiseShaper<T>::nStrLen] =
 {
-	if(pWave == NULL)
-	{
-		return E_POINTER;
-	}
-
-	if ((pWave->nBlockAlign != pWave->nChannels * pWave->wBitsPerSample / 8) ||
-		(pWave->nAvgBytesPerSec != pWave->nBlockAlign * pWave->nSamplesPerSec))
-	{
-		return DMO_E_INVALIDTYPE;
-	}
-
-	// TODO:: will need to use Sample Rate to select shapers
-	WORD wBitsPerSample = 0;
-	WORD validBits = 0;
-	WORD nChannels = 0;
-
-	// Formats that support more than two channels or sample sizes of more than 16 bits can be described
-	// in a WAVEFORMATEXTENSIBLE structure, which includes the WAVEFORMAT structure.
-	if (pWave->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-	{
-		const WAVEFORMATEXTENSIBLE* pWaveXT = (WAVEFORMATEXTENSIBLE*) pWave;
-
-		if(pWaveXT->Format.cbSize < 22) // required (see http://www.microsoft.com/whdc/device/audio/multichaud.mspx)
-		{
-			return DMO_E_INVALIDTYPE;
-		}
-		assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
-
-		validBits = pWaveXT->Samples.wValidBitsPerSample;
-		nChannels = pWaveXT->Format.nChannels;
-		wBitsPerSample = pWaveXT->Format.wBitsPerSample;
-	}
-	else // WAVE_FORMAT_PCM (8, 16 or 32-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
-	{
-		// TODO:: reject WAVE_FORMAT_IEEE_FLOAT ??
-		if(pWave->cbSize != 0)
-		{
-			return DMO_E_INVALIDTYPE;
-		}
-
-		validBits = pWave->wBitsPerSample;
-		nChannels = pWave->nChannels;
-		wBitsPerSample = pWave->wBitsPerSample;
-	}
-
-	switch (nt)
-	{
-	case None:
-		switch (wBitsPerSample)
-		{
-		case 8:		// Apparently shaping 8-bit channels is not a good idea
-			noiseshape_.set_ptr(new NoNoiseShape<T,8>());
-			break;
-		case 16:
-			{
-				assert(validBits == 16);
-				noiseshape_.set_ptr(new NoNoiseShape<T,16>());
-				break;
-			}
-			break;
-		case 24:
-		case 32:
-			switch (validBits)
-			{
-			case 8:
-				std::range_error("Internal error: NoiseShaper: NoNoiseShape: 8 is not an acceptable number of bits for 24 or 32-bit containers");
-				break;
-			case 16:
-				noiseshape_.set_ptr(new NoNoiseShape<T,16>());
-				break;
-			case 20:
-				noiseshape_.set_ptr(new NoNoiseShape<T,20>());
-				break;
-			case 24:
-				noiseshape_.set_ptr(new NoNoiseShape<T,24>());
-				break;
-			case 32:
-				{
-					assert(validBits == 32);
-					noiseshape_.set_ptr(new NoNoiseShape<T,32>());
-				}
-				break;
-			default:
-				throw std::range_error("Internal error: NoiseShaper: NoNoiseShaping: Invalid valid bits for 24 or 32-bit containers");
-			}
-		}
-		break;
-	case Simple:
-		switch (wBitsPerSample)
-		{
-		case 8:		// Apparently shaping 8-bit channels is not a good idea
-			noiseshape_.set_ptr(new NoNoiseShape<T,8>());
-			break;
-		case 16:
-			{
-				assert(validBits == 16);
-				noiseshape_.set_ptr(new SimpleNoiseShape<T,16>(nChannels));
-				break;
-			}
-			break;
-		case 24:
-		case 32:
-			switch (validBits)
-			{
-			case 8:
-				std::range_error("Internal error: NoiseShaper: SimpleNoiseShape:  8 is not an acceptable number of bits for 24 or 32-bit containers");
-				break;
-			case 16:
-				noiseshape_.set_ptr(new SimpleNoiseShape<T,16>(nChannels));
-				break;
-			case 20:
-				noiseshape_.set_ptr(new SimpleNoiseShape<T,20>(nChannels));
-				break;
-			case 24:
-				noiseshape_.set_ptr(new SimpleNoiseShape<T,24>(nChannels));
-				break;
-			case 32:
-				{
-					assert(validBits == 32);
-					noiseshape_.set_ptr(new SimpleNoiseShape<T,32>(nChannels));
-				}
-				break;
-			default:
-				throw std::range_error("Internal error: NoiseShaper: SimpleNoiseShape: Invalid valid bits for 24 or 32-bit containers");
-			}
-		}
-		break;
-	default:
-		throw std::range_error("Internal error: NoiseShaper: Invalid bits per sample");
-	}
-
-	return S_OK;
-}
+	TEXT("No noise shaping"),
+		TEXT("Simple noise shaping"),
+		TEXT("2nd order shaping"),
+		TEXT("3rd order shaping"),
+		TEXT("9th order shaping"),
+		TEXT("Pseudo Sony SBM")
+};

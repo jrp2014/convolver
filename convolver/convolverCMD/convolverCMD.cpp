@@ -55,9 +55,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	const DWORD SAMPLES = 1; // how many filter lengths to convolve at a time
 
 	HRESULT hr = S_OK;
-	Holder< Sample<float> > convertor(new Sample_ieeefloat<float>());
-	Holder< Dither<float> > dither(new NoDither<float>());
-	Holder< NoiseShape<float> > noiseshape(new NoNoiseShape<float,32>());
+	Holder< ConvertSample<float> > convertor(new ConvertSample_ieeefloat<float>());
 
 	PlanningRigour pr;
 
@@ -76,7 +74,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			std::wcerr << pr.Rigour[i] << "|";
 		std::wcerr <<  pr.Rigour[pr.nDegrees - 1] << ")" << std::endl;
 		std::wcerr << "       config.txt|IR.wav = a config text file specifying a single filter path" << std::endl;
-		std::wcerr << "				or a sound file to be used as a filter" << std::endl;
+		std::wcerr << "				              or a sound file to be used as a filter" << std::endl;
 		std::wcerr << "       input and output sound files are, typically, .wav" << std::endl;
 		return 1;
 	}
@@ -226,7 +224,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 #ifdef LIBSNDFILE
 			// Pad with zeros, to flush.  TODO: Won't work with 8-bit samples
-			for(int i = dwSizeRead * nInputChannels; i < cBufferLength * nInputChannels; ++i)
+			for(unsigned int i = dwSizeRead * nInputChannels; i < cBufferLength * nInputChannels; ++i)
 				pfInputSamples[i]=0;
 
 			DWORD dwBlocksToProcess = cBufferLength;
@@ -254,7 +252,6 @@ int _tmain(int argc, _TCHAR* argv[])
 				conv.SelectedConvolution().doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
-				 noiseshape.get_ptr(), dither.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation)
 				:
@@ -265,7 +262,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			conv.SelectedConvolution().doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
 				convertor.get_ptr(), convertor.get_ptr(),
-				noiseshape.get_ptr(), dither.get_ptr(),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
 				/* fAttenuation_db */ fAttenuation);
 

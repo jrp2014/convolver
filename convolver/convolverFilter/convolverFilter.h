@@ -102,22 +102,24 @@ private:
 
 
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
-	WORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
+	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	unsigned int			m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
 
 
-	Holder< ConvolutionList<float> >	m_ConvolutionList;				// Processing class.  Handle manages resources
-	Sample<float>*						m_InputSampleConvertor;		// functionoid conversion between BYTE and 
-	Sample<float>*						m_OutputSampleConvertor;	// float
 
-	Ditherer<float>::DitherType			m_nDither;
-	Ditherer<float>						m_Ditherer;
+	typedef float			BaseT;
+	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;
+	typedef Ditherer<BaseT>::DitherType DitherType;
 
-	NoiseShaper<float>::NoiseShapingType m_nNoiseShaping;
-	NoiseShaper<float>					m_NoiseShaping;
+	DitherType				m_nDither;				// The dither type index
+	NoiseShapingType		m_nNoiseShaping;	// The noise shaping type index
 
-	SampleMaker<float>					m_FormatSpecs;				// Supported formats
+	Holder< ConvolutionList<BaseT> >	m_ConvolutionList;			// Processing class.
+	Holder<ConvertSample<BaseT> >		m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Holder<ConvertSample<BaseT> >		m_OutputSampleConvertor;	// BaseT
+
+	ConvertSampleMaker<BaseT>			m_FormatSpecs;				// Supported formats
 
 	WAVEFORMATEXTENSIBLE				m_WaveInXT;					// The current formats;
 	WAVEFORMATEXTENSIBLE				m_WaveOutXT;

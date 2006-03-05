@@ -37,28 +37,15 @@ struct PlanningRigour
 #ifdef FFTW
 	enum Degree {Estimate=0, Measure=1, Patient=2, Exhaustive=3, TimeLimited=4};
 	static const unsigned int nDegrees = 5;
-	static const unsigned int nStrLen = 15;
+	static const unsigned int nStrLen = sizeof(TEXT("Take 1 minute")) / sizeof(TCHAR) + 1;
 	static const int nTimeLimit = 30; // 30s -> 1min, for user, as a forward and reverse plan are optimized
 #else
 	enum Degree {Default=0};
 	static const unsigned int nDegrees = 1;
 	static const unsigned int nStrLen = 8;
 #endif
-	TCHAR Rigour[nDegrees][nStrLen];
-	unsigned int Flag[nDegrees];
-
-	PlanningRigour()
-	{
-#ifdef FFTW
-		_tcsncpy(Rigour[Estimate], TEXT("Estimate"), nStrLen);		Flag[Estimate] = FFTW_ESTIMATE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[Measure], TEXT("Measure"), nStrLen);		Flag[Measure] = FFTW_MEASURE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[Patient], TEXT("Patient"), nStrLen);		Flag[Patient] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[Exhaustive], TEXT("Exhaustive"), nStrLen);	Flag[Exhaustive] = FFTW_EXHAUSTIVE|FFTW_DESTROY_INPUT;
-		_tcsncpy(Rigour[TimeLimited], TEXT("Take 1 minute"), nStrLen);	Flag[TimeLimited] = FFTW_PATIENT|FFTW_DESTROY_INPUT;
-#else
-		_tcsncpy(Rigour[Default], TEXT("Default"), nStrLen);	Flag[0] = 0;
-#endif
-	}
+	static const TCHAR Rigour[nDegrees][nStrLen];
+	static const unsigned int Flag[nDegrees];
 
 	unsigned int Lookup(const TCHAR* r) const
 	{
@@ -70,3 +57,4 @@ struct PlanningRigour
 		throw std::range_error("Invalid rigour");
 	}
 };
+

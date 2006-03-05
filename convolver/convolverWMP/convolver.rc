@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,2,0,0
- PRODUCTVERSION 3,2,0,0
+ FILEVERSION 3,3,0,0
+ PRODUCTVERSION 3,3,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver WMP plug-in Module"
-            VALUE "FileVersion", "3, 2, 0, 0"
+            VALUE "FileVersion", "3, 3, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"
-            VALUE "ProductVersion", "3, 2, 0, 0"
+            VALUE "ProductVersion", "3, 3, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -174,13 +174,13 @@ BEGIN
     IDS_ATTENUATIONRANGEERROR 
                             "Attenuation must be between -1000 and +1000 (dB)"
     IDS_ATTENUATIONSAVEERROR "Failed to save attenuation"
-    IDS_EFFECTSAVEERROR     "Failed to save effect %"
-    IDS_FILTERSAVEERROR     "Invalid filter file"
-    IDS_PARTITIONSERROR     "Invalid number of partitions"
 END
 
 STRINGTABLE 
 BEGIN
+    IDS_EFFECTSAVEERROR     "Failed to save effect %"
+    IDS_FILTERSAVEERROR     "Invalid filter file"
+    IDS_PARTITIONSERROR     "Invalid number of partitions"
     IDS_PARTITIONSSAVEERROR "Failed to save number of partitions to convolver"
     IDS_PLANNINGRIGOURSAVEERROR "Failed to save tuning rigour to convolver"
     IDS_DITHERSAVEERROR     "Failed to save dither to convolver"

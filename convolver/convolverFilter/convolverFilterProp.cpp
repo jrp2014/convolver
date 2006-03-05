@@ -193,14 +193,14 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 					if(HIWORD(wParam) == BN_CLICKED)
 					{
 						float	fAttenuation = 0;
-						DWORD	nPartitions = 1;
-						unsigned int nPlanningRigour =
-#ifdef FFTW
-							1;		// Set "Measure" as the default
-#else
-							0;
-#endif
-						TCHAR*  szFilterFileName	= TEXT("");
+//						DWORD	nPartitions = 1;
+//						unsigned int nPlanningRigour =
+//#ifdef FFTW
+//							1;		// Set "Measure" as the default
+//#else
+//							0;
+//#endif
+//						TCHAR*  szFilterFileName	= TEXT("");
 						HRESULT hr S_OK;
 
 						try
@@ -215,26 +215,26 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 								}
 							}
 
-							hr = m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
-							if (FAILED(hr))
-							{
-								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
-								return (INT_PTR)TRUE;
-							}
+							//hr = m_pIconvolverFilter->get_filterfilename(&szFilterFileName);
+							//if (FAILED(hr))
+							//{
+							//	SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get filter filename.") ); // TODO: internationalize
+							//	return (INT_PTR)TRUE;
+							//}
 
-							hr = m_pIconvolverFilter->get_partitions(&nPartitions);
-							if (FAILED(hr))
-							{
-								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
-								return (INT_PTR)TRUE;
-							}
+							//hr = m_pIconvolverFilter->get_partitions(&nPartitions);
+							//if (FAILED(hr))
+							//{
+							//	SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get number of partitions.") ); // TODO: internationalize
+							//	return (INT_PTR)TRUE;
+							//}
 
-							hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
-							if (FAILED(hr))
-							{
-								SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
-								return (INT_PTR)TRUE;
-							}
+							//hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
+							//if (FAILED(hr))
+							//{
+							//	SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to get tuning rigour.") ); // TODO: internationalize
+							//	return (INT_PTR)TRUE;
+							//}
 
 							double fElapsed = 0;
 							apHiResElapsedTime t;
@@ -286,6 +286,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 					if(HIWORD(wParam) == EN_CHANGE)
 					{
 						SetDirty();
+						Apply();
 						return (INT_PTR)TRUE;
 					}
 				}
@@ -296,6 +297,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 					if(HIWORD(wParam) == EN_CHANGE)
 					{
 						SetDirty();
+						Apply();
 						return (INT_PTR)TRUE;
 					}
 				}
@@ -308,6 +310,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 					if(HIWORD(wParam) == CBN_SELENDOK)
 					{
 						SetDirty();
+						Apply();
 						return (INT_PTR)TRUE;
 					}
 				}

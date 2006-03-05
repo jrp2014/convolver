@@ -29,21 +29,27 @@ long int lrintf (float flt);
 template <class IntType, class FloatType>
 IntType conv_float_to_int (FloatType x);
 
-inline int conv_float_to_int (float x);
-inline int conv_float_to_int_mem (double x);
-int round_int (double x);
+extern inline int conv_float_to_int (float x);
+extern inline int conv_float_to_int_mem (double x);
+extern int round_int (double x);
 
-template <typename IntType, typename FloatType>
-IntType floor_int (FloatType x);
-
-template
-int floor_int<int,float>(float);
+//template <typename IntType, typename FloatType>
+//extern inline IntType floor_int (const FloatType x);
+//
+//extern BYTE floor_int (const float x);
+//extern BYTE floor_int (const double x);
+//
+//template
+//extern INT16 floor_int<INT16,float>(float);
+//
+//template
+//extern INT32 floor_int<INT32,float>(float);
 
 int ceil_int (double x);
 //int truncate_int (double x);
 
-void test_and_kill_denormal (float &val);
-void kill_denormal_by_quantization (float &val);
-bool is_denormalized ();
-void add_white_noise (float &val);
-void add_dc (float &val);
+extern void test_and_kill_denormal (float &val);
+extern void kill_denormal_by_quantization (float &val);
+extern bool is_denormalized ();
+extern void add_white_noise (float &val);
+extern void add_dc (float &val);

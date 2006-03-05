@@ -48,8 +48,8 @@ m_rtTimestamp(0),
 m_bEnabled(TRUE),
 m_nPartitions(0), // default, just overlap-save
 m_nPlanningRigour(0),
-m_nDither(Ditherer<float>::None),
-m_nNoiseShaping(NoiseShaper<float>::None),
+m_nDither(Ditherer<BaseT>::None),
+m_nNoiseShaping(NoiseShaper<BaseT>::None),
 m_ConvolutionList(NULL),
 m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
@@ -169,19 +169,19 @@ HRESULT CConvolver::FinalConstruct()
 		lResult = key.QueryDWORDValue(kszPrefsDither, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			m_nDither = static_cast<Ditherer<float>::DitherType>(dwValue);
+			m_nDither = static_cast<DitherType>(dwValue);
 		}
 
 		// Read the noise shaping type
 		lResult = key.QueryDWORDValue(kszPrefsNoiseShaping, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			m_nNoiseShaping = static_cast<NoiseShaper<float>::NoiseShapingType>(dwValue);
+			m_nNoiseShaping = static_cast<NoiseShapingType>(dwValue);
 		}
 
 		try // creating m_ConvolutionList might throw
 		{
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 
 		}
 		catch (...) 
@@ -644,23 +644,7 @@ STDMETHODIMP CConvolver::SetOutputType(DWORD dwOutputStreamIndex,
 					return hr;
 				}
 
-				// Set the dither generator, defined by the dither type (m_nDither) and the nChannels
-				// and valid bits per sample, defined in pWaveOut
-				hr = m_Ditherer.SelectDither(m_nDither, pWaveOut);
-				if (FAILED(hr))
-				{
-					return hr;
-				}
-
-				// Set the noise shaper, defined by the dither type (m_nNoiseShaping) and the nChannels
-				// and valid bits per sample, defined in pWaveOut
-				hr = m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWaveOut);
-				if (FAILED(hr))
-				{
-					return hr;
-				}
-
-				return m_FormatSpecs.SelectSampleConvertor(pWaveOut, m_OutputSampleConvertor);
+				return m_FormatSpecs.SelectSampleConvertor(pWaveOut, m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 			}
 		}
 	}
@@ -872,7 +856,7 @@ STDMETHODIMP CConvolver::GetInputMaxLatency(
 		if(m_ConvolutionList->ConvolutionSelected())
 		{
 			//// Latency is a partition length
-			*prtMaxLatency = ::MulDiv( m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor), UNITS, pWave->nAvgBytesPerSec);
+			*prtMaxLatency = ::MulDiv( m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor.get_ptr()), UNITS, pWave->nAvgBytesPerSec);
 		}
 		else
 		{
@@ -1503,26 +1487,23 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-		if (m_ConvolutionList.get_ptr() != NULL )
+		const bool selected = m_ConvolutionList.get_ptr() != NULL && m_ConvolutionList->ConvolutionSelected();
+
+		// May throw
+		m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  
+			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+		if(selected)
 		{
-			const bool selected = m_ConvolutionList->ConvolutionSelected();
+			// Get the pointer to the input and output format structures.
+			const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+			const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
 
-			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  
-				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			if(selected)
+			if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
 			{
-				// Get the pointer to the input and output format structures.
-				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-
-				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
-				{
-					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-					throw convolutionException(diagnostic);
-				}
+				const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+					"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+				throw convolutionException(diagnostic);
 			}
 		}
 	}
@@ -1564,7 +1545,7 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 			const bool selected = m_ConvolutionList->ConvolutionSelected();
 
 			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
 				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 
 			if(selected)
@@ -1621,7 +1602,7 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 			const bool selected = m_ConvolutionList->ConvolutionSelected();
 
 			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
 				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 
 			if(selected)
@@ -1668,7 +1649,7 @@ STDMETHODIMP CConvolver::put_dither(unsigned int newVal)
 	DEBUGGING(3, cdebug << "put_dither" << std::endl;);
 #endif
 
-	m_nDither = static_cast<Ditherer<float>::DitherType>(newVal);
+	m_nDither = DitherType(newVal);
 
 	const WAVEFORMATEX * pWave =  ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
 
@@ -1678,7 +1659,7 @@ STDMETHODIMP CConvolver::put_dither(unsigned int newVal)
 	}
 	else
 	{
-		return m_Ditherer.SelectDither(m_nDither, ( WAVEFORMATEX * ) m_mtOutput.pbFormat);
+		return m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 	}
 }
 
@@ -1707,7 +1688,7 @@ STDMETHODIMP CConvolver::put_noiseshaping(unsigned int newVal)
 	DEBUGGING(3, cdebug << "put_noiseshaping" << std::endl;);
 #endif
 
-	m_nNoiseShaping = static_cast<NoiseShaper<float>::NoiseShapingType>(newVal);
+	m_nNoiseShaping = NoiseShapingType(newVal);
 
 	const WAVEFORMATEX * pWave =  ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
 
@@ -1717,7 +1698,7 @@ STDMETHODIMP CConvolver::put_noiseshaping(unsigned int newVal)
 	}
 	else
 	{
-		return m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWave);
+		return m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 	}
 }
 
@@ -1729,7 +1710,7 @@ STDMETHODIMP CConvolver::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
-	*description = m_ConvolutionList.get_ptr() == NULL ? "No filter loaded" : m_ConvolutionList->DisplayConvolutionList();
+	*description = m_ConvolutionList.get_ptr() == NULL ? "No valid filter loaded" : m_ConvolutionList->DisplayConvolutionList();
 	return S_OK;
 }
 
@@ -1740,29 +1721,25 @@ STDMETHODIMP CConvolver::calculateOptimumAttenuation(float & fAttenuation)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;);
 #endif
 
-	if(m_ConvolutionList.get_ptr() != NULL)
+	// Need to call up a new Convolver as the current one may be playing.
+	Holder< ConvolutionList<BaseT> > ConvolutionListOpt(new ConvolutionList<BaseT>(m_szFilterFileName,
+		m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+	float min_fAttenuation = MAX_ATTENUATION;
+	for(unsigned int i=0; i<ConvolutionListOpt->nConvolutionList(); ++i)
 	{
-		float min_fAttenuation = MAX_ATTENUATION;
-		for(unsigned int i=0; i<m_ConvolutionList->nConvolutionList(); ++i)
+		HRESULT hr = ConvolutionListOpt->Conv(i).calculateOptimumAttenuation(fAttenuation);
+		if(FAILED(hr))
 		{
-			HRESULT hr = m_ConvolutionList->Conv(i).calculateOptimumAttenuation(fAttenuation);
-			if(FAILED(hr))
-			{
-				return hr;
-			}
-			if(fAttenuation < min_fAttenuation)
-			{
-				min_fAttenuation = fAttenuation;
-			}
+			return hr;
 		}
-		fAttenuation = min_fAttenuation;
-		return S_OK;
+		if(fAttenuation < min_fAttenuation)
+		{
+			min_fAttenuation = fAttenuation;
+		}
 	}
-	else
-	{
-		fAttenuation = 0;
-		return E_FAIL;
-	}
+	fAttenuation = min_fAttenuation;
+	return S_OK;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1806,11 +1783,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?
 		m_ConvolutionList->SelectedConvolution().doConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor, m_OutputSampleConvertor, m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(),
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
 		dwBlocksToProcess,
 		m_fAttenuation_db)
 		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor, m_OutputSampleConvertor, m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(),
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 

@@ -20,7 +20,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "convolution\lrint.h"
-
+#include <limits>
+#undef min
+#undef max
 
 // From the Intel Software Optimization Cookbook
 
@@ -120,15 +122,17 @@ int round_int (double x)
 	return (i);
 }
 
-// IntType may be Int16, 32, or 64; FloatType may be float or double
-// Uses current rounding mode, assumed to be round to nearest
-template <typename IntType, typename FloatType>
-IntType floor_int (FloatType x)
+
+
+
+
+
+inline BYTE floor_int(const float x)
 {
-	assert (x > static_cast <FloatType> (INT_MIN / 2) - 1.0);
-	assert (x < static_cast <FloatType> (INT_MAX / 2) + 1.0);
-	static const FloatType round_towards_m_i = FloatType(-0.5);
-	IntType i;
+	assert (x > static_cast <float> (-128 - 1));
+	assert (x < static_cast <float> (127 + 1));
+	static const float round_towards_m_i = float(-0.5);
+	INT16 i;
 	__asm
 	{
 		fld x
@@ -137,7 +141,24 @@ IntType floor_int (FloatType x)
 			fistp i
 			sar i, 1
 	}
-	return (i);
+	return BYTE(i);
+}
+
+inline BYTE floor_int(const double x)
+{
+	assert (x > static_cast <float> (-128 - 1));
+	assert (x < static_cast <float> (127 + 1));
+	static const float round_towards_m_i = float(-0.5);
+	INT16 i;
+	__asm
+	{
+		fld x
+			fadd st, st (0)
+			fadd round_towards_m_i
+			fistp i
+			sar i, 1
+	}
+	return BYTE(i);
 }
 
 int ceil_int (double x)

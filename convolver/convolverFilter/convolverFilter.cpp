@@ -368,7 +368,8 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	// Get sizes
 	const DWORD cbOutputMaxLength = pOut->GetSize();
 	const DWORD cbBytesToProcess = pIn->GetActualDataLength();
-	DWORD cbBytesThatWouldBeGenerated = m_ConvolutionList->SelectedConvolution().cbOutputBuffer(cbBytesToProcess, m_InputSampleConvertor, m_OutputSampleConvertor);
+	DWORD cbBytesThatWouldBeGenerated = m_ConvolutionList->SelectedConvolution().cbOutputBuffer(cbBytesToProcess,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
 
 	// This should never happen if DecideBufferSize did its job
 	if (cbBytesThatWouldBeGenerated > cbOutputMaxLength)
@@ -382,13 +383,11 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 
 	DWORD cbBytesGenerated = m_nPartitions == 0 ?
 		m_ConvolutionList->SelectedConvolution().doConvolution(pbSrc, pbDst,
-		m_InputSampleConvertor, m_OutputSampleConvertor,
-		m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(), 
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
 		dwBlocksToProcess,
 		m_fAttenuation_db)
 		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbSrc, pbDst,
-		m_InputSampleConvertor, m_OutputSampleConvertor,
-		m_NoiseShaping.noiseshaper(), m_Ditherer.ditherer(), 
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 
@@ -679,7 +678,8 @@ HRESULT CconvolverFilter::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROP
 	}
 
 	// Now calculate the output buffer size, which is a function of the input buffer size
-	const unsigned int cbOutputBuffer = m_ConvolutionList->SelectedConvolution().cbOutputBuffer(InputProp.cbBuffer, m_InputSampleConvertor, m_OutputSampleConvertor);
+	const unsigned int cbOutputBuffer = m_ConvolutionList->SelectedConvolution().cbOutputBuffer(InputProp.cbBuffer,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
 	if (cbOutputBuffer > pProp->cbBuffer)
 	{
 		pProp->cbBuffer = cbOutputBuffer;
@@ -858,19 +858,7 @@ HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType
 		{
 			return hr;
 		}
-		hr = m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor);
-		if(FAILED(hr))
-		{
-			return hr;
-		}
-
-		hr = m_Ditherer.SelectDither(m_nDither, pWave);
-		if(FAILED(hr))
-		{
-			return hr;
-		}
-
-		hr = m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, pWave);
+		hr = m_FormatSpecs.SelectSampleConvertor(pWave, m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 		if(FAILED(hr))
 		{
 			return hr;
@@ -1076,11 +1064,11 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 	DEBUGGING(3, cdebug << "put_filterfilename" << std::endl;);
 #endif
 
-	if (m_ConvolutionList.get_ptr() != NULL &&_tcscmp(newVal, m_szFilterFileName) != 0) // if new filename set
+	if (_tcscmp(newVal, m_szFilterFileName) != 0) // if new filename set
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-		const bool selected = m_ConvolutionList->ConvolutionSelected();
+		const bool selected = m_ConvolutionList.get_ptr() != NULL && m_ConvolutionList->ConvolutionSelected();
 
 		// May throw
 		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions,
@@ -1088,10 +1076,11 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 
 		if(selected)
 		{
-			HRESULT hr = m_ConvolutionList->SelectConvolution(&m_WaveInXT.Format, &m_WaveOutXT.Format);
-			if(FAILED(hr))
+			if(FAILED(m_ConvolutionList->SelectConvolution(&m_WaveInXT.Format, &m_WaveOutXT.Format)))
 			{
-				return hr;
+				const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
+					"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
+				throw convolutionException(diagnostic);
 			}
 		}
 	}
@@ -1234,7 +1223,7 @@ STDMETHODIMP CconvolverFilter::put_dither(unsigned int newVal)
 	}
 	else
 	{
-		return m_Ditherer.SelectDither(m_nDither, (WAVEFORMATEX*)(&m_WaveOutXT));
+		return m_FormatSpecs.SelectSampleConvertor((WAVEFORMATEX*)(&m_WaveOutXT), m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 	}
 }
 
@@ -1271,7 +1260,7 @@ STDMETHODIMP CconvolverFilter::put_noiseshaping(unsigned int newVal)
 	}
 	else
 	{
-		return m_NoiseShaping.SelectNoiseShaper(m_nNoiseShaping, (WAVEFORMATEX*)(&m_WaveOutXT));
+		return m_FormatSpecs.SelectSampleConvertor((WAVEFORMATEX*)(&m_WaveOutXT), m_OutputSampleConvertor, m_nNoiseShaping, m_nDither);
 	}
 }
 
@@ -1282,7 +1271,7 @@ STDMETHODIMP CconvolverFilter::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
-	*description = m_ConvolutionList.get_ptr() == NULL ? "No filter loaded" : m_ConvolutionList->DisplayConvolutionList();
+	*description = m_ConvolutionList.get_ptr() == NULL ? "No valid filter loaded" : m_ConvolutionList->DisplayConvolutionList();
 	return S_OK;
 }
 
@@ -1322,27 +1311,23 @@ STDMETHODIMP CconvolverFilter::calculateOptimumAttenuation(float & fAttenuation)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;);
 #endif
 
-	if(m_ConvolutionList.get_ptr() != NULL)
+	// Need to call up a new Convolver as the current one may be playing.
+	Holder< ConvolutionList<BaseT> > ConvolutionListOpt(new ConvolutionList<BaseT>(m_szFilterFileName,
+		m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+	float min_fAttenuation = MAX_ATTENUATION;
+	for(unsigned int i=0; i<ConvolutionListOpt->nConvolutionList(); ++i)
 	{
-		float min_fAttenuation = MAX_ATTENUATION;
-		for(unsigned int i=0; i<m_ConvolutionList->nConvolutionList(); ++i)
+		HRESULT hr = ConvolutionListOpt->Conv(i).calculateOptimumAttenuation(fAttenuation);
+		if(FAILED(hr))
 		{
-			HRESULT hr = m_ConvolutionList->Conv(i).calculateOptimumAttenuation(fAttenuation);
-			if(FAILED(hr))
-			{
-				return hr;
-			}
-			if(fAttenuation < min_fAttenuation)
-			{
-				min_fAttenuation = fAttenuation;
-			}
+			return hr;
 		}
-		fAttenuation = min_fAttenuation;
-		return S_OK;
+		if(fAttenuation < min_fAttenuation)
+		{
+			min_fAttenuation = fAttenuation;
+		}
 	}
-	else
-	{
-		fAttenuation = 0;
-		return E_FAIL;
-	}
+	fAttenuation = min_fAttenuation;
+	return S_OK;
 }

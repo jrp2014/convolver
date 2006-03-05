@@ -301,7 +301,7 @@ public:
 	float decode_Attenuationdb(const DWORD dwValue)
 	{
 		assert(dwValue <= (MAX_ATTENUATION + MAX_ATTENUATION) * 100);
-		return static_cast<float>(dwValue) / 100.0f - MAX_ATTENUATION;
+		return static_cast<BaseT>(dwValue) / 100.0f - MAX_ATTENUATION;
 	}
 	DWORD encode_Attenuationdb(const float fValue)
 	{	assert (abs(fValue) <= MAX_ATTENUATION);
@@ -335,17 +335,18 @@ private:
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	unsigned int			m_nPlanningRigour;
 
-	Ditherer<float>::DitherType m_nDither;
-	Ditherer<float>			m_Ditherer;
+	typedef float			BaseT;
+	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;
+	typedef Ditherer<BaseT>::DitherType DitherType;
 
-	NoiseShaper<float>::NoiseShapingType m_nNoiseShaping;
-	NoiseShaper<float>		m_NoiseShaping;
+	DitherType				m_nDither;				// The dither type index
+	NoiseShapingType		m_nNoiseShaping;	// The noise shaping type index
 
-	Holder< ConvolutionList<float> >	m_ConvolutionList;			// Processing class.
-	Sample<float>*			m_InputSampleConvertor;		// functionoid conversion between BYTE and 
-	Sample<float>*			m_OutputSampleConvertor;	// float
+	Holder< ConvolutionList<BaseT> >	m_ConvolutionList;		// Processing class.
+	Holder<ConvertSample<BaseT> >		m_InputSampleConvertor;		// functionoid conversion between BYTE and 
+	Holder<ConvertSample<BaseT> >		m_OutputSampleConvertor;	// BaseT
 
-	SampleMaker<float>		m_FormatSpecs;
+	ConvertSampleMaker<BaseT>			m_FormatSpecs;
 
 	BOOL					m_bEnabled;         // TRUE if enabled
 };

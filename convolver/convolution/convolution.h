@@ -45,26 +45,22 @@ template <typename T>
 class Convolution
 {
 public:
-	Convolution(const TCHAR szConfigFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
+	Convolution(const TCHAR szConfigFileName[MAX_PATH], const DWORD& nPartitions, const unsigned int& nPlanningRigour);
 	//	virtual ~Convolution(void) {};
 
 	// This version of the convolution routine does partitioned convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
 	DWORD doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-		const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
-		NoiseShape<T>* noiseshaper,						// not const because noise shaper has changeable state
-		Dither<T>* ditherer,							// not const because dither has changeable state
+		const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+		const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,						// A block contains a sample for each channel
 		const T fAttenuation_db);						// Returns bytes generated
 
 	// This version does straight overlap-save convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
 	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const Sample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-		const Sample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
-		NoiseShape<T>* noiseshaper,						// not const because noise shaper has changeable state
-		Dither<T>* ditherer,
+		const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
+		const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
 		DWORD dwBlocksToProcess,
 		const T fAttenuation_db);						// Returns bytes generated
 
@@ -74,7 +70,7 @@ public:
 
 	HRESULT calculateOptimumAttenuation(T& fAttenuation, const bool overlapsave = false);
 
-	int cbLookAhead(Sample<T>* & sample_convertor) const
+	int cbLookAhead(const ConvertSample<T>* sample_convertor) const
 	{
 		if(sample_convertor != NULL)
 		{
@@ -88,7 +84,7 @@ public:
 
 	// Calculate the size in bytes of the output buffer corresponding to a given input buffer size
 	unsigned int cbOutputBuffer(const int cbInputBuffer, 
-		Sample<T>* & InputSampleConvertor, Sample<T>* & OutputSampleConvertor) const
+		const ConvertSample<T>* InputSampleConvertor, const ConvertSample<T>* OutputSampleConvertor) const
 	{
 		// Size of each input frame / block
 		const unsigned int cbInputFrame = InputSampleConvertor->nContainerSize() * Mixer.nInputChannels();
