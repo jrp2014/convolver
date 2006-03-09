@@ -458,7 +458,7 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 			// untangle [Xn, Xn-1] and [Xn-1,Xn] -> [Yn-1,Yn]
 
 			ChannelBuffer::const_iterator pInputSamples = InputSamples.begin();
-			ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
+			const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
 			ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator.begin() + nHalfPartitionLength;
 
 			// TODO: Do this by pointers to make it faster
@@ -469,7 +469,7 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 					*pInputBufferAccumulator++ += *pInputSamples++;
 				}
 				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
-				pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
 				pInputBufferAccumulator = InputBufferAccumulator.begin();
 				while(pInputSamples != pInputSamplesEnd)
 				{
@@ -496,7 +496,7 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
 				}
 				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
-				pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
 				pInputBufferAccumulator = InputBufferAccumulator.begin();
 				while(pInputSamples != pInputSamplesEnd)
 				{
@@ -602,16 +602,15 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const
 #pragma ivdep
 #pragma loop count (65536)
 #pragma vector aligned
-	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
+	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index)
+	{
+		//result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		//result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
-
-		//const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		//const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		//result[index][0] = T1 - T2;
-		//result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
-
+		const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		result[index][0] = T1 - T2;
+		result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 	}
 }
 
@@ -622,16 +621,15 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, c
 #pragma ivdep
 #pragma loop count (65536)
 #pragma vector aligned
-	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index) {
+	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index)
+	{
+		//result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		//result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 
-		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
-
-		//const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		//const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		//result[index][0] += T1 - T2;
-		//result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
-
+		const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
+		const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
+		result[index][0] += T1 - T2;
+		result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
 	}
 }
 

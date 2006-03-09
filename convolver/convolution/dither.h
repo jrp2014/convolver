@@ -112,26 +112,42 @@
 #include <boost\random.hpp>
 #include <limits>
 
-// IntType may be Int16, 32, or 64; T may be float or double
-// Uses current rounding mode, assumed to be round to nearest
+//// IntType may be Int16, 32, or 64; T may be float or double
+//// Uses current rounding mode, assumed to be round to nearest
+//template <typename IntType, typename T>
+//inline IntType floor_int (const T x)
+//{
+//#undef min
+//#undef max
+//	assert (x > static_cast <T> (std::numeric_limits<IntType>::min()/2 - 1.0));
+//	assert (x < static_cast <T> (std::numeric_limits<IntType>::max()/2 + 1.0));
+//	static const T round_towards_m_i = T(-0.5);
+//	IntType i;
+//	__asm
+//	{
+//		fld x
+//			fadd st, st (0)
+//			fadd round_towards_m_i
+//			fistp i
+//			sar i, 1
+//	}
+//	return (i);
+//}
+
+// floor_int does not work for |x| > maxint/2
+// So use the following, which assumes round to nearest rounding mode
 template <typename IntType, typename T>
-inline IntType floor_int (const T x)
+inline IntType conv_float_to_int (T x)
 {
-#undef min
-#undef max
-	assert (x > static_cast <T> (std::numeric_limits<IntType>::min() / 2) - 1.0);
-	assert (x < static_cast <T> (std::numeric_limits<IntType>::max() / 2) + 1.0);
+	IntType a;
 	static const T round_towards_m_i = T(-0.5);
-	IntType i;
 	__asm
 	{
 		fld x
-			fadd st, st (0)
 			fadd round_towards_m_i
-			fistp i
-			sar i, 1
+			fistp a
 	}
-	return (i);
+	return a;
 }
 
 template <typename T>
@@ -308,8 +324,6 @@ const TCHAR Ditherer<T>::Description[Ditherer<T>::nDitherers][Ditherer<T>::nStrL
 template <typename T, typename IntType>
 struct NoiseShape
 {
-	NoiseShape(const WORD nChannels) {}
-
 	// Generate the dither
 	virtual IntType shapenoise(const T sample, Dither<T> * dither, const WORD nChannel) = 0;
 
@@ -322,13 +336,14 @@ template <typename T, typename IntType, int validBits>
 class NoNoiseShape : public NoiseShape<T,IntType>
 {
 public:
-	NoNoiseShape(const WORD nChannels) : NoiseShape<T,IntType>(nChannels)
+	NoNoiseShape(const WORD nChannels) : nChannels_(nChannels)
 	{}
 
 	// Generate the dither
 	virtual IntType shapenoise(const T sample, Dither<T> * dither, const WORD nChannel)
 	{
-		return floor_int<IntType,T>((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to INT32)
+		assert(nChannel < nChannels_);
+		return conv_float_to_int<IntType,T>((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to IntType)
 	}
 
 	virtual ~NoNoiseShape(void) {}
@@ -337,6 +352,7 @@ protected:
 	static const T Q_;				// Least significant bit
 	static const T Qover2_;
 	static const T q_;
+	const WORD nChannels_;
 };
 
 template <typename T, typename IntType, int validBits>
@@ -348,44 +364,13 @@ const T  NoNoiseShape<T, IntType, validBits>::Qover2_ = 0.5 / ((1 << (validBits-
 template <typename T, typename IntType, int validBits>
 const T  NoNoiseShape<T, IntType, validBits>::q_ = ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
 
-// Specialization needed because the templated floor_int function is invalid for BYTEs
-template <typename T>
-class NoNoiseShape<T, BYTE, 8> : public NoiseShape<T,BYTE>
-{
-public:
-	NoNoiseShape(const WORD nChannels) : NoiseShape<T,BYTE>(nChannels)
-	{}
-
-	// Generate the dither
-	virtual BYTE shapenoise(const T sample, Dither<T> * dither, const WORD nChannel)
-	{
-		return floor_int((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to INT32)
-	}
-
-	virtual ~NoNoiseShape(void) {}
-
-protected:
-	static const T Q_;				// Least significant bit
-	static const T Qover2_;
-	static const T q_;
-};
-
-template <typename T>
-const T  NoNoiseShape<T, BYTE, 8>::Q_ = 1.0 / ((1 << (8-2)) - 0.5 + (1 << (8-2)));
-
-template <typename T>
-const T  NoNoiseShape<T, BYTE, 8>::Qover2_ = 0.5 / ((1 << (8-2)) - 0.5 + (1 << (8-2)));
-
-template <typename T>
-const T  NoNoiseShape<T, BYTE, 8>::q_ = ((1 << (8-2)) - 0.5 + (1 << (8-2)));
-
 
 // SimpleShaping 
 template <typename T, typename IntType, int validBits>
 class SimpleNoiseShape : public NoNoiseShape<T, IntType, validBits>
 {
 public:
-	SimpleNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), e_(nChannels, 0), nChannels_(nChannels)
+	SimpleNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), e_(nChannels, 0)
 	{}
 
 	// Generate shaped sample
@@ -393,9 +378,10 @@ public:
 	{
 		assert(nChannel < nChannels_);
 		const T d = dither->dither(nChannel);
-		const T y = sample + d - e_[nChannel];
-		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
-		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - e_[nChannel]);			// generate the feedback for this channel
+		const T H = e_[nChannel];
+		const T y = sample + d - H;
+		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to IntType)
+		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - H);				// generate the feedback for this channel
 		return yint;	
 	}
 
@@ -403,33 +389,8 @@ public:
 
 private:
 	std::vector<T> e_;				// error feedback
-	const WORD nChannels_;
 };
 
-template <typename T>
-class SimpleNoiseShape<T, BYTE, 8> : public NoNoiseShape<T, BYTE, 8>
-{
-public:
-	SimpleNoiseShape(const WORD nChannels) : NoNoiseShape<T, BYTE, 8>(nChannels), e_(nChannels, 0), nChannels_(nChannels)
-	{}
-
-	// Generate shaped sample
-	virtual BYTE shapenoise(const T sample,  Dither<T> * dither, const WORD nChannel)
-	{
-		assert(nChannel < nChannels_);
-		const T d = dither->dither(nChannel);
-		const T y = sample + d - e_[nChannel];
-		const BYTE yint = floor_int(y * q_);		// just scale (eg from float to INT32)
-		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - e_[nChannel]);			// generate the feedback for this channel
-		return yint;	
-	}
-
-	virtual ~SimpleNoiseShape(void) {}
-
-private:
-	std::vector<T> e_;				// error feedback
-	const WORD nChannels_;
-};
 
 // 2nd order Shaping 
 template <typename T, typename IntType, int validBits>
@@ -437,7 +398,7 @@ class SecondOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
 {
 public:
 	SecondOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
-		pos_(nChannels, 0), e_(nChannels,std::vector<T>(4, 0)), nChannels_(nChannels)
+		pos_(nChannels, 0), e_(nChannels,std::vector<T>(4, 0))
 	{}
 
 	// Generate shaped sample
@@ -450,8 +411,8 @@ public:
 
 		const T H = e_[nChannel][pos] * T(1.287) + e_[nChannel][pos+1]*T(-0.651);
 		const T y = sample + d - H;
-	
-		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+
+		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to IntType)
 
 		pos = 1 - pos;
 		e_[nChannel][pos+2] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
@@ -465,7 +426,6 @@ public:
 private:
 	std::vector<unsigned int> pos_;
 	std::vector<std::vector<T> > e_;				// error feedback
-	const WORD nChannels_;
 };
 
 
@@ -475,7 +435,7 @@ class ThirdOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
 {
 public:
 	ThirdOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
-		pos_(nChannels, 0), e_(nChannels,std::vector<T>(6, 0)), nChannels_(nChannels)
+		pos_(nChannels, 2), e_(nChannels,std::vector<T>(6, 0))
 	{}
 
 	// Generate shaped sample
@@ -489,9 +449,22 @@ public:
 		const T H = e_[nChannel][pos] * T(1.329) + e_[nChannel][pos+1]*T(-0.735) + e_[nChannel][pos+2]*T(0.0646);
 		const T y = sample + d - H;
 	
-		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
 
-		if(++pos == 3) pos = 0;
+
+		//cdebug << "sample " << sample << " y " << y << " yint " << yint <<std::endl;
+		//cdebug << "H " << H << " e_[" << nChannel << "][" << pos << "]=" << e_[nChannel][pos] << 
+		//	" e_[" << nChannel << "][" << pos+1 << "]=" << e_[nChannel][pos+1] << 
+		//	" e_[" << nChannel << "][" << pos+2 << "]=" << e_[nChannel][pos+2] << std::endl;
+
+		if(pos == 0)
+		{
+			pos = 2; 
+		}
+		else
+		{
+			--pos;
+		}
 		e_[nChannel][pos+3] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
 		pos_[nChannel] = pos;
 
@@ -503,7 +476,6 @@ public:
 private:
 	std::vector<unsigned int> pos_;
 	std::vector<std::vector<T> > e_;				// error feedback
-	const WORD nChannels_;
 };
 
 // 9th order Shaping 
@@ -512,7 +484,7 @@ class NinthOrderNoiseShape : public NoNoiseShape<T, IntType, validBits>
 {
 public:
 	NinthOrderNoiseShape(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
-		pos_(nChannels, 0), e_(nChannels,std::vector<T>(18, 0)), nChannels_(nChannels)
+		pos_(nChannels, 8), e_(nChannels,std::vector<T>(18, 0))
 	{}
 
 	// Generate shaped sample
@@ -529,9 +501,16 @@ public:
 
 		const T y = sample + d - H;
 	
-		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
 
-		if(++pos == 9) pos = 0;
+		if(pos == 0)
+		{
+			pos = 8; 
+		}
+		else
+		{
+			--pos;
+		}
 		e_[nChannel][pos+9] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
 		pos_[nChannel] = pos;
 
@@ -543,7 +522,6 @@ public:
 private:
 	std::vector<unsigned int> pos_;
 	std::vector<std::vector<T> > e_;				// error feedback
-	const WORD nChannels_;
 };
 
 // Pseudo Sony SBM(TM) 
@@ -552,7 +530,7 @@ class SonySBM : public NoNoiseShape<T, IntType, validBits>
 {
 public:
 	SonySBM(const WORD nChannels) : NoNoiseShape<T, IntType, validBits>(nChannels), 
-		pos_(nChannels, 0), e_(nChannels,std::vector<T>(24, 0)), nChannels_(nChannels)
+		pos_(nChannels, 11), e_(nChannels,std::vector<T>(24, 0))
 	{}
 
 	// Generate shaped sample
@@ -570,9 +548,16 @@ public:
 
 		const T y = sample + d - H;
 	
-		const IntType yint = floor_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
 
-		if(++pos == 12) pos = 0;
+		if(pos == 0)
+		{
+			pos = 11; 
+		}
+		else
+		{
+			--pos;
+		}
 		e_[nChannel][pos+12] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
 		pos_[nChannel] = pos;
 
@@ -584,15 +569,12 @@ public:
 private:
 	std::vector<unsigned int> pos_;
 	std::vector<std::vector<T> > e_;				// error feedback
-	const WORD nChannels_;
 };
 
 template <typename T>
-class NoiseShaper
+struct NoiseShaper
 {
-public:
-
-	/// These ditherers are currently available:
+	/// These noise shapers are currently available:
 	enum NoiseShapingType { None=0, Simple=1, SecondOrder=2, ThirdOrder=3, NinthOrder=4, SonySBM=5};
 
 	static const unsigned int nNoiseShapers = 6;

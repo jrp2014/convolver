@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,3,0,0
- PRODUCTVERSION 3,3,0,0
+ FILEVERSION 3,4,0,0
+ PRODUCTVERSION 3,4,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver WMP plug-in Module"
-            VALUE "FileVersion", "3, 3, 0, 0"
+            VALUE "FileVersion", "3, 4, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"
-            VALUE "ProductVersion", "3, 3, 0, 0"
+            VALUE "ProductVersion", "3, 4, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -121,9 +121,9 @@ BEGIN
                     WS_GROUP,0,48,46,8
     CONTROL         "http://convolver.sf.net",IDC_STATIC,"Static",SS_SIMPLE | 
                     WS_GROUP,137,43,76,8,WS_EX_RIGHT
-    COMBOBOX        IDC_COMBODITHER,88,29,62,14,CBS_DROPDOWNLIST | 
+    COMBOBOX        IDC_COMBODITHER,88,29,62,92,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBONOISESHAPING,151,29,62,16,CBS_DROPDOWNLIST | 
+    COMBOBOX        IDC_COMBONOISESHAPING,151,29,62,93,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
 END
 

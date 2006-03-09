@@ -67,14 +67,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		USES_CONVERSION;
 
-		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt|IR.wav inputfile outputfile" << std::endl;
-		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used." << std::endl;
+		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt|IR.wav infile outfile" << std::endl;
+		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used" << std::endl;
 		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << " (";
 		for(int i = 0; i < pr.nDegrees - 1; ++i)
 			std::wcerr << pr.Rigour[i] << "|";
 		std::wcerr <<  pr.Rigour[pr.nDegrees - 1] << ")" << std::endl;
 		std::wcerr << "       config.txt|IR.wav = a config text file specifying a single filter path" << std::endl;
-		std::wcerr << "				              or a sound file to be used as a filter" << std::endl;
+		std::wcerr << "                           or a sound file to be used as a filter" << std::endl;
 		std::wcerr << "       input and output sound files are, typically, .wav" << std::endl;
 		return 1;
 	}

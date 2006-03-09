@@ -247,7 +247,7 @@ typedef	struct SNDFILE_tag	SNDFILE ;
 
 typedef __int64	sf_count_t ;
 
-#define SF_COUNT_MAX		0x7FFFFFFFFFFFFFFFi64
+#define SF_COUNT_MAX		0x7FFFFFFFFFFFFFFFLL
 
 /* A pointer to a SF_INFO structure is passed to sf_open_read () and filled in.
 ** On write, the SF_INFO structure is filled in by the user and passed into
@@ -528,12 +528,3 @@ void	sf_write_sync	(SNDFILE *sndfile) ;
 #endif	/* __cplusplus */
 
 #endif	/* SNDFILE_H */
-
-/*
-** Do not edit or modify anything in this comment block.
-** The arch-tag line is a file identity tag for the GNU Arch
-** revision control system.
-**
-** arch-tag: 906bb197-18f2-4f66-a395-b4722bab5114
-*/
-

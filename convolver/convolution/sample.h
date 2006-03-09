@@ -166,6 +166,7 @@ struct ConvertSample_pcm8 : public ConvertSample<T>
 					dither_.set_ptr(new TriangularDither<T, 8>(nChannels));
 				}
 			}
+			break;
 		case Ditherer<T>::Rectangular:
 			{
 				dither_.set_ptr(new RectangularDither<T, 8>(nChannels));
@@ -224,8 +225,8 @@ struct ConvertSample_pcm8 : public ConvertSample<T>
 	{   
 		//*dstContainer = static_cast<BYTE>(srcSample < T(-1.0) ? 0 : (srcSample > T(1.0) ? 255 : srcSample * T(127.5) + T(128.0))); 
 
-		*dstContainer = noiseshape_->shapenoise(srcSample < T(-1.0) ? 
-			T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample), dither_.get_ptr(), nChannel) + BYTE(128);
+		*dstContainer = static_cast<BYTE>(noiseshape_->shapenoise(srcSample < T(-1.0) ? 
+			T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample), dither_.get_ptr(), nChannel) + 128);
 
 		++dstContainer;
 		++nBytesGenerated;
@@ -269,6 +270,7 @@ struct ConvertSample_pcm16 : public ConvertSample<T>
 					dither_.set_ptr(new TriangularDither<T, 16>(nChannels));
 				}
 			}
+			break;
 		case Ditherer<T>::Rectangular:
 			{
 				dither_.set_ptr(new RectangularDither<T, 16>(nChannels));
@@ -371,6 +373,7 @@ struct ConvertSample_pcm24 : public ConvertSample<T>
 					dither_.set_ptr(new TriangularDither<T, validBits>(nChannels));
 				}
 			}
+			break;
 		case Ditherer<T>::Rectangular:
 			{
 				dither_.set_ptr(new RectangularDither<T, validBits>(nChannels));
@@ -495,6 +498,7 @@ struct ConvertSample_pcm32 : public ConvertSample<T>
 					dither_.set_ptr(new TriangularDither<T, validBits>(nChannels));
 				}
 			}
+			break;
 		case Ditherer<T>::Rectangular:
 			{
 				dither_.set_ptr(new RectangularDither<T, validBits>(nChannels));
@@ -598,7 +602,7 @@ struct ConvertSample_pcm32<T,32> : public ConvertSample<T>
 
 		// Clip if exceeded full scale.
 		*(INT32 *)dstContainer = 
-			floor_int<INT32,T>((srcSample < T(-1.0) ? T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample)) * q);
+			conv_float_to_int<INT32,T>((srcSample < T(-1.0) ? T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample)) * q);
 
 		dstContainer += 4;
 		nBytesGenerated += 4;

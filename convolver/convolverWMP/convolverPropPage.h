@@ -71,6 +71,7 @@ BEGIN_MSG_MAP(CConvolverPropPage)
 	COMMAND_HANDLER(IDC_COMBOPLANNINGRIGOUR, CBN_SELENDOK, OnCbnSelendokCombofftwmeasure)
 	COMMAND_HANDLER(IDC_COMBODITHER, CBN_SELENDOK, OnCbnSelendokCombodither)
 	COMMAND_HANDLER(IDC_COMBONOISESHAPING, CBN_SELENDOK, OnCbnSelendokCombonoiseshaping)
+	COMMAND_HANDLER(IDC_COMBODITHER, CBN_SELCHANGE, OnCbnSelchangeCombodither)
 	CHAIN_MSG_MAP(IPropertyPageImpl<CConvolverPropPage>)
 	MESSAGE_HANDLER(WM_INITDIALOG, OnInitDialog)
 END_MSG_MAP()
@@ -93,6 +94,7 @@ public:
 	LRESULT OnCbnSelendokCombofftwmeasure(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCbnSelendokCombodither(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 	LRESULT OnCbnSelendokCombonoiseshaping(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
+	LRESULT OnCbnSelchangeCombodither(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 #endif // __CCONVOLVERPROPPAGE_H_

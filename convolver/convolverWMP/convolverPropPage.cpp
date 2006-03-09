@@ -673,3 +673,10 @@ LRESULT CConvolverPropPage::OnCbnSelendokCombonoiseshaping(WORD /*wNotifyCode*/,
 
 	return 0;
 }
+
+LRESULT CConvolverPropPage::OnCbnSelchangeCombodither(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	// TODO: Add your control notification handler code here
+
+	return 0;
+}

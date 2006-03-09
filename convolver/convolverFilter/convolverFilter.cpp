@@ -403,9 +403,8 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 
 	if(cbBytesGenerated > 0)
 	{
-		pOut->SetSyncPoint(TRUE); // As bTemporalCompression member of the AM_MEDIA_TYPE structure is FALSE, all samples are synchronization points. 
-
-		// Copy the preroll property
+		pOut->SetSyncPoint(TRUE); // As bTemporalCompression member of the AM_MEDIA_TYPE structure is FALSE, all samples are synchronization points.             
+  		// Copy the preroll property
 		// TODO: This may not be quite right because of latency
 		hr = pIn->IsPreroll();
 		if (hr == S_OK)
@@ -450,7 +449,6 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 		{  // an unexpected error has occured...
 			return hr;
 		}
-
 
 		// Copy the sample times
 
