@@ -147,31 +147,31 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_B7383602C6A04D8682E86586F94146BD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_7C8CF7A10F524ED89B22A73258C218A4"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_7B653B8AB6A04A74B37B59458951A8E6"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -429,10 +429,10 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
-            "{A582A373-4685-4296-BEFE-614B80A702C3}:_F0C5E40B2A4BFD12DACAB3AA88177D9B"
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_E66BB97C6EA5150E09B382BA918D938F"
             {
-            "SourcePath" = "8:libsndfile.dll"
-            "TargetName" = "8:libsndfile.dll"
+            "SourcePath" = "8:libsndfile-1.dll"
+            "TargetName" = "8:libsndfile-1.dll"
             "Tag" = "8:"
             "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
             "Condition" = "8:"
@@ -504,13 +504,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{D4F459D8-63FE-4C06-B549-BC9FF96426CF}"
-        "PackageCode" = "8:{14DC0A9F-7321-4EDA-A970-575520BA7731}"
+        "ProductCode" = "8:{D0790273-D8D1-4123-AE36-B6B2B2514CBC}"
+        "PackageCode" = "8:{DD023C17-EC88-4A4F-8619-464FA8663F74}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:3.4"
+        "ProductVersion" = "8:3.5"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"

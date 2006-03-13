@@ -18,6 +18,10 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
+
+// Frank Klemm says:
+//
+//
 //1) Round-to-Zero-Truncation
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //Round samples down to zero.
@@ -110,7 +114,27 @@
 #include <mediaerr.h>
 #include <time.h>
 #include <boost\random.hpp>
-#include <limits>
+//#include <boost\numeric\conversion\conversion_traits.hpp>
+#include <boost\numeric\conversion\converter.hpp>
+
+template <typename IntType, typename T>
+IntType Floor( const T t )
+{
+	typedef boost::numeric::conversion_traits<IntType,T> TtoIntTraits;
+	typedef boost::numeric::converter<IntType,T,TtoIntTraits,
+#if defined(DEBUG) | defined(_DEBUG)
+		boost::numeric::def_overflow_handler,
+#else
+		boost::numeric::silent_overflow_handler,
+#endif
+		boost::numeric::Floor<T> > TtoIntType;
+
+	assert ( TtoIntTraits::subranged::value ) ;
+	assert ( TtoIntTraits::int_float_mixture::value == boost::numeric::float_to_integral ) ;
+	return TtoIntType::convert(t);
+}
+
+//#include <limits>
 
 //// IntType may be Int16, 32, or 64; T may be float or double
 //// Uses current rounding mode, assumed to be round to nearest
@@ -134,21 +158,21 @@
 //	return (i);
 //}
 
-// floor_int does not work for |x| > maxint/2
-// So use the following, which assumes round to nearest rounding mode
-template <typename IntType, typename T>
-inline IntType conv_float_to_int (T x)
-{
-	IntType a;
-	static const T round_towards_m_i = T(-0.5);
-	__asm
-	{
-		fld x
-			fadd round_towards_m_i
-			fistp a
-	}
-	return a;
-}
+//// floor_int does not work for |x| > maxint/2
+//// So use the following, which assumes round to nearest rounding mode
+//template <typename IntType, typename T>
+//inline IntType Floor (T x)
+//{
+//	IntType a;
+//	static const T round_towards_m_i = T(-0.5);
+//	__asm
+//	{
+//		fld x
+//			fadd round_towards_m_i
+//			fistp a
+//	}
+//	return a;
+//}
 
 template <typename T>
 class Dither
@@ -164,7 +188,7 @@ template <typename T>
 inline Dither<T>::~Dither(){}
 
 template <typename T>
-class NoDither : public Dither<T>
+class NoDither : public virtual Dither<T>
 {
 public:
 
@@ -184,7 +208,7 @@ public:
 template <typename T, unsigned short validBits, 
 typename distribution_type = boost::uniform_real<T>, 
 typename base_generator_type = boost::random::lagged_fibonacci_01<T, 48, 607, 273> >
-class SimpleDither : public Dither<T>
+class SimpleDither : public virtual Dither<T>
 {
 public:
 
@@ -302,7 +326,7 @@ public:
 
 	HRESULT SelectDither(DitherType dt, const WAVEFORMATEX* pWave);
 
-	unsigned int Lookup(const TCHAR* r) const
+	static unsigned int Lookup(const TCHAR* r)
 	{
 		for(unsigned int i=0; i<nDitherers; ++i)
 		{
@@ -333,7 +357,7 @@ template <typename T, typename IntType>
 inline NoiseShape<T,IntType>::~NoiseShape(void){}
 
 template <typename T, typename IntType, int validBits>
-class NoNoiseShape : public NoiseShape<T,IntType>
+class NoNoiseShape : public virtual NoiseShape<T,IntType>
 {
 public:
 	NoNoiseShape(const WORD nChannels) : nChannels_(nChannels)
@@ -343,7 +367,7 @@ public:
 	virtual IntType shapenoise(const T sample, Dither<T> * dither, const WORD nChannel)
 	{
 		assert(nChannel < nChannels_);
-		return conv_float_to_int<IntType,T>((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to IntType)
+		return Floor<IntType,T>((dither->dither(nChannel) + sample) * q_);	// just scale (eg from float to IntType)
 	}
 
 	virtual ~NoNoiseShape(void) {}
@@ -380,7 +404,7 @@ public:
 		const T d = dither->dither(nChannel);
 		const T H = e_[nChannel];
 		const T y = sample + d - H;
-		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to IntType)
+		const IntType yint = Floor<IntType,T>(y * q_);		// just scale (eg from float to IntType)
 		e_[nChannel] = Q_ * (yint + T(0.5)) - (sample - H);				// generate the feedback for this channel
 		return yint;	
 	}
@@ -412,7 +436,7 @@ public:
 		const T H = e_[nChannel][pos] * T(1.287) + e_[nChannel][pos+1]*T(-0.651);
 		const T y = sample + d - H;
 
-		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to IntType)
+		const IntType yint =  Floor<IntType,T>(y * q_);		// just scale (eg from float to IntType)
 
 		pos = 1 - pos;
 		e_[nChannel][pos+2] = e_[nChannel][pos] = Q_ * (yint + T(0.5)) - (sample - H);
@@ -449,7 +473,7 @@ public:
 		const T H = e_[nChannel][pos] * T(1.329) + e_[nChannel][pos+1]*T(-0.735) + e_[nChannel][pos+2]*T(0.0646);
 		const T y = sample + d - H;
 	
-		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = Floor<IntType,T>(y * q_);		// just scale (eg from float to INT32)
 
 
 		//cdebug << "sample " << sample << " y " << y << " yint " << yint <<std::endl;
@@ -501,7 +525,7 @@ public:
 
 		const T y = sample + d - H;
 	
-		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = Floor<IntType,T>(y * q_);		// just scale (eg from float to IntType)
 
 		if(pos == 0)
 		{
@@ -548,7 +572,7 @@ public:
 
 		const T y = sample + d - H;
 	
-		const IntType yint = conv_float_to_int<IntType,T>(y * q_);		// just scale (eg from float to INT32)
+		const IntType yint = Floor<IntType,T>(y * q_);		// just scale (eg from float to IntType)
 
 		if(pos == 0)
 		{
@@ -582,7 +606,7 @@ struct NoiseShaper
 
 	static const TCHAR Description[nNoiseShapers][nStrLen];
 
-	unsigned int Lookup(const TCHAR* r) const
+	static unsigned int Lookup(const TCHAR* r)
 	{
 		for(unsigned int i=0; i<nNoiseShapers; ++i)
 		{

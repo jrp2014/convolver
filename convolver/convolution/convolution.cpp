@@ -112,7 +112,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
 
-	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
+	const BYTE* pbInputDataPointer = pbInputData;
 	BYTE* pbOutputDataPointer = pbOutputData;
 
 	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
@@ -286,7 +286,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
 
-	BYTE* pbInputDataPointer = const_cast<BYTE*>(pbInputData);
+	const BYTE* pbInputDataPointer = pbInputData;
 	BYTE* pbOutputDataPointer = pbOutputData;
 
 	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
@@ -880,7 +880,8 @@ state_(Unselected),
 selectedConvolutionIndex_(0),
 ConvolutionList_(0),
 nConvolutionList_(0),
-nPartitions_(nPartitions)
+nPartitions_(nPartitions),
+bNeedsUpdating(false)
 {
 	USES_CONVERSION;
 

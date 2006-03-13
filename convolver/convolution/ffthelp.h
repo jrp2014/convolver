@@ -47,7 +47,7 @@ struct PlanningRigour
 	static const TCHAR Rigour[nDegrees][nStrLen];
 	static const unsigned int Flag[nDegrees];
 
-	unsigned int Lookup(const TCHAR* r) const
+	static unsigned int Lookup(const TCHAR* r)
 	{
 		for(unsigned int i=0; i<nDegrees; ++i)
 		{

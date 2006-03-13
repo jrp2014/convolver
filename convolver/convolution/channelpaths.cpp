@@ -422,7 +422,7 @@ const std::string ChannelPaths::DisplayChannelPaths() const
 		result
 			<< nSamplesPerSec()/1000.0f << "kHz, " 
 			<< nFilterLength() << " taps, " 
-			<< std::setprecision(2) << (static_cast<float>(nPartitionLength()) / static_cast<float>(nSamplesPerSec())) << "s lag";
+			<< std::setprecision(2) << (static_cast<float>(nPartitionLength() * float(2.0)) / static_cast<float>(nSamplesPerSec())) << "s lag";
 	}
 	return result.str();
 }

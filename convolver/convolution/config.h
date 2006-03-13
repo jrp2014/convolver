@@ -32,6 +32,7 @@
 
 
 #define STRSAFE_NO_DEPRECATE	1
+#define _CRT_SECURE_NO_DEPRECATE	1
 
 // For STLport
 #define _STLP_NO_ANACHRONISMS 1
@@ -112,6 +113,9 @@ const DWORD MAXSTRING = 1024;	// length
 #if !defined(__INTEL_COMPILER) || (defined(_MSC_VER) && _MSC_VER < 1400)
 #define restrict
 #endif
+
+// Base type for convolution (float/double)
+typedef float			BaseT;
 
 // FFT routines
 //#define OOURA	1

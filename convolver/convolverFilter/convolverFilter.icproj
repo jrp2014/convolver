@@ -144,7 +144,7 @@
 			<Tool 
 				Name="LinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib fftw31.lib  libsndfile.lib"
+				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib fftw31.lib libsndfile.lib"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"

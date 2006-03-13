@@ -92,7 +92,6 @@ int	_tmain(int argc, _TCHAR* argv[])
 		}
 #endif
 
-
 		std::wistringstream	szPartitions(argv[1]);
 		unsigned int max_nPartitions;	// Can't use WORD as that seems to break >>
 		szPartitions >>	max_nPartitions;
@@ -111,13 +110,13 @@ int	_tmain(int argc, _TCHAR* argv[])
 			throw(std::length_error("invalid nIterations"));
 		}
 
-		PlanningRigour pr;
+		//PlanningRigour pr;
 		std::wistringstream	szPlanningRigour(argv[3]);
 		unsigned int nPlanningRigour;
 		szPlanningRigour >>	nPlanningRigour;
-		if (nPlanningRigour	< 0 || nPlanningRigour > pr.nDegrees - 1)
+		if (nPlanningRigour	< 0 || nPlanningRigour > PlanningRigour::nDegrees - 1)
 		{
-			std::wcerr << "nTuningRigour (" << nPlanningRigour << ") must be between 0 and " << pr.nDegrees - 1 << std::endl;
+			std::wcerr << "nTuningRigour (" << nPlanningRigour << ") must be between 0 and " << PlanningRigour::nDegrees - 1 << std::endl;
 			throw(std::length_error("invalid nTuningRigour"));
 		}
 

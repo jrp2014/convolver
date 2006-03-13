@@ -335,14 +335,13 @@ private:
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	unsigned int			m_nPlanningRigour;
 
-	typedef float			BaseT;
 	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;
 	typedef Ditherer<BaseT>::DitherType DitherType;
 
-	DitherType				m_nDither;				// The dither type index
+	DitherType				m_nDither;			// The dither type index
 	NoiseShapingType		m_nNoiseShaping;	// The noise shaping type index
 
-	Holder< ConvolutionList<BaseT> >	m_ConvolutionList;		// Processing class.
+	Holder< ConvolutionList<BaseT> >	m_ConvolutionList;			// Processing class.
 	Holder<ConvertSample<BaseT> >		m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Holder<ConvertSample<BaseT> >		m_OutputSampleConvertor;	// BaseT
 

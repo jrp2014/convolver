@@ -24,10 +24,6 @@
 #include "debugging\fastTiming.h"
 #include "convolverWMP\version.h"
 
-static PlanningRigour pr;
-static Ditherer<float> dither;
-static NoiseShaper<float> noiseshaping;
-
 //
 // CreateInstance
 //
@@ -348,7 +344,6 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 	} // switch uMsg
 
 	return CBasePropertyPage::OnReceiveMessage(hwnd,uMsg,wParam,lParam);
-
 }
 
 //
@@ -449,9 +444,9 @@ HRESULT CconvolverFilterProperties::OnActivate()
 	}
 	else
 	{
-		for(unsigned int i=0; i<pr.nDegrees; ++i)
+		for(unsigned int i=0; i<PlanningRigour::nDegrees; ++i)
 		{
-			SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)pr.Rigour[i]);
+			SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)PlanningRigour::Rigour[i]);
 		}
 		SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 	}
@@ -460,13 +455,13 @@ HRESULT CconvolverFilterProperties::OnActivate()
 	hr = m_pIconvolverFilter->get_dither(&nDither);
 	if(FAILED(hr))
 	{
-		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve dither.") );
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve dither") );
 	}
 	else
 	{
-		for(unsigned int i=0; i<dither.nDitherers; ++i)
+		for(unsigned int i=0; i<Ditherer<BaseT>::nDitherers; ++i)
 		{
-			SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)dither.Description[i]);
+			SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)Ditherer<BaseT>::Description[i]);
 		}
 		SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
 	}
@@ -475,13 +470,13 @@ HRESULT CconvolverFilterProperties::OnActivate()
 	hr = m_pIconvolverFilter->get_noiseshaping(&nNoiseShaping);
 	if(FAILED(hr))
 	{
-		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve noise shaping.") );
+		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to retrieve noise shaping") );
 	}
 	else
 	{
-		for(unsigned int i=0; i<noiseshaping.nNoiseShapers; ++i)
+		for(unsigned int i=0; i<NoiseShaper<BaseT>::nNoiseShapers; ++i)
 		{
-			SendDlgItemMessage(m_Dlg, IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)noiseshaping.Description[i]);
+			SendDlgItemMessage(m_Dlg, IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)NoiseShaper<BaseT>::Description[i]);
 		}
 		SendDlgItemMessage(m_Dlg, IDC_COMBONOISESHAPING, CB_SETCURSEL, nNoiseShaping, 0);
 	}
@@ -673,15 +668,15 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 
 	// Get the planning rigour value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBOPLANNINGRIGOUR), szStr, sizeof(szStr) / sizeof(szStr[0]));
-	nPlanningRigour = pr.Lookup(szStr);
+	nPlanningRigour = PlanningRigour::Lookup(szStr);
 
 	// Get the planning rigour value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBODITHER), szStr, sizeof(szStr) / sizeof(szStr[0]));
-	nDither = dither.Lookup(szStr);
+	nDither = Ditherer<BaseT>::Lookup(szStr);
 
 	// Get the planning rigour value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_COMBONOISESHAPING), szStr, sizeof(szStr) / sizeof(szStr[0]));
-	nNoiseShaping = noiseshaping.Lookup(szStr);
+	nNoiseShaping = NoiseShaper<BaseT>::Lookup(szStr);
 
 	// update the registry
 	CRegKey key;

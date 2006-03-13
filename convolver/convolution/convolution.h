@@ -245,6 +245,10 @@ public:
 
 	const std::string DisplayConvolutionList() const;
 
+
+	bool	bNeedsUpdating;				// Whether the current convolutionlist is valid
+
+
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump() const;
 #endif

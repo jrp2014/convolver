@@ -51,7 +51,7 @@
 
 // A simple aligned array
 template <class T>
-class AlignedArray
+class __single_inheritance AlignedArray
 {
 public:
 	typedef T					value_type;
@@ -122,7 +122,7 @@ template<class T>
 inline void swap (AlignedArray<T>& x, AlignedArray<T>& y);
 
 template <typename T> 
-struct FastArray : public AlignedArray<T>
+struct FastArray : AlignedArray<T>
 {
 
 	// type definitions
@@ -165,11 +165,11 @@ struct FastArray : public AlignedArray<T>
 	explicit FastArray(const size_type n) : AlignedArray<T>(n)
 	{ 
 		// TODO: we probably don't need to do this
-		std::uninitialized_fill_n(first_, size_, 0);
+		std::fill_n(first_, size_, 0);
 	}
 	FastArray(const_reference x, const size_t n) : AlignedArray<T>(n)
 	{ 
-		std::uninitialized_fill_n(first_, size_, x);
+		std::fill_n(first_, size_, x);
 	}
 	FastArray(const_pointer p, const size_t n) : AlignedArray<T>(n)
 	{
@@ -189,7 +189,8 @@ struct FastArray : public AlignedArray<T>
 	reference restrict operator[](const size_type n)
 	{
 		assert(n >= 0 && n < size_);
-		return *(first_ + n);
+		//return *(first_ + n);
+		return first_[n];
 	}
 
 	const_reference operator[](const size_type n) const
@@ -263,7 +264,7 @@ struct FastArray : public AlignedArray<T>
 	// assign one value to all elements
 	void assign (const T x)
 	{
-		std::fill_n(begin(), size(), x);
+		std::fill_n(first_, size_, x);
 	}
 
 	// Basic assignment.  Note that assertions are stricter than necessary, as unequally-size
@@ -282,7 +283,20 @@ struct FastArray : public AlignedArray<T>
 		//	swap(temp);
 		//}
 		if( this != &other)
-			std::uninitialized_copy(other.first_, other.first_ + other.size_, first_);
+//			std::uninitialized_copy(other.first_, other.first_ + other.size_, first_);
+		{
+			::CopyMemory(first_, other.first_, bsize_);
+		}
+
+
+//		{
+//			const size_type ss = other.size_;						// Improve chances of vectorization
+//#pragma loop count(65536)
+//#pragma ivdep
+//#pragma vector aligned
+//			for (size_type i = 0; i < ss; ++i)
+//				(*this)[i] = other[i];             // TODO: optimize int->float
+//		}
 		return *this;
 	}
 
@@ -303,20 +317,20 @@ struct FastArray : public AlignedArray<T>
 
 	FastArray<T>& operator=(const T x)
 	{
-		std::uninitialized_fill_n(first_, size_, x);
-//		if(x == 0)
-//		{
-//			::ZeroMemory(first_, bsize_);
-//		}
-//		else
-//		{
+		if(x == 0)
+		{
+			::ZeroMemory(first_, bsize_);
+		}
+		else
+		{
+			std::fill_n(first_, size_, x);
 //			const size_type ss = size_;						// Improve chances of vectorization
 //#pragma loop count(65536)
 //#pragma ivdep
 //#pragma vector aligned
 //			for (size_type i = 0; i < ss; ++i)
-//				(*this)[i] = static_cast<T>(x);             // TODO: optimize int->float
-//		}
+//				(*this)[i] = x;             // TODO: optimize int->float
+		}
 		return *this;
 	}
 
@@ -357,7 +371,6 @@ struct FastArray : public AlignedArray<T>
 			{
 				*p++ += x;
 			}
-
 		}
 		return *this;
 	}
@@ -377,6 +390,7 @@ struct FastArray : public AlignedArray<T>
 //#pragma vector aligned
 //		for (size_type i = 0; i < rhs_size; ++i)
 //			(*this)[i] += rhs[i];
+
 		const pointer last = first_ + size_;
 		for(pointer p = first_, q = rhs.first_; p != last;)
 		{

@@ -32,13 +32,9 @@
 #include "convolution\waveformat.h"
 #include "convolverWMP\version.h"
 #include <exception>
-#include ".\convolverproppage.h"
 #include "convolution\dither.h"
 
 
-static PlanningRigour pr;
-static Ditherer<float> dither;
-static NoiseShaper<float> noiseshaping;
 
 /////////////////////////////////////////////////////////////////////////////
 // CConvolverProp::CConvolverProp
@@ -187,23 +183,23 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 		// Get the planning rigour from the dialogue box
 		//nPlanningRigour = GetDlgItemInt(IDC_COMBOPLANNINGRIGOUR, NULL, FALSE); // Doesn't work
-		TCHAR* szMeasure = new TCHAR[pr.nStrLen];
-		GetDlgItemText(IDC_COMBOPLANNINGRIGOUR, szMeasure, pr.nStrLen);
-		nPlanningRigour = pr.Lookup(szMeasure);
+		TCHAR* szMeasure = new TCHAR[PlanningRigour::nStrLen];
+		GetDlgItemText(IDC_COMBOPLANNINGRIGOUR, szMeasure, PlanningRigour::nStrLen);
+		nPlanningRigour = PlanningRigour::Lookup(szMeasure);
 		delete [] szMeasure;
 
 		// Get the dither from the dialogue box
 		// nDither = GetDlgItemInt(IDC_COMBODITHER, NULL, FALSE); // Doesn't work
-		TCHAR* szDither = new TCHAR[dither.nStrLen];
-		GetDlgItemText(IDC_COMBODITHER, szDither, dither.nStrLen);
-		nDither = dither.Lookup(szDither);
+		TCHAR* szDither = new TCHAR[Ditherer<BaseT>::nStrLen];
+		GetDlgItemText(IDC_COMBODITHER, szDither, Ditherer<BaseT>::nStrLen);
+		nDither = Ditherer<BaseT>::Lookup(szDither);
 		delete [] szDither;
 
 		// Get the shaping from the dialogue box
 		// nDither = GetDlgItemInt(IDC_COMBODITHER, NULL, FALSE); // Doesn't work
-		TCHAR* szShaping = new TCHAR[noiseshaping.nStrLen];
-		GetDlgItemText(IDC_COMBONOISESHAPING, szShaping, noiseshaping.nStrLen);
-		nNoiseShaping = noiseshaping.Lookup(szShaping);
+		TCHAR* szShaping = new TCHAR[NoiseShaper<BaseT>::nStrLen];
+		GetDlgItemText(IDC_COMBONOISESHAPING, szShaping, NoiseShaper<BaseT>::nStrLen);
+		nNoiseShaping = NoiseShaper<BaseT>::Lookup(szShaping);
 		delete [] szShaping;
 
 
@@ -399,21 +395,21 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		version v(TEXT("convolverWMP.dll"));
 		SetDlgItemText(IDC_STATIC_VERSION,  (TEXT("Version ") + v.get_product_version()).c_str());
 
-		for(unsigned int i=0; i<pr.nDegrees; ++i)
+		for(unsigned int i=0; i<PlanningRigour::nDegrees; ++i)
 		{
-			SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)pr.Rigour[i]);
+			SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_ADDSTRING, 0, (LPARAM)PlanningRigour::Rigour[i]);
 		}
 		SendDlgItemMessage(IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 
-		for(unsigned int i=0; i<dither.nDitherers; ++i)
+		for(unsigned int i=0; i<Ditherer<BaseT>::nDitherers; ++i)
 		{
-			SendDlgItemMessage(IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)dither.Description[i]);
+			SendDlgItemMessage(IDC_COMBODITHER, CB_ADDSTRING, 0, (LPARAM)Ditherer<BaseT>::Description[i]);
 		}
 		SendDlgItemMessage(IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
 
-		for(unsigned int i=0; i<noiseshaping.nNoiseShapers; ++i)
+		for(unsigned int i=0; i<NoiseShaper<BaseT>::nNoiseShapers; ++i)
 		{
-			SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)noiseshaping.Description[i]);
+			SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_ADDSTRING, 0, (LPARAM)NoiseShaper<BaseT>::Description[i]);
 		}
 		SendDlgItemMessage(IDC_COMBONOISESHAPING, CB_SETCURSEL, nNoiseShaping, 0);
 

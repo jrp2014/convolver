@@ -179,9 +179,10 @@ HRESULT CConvolver::FinalConstruct()
 			m_nNoiseShaping = static_cast<NoiseShapingType>(dwValue);
 		}
 
-		try // creating m_ConvolutionList might throw
+		try // creating m_ConvolutionList. Might throw
 		{
-			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 
 		}
 		catch (...) 
@@ -1141,7 +1142,15 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 
 	if(cbInputLength == 0)
 	{
-		return S_FALSE; // No output to process.
+		hr = Flush();
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+		else
+		{
+			return S_FALSE; // No output to process.
+		}
 	}
 	else
 	{
@@ -1212,13 +1221,14 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 		return S_FALSE;
 	}
 
-	BYTE         *pbOutputData = NULL;
-	DWORD        cbOutputMaxLength = 0;
-	DWORD        cbBytesToProcess = 0;
-	DWORD		 cbBytesGenerated = 0;
+	BYTE	*pbOutputData = NULL;
+	DWORD	cbOutputMaxLength = 0;
+	DWORD	cbOutputActualLength = 0;	 
+	DWORD	cbBytesToProcess = 0;
+	DWORD	cbBytesGenerated = 0;
 
 	// Get current length of output buffer
-	hr = pOutputBuffer->GetBufferAndLength(&pbOutputData, &cbOutputMaxLength);
+	hr = pOutputBuffer->GetBufferAndLength(&pbOutputData, &cbOutputActualLength);
 	if (FAILED(hr))
 	{
 		return hr;
@@ -1230,6 +1240,8 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	{
 		return hr;
 	}
+
+	assert(cbOutputMaxLength >= cbOutputActualLength);
 
 	// Get the pointer to the input and output format structures.
 	const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
@@ -1261,7 +1273,6 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	{
 		return E_ABORT;
 	}
-
 
 	// Call the internal processing method, which returns the no. bytes processed
 	hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesToProcess, &cbBytesGenerated);
@@ -1487,25 +1498,8 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-		const bool selected = m_ConvolutionList.get_ptr() != NULL && m_ConvolutionList->ConvolutionSelected();
-
-		// May throw
-		m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  
-			m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-		if(selected)
-		{
-			// Get the pointer to the input and output format structures.
-			const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-			const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-
-			if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
-			{
-				const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-					"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-				throw convolutionException(diagnostic);
-			}
-		}
+		if(m_ConvolutionList.get_ptr() != NULL)
+			m_ConvolutionList->bNeedsUpdating = true;
 	}
 
 	return S_OK;
@@ -1541,26 +1535,7 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 
 		if(m_ConvolutionList.get_ptr() != NULL)
 		{
-
-			const bool selected = m_ConvolutionList->ConvolutionSelected();
-
-			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
-				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			if(selected)
-			{
-				// Get the pointer to the input and output format structures.
-				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-
-				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
-				{
-					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-					throw convolutionException(diagnostic);
-				}
-			}
+			m_ConvolutionList->bNeedsUpdating = true;
 		}
 	}
 
@@ -1598,26 +1573,7 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 
 		if(m_ConvolutionList.get_ptr() != NULL)
 		{
-
-			const bool selected = m_ConvolutionList->ConvolutionSelected();
-
-			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
-				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			if(selected)
-			{
-				// Get the pointer to the input and output format structures.
-				const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-				const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-
-				if(FAILED(m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
-				{
-					const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-						"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-					throw convolutionException(diagnostic);
-				}
-			}
+			m_ConvolutionList->bNeedsUpdating = true;
 		}
 	}
 
@@ -1773,12 +1729,33 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 		return E_FAIL;
 	}
 
-	// Get a pointer to the valid WAVEFORMATEX structure
-	// for the current media type.
-	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat; // TODO: reinterpret_cast?
+	// Get the pointer to the input format structure.
+	const WAVEFORMATEX *pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+
+	if(m_ConvolutionList->bNeedsUpdating)
+	{
+		try
+		{
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+			// Get the pointer to the output format structure.
+			const WAVEFORMATEX *pWaveOut = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+
+			HRESULT hr = m_ConvolutionList->SelectConvolution(pWaveIn, pWaveOut);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+		}
+		catch(...)
+		{
+			return E_ABORT;
+		}
+	}
 
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
-	DWORD dwBlocksToProcess = (*cbInputBytesToProcess / pWave->nBlockAlign);
+	DWORD dwBlocksToProcess = (*cbInputBytesToProcess / pWaveIn->nBlockAlign);
 
 	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?

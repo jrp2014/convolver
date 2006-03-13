@@ -260,8 +260,8 @@ m_OutputSampleConvertor(NULL)
 
 		try // creating m_ConvolutionList might throw
 		{
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions,
-				m_nPlanningRigour)); // 0 partitions = overlap-save
+			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+				m_nPartitions == 0 ? 1 : m_nPartitions,	m_nPlanningRigour)); // 0 partitions = overlap-save
 		}
 		catch (...) 
 		{
@@ -342,6 +342,25 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return E_ABORT;
+	}
+
+	if(m_ConvolutionList->bNeedsUpdating)
+	{
+		try
+		{
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  
+				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
+
+			HRESULT hr = m_ConvolutionList->SelectConvolution((WAVEFORMATEX*) &m_WaveInXT, (WAVEFORMATEX*) &m_WaveOutXT);
+			if(FAILED(hr))
+			{
+				return hr;
+			}
+		}
+		catch(...)
+		{
+			return E_ABORT;
+		}
 	}
 
 	// input
@@ -1066,21 +1085,8 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 	{
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 
-		const bool selected = m_ConvolutionList.get_ptr() != NULL && m_ConvolutionList->ConvolutionSelected();
-
-		// May throw
-		m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions,
-			m_nPlanningRigour)); // 0 partitions = overlap-save
-
-		if(selected)
-		{
-			if(FAILED(m_ConvolutionList->SelectConvolution(&m_WaveInXT.Format, &m_WaveOutXT.Format)))
-			{
-				const std::string diagnostic = m_ConvolutionList->DisplayConvolutionList() + 
-					"\nWarning: filter sample rate or numbers of i/o channels not compatible with current playback";
-				throw convolutionException(diagnostic);
-			}
-		}
+		if(m_ConvolutionList.get_ptr() != NULL)
+			m_ConvolutionList->bNeedsUpdating = true;
 	}
 
 	return S_OK;
@@ -1117,19 +1123,7 @@ STDMETHODIMP CconvolverFilter::put_partitions(DWORD newVal)
 		// May throw
 		if(m_ConvolutionList.get_ptr() != NULL)
 		{
-			const bool selected = m_ConvolutionList->ConvolutionSelected();
-
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,  m_nPartitions == 0 ? 1 : m_nPartitions,
-				m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			if(selected)
-			{
-				HRESULT hr = m_ConvolutionList->SelectConvolution(&m_WaveInXT.Format, &m_WaveOutXT.Format);
-				if(FAILED(hr))
-				{
-					return hr;
-				}
-			}
+			m_ConvolutionList->bNeedsUpdating = true;
 		}
 	}
 
@@ -1167,20 +1161,7 @@ STDMETHODIMP CconvolverFilter::put_planning_rigour(unsigned int newVal)
 
 		if(m_ConvolutionList.get_ptr() != NULL)
 		{
-			const bool selected = m_ConvolutionList->ConvolutionSelected();
-
-			// May throw
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
-				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			if(selected)
-			{
-				HRESULT hr = m_ConvolutionList->SelectConvolution(&m_WaveInXT.Format, &m_WaveOutXT.Format);
-				if(FAILED(hr))
-				{
-					return hr;
-				}
-			}
+			m_ConvolutionList->bNeedsUpdating = true;
 		}
 	}
 

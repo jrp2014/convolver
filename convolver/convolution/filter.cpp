@@ -143,8 +143,6 @@ nSamplesPerSec_(nSamplesPerSec)
 #endif
 
 	// Initialise the Filter
-
-	PlanningRigour pr;
 #ifdef FFTW
 	nFFTWPartitionLength_ = 2*(nPaddedPartitionLength/2+1);
 #ifdef ARRAY
@@ -153,18 +151,18 @@ nSamplesPerSec_(nSamplesPerSec)
 	coeffs_ = SampleBuffer(nPartitions, ChannelBuffer(nFFTWPartitionLength_));
 #endif
 	// PATIENT will disable multithreading, if it's not faster
-	if(nPlanningRigour > pr.Measure)
+	if(nPlanningRigour > PlanningRigour::Measure)
 		fftwf_plan_with_nthreads(2);
 
-	if(nPlanningRigour == pr.TimeLimited)
-		fftwf_set_timelimit(pr.nTimeLimit);
+	if(nPlanningRigour == PlanningRigour::TimeLimited)
+		fftwf_set_timelimit(PlanningRigour::nTimeLimit);
 
 	plan_ =  fftwf_plan_dft_r2c_1d(nPaddedPartitionLength,
 		c_ptr(coeffs_), reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_)),
-		pr.Flag[nPlanningRigour]);
+		PlanningRigour::Flag[nPlanningRigour]);
 	reverse_plan_ =  fftwf_plan_dft_c2r_1d(nPaddedPartitionLength, 
 		reinterpret_cast<fftwf_complex*>(c_ptr(coeffs_)), c_ptr(coeffs_),
-		pr.Flag[nPlanningRigour]);
+		PlanningRigour::Flag[nPlanningRigour]);
 #else
 #ifdef ARRAY
 	coeffs_ = SampleBuffer(nPartitions, nPaddedPartitionLength);

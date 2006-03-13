@@ -59,7 +59,7 @@ struct __declspec(novtable) __single_inheritance ConvertSample
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	virtual void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
+	virtual void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
 
 	virtual void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const = 0;
 
@@ -75,7 +75,7 @@ inline ConvertSample<T>::~ConvertSample(void){}
 
 // TODO: float with wValidBitsPerSample = 18; //Top 18 bits have data
 template <typename T>
-struct ConvertSample_ieeefloat : public ConvertSample<T>
+struct ConvertSample_ieeefloat : public virtual ConvertSample<T>
 {
 
 	ConvertSample_ieeefloat()
@@ -85,14 +85,14 @@ struct ConvertSample_ieeefloat : public ConvertSample<T>
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
-		dstSample = *reinterpret_cast<float *>(srcContainer) * fAttenuationFactor;
+		dstSample = *reinterpret_cast<const float *>(srcContainer) * fAttenuationFactor;
 		srcContainer += sizeof(float);
 		nBytesProcessed += sizeof(float);
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
+	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{ 
 		*((float *) dstContainer) = srcSample;
 		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
@@ -107,7 +107,7 @@ struct ConvertSample_ieeefloat : public ConvertSample<T>
 };
 
 template <typename T>
-struct ConvertSample_ieeedouble : public ConvertSample<T>
+struct ConvertSample_ieeedouble : public virtual ConvertSample<T>
 {
 	ConvertSample_ieeedouble()
 	{}
@@ -116,9 +116,9 @@ struct ConvertSample_ieeedouble : public ConvertSample<T>
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
-		dstSample = *reinterpret_cast<double *>(srcContainer) * fAttenuationFactor;
+		dstSample = *reinterpret_cast<const double *>(srcContainer) * fAttenuationFactor;
 		srcContainer += sizeof(double);
 		nBytesProcessed += sizeof(double);
 	}
@@ -139,7 +139,7 @@ struct ConvertSample_ieeedouble : public ConvertSample<T>
 
 // 8-bit sound is 0..255 with 128 == silence
 template <typename T>
-struct ConvertSample_pcm8 : public ConvertSample<T>
+struct ConvertSample_pcm8 : public virtual ConvertSample<T>
 {
 
 	ConvertSample_pcm8() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,8>(1))
@@ -213,10 +213,10 @@ struct ConvertSample_pcm8 : public ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		const T Q = 1.0 / ((1 << (8-1)) - 0.5); // 1/127.5
-		dstSample = static_cast<T>((*srcContainer - T(127.5)) * Q) * fAttenuationFactor;  // Normalize [0..255] -> to [-1..1)
+		dstSample = (*srcContainer - T(127.5)) * Q * fAttenuationFactor;  // Normalize [0..255] -> to [-1..1)
 		++srcContainer;
 		++nBytesProcessed;
 	}
@@ -244,7 +244,7 @@ private:
 
 // 16-bit sound is -32768..32767 with 0 == silence
 template <typename T>
-struct ConvertSample_pcm16 : public ConvertSample<T>
+struct ConvertSample_pcm16 : public virtual ConvertSample<T>
 {
 	ConvertSample_pcm16() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,16>(1))
 	{}
@@ -317,11 +317,11 @@ struct ConvertSample_pcm16 : public ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const 
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const 
 	{ 
 		const T Q = 2.0 / ((1 << 16) - 1.0); // 2/65535 
 
-		dstSample = (static_cast<T>(*reinterpret_cast<INT16*>(srcContainer)) + T(0.5)) * Q * fAttenuationFactor;
+		dstSample = (*reinterpret_cast<const INT16*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
 		srcContainer += 2;
 		nBytesProcessed += 2;
 	}
@@ -347,7 +347,7 @@ private:
 
 // 24-bit sound
 template <typename T, int validBits>
-struct ConvertSample_pcm24 : public ConvertSample<T>
+struct ConvertSample_pcm24 : public virtual ConvertSample<T>
 {
 	ConvertSample_pcm24() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
@@ -420,7 +420,7 @@ struct ConvertSample_pcm24 : public ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 
 		INT32 i = srcContainer[2];
@@ -472,7 +472,7 @@ private:
 
 // 32-bit sound
 template <typename T, int validBits = 32>
-struct ConvertSample_pcm32 : public ConvertSample<T>
+struct ConvertSample_pcm32 : public virtual ConvertSample<T>
 {
 	ConvertSample_pcm32() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
@@ -545,11 +545,11 @@ struct ConvertSample_pcm32 : public ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		const T Q = 1.0 / ( (1 << (validBits-2)) - 0.5 + (1 << (validBits-2)) );
 
-		dstSample = (*reinterpret_cast<INT32*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
+		dstSample = (*reinterpret_cast<const INT32*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
 
 		srcContainer += 4;
 		nBytesProcessed += 4;
@@ -577,7 +577,7 @@ private:
 
 // 32-bit sound. No dithering or shaping
 template <typename T>
-struct ConvertSample_pcm32<T,32> : public ConvertSample<T>
+struct ConvertSample_pcm32<T,32> : public virtual ConvertSample<T>
 {
 	ConvertSample_pcm32()
 	{}
@@ -586,11 +586,11 @@ struct ConvertSample_pcm32<T,32> : public ConvertSample<T>
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	void GetSample(T& dstSample, BYTE*& srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		const T Q = 1.0 / ( (1 << (32-2)) - 0.5 + (1 << (32-2)) );
 
-		dstSample = (*reinterpret_cast<INT32*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
+		dstSample = (*reinterpret_cast<const INT32*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
 
 		srcContainer += 4;
 		nBytesProcessed += 4;
@@ -598,11 +598,11 @@ struct ConvertSample_pcm32<T,32> : public ConvertSample<T>
 
 	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{   
-		const T q = (1 << 30) - 0.5 + (1 << 30); // (2^31 - 0.5)
+		const T q = ( (1 << (32-2)) - 0.5 + (1 << (32-2)) ); // (2^31 - 0.5)
 
 		// Clip if exceeded full scale.
 		*(INT32 *)dstContainer = 
-			conv_float_to_int<INT32,T>((srcSample < T(-1.0) ? T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample)) * q);
+			Floor<INT32,T>((srcSample < T(-1.0) ? T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample)) * q);
 
 		dstContainer += 4;
 		nBytesGenerated += 4;
@@ -654,7 +654,7 @@ public:
 		sample_factory_.Register<ConvertSample_pcm24<T,24> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,24));
 		sample_factory_.Register<ConvertSample_pcm24<T,20> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,20));
 		sample_factory_.Register<ConvertSample_pcm24<T,16> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,16));
-		sample_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,					16,16));
+		sample_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						16,16));
 		sample_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				16,16));
 		sample_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						 8, 8));
 		sample_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				 8, 8));
