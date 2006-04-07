@@ -70,11 +70,11 @@ public:
 
 	HRESULT calculateOptimumAttenuation(T& fAttenuation, const bool overlapsave = false);
 
-	int cbLookAhead(const ConvertSample<T>* sample_convertor) const
+	int cbLookAhead(const ConvertSample<T>* const sample_convertor, const WORD nChannels) const
 	{
 		if(sample_convertor != NULL)
 		{
-			return Mixer.nPartitionLength() * sample_convertor->nContainerSize(); // The lag
+			return Mixer.nHalfPartitionLength() * sample_convertor->nContainerSize() * nChannels; // The lag
 		}
 		else
 		{
@@ -84,7 +84,7 @@ public:
 
 	// Calculate the size in bytes of the output buffer corresponding to a given input buffer size
 	unsigned int cbOutputBuffer(const int cbInputBuffer, 
-		const ConvertSample<T>* InputSampleConvertor, const ConvertSample<T>* OutputSampleConvertor) const
+		const ConvertSample<T>* const InputSampleConvertor, const ConvertSample<T>* const OutputSampleConvertor) const
 	{
 		// Size of each input frame / block
 		const unsigned int cbInputFrame = InputSampleConvertor->nContainerSize() * Mixer.nInputChannels();
@@ -99,9 +99,18 @@ public:
 		return cbOutputFrame * nInputFrames;
 	}
 
+	// Calculate the number of input bytes that are required to generate cbMaxOutputBuffer bytes,
+	// assuming that only whole blocks/frames can be processed
+	unsigned int cbInputBuffer(const int cbMaxOutputBuffer, 
+		const ConvertSample<T>* const InputSampleConvertor, const ConvertSample<T>* const OutputSampleConvertor) const
+	{
+		const unsigned int nMaxOutputFrames = cbMaxOutputBuffer / (OutputSampleConvertor->nContainerSize() * Mixer.nOutputChannels());
+		return nMaxOutputFrames * (InputSampleConvertor->nContainerSize() * Mixer.nInputChannels());
+	}
+
 private:
 	SampleBuffer		InputBuffer_;				// Circular buffer holding the current and previous half partition's
-													// worth of samples
+	// worth of samples
 	ChannelBuffer		InputBufferAccumulator_;
 	ChannelBuffer		OutputBuffer_;				// The output for a particular path, before mixing
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
@@ -113,10 +122,10 @@ private:
 	DWORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWriting_;
 
-	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
-	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
-							   const SampleBuffer& restrict InputBuffer,
-							   ChannelBuffer& restrict InputBufferAccumulator);
+	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
+	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
+	//						   const SampleBuffer& restrict InputBuffer,
+	//						   ChannelBuffer& restrict InputBufferAccumulator);
 	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
 		const ChannelBuffer& restrict Output, const DWORD to);
 
@@ -153,8 +162,8 @@ template <typename T>
 class ConvolutionList
 {
 public:
-	ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD& nPartitions,
-		const unsigned int& nPlanningRigour);
+	ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD nPartitions,
+		const unsigned int nPlanningRigour);
 
 	virtual ~ConvolutionList() 
 	{
@@ -175,7 +184,7 @@ public:
 		return nConvolutionList_;
 	}
 
-	void selectConvolutionIndex(const size_type& pathsIndex)
+	void selectConvolutionIndex(const size_type pathsIndex)
 	{
 		assert(pathsIndex < nConvolutionList_);
 		state_ = Selected;
@@ -200,7 +209,7 @@ public:
 		return ConvolutionList_[n];
 	}
 
-	Convolution<T>& Conv(size_type n)
+	Convolution<T>& Conv(const size_type n)
 	{
 		assert(n >= 0 && n < nConvolutionList());
 		return ConvolutionList_[n];
@@ -243,27 +252,41 @@ public:
 		}
 	}
 
+	SelectedState state()
+	{
+		return state_;
+	}
+
 	const std::string DisplayConvolutionList() const;
-
-
-	bool	bNeedsUpdating;				// Whether the current convolutionlist is valid
-
 
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump() const;
 #endif
 
 private:
-	configFile	config_;
-
-
-	SelectedState state_;
-	size_type selectedConvolutionIndex_;
-	boost::ptr_vector< Convolution<T> > ConvolutionList_;
-	size_type	nConvolutionList_;
-	DWORD	nPartitions_;
+	SelectedState						state_;
+	size_type							selectedConvolutionIndex_;
+	boost::ptr_vector< Convolution<T> >	ConvolutionList_;
+	size_type							nConvolutionList_;
+	DWORD								nPartitions_;
 
 	ConvolutionList();											// No default ctor
 	ConvolutionList(const ConvolutionList&);					// No copy ctor
 	const ConvolutionList &operator =(const ConvolutionList&);	// No copy assignment
 };
+
+template <typename T>
+ConvolutionList<T>* updateConvolutionList(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut,
+										  const TCHAR szConfigFileName[MAX_PATH],
+										  const DWORD nPartitions, 
+										  const unsigned int nPlanningRigour)
+{
+	ConvolutionList<T> * newList = new ConvolutionList<T>(szConfigFileName, nPartitions, nPlanningRigour);  // May throw
+
+	HRESULT hr = newList->SelectConvolution(pWaveIn, pWaveOut);
+
+	if(FAILED(hr))
+		throw convolutionListException("Failed to update convolution list", szConfigFileName);
+
+	return newList;
+}

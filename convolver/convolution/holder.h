@@ -10,14 +10,103 @@
 
 #pragma once
 
-template <typename T>
+/// This class provides an implementation of the mutex model based on the Win32 CRITICAL_SECTION
+class Thread_Mutex
+{
+	// Construction
+public:
+	/// Creates an instance of the mutex
+	Thread_Mutex()
+	{
+		::InitializeCriticalSection(&lock_);
+	}
+
+	/// Destroys an instance of the mutex
+	~Thread_Mutex()
+	{
+		::DeleteCriticalSection(&lock_);
+	}
+
+	// Operations
+
+	/// Acquires a lock on the mutex, pending the thread until the lock is aquired
+	void lock()
+	{
+		::EnterCriticalSection(&lock_);
+	}
+
+	/// Releases an aquired lock on the mutex
+	void unlock()
+	{
+		::LeaveCriticalSection(&lock_);
+	}
+
+	// Members
+private:
+	CRITICAL_SECTION    lock_;   // critical section
+
+	// Not to be implemented
+private:
+	Thread_Mutex(const Thread_Mutex &rhs);
+	Thread_Mutex &operator =(const Thread_Mutex &rhs);
+};
+
+
+class Null_Mutex
+{
+public:
+	Null_Mutex()
+	{}
+
+	~Null_Mutex()
+	{}
+
+	void lock()
+	{}
+
+	void unlock()
+	{}
+
+private: // unimplemented
+	Null_Mutex(Null_Mutex const &rhs);
+	Null_Mutex &operator =(const Null_Mutex &rhs);
+};
+
+
+template <class Mutex>
+class Mutex_Guard
+{
+public:
+	// Store a pointer to the lock and acquire it
+	Mutex_Guard(Mutex& lock) : lock_(lock)
+	{
+		lock_.lock();
+	}
+
+	~Mutex_Guard()
+	{
+		lock_.unlock();
+	}
+
+private:
+	Mutex& lock_;		// reference to the lock we're managing
+
+private: // unimplemented
+	Mutex_Guard(Mutex_Guard const &rhs);
+	Mutex_Guard &operator =(const Mutex_Guard &rhs);
+};
+
+
+template <typename T, class Mutex = Null_Mutex>
 class Holder {
 private:
 	T* ptr_;    // refers to the object it holds (if any)
 	bool owns_;
-	
 
 public:
+
+	Mutex lock;
+
 	// default constructor: let the holder refer to nothing, and
 	// constructor for a pointer: let the holder refer to where the pointer refers
 	Holder() : ptr_(NULL), owns_(true) {}
@@ -37,14 +126,14 @@ public:
 		return *ptr_;
 	}
 
-	T* operator-> () const
+	T* const operator-> () const
 	{ 
 		assert(ptr_);
 		return ptr_; 
 	}
 
 	// get referenced object (if any)
-	T* get_ptr() const
+	T* const get_ptr() const
 	{
 		return ptr_;
 	}
@@ -91,5 +180,5 @@ private:
 
 	// No copying
 	Holder(const Holder&);
-	const Holder& operator=(const Holder&);
+	Holder& operator=(const Holder&);
 };

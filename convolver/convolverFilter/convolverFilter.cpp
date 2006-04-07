@@ -323,13 +323,21 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 
 	HRESULT hr = S_OK;
 
-	// Look for format changes
+	// Look for format changes from downstream.
 	CMediaType *pMediaType = NULL;
 	if( S_OK == pOut->GetMediaType((AM_MEDIA_TYPE**)&pMediaType) && pMediaType)
 	{
 #if defined(DEBUG) | defined(_DEBUG)
 		cdebug << "Format change" << std::endl;
 #endif
+
+        hr = m_pOutput->CheckMediaType(pMediaType);
+        if(FAILED(hr))
+        {
+            DeleteMediaType(pMediaType);
+            return E_FAIL;
+        }
+
 		// Notify our own output pin of the new type
 		hr = m_pOutput->SetMediaType(pMediaType);
 		DeleteMediaType(pMediaType);
@@ -339,28 +347,10 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 		}
 	}
 
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return E_ABORT;
-	}
-
-	if(m_ConvolutionList->bNeedsUpdating)
-	{
-		try
-		{
-			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,  
-				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
-			HRESULT hr = m_ConvolutionList->SelectConvolution((WAVEFORMATEX*) &m_WaveInXT, (WAVEFORMATEX*) &m_WaveOutXT);
-			if(FAILED(hr))
-			{
-				return hr;
-			}
-		}
-		catch(...)
-		{
-			return E_ABORT;
-		}
 	}
 
 	// input
@@ -475,7 +465,11 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 		if (S_OK == pIn->GetTime(&TimeStart, &TimeEnd))
 		{
 			// TODO: this is not yet right
-			//REFERENCE_TIME latency = ::MulDiv(m_ConvolutionList->cbLookAhead(m_InputSampleConvertor), UNITS, pWaveOut->nAvgBytesPerSec);
+			// Each unit of reference time is 100 nanoseconds
+			//const REFERENCE_TIME latency = ::MulDiv(m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor.get_ptr(),
+			//	m_WaveInXT.Format.nChannels), UNITS, m_WaveInXT.Format.nAvgBytesPerSec);
+			//assert(TimeStart > latency); // fails
+			//assert(TimeEnd > TimeStart);
 			//TimeStart -= latency;
 			//TimeEnd -= latency;
 
@@ -558,6 +552,7 @@ HRESULT CconvolverFilter::CheckInputType(const CMediaType *mtIn)
 			return VFW_E_TYPE_NOT_ACCEPTED;
 		}
 
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 		if(m_ConvolutionList.get_ptr() != NULL)
 		{
 			const WAVEFORMATEX *pWave = reinterpret_cast<WAVEFORMATEX*>(mtIn->pbFormat);
@@ -603,6 +598,7 @@ HRESULT CconvolverFilter::CheckTransform(const CMediaType *mtIn, const CMediaTyp
 		return VFW_E_TYPE_NOT_ACCEPTED;
 	}
 
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return VFW_E_TYPE_NOT_ACCEPTED;
@@ -628,7 +624,7 @@ HRESULT CconvolverFilter::CheckTransform(const CMediaType *mtIn, const CMediaTyp
 			return VFW_E_TYPE_NOT_ACCEPTED;
 		}
 	}
-
+	
 	if(FAILED(m_ConvolutionList->CheckConvolutionList(pWaveIn, pWaveOut)))
 	{
 		return VFW_E_TYPE_NOT_ACCEPTED;
@@ -654,6 +650,7 @@ HRESULT CconvolverFilter::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROP
 	ASSERT(pAlloc);
 	ASSERT(pProp);
 
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return E_ABORT;
@@ -739,6 +736,7 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 		return E_INVALIDARG;
 	}
 
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if (NULL == m_ConvolutionList.get_ptr())
 	{
 		//// use the input format
@@ -831,7 +829,7 @@ HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType
 		return E_INVALIDARG;
 	};
 
-
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if(m_ConvolutionList.get_ptr() == NULL)
 	{
 		return E_ABORT;
@@ -903,6 +901,7 @@ HRESULT CconvolverFilter::BeginFlush(void)
 	if (m_pOutput != NULL) {
 		// block receives -- done by caller (CBaseInputPin::BeginFlush)
 
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 		if (m_ConvolutionList.get_ptr() != NULL)
 		{
 			m_ConvolutionList->Flush();
@@ -1083,10 +1082,11 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 
 	if (_tcscmp(newVal, m_szFilterFileName) != 0) // if new filename set
 	{
-		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
+		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
+			newVal,	m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour));// May throw
 
-		if(m_ConvolutionList.get_ptr() != NULL)
-			m_ConvolutionList->bNeedsUpdating = true;
+		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 	}
 
 	return S_OK;
@@ -1118,13 +1118,11 @@ STDMETHODIMP CconvolverFilter::put_partitions(DWORD newVal)
 
 	if(m_nPartitions != newVal)
 	{
-		m_nPartitions = newVal;
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
+		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
+			m_szFilterFileName,	newVal == 0 ? 1 : newVal, m_nPlanningRigour));// May throw
 
-		// May throw
-		if(m_ConvolutionList.get_ptr() != NULL)
-		{
-			m_ConvolutionList->bNeedsUpdating = true;
-		}
+		m_nPartitions = newVal;
 	}
 
 	return S_OK;
@@ -1157,12 +1155,11 @@ STDMETHODIMP CconvolverFilter::put_planning_rigour(unsigned int newVal)
 
 	if(m_nPlanningRigour != newVal)
 	{
-		m_nPlanningRigour = newVal;
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
+		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
+			m_szFilterFileName,	m_nPartitions == 0 ? 1 : m_nPartitions, newVal));// May throw
 
-		if(m_ConvolutionList.get_ptr() != NULL)
-		{
-			m_ConvolutionList->bNeedsUpdating = true;
-		}
+		m_nPlanningRigour = newVal;
 	}
 
 	return S_OK;
@@ -1250,6 +1247,7 @@ STDMETHODIMP CconvolverFilter::get_filter_description(std::string* description)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	*description = m_ConvolutionList.get_ptr() == NULL ? "No valid filter loaded" : m_ConvolutionList->DisplayConvolutionList();
 	return S_OK;
 }
@@ -1284,7 +1282,7 @@ STDMETHODIMP CconvolverFilter::put_attenuation(float newVal)
 }
 
 // Property to get a filter description 
-STDMETHODIMP CconvolverFilter::calculateOptimumAttenuation(float & fAttenuation)
+STDMETHODIMP CconvolverFilter::calculateOptimumAttenuation(float & fAttenuation_db)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;);
@@ -1294,19 +1292,19 @@ STDMETHODIMP CconvolverFilter::calculateOptimumAttenuation(float & fAttenuation)
 	Holder< ConvolutionList<BaseT> > ConvolutionListOpt(new ConvolutionList<BaseT>(m_szFilterFileName,
 		m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
 
-	float min_fAttenuation = MAX_ATTENUATION;
+	float min_fAttenuation_db = MAX_ATTENUATION_DB;
 	for(unsigned int i=0; i<ConvolutionListOpt->nConvolutionList(); ++i)
 	{
-		HRESULT hr = ConvolutionListOpt->Conv(i).calculateOptimumAttenuation(fAttenuation);
+		HRESULT hr = ConvolutionListOpt->Conv(i).calculateOptimumAttenuation(fAttenuation_db);
 		if(FAILED(hr))
 		{
 			return hr;
 		}
-		if(fAttenuation < min_fAttenuation)
+		if(fAttenuation_db < min_fAttenuation_db)
 		{
-			min_fAttenuation = fAttenuation;
+			min_fAttenuation_db = fAttenuation_db;
 		}
 	}
-	fAttenuation = min_fAttenuation;
+	fAttenuation_db = min_fAttenuation_db;
 	return S_OK;
 }

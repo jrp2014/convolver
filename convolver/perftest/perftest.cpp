@@ -18,16 +18,6 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef MINGW_FFTW
-// For MinGW-compile FFTW, which does not do its own initialization
-static void my_fftwf_write_char(char c, void *f) { fputc(c, (FILE *) f); }
-#define fftwf_export_wisdom_to_file(f) fftwf_export_wisdom(my_fftwf_write_char, (void*) (f))
-
-static int my_fftwf_read_char(void *f) { return fgetc((FILE *) f); } 
-#define fftwf_import_wisdom_from_file(f) fftwf_import_wisdom(my_fftwf_read_char, (void*) (f))
-#endif
-
-
 int	_tmain(int argc, _TCHAR* argv[])
 {
 #if defined(DEBUG) | defined(_DEBUG)
@@ -42,7 +32,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
 	// 3 = function call trace
-	apDebug::gOnly().set(4);
+	apDebug::gOnly().set(3);
 
 	debugstream.sink (apDebugSinkConsole::sOnly);
 
@@ -62,7 +52,9 @@ int	_tmain(int argc, _TCHAR* argv[])
 	double fElapsedCalc = 0;
 	double fTotalElapsedCalc = 0;
 	apHiResElapsedTime t;
-
+#ifdef FFTW
+	Wisdom w;									// Loads and saves FFTW wisdom
+#endif
 	//CWaveFileHandle	FilterWav;
 
 	if (argc !=	5)
@@ -73,25 +65,6 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 	try
 	{
-
-#ifdef MINGW_FFTW
-// For MinGW-compile FFTW, which does not do its own initialization
-#define WISDOM_FILENAME	"wisdom.fftw"
-
-		if (fftwf_init_threads() == 0)
-			return FALSE;	// failed to initialize threads
-
-		FILE* wisdom = fopen (WISDOM_FILENAME,"r");
-		if (wisdom!=NULL)
-		{
-			if(fftwf_import_wisdom_from_file(wisdom) != 1)
-			{
-				std::wcerr << "Failed to import wisdom" << std::endl;
-			}
-			fclose (wisdom);
-		}
-#endif
-
 		std::wistringstream	szPartitions(argv[1]);
 		unsigned int max_nPartitions;	// Can't use WORD as that seems to break >>
 		szPartitions >>	max_nPartitions;
@@ -183,10 +156,8 @@ int	_tmain(int argc, _TCHAR* argv[])
 						throw (hr);
 					}
 					std::cout  << std::setprecision(3) << nPartitions << "\t"
-#ifdef LIBSNDFILE
-						<< (static_cast<float>(convp.SelectedConvolution().Mixer.Paths()[0].filter.sf_FilterFormat().frames * NSAMPLES) / fElapsedCalc) /
-						static_cast<float>(convp.SelectedConvolution().Mixer.Paths()[0].filter.sf_FilterFormat().samplerate) << "\t"
-#endif
+						<< (static_cast<float>(convp.SelectedConvolution().Mixer.nFilterLength() / 2 * NSAMPLES) / fElapsedCalc) /
+						static_cast<float>(convp.SelectedConvolution().Mixer.nSamplesPerSec()) << "\t"
 						<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
 						<< fAttenuation << "\t" << convp.SelectedConvolution().Mixer.nFilterLength() << "\t" 
 						<< convp.SelectedConvolution().Mixer.nPartitionLength() << "\t" << nIteration  << std::endl;

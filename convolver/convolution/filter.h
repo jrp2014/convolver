@@ -43,6 +43,11 @@ public:
 		return coeffs_;
 	}
 
+	BaseT gain() const
+	{
+		return gain_;
+	}
+
 #ifdef LIBSNDFILE
 	const SF_INFO& sf_FilterFormat() const		// The format of the filter file
 	{
@@ -124,6 +129,8 @@ private:
 
 	DWORD					nSamplesPerSec_;		// 44100, 48000, etc
 	SampleBuffer			coeffs_;
+	BaseT					gain_;
+
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat_;		// The format of the filter file
 #else

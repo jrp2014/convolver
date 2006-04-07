@@ -23,13 +23,11 @@
 
 struct OptimalDFT
 {
-
 	static const DWORD HalfLargestDFTSize = 1000000; // allow FFTs up to 2x this size
 
 	static const DWORD OptimalDFTSize[];
 
-	DWORD GetOptimalDFTSize( DWORD size0 );
-
+	static DWORD GetOptimalDFTSize( DWORD size0 );
 };
 
 struct PlanningRigour
@@ -58,3 +56,63 @@ struct PlanningRigour
 	}
 };
 
+#ifdef FFTW
+
+// The following is a workaround with FFTW is a DLL
+static void my_fftwf_write_char(char c, void *f) { fputc(c, (FILE *) f); }
+#define fftwf_export_wisdom_to_file(f) fftwf_export_wisdom(my_fftwf_write_char, (void*) (f))
+
+static int my_fftwf_read_char(void *f) { return fgetc((FILE *) f); } 
+#define fftwf_import_wisdom_from_file(f) fftwf_import_wisdom(my_fftwf_read_char, (void*) (f))
+
+struct Wisdom
+{
+	static TCHAR szCurrentDir[MAX_PATH];
+	static char szWisdomFileName[MAX_PATH];
+
+	Wisdom()
+	{
+		if (fftwf_init_threads() == 0)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Failed to fftwf_init_threads" << std::endl;
+#endif
+		}
+
+		FILE* wisdom = fopen (szWisdomFileName,"r");
+		if (wisdom!=NULL)
+		{
+			if(fftwf_import_wisdom_from_file(wisdom) != 1)
+			{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Failed to fftwf_import_wisdom_from_file" << std::endl;
+#endif
+			}
+			fclose (wisdom);
+			GetCurrentDirectory(MAX_PATH, szCurrentDir);
+		}
+	}
+
+
+	~Wisdom()
+	{
+			SetCurrentDirectory(szCurrentDir);
+
+			FILE* wisdom = fopen (szWisdomFileName,"w");
+			if (wisdom!=NULL)
+			{
+				fftwf_export_wisdom_to_file(wisdom);
+				fflush(wisdom);		// needed as WIN32 fclose does not do it as it should
+				fclose (wisdom);
+			}
+			else
+			{
+#if defined(DEBUG) | defined(_DEBUG)
+				cdebug << "Failed to fftwf_import_wisdom_from_file" << std::endl;
+#endif
+			}
+			fftwf_cleanup_threads();
+	}
+};
+
+#endif

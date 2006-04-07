@@ -24,7 +24,8 @@
 Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, const DWORD nFilterChannel, const DWORD nSamplesPerSec,
 			   const unsigned int nPlanningRigour) : 
 nPartitions (nPartitions),
-nSamplesPerSec_(nSamplesPerSec)
+nSamplesPerSec_(nSamplesPerSec),
+gain_(0)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSamplesPerSec << std::endl;);
@@ -108,15 +109,15 @@ nSamplesPerSec_(nSamplesPerSec)
 			}
 		}
 	}
+
 #endif
 
 	// Setup the filter
 	// A partition will contain half real data, and half zero padding.  Taking the DFT will, of course, overwrite that padding
 	nHalfPartitionLength_ = (nFilterLength_ + nPartitions - 1) / nPartitions;
 
-	OptimalDFT oDFT;	// helper
 	// Check that the filter is not too big ...
-	if ( nHalfPartitionLength_ > oDFT.HalfLargestDFTSize )
+	if ( nHalfPartitionLength_ > OptimalDFT::HalfLargestDFTSize )
 	{
 		throw filterException("Filter too long to handle", szFilterFileName);
 	}
@@ -132,7 +133,7 @@ nSamplesPerSec_(nSamplesPerSec)
 
 	nPartitionLength_ = nHalfPartitionLength_ * 2;
 
-	DWORD nHalfPaddedPartitionLength = oDFT.GetOptimalDFTSize(nHalfPartitionLength_);
+	DWORD nHalfPaddedPartitionLength = OptimalDFT::GetOptimalDFTSize(nHalfPartitionLength_);
 	DWORD nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
 
 #ifdef OOURA
@@ -185,6 +186,7 @@ nSamplesPerSec_(nSamplesPerSec)
 	float sample = 0;
 #endif
 
+
 #if defined(DEBUG) | defined(_DEBUG)
 	float minSample = 0;
 	float maxSample = 0;
@@ -198,9 +200,11 @@ nSamplesPerSec_(nSamplesPerSec)
 #ifdef LIBSNDFILE
 		if (1 == pFilterWave.readf_float(&item[0], 1))		// 1 = 1 frame = nChannel items
 		{
-			// Got a frame / block (ie, the items / samples for each channel)
+			// Got a frame / block (ie, the items / samples for the nFilterChannel channel)
 			// Pick the sample corresponding to the selected channel
 			coeffs_[nPartition][nFrame % nHalfPartitionLength_] = item[nFilterChannel];
+			gain_ += fabs(item[nFilterChannel]);
+
 #if defined(DEBUG) | defined(_DEBUG)
 			if (item[nFilterChannel] > maxSample)
 				maxSample = item[nFilterChannel];
@@ -381,9 +385,9 @@ nSamplesPerSec_(nSamplesPerSec)
 
 			// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-			coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+			coeffs_[nPartition] *= static_cast<BaseT>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
-			coeffs_[nPartition] *= static_cast<float>(2.0L / nPaddedPartitionLength);
+			coeffs_[nPartition] *= static_cast<BaseT>(2.0L / nPaddedPartitionLength);
 #else
 #error "No FFT package defined"
 #endif
@@ -412,9 +416,9 @@ nSamplesPerSec_(nSamplesPerSec)
 
 		// Scale here, so that we don't need to do so when convolving
 #ifdef FFTW
-		coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+		coeffs_[nPartition] *= static_cast<BaseT>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
-		coeffs_[nPartition] *= static_cast<float>(1.0L / nPaddedPartitionLength);
+		coeffs_[nPartition] *= static_cast<BaseT>(1.0L / nPaddedPartitionLength);
 #else
 #error "No FFT package defined"
 #endif
@@ -463,7 +467,7 @@ nSamplesPerSec_(nSamplesPerSec)
 	cdebug << waveFormatDescription(&wfexFilterFormat_, nFilterLength_, "FFT Filter:") << std::endl;
 #endif
 
-	cdebug << "minSample " << minSample << ", maxSample " << maxSample << std::endl;
+	cdebug << "minSample " << minSample << ", maxSample " << maxSample << ", gain_ " << gain_ << std::endl;
 #endif
 
 }

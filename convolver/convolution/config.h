@@ -142,7 +142,7 @@ typedef float			BaseT;
 #define LIBSNDFILE 1
 
 
-const DWORD MAX_ATTENUATION = 1000; // dB
+const DWORD MAX_ATTENUATION_DB = 1000; // dB
 
 // Number of filter lengths used to calculate optimum attenuation
 // The bigger the number the more accurate the calculation, but the

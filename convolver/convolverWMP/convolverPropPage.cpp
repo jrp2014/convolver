@@ -138,8 +138,8 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	// room for the multibyte characters if they are two
 	// bytes long and a terminating null character.
 #endif
-	float	fAttenuation = 0.0;													// Initialize a float for the attenuation
-	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
+	float	fAttenuation_db = 0.0;													// Initialize a float for the attenuation
+	DWORD   dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation_db);  // Encoding necessary as DWORD is an unsigned long
 	TCHAR	szFilterFileName[MAX_PATH]	= { 0 };
 	DWORD	nPartitions = 0;													// Initialize a DWORD for the number of partitions
 																				// to be used in the convolution algorithm
@@ -161,13 +161,13 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		// TODO:: redo this in C++ style, with stringstream
 #ifdef UNICODE
 		wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-		fAttenuation = atof(strTmp); 
+		fAttenuation_db = atof(strTmp); 
 #else 
-		fAttenuation = atof(szStr);
+		fAttenuation_db = atof(szStr);
 #endif 
 
 		// Make sure attenuation value is valid
-		if ((-fAttenuation > MAX_ATTENUATION) || (fAttenuation > MAX_ATTENUATION))
+		if ((-fAttenuation_db > MAX_ATTENUATION_DB) || (fAttenuation_db > MAX_ATTENUATION_DB))
 		{
 			if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONRANGEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
 			{
@@ -176,7 +176,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 			return E_FAIL;
 		}
 		else
-			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
+			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation_db); // to ensure that it is unsigned
 
 		// Get the number of partitions value from the dialogue box.
 		nPartitions = GetDlgItemInt(IDC_PARTITIONS, NULL, FALSE); 
@@ -288,7 +288,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 		{
 			HRESULT hr;
 
-			hr = m_spConvolver->put_attenuation(fAttenuation);
+			hr = m_spConvolver->put_attenuation(fAttenuation_db);
 			if (FAILED(hr))
 			{
 				if (::LoadString(_Module.GetResourceInstance(), IDS_ATTENUATIONSAVEERROR, szStr, sizeof(szStr) / sizeof(szStr[0])))
@@ -305,6 +305,11 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 				{
 					MessageBox(szStr);
 				}
+				return hr;
+			}
+			hr = DisplayFilterFormat(szFilterFileName);
+			if (FAILED(hr))
+			{
 				return hr;
 			}
 
@@ -373,9 +378,9 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	float fAttenuation		 = 0.0;									// Default attenuation float
+	float fAttenuation_db		 = 0.0;									// Default attenuation float
 	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
-		m_spConvolver->encode_Attenuationdb(fAttenuation);
+		m_spConvolver->encode_Attenuationdb(fAttenuation_db);
 	TCHAR*  szFilterFileName = TEXT("");
 	DWORD   nPartitions		 = 0;									// Default number of partitions
 	CRegKey key;
@@ -418,9 +423,9 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		if (m_spConvolver)
 		{
 			HRESULT hr = S_OK;
-			hr = m_spConvolver->get_attenuation(&fAttenuation);
+			hr = m_spConvolver->get_attenuation(&fAttenuation_db);
 			if(FAILED(hr)) return hr;
-			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation);
+			dwAttenuation = m_spConvolver->encode_Attenuationdb(fAttenuation_db);
 
 			hr = m_spConvolver->get_filterfilename(&szFilterFileName);
 			if(FAILED(hr)) return hr;
@@ -444,7 +449,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 				if (ERROR_SUCCESS == lResult)
 				{
 					dwAttenuation = dwValue;
-					fAttenuation = m_spConvolver->decode_Attenuationdb(dwAttenuation);
+					fAttenuation_db = m_spConvolver->decode_Attenuationdb(dwAttenuation);
 				}
 
 				TCHAR szValue[MAX_PATH]	= TEXT("");
@@ -489,7 +494,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 		TCHAR szStr[MAXSTRING];
 
 		// Display the attenuation.
-		_stprintf(szStr, _T("%.1f"), fAttenuation);
+		_stprintf(szStr, _T("%.1f"), fAttenuation_db);
 		SetDlgItemText(IDC_ATTENUATION, szStr);
 
 		// Display the number of partitions
@@ -588,7 +593,7 @@ LRESULT CConvolverPropPage::OnEnChangeAttenuation(WORD /*wNotifyCode*/, WORD /*w
 
 LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
 {
-	float	fAttenuation = 0;
+	float	fAttenuation_db = 0;
 	HRESULT hr S_OK;
 
 	try
@@ -605,7 +610,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 
 		double fElapsed = 0;
 		apHiResElapsedTime t;
-		hr = m_spConvolver->calculateOptimumAttenuation(fAttenuation);
+		hr = m_spConvolver->calculateOptimumAttenuation(fAttenuation_db);
 		fElapsed = t.sec();
 		if (FAILED(hr))
 		{
@@ -615,7 +620,7 @@ LRESULT CConvolverPropPage::OnBnClickedButtonCalculateoptimumattenuation(WORD /*
 
 		// Display the attenuation.
 		TCHAR   szStr[MAXSTRING] = { 0 };
-		_stprintf(szStr, _T("%.1f"), fAttenuation);
+		_stprintf(szStr, _T("%.1f"), fAttenuation_db);
 		SetDlgItemText(IDC_ATTENUATION, szStr);
 
 		SetDirty(TRUE);

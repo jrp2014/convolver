@@ -33,7 +33,8 @@ nFilterLength_(0),
 #ifdef FFTW
 nFFTWPartitionLength_(2),
 #endif
-config_(szChannelPathsFileName)
+config_(szChannelPathsFileName),
+gain_(0)
 {
 	//USES_CONVERSION;
 
@@ -335,6 +336,7 @@ config_(szChannelPathsFileName)
 #ifdef FFTW
 		nFFTWPartitionLength_ = Paths_[0].filter.nFFTWPartitionLength();	// Needs an extra element
 #endif
+		gain_ = Paths_[0].filter.gain();
 	}
 	else
 	{
@@ -381,6 +383,11 @@ config_(szChannelPathsFileName)
 		{
 			throw channelPathsException("Filters must all have the same sample rate", szChannelPathsFileName);
 		}
+
+		if(Paths_[i].filter.gain() > gain_)
+		{
+			gain_ = Paths_[i].filter.gain();
+		}
 	}
 #if defined(DEBUG) | defined(_DEBUG)
 	Dump();
@@ -422,7 +429,8 @@ const std::string ChannelPaths::DisplayChannelPaths() const
 		result
 			<< nSamplesPerSec()/1000.0f << "kHz, " 
 			<< nFilterLength() << " taps, " 
-			<< std::setprecision(2) << (static_cast<float>(nPartitionLength() * float(2.0)) / static_cast<float>(nSamplesPerSec())) << "s lag";
+			<< std::setprecision(2) << (float(nHalfPartitionLength()) / float(nSamplesPerSec())) << "s lag, "
+			<< "peak gain " << gain_dB() << "dB";
 	}
 	return result.str();
 }

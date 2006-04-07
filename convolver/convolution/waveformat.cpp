@@ -78,7 +78,7 @@ std::string waveFormatDescription(const SF_INFO& sfinfo, const char* prefix)
 #if defined(DEBUG) | defined(_DEBUG)
 		<< sfinfo.sections << " sections "
 #endif
-		<< sfinfo.frames << " taps";
+		<< sfinfo.frames << " frames";
 	return s.str();
 }
 

@@ -420,6 +420,18 @@ struct FastArray : AlignedArray<T>
 		::ZeroMemory(first_ + start, len * sizeof(T));
 	}
 
+	T maxabs()
+	{
+		T result = 0;
+		for(int i = 0; i<size_; ++i)
+		{
+			if(fabs((*this)[i]) > result)
+				result = fabs((*this)[i]);
+		}
+		return result;
+	}
+
+
 private:
 	// check range (may be private because it is static)
 	static void rangecheck (size_type n)

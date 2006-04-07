@@ -38,7 +38,7 @@
 #endif
 
 // Pull in Common DX classes
-#include "Common\dxstdafx.h"
+//#include "Common\dxstdafx.h"
 
 #if defined(DEBUG) | defined(_DEBUG)
 #include "debugging\debugging.h"
@@ -300,12 +300,12 @@ public:
 	// The following pair is needed because DWORD is unsigned
 	float decode_Attenuationdb(const DWORD dwValue)
 	{
-		assert(dwValue <= (MAX_ATTENUATION + MAX_ATTENUATION) * 100);
-		return static_cast<BaseT>(dwValue) / 100.0f - MAX_ATTENUATION;
+		assert(dwValue <= (MAX_ATTENUATION_DB + MAX_ATTENUATION_DB) * 100);
+		return static_cast<BaseT>(dwValue) / 100.0f - MAX_ATTENUATION_DB;
 	}
 	DWORD encode_Attenuationdb(const float fValue)
-	{	assert (abs(fValue) <= MAX_ATTENUATION);
-		return static_cast<DWORD>((fValue + MAX_ATTENUATION) * 100.0f);
+	{	assert (fabs(fValue) <= MAX_ATTENUATION_DB);
+		return static_cast<DWORD>((fValue + MAX_ATTENUATION_DB) * 100.0f);
 	}
 
 private:
@@ -341,13 +341,25 @@ private:
 	DitherType				m_nDither;			// The dither type index
 	NoiseShapingType		m_nNoiseShaping;	// The noise shaping type index
 
-	Holder< ConvolutionList<BaseT> >	m_ConvolutionList;			// Processing class.
+	Holder< ConvolutionList<BaseT>, Thread_Mutex >	m_ConvolutionList;			// Processing class.
 	Holder<ConvertSample<BaseT> >		m_InputSampleConvertor;		// functionoid conversion between BYTE and 
 	Holder<ConvertSample<BaseT> >		m_OutputSampleConvertor;	// BaseT
 
 	ConvertSampleMaker<BaseT>			m_FormatSpecs;
 
 	BOOL					m_bEnabled;         // TRUE if enabled
+
+//#ifdef DMO_NOATL
+//    CRITICAL_SECTION		m_cs;
+//#else
+//    CComAutoCriticalSection m_cs;
+//#endif
+
+	Thread_Mutex			m_cs;				// for locking the whole DMO
+
+#ifdef FFTW
+	Wisdom w;									// Loads and saves FFTW wisdom
+#endif
 };
 
 #endif //__CCONVOLVER_H_

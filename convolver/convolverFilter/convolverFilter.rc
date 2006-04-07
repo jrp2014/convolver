@@ -58,7 +58,8 @@ FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
     EDITTEXT        IDC_CONFIGFILE,58,1,157,14,ES_AUTOHSCROLL,
                     WS_EX_ACCEPTFILES
-    EDITTEXT        IDC_ATTENUATION,58,18,28,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_ATTENUATION,58,18,28,12,ES_RIGHT | ES_AUTOHSCROLL,
+                    WS_EX_RIGHT
     LTEXT           "Attenuation (db)",IDS_ATTENUATION,1,20,54,8
     DEFPUSHBUTTON   "Get config or IR",IDC_GETCONFIG,1,1,56,14,BS_NOTIFY
     PUSHBUTTON      "Calculate optimum attenuation",
@@ -88,8 +89,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,5,0,0
- PRODUCTVERSION 3,5,0,0
+ FILEVERSION 3,7,0,0
+ PRODUCTVERSION 3,7,0,0
  FILEFLAGSMASK 0x30003fL
 #ifdef _DEBUG
  FILEFLAGS 0xbL
@@ -107,14 +108,14 @@ BEGIN
             VALUE "ActiveMovie", "Filter dll"
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "convolver DirectShow Transform Filter"
-            VALUE "FileVersion", "3.5"
+            VALUE "FileVersion", "3.7"
             VALUE "InternalName", "convolverFilter.ax"
             VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
             VALUE "LegalTrademarks", "GPL"
             VALUE "OLESelfRegister", "AM20"
             VALUE "OriginalFilename", "convolverFilter.ax"
             VALUE "ProductName", "ConvolverFilter"
-            VALUE "ProductVersion", "3.5"
+            VALUE "ProductVersion", "3.7"
         END
     END
     BLOCK "VarFileInfo"

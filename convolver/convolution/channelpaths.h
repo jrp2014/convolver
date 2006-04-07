@@ -228,6 +228,16 @@ private:
 	}
 #endif
 
+	BaseT gain() const
+	{
+		return gain_;
+	}
+
+	BaseT gain_dB() const
+	{
+		return BaseT(20) * log10(gain_);
+	}
+
 	ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
 
 	const std::string DisplayChannelPaths() const;
@@ -264,6 +274,7 @@ private:
 #ifdef FFTW
 	DWORD		nFFTWPartitionLength_;	// 2*(nPartitionLength / 2 + 1)
 #endif
+	BaseT	gain_;
 
 	ChannelPaths();											// No construction
 	ChannelPaths(const ChannelPaths&);						// No copy ctor

@@ -75,7 +75,7 @@ inline ConvertSample<T>::~ConvertSample(void){}
 
 // TODO: float with wValidBitsPerSample = 18; //Top 18 bits have data
 template <typename T>
-struct ConvertSample_ieeefloat : public virtual ConvertSample<T>
+struct ConvertSample_ieeefloat : ConvertSample<T>
 {
 
 	ConvertSample_ieeefloat()
@@ -107,7 +107,7 @@ struct ConvertSample_ieeefloat : public virtual ConvertSample<T>
 };
 
 template <typename T>
-struct ConvertSample_ieeedouble : public virtual ConvertSample<T>
+struct ConvertSample_ieeedouble : ConvertSample<T>
 {
 	ConvertSample_ieeedouble()
 	{}
@@ -139,7 +139,7 @@ struct ConvertSample_ieeedouble : public virtual ConvertSample<T>
 
 // 8-bit sound is 0..255 with 128 == silence
 template <typename T>
-struct ConvertSample_pcm8 : public virtual ConvertSample<T>
+struct ConvertSample_pcm8 : ConvertSample<T>
 {
 
 	ConvertSample_pcm8() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,8>(1))
@@ -215,6 +215,10 @@ struct ConvertSample_pcm8 : public virtual ConvertSample<T>
 
 	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
+
+		//const T Q = 1.0 / (float) 255;
+        //dstSample = (*srcContainer * Q - T(0.5)) * T(2.0) * fAttenuationFactor;	// 0->-1; 127->-.004 255->1
+
 		const T Q = 1.0 / ((1 << (8-1)) - 0.5); // 1/127.5
 		dstSample = (*srcContainer - T(127.5)) * Q * fAttenuationFactor;  // Normalize [0..255] -> to [-1..1)
 		++srcContainer;
@@ -244,7 +248,7 @@ private:
 
 // 16-bit sound is -32768..32767 with 0 == silence
 template <typename T>
-struct ConvertSample_pcm16 : public virtual ConvertSample<T>
+struct ConvertSample_pcm16 : ConvertSample<T>
 {
 	ConvertSample_pcm16() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,16>(1))
 	{}
@@ -347,7 +351,7 @@ private:
 
 // 24-bit sound
 template <typename T, int validBits>
-struct ConvertSample_pcm24 : public virtual ConvertSample<T>
+struct ConvertSample_pcm24 : ConvertSample<T>
 {
 	ConvertSample_pcm24() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
@@ -472,7 +476,7 @@ private:
 
 // 32-bit sound
 template <typename T, int validBits = 32>
-struct ConvertSample_pcm32 : public virtual ConvertSample<T>
+struct ConvertSample_pcm32 : ConvertSample<T>
 {
 	ConvertSample_pcm32() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
@@ -577,7 +581,7 @@ private:
 
 // 32-bit sound. No dithering or shaping
 template <typename T>
-struct ConvertSample_pcm32<T,32> : public virtual ConvertSample<T>
+struct ConvertSample_pcm32<T,32> : ConvertSample<T>
 {
 	ConvertSample_pcm32()
 	{}

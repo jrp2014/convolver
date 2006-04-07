@@ -322,3 +322,7 @@ DWORD OptimalDFT::GetOptimalDFTSize( DWORD size0 )
 	return d;
 #endif
 }
+
+
+char Wisdom::szWisdomFileName[MAX_PATH] = "wisdom.fftw";
+TCHAR Wisdom::szCurrentDir[MAX_PATH] = {0};

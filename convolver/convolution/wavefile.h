@@ -76,7 +76,7 @@ public:
 			sfinfo->format = 0;
 
 			const std::wstring spath = path;
-			std::wstring::size_type idx = spath.find('.');
+			std::wstring::size_type idx = spath.rfind('.');
 			if(idx != std::wstring::npos)
 			{
 				if(spath.substr(idx+1) == TEXT("pcm") || spath.substr(idx+1) == TEXT("PCM") || spath.substr(idx+1) == TEXT("Pcm") ||
@@ -164,6 +164,14 @@ public:
 #endif
 		return result;
 
+	}
+
+	void  sf_rewind()
+	{
+		if(sf_seek(sndfile_, 0, SEEK_SET) != 0)
+		{
+			throw wavfileException("Failed to rewind filter sound file", TEXT(""), "");
+		}
 	}
 
 	//WAVEFORMATEXTENSIBLE sfinfo_to_wfex(const SF_INFO& sf_info) const

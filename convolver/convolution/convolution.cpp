@@ -85,7 +85,7 @@ void Convolution<T>::Flush()
 	Zero(ComputationCircularBuffer_);
 	Zero(OutputBufferAccumulator_);
 
-	nInputBufferIndex_ = 0; //Mixer.nHalfPartitionLength();// placeholder
+	nInputBufferIndex_ = 0;							// placeholder
 	nPartitionIndex_ = 0;							// for partitioned convolution
 	nPreviousPartitionIndex_ = nPartitions_ - 1;	// lags nPartitionIndex_ by 1
 	bStartWriting_ = false;
@@ -121,8 +121,8 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 	{
 		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
 
-		if(bStartWriting_)
-		{
+		//if(bStartWriting_)
+		//{
 			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
 			{
 				int nDelayedIndex = nInputBufferIndex_ - Mixer.nOutputSamplesDelay()[nChannel];
@@ -134,7 +134,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
 					nChannel, cbOutputBytesGenerated);
 			}
-		}
+		//}
 
 		// Get the next frame from pbInputDataPointer to InputBuffer_
 		// Output lags input by half a partition length
@@ -179,7 +179,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 				ComputationCircularBuffer_[nPath][nPreviousPartitionIndex_] = 0;
 
 				// Mix the input samples for this filter path
-				mix_input(Mixer.Paths()[nPath], InputBuffer_, InputBufferAccumulator_);
+				mix_input(Mixer.Paths()[nPath]);
 
 				// get DFT of InputBufferAccumulator_
 #ifdef FFTW
@@ -295,8 +295,8 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	{
 		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
 
-		if(bStartWriting_)
-		{
+		//if(bStartWriting_)
+		//{
 #pragma loop count(8)
 			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
 			{
@@ -309,7 +309,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 					OutputBufferAccumulator_[nChannel][nDelayedIndex],
 					nChannel, cbOutputBytesGenerated);
 			}
-		}
+		//}
 
 		// Get the next frame from pbInputDataPointer to InputBuffer_
 #pragma loop count(8)
@@ -350,7 +350,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 			for (SampleBuffer::size_type nPath = 0; nPath < Mixer.nPaths(); ++nPath)
 			{
 				// Mix the input samples for this filter path into InputBufferAccumulator_
-				mix_input(Mixer.Paths()[nPath], InputBuffer_, InputBufferAccumulator_);
+				mix_input(Mixer.Paths()[nPath]);
 
 				// get DFT of InputBufferAccumulator_
 #ifdef FFTW
@@ -421,9 +421,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 }
 
 template <typename T>
-void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
-							   const SampleBuffer& restrict InputBuffer,
-							   ChannelBuffer& restrict InputBufferAccumulator)
+void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath)
 {
 
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
@@ -439,18 +437,18 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 
 	if (nChannels == 1 && thisPath.inChannel[0].fScale == 1.0f && nInputBufferIndex_ == 0)
 	{
-		InputBufferAccumulator = InputBuffer_[thisPath.inChannel[0].nChannel];
+		InputBufferAccumulator_ = InputBuffer_[thisPath.inChannel[0].nChannel];
 	}
 	else
 	{	
-		InputBufferAccumulator = 0;
+		InputBufferAccumulator_ = 0;
 #pragma loop count(8)
 #pragma ivdep
 		for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
 		{
 			const float fScale = thisPath.inChannel[nChannel].fScale;
 			const WORD thisChannel = thisPath.inChannel[nChannel].nChannel;
-			const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
+			const ChannelBuffer& InputSamples = InputBuffer_[thisChannel];
 
 			// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
 			// because FFTW destroys its inputs.
@@ -459,67 +457,68 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 
 			ChannelBuffer::const_iterator pInputSamples = InputSamples.begin();
 			const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
-			ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator.begin() + nHalfPartitionLength;
+			ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator_.begin() + nHalfPartitionLength;
 
 			// TODO: Do this by pointers to make it faster
 			if(fScale == 1.0f)
 			{
-				while(pInputSamples != pInputSamplesEnd)
+				for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
 				{
-					*pInputBufferAccumulator++ += *pInputSamples++;
+					*pInputBufferAccumulator += *pInputSamples;
 				}
-				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+
 				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
-				pInputBufferAccumulator = InputBufferAccumulator.begin();
-				while(pInputSamples != pInputSamplesEnd)
+				for(pInputBufferAccumulator = InputBufferAccumulator_.begin(), pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+					pInputSamples != pInputSamplesEnd;
+					++pInputBufferAccumulator, ++pInputSamples)
 				{
-					*pInputBufferAccumulator++ += *pInputSamples++;
+					*pInputBufferAccumulator += *pInputSamples;
 				}
 
 				//ChannelBuffer::size_type j = nHalfPartitionLength;
 				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
 				//{
-				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//	InputBufferAccumulator_[j++] += InputSamples[i];
 				//}
 				//j = 0;
 				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
 				//{
-				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//	InputBufferAccumulator_[j++] += InputSamples[i];
 				//}
 			}
 			else
 			{
 				// TODO:: performance killer
 
-				while(pInputSamples != pInputSamplesEnd)
+				for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
 				{
-					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
+					*pInputBufferAccumulator += *pInputSamples * fScale;
 				}
-				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+
 				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
-				pInputBufferAccumulator = InputBufferAccumulator.begin();
-				while(pInputSamples != pInputSamplesEnd)
+				for(pInputBufferAccumulator = InputBufferAccumulator_.begin(), pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+					pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
 				{
-					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
+					*pInputBufferAccumulator += *pInputSamples * fScale;
 				}
 
 				//ChannelBuffer::size_type j = nHalfPartitionLength;
 				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
 				//{
-				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//	InputBufferAccumulator_[j++] += InputSamples[i] * fScale;
 				//}
 				//j = 0;
 				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
 				//{
-				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//	InputBufferAccumulator_[j++] += InputSamples[i] * fScale;
 				//}
 
-//				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
+//				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator_.end();
 //#pragma loop count(65536)
 //#pragma ivdep
 //#pragma vector aligned
 //#pragma prefetch pInputSamples
-//				for(T* pInputBufferAccumulator = InputBufferAccumulator.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
+//				for(T* pInputBufferAccumulator = InputBufferAccumulator_.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
 //					pInputBufferAccumulator != pInputBufferAccumulatorEnd;)
 //				{
 //					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
@@ -565,31 +564,31 @@ void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPa
 		if(fScale == 1.0f)
 		{
 			// the output is in the second half of Output; Accumulate to the specified part of thisAccumulator
-			while(pOutput != pOutputEnd)
+			for(;pOutput != pOutputEnd; ++pAccumulator, ++pOutput)
 			{
-				*pAccumulator++ += *pOutput++;
+				*pAccumulator += *pOutput;
 			}
-//		DWORD j = to;
-//#pragma loop count(65536)
-//#pragma ivdep
-//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
-//			{
-//				thisAccumulator[j++] += Output[i];
-//			} // i
+			//		DWORD j = to;
+			//#pragma loop count(65536)
+			//#pragma ivdep
+			//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+			//			{
+			//				thisAccumulator[j++] += Output[i];
+			//			} // i
 		}
 		else
 		{
-			while(pOutput != pOutputEnd)
+			for(;pOutput != pOutputEnd; ++pAccumulator, ++pOutput)
 			{
-				*pAccumulator++ += *pOutput++ * fScale;
+				*pAccumulator += *pOutput * fScale;
 			}
-//			DWORD j = to;
-//#pragma loop count(65536)
-//#pragma ivdep
-//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
-//			{
-//				thisAccumulator[j++] += Output[i] * fScale;
-//			} // i
+			//			DWORD j = to;
+			//#pragma loop count(65536)
+			//#pragma ivdep
+			//			for(ChannelBuffer::size_type i=nHalfPartitionLength; i < nPartitionLength; ++i)
+			//			{
+			//				thisAccumulator[j++] += Output[i] * fScale;
+			//			} // i
 		}
 	} // nChannel
 }
@@ -754,7 +753,7 @@ T Convolution<T>::verify_convolution(const ChannelBuffer& X, const ChannelBuffer
 
 // Convolve the filter with white noise to get the maximum output, from which we calculate the maximum attenuation
 template <typename T>
-HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool overlapsave)
+HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bool overlapsave)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "calculateOptimumAttenuation" << std::endl;)
@@ -787,9 +786,9 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 
 	// Define a uniform random number distribution which produces "float"
 	// values between -1 and 1 (-1 inclusive, 1 exclusive).
-	typedef boost::uniform_real<float> distribution_type;
+	typedef boost::uniform_real<BaseT> distribution_type;
 	typedef boost::variate_generator<base_generator_type&, distribution_type> gen_type;
-	distribution_type uni_dist(-1, 1);
+	distribution_type uni_dist(-1.0f, 1.0f);
 	gen_type uni(generator, uni_dist);
 
 	//srand( (unsigned)time( NULL ) );
@@ -805,8 +804,10 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	std::generate_n(InputSamples.begin(), nInputBufferLength, uni);
 	//for(DWORD i = 0; i < nInputBufferLength; ++i)
 	//{
-	////	InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
+	//	InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
 	//	InputSamples[i] = 1.0 / (i / 8.0 + 1.0);  // For testing algorithm
+	//	// Gaussian  White Noise:
+	//	InputSamples[i] = (uni() + uni() + uni() + uni() + uni() + uni() + uni() + uni() + uni() + uni() + uni() + uni()) / 12;
 	//}
 
 	std::fill_n(OutputSamples.begin(), nOutputBufferLength, 0.0f);
@@ -845,7 +846,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 	{
 		if (abs(OutputSamples[i]) > maxSample)
 		{
-			maxSample = abs(OutputSamples[i]);
+			maxSample = fabs(OutputSamples[i]);
 			again = TRUE; // Keep convolving until find no larger output samples
 		}
 	}
@@ -853,19 +854,21 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 
 	// maxSample * 10 ^ (fAttenuation_db / 20) = 1
 	// Limit fAttenuation to +/-MAX_ATTENUATION dB
-	fAttenuation = -20.0f * log10(maxSample);
+	fAttenuation_db = -20.0f * log10(maxSample);
 
-	if (fAttenuation > MAX_ATTENUATION)
+	assert(-fAttenuation_db <= Mixer.gain_dB());
+
+	if (fAttenuation_db > MAX_ATTENUATION_DB)
 	{
-		fAttenuation = MAX_ATTENUATION;
+		fAttenuation_db = MAX_ATTENUATION_DB;
 	}
-	else if (-fAttenuation > MAX_ATTENUATION)
+	else if (-fAttenuation_db > MAX_ATTENUATION_DB)
 	{
-		fAttenuation = -1.0L * MAX_ATTENUATION;
+		fAttenuation_db = -1.0 * MAX_ATTENUATION_DB;
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
-	cdebug << "fAttenuation:" << fAttenuation << " maxSample: " << maxSample << std::endl;
+	cdebug << "fAttenuation_dB:" << fAttenuation_db << " maxSample: " << maxSample << " gain_" << Mixer.gain() << std::endl;
 #endif
 
 	Flush(); // Reset, so that residual noise cleared
@@ -874,15 +877,15 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation, const bool 
 }
 
 template <typename T>
-ConvolutionList<T>::ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD& nPartitions, const unsigned int& nPlanningRigour) :
-config_(szConfigFileName),
+ConvolutionList<T>::ConvolutionList(const TCHAR szConfigFileName[MAX_PATH], const DWORD nPartitions, const unsigned int nPlanningRigour) :
 state_(Unselected),
 selectedConvolutionIndex_(0),
 ConvolutionList_(0),
 nConvolutionList_(0),
-nPartitions_(nPartitions),
-bNeedsUpdating(false)
+nPartitions_(nPartitions)
 {
+	configFile config(szConfigFileName);
+
 	USES_CONVERSION;
 
 #if defined(DEBUG) | defined(_DEBUG)
@@ -918,7 +921,7 @@ bNeedsUpdating(false)
 		{
 			// if the first character is a number, we have a config containing a list of filter paths,
 			// rather than config containing list of config files and filter sound files
-			std::basic_ifstream<TCHAR>::int_type nextchar = config_().peek();
+			std::basic_ifstream<TCHAR>::int_type nextchar = config().peek();
 			if (std::isdigit<TCHAR>(nextchar, std::locale()))
 			{
 				ConvolutionList_.push_back(new Convolution<T>(szConfigFileName, nPartitions_, nPlanningRigour));
@@ -930,22 +933,22 @@ bNeedsUpdating(false)
 				// TODO:: should do this by unsetting the eof exception bit
 				TCHAR szConvolutionListFilename[MAX_PATH];
 				szConvolutionListFilename[0] = 0;
-				while(!config_().eof())
+				while(!config().eof())
 				{
 					try
 					{
 						szConvolutionListFilename[0] = 0;
 						while(szConvolutionListFilename[0] == 0)
 						{
-							config_().getline(szConvolutionListFilename, MAX_PATH);
+							config().getline(szConvolutionListFilename, MAX_PATH);
 						}
 					}
 					catch(const std::ios_base::failure& error)
 					{
-						if(!config_().eof())
+						if(!config().eof())
 							throw;
 					}
-					if(!config_().eof())
+					if(!config().eof())
 					{
 #if defined(DEBUG) | defined(_DEBUG)
 						cdebug << "Reading ConvolutionList from " << szConvolutionListFilename << std::endl;
@@ -958,7 +961,7 @@ bNeedsUpdating(false)
 		}
 		catch(const std::ios_base::failure& error)
 		{
-			if(config_().eof())
+			if(config().eof())
 			{
 				if(nConvolutionList_ == 0)
 				{
@@ -968,11 +971,11 @@ bNeedsUpdating(false)
 				Dump();
 #endif
 			}
-			else if (config_().fail())
+			else if (config().fail())
 			{
 				throw convolutionListException("Bad sound file or config file syntax is incorrect", szConfigFileName);
 			}
-			else if (config_().bad())
+			else if (config().bad())
 			{
 				throw convolutionListException("Fatal error opening/reading config file", szConfigFileName);
 			}

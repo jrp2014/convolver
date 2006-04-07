@@ -53,7 +53,7 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib fftw31.lib   libsndfile.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
@@ -105,11 +105,11 @@
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
+				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
 				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
+				OptimizeForProcessor="3"
 				OptimizeForWindowsApplication="TRUE"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;FFTW_DLL"
@@ -120,7 +120,7 @@
 				StructMemberAlignment="0"
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
-				EnableEnhancedInstructionSet="0"
+				EnableEnhancedInstructionSet="2"
 				TreatWChar_tAsBuiltInType="TRUE"
 				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
@@ -141,7 +141,7 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib   libsndfile.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -231,7 +231,7 @@
 				Name="CustomTool"/>
 			<Tool 
 				Name="LinkerTool"
-				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib fftw31.lib  libsndfile.lib"
+				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/perftest.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
@@ -276,27 +276,6 @@
 			<File 
 				RelativePath=".\perftest.cpp">
 			</File>
-			<File 
-				RelativePath=".\stdafx.cpp">
-				<FileConfiguration 
-					Name="Debug|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration 
-					Name="Release|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-				<FileConfiguration 
-					Name="Release PIII|Win32">
-					<Tool 
-						Name="CppCmplrTool"
-						UsePrecompiledHeader="1"/>
-				</FileConfiguration>
-			</File>
 			<Filter 
 				Name="debugging"
 				Filter="">
@@ -317,6 +296,27 @@
 				</File>
 				<File 
 					RelativePath="..\debugging\fastTiming.h">
+				</File>
+				<File 
+					RelativePath=".\stdafx.cpp">
+					<FileConfiguration 
+						Name="Debug|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							UsePrecompiledHeader="1"/>
+					</FileConfiguration>
+					<FileConfiguration 
+						Name="Release|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							UsePrecompiledHeader="1"/>
+					</FileConfiguration>
+					<FileConfiguration 
+						Name="Release PIII|Win32">
+						<Tool 
+							Name="CppCmplrTool"
+							UsePrecompiledHeader="1"/>
+					</FileConfiguration>
 				</File>
 			</Filter>
 			<Filter 

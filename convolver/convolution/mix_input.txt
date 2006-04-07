@@ -1,0 +1,164 @@
+template <typename T>
+void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
+							   const SampleBuffer& restrict InputBuffer,
+							   ChannelBuffer& restrict InputBufferAccumulator)
+{
+
+	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
+	const DWORD nPartitionLength = Mixer.nPartitionLength();
+	const DWORD nHalfPartitionLength = Mixer.nHalfPartitionLength();
+
+	assert(nPartitionLength % 2 ==0);
+
+	assert(nInputBufferIndex_ == nHalfPartitionLength ||
+		nInputBufferIndex_ == 0);
+
+	// NB InputBuffer_ is circular
+
+	if (nChannels == 1)
+	{	
+		const float fScale = thisPath.inChannel[0].fScale;
+		const WORD thisChannel = thisPath.inChannel[0].nChannel;
+		const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
+
+		// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
+		// because FFTW destroys its inputs.
+
+		// untangle [Xn, Xn-1] and [Xn-1,Xn] -> [Yn-1,Yn]
+
+		const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
+		ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator.begin() + nHalfPartitionLength;
+		ChannelBuffer::const_iterator pInputSamples = InputSamples.begin();
+
+		if(fScale == 1.0f)
+		{
+			for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+			{
+				*pInputBufferAccumulator = *pInputSamples;
+			}
+
+			const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+			for(pInputBufferAccumulator = InputBufferAccumulator.begin(),
+				pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+				pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+			{
+				*pInputBufferAccumulator = *pInputSamples;
+			}
+		}
+		else
+		{
+			// TODO:: performance killer
+
+			for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+			{
+				*pInputBufferAccumulator = *pInputSamples * fScale;
+			}
+			const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+			for(pInputBufferAccumulator = InputBufferAccumulator.begin(),
+				pInputSamples = InputSamples.begin() + nInputBufferIndex_; pInputSamples != pInputSamplesEnd; 
+				++pInputBufferAccumulator, ++pInputSamples)
+			{
+				*pInputBufferAccumulator = *pInputSamples * fScale;
+
+			}
+		}
+	}
+	else
+	{	
+		InputBufferAccumulator = 0;
+#pragma loop count(8)
+#pragma ivdep
+		for(SampleBuffer::size_type nChannel = 0; nChannel < nChannels; ++nChannel)
+		{
+			const float fScale = thisPath.inChannel[nChannel].fScale;
+			const WORD thisChannel = thisPath.inChannel[nChannel].nChannel;
+			const ChannelBuffer& InputSamples = InputBuffer[thisChannel];
+
+			// Need to accumulate the whole partition, even though the input buffer contains the previous half-partition
+			// because FFTW destroys its inputs.
+
+			// untangle [Xn, Xn-1] and [Xn-1,Xn] -> [Yn-1,Yn]
+
+			
+			const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nInputBufferIndex_;
+			ChannelBuffer::iterator pInputBufferAccumulator = InputBufferAccumulator.begin() + nHalfPartitionLength;
+			ChannelBuffer::const_iterator pInputSamples = InputSamples.begin();
+
+			// TODO: Do this by pointers to make it faster
+			if(fScale == 1.0f)
+			{
+				for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+				{
+					*pInputBufferAccumulator += *pInputSamples;
+				}
+				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				for(pInputBufferAccumulator = InputBufferAccumulator.begin(), 
+					pInputSamples = InputSamples.begin() + nInputBufferIndex_;
+					pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+				{
+					*pInputBufferAccumulator += *pInputSamples;
+				}
+
+				//ChannelBuffer::size_type j = nHalfPartitionLength;
+				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//}
+				//j = 0;
+				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i];
+				//}
+			}
+			else
+			{
+				// TODO:: performance killer
+
+				for(;pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+				{
+					*pInputBufferAccumulator += *pInputSamples * fScale;
+				}
+				const ChannelBuffer::const_iterator pInputSamplesEnd = InputSamples.begin() + nPartitionLength;
+				for(pInputBufferAccumulator = InputBufferAccumulator.begin(), 
+					pInputSamples = InputSamples.begin() + nInputBufferIndex_;				
+					pInputSamples != pInputSamplesEnd; ++pInputBufferAccumulator, ++pInputSamples)
+				{
+					*pInputBufferAccumulator += *pInputSamples * fScale;
+
+				}
+
+				//ChannelBuffer::size_type j = nHalfPartitionLength;
+				//for(ChannelBuffer::size_type i=0; i<nInputBufferIndex_; ++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//}
+				//j = 0;
+				//for(ChannelBuffer::size_type i=nInputBufferIndex_; i<nPartitionLength;++i)
+				//{
+				//	InputBufferAccumulator[j++] += InputSamples[i] * fScale;
+				//}
+
+				//				const T* pInputBufferAccumulatorEnd = InputBufferAccumulator.end();
+				//#pragma loop count(65536)
+				//#pragma ivdep
+				//#pragma vector aligned
+				//#pragma prefetch pInputSamples
+				//				for(T* pInputBufferAccumulator = InputBufferAccumulator.begin(), *pInputSamples = const_cast<T*>(InputSamples.begin());
+				//					pInputBufferAccumulator != pInputBufferAccumulatorEnd;)
+				//				{
+				//					*pInputBufferAccumulator++ += *pInputSamples++ * fScale;
+				//					//PreFetchCacheLine(PF_NON_TEMPORAL_LEVEL_ALL, pInputSamples+16);
+				//					//PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, pInputBufferAccumulator+16);
+				//				}
+
+
+				//for(ChannelBuffer::iterator iterInputSamples = const_cast<ChannelBuffer::iterator>(InputSamples.begin()),
+				//	iterInputBufferAccumulator = InputBufferAccumulator_.begin();
+				//	iterInputSamples != InputSamples.end();)
+				//{
+				//	*iterInputBufferAccumulator++ += fScale * *iterInputSamples++;
+				//}
+			}
+		}
+	}
+}

@@ -188,7 +188,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 				{
 					if(HIWORD(wParam) == BN_CLICKED)
 					{
-						float	fAttenuation = 0;
+						float	fAttenuation_db = 0;
 //						DWORD	nPartitions = 1;
 //						unsigned int nPlanningRigour =
 //#ifdef FFTW
@@ -234,7 +234,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 
 							double fElapsed = 0;
 							apHiResElapsedTime t;
-							hr = m_pIconvolverFilter->calculateOptimumAttenuation(fAttenuation);
+							hr = m_pIconvolverFilter->calculateOptimumAttenuation(fAttenuation_db);
 							fElapsed = t.sec();
 							if (FAILED(hr))
 							{
@@ -243,7 +243,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 							}
 
 							// Save the calculated attenuation
-							hr = m_pIconvolverFilter->put_attenuation(fAttenuation);
+							hr = m_pIconvolverFilter->put_attenuation(fAttenuation_db);
 							if (FAILED(hr))
 							{
 								SetDlgItemText( hwnd,  IDS_STATUS, TEXT("Failed to save optimum attenuation.") );  // TODO: internationalize
@@ -252,7 +252,7 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 
 							// Display the attenuation.
 							TCHAR   szStr[MAXSTRING] = { 0 };
-							_stprintf(szStr, _T("%.1f"), fAttenuation);
+							_stprintf(szStr, _T("%.1f"), fAttenuation_db);
 							SetDlgItemText( hwnd, IDC_ATTENUATION, szStr);
 
 							// Display calculation time
@@ -267,7 +267,6 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 						}
 						catch (...) 
 						{
-
 							SetDlgItemText( hwnd, IDS_STATUS, TEXT("Failed to calculate optimum attenuation.") );
 							return (INT_PTR)TRUE;
 						}
@@ -496,7 +495,7 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 	ASSERT(m_pIconvolverFilter);
 	m_bIsInitialized = FALSE;
 
-	float	fAttenuation = 0; 
+	float	fAttenuation_db = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
 	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
@@ -509,7 +508,7 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 	unsigned int nDither = 0;
 	unsigned int nNoiseShaping =0;
 
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
+	GetControlValues(fAttenuation_db, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
 	return NOERROR;
 }
@@ -521,7 +520,7 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 //
 HRESULT CconvolverFilterProperties::OnApplyChanges()
 {
-	float	fAttenuation = 0; 
+	float	fAttenuation_db = 0; 
 	TCHAR szFilterFileName[MAX_PATH] = {0};
 	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
@@ -534,7 +533,7 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 	unsigned int nDither = 0;
 	unsigned int nNoiseShaping = 0;
 
-	GetControlValues(fAttenuation, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
+	GetControlValues(fAttenuation_db, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
 	// update the plug-in
 	if (m_pIconvolverFilter != NULL)
@@ -543,7 +542,7 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 		{
 			HRESULT hr;
 
-			hr = m_pIconvolverFilter->put_attenuation(fAttenuation);
+			hr = m_pIconvolverFilter->put_attenuation(fAttenuation_db);
 			if (FAILED(hr))
 			{
 				SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Failed to put attenuation"));
@@ -564,7 +563,11 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 				return hr;
 			}
 
-			DisplayFilterFormat(m_Dlg, szFilterFileName);
+			hr = DisplayFilterFormat(m_Dlg, szFilterFileName);
+			if (FAILED(hr))
+			{
+				return hr;
+			}
 
 			hr = m_pIconvolverFilter->put_planning_rigour(nPlanningRigour);
 			if (FAILED(hr))
@@ -605,7 +608,7 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 //
 // GetControlValues
 //
-void CconvolverFilterProperties::GetControlValues(float& fAttenuation, 
+void CconvolverFilterProperties::GetControlValues(float& fAttenuation_db, 
 												  TCHAR szFilterFileName[MAX_PATH],
 												  DWORD& nPartitions,
 												  unsigned int& nPlanningRigour,
@@ -614,15 +617,14 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 {
 	// TODO:: redo this in C++ style, with stringstream
 
-	DWORD	dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation);
 	TCHAR   szStr[MAXSTRING] = { 0 };											// Temporary string
 #ifdef UNICODE
 	CHAR strTmp[2*(sizeof(szStr)+1)];	// SIZE equals (2*(sizeof(tstr)+1)). This ensures enough
 	// room for the multibyte characters if they are two
 	// bytes long and a terminating null character.
 #endif
-	fAttenuation = 0.0;													// Initialize a float for the attenuation
-	dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation);  // Encoding necessary as DWORD is an unsigned long
+	fAttenuation_db = 0.0;													// Initialize a float for the attenuation
+	DWORD dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation_db);  // Encoding necessary as DWORD is an unsigned long
 	szFilterFileName[0] = 0;
 	nPartitions = 0;													// Initialize a WORD for the number of partitions
 	nPlanningRigour = 
@@ -642,19 +644,19 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation,
 	// TODO:: redo this in C++ style, with stringstream
 #ifdef UNICODE
 	wcstombs(strTmp, (const wchar_t *) szStr, sizeof(strTmp)); 
-	fAttenuation = atof(strTmp); 
+	fAttenuation_db = atof(strTmp); 
 #else 
-	fAttenuation = atof(szStr);
+	fAttenuation_db = atof(szStr);
 #endif 
 
 	// Make sure attenuation value is valid
-	if ((-fAttenuation > MAX_ATTENUATION) || (fAttenuation > MAX_ATTENUATION))
+	if ((-fAttenuation_db > MAX_ATTENUATION_DB) || (fAttenuation_db > MAX_ATTENUATION_DB))
 	{
 		SetDlgItemText( m_Dlg, IDS_STATUS, TEXT("Attenuation too high or low.") );
-		fAttenuation = 0;
+		fAttenuation_db = 0;
 	}
 	else
-		dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation); // to ensure that it is unsigned
+		dwAttenuation = m_pIconvolverFilter->encode_Attenuationdb(fAttenuation_db); // to ensure that it is unsigned
 
 	// Get the number of partitions value from the dialog box.
 	Edit_GetText(GetDlgItem(m_Dlg, IDC_NOOFPARTITIONS), szStr, sizeof(szStr) / sizeof(szStr[0]));

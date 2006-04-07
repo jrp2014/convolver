@@ -58,6 +58,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	Holder< ConvertSample<float> > convertor(new ConvertSample_ieeefloat<float>());
 
 	PlanningRigour pr;
+#ifdef FFTW
+	Wisdom w;					// Loads and saves FFTW wisdom
+#endif
 
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);

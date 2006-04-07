@@ -1,0 +1,13 @@
+44100 2 2 0
+0 0
+0 0
+D:\Projects\convolver\convolver\Media\XO2L44.pcm
+0
+0.0
+0.0
+D:\Projects\convolver\convolver\Media\XO2R44.pcm
+0
+1.0
+1.0
+
+ 
