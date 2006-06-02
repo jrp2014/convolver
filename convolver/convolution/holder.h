@@ -126,14 +126,14 @@ public:
 		return *ptr_;
 	}
 
-	T* const operator-> () const
+	T* operator-> () const
 	{ 
 		assert(ptr_);
 		return ptr_; 
 	}
 
 	// get referenced object (if any)
-	T* const get_ptr() const
+	T* get_ptr() const
 	{
 		return ptr_;
 	}

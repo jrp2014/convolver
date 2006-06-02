@@ -177,10 +177,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 #endif
 
-#if	defined(DEBUG) | defined(_DEBUG)
-		cdebug << "sFormatTag " << sFormatTag << std::endl;
-#endif
-
 		// Get the Wave format
 #ifdef LIBSNDFILE
 		WORD wBitsPerSample=0;
@@ -574,7 +570,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 #ifdef LIBSNDFILE
-	std::cerr << waveFormatDescription(sf_info, "Output format: ") << std::endl;
+	std::wcerr << waveFormatDescription(sf_info, TEXT("Output format: ")) << std::endl;
 
 	if (nSamples % sf_info.channels != 0)
 	{
@@ -586,7 +582,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 #else
-	std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(&Wave), nSamples, "Output format: ") << std::endl;
+	std::cerr << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(&Wave), nSamples, TEXT("Output format: ")) << std::endl;
 
 	if (nSamples % Wave.Format.nChannels != 0)
 	{

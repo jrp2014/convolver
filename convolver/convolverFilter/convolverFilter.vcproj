@@ -25,11 +25,11 @@
 				FavorSizeOrSpeed="1"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="DEBUG;WIN32;_WINDOWS;FFTW_DLL;CRTDBG_MAP_ALLOC;_WIN32_DCOM;STRSAFE_NO_DEPRECATE"
+				PreprocessorDefinitions="DEBUG;WIN32;_WINDOWS;FFTW_DLL;_CRTDBG_MAP_ALLOC;_WIN32_DCOM;_LIB;STRSAFE_NO_DEPRECATE;_X86_=1"
 				ExceptionHandling="TRUE"
 				RuntimeLibrary="1"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
+				TreatWChar_tAsBuiltInType="FALSE"
 				ForceConformanceInForLoopScope="FALSE"
 				UsePrecompiledHeader="2"
 				PrecompiledHeaderThrough="streams.h"
@@ -44,12 +44,12 @@
 			<Tool
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="strmbasd.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib libsndfile.lib"
+				AdditionalDependencies="quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib libsndfile.lib"
 				ShowProgress="2"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="0"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
 				IgnoreAllDefaultLibraries="FALSE"
 				ModuleDefinitionFile="convolverFilter.def"
 				GenerateDebugInformation="TRUE"
@@ -102,7 +102,7 @@
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="0"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;NDEBUG"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;_LIB;NDEBUG;_X86_=1"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
@@ -111,7 +111,7 @@
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
+				TreatWChar_tAsBuiltInType="FALSE"
 				ForceConformanceInForLoopScope="FALSE"
 				UsePrecompiledHeader="0"
 				PrecompiledHeaderThrough="streams.h"
@@ -127,11 +127,11 @@
 			<Tool
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
+				AdditionalDependencies="libcmt.lib strmiids.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
 				IgnoreAllDefaultLibraries="FALSE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverFilter.def"
@@ -179,13 +179,13 @@
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
+				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
 				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
 				OptimizeForProcessor="0"
 				AdditionalIncludeDirectories="..\"
-				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;NDEBUG"
+				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;_LIB;NDEBUG;_X86_=1"
 				StringPooling="TRUE"
 				ExceptionHandling="TRUE"
 				BasicRuntimeChecks="0"
@@ -194,7 +194,7 @@
 				BufferSecurityCheck="FALSE"
 				EnableFunctionLevelLinking="TRUE"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
+				TreatWChar_tAsBuiltInType="FALSE"
 				ForceConformanceInForLoopScope="FALSE"
 				UsePrecompiledHeader="0"
 				PrecompiledHeaderThrough="streams.h"
@@ -210,11 +210,11 @@
 			<Tool
 				Name="VCLinkerTool"
 				RegisterOutput="TRUE"
-				AdditionalDependencies="libcmt.lib strmbase.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
+				AdditionalDependencies="libcmt.lib strmiids.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;$(OutDir)"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
 				IgnoreAllDefaultLibraries="FALSE"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverFilter.def"
@@ -376,193 +376,193 @@
 				Name="BaseClasses"
 				Filter="">
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amextra.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amextra.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amextra.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amextra.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amfilter.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amfilter.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amfilter.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amfilter.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\amvideo.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amvideo.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cache.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\cache.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\combase.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\combase.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\combase.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\combase.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cprop.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\cprop.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\cprop.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\cprop.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\ctlutil.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ddmm.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\ddmm.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\ddmm.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\ddmm.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllentry.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\dllentry.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\dllsetup.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\dsschedule.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\dsschedule.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\fourcc.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\fourcc.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\measure.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\measure.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\msgthrd.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\msgthrd.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\mtype.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\mtype.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\mtype.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\mtype.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\outputq.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\outputq.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\outputq.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\outputq.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pstream.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\pstream.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pstream.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\pstream.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pullpin.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\pullpin.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\pullpin.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\pullpin.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\refclock.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\refclock.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\refclock.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\refclock.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\reftime.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\reftime.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\renbase.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\renbase.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\renbase.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\renbase.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\schedule.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\schedule.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\schedule.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\schedule.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\seekpt.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\seekpt.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\seekpt.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\seekpt.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\source.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\source.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\source.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\source.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\streams.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\streams.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\strmctl.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\strmctl.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\strmctl.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\strmctl.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\sysclock.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\sysclock.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\sysclock.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\sysclock.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transfrm.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\transfrm.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transfrm.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\transfrm.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transip.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\transip.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\transip.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\transip.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\videoctl.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\videoctl.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\videoctl.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\videoctl.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\vtrans.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\vtrans.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\vtrans.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\vtrans.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winctrl.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\winctrl.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winctrl.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\winctrl.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winutil.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\winutil.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\winutil.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\winutil.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxdebug.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxlist.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxlist.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxlist.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxlist.h">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.cpp">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxutil.cpp">
 				</File>
 				<File
-					RelativePath="C:\Program Files\Microsoft Platform SDK\Samples\Multimedia\DirectShow\BaseClasses\wxutil.h">
+					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\wxutil.h">
 				</File>
 			</Filter>
 			<Filter

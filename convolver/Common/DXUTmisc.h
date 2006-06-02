@@ -59,6 +59,7 @@ struct DXUT_GAMEPAD
 
 HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbstickDeadZone = true, bool bSnapThumbstickToCardinals = true );
 HRESULT DXUTStopRumbleOnAllControllers();
+void    DXUTEnableXInput( bool bEnable );
 
 
 //--------------------------------------------------------------------------------------
@@ -125,10 +126,13 @@ public:
     void GetTimeValues( double* pfTime, double* pfAbsoluteTime, float* pfElapsedTime ); // get all time values at once
     bool IsStopped(); // returns true if timer stopped
 
+    // Limit the current thread to one processor (the current one). This ensures that timing code runs
+    // on only one processor, and will not suffer any ill effects from power management.
+    void LimitThreadAffinityToCurrentProc();
+
 protected:
     LARGE_INTEGER GetAdjustedCurrentTime();
 
-    bool m_bUsingQPF;
     bool m_bTimerStopped;
     LONGLONG m_llQPFTicksPerSec;
     

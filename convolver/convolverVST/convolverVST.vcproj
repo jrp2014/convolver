@@ -3,7 +3,7 @@
 	ProjectType="Visual C++"
 	Version="7.10"
 	Name="convolverVST"
-	ProjectGUID="{A032F028-78A8-4C20-818F-81F5E1765583}"
+	ProjectGUID="{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -12,32 +12,41 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="Debug"
+			OutputDirectory="..\bin\Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="2"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/fp:strict"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\;..\..\..\vstsdk2.4"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;CONVOLVERVST_EXPORTS"
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				PreprocessorDefinitions="WIN32;_DEBUG;DEBUG=1;_WINDOWS;_WINDLL;_USRDLL;CONVOLVERVST_EXPORTS;FFTW_DLL;_CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
+				SmallerTypeCheck="TRUE"
 				RuntimeLibrary="1"
+				BufferSecurityCheck="TRUE"
+				TreatWChar_tAsBuiltInType="TRUE"
+				ForceConformanceInForLoopScope="TRUE"
+				RuntimeTypeInfo="TRUE"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="4"/>
+				DebugInformationFormat="4"
+				CompileAs="0"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/convolverVST.dll"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				ModuleDefinitionFile="convolverVST.def"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/convolverVST.pdb"
 				SubSystem="2"
+				EntryPointSymbol=""
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -63,29 +72,37 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="Release"
+			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="2"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\;..\..\..\vstsdk2.4"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;CONVOLVERVST_EXPORTS"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_WINDLL;_USRDLL;CONVOLVERVST_EXPORTS;FFTW_DLL"
 				RuntimeLibrary="0"
+				TreatWChar_tAsBuiltInType="TRUE"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				DebugInformationFormat="3"
+				CompileAs="0"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/convolverVST.dll"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				ModuleDefinitionFile="convolverVST.def"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				EntryPointSymbol=""
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -111,29 +128,48 @@
 		</Configuration>
 		<Configuration
 			Name="Release PIII|Win32"
-			OutputDirectory="Release"
+			OutputDirectory="..\bin\Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="2"
-			CharacterSet="2">
+			CharacterSet="2"
+			WholeProgramOptimization="TRUE">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\;..\..\..\vstsdk2.4"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;CONVOLVERVST_EXPORTS"
+				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
+				GlobalOptimizations="TRUE"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="TRUE"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="TRUE"
+				EnableFiberSafeOptimizations="TRUE"
+				OptimizeForProcessor="0"
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_WINDLL;CONVOLVERVST_EXPORTS;FFTW_DLL"
+				StringPooling="TRUE"
 				RuntimeLibrary="0"
+				BufferSecurityCheck="FALSE"
+				EnableFunctionLevelLinking="TRUE"
+				TreatWChar_tAsBuiltInType="TRUE"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
+				WarningLevel="4"
 				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				DebugInformationFormat="3"
+				CompileAs="0"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/convolverVST.dll"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
+				ModuleDefinitionFile="convolverVST.def"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				EntryPointSymbol=""
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -169,7 +205,10 @@
 				RelativePath=".\convolverVST.cpp">
 			</File>
 			<File
-				RelativePath=".\ConvolverVSTmain.cpp">
+				RelativePath=".\convolverVSTEditor.cpp">
+			</File>
+			<File
+				RelativePath=".\convolverVSTmain.cpp">
 			</File>
 			<Filter
 				Name="vst2.x"
@@ -194,34 +233,6 @@
 				</File>
 			</Filter>
 			<Filter
-				Name="vstgui"
-				Filter="">
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.h">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.h">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.h">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstgui.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstgui.h">
-				</File>
-			</Filter>
-			<Filter
 				Name="convolution"
 				Filter="">
 				<File
@@ -240,7 +251,13 @@
 					RelativePath="..\convolution\convolution.h">
 				</File>
 				<File
+					RelativePath="..\convolution\dither.h">
+				</File>
+				<File
 					RelativePath="..\convolution\exception.h">
+				</File>
+				<File
+					RelativePath="..\convolution\factory.h">
 				</File>
 				<File
 					RelativePath="..\convolution\ffthelp.cpp">
@@ -264,6 +281,9 @@
 					RelativePath="..\convolution\lrint.h">
 				</File>
 				<File
+					RelativePath="..\convolution\sample.cpp">
+				</File>
+				<File
 					RelativePath="..\convolution\sample.h">
 				</File>
 				<File
@@ -282,6 +302,28 @@
 					RelativePath="..\convolution\waveformat.h">
 				</File>
 			</Filter>
+			<Filter
+				Name="debugging"
+				Filter="">
+				<File
+					RelativePath="..\debugging\debugging.cpp">
+				</File>
+				<File
+					RelativePath="..\debugging\debugging.h">
+				</File>
+				<File
+					RelativePath="..\debugging\debugStream.cpp">
+				</File>
+				<File
+					RelativePath="..\debugging\debugStream.h">
+				</File>
+				<File
+					RelativePath="..\debugging\fastTiming.cpp">
+				</File>
+				<File
+					RelativePath="..\debugging\fastTiming.h">
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -290,11 +332,20 @@
 			<File
 				RelativePath=".\convolverVST.h">
 			</File>
+			<File
+				RelativePath=".\convolverVSTEditor.h">
+			</File>
+			<File
+				RelativePath=".\resource.h">
+			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+			<File
+				RelativePath=".\convolverVST.rc">
+			</File>
 		</Filter>
 		<Filter
 			Name="Interfaces"
@@ -309,6 +360,61 @@
 				RelativePath="..\..\..\vstsdk2.4\pluginterfaces\vst2.x\vstfxstore.h">
 			</File>
 		</Filter>
+		<Filter
+			Name="vstgui"
+			Filter="">
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cscrollview.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cscrollview.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\ctabview.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\ctabview.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstgui.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstkeycode.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugscarbon.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsmac.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsmacho.h">
+			</File>
+			<File
+				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsquartz.h">
+			</File>
+		</Filter>
+		<File
+			RelativePath=".\convolverVST.def">
+		</File>
 	</Files>
 	<Globals>
 	</Globals>

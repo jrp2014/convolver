@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -228,19 +228,29 @@ private:
 	}
 #endif
 
-	BaseT gain() const
+	BaseT peak_gain() const
 	{
-		return gain_;
+		return peak_gain_;
 	}
 
-	BaseT gain_dB() const
+	BaseT peak_gain_dB() const
 	{
-		return BaseT(20) * log10(gain_);
+		return BaseT(20) * log10(peak_gain_);
 	}
 
-	ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour);
+	BaseT estimated_gain() const
+	{
+		return estimated_gain_;
+	}
 
-	const std::string DisplayChannelPaths() const;
+	BaseT estimated_gain_dB() const
+	{
+		return BaseT(20) * log10(estimated_gain_);
+	}
+
+	ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], const DWORD& nPartitions, const unsigned int& nPlanningRigour);
+
+	const std::basic_string<TCHAR> DisplayChannelPaths() const;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump() const;
@@ -263,8 +273,10 @@ private:
 
 	DWORD	nInputChannels_;				// number of input channels; must be a DWORD, otherwise not read correctly by >> from TCHAR config file
 	DWORD	nOutputChannels_;				// number of output channels
-	std::vector<DWORD> nInputSamplesDelay_;	// the number of samples by which to delay each output channel
+	std::vector<DWORD> nInputSamplesDelay_;	// the number of samples by which to delay each input channel
 	std::vector<DWORD> nOutputSamplesDelay_;// the number of samples by which to delay each output channel
+	std::vector<float> estimated_output_gain_;		// for each output channel
+	std::vector<float> peak_output_gain_;			// for each output channel
 	DWORD	nSamplesPerSec_;				// 44100, 48000, etc
 	DWORD	dwChannelMask_;					// http://www.microsoft.com/whdc/device/audio/multichaud.mspx
 	unsigned int nPaths_;					// number of Paths
@@ -274,7 +286,8 @@ private:
 #ifdef FFTW
 	DWORD		nFFTWPartitionLength_;	// 2*(nPartitionLength / 2 + 1)
 #endif
-	BaseT	gain_;
+	BaseT	peak_gain_;
+	BaseT	estimated_gain_;
 
 	ChannelPaths();											// No construction
 	ChannelPaths(const ChannelPaths&);						// No copy ctor

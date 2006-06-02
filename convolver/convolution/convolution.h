@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -257,7 +257,7 @@ public:
 		return state_;
 	}
 
-	const std::string DisplayConvolutionList() const;
+	const std::basic_string<TCHAR> DisplayConvolutionList() const;
 
 #if defined(DEBUG) | defined(_DEBUG)
 	void Dump() const;
@@ -283,10 +283,15 @@ ConvolutionList<T>* updateConvolutionList(const WAVEFORMATEX* pWaveIn, const WAV
 {
 	ConvolutionList<T> * newList = new ConvolutionList<T>(szConfigFileName, nPartitions, nPlanningRigour);  // May throw
 
-	HRESULT hr = newList->SelectConvolution(pWaveIn, pWaveOut);
+	if(pWaveIn != NULL || pWaveOut != NULL)
+	{
+		HRESULT hr = newList->SelectConvolution(pWaveIn, pWaveOut);
 
-	if(FAILED(hr))
-		throw convolutionListException("Failed to update convolution list", szConfigFileName);
+		if(FAILED(hr))
+		{
+			throw convolutionListException("Incompatible number of input or output channels or sample rate. Choose new filter or reload this plug-in.", szConfigFileName);
+		}
+	}
 
 	return newList;
 }

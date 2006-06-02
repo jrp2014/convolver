@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -20,7 +20,9 @@
 
 #include "convolution\channelpaths.h"
 
-ChannelPaths::ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], const WORD& nPartitions, const unsigned int& nPlanningRigour) :
+ChannelPaths::ChannelPaths(const TCHAR szChannelPathsFileName[MAX_PATH], 
+						   const DWORD& nPartitions, 
+						   const unsigned int& nPlanningRigour) :
 nInputChannels_(0),
 nOutputChannels_(0),
 nSamplesPerSec_(0),
@@ -34,7 +36,7 @@ nFilterLength_(0),
 nFFTWPartitionLength_(2),
 #endif
 config_(szChannelPathsFileName),
-gain_(0)
+peak_gain_(0)
 {
 	//USES_CONVERSION;
 
@@ -51,7 +53,7 @@ gain_(0)
 	{
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
-		CWaveFileHandle wav(szChannelPathsFileName, SFM_READ, &sf_info, 44100);
+		CWaveFileHandle wav(szChannelPathsFileName, SFM_READ, &sf_info, 44100); // 44100 is a default for raw pcm
 
 		nInputChannels_ = sf_info.channels;
 		nOutputChannels_ = sf_info.channels;
@@ -70,18 +72,6 @@ gain_(0)
 		nSamplesPerSec_ = wfex.nSamplesPerSec_;
 #endif
 
-		nInputSamplesDelay_.reserve(nInputChannels());
-		for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
-		{
-			nInputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
-		}
-
-		nOutputSamplesDelay_.reserve(nOutputChannels());
-		for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
-		{
-			nOutputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
-		}
-
 		for(WORD nChannel=0; nChannel < nInputChannels_; ++nChannel)
 		{
 			std::vector<ChannelPath::ScaledChannel> inChannel(1, ChannelPath::ScaledChannel(nChannel, 1.0f));
@@ -89,6 +79,22 @@ gain_(0)
 			Paths_.push_back(new ChannelPath(szChannelPathsFileName, nPartitions, inChannel, outChannel, nChannel, 
 				nSamplesPerSec_, nPlanningRigour));  // 0 = no delay
 			++nPaths_;
+		}
+
+		nInputSamplesDelay_.reserve(nInputChannels());
+		for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
+		{
+			nInputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
+		}
+
+		nOutputSamplesDelay_.reserve(nOutputChannels());
+		estimated_output_gain_.reserve(nOutputChannels());
+		peak_output_gain_.reserve(nOutputChannels());
+		for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
+		{
+			nOutputSamplesDelay_.push_back(0);  // No delay, where a sound file is used as a filter
+			estimated_output_gain_.push_back(0);
+			peak_output_gain_.push_back(0);
 		}
 	}
 	catch(const wavfileException&)
@@ -127,7 +133,6 @@ gain_(0)
 				throw channelPathsException("Config file syntax error: initial line should contain sample rate, number of input and of output channels, and a channel mask followed by a newline", szChannelPathsFileName);
 			}
 
-
 			nInputSamplesDelay_.reserve(nInputChannels());
 			for(DWORD nInputChannel = 0; nInputChannel < nInputChannels_; ++nInputChannel)
 			{
@@ -157,6 +162,14 @@ gain_(0)
 				nOutputSamplesDelay_.push_back(nSamplesPerSec_ * fDelayMS / 1000.0);  // Convert ms to samples
 			}
 
+			estimated_output_gain_.reserve(nOutputChannels());
+			peak_output_gain_.reserve(nOutputChannels());
+			for(DWORD nOutputChannel = 0; nOutputChannel < nOutputChannels_; ++nOutputChannel)
+			{
+				estimated_output_gain_.push_back(0);
+				peak_output_gain_.push_back(0);
+			}
+
 			if (config_().get() != '\n')
 			{
 				throw channelPathsException("Inconsistent output channels delay specification line?", szChannelPathsFileName);
@@ -164,7 +177,7 @@ gain_(0)
 
 
 			TCHAR szFilterFilename[MAX_PATH];
-			szFilterFilename[0] = 0;
+
 			while(!config_().eof())
 			{
 				szFilterFilename[0] = 0;
@@ -175,6 +188,7 @@ gain_(0)
 #if defined(DEBUG) | defined(_DEBUG)
 				cdebug << "Reading specification for " << CT2A(szFilterFilename) << std::endl;
 #endif
+
 				got_path_spec = false;
 
 				DWORD nFilterChannel=0;			// The channel to select from the filter file.
@@ -189,7 +203,7 @@ gain_(0)
 				std::vector<ChannelPath::ScaledChannel> inChannel;
 				while(true) // Require at least one input channel
 				{
-					float scale=0; // The scaling factor to be applied
+					float scale=0; // The scaling factor to be applied to the input channel
 					config_() >> scale;
 
 					float fchannel=0;
@@ -198,7 +212,7 @@ gain_(0)
 					// The signed fractional portion of scale is returned
 					// The integer portion is stored as a floating-point value at fchannel
 					scale = modff(scale, &fchannel);
-					const WORD channel = static_cast<WORD>(abs((fchannel)));
+					const DWORD channel = static_cast<DWORD>(abs(fchannel));
 
 					if(channel + 1 > nInputChannels_)
 						throw channelPathsException("Input channel number greater than the specified number of input channels",
@@ -212,7 +226,9 @@ gain_(0)
 
 					nextchar = config_().get();
 					if (nextchar == '\n')
+					{
 						break;
+					}
 					else
 					{
 						if (nextchar == std::char_traits<TCHAR>::eof())
@@ -244,9 +260,9 @@ gain_(0)
 
 					float fchannel=0;
 					scale = modff(scale, &fchannel);
-					const WORD channel = static_cast<WORD>(abs(fchannel));
+					const DWORD channel = static_cast<DWORD>(abs(fchannel));
 
-					if(channel > nOutputChannels_ - 1)
+					if(channel + 1 > nOutputChannels_)
 						throw channelPathsException("Output channel number greater than the specified number of output channels",
 						szChannelPathsFileName);
 
@@ -336,7 +352,6 @@ gain_(0)
 #ifdef FFTW
 		nFFTWPartitionLength_ = Paths_[0].filter.nFFTWPartitionLength();	// Needs an extra element
 #endif
-		gain_ = Paths_[0].filter.gain();
 	}
 	else
 	{
@@ -360,77 +375,100 @@ gain_(0)
 		}
 	}
 
-	for(WORD i = 0; i < nPaths_; ++i)
+	for(WORD nPath = 0; nPath < nPaths_; ++nPath)
 	{
-		if(Paths_[i].filter.nFilterLength() != nFilterLength_)
+		if(Paths_[nPath].filter.nFilterLength() != nFilterLength_)
 		{
 			throw channelPathsException("Filters must all be of the same length", szChannelPathsFileName);
 		}
 
-		if(Paths_[0].filter.nPartitionLength() != nPartitionLength_)
+		if(Paths_[nPath].filter.nPartitionLength() != nPartitionLength_)
 		{
 			// It should be impossible for this to happen, if nFilterLength is OK
 			throw channelPathsException("Internal error: inconsistent partition length", szChannelPathsFileName);
 		}
 
-		if(Paths_[0].filter.nHalfPartitionLength() != nHalfPartitionLength_)
+		if(Paths_[nPath].filter.nHalfPartitionLength() != nHalfPartitionLength_)
 		{
 			// It should be impossible for this to happen, if nFilterLength is OK
 			throw channelPathsException("Internal error: inconsistent half partition length", szChannelPathsFileName);
 		}
 
-		if(Paths_[i].filter.nSamplesPerSec() != nSamplesPerSec_)
+		if(Paths_[nPath].filter.nSamplesPerSec() != nSamplesPerSec_)
 		{
 			throw channelPathsException("Filters must all have the same sample rate", szChannelPathsFileName);
 		}
 
-		if(Paths_[i].filter.gain() > gain_)
+		// Calculate the gain for each output channel
+		float inputScale = 0;
+		for(WORD nChannel = 0; nChannel < Paths_[nPath].inChannel.size(); ++ nChannel)
 		{
-			gain_ = Paths_[i].filter.gain();
+			inputScale += abs(Paths_[nPath].inChannel[nChannel].fScale);
+		}
+
+		for(WORD nChannel = 0; nChannel < Paths_[0].outChannel.size(); ++ nChannel)
+		{
+			estimated_output_gain_[Paths_[nPath].outChannel[nChannel].nChannel] += inputScale * Paths_[nPath].filter.estimated_gain() *
+				abs(Paths_[nPath].outChannel[nChannel].fScale);
+			peak_output_gain_[Paths_[nPath].outChannel[nChannel].nChannel] += inputScale * Paths_[nPath].filter.peak_gain() *
+				abs(Paths_[nPath].outChannel[nChannel].fScale);
 		}
 	}
+
+	// Calculate the max gain from all output channels
+	estimated_gain_ = estimated_output_gain_[0];
+	peak_gain_ = peak_output_gain_[0];
+	for(WORD nOutputChannel = 1; nOutputChannel < nOutputChannels(); ++ nOutputChannel)
+	{
+		if(estimated_gain_ < estimated_output_gain_[nOutputChannel])
+			estimated_gain_ = estimated_output_gain_[nOutputChannel];
+		if(peak_gain_ < peak_output_gain_[nOutputChannel])
+			peak_gain_ = peak_output_gain_[nOutputChannel];
+	}
+
 #if defined(DEBUG) | defined(_DEBUG)
 	Dump();
 #endif
 }
 
-const std::string ChannelPaths::DisplayChannelPaths() const
+const std::basic_string<TCHAR> ChannelPaths::DisplayChannelPaths() const
 {
-	std::ostringstream result;
+	std::basic_ostringstream<TCHAR> result;
 
 	if (nPaths() == 0)
 	{
-		result << "No paths defined";
+		result << TEXT("No paths defined");
 	}
 	else
 	{
 		if (nPaths() == 1)
 		{
-			result << "1 Path (";
+			result << TEXT("1 Path (");
 		}
 		else
 		{
-			result << nPaths() << " Paths (";
+			result << nPaths() << TEXT(" Paths (");
 		}
 
 		if (nInputChannels() == 1)
 		{
-			result << "Mono to ";
+			result << TEXT("Mono to ");
 		}
 		else if (nInputChannels() == 2)
 		{
-			result << "Stereo to ";
+			result << TEXT("Stereo to ");
 		}
 		else
-			result << nInputChannels() << " channels to ";
+			result << nInputChannels() << TEXT(" channels to ");
 
-		result << channelDescription(WAVE_FORMAT_EXTENSIBLE, dwChannelMask(), nOutputChannels()) << ") ";
+		result << channelDescription(WAVE_FORMAT_EXTENSIBLE, dwChannelMask(), nOutputChannels()) << TEXT(") ");
 
 		result
-			<< nSamplesPerSec()/1000.0f << "kHz, " 
-			<< nFilterLength() << " taps, " 
-			<< std::setprecision(2) << (float(nHalfPartitionLength()) / float(nSamplesPerSec())) << "s lag, "
-			<< "peak gain " << gain_dB() << "dB";
+			<< nSamplesPerSec()/1000.0f << TEXT("kHz ") 
+			<< nFilterLength() << TEXT(" taps Lag ") 
+			<< std::setprecision(2) << (float(nHalfPartitionLength()) / float(nSamplesPerSec())) <<
+			TEXT("s Estimated gain ") << estimated_gain_dB() <<
+			TEXT("dB Peak gain ") << peak_gain_dB() << TEXT("dB");
 	}
 	return result.str();
 }

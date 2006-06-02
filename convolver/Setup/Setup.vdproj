@@ -39,6 +39,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_13C5A73BBCF0EDBD0E9C59A004BC7313"
+        "OwnerKey" = "8:_6857A632778844AC9C7F65046D83190D"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -64,7 +70,7 @@
         "Entry"
         {
         "MsmKey" = "8:_50088B1D7DB527D9B2047C152B9D7290"
-        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
+        "OwnerKey" = "8:_6857A632778844AC9C7F65046D83190D"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -75,8 +81,20 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_50088B1D7DB527D9B2047C152B9D7290"
+        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_62C2CC6C9607EEB26EB53A15F81A2094"
         "OwnerKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_6857A632778844AC9C7F65046D83190D"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -112,6 +130,12 @@
         "Entry"
         {
         "MsmKey" = "8:_8CCFA8EB511742BF8789AFC81CB9800F"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_9F803D79DEB74664B558553574F1C118"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -154,6 +178,12 @@
         "Entry"
         {
         "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
+        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
         "OwnerKey" = "8:_B7383602C6A04D8682E86586F94146BD"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -178,7 +208,7 @@
         "Entry"
         {
         "MsmKey" = "8:_E66BB97C6EA5150E09B382BA918D938F"
-        "OwnerKey" = "8:_17210C20EFD44B1AA3780B36282C79A5"
+        "OwnerKey" = "8:_6857A632778844AC9C7F65046D83190D"
         "MsmSig" = "8:_UNDEFINED"
         }
     }
@@ -375,6 +405,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{A582A373-4685-4296-BEFE-614B80A702C3}:_9F803D79DEB74664B558553574F1C118"
+            {
+            "SourcePath" = "8:..\\convolverWMP\\convolver.bmp"
+            "TargetName" = "8:convolver.bmp"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:TRUE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{A582A373-4685-4296-BEFE-614B80A702C3}:_A22773B9D16148E7BAD44BEBA0B1C378"
             {
             "SourcePath" = "8:..\\convolverWMP\\ConvolverWrapper.filterdata"
@@ -530,13 +580,13 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:Convolver"
-        "ProductCode" = "8:{189435EF-70D1-4C98-B442-97617D36CFB7}"
-        "PackageCode" = "8:{489FE63C-D71C-4DF2-A8CF-8E3B3FDEAEF3}"
+        "ProductCode" = "8:{66AABFD6-A22B-40D8-B3AF-E6B26433DC0B}"
+        "PackageCode" = "8:{4CA0C73B-C0D1-4030-B7EE-D1D37655E820}"
         "UpgradeCode" = "8:{616FE744-DD3D-48F5-94E0-E2C372571025}"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
-        "ProductVersion" = "8:3.7"
+        "ProductVersion" = "8:4.0"
         "Manufacturer" = "8:Convolver"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
@@ -980,7 +1030,7 @@
                 {
                     "{18ADD6EC-89FE-4ED7-AD3E-211C40278470}:_7FBE93AB5AB2451E848AF3998739C5EB"
                     {
-                    "Sequence" = "3:110"
+                    "Sequence" = "3:200"
                     "DisplayName" = "8:License Agreement"
                     "UseDynamicProperties" = "11:TRUE"
                     "IsDependency" = "11:FALSE"
@@ -1027,7 +1077,7 @@
                     }
                     "{18ADD6EC-89FE-4ED7-AD3E-211C40278470}:_999ADABB298C414789E50B678FD9C56F"
                     {
-                    "Sequence" = "3:100"
+                    "Sequence" = "3:110"
                     "DisplayName" = "8:Welcome"
                     "UseDynamicProperties" = "11:TRUE"
                     "IsDependency" = "11:FALSE"
@@ -1075,7 +1125,7 @@
                     }
                     "{18ADD6EC-89FE-4ED7-AD3E-211C40278470}:_E04832A896F84CD8A5E4ADE52114A60E"
                     {
-                    "Sequence" = "3:300"
+                    "Sequence" = "3:400"
                     "DisplayName" = "8:Confirm Installation"
                     "UseDynamicProperties" = "11:TRUE"
                     "IsDependency" = "11:FALSE"
@@ -1097,7 +1147,7 @@
                     }
                     "{18ADD6EC-89FE-4ED7-AD3E-211C40278470}:_FC7EB2B88E0C46A19FB66B96522FF4B2"
                     {
-                    "Sequence" = "3:200"
+                    "Sequence" = "3:300"
                     "DisplayName" = "8:Installation Folder"
                     "UseDynamicProperties" = "11:TRUE"
                     "IsDependency" = "11:FALSE"
@@ -1434,6 +1484,62 @@
                 {
                 }
             }
+            "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_6857A632778844AC9C7F65046D83190D"
+            {
+            "SourcePath" = "8:..\\bin\\Release\\convolverVST.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            "ProjectOutputGroupRegister" = "3:1"
+            "OutputConfiguration" = "8:"
+            "OutputGroupCanonicalName" = "8:Built"
+            "OutputProjectGuid" = "8:{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
+            "ShowKeyOutput" = "11:TRUE"
+                "ExcludeFilters"
+                {
+                }
+            }
+            "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_6D482BE2FFDE445295B07680FE351D53"
+            {
+            "SourcePath" = "8:"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            "ProjectOutputGroupRegister" = "3:1"
+            "OutputConfiguration" = "8:"
+            "OutputGroupCanonicalName" = "8:LocalizedResourceDlls"
+            "OutputProjectGuid" = "8:{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
+            "ShowKeyOutput" = "11:TRUE"
+                "ExcludeFilters"
+                {
+                }
+            }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_7B653B8AB6A04A74B37B59458951A8E6"
             {
             "SourcePath" = "8:..\\bin\\Release\\convolverCMD.exe"
@@ -1742,6 +1848,34 @@
                 {
                 }
             }
+            "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_BA99F106894B4199852127E814048AEA"
+            {
+            "SourcePath" = "8:"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            "ProjectOutputGroupRegister" = "3:1"
+            "OutputConfiguration" = "8:"
+            "OutputGroupCanonicalName" = "8:ContentFiles"
+            "OutputProjectGuid" = "8:{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
+            "ShowKeyOutput" = "11:TRUE"
+                "ExcludeFilters"
+                {
+                }
+            }
             "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_CA09217AD44343F6AE30A570350C3614"
             {
             "SourcePath" = "8:"
@@ -1821,6 +1955,34 @@
             "OutputConfiguration" = "8:"
             "OutputGroupCanonicalName" = "8:ContentFiles"
             "OutputProjectGuid" = "8:{90C47E62-931C-411D-9F16-0B877E34B415}"
+            "ShowKeyOutput" = "11:TRUE"
+                "ExcludeFilters"
+                {
+                }
+            }
+            "{8062640A-2EEE-46E9-AB67-688E9A886E9F}:_FF402819AB4445A187265D7240FB7D5C"
+            {
+            "SourcePath" = "8:"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_8397AC75FFE64568A0E05B3288B944C5"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            "ProjectOutputGroupRegister" = "3:1"
+            "OutputConfiguration" = "8:"
+            "OutputGroupCanonicalName" = "8:LocalizedResourceDlls"
+            "OutputProjectGuid" = "8:{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
             "ShowKeyOutput" = "11:TRUE"
                 "ExcludeFilters"
                 {

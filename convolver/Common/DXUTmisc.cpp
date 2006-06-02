@@ -7,7 +7,6 @@
 //--------------------------------------------------------------------------------------
 #include "dxstdafx.h"
 #define DXUT_GAMEPAD_TRIGGER_THRESHOLD      30
-#define DXUT_INPUT_DEADZONE                 ( 0.24f * FLOAT(0x7FFF) )  // Default to 24% of the +/- 32767 range.   This is a reasonable default value but can be altered if needed.
 #undef min // use __min instead
 #undef max // use __max instead
 
@@ -269,11 +268,45 @@ LARGE_INTEGER CDXUTTimer::GetAdjustedCurrentTime()
     return qwTime;
 }
 
+
 //--------------------------------------------------------------------------------------
 bool CDXUTTimer::IsStopped()
 {
     return m_bTimerStopped;
 }
+
+
+//--------------------------------------------------------------------------------------
+// Limit the current thread to one processor (the current one). This ensures that timing code 
+// runs on only one processor, and will not suffer any ill effects from power management.
+// See "Game Timing and Multicore Processors" for more details
+//--------------------------------------------------------------------------------------
+void CDXUTTimer::LimitThreadAffinityToCurrentProc()
+{
+    HANDLE hCurrentProcess = GetCurrentProcess();
+    
+    // Get the processor affinity mask for this process
+    DWORD_PTR dwProcessAffinityMask = 0;
+    DWORD_PTR dwSystemAffinityMask = 0;
+    
+    if( GetProcessAffinityMask( hCurrentProcess, &dwProcessAffinityMask, &dwSystemAffinityMask ) != 0 && dwProcessAffinityMask )
+    {
+        // Find the lowest processor that our process is allows to run against
+        DWORD_PTR dwAffinityMask = ( dwProcessAffinityMask & ((~dwProcessAffinityMask) + 1 ) );
+
+        // Set this as the processor that our thread must always run against
+        // This must be a subset of the process affinity mask
+        HANDLE hCurrentThread = GetCurrentThread();
+        if( INVALID_HANDLE_VALUE != hCurrentThread )
+        {
+            SetThreadAffinityMask( hCurrentThread, dwAffinityMask );
+            CloseHandle( hCurrentThread );
+        }
+    }
+
+    CloseHandle( hCurrentProcess );
+}
+
 
 //--------------------------------------------------------------------------------------
 // Returns pointer to static media search buffer
@@ -3206,6 +3239,7 @@ IDirect3DDevice9* DXUTCreateRefDevice( HWND hWnd, bool bNullRef )
 typedef DWORD (WINAPI* LPXINPUTGETSTATE)(DWORD dwUserIndex, XINPUT_STATE* pState );
 typedef DWORD (WINAPI* LPXINPUTSETSTATE)(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration );
 typedef DWORD (WINAPI* LPXINPUTGETCAPABILITIES)( DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES* pCapabilities );
+typedef void  (WINAPI* LPXINPUTENABLE)(BOOL bEnable);
 
 
 
@@ -3266,26 +3300,26 @@ HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbst
     if( bSnapThumbstickToCardinals )
     {
         // Apply deadzone to each axis independantly to slightly snap to up/down/left/right
-        if( pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE )
+        if( pGamePad->sThumbLX < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE && pGamePad->sThumbLX > -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE )
             pGamePad->sThumbLX = 0;
-        if( pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE ) 
+        if( pGamePad->sThumbLY < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE && pGamePad->sThumbLY > -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE ) 
             pGamePad->sThumbLY = 0;
-        if( pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE )
+        if( pGamePad->sThumbRX < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE && pGamePad->sThumbRX > -XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE )
             pGamePad->sThumbRX = 0;
-        if( pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE ) 
+        if( pGamePad->sThumbRY < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE && pGamePad->sThumbRY > -XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE ) 
             pGamePad->sThumbRY = 0;
     }
     else if( bThumbstickDeadZone )
     {
         // Apply deadzone if centered
-        if( (pGamePad->sThumbLX < DXUT_INPUT_DEADZONE && pGamePad->sThumbLX > -DXUT_INPUT_DEADZONE) && 
-            (pGamePad->sThumbLY < DXUT_INPUT_DEADZONE && pGamePad->sThumbLY > -DXUT_INPUT_DEADZONE) ) 
+        if( (pGamePad->sThumbLX < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE && pGamePad->sThumbLX > -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) && 
+            (pGamePad->sThumbLY < XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE && pGamePad->sThumbLY > -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) ) 
         {   
             pGamePad->sThumbLX = 0;
             pGamePad->sThumbLY = 0;
         }
-        if( (pGamePad->sThumbRX < DXUT_INPUT_DEADZONE && pGamePad->sThumbRX > -DXUT_INPUT_DEADZONE) && 
-            (pGamePad->sThumbRY < DXUT_INPUT_DEADZONE && pGamePad->sThumbRY > -DXUT_INPUT_DEADZONE) ) 
+        if( (pGamePad->sThumbRX < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE && pGamePad->sThumbRX > -XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) && 
+            (pGamePad->sThumbRY < XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE && pGamePad->sThumbRY > -XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) ) 
         {
             pGamePad->sThumbRX = 0;
             pGamePad->sThumbRY = 0;
@@ -3314,6 +3348,31 @@ HRESULT DXUTGetGamepadState( DWORD dwPort, DXUT_GAMEPAD* pGamePad, bool bThumbst
     pGamePad->bLastRightTrigger = bPressed;
 
     return S_OK;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Don't pause the game or deactive the window without first stopping rumble otherwise 
+// the controller will continue to rumble
+//--------------------------------------------------------------------------------------
+void DXUTEnableXInput( bool bEnable )
+{
+    static LPXINPUTENABLE s_pXInputEnable = NULL;
+    if( NULL == s_pXInputEnable )
+    {
+        WCHAR wszPath[MAX_PATH];
+        if( GetSystemDirectory( wszPath, MAX_PATH ) )
+        {
+            StringCchCat( wszPath, MAX_PATH, L"\\" );
+            StringCchCat( wszPath, MAX_PATH, XINPUT_DLL );
+            HINSTANCE hInst = LoadLibrary( wszPath );
+            if( hInst ) 
+                s_pXInputEnable = (LPXINPUTENABLE)GetProcAddress( hInst, "XInputEnable" );
+        }
+    }
+
+    if( s_pXInputEnable )
+        s_pXInputEnable( bEnable );
 }
 
 

@@ -167,6 +167,6 @@ void apDebugSinkWindows::display (const std::string& str)
 // *                    *
 // **********************
 
-apDebugStringBuf<char> debugstream;
+apDebugStringBuf<TCHAR> debugstream;
 
-std::ostream cdebug (&debugstream);
+std::basic_ostream<TCHAR> cdebug (&debugstream);

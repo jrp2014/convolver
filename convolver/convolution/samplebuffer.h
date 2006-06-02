@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License

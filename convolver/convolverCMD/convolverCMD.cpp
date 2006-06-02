@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -55,7 +55,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	const DWORD SAMPLES = 1; // how many filter lengths to convolve at a time
 
 	HRESULT hr = S_OK;
-	Holder< ConvertSample<float> > convertor(new ConvertSample_ieeefloat<float>());
+	Holder< ConvertSample<float> > convertor(new ConvertSample_ieeefloat<BaseT>());
 
 	PlanningRigour pr;
 #ifdef FFTW
@@ -118,7 +118,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		// TODO: The following uses the sample rate of the first filter path for .PCM files
 		conv.selectConvolutionIndex(0);  // Select the one and only filter path
 		CWaveFileHandle WavIn(INPUTFILE, SFM_READ, &sf_info, conv.SelectedConvolution().Mixer.nSamplesPerSec());
-		std::cerr << waveFormatDescription(sf_info, "Input file format: ") << std::endl;
+		std::wcerr << waveFormatDescription(sf_info, TEXT("Input file format: ")) << std::endl;
 
 		const DWORD cBufferLength = conv.SelectedConvolution().Mixer.nFilterLength() * SAMPLES;  // frames
 #else
@@ -132,11 +132,11 @@ int _tmain(int argc, _TCHAR* argv[])
 		WAVEFORMATEXTENSIBLE wfexFilterFormat;
 		::ZeroMemory(&wfexFilterFormat, sizeof(wfexFilterFormat));
 		wfexFilterFormat = *(WAVEFORMATEXTENSIBLE*) WavIn->GetFormat();
-		std::cerr << waveFormatDescription(&wfexFilterFormat, WavIn->GetSize() / WavIn->GetFormat()->nBlockAlign, "Input file format: ") << std::endl;
+		std::cerr << waveFormatDescription(&wfexFilterFormat, WavIn->GetSize() / WavIn->GetFormat()->nBlockAlign, TEXT("Input file format: ")) << std::endl;
 
 		WAVEFORMATEX* pWave = WavIn->GetFormat();
 
-		std::cerr << waveFormatDescription(&(conv->FIR.wfexFilterFormat), conv->FIR.nFilterLength, "Filter format: ") << std::endl;
+		std::cerr << waveFormatDescription(&(conv->FIR.wfexFilterFormat), conv->FIR.nFilterLength, TEXT("Filter format: ")) << std::endl;
 
 		if (conv->FIR.wfexFilterFormat.Format.nChannels < WavIn->GetFormat()->nChannels)
 		{

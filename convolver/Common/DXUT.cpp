@@ -50,6 +50,7 @@ struct DXUT_TIMER
     float fTimeoutInSecs;
     float fCountdown;
     bool  bEnabled;
+    UINT  nID;
 };
 
 
@@ -140,6 +141,7 @@ protected:
         bool  m_NotifyOnMouseMove;          // if true, include WM_MOUSEMOVE in mousecallback
         bool  m_Automation;                 // if true, automation is enabled
         bool  m_InSizeMove;                 // if true, app is inside a WM_ENTERSIZEMOVE
+        UINT  m_TimerLastID;               // last ID of the DXUT timer
 
         int   m_OverrideAdapterOrdinal;     // if != -1, then override to use this adapter ordinal
         bool  m_OverrideWindowed;           // if true, then force to start windowed
@@ -304,6 +306,7 @@ public:
     GET_SET_ACCESSOR( bool, NotifyOnMouseMove );
     GET_SET_ACCESSOR( bool, Automation );
     GET_SET_ACCESSOR( bool, InSizeMove );
+    GET_SET_ACCESSOR( UINT, TimerLastID );
 
     GET_SET_ACCESSOR( int, OverrideAdapterOrdinal );
     GET_SET_ACCESSOR( bool, OverrideWindowed );
@@ -529,37 +532,6 @@ HRESULT DXUTInit( bool bParseCommandLine, bool bHandleDefaultHotkeys, bool bShow
     GetDXUTState().SetDXUTInited( true );
 
     return S_OK;
-}
-
-
-//--------------------------------------------------------------------------------------
-// Assign the current thread to one processor. This ensures that timing code runs 
-// on only one processor, and will not suffer any ill effects from power management.
-//--------------------------------------------------------------------------------------
-void DXUTSetProcessorAffinity()
-{
-    HANDLE hCurrentProcess = GetCurrentProcess();
-    
-    // Get the processor affinity mask for this process
-    DWORD_PTR dwProcessAffinityMask = 0;
-    DWORD_PTR dwSystemAffinityMask = 0;
-    
-    if( GetProcessAffinityMask( hCurrentProcess, &dwProcessAffinityMask, &dwSystemAffinityMask ) != 0 && dwProcessAffinityMask )
-    {
-        // Find the lowest processor that our process is allows to run against
-        DWORD_PTR dwAffinityMask = ( dwProcessAffinityMask & ((~dwProcessAffinityMask) + 1 ) );
-
-        // Set this as the processor that our thread must always run against
-        // This must be a subset of the process affinity mask
-        HANDLE hCurrentThread = GetCurrentThread();
-        if( INVALID_HANDLE_VALUE != hCurrentThread )
-        {
-            SetThreadAffinityMask( hCurrentThread, dwAffinityMask );
-            CloseHandle( hCurrentThread );
-        }
-    }
-
-    CloseHandle( hCurrentProcess );
 }
 
 
@@ -4266,6 +4238,9 @@ LRESULT CALLBACK DXUTStaticWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
             {
                 GetDXUTState().SetActive( true );
 
+                // Disable any controller rumble & input when de-activating app
+                DXUTEnableXInput( true );
+
                 // The GetMinimizedWhileFullscreen() varible is used instead of !DXUTIsWindowed()
                 // to handle the rare case toggling to windowed mode while the fullscreen application 
                 // is minimized and thus making the pause count wrong
@@ -4285,8 +4260,8 @@ LRESULT CALLBACK DXUTStaticWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
             {               
                 GetDXUTState().SetActive( false );
 
-                // Disable any controller rumble when de-activating app
-                DXUTStopRumbleOnAllControllers();
+                // Disable any controller rumble & input when de-activating app
+                DXUTEnableXInput( false );
 
                 if( !DXUTIsWindowed() )
                 {
@@ -4617,6 +4592,8 @@ HRESULT DXUTSetTimer( LPDXUTCALLBACKTIMER pCallbackTimer, float fTimeoutInSecs, 
     DXUTTimer.fTimeoutInSecs = fTimeoutInSecs;
     DXUTTimer.fCountdown = fTimeoutInSecs;
     DXUTTimer.bEnabled = true;
+    DXUTTimer.nID = GetDXUTState().GetTimerLastID() + 1;
+    GetDXUTState().SetTimerLastID( DXUTTimer.nID );
 
     CGrowableArray<DXUT_TIMER>* pTimerList = GetDXUTState().GetTimerList();
     if( pTimerList == NULL )
@@ -4631,7 +4608,7 @@ HRESULT DXUTSetTimer( LPDXUTCALLBACKTIMER pCallbackTimer, float fTimeoutInSecs, 
         return hr;
 
     if( pnIDEvent )
-        *pnIDEvent = pTimerList->GetSize();
+        *pnIDEvent = DXUTTimer.nID;
 
     return S_OK; 
 }
@@ -4646,16 +4623,22 @@ HRESULT DXUTKillTimer( UINT nIDEvent )
     if( pTimerList == NULL )
         return S_FALSE;
 
-    if( nIDEvent < (UINT)pTimerList->GetSize() )
+    bool bFound = false;
+
+    for( int i=0; i<pTimerList->GetSize(); i++ )
     {
-        DXUT_TIMER DXUTTimer = pTimerList->GetAt(nIDEvent);
-        DXUTTimer.bEnabled = false;
-        pTimerList->SetAt(nIDEvent, DXUTTimer);
+        DXUT_TIMER DXUTTimer = pTimerList->GetAt(i);
+        if( DXUTTimer.nID == nIDEvent )
+        {
+            DXUTTimer.bEnabled = false;
+            pTimerList->SetAt(i, DXUTTimer);
+            bFound = true;
+            break;
+        }
     }
-    else
-    {
+
+    if( !bFound ) 
         return DXUT_ERR_MSGBOX( L"DXUTKillTimer", E_INVALIDARG );
-    }
 
     return S_OK; 
 }

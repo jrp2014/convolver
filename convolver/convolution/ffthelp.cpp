@@ -26,6 +26,7 @@ const unsigned int PlanningRigour::Flag[PlanningRigour::nDegrees] =
 #endif
 };
 
+#ifdef FFTW
 // 2^a * 2^b * 3^c * 5^d * 11^e * 13^f (e+f=0 or 1)
 const DWORD OptimalDFT::OptimalDFTSize[]  =
 {
@@ -289,8 +290,7 @@ const DWORD OptimalDFT::OptimalDFTSize[]  =
 		972000, 972405, 975000, 978432, 979776, 980000, 982800, 983040, 984150, 984375, 
 		985600, 987840, 990000, 992250, 995085, 995328, 997920, 998400, 998816, 1000000
 };
-
-
+#endif
 
 DWORD OptimalDFT::GetOptimalDFTSize( DWORD size0 )
 {
@@ -323,6 +323,9 @@ DWORD OptimalDFT::GetOptimalDFTSize( DWORD size0 )
 #endif
 }
 
-
+#ifdef FFTW
 char Wisdom::szWisdomFileName[MAX_PATH] = "wisdom.fftw";
 TCHAR Wisdom::szCurrentDir[MAX_PATH] = {0};
+
+Wisdom w;
+#endif

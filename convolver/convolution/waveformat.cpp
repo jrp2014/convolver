@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -37,181 +37,181 @@
 
 #ifdef LIBSNDFILE
 
-const std::string channelDescription(const SF_INFO& sfinfo)
+const std::basic_string<TCHAR> channelDescription(const SF_INFO& sfinfo)
 {
 	switch(sfinfo.channels)
 	{
 	case 1:
-		return "Mono";
+		return TEXT("Mono");
 	case 2:
-		return "Stereo";
+		return TEXT("Stereo");
 	default:
 		{
-			std::ostringstream s;
-			s << sfinfo.channels << "-channel";
+			std::basic_ostringstream<TCHAR> s;
+			s << sfinfo.channels << TEXT("-channel");
 			return s.str();
 		}
 	}
 }
 
-const std::string formatDescription(const SF_INFO& sfinfo)
+const std::basic_string<TCHAR> formatDescription(const SF_INFO& sfinfo)
 {
 	SF_FORMAT_INFO	format_info;
 	format_info.format = sfinfo.format;
 	sf_command (NULL, SFC_GET_FORMAT_INFO, &format_info, sizeof (format_info)) ;
 	//printf ("%08x  %s %s\n", format_info.format, format_info.name, format_info.extension) ;
-	std::ostringstream s;
+	std::basic_ostringstream<TCHAR> s;
 	s <<  format_info.name 
 #if defined(DEBUG) | defined(_DEBUG)
-	<< " [" << format_info.extension << "]"
+	<< TEXT(" [") << format_info.extension << TEXT("]")
 #endif
 	;
 	return s.str();
 }
 
-std::string waveFormatDescription(const SF_INFO& sfinfo, const char* prefix)
+const std::basic_string<TCHAR> waveFormatDescription(const SF_INFO& sfinfo, const TCHAR* prefix)
 {
-	std::ostringstream s;
-	s << prefix << channelDescription(sfinfo) << " " 
-		<< formatDescription(sfinfo) << " "
-		<< sfinfo.samplerate/1000.0f << "kHz "
+	std::basic_ostringstream<TCHAR> s;
+	s << prefix << channelDescription(sfinfo) << TEXT(" ") 
+		<< formatDescription(sfinfo) << TEXT(" ")
+		<< sfinfo.samplerate/1000.0f << TEXT("kHz ")
 #if defined(DEBUG) | defined(_DEBUG)
-		<< sfinfo.sections << " sections "
+		<< sfinfo.sections << TEXT(" sections ")
 #endif
-		<< sfinfo.frames << " frames";
+		<< sfinfo.frames << TEXT(" frames");
 	return s.str();
 }
 
 #endif
 
-const std::string channelDescription(const WAVEFORMATEXTENSIBLE* w)
+const std::basic_string<TCHAR> channelDescription(const WAVEFORMATEXTENSIBLE* w)
 {
 	return channelDescription(w->Format.wFormatTag, w->dwChannelMask,  w->Format.nChannels);
 }
 
-const std::string channelDescription(const WORD wFormatTag, const DWORD& dwChannelMask, const WORD& nChannels)
+const std::basic_string<TCHAR> channelDescription(const WORD wFormatTag, const DWORD& dwChannelMask, const WORD& nChannels)
 {
 	if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
 	{
 		// Need to check number of channels as the likes of Audition sets the channel mask to 7.1 for 5.1 wav files, eg
 		// Also, order dependent
 		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1_SURROUND) && nChannels == 8)
-			return "7.1 surround";
+			return TEXT("7.1 surround");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_7POINT1) && nChannels == 8)
-			return "7.1";
+			return TEXT("7.1");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_5POINT1) && nChannels == 6)
-			return "5.1";
+			return TEXT("5.1");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_QUAD) && nChannels == 4)
-			return "Quad";
+			return TEXT("Quad");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_SURROUND) && nChannels == 4)
-			return "Surround";
+			return TEXT("Surround");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_STEREO) && nChannels == 2)
-			return "Stereo";
+			return TEXT("Stereo");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_SUPER_WOOFER) && nChannels == 1)
-			return "Sub";
+			return TEXT("Sub");
 		if ((dwChannelMask & KSAUDIO_SPEAKER_MONO) && nChannels == 1)
-			return "Mono";
+			return TEXT("Mono");
 
-		std::ostringstream s;
+		std::basic_ostringstream<TCHAR> s;
 
 		if (nChannels == 1)
 		{
-			s << "Mono";
+			s <<TEXT("Mono");
 		}
 		else if (nChannels == 2)
 		{
-			s << "Stereo";
+			s <<TEXT("Stereo");
 		}
 		else
-			s << nChannels << "-channel";
+			s << nChannels <<TEXT("-channel");
 
 		if(dwChannelMask == 0)
 		{
-			s << " direct";
+			s <<TEXT(" direct");
 		}
 		else
 		{
-			s << " (";
+			s <<TEXT(" (");
 			if (dwChannelMask & SPEAKER_ALL)
-				s << "any speakers";
+				s <<TEXT("any speakers");
 
 			if( dwChannelMask & SPEAKER_FRONT_LEFT)
-				s << "Front Left,";
+				s <<TEXT("Front Left,");
 			if( dwChannelMask & SPEAKER_FRONT_RIGHT)
-				s <<  "Front Right,";
+				s << TEXT("Front Right,");
 			if( dwChannelMask & SPEAKER_FRONT_CENTER)
-				s <<  "Front Centre,";
+				s << TEXT("Front Centre,");
 			if( dwChannelMask & SPEAKER_LOW_FREQUENCY)
-				s <<  "Low Frequency,";
+				s << TEXT("Low Frequency,");
 			if( dwChannelMask & SPEAKER_BACK_LEFT)
-				s <<  "Back Left,";
+				s << TEXT("Back Left,");
 			if( dwChannelMask & SPEAKER_BACK_RIGHT)
-				s <<  "Back Right,";
+				s << TEXT("Back Right,");
 			if( dwChannelMask & SPEAKER_FRONT_LEFT_OF_CENTER)
-				s <<  "Front Left of Centre,";
+				s << TEXT("Front Left of Centre,");
 			if( dwChannelMask & SPEAKER_FRONT_RIGHT_OF_CENTER)
-				s <<  "Front Right of Centre,";
+				s << TEXT("Front Right of Centre,");
 			if( dwChannelMask & SPEAKER_BACK_CENTER)
-				s <<  "Back Centre,";
+				s << TEXT("Back Centre,");
 			if( dwChannelMask & SPEAKER_SIDE_LEFT)
-				s <<  "Side Left,";
+				s << TEXT("Side Left,");
 			if( dwChannelMask & SPEAKER_SIDE_RIGHT)
-				s <<  "Side Right,";
+				s << TEXT("Side Right,");
 			if( dwChannelMask & SPEAKER_TOP_CENTER)
-				s <<  "Top Centre,";
+				s << TEXT("Top Centre,");
 			if( dwChannelMask & SPEAKER_TOP_FRONT_LEFT)
-				s <<  "Top Front Left,";
+				s << TEXT("Top Front Left,");
 			if( dwChannelMask & SPEAKER_TOP_FRONT_CENTER)
-				s <<  "Top Front Centre,";
+				s << TEXT("Top Front Centre,");
 			if( dwChannelMask & SPEAKER_TOP_FRONT_RIGHT)
-				s <<  "Top Front Right,";
+				s << TEXT("Top Front Right,");
 			if( dwChannelMask & SPEAKER_TOP_BACK_LEFT)
-				s <<  "Top Back Left,";
+				s << TEXT("Top Back Left,");
 			if( dwChannelMask & SPEAKER_TOP_BACK_CENTER)
-				s <<  "Top Back Centre,";
+				s << TEXT("Top Back Centre,");
 			if( dwChannelMask & SPEAKER_TOP_BACK_RIGHT)
-				s <<  "Top Back Right,";
+				s << TEXT("Top Back Right,");
 
 			long pos = s.tellp();
 			s.seekp(pos - 1); // remove trailing ,
-			s << " )";
+			s <<TEXT(" )");
 		}
 
 		return s.str();
 	}
 	else
 	{
-		std::ostringstream s;
-		s << nChannels << "-channel";
+		std::basic_ostringstream<TCHAR> s;
+		s << nChannels << TEXT("-channel");
 		return s.str();
 	}
 }
 
-const std::string formatDescription(const WAVEFORMATEXTENSIBLE* w)
+const std::basic_string<TCHAR> formatDescription(const WAVEFORMATEXTENSIBLE* w)
 {
 	switch (w->Format.wFormatTag)
 	{
 	case WAVE_FORMAT_PCM:
-		return "PCM";
+		return TEXT("PCM");
 
 	case WAVE_FORMAT_IEEE_FLOAT:
-		return "IEEE Float";
+		return TEXT("IEEE Float");
 
 	case WAVE_FORMAT_EXTENSIBLE:
 		{
 			if (w->SubFormat == KSDATAFORMAT_SUBTYPE_PCM)
-				return "PCM";
+				return TEXT("PCM");
 			else
 				if (w->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
-					return "IEEE Float";
+					return TEXT("IEEE Float");
 				else
-					return "Unsupported extensible format";
+					return TEXT("Unsupported extensible format");
 		}
 
 	default:
 		{
-			std::ostringstream s;
-			s << "Unsupported format: " << w->Format.wFormatTag;
+			std::basic_ostringstream<TCHAR> s;
+			s << TEXT("Unsupported format: ") << w->Format.wFormatTag;
 			return s.str(); 
 		}
 	}
@@ -226,16 +226,21 @@ WORD BitsPerSample(const WAVEFORMATEXTENSIBLE* w)
 }
 
 
-std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix)
+const std::basic_string<TCHAR> waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const TCHAR* prefix)
 {
-	std::ostringstream s;
+	std::basic_ostringstream<TCHAR> s;
 	if(w == NULL)
 	{
-		s << prefix << "Null Wave Format";
+		s << prefix << TEXT("Not set");
 	}
 	else
 	{
-		s << prefix << BitsPerSample(w) << "-bit " << w->Format.nSamplesPerSec/1000.0f << "kHz " << channelDescription(w) << " " << formatDescription(w) << ", " << samples << " samples";
+		s << prefix << BitsPerSample(w) << TEXT("-bit ") <<
+			w->Format.nSamplesPerSec/1000.0f << TEXT("kHz ") << 
+			channelDescription(w) << TEXT(" ") << 
+			formatDescription(w);
+		if(samples > 0)
+			s << TEXT(" ") << samples << TEXT(" samples");
 	}
 	return s.str();
 }

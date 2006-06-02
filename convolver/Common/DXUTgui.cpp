@@ -5645,7 +5645,9 @@ void CDXUTEditBox::Render( IDirect3DDevice9* pd3dDevice, float fElapsedTime )
         SetRect( &rcSelection, nSelLeftX, m_rcText.top, nSelRightX, m_rcText.bottom );
         OffsetRect( &rcSelection, m_rcText.left - nXFirst, 0 );
         IntersectRect( &rcSelection, &m_rcText, &rcSelection );
+        pd3dDevice->SetRenderState( D3DRS_ZENABLE, FALSE );
         m_pDialog->DrawRect( &rcSelection, m_SelBkColor );
+        pd3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
     }
 
     //

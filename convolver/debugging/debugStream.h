@@ -238,8 +238,8 @@ private:
 // using cdebug, ex:
 //     debugstream.sink (apDebugSinkConsole::sOnly);
 
-extern apDebugStringBuf<char> debugstream;
-extern std::ostream cdebug;
+extern apDebugStringBuf<TCHAR> debugstream;
+extern std::basic_ostream<TCHAR> cdebug;
 
 
 #endif // _debugstream_h_

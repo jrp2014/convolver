@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -47,7 +47,7 @@ m_bValidTime(false),
 m_rtTimestamp(0),
 m_bEnabled(TRUE),
 m_nPartitions(0), // default, just overlap-save
-m_nPlanningRigour(0),
+m_nPlanningRigour(PlanningRigour::Measure),
 m_nDither(Ditherer<BaseT>::None),
 m_nNoiseShaping(NoiseShaper<BaseT>::None),
 m_ConvolutionList(NULL),
@@ -168,9 +168,9 @@ HRESULT CConvolver::FinalConstruct()
 		{
 			m_nPlanningRigour = dwValue;
 			// limit planning rigour to avoid long startup times.
-			if (m_nPlanningRigour > 1)
+			if (m_nPlanningRigour > PlanningRigour::Measure)
 			{
-				m_nPlanningRigour = 1;
+				m_nPlanningRigour = PlanningRigour::Measure;
 			}
 		}
 
@@ -192,13 +192,18 @@ HRESULT CConvolver::FinalConstruct()
 		{
 			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
 				m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour)); // 0 partitions = overlap-save
-
 		}
 		catch (...) 
 		{
+			return ShowFilterPropertyPage();
 			//throw(std::runtime_error("Failed to initialize Convolver with current config file"));
-			return S_FALSE;  // Don't return a real error as it will prevent the property page from showing
+			//return S_FALSE;  // Don't return a real error as it will prevent the property page from showing
 		}
+	}
+	else
+	{
+		// First time through -- no registry setting saved
+		return ShowFilterPropertyPage();
 	}
 
 	return S_OK;
@@ -355,29 +360,28 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	cdebug << "dwTypeIndex:" << dwTypeIndex << " dwPathIndex:" << dwPathIndex << " dwFormatSpecIndex:" << dwFormatSpecIndex << std::endl;
 #endif
 
+
+	// pmt is a pointer to a DMO_MEDIA_TYPE structure allocated by the caller, or NULL.
+	// If this parameter is non-NULL, this method fills the structure with the media type.
+	// The value NULL is used to test whether the type index is in range, by checking the return code.
+
+
 	if ( NULL == pmt ) 
 	{
-		hr = ::MoCreateMediaType(&pmt,
-			m_FormatSpecs[dwFormatSpecIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
-		if(FAILED(hr))
-		{
-			return hr;
-		}
+		return S_OK;
 	}
-	else
-	{
-		hr = ::MoFreeMediaType(pmt);
-		if(FAILED(hr))
-		{
-			return hr;
-		}
 
-		hr = ::MoInitMediaType(pmt, 
-			m_FormatSpecs[dwFormatSpecIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
-		if(FAILED(hr))
-		{
-			return hr;
-		}
+	hr = ::MoFreeMediaType(pmt);
+	if(FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = ::MoInitMediaType(pmt, 
+		m_FormatSpecs[dwFormatSpecIndex].wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof(WAVEFORMATEXTENSIBLE) : sizeof(WAVEFORMATEX));
+	if(FAILED(hr))
+	{
+		return hr;
 	}
 
 	pmt->majortype = MEDIATYPE_Audio;
@@ -391,7 +395,7 @@ STDMETHODIMP CConvolver::GetMediaType (DWORD dwStreamIndex,
 	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) pmt->pbFormat;
 	if(NULL == pWave)
 	{
-		return E_OUTOFMEMORY;
+		return E_POINTER;
 	}
 
 	pWave->cbSize = 0; // Size, in bytes, of extra format information appended to the end of the WAVEFORMATEX structure
@@ -818,7 +822,7 @@ STDMETHODIMP CConvolver::GetInputSizeInfo(
 	}
 
 	// Get the pointer to the input format structure.
-	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+	//WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
 
 	// Return the input buffer alignment, in bytes.
 	*pcbAlignment = 1; // 1 = no alignment requirements
@@ -871,7 +875,7 @@ STDMETHODIMP CConvolver::GetOutputSizeInfo(
 	*pcbSize = m_mtOutput.lSampleSize;
 
 	// Get the pointer to the output format structure.
-	WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+	//WAVEFORMATEX *pWave = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
 
 	// Return the output buffer aligment, in bytes.
 	*pcbAlignment = 1; // No alignement requirements
@@ -939,8 +943,12 @@ STDMETHODIMP CConvolver::SetInputMaxLatency(
 	DEBUGGING(3, cdebug << "SetInputMaxLatency" << std::endl;);
 #endif
 
+	if ( 0 != dwInputStreamIndex )
+	{
+		return DMO_E_INVALIDSTREAMINDEX;
+	}
 	// TODO: work out how to use this, when partitioned convoltion implemented
-	return E_NOTIMPL; // Not dealing with latency in this plug-in.
+	ATLTRACENOTIMPL( TEXT("CConvolver::SetInputMaxLatency") );  // Not dealing with latency in this plug-in.
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1195,6 +1203,8 @@ STDMETHODIMP CConvolver::ProcessInput(DWORD dwInputStreamIndex,
 		m_bValidTime = false;
 	}
 
+	// Use empty input buffer as flush signal
+	// TODO: process a further half partition length's worth of samples before actually flushing
 	if(cbInputLength == 0)
 	{
 		hr = Flush();
@@ -1247,13 +1257,9 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	}
 
 	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-	if(m_ConvolutionList.get_ptr() == NULL)
+	if(m_ConvolutionList.get_ptr() == NULL || !m_ConvolutionList->ConvolutionSelected())
 	{
-		return DMO_E_TYPE_NOT_SET;
-	}
-
-	if(!m_ConvolutionList->ConvolutionSelected())
-	{
+		NoValidFilterSelected();
 		return DMO_E_TYPE_NOT_SET;
 	}
 
@@ -1308,22 +1314,25 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	// Calculate how many bytes we can process. Tricky, because the number of input and output channels,
 	// and the input and output block sizes may not be the equal
 
-	// Calculate the number of input bytes that are required to generate cbOutputMaxLength bytes,
-	// assuming that only whole blocks/frames can be processed
-	cbBytesToProcess =  m_ConvolutionList->SelectedConvolution().cbInputBuffer(cbOutputMaxLength, 
-		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
-
-	if (cbBytesToProcess >= m_cbInputLength)
 	{
-		cbBytesToProcess = m_cbInputLength;
-		bComplete = true;                   // the entire input buffer will be processed. 
-	}
+		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
+		// Calculate the number of input bytes that are required to generate cbOutputMaxLength bytes,
+		// assuming that only whole blocks/frames can be processed
+		cbBytesToProcess =  m_ConvolutionList->SelectedConvolution().cbInputBuffer(cbOutputMaxLength, 
+			m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
 
-	// Call the internal processing method, which returns the no. bytes processed
-	hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesToProcess, &cbBytesGenerated);
-	if (FAILED(hr))
-	{
-		return hr;
+		if (cbBytesToProcess >= m_cbInputLength)
+		{
+			cbBytesToProcess = m_cbInputLength;
+			bComplete = true;                   // the entire input buffer will be processed. 
+		}
+
+		// Call the internal processing method, which returns the no. bytes processed
+		hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesToProcess, &cbBytesGenerated);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
 	}
 
 	assert(cbBytesGenerated <= cbOutputMaxLength);
@@ -1345,6 +1354,7 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 		pOutputBuffers[0].rtTimestamp = m_rtTimestamp;
 
 		const WAVEFORMATEX * const pWave = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
+		assert(pWave != NULL);
 
 		// estimate time length of output buffer
 		pOutputBuffers[0].dwStatus |= DMO_OUTPUT_DATA_BUFFERF_TIMELENGTH;
@@ -1737,14 +1747,14 @@ STDMETHODIMP CConvolver::put_noiseshaping(unsigned int newVal)
 
 
 // Property to get a filter description 
-STDMETHODIMP CConvolver::get_filter_description(std::string* description)
+STDMETHODIMP CConvolver::get_filter_description(std::basic_string<TCHAR>* description)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_filter_description" << std::endl;);
 #endif
 
 	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-	*description = m_ConvolutionList.get_ptr() == NULL ? "No valid filter loaded" : m_ConvolutionList->DisplayConvolutionList();
+	*description = m_ConvolutionList.get_ptr() == NULL ? TEXT("No valid filter loaded") : m_ConvolutionList->DisplayConvolutionList();
 	return S_OK;
 }
 
@@ -1810,9 +1820,11 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 
 	// Get the pointer to the input format structure.
 	const WAVEFORMATEX* const pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
+	assert(pWaveIn != NULL);
 
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbInputBytesToProcess / pWaveIn->nBlockAlign);
+	assert(m_ConvolutionList->ConvolutionSelected());
 	assert(pWaveIn->nBlockAlign == m_ConvolutionList->SelectedConvolution().Mixer.nInputChannels() * m_InputSampleConvertor->nContainerSize());
 
 	// Convolve the pbInputData to produce pbOutputData
@@ -1857,7 +1869,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_
 		}
 		else
 		{
-			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtInput->pbFormat, 0, "Input:") << std::endl;
+			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtInput->pbFormat, 0, TEXT("Input:")) << std::endl;
 		}
 	}
 	else
@@ -1874,7 +1886,7 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_
 		}
 		else
 		{
-			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtOutput->pbFormat, 0, "Output:") << std::endl;
+			cdebug << waveFormatDescription((WAVEFORMATEXTENSIBLE *)pmtOutput->pbFormat, 0, TEXT("Output:")) << std::endl;
 		}
 	}
 	else
@@ -1947,9 +1959,64 @@ HRESULT CConvolver::ValidateMediaType(const DMO_MEDIA_TYPE *pmtInput, const DMO_
 	return hr;
 }
 
+HRESULT CConvolver::ShowFilterPropertyPage()
+{
+	CAUUID caGUID;
+	HRESULT hr = GetPages(&caGUID);
+	if (FAILED(hr))
+		return hr;
+
+	IUnknown * pFilterUnk;
+	hr = QueryInterface(IID_IUnknown, (void **)&pFilterUnk);
+	if(FAILED(hr))
+		return hr;
+
+	// Display the filter's property page
+	hr = OleCreatePropertyFrame(
+		NULL,					// Parent window
+		0,                      // x (Reserved)
+		0,                      // y (Reserved)
+		OLESTR("ConvolverWMP"), // Caption for the dialog box
+		1,                      // Number of filters
+		(IUnknown **)&pFilterUnk,// Pointer to the filter 
+		caGUID.cElems,          // Number of property pages
+		caGUID.pElems,          // Pointer to property page CLSIDs
+		0,                   // Locale identifier
+		0,                      // Reserved
+		NULL                    // Reserved
+		);
+
+	CoTaskMemFree(caGUID.pElems);
+
+	return hr;
+}
+
+HRESULT CConvolver::NoValidFilterSelected()
+{
+	std::basic_ostringstream<TCHAR> diagnostic;
+
+	diagnostic << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_mtInput.pbFormat), 0, TEXT("Input: ")) << std::endl;
+	diagnostic << waveFormatDescription(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_mtOutput.pbFormat), 0, TEXT("Output: ")) << std::endl << std::endl;
+
+	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
+
+	if( m_ConvolutionList.get_ptr() == NULL)
+	{
+		diagnostic << "No valid filter loaded.";
+	}
+	else
+	{
+		diagnostic << TEXT("Loaded filter: ") << std::endl <<  m_ConvolutionList->DisplayConvolutionList();
+	}
+
+	MessageBox(NULL, diagnostic.str().c_str(), TEXT("Filter invalid for current input/output"), 0);
+
+	return S_OK;
+}
+
+
 #ifdef IPROPERTYBAG
 // Helper
-
 IStream* StreamFromResource(int id)
 {
 #if defined(DEBUG) | defined(_DEBUG)
@@ -1964,7 +2031,7 @@ IStream* StreamFromResource(int id)
 	IStream* pstm = NULL;
 
 	hModule = GetModuleHandle(TEXT("convolverWMP.dll"));			
-	hrsrc = FindResource(hModule, MAKEINTRESOURCE(id), TEXT("BITMAPWITHHEADER")); // TODO: does not work
+	hrsrc = FindResource(hModule, MAKEINTRESOURCE(id), TEXT("BITMAPWITHHEADER"));
 	len = SizeofResource(hModule, hrsrc);
 	hres = LoadResource(hModule, hrsrc);
 	pres = LockResource(hres);
@@ -2027,6 +2094,6 @@ STDMETHODIMP CConvolver::Read(LPCOLESTR pszPropName,VARIANT *pVar, IErrorLog *pE
 		else
 			return E_FAIL;
 	}
-	return E_NOTIMPL;
+	ATLTRACENOTIMPL(TEXT("CConvolver::Read"));
 }
 #endif

@@ -1,7 +1,7 @@
-// Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
+// ConvolverFilter: DirectShow filter that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -53,40 +53,41 @@ public:
 	HRESULT CconvolverFilter::BeginFlush(void);
 
     // These implement the custom IconvolverFilter interface
-	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
-	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
+	STDMETHODIMP get_filterfilename(TCHAR *pVal[]);
+	STDMETHODIMP put_filterfilename(TCHAR newVal[]);
 
-	STDMETHOD(get_attenuation)(float *pVal);
-	STDMETHOD(put_attenuation)(float newVal);
+	STDMETHODIMP get_attenuation(float *pVal);
+	STDMETHODIMP put_attenuation(float newVal);
 
-	STDMETHOD(get_partitions)(DWORD *pVal);
-	STDMETHOD(put_partitions)(DWORD newVal);
+	STDMETHODIMP get_partitions(DWORD *pVal);
+	STDMETHODIMP put_partitions(DWORD newVal);
 
-	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
-	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+	STDMETHODIMP get_planning_rigour(unsigned int *pVal);
+	STDMETHODIMP put_planning_rigour(unsigned int newVal);
 
-	STDMETHOD(get_dither)(unsigned int *pVal);
-	STDMETHOD(put_dither)(unsigned int newVal);
+	STDMETHODIMP get_dither(unsigned int *pVal);
+	STDMETHODIMP put_dither(unsigned int newVal);
 
-	STDMETHOD(get_noiseshaping)(unsigned int *pVal);
-	STDMETHOD(put_noiseshaping)(unsigned int newVal);
+	STDMETHODIMP get_noiseshaping(unsigned int *pVal);
+	STDMETHODIMP put_noiseshaping(unsigned int newVal);
 
-	STDMETHOD(get_filter_description)(std::string* description);
-	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
+	STDMETHODIMP get_filter_description(std::basic_string<TCHAR>* description);
+	STDMETHODIMP calculateOptimumAttenuation(float & fAttenuation);
 
 	// The following pair is needed because DWORD is unsigned
-	float decode_Attenuationdb(const DWORD dwValue)
+	STDMETHODIMP_(float) decode_Attenuationdb(const DWORD dwValue)
 	{
 		assert(dwValue <= (MAX_ATTENUATION_DB + MAX_ATTENUATION_DB) * 100);
 		return static_cast<float>(dwValue) / 100.0f - MAX_ATTENUATION_DB;
 	}
-	DWORD encode_Attenuationdb(const float fValue)
+	STDMETHODIMP_(DWORD) encode_Attenuationdb(const float fValue)
 	{	assert (abs(fValue) <= MAX_ATTENUATION_DB);
 		return static_cast<DWORD>((fValue + MAX_ATTENUATION_DB) * 100.0f);
 	}
 
     // ISpecifyPropertyPages interface
     STDMETHODIMP GetPages(CAUUID *pPages);
+
 
 private:
 
@@ -100,14 +101,15 @@ private:
 
 	HRESULT Copy(IMediaSample *pSource, IMediaSample *pDest) const;
 
+	// Helper method
+	HRESULT ShowFilterPropertyPage();
+	HRESULT NoValidFilterSelected();
+
 
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	unsigned int			m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
-#ifdef FFTW
-	Wisdom w;					// Loads and saves FFTW wisdom
-#endif
 
 	typedef float			BaseT;
 	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;

@@ -1,7 +1,6 @@
 // perftest.cpp	: Defines the entry	point for the console application.
 //
 
-#include "stdafx.h"
 #include "convolution\config.h"
 
 #ifdef LIBSNDFILE
@@ -32,7 +31,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
 	// 3 = function call trace
-	apDebug::gOnly().set(3);
+	apDebug::gOnly().set(4);
 
 	debugstream.sink (apDebugSinkConsole::sOnly);
 
@@ -52,9 +51,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 	double fElapsedCalc = 0;
 	double fTotalElapsedCalc = 0;
 	apHiResElapsedTime t;
-#ifdef FFTW
-	Wisdom w;									// Loads and saves FFTW wisdom
-#endif
+
 	//CWaveFileHandle	FilterWav;
 
 	if (argc !=	5)
@@ -113,7 +110,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		//#endif
 
 		ConvolutionList<float> conv(argv[4], 1, nPlanningRigour);
-		std::cerr << conv.DisplayConvolutionList() << std::endl;
+		std::wcerr << conv.DisplayConvolutionList() << std::endl;
 
 		float fAttenuation	= 0;
 
@@ -121,7 +118,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		{
 
 			conv.selectConvolutionIndex(i);
-			std::cerr << std::endl << conv.SelectedConvolution().Mixer.DisplayChannelPaths();
+			std::wcerr << std::endl << conv.SelectedConvolution().Mixer.DisplayChannelPaths();
 
 #ifdef LIBSNDFILE
 			std::cout << std::endl << "Partitions\tRate\tSecCalc\tSecLoad\tAttenuation\tFilter Length\tPartition Length\tIteration" << std::endl;

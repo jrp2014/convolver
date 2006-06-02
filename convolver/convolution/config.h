@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,6 +18,15 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+// Base type for convolution (float/double)
+typedef float			BaseT;
+
+// Number of filter lengths used to calculate optimum attenuation
+// The bigger the number the more accurate the calculation, but the
+// longer it takes
+const unsigned int NSAMPLES = 10;
+
+
 
 // If app hasn't choosen, set to work with Windows 98, Windows Me, Windows 2000, Windows XP and beyond
 #ifndef WINVER
@@ -30,9 +39,9 @@
 #define _WIN32_WINNT   0x0500 
 #endif
 
-
 #define STRSAFE_NO_DEPRECATE	1
 #define _CRT_SECURE_NO_DEPRECATE	1
+#define _SECURE_SCL_DEPRECATE		0
 
 // For STLport
 #define _STLP_NO_ANACHRONISMS 1
@@ -42,6 +51,9 @@
 //#define _STLP_USE_BOOST_SUPPORT 1
 
 #if defined(DEBUG) || defined(_DEBUG)
+
+#define _ATL_DEBUG_QI
+#define _ATL_DEBUG_INTERFACES
 
 // For VC++ 2005
 #define _HAS_ITERATOR_DEBUGGING 1
@@ -55,14 +67,13 @@
 #endif
 
 
-#define _CRT_SECURE_NO_DEPRECATE	1
-#define _SECURE_SCL_DEPRECATE		0
-
 // CRT's memory leak detection
 // use command line to define the following
-//#define CRTDBG_MAP_ALLOC
-#include <crtdbg.h>
+//#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
+
+#include <atlbase.h>
+#include <atlcom.h>
 
 #include <assert.h>
 #include <wchar.h>
@@ -71,8 +82,7 @@
 #include <mmsystem.h>
 #include <limits.h>      
 #include <stdio.h>
-#include <atlbase.h>
-#include <atlcom.h>
+
 #include "convolution\exception.h"
 
 //#include <dshow.h>
@@ -88,20 +98,14 @@
 //#include <ks.h>
 //#include <ksmedia.h>
 
+
+const DWORD MAX_ATTENUATION_DB = 1000; // dB
 const DWORD MAXSTRING = 1024;	// length
+
 
 // Debugging
 
 #if defined(DEBUG) || defined(_DEBUG)
-
-// For VC++ 2005
-//#define _HAS_ITERATOR_DEBUGGING 1
-#define _SECURE_SCL 1
-
-// For STLport std::
-//#define _STLP_DEBUG 1
-//#define _STLP_DEBUG_UNINITIALIZED 1
-//#define _STLP_DEBUG_ALLOC 1
 
 #undef DIRAC_DELTA_FUNCTIONS
 
@@ -114,8 +118,7 @@ const DWORD MAXSTRING = 1024;	// length
 #define restrict
 #endif
 
-// Base type for convolution (float/double)
-typedef float			BaseT;
+
 
 // FFT routines
 //#define OOURA	1
@@ -141,10 +144,8 @@ typedef float			BaseT;
 // Use LibSndFile, rather than the DirectX samples
 #define LIBSNDFILE 1
 
+#if defined(DEBUG) || defined(_DEBUG)
+#include <crtdbg.h>
+#endif
 
-const DWORD MAX_ATTENUATION_DB = 1000; // dB
 
-// Number of filter lengths used to calculate optimum attenuation
-// The bigger the number the more accurate the calculation, but the
-// longer it takes
-const int NSAMPLES = 10;

@@ -2,7 +2,7 @@
 // See http://softwareforums.intel.com/ids/board/message?board.id=16&message.id=2983
 // requires C99
 //
-// This may be a inelegant, but it beats having to learn assembler
+// This may be inelegant, but it beats having to learn assembler
 
 #ifndef __RESTRICT
 #define restrict
@@ -10,7 +10,7 @@
 
 #if (defined(__ICC) || defined(__ICL) || defined(__ECC) || defined(__ECL))
 
-#include<complex.h>
+#include <complex.h>
 
 typedef float _Complex c32;
 

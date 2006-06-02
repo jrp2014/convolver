@@ -21,7 +21,6 @@ CDXUTMesh::CDXUTMesh( LPCWSTR strName )
 {
     StringCchCopy( m_strName, 512, strName );
     m_pMesh              = NULL;
-    m_dwNumMaterials     = 0L;
     m_pMaterials         = NULL;
     m_pTextures          = NULL;
     m_bUseMaterials      = TRUE;
@@ -29,6 +28,10 @@ CDXUTMesh::CDXUTMesh( LPCWSTR strName )
     m_pIB                = NULL;
     m_pDecl              = NULL;
     m_strMaterials       = NULL;
+    m_dwNumMaterials     = 0;
+    m_dwNumVertices      = 0;
+    m_dwNumFaces         = 0;
+    m_dwBytesPerVertex   = 0;
 }
 
 
@@ -835,7 +838,7 @@ HRESULT CDXUTMeshFile::LoadFrame( LPDIRECT3DDEVICE9 pd3dDevice,
         if( FAILED( hr = pFileData->GetName( strAnsiName, &dwNameLength ) ) )
             return hr;
 
-        WideCharToMultiByte( CP_ACP, 0, strName, -1, strAnsiName, 512, NULL, NULL );
+        MultiByteToWideChar( CP_ACP, 0, strAnsiName, -1, strName, 512 );
         strName[511] = 0;
 
         // Create the frame

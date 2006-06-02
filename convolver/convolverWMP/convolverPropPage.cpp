@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -96,14 +96,14 @@ STDMETHODIMP CConvolverPropPage::DisplayFilterFormat(TCHAR* szFilterFileName)
 	{
 		try
 		{
-			std::string description = "";
+			std::basic_string<TCHAR> description = TEXT("");
 			hr = m_spConvolver->get_filter_description(&description);
 			if (FAILED(hr))
 			{
 				SetDlgItemText( IDC_STATUS, TEXT("Get valid config file or filter sound file."));
 				return hr;
 			}
-			SetDlgItemText( IDC_STATUS, CA2CT(description.c_str()));
+			SetDlgItemText( IDC_STATUS, description.c_str());
 		}
 		catch (std::exception& error)
 		{
@@ -146,13 +146,13 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 																				// Get the attenuation value from the dialog box.
 	unsigned int nPlanningRigour =
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;;
 #endif
 
-	unsigned int nDither = 0;
-	unsigned int nNoiseShaping = 0;
+	unsigned int nDither = Ditherer<BaseT>::None;
+	unsigned int nNoiseShaping = NoiseShaper<BaseT>::None;
 
 	try
 	{
@@ -378,21 +378,21 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 
 LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
 {
-	float fAttenuation_db		 = 0.0;									// Default attenuation float
-	DWORD  dwAttenuation	 =										// Default attenuation DWORD (offset, as DWORD unsigned)
+	float fAttenuation_db		= 0.0;								// Default attenuation float
+	DWORD dwAttenuation	 =											// Default attenuation DWORD (offset, as DWORD unsigned)
 		m_spConvolver->encode_Attenuationdb(fAttenuation_db);
-	TCHAR*  szFilterFileName = TEXT("");
-	DWORD   nPartitions		 = 0;									// Default number of partitions
+	TCHAR*  szFilterFileName	= TEXT("");
+	DWORD   nPartitions			= 0;								// Default number of partitions
 	CRegKey key;
-	DWORD   dwValue			 = 0;
+	DWORD   dwValue				= 0;
 	unsigned int nPlanningRigour = 
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;
 #endif
-	unsigned int nDither = 0;
-	unsigned int nNoiseShaping = 0;
+	unsigned int nDither = Ditherer<BaseT>::None;
+	unsigned int nNoiseShaping = NoiseShaper<BaseT>::None;
 
 	try
 	{

@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -43,9 +43,15 @@ public:
 		return coeffs_;
 	}
 
-	BaseT gain() const
+	BaseT peak_gain() const
 	{
-		return gain_;
+		return peak_gain_;
+	}
+
+
+	BaseT estimated_gain() const
+	{
+		return estimated_gain_;
 	}
 
 #ifdef LIBSNDFILE
@@ -129,7 +135,8 @@ private:
 
 	DWORD					nSamplesPerSec_;		// 44100, 48000, etc
 	SampleBuffer			coeffs_;
-	BaseT					gain_;
+	BaseT					peak_gain_;
+	BaseT					estimated_gain_;
 
 #ifdef LIBSNDFILE
 	SF_INFO					sf_FilterFormat_;		// The format of the filter file

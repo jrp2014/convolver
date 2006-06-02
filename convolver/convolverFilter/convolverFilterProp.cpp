@@ -1,12 +1,23 @@
-#ifndef WINVER
-#define WINVER         0x0410
-#endif
-#ifndef _WIN32_WINDOWS
-#define _WIN32_WINDOWS 0x0410 
-#endif
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT   0x0500 
-#endif
+// ConvolverFilter: DirectShow filter that convolves an impulse respose
+// filter it with the input stream.
+//
+// Copyright (C) 2005,2006  John Pavel
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#include "convolution\config.h"
+
 #include <windows.h>
 #include <windowsx.h>
 #include <streams.h>
@@ -61,14 +72,14 @@ HRESULT CconvolverFilterProperties::DisplayFilterFormat(HWND hwnd, TCHAR* szFilt
 	{
 		try
 		{
-			std::string description = "";
+			std::basic_string<TCHAR> description = TEXT("");
 			hr = m_pIconvolverFilter->get_filter_description(&description);
 			if (FAILED(hr))
 			{
 				SetDlgItemText( hwnd, IDS_STATUS, TEXT("Get a config file or filter sound file."));
 				return hr;
 			}
-			SetDlgItemText( hwnd, IDS_STATUS, CA2CT(description.c_str()));
+			SetDlgItemText( hwnd, IDS_STATUS, description.c_str());
 		}
 		catch (std::exception& error)
 		{
@@ -352,6 +363,15 @@ BOOL CconvolverFilterProperties::OnReceiveMessage(HWND hwnd,
 //
 HRESULT CconvolverFilterProperties::OnConnect(IUnknown *pUnknown)
 {
+
+	CheckPointer(pUnknown, E_POINTER);
+
+	if(NULL != m_pIconvolverFilter)
+	{
+		m_pIconvolverFilter->Release();
+		m_pIconvolverFilter = NULL;
+	}
+
 	ASSERT(m_pIconvolverFilter == NULL);
 
 	HRESULT hr = pUnknown->QueryInterface(IID_IconvolverFilter, (void **) &m_pIconvolverFilter);
@@ -432,9 +452,9 @@ HRESULT CconvolverFilterProperties::OnActivate()
 
 	unsigned int nPlanningRigour = 
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;
 #endif
 	hr = m_pIconvolverFilter->get_planning_rigour(&nPlanningRigour);
 	if(FAILED(hr))
@@ -450,7 +470,7 @@ HRESULT CconvolverFilterProperties::OnActivate()
 		SendDlgItemMessage(m_Dlg, IDC_COMBOPLANNINGRIGOUR, CB_SETCURSEL, nPlanningRigour, 0);
 	}
 
-	unsigned int nDither = 0;
+	unsigned int nDither = Ditherer<BaseT>::None;
 	hr = m_pIconvolverFilter->get_dither(&nDither);
 	if(FAILED(hr))
 	{
@@ -465,7 +485,7 @@ HRESULT CconvolverFilterProperties::OnActivate()
 		SendDlgItemMessage(m_Dlg, IDC_COMBODITHER, CB_SETCURSEL, nDither, 0);
 	}
 
-	unsigned int nNoiseShaping = 0;
+	unsigned int nNoiseShaping = NoiseShaper<BaseT>::None;
 	hr = m_pIconvolverFilter->get_noiseshaping(&nNoiseShaping);
 	if(FAILED(hr))
 	{
@@ -500,13 +520,13 @@ HRESULT CconvolverFilterProperties::OnDeactivate(void)
 	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;
 #endif
 
-	unsigned int nDither = 0;
-	unsigned int nNoiseShaping =0;
+	unsigned int nDither = Ditherer<BaseT>::None;
+	unsigned int nNoiseShaping =NoiseShaper<BaseT>::None;
 
 	GetControlValues(fAttenuation_db, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
@@ -525,13 +545,13 @@ HRESULT CconvolverFilterProperties::OnApplyChanges()
 	DWORD nPartitions = 0;
 	unsigned int nPlanningRigour =
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;
 #endif
 
-	unsigned int nDither = 0;
-	unsigned int nNoiseShaping = 0;
+	unsigned int nDither = Ditherer<BaseT>::None;
+	unsigned int nNoiseShaping = NoiseShaper<BaseT>::None;
 
 	GetControlValues(fAttenuation_db, szFilterFileName, nPartitions, nPlanningRigour, nDither, nNoiseShaping);
 
@@ -629,12 +649,12 @@ void CconvolverFilterProperties::GetControlValues(float& fAttenuation_db,
 	nPartitions = 0;													// Initialize a WORD for the number of partitions
 	nPlanningRigour = 
 #ifdef FFTW
-		1;		// Set "Measure" as the default
+		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
-		0;
+		PlanningRigour::Default;
 #endif
-	nDither = 0;
-	nNoiseShaping = 0;
+	nDither = Ditherer<BaseT>::None;
+	nNoiseShaping = NoiseShaper<BaseT>::None;
 
 	// to be used in the convolution algorithm
 

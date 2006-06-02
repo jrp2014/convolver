@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -70,29 +70,29 @@ DEFINE_GUID(CLSID_Convolver,
 interface __declspec(uuid("{9B102F5D-8E2C-41F2-9256-2D3CA76FBE35}")) IConvolver : IUnknown
 {
 public:
-	virtual HRESULT STDMETHODCALLTYPE get_filterfilename(TCHAR* *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_filterfilename(TCHAR* newVal) = 0;
+	STDMETHOD(get_filterfilename)(TCHAR* *pVal) PURE;
+	STDMETHOD(put_filterfilename)(TCHAR* newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_attenuation(float *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_attenuation(float newVal) = 0;
+	STDMETHOD(get_attenuation)(float *pVal) PURE;
+	STDMETHOD(put_attenuation)(float newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_partitions(DWORD *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_partitions(DWORD newVal) = 0;
+	STDMETHOD(get_partitions)(DWORD *pVal) PURE;
+	STDMETHOD(put_partitions)(DWORD newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_planning_rigour(unsigned int *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_planning_rigour(unsigned int newVal) = 0;
+	STDMETHOD(get_planning_rigour)(unsigned int *pVal) PURE;
+	STDMETHOD(put_planning_rigour)(unsigned int newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_dither(unsigned int *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_dither(unsigned int newVal) = 0;
+	STDMETHOD(get_dither)(unsigned int *pVal) PURE;
+	STDMETHOD(put_dither)(unsigned int newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_noiseshaping(unsigned int *pVal) = 0;
-	virtual HRESULT STDMETHODCALLTYPE put_noiseshaping(unsigned int newVal) = 0;
+	STDMETHOD(get_noiseshaping)(unsigned int *pVal) PURE;
+	STDMETHOD(put_noiseshaping)(unsigned int newVal) PURE;
 
-	virtual HRESULT STDMETHODCALLTYPE get_filter_description(std::string* description) = 0;
-	virtual HRESULT STDMETHODCALLTYPE calculateOptimumAttenuation(float & fAttenuation) = 0;
+	STDMETHOD(get_filter_description)(std::basic_string<TCHAR>* description) PURE;
+	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation) PURE;
 
-	virtual float	decode_Attenuationdb(const DWORD dwValue) = 0;
-	virtual DWORD	encode_Attenuationdb(const float fValue) = 0;
+	STDMETHOD_(float,decode_Attenuationdb)(const DWORD dwValue) PURE;
+	STDMETHOD_(DWORD,encode_Attenuationdb)(const float fValue) PURE;
 };
 
 
@@ -138,56 +138,56 @@ public:
 	void    FinalRelease();
 
 	// IConvolver methods
-	STDMETHOD(get_filterfilename)(TCHAR *pVal[]);
-	STDMETHOD(put_filterfilename)(TCHAR newVal[]);
+	STDMETHODIMP get_filterfilename(TCHAR *pVal[]);
+	STDMETHODIMP put_filterfilename(TCHAR newVal[]);
 
-	STDMETHOD(get_attenuation)(float *pVal);
-	STDMETHOD(put_attenuation)(float newVal);
+	STDMETHODIMP get_attenuation(float *pVal);
+	STDMETHODIMP put_attenuation(float newVal);
 
-	STDMETHOD(get_partitions)(DWORD *pVal);
-	STDMETHOD(put_partitions)(DWORD newVal);
+	STDMETHODIMP get_partitions(DWORD *pVal);
+	STDMETHODIMP put_partitions(DWORD newVal);
 
-	STDMETHOD(get_planning_rigour)(unsigned int *pVal);
-	STDMETHOD(put_planning_rigour)(unsigned int newVal);
+	STDMETHODIMP get_planning_rigour(unsigned int *pVal);
+	STDMETHODIMP put_planning_rigour(unsigned int newVal);
 
-	STDMETHOD(get_dither)(unsigned int *pVal);
-	STDMETHOD(put_dither)(unsigned int newVal);
+	STDMETHODIMP get_dither(unsigned int *pVal);
+	STDMETHODIMP put_dither(unsigned int newVal);
 
-	STDMETHOD(get_noiseshaping)(unsigned int *pVal);
-	STDMETHOD(put_noiseshaping)(unsigned int newVal);
+	STDMETHODIMP get_noiseshaping(unsigned int *pVal);
+	STDMETHODIMP put_noiseshaping(unsigned int newVal);
 
-	STDMETHOD(get_filter_description)(std::string* description);
-	STDMETHOD(calculateOptimumAttenuation)(float & fAttenuation);
+	STDMETHODIMP get_filter_description(std::basic_string<TCHAR>* description);
+	STDMETHODIMP calculateOptimumAttenuation(float & fAttenuation);
 
 	// IMediaObject methods
-	STDMETHOD( GetStreamCount )( 
+	STDMETHODIMP GetStreamCount ( 
 		DWORD *pcInputStreams,
 		DWORD *pcOutputStreams
 		);
 
-	STDMETHOD( GetInputStreamInfo )( 
+	STDMETHODIMP GetInputStreamInfo ( 
 		DWORD dwInputStreamIndex,
 		DWORD *pdwFlags
 		);
 
-	STDMETHOD( GetOutputStreamInfo )( 
+	STDMETHODIMP GetOutputStreamInfo ( 
 		DWORD dwOutputStreamIndex,
 		DWORD *pdwFlags
 		);
 
-	STDMETHOD( GetInputType )( 
+	STDMETHODIMP GetInputType ( 
 		DWORD dwInputStreamIndex,
 		DWORD dwTypeIndex,
 		DMO_MEDIA_TYPE *pmt
 		);
 
-	STDMETHOD( GetOutputType )( 
+	STDMETHODIMP GetOutputType ( 
 		DWORD dwOutputStreamIndex,
 		DWORD dwTypeIndex,
 		DMO_MEDIA_TYPE *pmt
 		);
 
-	STDMETHOD( GetMediaType )( // Helper
+	STDMETHODIMP GetMediaType ( // Helper
 		DWORD dwInputStreamIndex,
 		DWORD dwTypeIndex,
 		DMO_MEDIA_TYPE *pmt,
@@ -195,66 +195,66 @@ public:
 		DWORD dwChannelMask
 		);
 
-	STDMETHOD( SetInputType )( 
+	STDMETHODIMP SetInputType ( 
 		DWORD dwInputStreamIndex,
 		const DMO_MEDIA_TYPE *pmt,
 		DWORD dwFlags
 		);
 
-	STDMETHOD( SetOutputType )( 
+	STDMETHODIMP SetOutputType ( 
 		DWORD dwOutputStreamIndex,
 		const DMO_MEDIA_TYPE *pmt,
 		DWORD dwFlags
 		);
 
-	STDMETHOD( GetInputCurrentType )( 
+	STDMETHODIMP GetInputCurrentType ( 
 		DWORD dwInputStreamIndex,
 		DMO_MEDIA_TYPE *pmt
 		);
 
-	STDMETHOD( GetOutputCurrentType )( 
+	STDMETHODIMP GetOutputCurrentType ( 
 		DWORD dwOutputStreamIndex,
 		DMO_MEDIA_TYPE *pmt
 		);
 
-	STDMETHOD( GetInputSizeInfo )( 
+	STDMETHODIMP GetInputSizeInfo ( 
 		DWORD dwInputStreamIndex,
 		DWORD *pcbSize,
 		DWORD *pcbMaxLookahead,
 		DWORD *pcbAlignment
 		);
 
-	STDMETHOD( GetOutputSizeInfo )( 
+	STDMETHODIMP GetOutputSizeInfo ( 
 		DWORD dwOutputStreamIndex,
 		DWORD *pcbSize,
 		DWORD *pcbAlignment
 		);
 
-	STDMETHOD( GetInputMaxLatency )( 
+	STDMETHODIMP GetInputMaxLatency ( 
 		DWORD dwInputStreamIndex,
 		REFERENCE_TIME *prtMaxLatency
 		);
 
-	STDMETHOD( SetInputMaxLatency )( 
+	STDMETHODIMP SetInputMaxLatency ( 
 		DWORD dwInputStreamIndex,
 		REFERENCE_TIME rtMaxLatency
 		);
 
-	STDMETHOD( Flush )( void );
+	STDMETHODIMP Flush ( void );
 
-	STDMETHOD( Discontinuity )( 
+	STDMETHODIMP Discontinuity ( 
 		DWORD dwInputStreamIndex
 		);
-	STDMETHOD( AllocateStreamingResources )( void );
+	STDMETHODIMP AllocateStreamingResources ( void );
 
-	STDMETHOD( FreeStreamingResources )( void );
+	STDMETHODIMP FreeStreamingResources ( void );
 
-	STDMETHOD( GetInputStatus )( 
+	STDMETHODIMP GetInputStatus ( 
 		DWORD dwInputStreamIndex,
 		DWORD *pdwFlags
 		);
 
-	STDMETHOD( ProcessInput )( 
+	STDMETHODIMP ProcessInput ( 
 		DWORD dwInputStreamIndex,
 		IMediaBuffer *pBuffer,
 		DWORD dwFlags,
@@ -262,14 +262,14 @@ public:
 		REFERENCE_TIME rtTimelength
 		);
 
-	STDMETHOD( ProcessOutput )( 
+	STDMETHODIMP ProcessOutput ( 
 		DWORD dwFlags,
 		DWORD cOutputBufferCount,
 		DMO_OUTPUT_DATA_BUFFER *pOutputBuffers,
 		DWORD *pdwStatus
 		);
 
-	STDMETHOD( Lock )( LONG bLock );
+	STDMETHODIMP Lock ( LONG bLock );
 
 	// Note: need to override CComObjectRootEx::Lock to avoid
 	// ambiguity with IMediaObject::Lock. The override just
@@ -282,12 +282,12 @@ public:
 	}
 
 	// IWMPPluginEnable methods
-	STDMETHOD( SetEnable )( BOOL fEnable );
-	STDMETHOD( GetEnable )( BOOL *pfEnable );
-	STDMETHOD( GetCaps )( DWORD* pdwFlags );
+	STDMETHODIMP SetEnable ( BOOL fEnable );
+	STDMETHODIMP GetEnable ( BOOL *pfEnable );
+	STDMETHODIMP GetCaps ( DWORD* pdwFlags );
 
 	// ISpecifyPropertyPages methods
-	STDMETHOD( GetPages )(CAUUID *pPages);
+	STDMETHODIMP GetPages (CAUUID *pPages);
 
 #ifdef IPROPERTYBAG
 	// IPropertyBag methods
@@ -298,14 +298,14 @@ public:
 #endif
 
 	// The following pair is needed because DWORD is unsigned
-	float decode_Attenuationdb(const DWORD dwValue)
+	STDMETHODIMP_(float) decode_Attenuationdb(const DWORD dwValue)
 	{
 		assert(dwValue <= (MAX_ATTENUATION_DB + MAX_ATTENUATION_DB) * 100);
-		return static_cast<BaseT>(dwValue) / 100.0f - MAX_ATTENUATION_DB;
+		return static_cast<BaseT>(dwValue) / 100.0 - MAX_ATTENUATION_DB;
 	}
-	DWORD encode_Attenuationdb(const float fValue)
+	STDMETHODIMP_(DWORD) encode_Attenuationdb(const float fValue)
 	{	assert (fabs(fValue) <= MAX_ATTENUATION_DB);
-		return static_cast<DWORD>((fValue + MAX_ATTENUATION_DB) * 100.0f);
+		return static_cast<DWORD>((fValue + MAX_ATTENUATION_DB) * 100.0);
 	}
 
 private:
@@ -317,6 +317,9 @@ private:
 	HRESULT ValidateMediaType(
 		const DMO_MEDIA_TYPE *pmtTarget,		// target media type to verify
 		const DMO_MEDIA_TYPE *pmtPartner);		// partner media type to verify
+
+	HRESULT ShowFilterPropertyPage();
+	HRESULT NoValidFilterSelected();
 
 	//void FillBufferWithSilence(WAVEFORMATEX *pWfex); // TODO: Remove or make this do something useful
 
@@ -357,9 +360,6 @@ private:
 
 	Thread_Mutex			m_cs;				// for locking the whole DMO
 
-#ifdef FFTW
-	Wisdom w;									// Loads and saves FFTW wisdom
-#endif
 };
 
 #endif //__CCONVOLVER_H_

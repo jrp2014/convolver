@@ -29,7 +29,7 @@
 				WholeProgramOptimization="FALSE"
 				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..;D:\Projects\boost_1_33_1;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW_DLL;CRTDBG_MAP_ALLOC"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;FFTW_DLL;_CRTDBG_MAP_ALLOC"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="TRUE"
@@ -169,7 +169,7 @@
 				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
 				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
+				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
 				EnableFiberSafeOptimizations="TRUE"
 				WholeProgramOptimization="TRUE"
@@ -376,9 +376,6 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
-			<File
-				RelativePath=".\stdafx.h">
-			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

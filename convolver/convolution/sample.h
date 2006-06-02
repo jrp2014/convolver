@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -627,12 +627,54 @@ struct SampleFormatId
 		const WORD wBitsPerSample,
 		const WORD wValidBitsPerSample) : 
 	SubType(SubType), wFormatTag(wFormatTag), wBitsPerSample(wBitsPerSample), wValidBitsPerSample(wValidBitsPerSample)
-	{}
+	{
+		assert(SubType == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT || SubType == KSDATAFORMAT_SUBTYPE_PCM);
+	}
 
 	const GUID SubType;
 	const WORD wFormatTag;
 	const WORD wBitsPerSample; 
 	const WORD wValidBitsPerSample;
+
+#if defined(DEBUG) | defined(_DEBUG)
+	void Dump() const
+	{
+		cdebug << "Subtype:";
+		if (SubType == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
+		{
+			cdebug << "Float ";
+		}
+		else if (SubType == KSDATAFORMAT_SUBTYPE_PCM)
+		{
+			cdebug << "PCM ";
+		}
+		else
+		{
+			cdebug << "Unrecognised ";
+		}
+		
+		cdebug << "Format:";
+
+		if(wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+		{
+			cdebug << "Extensible ";
+		}
+		else if (wFormatTag == WAVE_FORMAT_PCM)
+		{
+			cdebug << "PCM ";
+		}
+		else if (wFormatTag == WAVE_FORMAT_IEEE_FLOAT)
+		{
+			cdebug << "Float ";
+		}
+		else
+		{
+			cdebug << wFormatTag;
+		}
+
+		cdebug << wBitsPerSample << "(" << wValidBitsPerSample << ")" << std::endl;
+	}
+#endif
 };
 
 // Ordering is by preference
@@ -649,36 +691,53 @@ private:
 public:
 	ConvertSampleMaker()
 	{
-		sample_factory_.Register<ConvertSample_ieeefloat<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT,	32,32));
-		sample_factory_.Register<ConvertSample_ieeefloat<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE,	32,32));
-		sample_factory_.Register<ConvertSample_pcm32<T,32> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,32));
-		sample_factory_.Register<ConvertSample_pcm32<T,24> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,24));
-		sample_factory_.Register<ConvertSample_pcm32<T,20> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,20));
-		sample_factory_.Register<ConvertSample_pcm32<T,16> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,16));
-		sample_factory_.Register<ConvertSample_pcm24<T,24> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,24));
-		sample_factory_.Register<ConvertSample_pcm24<T,20> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,20));
-		sample_factory_.Register<ConvertSample_pcm24<T,16> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,16));
-		sample_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						16,16));
-		sample_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				16,16));
-		sample_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						 8, 8));
-		sample_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				 8, 8));
-		sample_factory_.Register<ConvertSample_ieeedouble<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT,	64,64)); // May not exist
-		sample_factory_.Register<ConvertSample_ieeedouble<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE,	64,64)); // May not exist
+		sampleformat_factory_.Register<ConvertSample_ieeefloat<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT,	32,32));
+		sampleformat_factory_.Register<ConvertSample_ieeefloat<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE,	32,32));
+		sampleformat_factory_.Register<ConvertSample_pcm32<T,32> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,32));
+		sampleformat_factory_.Register<ConvertSample_pcm32<T,24> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,24));
+		sampleformat_factory_.Register<ConvertSample_pcm32<T,20> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,20));
+		sampleformat_factory_.Register<ConvertSample_pcm32<T,16> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			32,16));
+		sampleformat_factory_.Register<ConvertSample_pcm24<T,24> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,24));
+		sampleformat_factory_.Register<ConvertSample_pcm24<T,20> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,20));
+		sampleformat_factory_.Register<ConvertSample_pcm24<T,16> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,			24,16));
+		sampleformat_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						16,16));
+		sampleformat_factory_.Register<ConvertSample_pcm16<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				16,16));
+		sampleformat_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_PCM,						 8, 8));
+		sampleformat_factory_.Register<ConvertSample_pcm8<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_PCM, WAVE_FORMAT_EXTENSIBLE,				 8, 8));
+		sampleformat_factory_.Register<ConvertSample_ieeedouble<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT,	64,64)); // May not exist
+		sampleformat_factory_.Register<ConvertSample_ieeedouble<T> >(SampleFormatId(KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_EXTENSIBLE,	64,64)); // May not exist
+
+
+#if defined(DEBUG) | defined(_DEBUG)
+		Dump();
+#endif
 	}
 
 	typename FactoryType::size_type size() const
 	{
-		return sample_factory_.size();
+		return sampleformat_factory_.size();
 	}
 
 	const SampleFormatId& operator[](const typename FactoryType::size_type i) const
 	{
 		assert(i < size());
-		typename FactoryType::const_iterator pos = sample_factory_.begin();
+		typename FactoryType::const_iterator pos = sampleformat_factory_.begin();
 		for(int j= 0; j < i; ++j)
 			++pos;
 		return pos->first;
 	}
+
+#if defined(DEBUG) | defined(_DEBUG)
+	void Dump() const
+	{
+		for(typename FactoryType::const_iterator pos = sampleformat_factory_.begin() ; pos != sampleformat_factory_.end(); ++pos)
+		{
+			pos->first.Dump();
+		}
+	}
+#endif
+
+
 
 	// Is the pWave sample format supported?
 	HRESULT CheckSampleFormat(const WAVEFORMATEX* pWave) const
@@ -706,7 +765,7 @@ public:
 			}
 			assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
 
-			return sample_factory_.Registered(SampleFormatId(pWaveXT->SubFormat, WAVE_FORMAT_EXTENSIBLE,
+			return sampleformat_factory_.Registered(SampleFormatId(pWaveXT->SubFormat, WAVE_FORMAT_EXTENSIBLE,
 				pWaveXT->Format.wBitsPerSample, pWaveXT->Samples.wValidBitsPerSample)) ? S_OK : DMO_E_TYPE_NOT_ACCEPTED;
 		}
 		else // WAVE_FORMAT_PCM (8, or 16-bit) or WAVE_FORMAT_IEEE_FLOAT (32-bit)
@@ -718,7 +777,7 @@ public:
 				return DMO_E_INVALIDTYPE;
 			}
 
-			return sample_factory_.Registered(SampleFormatId(pWave->wFormatTag == WAVE_FORMAT_PCM
+			return sampleformat_factory_.Registered(SampleFormatId(pWave->wFormatTag == WAVE_FORMAT_PCM
 				? KSDATAFORMAT_SUBTYPE_PCM : KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
 				pWave->wFormatTag, pWave->wBitsPerSample, pWave->wBitsPerSample)) ? S_OK : DMO_E_TYPE_NOT_ACCEPTED;
 		}
@@ -752,7 +811,7 @@ public:
 			}
 			assert(pWaveXT->Format.cbSize == 22); // for the types that we currently support
 
-			sample_convertor.set_ptr(sample_factory_.Create(SampleFormatId(pWaveXT->SubFormat, WAVE_FORMAT_EXTENSIBLE,
+			sample_convertor.set_ptr(sampleformat_factory_.Create(SampleFormatId(pWaveXT->SubFormat, WAVE_FORMAT_EXTENSIBLE,
 				pWaveXT->Format.wBitsPerSample, pWaveXT->Samples.wValidBitsPerSample), nNoiseShaper, nDither,
 				pWaveXT->Format.nChannels, pWaveXT->Format.nSamplesPerSec));
 
@@ -768,7 +827,7 @@ public:
 				return DMO_E_INVALIDTYPE;
 			}
 
-			sample_convertor.set_ptr(sample_factory_.Create(SampleFormatId(pWave->wFormatTag == WAVE_FORMAT_PCM 
+			sample_convertor.set_ptr(sampleformat_factory_.Create(SampleFormatId(pWave->wFormatTag == WAVE_FORMAT_PCM 
 				? KSDATAFORMAT_SUBTYPE_PCM : KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,
 				pWave->wFormatTag, pWave->wBitsPerSample, pWave->wBitsPerSample), nNoiseShaper, nDither,
 				pWave->nChannels, pWave->nSamplesPerSec));
@@ -781,7 +840,7 @@ public:
 
 private:
 
-	FactoryType sample_factory_;
+	FactoryType sampleformat_factory_;
 
 	// No copying
 	ConvertSampleMaker& operator= (const ConvertSampleMaker&);

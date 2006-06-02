@@ -2,7 +2,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -72,11 +72,19 @@ struct Wisdom
 
 	Wisdom()
 	{
+
+		if(GetCurrentDirectory(MAX_PATH, szCurrentDir) == 0)
+		{
+//#if defined(DEBUG) | defined(_DEBUG)
+//			cdebug << "Failed to get current Directory" << std::endl;
+//#endif
+		}
+
 		if (fftwf_init_threads() == 0)
 		{
-#if defined(DEBUG) | defined(_DEBUG)
-			cdebug << "Failed to fftwf_init_threads" << std::endl;
-#endif
+//#if defined(DEBUG) | defined(_DEBUG)
+//			cdebug << "Failed to fftwf_init_threads" << std::endl;
+//#endif
 		}
 
 		FILE* wisdom = fopen (szWisdomFileName,"r");
@@ -84,12 +92,12 @@ struct Wisdom
 		{
 			if(fftwf_import_wisdom_from_file(wisdom) != 1)
 			{
-#if defined(DEBUG) | defined(_DEBUG)
-			cdebug << "Failed to fftwf_import_wisdom_from_file" << std::endl;
-#endif
+// cdebug may not yet be initialized
+//#if defined(DEBUG) | defined(_DEBUG)
+//			cdebug << "Failed to fftwf_import_wisdom_from_file" << std::endl;
+//#endif
 			}
 			fclose (wisdom);
-			GetCurrentDirectory(MAX_PATH, szCurrentDir);
 		}
 	}
 
@@ -108,7 +116,7 @@ struct Wisdom
 			else
 			{
 #if defined(DEBUG) | defined(_DEBUG)
-				cdebug << "Failed to fftwf_import_wisdom_from_file" << std::endl;
+				cdebug << "Failed to fftwf_export_wisdom_from_file" << std::endl;
 #endif
 			}
 			fftwf_cleanup_threads();

@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -31,10 +31,10 @@
 #include <iomanip>
 
 #ifdef LIBSNDFILE
-std::string waveFormatDescription(const SF_INFO& sf_info, const char* prefix);
+const std::basic_string<TCHAR> waveFormatDescription(const SF_INFO& sf_info, const TCHAR* prefix);
 #endif
-std::string waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const char* prefix);
-const std::string channelDescription(const WORD wFormatTag, const DWORD& dwChannelMask, const WORD& nChannels);
+const std::basic_string<TCHAR> waveFormatDescription(const WAVEFORMATEXTENSIBLE* w, const DWORD samples, const TCHAR* prefix);
+const std::basic_string<TCHAR> channelDescription(const WORD wFormatTag, const DWORD& dwChannelMask, const WORD& nChannels);
 
 //// Used to distinguish the different encoding and decoding routines
 //class WaveFormatSignature

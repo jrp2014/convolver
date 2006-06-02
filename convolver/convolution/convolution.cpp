@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // Filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -802,6 +802,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 	//{
 
 	std::generate_n(InputSamples.begin(), nInputBufferLength, uni);
+
 	//for(DWORD i = 0; i < nInputBufferLength; ++i)
 	//{
 	//	InputSamples[i] = (2.0f * static_cast<T>(rand()) - static_cast<T>(RAND_MAX)) / static_cast<T>(RAND_MAX); // -1..1
@@ -814,8 +815,8 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(4, 
-		cdebug << "InputSamples (" << nInputBufferLength << ") ";
-	std::copy(InputSamples.begin(), InputSamples.end(), std::ostream_iterator<T>(cdebug, " "));
+		cdebug << TEXT("InputSamples (") << nInputBufferLength << TEXT(") ");
+	std::copy(InputSamples.begin(), InputSamples.end(), std::ostream_iterator<T,TCHAR>(cdebug, TEXT(" ")));
 	cdebug << std::endl;);
 #endif
 	// nPartitions == 0 => use overlap-save version
@@ -829,20 +830,20 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0);
 
-		// The output will be missing the last half filter length, the first time around
-		assert (nBytesGenerated % sizeof(T) == 0);
-	assert (nBytesGenerated <= nOutputBufferLength * sizeof(T));
+	assert (nBytesGenerated % sizeof(T) == 0);
+	assert (nBytesGenerated == nOutputBufferLength * sizeof(T));
 
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(4,
-		cdebug << "OutputSamples(" << nBytesGenerated/sizeof(T) << ") " ;
-	std::copy(&OutputSamples[0], &OutputSamples[nBytesGenerated/sizeof(T)+1], std::ostream_iterator<T>(cdebug, " "));
+		cdebug << TEXT("OutputSamples(") << nBytesGenerated/sizeof(T) << TEXT(") ") ;
+	std::copy(&OutputSamples[0], &OutputSamples[nOutputBufferLength], std::ostream_iterator<T,TCHAR>(cdebug, TEXT(" ")));
 	cdebug << std::endl << std::endl;);
 #endif
 
 	// Scan the output coeffs for larger output samples
 	again = FALSE;
-	for(DWORD i = 0; i  < nBytesGenerated / sizeof(T); ++i)
+	// Skip the first HalfPartitionLength, which will be all 0s
+	for(DWORD i = Mixer.nHalfPartitionLength(); i  < nOutputBufferLength; ++i)
 	{
 		if (abs(OutputSamples[i]) > maxSample)
 		{
@@ -850,13 +851,14 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 			again = TRUE; // Keep convolving until find no larger output samples
 		}
 	}
+
 	//} while (again);
 
 	// maxSample * 10 ^ (fAttenuation_db / 20) = 1
 	// Limit fAttenuation to +/-MAX_ATTENUATION dB
 	fAttenuation_db = -20.0f * log10(maxSample);
 
-	assert(-fAttenuation_db <= Mixer.gain_dB());
+	assert(-fAttenuation_db <= Mixer.peak_gain_dB());
 
 	if (fAttenuation_db > MAX_ATTENUATION_DB)
 	{
@@ -868,7 +870,7 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
-	cdebug << "fAttenuation_dB:" << fAttenuation_db << " maxSample: " << maxSample << " gain_" << Mixer.gain() << std::endl;
+	cdebug << "fAttenuation_dB:" << fAttenuation_db << " maxSample: " << maxSample << " peak_gain_" << Mixer.peak_gain() << std::endl;
 #endif
 
 	Flush(); // Reset, so that residual noise cleared
@@ -884,12 +886,10 @@ ConvolutionList_(0),
 nConvolutionList_(0),
 nPartitions_(nPartitions)
 {
-	configFile config(szConfigFileName);
-
 	USES_CONVERSION;
 
 #if defined(DEBUG) | defined(_DEBUG)
-	DEBUGGING(3, cdebug << "ConvolutionList::ConvolutionList " << T2A(szConfigFileName) << " " << nPartitions << " " << std::endl;);
+	DEBUGGING(3, cdebug << "ConvolutionList::ConvolutionList " << CT2A(szConfigFileName) << " " << nPartitions << " " << std::endl;);
 #endif
 
 	try
@@ -916,6 +916,8 @@ nPartitions_(nPartitions)
 	}
 	catch(const wavfileException&)
 	{
+		configFile config(szConfigFileName);
+
 		// Assume that we have a text config file
 		try
 		{
@@ -1063,8 +1065,8 @@ HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, co
 				// Is there a path with compatible output type?
 				for(size_type i = 0; i < nConvolutionList(); ++i)
 				{
-					if(	ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels &&
-						ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec )
+					if(	(ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels || pWaveOut->nChannels == 0) &&
+						(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec || pWaveOut->nSamplesPerSec == 0) )
 					{
 						if(select)
 						{
@@ -1092,9 +1094,9 @@ HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, co
 				for(size_type i = 0; i < nConvolutionList(); ++i)
 				{
 					if(	ConvolutionList_[i].Mixer.nInputChannels() == nInputChannels &&
-						ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels &&
+						(ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels || pWaveOut->nChannels == 0) &&
 						ConvolutionList_[i].Mixer.nSamplesPerSec() == nSamplesPerSec &&
-						ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec )
+						(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec || pWaveOut->nSamplesPerSec == 0) )
 					{
 						// The currently selected Path is OK
 						if(select)
@@ -1127,8 +1129,8 @@ HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, co
 				// Is there a path with compatible input type?
 				for(size_type i = 0; i < nConvolutionList(); ++i)
 				{
-					if(	ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels &&
-						ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec)
+					if(	(ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels || pWaveIn->nChannels == 0) &&
+						(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec || pWaveIn->nSamplesPerSec == 0))
 					{
 						if(select)
 						{
@@ -1156,9 +1158,9 @@ HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, co
 				for(size_type i = 0; i < nConvolutionList(); ++i)
 				{
 					if(	ConvolutionList_[i].Mixer.nOutputChannels() == nOutputChannels &&
-						ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels &&
+						(ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels || pWaveIn->nChannels == 0) &&
 						ConvolutionList_[i].Mixer.nSamplesPerSec() == nSamplesPerSec &&
-						ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec )
+						(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec || pWaveIn->nSamplesPerSec == 0) )
 					{
 						// The currently selected Path is OK
 						if(select)
@@ -1186,10 +1188,10 @@ HRESULT ConvolutionList<T>::CheckConvolutionList(const WAVEFORMATEX* pWaveIn, co
 		// Is there a path with compatible output type?
 		for(size_type i = 0; i < nConvolutionList(); ++i)
 		{
-			if(ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels && 
-				ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels &&
-				ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec &&
-				ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec)
+			if( (ConvolutionList_[i].Mixer.nInputChannels() == pWaveIn->nChannels || pWaveIn->nChannels == 0) && 
+				(ConvolutionList_[i].Mixer.nOutputChannels() == pWaveOut->nChannels || pWaveOut->nChannels == 0) &&
+				(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveIn->nSamplesPerSec || pWaveIn->nSamplesPerSec == 0)  &&
+				(ConvolutionList_[i].Mixer.nSamplesPerSec() == pWaveOut->nSamplesPerSec || pWaveOut->nSamplesPerSec == 0) )
 			{
 				if(select)
 				{
@@ -1214,23 +1216,27 @@ HRESULT ConvolutionList<T>::SelectConvolution(const WAVEFORMATEX* pWaveIn, const
 }
 
 template <typename T>
-const std::string ConvolutionList<T>::DisplayConvolutionList() const
+const std::basic_string<TCHAR> ConvolutionList<T>::DisplayConvolutionList() const
 {
-	std::string result = "";
+	std::basic_string<TCHAR> result = TEXT("");
 	if(nConvolutionList_ > 0)
 	{
 		for(size_type i=1; i<nConvolutionList_ - 1; ++i)
-			result += ConvolutionList_[i-1].Mixer.DisplayChannelPaths() + "\n";
+		{
+			if(ConvolutionSelected() && selectedConvolutionIndex_ == i - 1)
+				result += TEXT(">");
+
+			result += ConvolutionList_[i-1].Mixer.DisplayChannelPaths() + TEXT("\n");
+		}
 
 		result += ConvolutionList_[nConvolutionList_ - 1].Mixer.DisplayChannelPaths();
 	}
 	else
 	{
-		result = "Invalid or empty filter";
+		result = TEXT("Invalid or empty filter");
 	}
 	return result;
 }
-
 
 #if defined(DEBUG) | defined(_DEBUG)
 template <typename T>

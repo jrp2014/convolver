@@ -1,7 +1,7 @@
 // Convolver: DSP plug-in for Windows Media Player that convolves an impulse respose
 // filter it with the input stream.
 //
-// Copyright (C) 2005  John Pavel
+// Copyright (C) 2005,2006  John Pavel
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,7 +25,8 @@ Filter::Filter(const TCHAR szFilterFileName[MAX_PATH], const DWORD nPartitions, 
 			   const unsigned int nPlanningRigour) : 
 nPartitions (nPartitions),
 nSamplesPerSec_(nSamplesPerSec),
-gain_(0)
+peak_gain_(0),
+estimated_gain_(0)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "Filter::Filter " << nPartitions << " " << nSamplesPerSec << std::endl;);
@@ -55,7 +56,7 @@ gain_(0)
 	}
 
 	nSamplesPerSec_ = sf_FilterFormat_.samplerate;
-	nFilterLength_ = sf_FilterFormat_.frames;
+	nFilterLength_ = static_cast<DWORD>(sf_FilterFormat_.frames);
 
 #else
 	CWaveFileHandle pFilterWave;
@@ -123,7 +124,7 @@ gain_(0)
 	}
 
 	// .. or filter too small
-	if ( nHalfPartitionLength_ == 0 )
+	if ( nHalfPartitionLength_ <= 0 )
 	{
 		filterException("Filter too short", szFilterFileName);
 	}
@@ -203,7 +204,8 @@ gain_(0)
 			// Got a frame / block (ie, the items / samples for the nFilterChannel channel)
 			// Pick the sample corresponding to the selected channel
 			coeffs_[nPartition][nFrame % nHalfPartitionLength_] = item[nFilterChannel];
-			gain_ += fabs(item[nFilterChannel]);
+			peak_gain_ += fabs(item[nFilterChannel]);
+			estimated_gain_ += item[nFilterChannel] * item[nFilterChannel];
 
 #if defined(DEBUG) | defined(_DEBUG)
 			if (item[nFilterChannel] > maxSample)
@@ -436,6 +438,8 @@ gain_(0)
 	nHalfPartitionLength_ = nHalfPaddedPartitionLength;
 	nFilterLength_ = nPartitions * nPartitionLength_;
 
+	estimated_gain_ = sqrt(estimated_gain_);
+
 #ifdef UNDEFINED
 	// Only works for float. Seems to have no performance benefit
 	for(WORD nPartition=0; nPartition<nPartitions; ++ nPartition)
@@ -460,14 +464,14 @@ gain_(0)
 	DumpSampleBuffer(coeffs_);
 	cdebug << std::endl;
 
-
 #ifdef LIBSNDFILE
-	cdebug << waveFormatDescription(sf_FilterFormat(), "FFT Filter: ") << std::endl;
+	cdebug << waveFormatDescription(sf_FilterFormat(), TEXT("FFT Filter: ")) << std::endl;
 #else
-	cdebug << waveFormatDescription(&wfexFilterFormat_, nFilterLength_, "FFT Filter:") << std::endl;
+	cdebug << waveFormatDescription(&wfexFilterFormat_, nFilterLength_, TEXT("FFT Filter:")) << std::endl;
 #endif
 
-	cdebug << "minSample " << minSample << ", maxSample " << maxSample << ", gain_ " << gain_ << std::endl;
+	cdebug << "minSample " << minSample << ", maxSample " << maxSample <<
+		", estimated_gain_ " << estimated_gain_ << ", peak_gain_ " << peak_gain_ << std::endl;
 #endif
 
 }

@@ -1,0 +1,4 @@
+LIBRARY			convolverVST
+EXPORTS
+	VSTPluginMain
+	main=VSTPluginMain

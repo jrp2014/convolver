@@ -236,7 +236,8 @@ HRESULT CD3DEnumeration::EnumerateDevices( CD3DEnumAdapterInfo* pAdapterInfo, CG
             continue;
         }
 
-        // Create a dummy device to verify that we really can create of this type.
+        // Create a temp device to verify that it is really possible to create a REF device 
+        // [the developer DirectX redist has to be installed]
         D3DDISPLAYMODE Mode;
         m_pD3D->GetAdapterDisplayMode(0, &Mode);
         D3DPRESENT_PARAMETERS pp;
@@ -248,7 +249,7 @@ HRESULT CD3DEnumeration::EnumerateDevices( CD3DEnumAdapterInfo* pAdapterInfo, CG
         pp.SwapEffect       = D3DSWAPEFFECT_COPY;
         pp.Windowed         = TRUE;
         pp.hDeviceWindow    = DXUTGetHWNDFocus();
-        IDirect3DDevice9 *pDevice;
+        IDirect3DDevice9 *pDevice = NULL;
         if( FAILED( hr = m_pD3D->CreateDevice( pAdapterInfo->AdapterOrdinal, pDeviceInfo->DeviceType, DXUTGetHWNDFocus(),
                                           D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &pDevice ) ) )
         {
