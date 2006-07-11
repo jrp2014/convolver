@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject 
 	ProjectType="Intel C++ Project"
-	Version="9.0"
+	Version="9.1"
 	Name="ConvolverFilter"
 	ProjectGUID="{B2AEC2B0-2191-4347-A21F-C41A91F7BCC0}"
 	VCNestedProjectGUID="{90C47E62-931C-411D-9F16-0B877E34B415}"
 	VCNestedProjectFileName="convolverFilter.vcproj">
+	<Platforms>
+		<Platform 
+			Name="Win32"/>
+	</Platforms>
 	<Configurations>
 		<Configuration 
 			Name="Debug|Win32">
@@ -14,74 +18,86 @@
 				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="0"
-				ATLMinimizesCRunTimeLibraryUsage="TRUE"
+				ATLMinimizesCRunTimeLibraryUsage="true"
 				CharacterSet="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/fp:fast"
 				Optimization="0"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				OptimizeForProcessor="3"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="DEBUG;WIN32;_WINDOWS;FFTW_DLL;_CRTDBG_MAP_ALLOC;_WIN32_DCOM;_LIB;STRSAFE_NO_DEPRECATE;_X86_=1"
-				ExceptionHandling="TRUE"
+				ExceptionHandling="1"
 				RuntimeLibrary="1"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="FALSE"
-				ForceConformanceInForLoopScope="FALSE"
-				UsePrecompiledHeader="2"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="false"
+				ForceConformanceInForLoopScope="false"
+				RuntimeTypeInfo="true"
+				UsePrecompiledHeader="0"
 				PrecompiledHeaderThrough="streams.h"
 				PrecompiledHeaderFile="./Debug/convolverFilter.pch"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 				CallingConvention="0"
 				CompileAs="0"
+				EnablePREfast="true"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"
-				OpenMP="1"/>
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib kernel32.lib advapi32.lib user32.lib ole32.lib strmiids.lib uuid.lib libsndfile.lib"
 				ShowProgress="2"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="0"
-				SuppressStartupBanner="TRUE"
+				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_DEBUG&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
-				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreAllDefaultLibraries="false"
 				ModuleDefinitionFile="convolverFilter.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/$(ProjectName).pdb"
 				SubSystem="2"
 				EntryPointSymbol=""
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"
 				Command="C:\Program Files\foobar2000\foobar2000.exe"
@@ -94,91 +110,102 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="1"
-				ATLMinimizesCRunTimeLibraryUsage="TRUE"
+				ATLMinimizesCRunTimeLibraryUsage="true"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;_LIB;NDEBUG;_X86_=1"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="FALSE"
-				ForceConformanceInForLoopScope="FALSE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="false"
+				ForceConformanceInForLoopScope="false"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				PrecompiledHeaderThrough="streams.h"
 				PrecompiledHeaderFile="./Release/convolverFilter.pch"
 				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CallingConvention="0"
 				CompileAs="0"
+				GlobalOptimizations="1"
 				UseProcExt="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="libcmt.lib strmiids.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
-				SuppressStartupBanner="TRUE"
+				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
-				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreAllDefaultLibraries="false"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverFilter.def"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				EntryPointSymbol=""
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -189,101 +216,112 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="1"
-				ATLMinimizesCRunTimeLibraryUsage="TRUE"
+				ATLMinimizesCRunTimeLibraryUsage="true"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"
+				WholeProgramOptimization="1"
 				PGOPhase="0"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;FFTW_DLL;_WIN32_DCOM;_LIB;NDEBUG;_X86_=1"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="FALSE"
-				ForceConformanceInForLoopScope="FALSE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
+				OpenMP="false"
 				UsePrecompiledHeader="0"
 				PrecompiledHeaderThrough="streams.h"
 				PrecompiledHeaderFile="./Release/convolverFilter.pch"
-				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				WarningLevel="4"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CallingConvention="0"
 				CompileAs="0"
-				UseProcExt="0"
-				RequireProcExt="3"
+				GlobalOptimizations="1"
+				UseProcExt="2"
+				RequireProcExt="0"
 				LoopUnrolling=" "
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="libcmt.lib strmiids.lib quartz.lib vfw32.lib winmm.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)\ConvolverFilter.ax"
 				LinkIncremental="1"
-				SuppressStartupBanner="TRUE"
+				SuppressStartupBanner="true"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\XP32_RETAIL&quot;;&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;;&quot;$(OutDir)&quot;"
-				IgnoreAllDefaultLibraries="FALSE"
+				IgnoreAllDefaultLibraries="false"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverFilter.def"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				EntryPointSymbol=""
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
 		<Filter 
-			Name="Source Files"
-			Filter="">
+			Name="Source Files">
 			<File 
 				RelativePath=".\convolverFilter.cpp">
 			</File>
@@ -309,8 +347,7 @@
 				RelativePath=".\resource.h">
 			</File>
 			<Filter 
-				Name="convolution"
-				Filter="">
+				Name="convolution">
 				<File 
 					RelativePath="..\convolution\channelpaths.cpp">
 				</File>
@@ -379,8 +416,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="debugging"
-				Filter="">
+				Name="debugging">
 				<File 
 					RelativePath="..\debugging\debugging.cpp">
 				</File>
@@ -401,8 +437,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="BaseClasses"
-				Filter="">
+				Name="BaseClasses">
 				<File 
 					RelativePath="C:\Program Files\Microsoft Platform SDK for Windows Server 2003 R2\Samples\Multimedia\DirectShow\BaseClasses\amextra.cpp">
 				</File>

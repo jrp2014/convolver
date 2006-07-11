@@ -24,6 +24,7 @@
 #include <mediaerr.h>
 #include "convolution\factory.h"
 #include "convolution\dither.h"
+#include "convolution\channelpaths.h"
 
 //Floating-point samples use the range -1.0...1.0, inclusive.
 //Integer formats use the full signed range of their data type,
@@ -55,21 +56,206 @@ struct __declspec(novtable) __single_inheritance ConvertSample
 {
 	ConvertSample() {}
 
-	ConvertSample(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	virtual void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
+	virtual void GetSample(T& dstSample, 
+		const BYTE* & srcContainer,
+		const float fAttenuationFactor, 
+		DWORD& nBytesProcessed) const = 0;	// converts sample into a T (eg, float), [-1..1]
 
-	virtual void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const = 0;
+	virtual void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const = 0;
 
 	virtual WORD nContainerSize() const = 0;
 
 	virtual ~ConvertSample(void) = 0;
+
+private:
+	// No implementation
+	ConvertSample( const ConvertSample& );
+	const ConvertSample& operator=( const ConvertSample& );
 };
+
 
 template <typename T>
 inline ConvertSample<T>::~ConvertSample(void){}
+
+template <typename T>
+struct __declspec(novtable) __single_inheritance SampleIO
+{
+	SampleIO(const ConvertSample<T>* input_sample_convertor,
+		const ConvertSample<T>* output_sample_convertor) :
+	input_sample_convertor_(input_sample_convertor), output_sample_convertor_(output_sample_convertor)
+	{}
+
+	virtual ~SampleIO(void) = 0;
+
+	virtual void TransferFrame(ChannelPaths const& Mixer,
+		SampleBuffer& InputBuffer,
+		SampleBuffer& OutputBufferAccumulator,
+		const float fAttenuationFactor,
+		const DWORD nInputBufferIndex,
+		DWORD& cbInputBytesProcessed,
+		DWORD& cbOutputBytesGenerated) = 0;
+
+protected:
+	const ConvertSample<T>* const input_sample_convertor_;
+	const ConvertSample<T>* const output_sample_convertor_;
+
+private:
+	// No implementation
+	SampleIO( const SampleIO& );
+	const SampleIO& operator=( const SampleIO& );
+};
+
+template <typename T>
+inline SampleIO<T>::~SampleIO(void){}
+
+template <typename T>
+class InterleavedIO : public SampleIO<T>
+{
+public:
+	InterleavedIO(const BYTE pbInputData[], 
+		BYTE pbOutputData[],
+		const ConvertSample<BaseT>* input_sample_convertor,
+		const ConvertSample<BaseT>* output_sample_convertor) : 
+		pbInputData_(pbInputData), 
+		pbOutputData_(pbOutputData),
+		pbInputDataPointer_(pbInputData),
+		pbOutputDataPointer_(pbOutputData),
+		SampleIO<T>(input_sample_convertor, output_sample_convertor)
+	{}
+
+	void TransferFrame(ChannelPaths const& Mixer,
+		SampleBuffer& InputBuffer,
+		SampleBuffer& OutputBufferAccumulator,
+		const float fAttenuationFactor,
+		const DWORD nInputBufferIndex,
+		DWORD& cbInputBytesProcessed,
+		DWORD& cbOutputBytesGenerated)
+	{
+		//if(bStartWriting_)
+		//{
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
+		{
+			int nDelayedIndex = nInputBufferIndex - Mixer.nOutputSamplesDelay()[nChannel];
+			if(nDelayedIndex < 0)
+			{
+				nDelayedIndex += Mixer.nPartitionLength();
+			}
+			output_sample_convertor_->PutSample(pbOutputDataPointer_,
+				OutputBufferAccumulator[nChannel][nDelayedIndex],
+				nChannel, cbOutputBytesGenerated);
+		}
+		//}
+
+		// Get the next frame from pbInputDataPointer to InputBuffer_
+		// Output lags input by half a partition length
+#pragma loop count (8)
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
+		{
+			// Get the next input sample and convert it to a float, and scale it and delay it circularly
+			DWORD nDelayedIndex = nInputBufferIndex + Mixer.nInputSamplesDelay()[nChannel];
+			if(nDelayedIndex >= Mixer.nPartitionLength())
+			{
+				nDelayedIndex -= Mixer.nPartitionLength();
+			}
+			input_sample_convertor_->GetSample(InputBuffer[nChannel][nDelayedIndex],
+				pbInputDataPointer_, fAttenuationFactor, cbInputBytesProcessed);
+		} // nChannel
+	}
+
+private:
+	const BYTE* const pbInputData_;
+	const BYTE* pbOutputData_;
+
+	const BYTE* pbInputDataPointer_;
+	BYTE* pbOutputDataPointer_;
+
+private:
+	// No implementation
+	InterleavedIO( const InterleavedIO& );
+	const InterleavedIO& operator=( const InterleavedIO& );
+};
+
+template <typename SampleT, typename T>
+class VSTIO : public SampleIO<T>
+{
+public:
+	VSTIO(SampleT** inputs, 
+		SampleT** outputs,
+		const ConvertSample<T>* input_sample_convertor,
+		const ConvertSample<T>* output_sample_convertor) : 
+	SampleIO<T>(input_sample_convertor, output_sample_convertor),
+		inputs_(inputs), outputs_(outputs),
+		DataIndex_(0)
+	{}
+
+	void TransferFrame(ChannelPaths const& Mixer,
+		SampleBuffer& InputBuffer,
+		SampleBuffer& OutputBufferAccumulator,
+		const float fAttenuationFactor,
+		const DWORD nInputBufferIndex,
+		DWORD& cbInputBytesProcessed,
+		DWORD& cbOutputBytesGenerated)
+	{
+		//if(bStartWriting_)
+		//{
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
+		{
+			int nDelayedIndex = nInputBufferIndex - Mixer.nOutputSamplesDelay()[nChannel];
+			if(nDelayedIndex < 0)
+			{
+				nDelayedIndex += Mixer.nPartitionLength();
+			}
+
+			// TODO:: implement the add version
+			if(outputs_[nChannel] != NULL)
+			{
+				outputs_[nChannel][DataIndex_] = OutputBufferAccumulator[nChannel][nDelayedIndex];
+
+				cbOutputBytesGenerated += sizeof(T);
+			}
+		}
+
+		//}
+
+		// Get the next frame from pbInputDataPointer to InputBuffer_
+		// Output lags input by half a partition length
+#pragma loop count (8)
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
+		{
+			// Get the next input sample and convert it to a float, and scale it and delay it circularly
+			DWORD nDelayedIndex = nInputBufferIndex + Mixer.nInputSamplesDelay()[nChannel];
+			if(nDelayedIndex >= Mixer.nPartitionLength())
+			{
+				nDelayedIndex -= Mixer.nPartitionLength();
+			}
+
+			if(inputs_[nChannel] != NULL)
+			{
+				InputBuffer[nChannel][nDelayedIndex] = inputs_[nChannel][DataIndex_] * fAttenuationFactor;
+
+				cbInputBytesProcessed += sizeof(T);
+			}
+		} // nChannel
+
+		DataIndex_++;
+	}
+
+private:
+	SampleT** const inputs_;
+	SampleT** const outputs_;
+
+	int DataIndex_;
+
+private:
+	// No implementation
+	VSTIO( const VSTIO& );
+	const VSTIO& operator=( const VSTIO& );
+};
 
 // Specializations with the appropriate functions for accessing the sample buffer
 
@@ -81,7 +267,8 @@ struct ConvertSample_ieeefloat : ConvertSample<T>
 	ConvertSample_ieeefloat()
 	{}
 
-	ConvertSample_ieeefloat(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample_ieeefloat(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
@@ -92,9 +279,9 @@ struct ConvertSample_ieeefloat : ConvertSample<T>
 		nBytesProcessed += sizeof(float);
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{ 
-		*((float *) dstContainer) = srcSample;
+		*reinterpret_cast<float *>(dstContainer) = srcSample;
 		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
 		dstContainer += sizeof(float);
 		nBytesGenerated += sizeof(float);
@@ -104,6 +291,50 @@ struct ConvertSample_ieeefloat : ConvertSample<T>
 	{
 		return sizeof(float);
 	}
+
+private:
+	// No implementation
+	ConvertSample_ieeefloat( const ConvertSample_ieeefloat& );
+	const ConvertSample_ieeefloat& operator=( const ConvertSample_ieeefloat& );
+};
+
+// For ConvolverVST process
+template <typename T>
+struct ConvertAddSample_ieeefloat : ConvertSample<T>
+{
+
+	ConvertAddSample_ieeefloat()
+	{}
+
+	ConvertAddSample_ieeefloat(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
+		const WORD nChannels, const DWORD nSamplesPerSec)
+	{}
+
+	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	{
+		dstSample = *reinterpret_cast<const float *>(srcContainer) * fAttenuationFactor;
+		srcContainer += sizeof(float);
+		nBytesProcessed += sizeof(float);
+	}
+
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
+	{ 
+		*reinterpret_cast<float *>(dstContainer) += srcSample;
+		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
+		dstContainer += sizeof(float);
+		nBytesGenerated += sizeof(float);
+	}
+
+	WORD nContainerSize() const
+	{
+		return sizeof(float);
+	}
+
+private:
+	// No implementation
+	ConvertAddSample_ieeefloat( const ConvertAddSample_ieeefloat& );
+	const ConvertAddSample_ieeefloat& operator=( const ConvertAddSample_ieeefloat& );
 };
 
 template <typename T>
@@ -112,20 +343,22 @@ struct ConvertSample_ieeedouble : ConvertSample<T>
 	ConvertSample_ieeedouble()
 	{}
 
-	ConvertSample_ieeedouble(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample_ieeedouble(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, 
+		const float fAttenuationFactor, DWORD& nBytesProcessed) const
 	{
 		dstSample = *reinterpret_cast<const double *>(srcContainer) * fAttenuationFactor;
 		srcContainer += sizeof(double);
 		nBytesProcessed += sizeof(double);
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
 	{ 
-		*((double *) dstContainer) = srcSample;
+		*reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample);
 		//* reinterpret_cast<double*>(dstContainer) = static_cast<double>(srcSample); // TODO: find cleaner way to do this
 		dstContainer += sizeof(double);
 		nBytesGenerated += sizeof(double);
@@ -135,6 +368,11 @@ struct ConvertSample_ieeedouble : ConvertSample<T>
 	{
 		return sizeof(double);
 	}
+
+private:
+	// No implementation
+	ConvertSample_ieeedouble( const ConvertSample_ieeedouble& );
+	const ConvertSample_ieeedouble& operator=( const ConvertSample_ieeedouble& );
 };
 
 // 8-bit sound is 0..255 with 128 == silence
@@ -145,7 +383,8 @@ struct ConvertSample_pcm8 : ConvertSample<T>
 	ConvertSample_pcm8() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,8>(1))
 	{}
 
-	ConvertSample_pcm8(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample_pcm8(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper,
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{
 		switch(nDither)
@@ -213,11 +452,13 @@ struct ConvertSample_pcm8 : ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, const BYTE* & srcContainer, 
+		const float fAttenuationFactor, 
+		DWORD& nBytesProcessed) const
 	{
 
 		//const T Q = 1.0 / (float) 255;
-        //dstSample = (*srcContainer * Q - T(0.5)) * T(2.0) * fAttenuationFactor;	// 0->-1; 127->-.004 255->1
+		//dstSample = (*srcContainer * Q - T(0.5)) * T(2.0) * fAttenuationFactor;	// 0->-1; 127->-.004 255->1
 
 		const T Q = 1.0 / ((1 << (8-1)) - 0.5); // 1/127.5
 		dstSample = (*srcContainer - T(127.5)) * Q * fAttenuationFactor;  // Normalize [0..255] -> to [-1..1)
@@ -225,7 +466,7 @@ struct ConvertSample_pcm8 : ConvertSample<T>
 		++nBytesProcessed;
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
 	{   
 		//*dstContainer = static_cast<BYTE>(srcSample < T(-1.0) ? 0 : (srcSample > T(1.0) ? 255 : srcSample * T(127.5) + T(128.0))); 
 
@@ -244,6 +485,11 @@ struct ConvertSample_pcm8 : ConvertSample<T>
 private:
 	Holder<Dither<T> > dither_;
 	Holder<NoiseShape<T, INT16> > noiseshape_;
+
+private:
+	// No implementation
+	ConvertSample_pcm8( const ConvertSample_pcm8& );
+	const ConvertSample_pcm8& operator=( const ConvertSample_pcm8& );
 };
 
 // 16-bit sound is -32768..32767 with 0 == silence
@@ -253,7 +499,8 @@ struct ConvertSample_pcm16 : ConvertSample<T>
 	ConvertSample_pcm16() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT16,16>(1))
 	{}
 
-	ConvertSample_pcm16(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample_pcm16(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{
 		switch(nDither)
@@ -321,7 +568,9 @@ struct ConvertSample_pcm16 : ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const 
+	void GetSample(T& dstSample, const BYTE* & srcContainer, 
+		const float fAttenuationFactor, 
+		DWORD& nBytesProcessed) const 
 	{ 
 		const T Q = 2.0 / ((1 << 16) - 1.0); // 2/65535 
 
@@ -330,7 +579,7 @@ struct ConvertSample_pcm16 : ConvertSample<T>
 		nBytesProcessed += 2;
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
 	{   
 		*(INT16 *)dstContainer = noiseshape_->shapenoise(srcSample < T(-1.0) ? 
 			T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample), dither_.get_ptr(), nChannel);
@@ -347,6 +596,11 @@ struct ConvertSample_pcm16 : ConvertSample<T>
 private:
 	Holder<Dither<T> > dither_;
 	Holder<NoiseShape<T, INT16> > noiseshape_;
+
+private:
+	// No implementation
+	ConvertSample_pcm16( const ConvertSample_pcm16& );
+	const ConvertSample_pcm16& operator=( const ConvertSample_pcm16& );
 };
 
 // 24-bit sound
@@ -356,7 +610,8 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 	ConvertSample_pcm24() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
 
-	ConvertSample_pcm24(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
+	ConvertSample_pcm24(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper,
+		const typename Ditherer<T>::DitherType nDither,
 		const WORD nChannels, const DWORD nSamplesPerSec)
 	{
 		switch(nDither)
@@ -424,7 +679,10 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample,
+		const BYTE* & srcContainer, 
+		const float fAttenuationFactor, 
+		DWORD& nBytesProcessed) const
 	{
 
 		INT32 i = srcContainer[2];
@@ -450,7 +708,7 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 		nBytesProcessed += 3;
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const 
 	{   
 		// Clip if exceeded full scale.
 		const INT32 i = noiseshape_->shapenoise(srcSample < T(-1.0) ?
@@ -472,6 +730,12 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 private:
 	Holder<Dither<T> > dither_;
 	Holder<NoiseShape<T, INT32> > noiseshape_;
+
+private:
+	// No implementation
+	ConvertSample_pcm24( const ConvertSample_pcm24& );
+	const ConvertSample_pcm24& operator=( const ConvertSample_pcm24& );
+
 };
 
 // 32-bit sound
@@ -481,8 +745,10 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 	ConvertSample_pcm32() : dither_(new NoDither<T>()), noiseshape_(new NoNoiseShape<T,INT32,validBits>(1))
 	{}
 
-	ConvertSample_pcm32(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
-		const WORD nChannels, const DWORD nSamplesPerSec)
+	ConvertSample_pcm32(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
+		const WORD nChannels,
+		const DWORD nSamplesPerSec)
 	{
 		switch(nDither)
 		{
@@ -549,7 +815,10 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 		}
 	}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample, 
+		const BYTE* & srcContainer, 
+		const float fAttenuationFactor, 
+		DWORD& nBytesProcessed) const
 	{
 		const T Q = 1.0 / ( (1 << (validBits-2)) - 0.5 + (1 << (validBits-2)) );
 
@@ -559,7 +828,7 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 		nBytesProcessed += 4;
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{   
 		// Clip if exceeded full scale.
 		*(INT32 *)dstContainer = noiseshape_->shapenoise(srcSample < T(-1.0) ?
@@ -577,6 +846,11 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 private:
 	Holder<Dither<T> > dither_;
 	Holder<NoiseShape<T, INT32> > noiseshape_;
+
+private:
+	// No implementation
+	ConvertSample_pcm32( const ConvertSample_pcm32& );
+	const ConvertSample_pcm32& operator=( const ConvertSample_pcm32& );
 };
 
 // 32-bit sound. No dithering or shaping
@@ -586,11 +860,16 @@ struct ConvertSample_pcm32<T,32> : ConvertSample<T>
 	ConvertSample_pcm32()
 	{}
 
-	ConvertSample_pcm32(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, const typename Ditherer<T>::DitherType nDither,
-		const WORD nChannels, const DWORD nSamplesPerSec)
+	ConvertSample_pcm32(const typename NoiseShaper<T>::NoiseShapingType nNoiseShaper, 
+		const typename Ditherer<T>::DitherType nDither,
+		const WORD nChannels,
+		const DWORD nSamplesPerSec)
 	{}
 
-	void GetSample(T& dstSample, const BYTE* & srcContainer, const float fAttenuationFactor, DWORD& nBytesProcessed) const
+	void GetSample(T& dstSample,
+		const BYTE* & srcContainer, 
+		const float fAttenuationFactor,
+		DWORD& nBytesProcessed) const
 	{
 		const T Q = 1.0 / ( (1 << (32-2)) - 0.5 + (1 << (32-2)) );
 
@@ -600,7 +879,7 @@ struct ConvertSample_pcm32<T,32> : ConvertSample<T>
 		nBytesProcessed += 4;
 	}
 
-	void PutSample(BYTE*& dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
+	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{   
 		const T q = ( (1 << (32-2)) - 0.5 + (1 << (32-2)) ); // (2^31 - 0.5)
 
@@ -616,6 +895,11 @@ struct ConvertSample_pcm32<T,32> : ConvertSample<T>
 	{
 		return 4;
 	}
+
+private:
+	// No implementation
+	ConvertSample_pcm32( const ConvertSample_pcm32& );
+	const ConvertSample_pcm32& operator=( const ConvertSample_pcm32& );
 };
 
 
@@ -652,7 +936,7 @@ struct SampleFormatId
 		{
 			cdebug << "Unrecognised ";
 		}
-		
+
 		cdebug << "Format:";
 
 		if(wFormatTag == WAVE_FORMAT_EXTENSIBLE)
@@ -685,8 +969,8 @@ template <typename T>
 class ConvertSampleMaker
 {
 private:
-	typedef typename ObjectFactory<ConvertSample<T> *(typename NoiseShaper<T>::NoiseShapingType, typename Ditherer<T>::DitherType,
-		WORD, DWORD), SampleFormatId> FactoryType;
+	typedef typename ObjectFactory<ConvertSample<T> *(typename NoiseShaper<T>::NoiseShapingType,
+		typename Ditherer<T>::DitherType, WORD, DWORD), SampleFormatId> FactoryType;
 
 public:
 	ConvertSampleMaker()

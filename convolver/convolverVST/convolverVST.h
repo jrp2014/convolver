@@ -18,18 +18,28 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 /////////////////////////////////////////////////////////////////////////////
+//
+//$Workfile: convolverVST.h $ 
+//$Revision: 32 $
+//$Date: 10/07/06 23:14 $
+//$Modtime: 10/07/06 23:14 $
+//
 #pragma once
 
+
+
 #include "convolution\config.h"
-
-
-#include "convolvervsteditor.h"
-
 #include "public.sdk\source\vst2.x\audioeffectx.h"
-
-
-
+#include "convolvervsteditor.h"
+#include "cfileselector.h"
 #include "convolution\convolution.h"
+
+// registry location for preferences
+const TCHAR kszPrefsRegKey[] = _T("Software\\Convolver\\VST Plugin");
+const TCHAR kszPrefsAttenuation[] = _T("Attenuation");
+const TCHAR kszPrefsFilterFileName[] = _T("FilterFileName");
+const TCHAR kszPrefsPartitions[] = _T("Partitions");
+const TCHAR kszPrefsPlanningRigour[] = _T("PlanningRigour");
 
 enum
 {
@@ -46,16 +56,13 @@ enum
 
 const VstInt32 MAX_ATTENUATION_DB_VST = 200;
 
-const VstInt32 kMaxInputs = 1;
-const VstInt32 kMaxOutputs = 1;
-
 class ConvolverVSTProgram
 {
 public:
 	ConvolverVSTProgram ();
 	~ConvolverVSTProgram () {}
 
-	float fAttenuationdB;
+	float fAttenuation_db;
 	DWORD nPartitions;
 	PlanningRigour::Degree nPlanningRigour;
 
@@ -72,7 +79,7 @@ public:
 	ConvolverVST (audioMasterCallback audioMaster);
 	~ConvolverVST ();
 
-	//virtual void process (float **inputs, float **outputs, VstInt32 sampleFrames);
+	virtual void process (float **inputs, float **outputs, VstInt32 sampleFrames);
 	virtual void processReplacing (float **inputs, float **outputs, VstInt32 sampleFrames);
 	virtual void processDoubleReplacing (double** inputs, double** outputs, VstInt32 sampleFrames);
 
@@ -99,12 +106,12 @@ public:
 	virtual void setSampleRate  (  float  sampleRate   );
 	//virtual void close () {}	// Called when plug-in will be released
 	//virtual void suspend () {}	// Called when plug-in is switched to off
-	virtual void resume ();	// Called when plug-in is switched to on
+	//virtual void resume ();	// Called when plug-in is switched to on
 
 	virtual bool getEffectName (char* name);
 	virtual bool getVendorString (char* text);
 	virtual bool getProductString (char* text);
-	virtual VstInt32 getVendorVersion () { return 4000; }
+	virtual VstInt32 getVendorVersion () { return 4300; }
 
 	virtual VstPlugCategory getPlugCategory () { return /* kPlugCategEffect */ kPlugCategRoomFx ; }
 	virtual VstInt32 ConvolverVST::canDo  (char*  text);
@@ -117,37 +124,60 @@ public:
 	virtual bool getSpeakerArrangement (VstSpeakerArrangement** pluginInput, VstSpeakerArrangement** pluginOutput);
 	virtual bool setSpeakerArrangement (VstSpeakerArrangement* pluginInput, VstSpeakerArrangement* pluginOutput);
 
+	virtual void SelectFilter();
+
+	virtual const Holder< Convolution<BaseT>, Thread_Mutex >& getConvolution(){ return m_Convolution; }
+	virtual const TCHAR* getFilterFileName ()
+	{
+		return m_szFilterFileName[0] == 0 ? TEXT("<- Select a filter or config") : m_szFilterFileName;
+	}
+
 protected:
+
 	void setFilterFilename(TCHAR m_szFilterFileName[MAX_PATH]);
 
-	float fAttenuationdB;
-	DWORD nPartitions;
-	PlanningRigour::Degree nPlanningRigour;
-	WAVEFORMATEX WaveIn, WaveOut;				// Used to select the right filter
+	template<typename T>
+	void processBase (T **inputs, T **outputs, VstInt32 sampleFrames, 
+		const ConvertSample<BaseT> * InputConvertor,
+		const ConvertSample<BaseT> * OutputConvertor);
+
+	void abort(const TCHAR* lpText);
+	int warn(const TCHAR* lpText);
+
+	bool m_bAborted;
+
+	float m_fAttenuation_db;
+	DWORD m_nPartitions;
+	PlanningRigour::Degree m_nPlanningRigour;
 
 	TCHAR m_szFilterFileName[MAX_PATH];
-	Holder< ConvolutionList<BaseT>, Thread_Mutex >	m_ConvolutionList;			// Processing class.
+	Holder< Convolution<BaseT>, Thread_Mutex >	m_Convolution;			// Processing class.
+	Holder< ConvertSample<BaseT> > m_ConvertAddfloat;
 	Holder< ConvertSample<BaseT> > m_Convertfloat;
 	Holder< ConvertSample<BaseT> > m_Convertdouble;
 
-	ConvolverVSTProgram *programs;
-	VstSpeakerArrangement* plugInput;
-	VstSpeakerArrangement* plugOutput;
+	ConvolverVSTProgram *m_programs;
 
-	VstInt32  MasterVersion;	// The Host's version (for example 2400 for VST 2.4). 
+	VstSpeakerArrangement* m_plugInput;
+	VstSpeakerArrangement* m_plugOutput;
 
-	char HostVendorString[64];		// A string identifying the vendor. 
-	char HostProductString[64];		// product name. 
-	VstInt32  HostVendorVersion;	// vendor-specific version (for example 3200 for Nuendo 3.2). 
-	VstHostLanguage HostLanguage;	// the Host's language (VstHostLanguage).  
+	VstInt32  m_MasterVersion;	// The Host's version (for example 2400 for VST 2.4). 
 
-
-	bool bOpened;
-	bool bSampleRateSet;
-	bool bAborted;
-
-	void abort(LPCTSTR lpText);
-	int warn(LPCTSTR lpText);
-
+	char m_HostVendorString[64];		// A string identifying the vendor. 
+	char m_HostProductString[64];		// product name. 
+	VstInt32  m_HostVendorVersion;	// vendor-specific version (for example 3200 for Nuendo 3.2). 
+	VstHostLanguage m_HostLanguage;	// the Host's language (VstHostLanguage).  
 };
 
+
+// Helper functions
+float int201float(const VstInt32 index, const int value);
+int float2int(const VstInt32 index, const float value);
+float float2dB(const float value);
+float db201float(const float value);
+
+float decode_Attenuationdb(const DWORD dwValue);
+DWORD encode_Attenuationdb(const float fValue);
+
+void displayPartitions(float value, char *string);
+void displayAttenuation(float value, char *string);

@@ -450,7 +450,7 @@ HRESULT CconvolverFilterProperties::OnActivate()
 		Edit_SetText(GetDlgItem(m_Dlg, IDC_NOOFPARTITIONS), sz);
 	}
 
-	unsigned int nPlanningRigour = 
+	PlanningRigour::PlanningRigourType nPlanningRigour = 
 #ifdef FFTW
 		PlanningRigour::Measure;		// Set "Measure" as the default
 #else

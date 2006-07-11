@@ -95,9 +95,7 @@ void Convolution<T>::Flush()
 // This version of the convolution routine does partitioned convolution
 template <typename T>
 DWORD
-Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-										 const ConvertSample<T>* input_sample_convertor,	// The functionoid for converting between BYTE* and T
-										 const ConvertSample<T>* output_sample_convertor,	// The functionoid for converting between T and BYTE*
+Convolution<T>::doPartitionedConvolution(SampleIO<T>& sampleio,
 										 DWORD dwBlocksToProcess,					// A block contains a sample for each channel
 										 const T fAttenuation_db)					// Returns bytes processed
 {
@@ -112,44 +110,17 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
 
-	const BYTE* pbInputDataPointer = pbInputData;
-	BYTE* pbOutputDataPointer = pbOutputData;
-
 	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
 	while (dwBlocksToProcess--)	// Frames to process
-	{
-		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
-
-		//if(bStartWriting_)
-		//{
-			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
-			{
-				int nDelayedIndex = nInputBufferIndex_ - Mixer.nOutputSamplesDelay()[nChannel];
-				if(nDelayedIndex < 0)
-				{
-					nDelayedIndex += Mixer.nPartitionLength();
-				}
-				output_sample_convertor->PutSample(pbOutputDataPointer,
-					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					nChannel, cbOutputBytesGenerated);
-			}
-		//}
-
-		// Get the next frame from pbInputDataPointer to InputBuffer_
-		// Output lags input by half a partition length
-#pragma loop count (8)
-		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
-		{
-			// Get the next input sample and convert it to a float, and scale it and delay it circularly
-			DWORD nDelayedIndex = nInputBufferIndex_ + Mixer.nInputSamplesDelay()[nChannel];
-			if(nDelayedIndex >= Mixer.nPartitionLength())
-			{
-				nDelayedIndex -= Mixer.nPartitionLength();
-			}
-			input_sample_convertor->GetSample(InputBuffer_[nChannel][nDelayedIndex],
-				pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
-		} // nChannel
+	{	
+		sampleio.TransferFrame(Mixer,
+			InputBuffer_,
+			OutputBufferAccumulator_,
+			fAttenuationFactor,
+			nInputBufferIndex_,
+			cbInputBytesProcessed,
+			cbOutputBytesGenerated);
 
 		// Got a frame
 
@@ -262,9 +233,7 @@ Convolution<T>::doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutput
 // This version of the convolution routine is just plain overlap-save.
 template <typename T>
 DWORD
-Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-							  const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-							  const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+Convolution<T>::doConvolution(SampleIO<T>& sampleio,
 							  DWORD dwBlocksToProcess,						// A block contains a sample for each channel
 							  const T fAttenuation_db)						// Returns bytes processed
 {
@@ -286,44 +255,17 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 	DWORD cbInputBytesProcessed = 0;
 	DWORD cbOutputBytesGenerated = 0;
 
-	const BYTE* pbInputDataPointer = pbInputData;
-	BYTE* pbOutputDataPointer = pbOutputData;
-
 	const float fAttenuationFactor = powf(10, fAttenuation_db / 20.0f);
 
 	while (dwBlocksToProcess--)
 	{
-		// Channels are stored sequentially in a frame (ie, they are interleaved on the channel)
-
-		//if(bStartWriting_)
-		//{
-#pragma loop count(8)
-			for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
-			{
-				int nDelayedIndex = nInputBufferIndex_ - Mixer.nOutputSamplesDelay()[nChannel];
-				if(nDelayedIndex < 0)
-				{
-					nDelayedIndex += Mixer.nPartitionLength();
-				}
-				output_sample_convertor->PutSample(pbOutputDataPointer,
-					OutputBufferAccumulator_[nChannel][nDelayedIndex],
-					nChannel, cbOutputBytesGenerated);
-			}
-		//}
-
-		// Get the next frame from pbInputDataPointer to InputBuffer_
-#pragma loop count(8)
-		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
-		{
-			// Get the next input sample and convert it to a float, and scale it and delay it circularly
-			DWORD nDelayedIndex = nInputBufferIndex_ + Mixer.nInputSamplesDelay()[nChannel];
-			if(nDelayedIndex >= Mixer.nPartitionLength())
-			{
-				nDelayedIndex -= Mixer.nPartitionLength();
-			}
-			input_sample_convertor->GetSample(InputBuffer_[nChannel][nDelayedIndex],
-				pbInputDataPointer, fAttenuationFactor, cbInputBytesProcessed);
-		} // nChannel
+		sampleio.TransferFrame(Mixer,
+			InputBuffer_,
+			OutputBufferAccumulator_,
+			fAttenuationFactor,
+			nInputBufferIndex_,
+			cbInputBytesProcessed,
+			cbOutputBytesGenerated);
 
 		// Got a frame
 
@@ -421,7 +363,7 @@ Convolution<T>::doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
 }
 
 template <typename T>
-void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPath)
+void Convolution<T>::mix_input(ChannelPaths::ChannelPath const& thisPath)
 {
 
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.inChannel.size();
@@ -539,8 +481,8 @@ void Convolution<T>::mix_input(const ChannelPaths::ChannelPath& restrict thisPat
 }
 
 template <typename T>
-void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-								const ChannelBuffer& restrict Output, const DWORD to)
+void Convolution<T>::mix_output(ChannelPaths::ChannelPath const& thisPath, SampleBuffer& Accumulator, 
+								ChannelBuffer const& Output, const DWORD to)
 {
 	// Don't zero the Accumulator as it can accumulate from more than one output
 	const ChannelPaths::ChannelPath::size_type nChannels = thisPath.outChannel.size();
@@ -595,8 +537,10 @@ void Convolution<T>::mix_output(const ChannelPaths::ChannelPath& restrict thisPa
 
 #ifdef FFTW
 template <typename T>
-void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-										fftwf_complex* restrict result, const ChannelBuffer::size_type count)
+void inline Convolution<T>::complex_mul(const fftwf_complex* const RESTRICT in1,
+										const fftwf_complex* const RESTRICT in2,
+										fftwf_complex* RESTRICT result,
+										const ChannelBuffer::size_type count)
 {
 #pragma ivdep
 #pragma loop count (65536)
@@ -614,8 +558,10 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* restrict in1, const
 }
 
 template <typename T>
-void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-											fftwf_complex* restrict result, const ChannelBuffer::size_type count)
+void inline Convolution<T>::complex_mul_add(const fftwf_complex* const RESTRICT in1, 
+											const fftwf_complex* const RESTRICT in2,
+											fftwf_complex* RESTRICT result,
+											const ChannelBuffer::size_type count)
 {
 #pragma ivdep
 #pragma loop count (65536)
@@ -637,7 +583,7 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* restrict in1, c
 
 /* Complex multiplication */
 template <typename T>
-void inline Convolution<T>::cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const ChannelBuffer::size_type N)
+void inline Convolution<T>::cmult(const ChannelBuffer& RESTRICT A, const ChannelBuffer& RESTRICT B, ChannelBuffer& RESTRICT C, const ChannelBuffer::size_type N)
 {
 	//__declspec(align( 16 )) float T1;
 	//__declspec(align( 16 )) float T2;
@@ -674,7 +620,7 @@ void inline Convolution<T>::cmult(const ChannelBuffer& restrict A, const Channel
 
 /* Complex multiplication with addition */
 template <typename T>
-void inline Convolution<T>::cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C, const ChannelBuffer::size_type N)
+void inline Convolution<T>::cmultadd(const ChannelBuffer& RESTRICT A, const ChannelBuffer& RESTRICT B, ChannelBuffer& RESTRICT C, const ChannelBuffer::size_type N)
 {
 	//__declspec(align( 16 )) float T1;
 	//__declspec(align( 16 )) float T2;
@@ -821,12 +767,14 @@ HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bo
 #endif
 	// nPartitions == 0 => use overlap-save version
 	DWORD nBytesGenerated = overlapsave && nPartitions_ == 1 ?
-		doConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-		convertor.get_ptr(), convertor.get_ptr(),
+		doConvolution(InterleavedIO<BaseT>(reinterpret_cast<BYTE*>(&InputSamples[0]),
+		reinterpret_cast<BYTE*>(&OutputSamples[0]),
+		convertor.get_ptr(), convertor.get_ptr()),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0)
-		: doPartitionedConvolution(reinterpret_cast<BYTE*>(&InputSamples[0]), reinterpret_cast<BYTE*>(&OutputSamples[0]),
-		convertor.get_ptr(), convertor.get_ptr(),
+		: doPartitionedConvolution(InterleavedIO<BaseT>(reinterpret_cast<BYTE*>(&InputSamples[0]),
+		reinterpret_cast<BYTE*>(&OutputSamples[0]),
+		convertor.get_ptr(), convertor.get_ptr()),
 		/* dwBlocksToProcess */ nBlocks,
 		/* fAttenuation_db */ 0);
 

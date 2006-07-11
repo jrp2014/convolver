@@ -118,6 +118,8 @@ BOOL APIENTRY DllMain(HANDLE hModule,
 //
 STDAPI DllRegisterServer(void)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::DllRegisterServer")));
+
 	//return AMovieDllRegisterServer2(TRUE);
 	HRESULT hr = AMovieDllRegisterServer2(TRUE);
 	if (FAILED(hr))
@@ -143,7 +145,7 @@ STDAPI DllRegisterServer(void)
 			TRANSFORM_NAME,                  // Filter name.
 			NULL,                            // Device moniker. 
 			&CLSID_LegacyAmFilterCategory,	 // DirectShow filter
-			TRANSFORM_NAME,					 // Instance data.
+			NULL,							 // Instance data.
 			&rf2convolverFilterReg           // Filter information.
 			);
 	}
@@ -159,6 +161,8 @@ STDAPI DllRegisterServer(void)
 //
 STDAPI DllUnregisterServer()
 {
+	DbgLog((LOG_TRACE, 3, TEXT("CconvolverFilter::DllUnregisterServer")));
+
 	//return AMovieDllRegisterServer2(FALSE);
 	HRESULT hr = AMovieDllRegisterServer2(FALSE);
 	if (FAILED(hr))
@@ -194,7 +198,7 @@ m_InputSampleConvertor(NULL),
 m_OutputSampleConvertor(NULL)
 {
 #if defined(DEBUG) | defined(_DEBUG)
-	DbgSetModuleLevel(LOG_ERROR|LOG_LOCKING|LOG_MEMORY|LOG_TIMING|LOG_TRACE, 0);
+	DbgSetModuleLevel(LOG_ERROR|LOG_LOCKING|LOG_MEMORY|LOG_TIMING|LOG_TRACE, 2);
 
 	// 3 = function call trace
 	apDebug::gOnly().set(3);
@@ -261,14 +265,14 @@ m_OutputSampleConvertor(NULL)
 		if (ERROR_SUCCESS == lResult)
 		{
 			// Convert the DWORD to a unsigned int.
-			m_nPlanningRigour = dwValue;
+			m_nPlanningRigour = static_cast<PlanningRigour::Degree>(dwValue);
 		}
 
 		// Read the dither that the convolution routine should use
 		lResult = key.QueryDWORDValue(kszPrefsDither, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			m_nDither = Ditherer<float>::DitherType(dwValue);
+			m_nDither = Ditherer<BaseT>::DitherType(dwValue);
 		}
 
 		
@@ -276,12 +280,12 @@ m_OutputSampleConvertor(NULL)
 		lResult = key.QueryDWORDValue(kszPrefsNoiseShaping, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			m_nNoiseShaping = NoiseShaper<float>::NoiseShapingType(dwValue);
+			m_nNoiseShaping = NoiseShaper<BaseT>::NoiseShapingType(dwValue);
 		}
 
 		try // creating m_ConvolutionList might throw
 		{
-			m_ConvolutionList.set_ptr(new ConvolutionList<float>(m_szFilterFileName,
+			m_ConvolutionList.set_ptr(new ConvolutionList<BaseT>(m_szFilterFileName,
 				m_nPartitions == 0 ? 1 : m_nPartitions,	m_nPlanningRigour)); // 0 partitions = overlap-save
 		}
 		catch (...) 
@@ -305,6 +309,8 @@ m_OutputSampleConvertor(NULL)
 //
 CUnknown *CconvolverFilter::CreateInstance(LPUNKNOWN punk, HRESULT *phr)
 {
+	DbgLog((LOG_TRACE, 3, TEXT("CconvolverFilter::CreateInstance")));
+
 	CconvolverFilter *pNewObject = new CconvolverFilter(NAME("ConvolverFilter"), punk, phr);
 	if (pNewObject == NULL) {
 		*phr = E_OUTOFMEMORY;
@@ -319,6 +325,8 @@ CUnknown *CconvolverFilter::CreateInstance(LPUNKNOWN punk, HRESULT *phr)
 //
 STDMETHODIMP CconvolverFilter::NonDelegatingQueryInterface(REFIID riid, void **ppv)
 {
+	DbgLog((LOG_TRACE, 3, TEXT("CconvolverFilter::NonDelegatingQueryInterface")));
+
 	CheckPointer(ppv,E_POINTER);
 
 	if (riid == IID_IconvolverFilter) {
@@ -337,10 +345,10 @@ STDMETHODIMP CconvolverFilter::NonDelegatingQueryInterface(REFIID riid, void **p
 //
 HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 {
+	DbgLog((LOG_TRACE, 3, TEXT("CconvolverFilter::Transform")));
+
 	CheckPointer(pIn, E_POINTER);
 	CheckPointer(pOut, E_POINTER);
-	assert(m_pInput);
-	assert(m_pOutput);
 
 	HRESULT hr = S_OK;
 
@@ -377,6 +385,7 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	}
 
 	// input
+	CheckPointer(m_pInput, E_UNEXPECTED);
 	const AM_MEDIA_TYPE* pTypeIn = &m_pInput->CurrentMediaType();
 	BYTE *pbSrc = NULL;
 	hr = pIn->GetPointer((BYTE **)&pbSrc); // retrieve a read/write pointer to the media sample's buffer.
@@ -384,9 +393,10 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	{
 		return hr;
 	}
-	assert(pIn);
+	CheckPointer(pbSrc, E_UNEXPECTED);
 
 	// output
+	CheckPointer(m_pOutput, E_UNEXPECTED);
 	AM_MEDIA_TYPE *pTypeOut = &m_pOutput->CurrentMediaType();
 	hr = pOut->SetMediaType(pTypeOut);
 	BYTE *pbDst = NULL;
@@ -395,7 +405,7 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	{
 		return hr;
 	}
-	assert(pOut);
+	CheckPointer(pbDst, E_UNEXPECTED);
 
 	// Get sizes
 	const DWORD cbOutputMaxLength = pOut->GetSize();
@@ -407,22 +417,29 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 	// This should never happen if DecideBufferSize did its job
 	if (cbBytesThatWouldBeGenerated > cbOutputMaxLength)
 	{
-		return E_ABORT;
+		return VFW_E_BUFFER_OVERFLOW;
 	}
 
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	assert(cbBytesToProcess % m_WaveInXT.Format.nBlockAlign == 0);
 	DWORD dwBlocksToProcess = (cbBytesToProcess / m_WaveInXT.Format.nBlockAlign);
 
+	if(pIn->IsDiscontinuity() == S_OK)
+	{
+		m_ConvolutionList->SelectedConvolution().Flush();
+	}
+
 	DWORD cbBytesGenerated = m_nPartitions == 0 ?
-		m_ConvolutionList->SelectedConvolution().doConvolution(pbSrc, pbDst,
-		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
+		m_ConvolutionList->SelectedConvolution().doConvolution(InterleavedIO<BaseT>(pbSrc, pbDst,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr()),
 		dwBlocksToProcess,
 		m_fAttenuation_db)
-		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbSrc, pbDst,
-		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
+		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(InterleavedIO<BaseT>(pbSrc, pbDst,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr()),
 		dwBlocksToProcess,
 		m_fAttenuation_db);
+
+	assert(cbBytesThatWouldBeGenerated == cbBytesGenerated);
 
 	assert(pOut->GetSize() >= cbBytesGenerated);
 	// Set the size of the valid data in the output buffer.
@@ -434,123 +451,12 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 
 	assert(!pTypeIn->bTemporalCompression);
 
-		// Not necessary to copy these, as it is done already by Receive
 	if(cbBytesGenerated > 0)
 	{
-		//	pOut->SetSyncPoint(TRUE); // As bTemporalCompression member of the AM_MEDIA_TYPE structure is FALSE, all samples are synchronization points.             
-		// 		// Copy the preroll property
-		//	// TODO: This may not be quite right because of latency
-		//	hr = pIn->IsPreroll();
-		//	if (hr == S_OK)
-		//	{
-		//		hr = pOut->SetPreroll(TRUE);
-		//		if (FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
-		//	else if (hr == S_FALSE)
-		//	{
-		//		hr = pOut->SetPreroll(FALSE);
-		//		if (FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
-		//	else
-		//	{  // an unexpected error has occured...
-		//		return hr;
-		//	}
-
-		//// Copy the discontinuity property
-		//// TODO: This may not be quite right because of latency
-		//hr = pIn->IsDiscontinuity();
-		//if (hr == S_OK) {
-		//	hr = pOut->SetDiscontinuity(TRUE);
-		//	if (FAILED(hr))
-		//	{
-		//		return hr;
-		//	}
-		//}
-		//else if (hr == S_FALSE) {
-		//	hr = pOut->SetDiscontinuity(FALSE);
-		//	if (FAILED(hr))
-		//	{
-		//		return hr;
-		//	}
-		//}
-		//else
-		//{  // an unexpected error has occured...
-		//	return hr;
-		//}
-
-		//// Copy the sample times
-
-		//	REFERENCE_TIME TimeStart=0, TimeEnd=0;
-		//	if (S_OK == pIn->GetTime(&TimeStart, &TimeEnd))
-		//	{
-		//		// TODO: this is not yet right
-		//		// Each unit of reference time is 100 nanoseconds
-		//		//const REFERENCE_TIME latency = ::MulDiv(m_ConvolutionList->SelectedConvolution().cbLookAhead(m_InputSampleConvertor.get_ptr(),
-		//		//	m_WaveInXT.Format.nChannels), UNITS, m_WaveInXT.Format.nAvgBytesPerSec);
-		//		//assert(TimeStart > latency); // fails
-		//		//assert(TimeEnd > TimeStart);
-		//		//TimeStart -= latency;
-		//		//TimeEnd -= latency;
-
-		//		//StartTime += m_pInput->CurrentStartTime( );
-		//		//StopTime  += m_pInput->CurrentStartTime( );
-
-		//		hr = pOut->SetTime(&TimeStart, &TimeEnd);
-		//		if(FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
-		//	else
-		//	{
-		//		hr = pOut->SetTime(NULL, NULL); // This will cause the IMediaSample::GetTime method to return VFW_E_SAMPLE_TIME_NOT_SET.
-		//		if(FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
-
-		//	LONGLONG MediaStart=0, MediaEnd=0;
-		//	if (pIn->GetMediaTime(&MediaStart, &MediaEnd) == NOERROR)
-		//	{
-		//		//LONGLONG latency = ::MulDiv(m_ConvolutionList->cbLookAhead(m_InputSampleConvertor), UNITS, pWaveOut->nAvgBytesPerSec);
-		//		//MediaStart -= latency;
-		//		//MediaEnd -= latency;
-		//		hr = pOut->SetMediaTime(&MediaStart, &MediaEnd);
-		//		if(FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
-		//	else
-		//	{
-		//		hr = pOut->SetMediaTime(NULL, NULL); // This will cause the IMediaSample::GetMediaTime method to return VFW_E_MEDIA_TIME_NOT_SET
-		//		if(FAILED(hr))
-		//		{
-		//			return hr;
-		//		}
-		//	}
 		return S_OK;
 	}
 	else // no bytes generated yet
 	{
-		//hr = pOut->SetTime(NULL, NULL); // This will cause the IMediaSample::GetTime method to return VFW_E_SAMPLE_TIME_NOT_SET.
-		//if(FAILED(hr))
-		//{
-		//	return hr;
-		//}
-
-		//	hr = pOut->SetMediaTime(NULL, NULL); // This will cause the IMediaSample::GetMediaTime method to return VFW_E_MEDIA_TIME_NOT_SET
-		//	if(FAILED(hr))
-		//	{
-		//		return hr;
-		//	}
 		return S_FALSE; // Don't deliver
 	}
 }
@@ -562,8 +468,13 @@ HRESULT CconvolverFilter::Transform(IMediaSample *pIn, IMediaSample *pOut)
 //
 HRESULT CconvolverFilter::CheckInputType(const CMediaType *mtIn)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::CheckInputType")));
 
 	CheckPointer(mtIn, E_POINTER);
+#ifdef DEBUG
+	DisplayType(TEXT("mtIn:"), (AM_MEDIA_TYPE*)(mtIn));
+#endif
+	assert(mtIn->IsValid());
 
 	if(((mtIn->majortype != MEDIATYPE_Audio) && (mtIn->majortype != MEDIATYPE_NULL)) ||
 		((mtIn->subtype != MEDIASUBTYPE_PCM) && (mtIn->subtype != MEDIASUBTYPE_IEEE_FLOAT) && (mtIn->subtype != MEDIASUBTYPE_NULL)) ||
@@ -615,9 +526,15 @@ HRESULT CconvolverFilter::CheckInputType(const CMediaType *mtIn)
 //
 HRESULT CconvolverFilter::CheckTransform(const CMediaType *mtIn, const CMediaType *mtOut)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::CheckTransform")));
+
 	// Health check.
 	CheckPointer(mtIn, E_POINTER);
 	CheckPointer(mtOut, E_POINTER);
+#ifdef DEBUG
+	DisplayType(TEXT("mtIn:"), (AM_MEDIA_TYPE*)(mtIn));
+	DisplayType(TEXT("mtOut:"), (AM_MEDIA_TYPE*)(mtOut));
+#endif
 
 	if(((mtIn->majortype != MEDIATYPE_Audio) && (mtIn->majortype != MEDIATYPE_NULL)) ||
 		((mtIn->subtype != MEDIASUBTYPE_PCM) && (mtIn->subtype != MEDIASUBTYPE_IEEE_FLOAT) &&
@@ -678,14 +595,17 @@ HRESULT CconvolverFilter::CheckTransform(const CMediaType *mtIn, const CMediaTyp
 //
 HRESULT CconvolverFilter::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *pProp)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::DecideBufferSize")));
+
 	// Is the input pin connected
+	CheckPointer(m_pInput, E_UNEXPECTED);
 	if (m_pInput->IsConnected() == FALSE)
 	{
 		return E_UNEXPECTED;
 	}
 
-	ASSERT(pAlloc);
-	ASSERT(pProp);
+	CheckPointer(pAlloc, E_POINTER);
+	CheckPointer(pProp, E_POINTER);
 
 	const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
 	if(m_ConvolutionList.get_ptr() == NULL)
@@ -765,8 +685,14 @@ HRESULT CconvolverFilter::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROP
 //
 HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 {
-	ASSERT(m_pInput->IsConnected());
-	ASSERT(pMediaType != NULL);
+
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::GetMediaType %d"), iPosition));
+
+	CheckPointer(m_pInput, E_UNEXPECTED);
+	if(!m_pInput->IsConnected())
+		return E_UNEXPECTED;
+
+	CheckPointer(pMediaType, E_POINTER);
 
 	if (iPosition < 0)
 	{
@@ -802,11 +728,11 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 	pMediaType->SetType(&MEDIATYPE_Audio);
 	pMediaType->SetSubtype(&m_FormatSpecs[dwFormatSpecIndex].SubType);
 
-
 	pMediaType->bFixedSizeSamples = true; // Actually already done in InitMediaType
 	pMediaType->SetTemporalCompression(false);
 	pMediaType->SetFormatType(&FORMAT_WaveFormatEx);
-	assert( m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample % 8 == 0);
+	pMediaType->pUnk = NULL;
+	assert(m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample % 8 == 0);
 
 	if(WAVE_FORMAT_EXTENSIBLE == m_FormatSpecs[dwFormatSpecIndex].wFormatTag)
 	{
@@ -821,7 +747,7 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 		pWaveXT->Format.nSamplesPerSec = m_ConvolutionList->Conv(dwPathIndex).Mixer.nSamplesPerSec();
 		pWaveXT->Format.wBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample;
 		pWaveXT->Format.nBlockAlign = pWaveXT->Format.nChannels * m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8;
-		pMediaType->SetSampleSize(m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8);
+		pMediaType->SetSampleSize(pWaveXT->Format.nBlockAlign);
 		pWaveXT->Format.nAvgBytesPerSec = pWaveXT->Format.nSamplesPerSec * pWaveXT->Format.nBlockAlign;
 
 		pWaveXT->Samples.wValidBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wValidBitsPerSample;
@@ -842,7 +768,7 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 		pWave->nSamplesPerSec = m_ConvolutionList->Conv(dwPathIndex).Mixer.nSamplesPerSec();
 		pWave->wBitsPerSample = m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample;
 		pWave->nBlockAlign = pWave->nChannels *  m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8;
-		pMediaType->SetSampleSize(m_FormatSpecs[dwFormatSpecIndex].wBitsPerSample / 8);
+		pMediaType->SetSampleSize(pWave->nBlockAlign);
 		pWave->nAvgBytesPerSec = pWave->nSamplesPerSec * pWave->nBlockAlign;
 	}
 
@@ -859,11 +785,13 @@ HRESULT CconvolverFilter::GetMediaType(int iPosition, CMediaType *pMediaType)
 //
 HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType *pMediaType)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::SetMediaType %d"), direction));
+
 	CheckPointer(pMediaType, E_POINTER);
 	CheckPointer(pMediaType->pbFormat, E_POINTER);
 	if((pMediaType->formattype != FORMAT_WaveFormatEx) ||
-		(pMediaType->cbFormat < sizeof(WAVEFORMATEX)) ||
-		(pMediaType->cbFormat > sizeof(WAVEFORMATEXTENSIBLE)))
+		(pMediaType->FormatLength() < sizeof(WAVEFORMATEX)) ||
+		(pMediaType->FormatLength() > sizeof(WAVEFORMATEXTENSIBLE)))
 	{
 		return VFW_E_INVALIDMEDIATYPE;
 	};
@@ -880,6 +808,9 @@ HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType
 
 	if (direction == PINDIR_INPUT)
 	{
+
+		// check the transform can be done (should always succeed)
+		assert(SUCCEEDED(CheckInputType(pMediaType)));
 
 		hr = m_ConvolutionList->SelectConvolution(pWave, NULL);
 		if(FAILED(hr))
@@ -936,6 +867,8 @@ HRESULT CconvolverFilter::SetMediaType(PIN_DIRECTION direction, const CMediaType
 // Override base implementation
 HRESULT CconvolverFilter::BeginFlush(void)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::BeginFlush")));
+
 	HRESULT hr = NOERROR;
 	if (m_pOutput != NULL) {
 		// block receives -- done by caller (CBaseInputPin::BeginFlush)
@@ -959,6 +892,8 @@ HRESULT CconvolverFilter::BeginFlush(void)
 //
 STDMETHODIMP CconvolverFilter::GetPages(CAUUID *pPages)
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::GetPages")));
+
 	pPages->cElems = 1;
 	pPages->pElems = (GUID *) CoTaskMemAlloc(sizeof(GUID));
 	if (pPages->pElems == NULL) {
@@ -972,6 +907,8 @@ STDMETHODIMP CconvolverFilter::GetPages(CAUUID *pPages)
 
 HRESULT CconvolverFilter::ShowFilterPropertyPage()
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::ShowFilterPropertyPage")));
+
 	CAUUID caGUID;
 	HRESULT hr = GetPages(&caGUID);
 	if (FAILED(hr))
@@ -1004,6 +941,8 @@ HRESULT CconvolverFilter::ShowFilterPropertyPage()
 
 HRESULT CconvolverFilter::NoValidFilterSelected()
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::NoValidFilterSelected")));
+
 	std::basic_ostringstream<TCHAR> diagnostic;
 
 	diagnostic << waveFormatDescription(&m_WaveInXT, 0, TEXT("Input: ")) << std::endl;
@@ -1071,6 +1010,8 @@ HRESULT CconvolverFilter::NoValidFilterSelected()
 //
 HRESULT CconvolverFilter::Copy(IMediaSample *pSource, IMediaSample *pDest) const
 {
+	DbgLog((LOG_TRACE, 2, TEXT("CconvolverFilter::Copy")));
+
 	// Copy the sample data
 
 	BYTE *pSourceBuffer, *pDestBuffer;
@@ -1178,9 +1119,11 @@ STDMETHODIMP CconvolverFilter::put_filterfilename(TCHAR newVal[])
 
 	if (_tcscmp(newVal, m_szFilterFileName) != 0) // if new filename set
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
-			newVal,	m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour));// May throw
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList, &m_WaveInXT.Format, &m_WaveOutXT.Format,
+			newVal,	m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 	}
@@ -1214,9 +1157,11 @@ STDMETHODIMP CconvolverFilter::put_partitions(DWORD newVal)
 
 	if(m_nPartitions != newVal)
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
-			m_szFilterFileName,	newVal == 0 ? 1 : newVal, m_nPlanningRigour));// May throw
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList, &m_WaveInXT.Format, &m_WaveOutXT.Format,
+			m_szFilterFileName,	newVal == 0 ? 1 : newVal, m_nPlanningRigour);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		m_nPartitions = newVal;
 	}
@@ -1226,7 +1171,7 @@ STDMETHODIMP CconvolverFilter::put_partitions(DWORD newVal)
 
 
 // Property get to retrieve the planning rigour by using the public interface.
-STDMETHODIMP CconvolverFilter::get_planning_rigour(unsigned int *pVal)
+STDMETHODIMP CconvolverFilter::get_planning_rigour(PlanningRigour::PlanningRigourType *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_planning_rigour" << std::endl;);
@@ -1243,7 +1188,7 @@ STDMETHODIMP CconvolverFilter::get_planning_rigour(unsigned int *pVal)
 }
 
 // Property put to store the number of planning rigour by using the public interface.
-STDMETHODIMP CconvolverFilter::put_planning_rigour(unsigned int newVal)
+STDMETHODIMP CconvolverFilter::put_planning_rigour(PlanningRigour::PlanningRigourType newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_planning_rigour" << std::endl;);
@@ -1251,9 +1196,11 @@ STDMETHODIMP CconvolverFilter::put_planning_rigour(unsigned int newVal)
 
 	if(m_nPlanningRigour != newVal)
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(&m_WaveInXT.Format, &m_WaveOutXT.Format,
-			m_szFilterFileName,	m_nPartitions == 0 ? 1 : m_nPartitions, newVal));// May throw
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList, &m_WaveInXT.Format, &m_WaveOutXT.Format,
+			m_szFilterFileName,	m_nPartitions == 0 ? 1 : m_nPartitions, newVal);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		m_nPlanningRigour = newVal;
 	}

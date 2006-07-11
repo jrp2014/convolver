@@ -16,8 +16,10 @@
 // English (U.S.) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-LANGUAGE 9, 1
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
+#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -25,18 +27,18 @@ LANGUAGE 9, 1
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE  
+1 TEXTINCLUDE 
 BEGIN
     "resource.h\0"
 END
 
-2 TEXTINCLUDE  
+2 TEXTINCLUDE 
 BEGIN
     "#include ""afxres.h""\r\n"
     "\0"
 END
 
-3 TEXTINCLUDE  
+3 TEXTINCLUDE 
 BEGIN
     "\r\n"
     "\0"
@@ -45,6 +47,36 @@ END
 #endif    // APSTUDIO_INVOKED
 
 #endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.K.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENG)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDB_ARROW_LEFT          BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\arrow_left.bmp"
+IDB_ARROW_LEFT_MASK     BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\arrow_left_mask.bmp"
+IDB_ARROW_RIGHT         BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\arrow_right.bmp"
+IDB_ARROW_RIGHT_MASK    BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\arrow_right_mask.bmp"
+IDB_BUTTON_SM           BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\button_sm.bmp"
+IDB_BUTTM_SM_MASK       BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\button_sm_mask.bmp"
+IDB_HSLIDER_MED         BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\hslider_med.bmp"
+IDB_HSLIDER_MED_MASK    BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\hslider_med_mask.bmp"
+IDB_VSLIDER_MED         BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\vslider_med.bmp"
+IDB_VSLIDER_MED_MASK    BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\vslider_med_mask.bmp"
+IDB_HSLIDER_MED_BUTTON  BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\hslider_med_button.bmp"
+IDB_BACKGROUND          BITMAP                  "D:\\Projects\\convolver\\VSTinterface\\VK_Numeric-Blue\\Background.bmp"
+#endif    // English (U.K.) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

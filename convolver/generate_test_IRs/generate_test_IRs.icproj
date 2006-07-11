@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject 
 	ProjectType="Intel C++ Project"
-	Version="9.0"
+	Version="9.1"
 	Name="generate_dirac_delta"
 	ProjectGUID="{AD487201-9DDE-4D2D-8F54-1D6068BFD46D}"
 	VCNestedProjectGUID="{9382F6C1-126D-46A8-B0F5-4BBD0E08602F}"
 	VCNestedProjectFileName="generate_test_IRs.vcproj"
-	Keyword="Win32Proj">
+	Keyword="Win32Proj"
+	SccProjectName="&quot;$/convolver.root/convolver&quot;, CAAAAAAA"
+	SccAuxPath=""
+	SccLocalPath="..\..\..\.."
+	SccProvider="MSSCCI:Microsoft Visual SourceSafe">
+	<Platforms>
+		<Platform 
+			Name="Win32"/>
+	</Platforms>
 	<Configurations>
 		<Configuration 
 			Name="Debug|Win32">
@@ -15,73 +23,85 @@
 				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="1"
-				CharacterSet="1"
-				WholeProgramOptimization="FALSE"/>
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+				CharacterSet="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
-				AdditionalOptions="/fp:fast"
 				Optimization="0"
-				GlobalOptimizations="FALSE"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				WholeProgramOptimization="FALSE"
-				OptimizeForProcessor="3"
+				WholeProgramOptimization="false"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC"
-				MinimalRebuild="TRUE"
+				StringPooling="true"
+				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="true"
 				RuntimeLibrary="1"
-				StructMemberAlignment="5"
-				BufferSecurityCheck="TRUE"
-				EnableFunctionLevelLinking="TRUE"
+				StructMemberAlignment="0"
+				BufferSecurityCheck="true"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				FloatingPointExceptions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
+				EnablePREfast="true"
+				GlobalOptimizations="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
-				RecognizeRestrictKeyword="1"
-				OpenMP="1"/>
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib libsndfile.lib"
 				OutputFile="$(OutDir)/generate_dirac_delta.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/generate_test_IRs.pdb"
 				SubSystem="1"
 				OptimizeReferences="0"
 				EnableCOMDATFolding="0"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -92,78 +112,89 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
+				GlobalOptimizations="1"
 				UseProcExt="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib libsndfile.lib"
 				OutputFile="$(OutDir)/generate_dirac_delta.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -174,82 +205,94 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="1"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"
+				WholeProgramOptimization="1"
 				PGOPhase="0"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
-				OptimizeForWindowsApplication="TRUE"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
+				OpenMP="false"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				WarningLevel="4"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CompileAs="0"
-				UseProcExt="0"
-				RequireProcExt="3"
+				GlobalOptimizations="1"
+				OptimizeForWindowsApplication="1"
+				UseProcExt="2"
+				RequireProcExt="0"
 				LoopUnrolling=" "
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib libsndfile.lib"
 				OutputFile="$(OutDir)/generate_dirac_delta.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -298,8 +341,7 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
 		<Filter 
-			Name="Common"
-			Filter="">
+			Name="Common">
 			<File 
 				RelativePath="..\Common\dxstdafx.cpp">
 			</File>

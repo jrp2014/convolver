@@ -1,0 +1,35 @@
+44100 2 4 0
+0 0
+0 0 0 0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_W_44.wav
+0
+0.0
+0.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_W_44.wav
+1
+1.0
+0.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_X_44.wav
+0
+0.0
+1.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_X_44.wav
+1
+1.0
+1.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_Y_44.wav
+0
+0.0
+2.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_Y_44.wav
+1
+1.0
+2.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_Z_44.wav
+0
+0.0
+3.0
+C:\Projects\convolver\Media\UHJ-conversion\UHJ_Z_44.wav
+1
+1.0
+3.0

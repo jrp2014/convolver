@@ -62,8 +62,8 @@ public:
 	STDMETHODIMP get_partitions(DWORD *pVal);
 	STDMETHODIMP put_partitions(DWORD newVal);
 
-	STDMETHODIMP get_planning_rigour(unsigned int *pVal);
-	STDMETHODIMP put_planning_rigour(unsigned int newVal);
+	STDMETHODIMP get_planning_rigour(PlanningRigour::PlanningRigourType *pVal);
+	STDMETHODIMP put_planning_rigour(PlanningRigour::PlanningRigourType newVal);
 
 	STDMETHODIMP get_dither(unsigned int *pVal);
 	STDMETHODIMP put_dither(unsigned int newVal);
@@ -109,7 +109,7 @@ private:
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
 	TCHAR					m_szFilterFileName[MAX_PATH];
-	unsigned int			m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
+	PlanningRigour::PlanningRigourType	m_nPlanningRigour;	// Estimate, Measure, Patient, Exhaustive
 
 	typedef float			BaseT;
 	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;

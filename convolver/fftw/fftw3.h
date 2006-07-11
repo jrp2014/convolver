@@ -47,7 +47,7 @@
 /* header file for fftw3 */
 /* (The following is the CVS ID for this file, *not* the version
    number of FFTW:) */
-/* $Id: fftw3.h,v 1.6 2006/04/07 21:38:15 godrick Exp $ */
+/* $Id: fftw3.h,v 1.90 2006-01-17 04:03:33 stevenj Exp $ */
 
 #ifndef FFTW3_H
 #define FFTW3_H
@@ -73,7 +73,9 @@ extern "C"
 #define FFTW_MANGLE_LONG_DOUBLE(name) FFTW_CONCAT(fftwl_, name)
 
 /* IMPORTANT: for Windows compilers, you should add a line
-        #define FFTW_DLL
+*/
+#define FFTW_DLL
+/*
    here and in kernel/ifftw.h if you are compiling/using FFTW as a
    DLL, in order to do the proper importing/exporting, or
    alternatively compile with -DFFTW_DLL or the equivalent

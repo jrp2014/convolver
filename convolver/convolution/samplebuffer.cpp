@@ -58,18 +58,18 @@ inline void swap (AlignedArray<T>& x, AlignedArray<T>& y)
 	x.swap(y);
 }
 
-inline float* restrict c_ptr(const ChannelBuffer& x)
+inline __declspec(restrict) float* c_ptr(const ChannelBuffer& x)
 {
 	return x.c_ptr();
 }
 
-inline float* restrict c_ptr(const SampleBuffer& x, const ChannelBuffer::size_type row)
+inline __declspec(restrict) float* c_ptr(const SampleBuffer& x, const ChannelBuffer::size_type row)
 {
 	assert (row < x.size());
 	return x[row].c_ptr();
 }
 
-inline float* restrict c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row, const ChannelBuffer::size_type column)
+inline __declspec(restrict) float* c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row, const ChannelBuffer::size_type column)
 {
 	assert (row < x.size() && (column < x[row].size()));
 	//return &x[row][column][0];

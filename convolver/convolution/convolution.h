@@ -50,17 +50,13 @@ public:
 
 	// This version of the convolution routine does partitioned convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
-	DWORD doPartitionedConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-		const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+	DWORD doPartitionedConvolution(SampleIO<T>& sampleio,
 		DWORD dwBlocksToProcess,						// A block contains a sample for each channel
 		const T fAttenuation_db);						// Returns bytes generated
 
 	// This version does straight overlap-save convolution
 	// Returns number of bytes processed  (== number of output bytes, too)
-	DWORD doConvolution(const BYTE pbInputData[], BYTE pbOutputData[],
-		const ConvertSample<T>* input_sample_convertor,		// The functionoid for converting between BYTE* and T
-		const ConvertSample<T>* output_sample_convertor,		// The functionoid for converting between T and BYTE*
+	DWORD doConvolution(SampleIO<T>& sampleio,
 		DWORD dwBlocksToProcess,
 		const T fAttenuation_db);						// Returns bytes generated
 
@@ -122,28 +118,28 @@ private:
 	DWORD				nPreviousPartitionIndex_;	// lags nPartitionIndex_ by 1
 	bool				bStartWriting_;
 
-	void mix_input(const ChannelPaths::ChannelPath& restrict thisPath);
-	//void mix_input(const ChannelPaths::ChannelPath& restrict thisPath, 
-	//						   const SampleBuffer& restrict InputBuffer,
-	//						   ChannelBuffer& restrict InputBufferAccumulator);
-	void mix_output(const ChannelPaths::ChannelPath& restrict thisPath, SampleBuffer& restrict Accumulator, 
-		const ChannelBuffer& restrict Output, const DWORD to);
+	void mix_input(ChannelPaths::ChannelPath const& thisPath);
+	//void mix_input(const ChannelPaths::ChannelPath& RESTRICT thisPath, 
+	//						   const SampleBuffer& RESTRICT InputBuffer,
+	//						   ChannelBuffer& RESTRICT InputBufferAccumulator);
+	void mix_output(ChannelPaths::ChannelPath const& thisPath, SampleBuffer& Accumulator, 
+								ChannelBuffer const& Output, const DWORD to);
 
 	// The following need to be distinguished because different FFT routines use different orderings
 #ifdef FFTW
-	void inline complex_mul(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-		fftwf_complex* restrict result, const ChannelBuffer::size_type count);
-	void inline complex_mul_add(const fftwf_complex* restrict in1, const fftwf_complex* restrict in2,
-		fftwf_complex* restrict result, const ChannelBuffer::size_type count);
+	void inline complex_mul(const fftwf_complex* const RESTRICT in1, const fftwf_complex* const RESTRICT in2,
+		fftwf_complex* RESTRICT result, const ChannelBuffer::size_type count);
+	void inline complex_mul_add(const fftwf_complex* const RESTRICT in1, const fftwf_complex* const RESTRICT in2,
+		fftwf_complex* RESTRICT result, const ChannelBuffer::size_type count);
 #if defined(DEBUG) | defined(_DEBUG)
 	T verify_convolution(const ChannelBuffer& X, const ChannelBuffer& H, const ChannelBuffer& Y, 
 		const ChannelBuffer::size_type from, const ChannelBuffer::size_type to) const;
 #endif
 #elif !(defined(__ICC) || defined(__INTEL_COMPILER))
 	// non-vectorized complex array multiplication -- ordering specific to the Ooura routines. C = A * B
-	void inline cmult(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C,
+	void inline cmult(const ChannelBuffer& RESTRICT A, const ChannelBuffer& RESTRICT B, ChannelBuffer& RESTRICT C,
 		const ChannelBuffer::size_type N);
-	void inline cmultadd(const ChannelBuffer& restrict A, const ChannelBuffer& restrict B, ChannelBuffer& restrict C,
+	void inline cmultadd(const ChannelBuffer& RESTRICT A, const ChannelBuffer& RESTRICT B, ChannelBuffer& RESTRICT C,
 		const ChannelBuffer::size_type N);
 #endif
 
@@ -276,22 +272,34 @@ private:
 };
 
 template <typename T>
-ConvolutionList<T>* updateConvolutionList(const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut,
+HRESULT updateConvolutionList(Holder< ConvolutionList<BaseT>, Thread_Mutex > & convolutionList,
+										  const WAVEFORMATEX* pWaveIn, const WAVEFORMATEX* pWaveOut,
 										  const TCHAR szConfigFileName[MAX_PATH],
 										  const DWORD nPartitions, 
 										  const unsigned int nPlanningRigour)
 {
-	ConvolutionList<T> * newList = new ConvolutionList<T>(szConfigFileName, nPartitions, nPlanningRigour);  // May throw
+	ConvolutionList<BaseT> * newConvolutionList = NULL;
+	try
+	{
+		newConvolutionList = new ConvolutionList<T>(szConfigFileName, nPartitions, nPlanningRigour);  // May throw
+	}
+	catch(...)
+	{
+		delete newConvolutionList;
+		throw;
+	}
 
 	if(pWaveIn != NULL || pWaveOut != NULL)
 	{
-		HRESULT hr = newList->SelectConvolution(pWaveIn, pWaveOut);
-
-		if(FAILED(hr))
+		if(FAILED(newConvolutionList->SelectConvolution(pWaveIn, pWaveOut)))
 		{
+			delete newConvolutionList;
 			throw convolutionListException("Incompatible number of input or output channels or sample rate. Choose new filter or reload this plug-in.", szConfigFileName);
 		}
 	}
+	const Mutex_Guard<Thread_Mutex> lock(convolutionList.lock);
+	convolutionList.set_ptr(newConvolutionList);
 
-	return newList;
+	return S_OK;
+
 }

@@ -47,8 +47,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,0,0,0
- PRODUCTVERSION 4,0,0,0
+ FILEVERSION 4,3,0,0
+ PRODUCTVERSION 4,3,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -65,13 +65,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Convolver"
             VALUE "FileDescription", "Convolver WMP plug-in Module"
-            VALUE "FileVersion", "4, 0, 0, 0"
+            VALUE "FileVersion", "4, 3, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
-            VALUE "LegalCopyright", "Copyright GPL 2005 John Pavel"
-            VALUE "LegalTrademarks", "GPL"
+            VALUE "LegalCopyright", "Copyright GPL 2005, 2006 John Pavel"
+            VALUE "LegalTrademarks", "convolver"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"
-            VALUE "ProductVersion", "4, 0, 0, 0"
+            VALUE "ProductVersion", "4, 3, 0, 0"
         END
     END
     BLOCK "VarFileInfo"
@@ -100,31 +100,19 @@ EXSTYLE WS_EX_RIGHT
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
     PUSHBUTTON      "Get config or IR",IDC_GETFILTER,0,0,55,14
-    CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | 
-                    SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | 
-                    WS_GROUP,58,2,153,11,WS_EX_CLIENTEDGE
+    CONTROL         "",IDC_FILTERFILELABEL,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | SS_CENTERIMAGE | SS_PATHELLIPSIS | WS_GROUP,58,2,153,11,WS_EX_CLIENTEDGE
     LTEXT           "Status",IDC_STATUS,0,61,213,59,SS_NOPREFIX
-    CONTROL         "Attenuation (dB):",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,0,17,57,8
+    CONTROL         "Attenuation (dB):",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,0,17,57,8
     EDITTEXT        IDC_ATTENUATION,58,15,28,12,ES_RIGHT | ES_AUTOHSCROLL
-    PUSHBUTTON      "Calculate optimum attenuation",
-                    IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,88,15,102,12
-    CONTROL         "No of partitions:",IDC_PARTITIONSLABEL,"Static",
-                    SS_SIMPLE | WS_GROUP,0,31,53,8
-    EDITTEXT        IDC_PARTITIONS,58,29,28,12,ES_RIGHT | ES_AUTOHSCROLL | 
-                    ES_NUMBER
-    CONTROL         "Version not set",IDC_STATIC_VERSION,"Static",SS_SIMPLE | 
-                    WS_GROUP,142,51,71,8,WS_EX_RIGHT
-    COMBOBOX        IDC_COMBOPLANNINGRIGOUR,58,44,53,75,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
-    CONTROL         "Tuning rigour:",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,0,48,46,8
-    CONTROL         "http://convolver.sf.net",IDC_STATIC,"Static",SS_SIMPLE | 
-                    WS_GROUP,137,43,76,8,WS_EX_RIGHT
-    COMBOBOX        IDC_COMBODITHER,88,29,62,92,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_COMBONOISESHAPING,151,29,62,93,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Calculate optimum attenuation",IDC_BUTTON_CALCULATEOPTIMUMATTENUATION,88,15,102,12
+    CONTROL         "No of partitions:",IDC_PARTITIONSLABEL,"Static",SS_SIMPLE | WS_GROUP,0,31,53,8
+    EDITTEXT        IDC_PARTITIONS,58,29,28,12,ES_RIGHT | ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "Version not set",IDC_STATIC_VERSION,"Static",SS_SIMPLE | WS_GROUP,142,51,71,8,WS_EX_RIGHT
+    COMBOBOX        IDC_COMBOPLANNINGRIGOUR,58,44,53,75,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Tuning rigour:",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,0,48,46,8
+    CONTROL         "http://convolver.sf.net",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,137,43,76,8,WS_EX_RIGHT
+    COMBOBOX        IDC_COMBODITHER,88,29,62,92,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBONOISESHAPING,151,29,62,93,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 

@@ -18,24 +18,79 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 /////////////////////////////////////////////////////////////////////////////
-#pragma once
+//
+//$Workfile: convolverVSTEditor.h $
+//$Revision: 30 $
+//$Date: 27/06/06 21:58 $
+//$Modtime: 24/06/06 12:19 $
+//
+
+#ifndef ConvolverVSTEditor_H_
+#define ConvolverVSTEditor_H_
+
+#define ENABLE_VST_EXTENSION_IN_VSTGUI 1
+//#define VSTGUI_ENABLE_DEPRECATED_METHODS 0
+
+#include <stdio.h>
+
+#include "ConvolverVST.h"
+#include "vstgui.h"
+#include "ctooltipsupport.h"
+#include "resource.h"
+
 
 #include "aeffguieditor.h"
-#include "cfileselector.h"
 
-class ConvolverVSTEditor :
-	public AEffGUIEditor, CControlListener
+enum
 {
-public:
-	ConvolverVSTEditor(AudioEffect *effect);
-	virtual ~ConvolverVSTEditor(void);
-
-
-	virtual bool open (void *ptr);
-	virtual void close ();
-
-	virtual void setParameter (VstInt32 index, float value);
-	virtual void valueChanged (VSTGUI::CDrawContext *pContext, VSTGUI::CControl *pControl);
-
-	CFileSelector* fs;
+	kSelectFilter = 100
 };
+
+
+class ConvolverVSTEditor : public AEffGUIEditor, public CControlListener
+{
+  public:
+    ConvolverVSTEditor(AudioEffect *effect);
+    ~ConvolverVSTEditor();
+
+	void setStatus(const char* txt);
+	void setFilterFilename(const char* txt);
+	//void setParameter(VstInt32 index, float value);
+	void setParameter (long index, float value);
+
+  protected:
+    bool open(void *ptr);
+    void close();
+
+    long controlModifierClicked(CDrawContext *pContext, CControl *pControl, long button) {return 0;};
+
+	void valueChanged(CControl* control);
+
+    void idle();
+
+    //Controls
+    COptionMenu *tuningOptionMenu;
+    CKickButton *selectFilterKickButton;
+    CHorizontalSlider *attenuationHSlider;
+    CTextLabel *filterFilename;
+    CTextLabel *statusText;
+    CHorizontalSlider *partitionsHSlider;
+
+	CParamDisplay *attenuationDisplay;
+	CParamDisplay *partitionsDisplay;
+
+    //Bitmaps
+    CBitmap *hBack;
+    CBitmap *hHSlider;
+    CBitmap *hButton;
+	CBitmap *hHSliderButton;
+};
+
+
+enum
+{
+	kBack = 128
+};
+
+#endif
+			

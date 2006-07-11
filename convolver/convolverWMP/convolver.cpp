@@ -166,7 +166,7 @@ HRESULT CConvolver::FinalConstruct()
 		lResult = key.QueryDWORDValue(kszPrefsPlanningRigour, dwValue);
 		if (ERROR_SUCCESS == lResult)
 		{
-			m_nPlanningRigour = dwValue;
+			m_nPlanningRigour = static_cast<PlanningRigour::Degree>(dwValue);
 			// limit planning rigour to avoid long startup times.
 			if (m_nPlanningRigour > PlanningRigour::Measure)
 			{
@@ -1314,25 +1314,22 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 	// Calculate how many bytes we can process. Tricky, because the number of input and output channels,
 	// and the input and output block sizes may not be the equal
 
+	// Calculate the number of input bytes that are required to generate cbOutputMaxLength bytes,
+	// assuming that only whole blocks/frames can be processed
+	cbBytesToProcess =  m_ConvolutionList->SelectedConvolution().cbInputBuffer(cbOutputMaxLength, 
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
+
+	if (cbBytesToProcess >= m_cbInputLength)
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		// Calculate the number of input bytes that are required to generate cbOutputMaxLength bytes,
-		// assuming that only whole blocks/frames can be processed
-		cbBytesToProcess =  m_ConvolutionList->SelectedConvolution().cbInputBuffer(cbOutputMaxLength, 
-			m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr());
+		cbBytesToProcess = m_cbInputLength;
+		bComplete = true;                   // the entire input buffer will be processed. 
+	}
 
-		if (cbBytesToProcess >= m_cbInputLength)
-		{
-			cbBytesToProcess = m_cbInputLength;
-			bComplete = true;                   // the entire input buffer will be processed. 
-		}
-
-		// Call the internal processing method, which returns the no. bytes processed
-		hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesToProcess, &cbBytesGenerated);
-		if (FAILED(hr))
-		{
-			return hr;
-		}
+	// Call the internal processing method, which returns the no. bytes processed
+	hr = DoProcessOutput(pbOutputData, m_pbInputData, &cbBytesToProcess, &cbBytesGenerated);
+	if (FAILED(hr))
+	{
+		return hr;
 	}
 
 	assert(cbBytesGenerated <= cbOutputMaxLength);
@@ -1354,7 +1351,10 @@ STDMETHODIMP CConvolver::ProcessOutput(DWORD dwFlags,
 		pOutputBuffers[0].rtTimestamp = m_rtTimestamp;
 
 		const WAVEFORMATEX * const pWave = ( WAVEFORMATEX * ) m_mtOutput.pbFormat;
-		assert(pWave != NULL);
+		if(pWave == NULL)
+		{
+			return DMO_E_TYPE_NOT_SET;
+		}
 
 		// estimate time length of output buffer
 		pOutputBuffers[0].dwStatus |= DMO_OUTPUT_DATA_BUFFERF_TIMELENGTH;
@@ -1581,10 +1581,13 @@ STDMETHODIMP CConvolver::put_filterfilename(TCHAR newVal[])
 
 	if (_tcscmp(newVal, m_szFilterFileName) != 0)  // if new filename set
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList,
+			reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
 			reinterpret_cast<WAVEFORMATEX*>(m_mtOutput.pbFormat),
-			newVal,	m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour));// May throw
+			newVal,	m_nPartitions == 0 ? 1 : m_nPartitions, m_nPlanningRigour);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		_tcsncpy(m_szFilterFileName, newVal, MAX_PATH);
 	}
@@ -1618,10 +1621,13 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 
 	if(m_nPartitions != newVal)
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList,
+			reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
 			reinterpret_cast<WAVEFORMATEX*>(m_mtOutput.pbFormat),
-			m_szFilterFileName,	newVal == 0 ? 1 : newVal, m_nPlanningRigour));// May throw
+			m_szFilterFileName,	newVal == 0 ? 1 : newVal, m_nPlanningRigour);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		m_nPartitions = newVal;
 	}
@@ -1631,7 +1637,7 @@ STDMETHODIMP CConvolver::put_partitions(DWORD newVal)
 
 
 // Property get to retrieve the planning rigour by using the public interface.
-STDMETHODIMP CConvolver::get_planning_rigour(unsigned int *pVal)
+STDMETHODIMP CConvolver::get_planning_rigour(PlanningRigour::PlanningRigourType *pVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "get_planning_rigour" << std::endl;);
@@ -1648,7 +1654,7 @@ STDMETHODIMP CConvolver::get_planning_rigour(unsigned int *pVal)
 }
 
 // Property put to store the number of planning rigour by using the public interface.
-STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
+STDMETHODIMP CConvolver::put_planning_rigour(PlanningRigour::PlanningRigourType newVal)
 {
 #if defined(DEBUG) | defined(_DEBUG)
 	DEBUGGING(3, cdebug << "put_planning_rigour" << std::endl;);
@@ -1656,10 +1662,13 @@ STDMETHODIMP CConvolver::put_planning_rigour(unsigned int newVal)
 
 	if(m_nPlanningRigour != newVal)
 	{
-		const Mutex_Guard<Thread_Mutex> lock(m_ConvolutionList.lock);
-		m_ConvolutionList.set_ptr(updateConvolutionList<BaseT>(reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
+		HRESULT hr = updateConvolutionList<BaseT>(m_ConvolutionList,
+			reinterpret_cast<WAVEFORMATEX*>(m_mtInput.pbFormat),
 			reinterpret_cast<WAVEFORMATEX*>(m_mtOutput.pbFormat),
-			m_szFilterFileName,	m_nPartitions == 0 ? 1 : m_nPartitions, newVal));// May throw
+			m_szFilterFileName,	m_nPartitions == 0 ? 1 : m_nPartitions, newVal);// May throw
+
+		if(FAILED(hr))
+			return hr;
 
 		m_nPlanningRigour = newVal;
 	}
@@ -1820,7 +1829,10 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 
 	// Get the pointer to the input format structure.
 	const WAVEFORMATEX* const pWaveIn = ( WAVEFORMATEX * ) m_mtInput.pbFormat;
-	assert(pWaveIn != NULL);
+	if(pWaveIn == NULL)
+	{
+		return DMO_E_TYPE_NOT_SET;
+	}
 
 	// Calculate the number of blocks to process.  A block contains the Samples for all channels
 	DWORD dwBlocksToProcess = (*cbInputBytesToProcess / pWaveIn->nBlockAlign);
@@ -1829,12 +1841,12 @@ HRESULT CConvolver::DoProcessOutput(BYTE *pbOutputData,
 
 	// Convolve the pbInputData to produce pbOutputData
 	*cbOutputBytesGenerated = m_nPartitions == 0 ?
-		m_ConvolutionList->SelectedConvolution().doConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
+		m_ConvolutionList->SelectedConvolution().doConvolution(InterleavedIO<BaseT>(pbInputData, pbOutputData,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr()),
 		dwBlocksToProcess,
 		m_fAttenuation_db)
-		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(pbInputData, pbOutputData,
-		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr(),
+		: 	m_ConvolutionList->SelectedConvolution().doPartitionedConvolution(InterleavedIO<BaseT>(pbInputData, pbOutputData,
+		m_InputSampleConvertor.get_ptr(), m_OutputSampleConvertor.get_ptr()),
 		dwBlocksToProcess,
 		m_fAttenuation_db);
 

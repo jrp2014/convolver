@@ -46,7 +46,7 @@ public:
 	~CWaveFileHandle()
 	{
 
-		 sf_write_sync(sndfile_);
+		sf_write_sync(sndfile_);
 
 		int result = sf_close (sndfile_);
 #if defined(DEBUG) | defined(_DEBUG)
@@ -96,7 +96,7 @@ public:
 			}
 		}
 
-	sndfile_ = sf_open(CT2CA(path), mode, sfinfo);
+		sndfile_ = sf_open(CT2CA(path), mode, sfinfo);
 
 #if defined(DEBUG) | defined(_DEBUG)
 		char  buffer [2048];
@@ -109,7 +109,7 @@ public:
 #if defined(DEBUG) | defined(_DEBUG)
 			cdebug << "Failed to open " << CT2CA(path) << std::endl;
 #endif
-			throw wavfileException("Failed to open filter sound file", path, "");
+			throw wavfileException("Failed to open filter sound file:", path, "");
 		}
 	};
 

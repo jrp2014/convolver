@@ -29,19 +29,20 @@ const unsigned int NSAMPLES = 10;
 
 
 // If app hasn't choosen, set to work with Windows 98, Windows Me, Windows 2000, Windows XP and beyond
-#ifndef WINVER
-#define WINVER         0x0410
-#endif
-#ifndef _WIN32_WINDOWS
-#define _WIN32_WINDOWS 0x0410 
-#endif
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT   0x0500 
-#endif
+//#ifndef WINVER
+//#define WINVER         0x0410
+//#endif
+//#ifndef _WIN32_WINDOWS
+//#define _WIN32_WINDOWS 0x0410 
+//#endif
+//#ifndef _WIN32_WINNT
+//#define _WIN32_WINNT   0x0500 
+//#endif
 
-#define STRSAFE_NO_DEPRECATE	1
+//#define STRSAFE_NO_DEPRECATE	1
 #define _CRT_SECURE_NO_DEPRECATE	1
-#define _SECURE_SCL_DEPRECATE		0
+//#define _SECURE_SCL_DEPRECATE		0
+#define _CRT_NONSTDC_NO_DEPRECATE 1
 
 // For STLport
 #define _STLP_NO_ANACHRONISMS 1
@@ -52,8 +53,8 @@ const unsigned int NSAMPLES = 10;
 
 #if defined(DEBUG) || defined(_DEBUG)
 
-#define _ATL_DEBUG_QI
-#define _ATL_DEBUG_INTERFACES
+//#define _ATL_DEBUG_QI
+//#define _ATL_DEBUG_INTERFACES
 
 // For VC++ 2005
 #define _HAS_ITERATOR_DEBUGGING 1
@@ -64,6 +65,13 @@ const unsigned int NSAMPLES = 10;
 //#define   _STLP_DEBUG_LEVEL _STLP_STANDARD_DBG_LEVEL
 //#define _STLP_DEBUG_UNINITIALIZED 1
 //#define _STLP_DEBUG_ALLOC 1
+#else
+
+// Breaks in boost_ptr_adaptor in VC++ 2005
+//#ifdef __INTEL_COMPILER
+#define _SECURE_SCL 0
+//#endif
+
 #endif
 
 
@@ -102,6 +110,8 @@ const unsigned int NSAMPLES = 10;
 const DWORD MAX_ATTENUATION_DB = 1000; // dB
 const DWORD MAXSTRING = 1024;	// length
 
+#undef  VST_FORCE_DEPRECATED
+#define ENABLE_VST_EXTENSION_IN_VSTGUI 1
 
 // Debugging
 
@@ -114,8 +124,18 @@ const DWORD MAXSTRING = 1024;	// length
 
 #endif
 
-#if !defined(__INTEL_COMPILER) || (defined(_MSC_VER) && _MSC_VER < 1400)
-#define restrict
+#if (defined(_MSC_VER) && _MSC_VER >= 1400)
+#define RESTRICT __restrict
+#define DECLSPECRESTRICT __declspec(restrict)
+#define DECLSPECNOALIAS __declspec(noalias)
+#elif defined(__INTEL_COMPILER)
+#define RESTRICT restrict
+#define DECLSPECRESTRICT
+#define DECLSPECNOALIAS
+#else
+#define RESTRICT
+#define DECLSPECRESTRICT
+#define DECLSPECNOALIAS
 #endif
 
 

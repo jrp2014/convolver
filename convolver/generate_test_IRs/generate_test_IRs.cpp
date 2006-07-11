@@ -81,9 +81,9 @@ int generate_perfect_dirac_delta(int nSamplesPerSec, WORD nChannels, int nSilenc
 
 
 	TCHAR sFileName[100];
-	int j = swprintf(sFileName, TEXT("PerfectDiracDelta-%i"), nSamplesPerSec);
-	j += swprintf(sFileName + j, TEXT("-%i"), nChannels);
-	j += swprintf(sFileName + j, TEXT("-%i.wav"), nSilence);
+	int k = swprintf(sFileName, TEXT("PerfectDiracDelta-%i"), nSamplesPerSec);
+	k += swprintf(sFileName + k, TEXT("-%i"), nChannels);
+	k += swprintf(sFileName + k, TEXT("-%i.wav"), nSilence);
 
 	CWaveFile* impulseFile = new CWaveFile;
 	if (FAILED(hr = impulseFile->Open(sFileName, &wfx, WAVEFILE_WRITE)))

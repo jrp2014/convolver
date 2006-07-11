@@ -79,8 +79,8 @@ public:
 	STDMETHOD(get_partitions)(DWORD *pVal) PURE;
 	STDMETHOD(put_partitions)(DWORD newVal) PURE;
 
-	STDMETHOD(get_planning_rigour)(unsigned int *pVal) PURE;
-	STDMETHOD(put_planning_rigour)(unsigned int newVal) PURE;
+	STDMETHOD(get_planning_rigour)(PlanningRigour::PlanningRigourType *pVal) PURE;
+	STDMETHOD(put_planning_rigour)(PlanningRigour::PlanningRigourType newVal) PURE;
 
 	STDMETHOD(get_dither)(unsigned int *pVal) PURE;
 	STDMETHOD(put_dither)(unsigned int newVal) PURE;
@@ -336,7 +336,7 @@ private:
 	TCHAR					m_szFilterFileName[MAX_PATH];
 	float					m_fAttenuation_db;	// attenuation (up to +/-20dB).  What is displayed.
 	DWORD					m_nPartitions;		// Number of partitions to be used in convolution algorithm
-	unsigned int			m_nPlanningRigour;
+	PlanningRigour::PlanningRigourType	m_nPlanningRigour;
 
 	typedef NoiseShaper<BaseT>::NoiseShapingType NoiseShapingType;
 	typedef Ditherer<BaseT>::DitherType DitherType;

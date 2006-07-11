@@ -32,22 +32,23 @@ struct OptimalDFT
 
 struct PlanningRigour
 {
+	typedef unsigned int PlanningRigourType;
 #ifdef FFTW
 	enum Degree {Estimate=0, Measure=1, Patient=2, Exhaustive=3, TimeLimited=4};
-	static const unsigned int nDegrees = 5;
+	static const PlanningRigourType nDegrees = 5;
 	static const unsigned int nStrLen = sizeof(TEXT("Take 1 minute")) / sizeof(TCHAR) + 1;
 	static const int nTimeLimit = 30; // 30s -> 1min, for user, as a forward and reverse plan are optimized
 #else
 	enum Degree {Default=0};
-	static const unsigned int nDegrees = 1;
+	static const PlanningRigourType nDegrees = 1;
 	static const unsigned int nStrLen = 8;
 #endif
 	static const TCHAR Rigour[nDegrees][nStrLen];
-	static const unsigned int Flag[nDegrees];
+	static const PlanningRigourType Flag[nDegrees];
 
-	static unsigned int Lookup(const TCHAR* r)
+	static PlanningRigourType Lookup(const TCHAR* r)
 	{
-		for(unsigned int i=0; i<nDegrees; ++i)
+		for(PlanningRigourType i=0; i<nDegrees; ++i)
 		{
 			if(_tcsncicmp(r, Rigour[i], nStrLen) == 0)
 				return i;

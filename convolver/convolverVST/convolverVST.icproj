@@ -4,9 +4,13 @@
 	Version="9.1"
 	Name="convolverVST"
 	ProjectGUID="{D2542E01-69D4-4D44-A0CE-FFE332C892F7}"
-	Keyword="Win32Proj"
 	VCNestedProjectGUID="{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
-	VCNestedProjectFileName="convolverVST.vcproj">
+	VCNestedProjectFileName="convolverVST.vcproj"
+	Keyword="Win32Proj"
+	SccProjectName="&quot;$/convolver.root/convolver&quot;, CAAAAAAA"
+	SccAuxPath=""
+	SccLocalPath="..\..\..\.."
+	SccProvider="MSSCCI:Microsoft Visual SourceSafe">
 	<Platforms>
 		<Platform 
 			Name="Win32"/>
@@ -19,27 +23,44 @@
 				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				CharacterSet="2"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstgui\vstgui\"
 				PreprocessorDefinitions="WIN32;_DEBUG;DEBUG=1;_WINDOWS;_WINDLL;_USRDLL;CONVOLVERVST_EXPORTS;FFTW_DLL;_CRTDBG_MAP_ALLOC"
-				MinimalRebuild="TRUE"
+				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="true"
 				RuntimeLibrary="1"
-				BufferSecurityCheck="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				BufferSecurityCheck="true"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
-				CompileAs="0"/>
+				CompileAs="0"
+				EnablePREfast="true"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
@@ -47,32 +68,30 @@
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				ModuleDefinitionFile="convolverVST.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/convolverVST.pdb"
 				SubSystem="2"
 				EntryPointSymbol=""
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release|Win32">
@@ -81,22 +100,39 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				CharacterSet="2"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
-				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstgui\vstgui\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_WINDLL;_USRDLL;CONVOLVERVST_EXPORTS;FFTW_DLL"
 				RuntimeLibrary="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CompileAs="0"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
@@ -104,7 +140,7 @@
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				ModuleDefinitionFile="convolverVST.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -112,25 +148,23 @@
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="DebugTool"/>
 		</Configuration>
 		<Configuration 
 			Name="Release PIII|Win32">
@@ -139,33 +173,61 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				CharacterSet="2"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
-				GlobalOptimizations="TRUE"
+				Optimization="1000"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				OptimizeForProcessor="0"
-				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstsdk2.4\vstgui.sf\vstgui"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
+				AdditionalIncludeDirectories="..;..\..\..\vstsdk2.4;..\..\..\vstsdk2.4\public.sdk\source\vst2.x;..\..\..\vstgui\vstgui\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_WINDLL;CONVOLVERVST_EXPORTS;FFTW_DLL"
-				StringPooling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
+				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				StructMemberAlignment="0"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
+				OpenMP="false"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
-				CompileAs="0"/>
+				CompileAs="0"
+				GlobalOptimizations="1"
+				UseProcExt="2"
+				RequireProcExt="0"
+				Parallelization="1"
+				C99Support="1"
+				RecognizeRestrictKeyword="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
 				AdditionalDependencies="libfftw3f-3.lib libsndfile.lib"
@@ -173,7 +235,7 @@
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
 				ModuleDefinitionFile="convolverVST.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -181,29 +243,25 @@
 				ImportLibrary="$(OutDir)/convolverVST.lib"
 				TargetMachine="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="DebugTool"/>
 		</Configuration>
 	</Configurations>
-	<References>
-	</References>
 	<Files>
 		<Filter 
 			Name="Source Files"
@@ -219,8 +277,7 @@
 				RelativePath=".\convolverVSTmain.cpp">
 			</File>
 			<Filter 
-				Name="vst2.x"
-				Filter="">
+				Name="vst2.x">
 				<File 
 					RelativePath="..\..\..\vstsdk2.4\public.sdk\source\vst2.x\aeffeditor.h">
 				</File>
@@ -241,8 +298,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="convolution"
-				Filter="">
+				Name="convolution">
 				<File 
 					RelativePath="..\convolution\channelpaths.cpp">
 				</File>
@@ -311,8 +367,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="debugging"
-				Filter="">
+				Name="debugging">
 				<File 
 					RelativePath="..\debugging\debugging.cpp">
 				</File>
@@ -352,12 +407,47 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\arrow_left.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\arrow_left_mask.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\arrow_right.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\arrow_right_mask.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\Background.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\button_sm.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\button_sm_mask.bmp">
+			</File>
+			<File 
 				RelativePath=".\convolverVST.rc">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\hslider_med.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\hslider_med_button.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\hslider_med_mask.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\vslider_med.bmp">
+			</File>
+			<File 
+				RelativePath="..\..\VSTinterface\VK_Numeric-Blue\vslider_med_mask.bmp">
 			</File>
 		</Filter>
 		<Filter 
-			Name="Interfaces"
-			Filter="">
+			Name="Interfaces">
 			<File 
 				RelativePath="..\..\..\vstsdk2.4\pluginterfaces\vst2.x\aeffect.h">
 			</File>
@@ -369,62 +459,92 @@
 			</File>
 		</Filter>
 		<Filter 
-			Name="vstgui"
-			Filter="">
+			Name="vstgui">
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\aeffguieditor.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\aeffguieditor.h">
+				RelativePath="..\..\..\vstgui\vstgui\aeffguieditor.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\cdatabrowser.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cfileselector.h">
+				RelativePath="..\..\..\vstgui\vstgui\cdatabrowser.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cscrollview.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\cfileselector.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\cscrollview.h">
+				RelativePath="..\..\..\vstgui\vstgui\cfileselector.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\ctabview.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\cscrollview.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\ctabview.h">
+				RelativePath="..\..\..\vstgui\vstgui\cscrollview.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\ctabview.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstcontrols.h">
+				RelativePath="..\..\..\vstgui\vstgui\ctabview.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstgui.cpp">
+				RelativePath="..\..\..\vstgui\vstgui\ctooltipsupport.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstkeycode.h">
+				RelativePath="..\..\..\vstgui\vstgui\ctooltipsupport.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugscarbon.h">
+				RelativePath="..\..\..\vstgui\vstgui\cvstguitimer.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsmac.h">
+				RelativePath="..\..\..\vstgui\vstgui\cvstguitimer.h">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsmacho.h">
+				RelativePath="..\..\..\vstgui\vstgui\plugguieditor.cpp">
 			</File>
 			<File 
-				RelativePath="..\..\..\vstsdk2.4\vstgui.sf\vstgui\vstplugsquartz.h">
+				RelativePath="..\..\..\vstgui\vstgui\plugguieditor.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstcontrols.cpp">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstcontrols.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstgui.cpp">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstgui.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstguidebug.cpp">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstguidebug.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstkeycode.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstplugscarbon.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstplugsmac.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstplugsmacho.h">
+			</File>
+			<File 
+				RelativePath="..\..\..\vstgui\vstgui\vstplugsquartz.h">
 			</File>
 		</Filter>
 		<File 
 			RelativePath=".\convolverVST.def">
 		</File>
 	</Files>
-	<Globals>
-	</Globals>
 </VisualStudioProject>
 

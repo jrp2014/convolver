@@ -27,7 +27,7 @@
 //
 // General-purpose debug stream, like std::cout
 
-
+#include "convolution/config.h"
 #include "debugStream.h"
 #include <time.h>
 

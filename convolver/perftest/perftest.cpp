@@ -31,7 +31,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 		| (1 * _CRTDBG_ALLOC_MEM_DF));
 
 	// 3 = function call trace
-	apDebug::gOnly().set(4);
+	apDebug::gOnly().set(3);
 
 	debugstream.sink (apDebugSinkConsole::sOnly);
 
@@ -114,7 +114,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 
 		float fAttenuation	= 0;
 
-		for(int i=0; i<conv.nConvolutionList(); ++i)
+		for(unsigned int i=0; i<conv.nConvolutionList(); ++i)
 		{
 
 			conv.selectConvolutionIndex(i);
@@ -153,7 +153,7 @@ int	_tmain(int argc, _TCHAR* argv[])
 						throw (hr);
 					}
 					std::cout  << std::setprecision(3) << nPartitions << "\t"
-						<< (static_cast<float>(convp.SelectedConvolution().Mixer.nFilterLength() / 2 * NSAMPLES) / fElapsedCalc) /
+						<< (static_cast<float>(convp.SelectedConvolution().Mixer.nFilterLength() * NSAMPLES) / fElapsedCalc) /
 						static_cast<float>(convp.SelectedConvolution().Mixer.nSamplesPerSec()) << "\t"
 						<< fElapsedCalc << "\t" << fElapsedLoad << "\t" 
 						<< fAttenuation << "\t" << convp.SelectedConvolution().Mixer.nFilterLength() << "\t" 

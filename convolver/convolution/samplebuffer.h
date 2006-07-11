@@ -23,7 +23,6 @@
 
 // Vector is slow when debugging
 #include <malloc.h>
-//#include <windows.h>    // for ZeroMemory, CopyMemory, etc
 #include <iterator>
 #include <vector>
 #include <algorithm>
@@ -89,9 +88,9 @@ public:
 protected:
 
 #if defined(__ICC) || defined(__INTEL_COMPILER)
-	_declspec(align(16)) T* restrict first_;
+	_declspec(align(16)) T* RESTRICT first_;
 #else
-	T* restrict first_;
+	 T* RESTRICT first_;
 #endif
 	size_type size_;        // length in elements
 	size_type bsize_;       // length in bytes
@@ -186,7 +185,7 @@ struct FastArray : AlignedArray<T>
 	// Element access
 
 	// operator[]
-	reference restrict operator[](const size_type n)
+	reference operator[](const size_type n)
 	{
 		assert(n >= 0 && n < size_);
 		//return *(first_ + n);
@@ -201,7 +200,7 @@ struct FastArray : AlignedArray<T>
 	}
 
 	// at() with range check
-	reference restrict at(const size_type n)
+	reference at(const size_type n)
 	{
 		rangecheck(i);
 		//return *(first_ + n);
@@ -237,7 +236,7 @@ struct FastArray : AlignedArray<T>
 	size_type static_size() const { return size_; }
 
 	// For use with C interface
-	pointer restrict c_ptr() const
+	pointer c_ptr() const
 	{
 		return empty() ? NULL : first_;
 	}
@@ -524,9 +523,9 @@ typedef std::vector<ChannelBuffer> SampleBuffer;
 typedef std::vector<SampleBuffer> PartitionedBuffer;
 
 // float must be the same as the FastArray base type
-extern float* restrict c_ptr(const ChannelBuffer& x);
-extern float* restrict c_ptr(const SampleBuffer& x, const ChannelBuffer::size_type row=0);
-extern float* restrict c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row=0, const ChannelBuffer::size_type column=0);
+extern __declspec(restrict) float* c_ptr(const ChannelBuffer& x);
+extern __declspec(restrict) float* c_ptr(const SampleBuffer& x, const ChannelBuffer::size_type row=0);
+extern __declspec(restrict) float* c_ptr(const PartitionedBuffer& x, const SampleBuffer::size_type row=0, const ChannelBuffer::size_type column=0);
 
 // zero all the elements
 extern void Zero (ChannelBuffer& x);

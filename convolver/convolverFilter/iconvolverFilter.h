@@ -18,6 +18,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma once
 
+#include "convolution/config.h"
+#include "convolution/convolution.h"
+
 // 2A0F29DC-2C05-4716-9522-3618687EAA5F
 DEFINE_GUID(CLSID_convolverFilter, 
 			0x2a0f29dc, 0x2c05, 0x4716, 0x95, 0x22, 0x36, 0x18, 0x68, 0x7e, 0xaa, 0x5f);
@@ -52,8 +55,8 @@ extern "C" {
 		STDMETHOD(get_partitions)(THIS_ DWORD *pVal) PURE;
 		STDMETHOD(put_partitions)(THIS_ DWORD newVal) PURE;
 
-		STDMETHOD(get_planning_rigour)(THIS_ unsigned int *pVal) PURE;
-		STDMETHOD(put_planning_rigour)(THIS_ unsigned int newVal) PURE;
+		STDMETHOD(get_planning_rigour)(THIS_ PlanningRigour::PlanningRigourType *pVal) PURE;
+		STDMETHOD(put_planning_rigour)(THIS_ PlanningRigour::PlanningRigourType newVal) PURE;
 
 		STDMETHOD(get_dither)(THIS_ unsigned int *pVal) PURE;
 		STDMETHOD(put_dither)(THIS_ unsigned int newVal) PURE;

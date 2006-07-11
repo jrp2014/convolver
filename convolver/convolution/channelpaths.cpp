@@ -401,7 +401,7 @@ peak_gain_(0)
 
 		// Calculate the gain for each output channel
 		float inputScale = 0;
-		for(WORD nChannel = 0; nChannel < Paths_[nPath].inChannel.size(); ++ nChannel)
+		for(WORD nChannel = 0; nChannel < Paths_[nPath].inChannel.size(); ++nChannel)
 		{
 			inputScale += abs(Paths_[nPath].inChannel[nChannel].fScale);
 		}

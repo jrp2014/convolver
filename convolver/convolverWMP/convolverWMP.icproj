@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject 
 	ProjectType="Intel C++ Project"
-	Version="9.0"
+	Version="9.1"
 	Name="convolverWMP"
 	ProjectGUID="{2CDCCB55-D6AC-47A9-BE1C-F2DED881C377}"
 	VCNestedProjectGUID="{514A2F25-7B25-4B3E-BA0E-D16F92C367AB}"
 	VCNestedProjectFileName="convolverWMP.vcproj">
+	<Platforms>
+		<Platform 
+			Name="Win32"/>
+	</Platforms>
 	<Configurations>
 		<Configuration 
 			Name="Debug|Win32">
@@ -14,87 +18,97 @@
 				OutputDirectory="..\bin\Debug"
 				IntermediateDirectory="Debug"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="1"
-				ATLMinimizesCRunTimeLibraryUsage="TRUE"
-				CharacterSet="1"
-				WholeProgramOptimization="FALSE"/>
+				ATLMinimizesCRunTimeLibraryUsage="true"
+				CharacterSet="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/fp:fast"
 				Optimization="0"
-				GlobalOptimizations="FALSE"
 				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				WholeProgramOptimization="FALSE"
-				OptimizeForProcessor="3"
+				WholeProgramOptimization="false"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;DEBUG;FFTW_DLL;_CRTDBG_MAP_ALLOC"
-				MinimalRebuild="TRUE"
-				ExceptionHandling="TRUE"
+				MinimalRebuild="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="3"
-				SmallerTypeCheck="TRUE"
+				SmallerTypeCheck="true"
 				RuntimeLibrary="1"
 				StructMemberAlignment="5"
-				BufferSecurityCheck="TRUE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="true"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
-				ExpandAttributedSource="FALSE"
+				ExpandAttributedSource="false"
 				WarningLevel="4"
-				Detect64BitPortabilityProblems="TRUE"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 				CallingConvention="0"
+				EnablePREfast="true"
+				GlobalOptimizations="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
-				InitLocalVarToNaN="1"
-				OpenMP="1"/>
+				InitLocalVarToNaN="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				ShowProgress="0"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
-				SuppressStartupBanner="FALSE"
+				SuppressStartupBanner="false"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				LinkDLL="TRUE"
+				LinkDLL="true"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="0"
 				EnableCOMDATFolding="0"
 				BaseAddress="254803968"
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"
 				Attach="0"/>
@@ -106,89 +120,100 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="0"
-				ATLMinimizesCRunTimeLibraryUsage="FALSE"
+				ATLMinimizesCRunTimeLibraryUsage="false"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"/>
+				WholeProgramOptimization="1"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb /QaxKNBP /Qsox"
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
+				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
-				OptimizeForWindowsApplication="FALSE"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG;FFTW_DLL"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
+				GlobalOptimizations="1"
+				OptimizeForWindowsApplication="0"
 				UseProcExt="0"
 				RequireProcExt="2"
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				LinkDLL="TRUE"
+				LinkDLL="true"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				SetChecksum="FALSE"
+				SetChecksum="false"
 				BaseAddress="254803968"
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -199,92 +224,104 @@
 				OutputDirectory="..\bin\Release"
 				IntermediateDirectory="Release"
 				ConfigurationType="2"
+				InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 				UseOfATL="0"
-				ATLMinimizesCRunTimeLibraryUsage="FALSE"
+				ATLMinimizesCRunTimeLibraryUsage="false"
 				CharacterSet="1"
-				WholeProgramOptimization="TRUE"
+				WholeProgramOptimization="1"
 				PGOPhase="0"/>
+			<Tool 
+				Name="PreBuildEventTool"/>
+			<Tool 
+				Name="CustomTool"/>
+			<Tool 
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool 
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool 
+				Name="MidlCmplrTool"/>
 			<Tool 
 				Name="CppCmplrTool"
 				AdditionalOptions="/Qipo /fp:fast /Qprefetch /Qprec-div- /Qglobal-hoist /vmb  /Qsox "
 				Optimization="1000"
-				GlobalOptimizations="TRUE"
 				InlineFunctionExpansion="2"
-				EnableIntrinsicFunctions="TRUE"
-				FavorSizeOrSpeed="2"
-				OmitFramePointers="TRUE"
-				EnableFiberSafeOptimizations="TRUE"
-				WholeProgramOptimization="TRUE"
-				OptimizeForProcessor="0"
-				OptimizeForWindowsApplication="FALSE"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
+				OmitFramePointers="true"
+				EnableFiberSafeOptimizations="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="..\"
 				PreprocessorDefinitions="WIN32;_WINDOWS;_USRDLL;_WINDLL;NDEBUG;FFTW_DLL"
-				StringPooling="TRUE"
-				ExceptionHandling="TRUE"
+				StringPooling="true"
+				ExceptionHandling="1"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="0"
 				StructMemberAlignment="0"
-				BufferSecurityCheck="FALSE"
-				EnableFunctionLevelLinking="TRUE"
+				BufferSecurityCheck="false"
+				EnableFunctionLevelLinking="true"
 				EnableEnhancedInstructionSet="0"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
+				FloatingPointModel="2"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
+				OpenMP="false"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				SuppressStartupBanner="FALSE"
-				Detect64BitPortabilityProblems="TRUE"
+				WarningLevel="4"
+				SuppressStartupBanner="false"
+				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CompileAs="0"
-				UseProcExt="0"
-				RequireProcExt="3"
+				GlobalOptimizations="1"
+				OptimizeForWindowsApplication="0"
+				UseProcExt="2"
+				RequireProcExt="0"
 				LoopUnrolling=" "
 				Parallelization="1"
 				C99Support="1"
 				RecognizeRestrictKeyword="1"
 				InitLocalVarToNaN="0"
-				SupportMultibyteCharSource="1"
-				OpenMP="1"/>
+				SupportMultibyteCharSource="1"/>
 			<Tool 
-				Name="CustomTool"/>
+				Name="VCManagedResourceCompilerTool"/>
+			<Tool 
+				Name="ResCmplrTool"/>
+			<Tool 
+				Name="PreLinkEventTool"/>
 			<Tool 
 				Name="LinkerTool"
-				RegisterOutput="TRUE"
+				RegisterOutput="true"
 				AdditionalDependencies="msdmo.lib comctl32.lib dxerr9.lib winmm.lib dsound.lib d3dx9.lib dxguid.lib odbc32.lib odbccp32.lib d3d9.lib libfftw3f-3.lib libsndfile.lib"
 				OutputFile="$(OutDir)/$(ProjectName).dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;C:\Program Files\Intel\Compiler\C++\9.0\IA32\Lib&quot;; $(OutDir)"
-				LinkDLL="TRUE"
+				LinkDLL="true"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="convolverwmp.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				SetChecksum="FALSE"
+				SetChecksum="false"
 				BaseAddress="254803968"
-				SupportUnloadOfDelayLoadedDLL="TRUE"
+				SupportUnloadOfDelayLoadedDLL="true"
 				TargetMachine="1"
 				FixedBaseAddress="1"/>
 			<Tool 
-				Name="MidlCmplrTool"/>
+				Name="VCALinkTool"/>
 			<Tool 
-				Name="PostBuildEventTool"/>
+				Name="VCManifestTool"/>
 			<Tool 
-				Name="PreBuildEventTool"/>
+				Name="VCXDCMakeTool"/>
 			<Tool 
-				Name="PreLinkEventTool"/>
+				Name="BscMakeTool"/>
 			<Tool 
-				Name="ResCmplrTool"/>
+				Name="VCFxCopTool"/>
 			<Tool 
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool 
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCAppVerifierTool"/>
 			<Tool 
 				Name="VCWebDeploymentTool"/>
 			<Tool 
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool 
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="PostBuildEventTool"/>
 			<Tool 
 				Name="DebugTool"/>
 		</Configuration>
@@ -325,8 +362,7 @@
 				</FileConfiguration>
 			</File>
 			<Filter 
-				Name="fft"
-				Filter="">
+				Name="fft">
 				<File 
 					RelativePath="..\fft\fftsg.cpp">
 				</File>
@@ -335,8 +371,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="debugging"
-				Filter="">
+				Name="debugging">
 				<File 
 					RelativePath="..\debugging\debugging.cpp">
 				</File>
@@ -357,8 +392,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="convolution"
-				Filter="">
+				Name="convolution">
 				<File 
 					RelativePath="..\convolution\channelpaths.cpp">
 				</File>
@@ -463,8 +497,7 @@
 				</File>
 			</Filter>
 			<Filter 
-				Name="fftw"
-				Filter="">
+				Name="fftw">
 				<File 
 					RelativePath="..\fftw\fftw3.h">
 				</File>

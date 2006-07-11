@@ -144,7 +144,7 @@ STDMETHODIMP CConvolverPropPage::Apply(void)
 	DWORD	nPartitions = 0;													// Initialize a DWORD for the number of partitions
 																				// to be used in the convolution algorithm
 																				// Get the attenuation value from the dialog box.
-	unsigned int nPlanningRigour =
+	PlanningRigour::PlanningRigourType nPlanningRigour =
 #ifdef FFTW
 		PlanningRigour::Measure;		// Set "Measure" as the default
 #else
@@ -385,7 +385,7 @@ LRESULT CConvolverPropPage::OnInitDialog(UINT uMsg, WPARAM wParam, LPARAM lParam
 	DWORD   nPartitions			= 0;								// Default number of partitions
 	CRegKey key;
 	DWORD   dwValue				= 0;
-	unsigned int nPlanningRigour = 
+	PlanningRigour::PlanningRigourType nPlanningRigour = 
 #ifdef FFTW
 		PlanningRigour::Measure;		// Set "Measure" as the default
 #else

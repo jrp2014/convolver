@@ -19,11 +19,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 //
-// convolverCMD.cpp : Defines the entry point for the console application.
+//$Workfile: convolverCMD.cpp $ : Defines the entry point for the console application.
+//$Revision: 32 $
+//$Date: 10/07/06 23:14 $
+//$Modtime: 10/07/06 23:14 $
 //
 
-#include "stdafx.h"
 #include "convolution\config.h"
+#include "stdafx.h"
 #include "convolution\convolution.h"
 #include "convolution\waveformat.h"
 
@@ -57,35 +60,33 @@ int _tmain(int argc, _TCHAR* argv[])
 	HRESULT hr = S_OK;
 	Holder< ConvertSample<float> > convertor(new ConvertSample_ieeefloat<BaseT>());
 
-	PlanningRigour pr;
-#ifdef FFTW
-	Wisdom w;					// Loads and saves FFTW wisdom
-#endif
-
 #if defined(DEBUG) | defined(_DEBUG)
 	debugstream.sink (apDebugSinkConsole::sOnly);
 #endif
 
-	if (argc != 6)
+#define PARTITIONS argv[1]
+#define PLANNINGRIGOUR argv[2]
+#define ATTENUATIONDB argv[3]
+#define CONFIG argv[4]
+#define INPUTFILE argv[5]
+#define OUTPUTFILE argv[6]
+
+	if (argc != 7)
 	{
 		USES_CONVERSION;
 
-		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour config.txt|IR.wav infile outfile" << std::endl;
+		std::wcerr << "Usage: convolverCMD nPartitions nTuningRigour fAttenuationDB config.txt|IR.wav infile outfile" << std::endl;
 		std::wcerr << "       nPartitions = 0 for overlap-save, or the number of partitions to be used" << std::endl;
-		std::wcerr << "       nTuningRigour = 0-" << pr.nDegrees-1 << " (";
-		for(int i = 0; i < pr.nDegrees - 1; ++i)
-			std::wcerr << pr.Rigour[i] << "|";
-		std::wcerr <<  pr.Rigour[pr.nDegrees - 1] << ")" << std::endl;
+		std::wcerr << "       nTuningRigour = 0-" << PlanningRigour::nDegrees-1 << " (";
+		for(int i = 0; i < PlanningRigour::nDegrees - 1; ++i)
+			std::wcerr << PlanningRigour::Rigour[i] << "|";
+		std::wcerr <<  PlanningRigour::Rigour[PlanningRigour::nDegrees - 1] << ")" << std::endl;
+		std::wcerr << "       fAttenuationDB = the attenuation to be applied in dB" << std::endl; 
 		std::wcerr << "       config.txt|IR.wav = a config text file specifying a single filter path" << std::endl;
 		std::wcerr << "                           or a sound file to be used as a filter" << std::endl;
 		std::wcerr << "       input and output sound files are, typically, .wav" << std::endl;
 		return 1;
 	}
-#define PARTITIONS argv[1]
-#define PLANNINGRIGOUR argv[2]
-#define CONFIG argv[3]
-#define INPUTFILE argv[4]
-#define OUTPUTFILE argv[5]
 
 	try
 	{
@@ -106,21 +107,46 @@ int _tmain(int argc, _TCHAR* argv[])
 		DWORD nPlanningRigour;
 		szPlanningRigour >> nPlanningRigour;
 
-		ConvolutionList<float> conv(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
+		ConvolutionList<BaseT> conv(CONFIG, nPartitions == 0 ? 1 : nPartitions, 
 			nPlanningRigour); // Sets conv. nPartitions==0 => use overlap-save
 
 		// TODO:: allow SF_INFO as well as WAVEFILEEX to select convolutions
 		if(conv.nConvolutionList() != 1)
-			throw convolutionException("Only single filter path specification acceptable");
+			throw convolutionException("Only a single filter path specification is acceptable");
+
+		std::wistringstream szAttenuationDB(ATTENUATIONDB);
+		float fAttenuationDB = 0;
+		szAttenuationDB >> fAttenuationDB;
+
+		if(fAttenuationDB > MAX_ATTENUATION_DB)
+		{
+			throw("fAttenuationDB too large or not a floating point number");
+		}
+
+		if(-fAttenuationDB > MAX_ATTENUATION_DB)
+		{
+			throw("fAttenuationDB too small (negative) or not a floating point number");
+		}
+
 
 #ifdef LIBSNDFILE
 		SF_INFO sf_info; ::ZeroMemory(&sf_info, sizeof(sf_info));
 		// TODO: The following uses the sample rate of the first filter path for .PCM files
 		conv.selectConvolutionIndex(0);  // Select the one and only filter path
 		CWaveFileHandle WavIn(INPUTFILE, SFM_READ, &sf_info, conv.SelectedConvolution().Mixer.nSamplesPerSec());
-		std::wcerr << waveFormatDescription(sf_info, TEXT("Input file format: ")) << std::endl;
 
-		const DWORD cBufferLength = conv.SelectedConvolution().Mixer.nFilterLength() * SAMPLES;  // frames
+		std::wcerr << waveFormatDescription(sf_info, TEXT("Input file format: ")) << std::endl;
+		std::wcerr << "Filter format: " << conv.DisplayConvolutionList() << std::endl;
+
+		if (conv.SelectedConvolution().Mixer.nInputChannels() != sf_info.channels)
+		{
+			throw("Filter has different number of channels from the Input file");
+		}
+
+		if (conv.SelectedConvolution().Mixer.nSamplesPerSec() != sf_info.samplerate)
+		{
+			std::wcerr << "Warning: Filter format and Input file have different sample rates" << std::endl;
+		}	
 #else
 		CWaveFileHandle WavIn;
 		if( FAILED( hr = WavIn->Open(INPUTFILE, NULL, WAVEFILE_READ ) ) )
@@ -136,24 +162,24 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		WAVEFORMATEX* pWave = WavIn->GetFormat();
 
-		std::cerr << waveFormatDescription(&(conv->FIR.wfexFilterFormat), conv->FIR.nFilterLength, TEXT("Filter format: ")) << std::endl;
+		std::cerr << waveFormatDescription(&(conv->conv.SelectedConvolution().Mixer.wfexFilterFormat()), 
+			conv.SelectedConvolution().Mixer.nFilterLength(), TEXT("Filter format: ")) << std::endl;
 
-		if (conv->FIR.wfexFilterFormat.Format.nChannels < WavIn->GetFormat()->nChannels)
+		if (conv.SelectedConvolution().Mixer.nInputChannels() != pWave->nChannels)
 		{
-			std::wcerr << "Filter format has fewer channels than the Input file" << std::endl;
-			throw(hr);
+			throw("Filter has different number of channels from the Input file");
 		}
 
-		if (conv->FIR.wfexFilterFormat.Format.nSamplesPerSec!= WavIn->GetFormat()->nSamplesPerSec)
+		if (conv.SelectedConvolution().Mixer.nSamplesPerSec() != pWave)->nSamplesPerSec)
 		{
 			std::wcerr << "Warning: Filter format and Input file have different sample rates" << std::endl;
-		}
-
-		const DWORD cBufferLength = conv->FIR.nFilterLength * conv->FIR.wfexFilterFormat.Format.nBlockAlign * SAMPLES;  // bytes
+		}		
 #endif		
 
+		const DWORD cBufferLength = conv.SelectedConvolution().Mixer.nFilterLength() * SAMPLES;  // frames
+
 #if defined(DEBUG) | defined(_DEBUG)
-		//cdebug << "cBufferLength=" << cBufferLength << std::endl ;
+		cdebug << "cBufferLength=" << cBufferLength << std::endl;
 #endif
 
 		UINT dwSizeWrote = 0;
@@ -179,29 +205,39 @@ int _tmain(int argc, _TCHAR* argv[])
 			std::wcerr << "Failed to calculate optimum attenuation" << std::endl;
 			throw (hr);
 		}
-		std::wcerr << "Optimum attenuation: " << fAttenuation << " calculated in " << fElapsed << " milliseconds" << std::endl;
-		//fAttenuation = 0;
-		std::wcerr << "Using attenuation of " << fAttenuation << std::endl;
+		std::wcerr << "Optimum attenuation: " << std::setprecision(2) << fAttenuation << 
+			"dB calculated in " << std::setprecision(3) << fElapsed / 1000.0f << "s" << std::endl;
+
+		fAttenuation = powf(10, fAttenuationDB / 20.0f);
+
+		std::wcerr << "Using attenuation of " << std::setprecision(2) << fAttenuationDB << 
+			"dB" << " (ie, scaling factor of " << fAttenuation << ")" << std::endl;
 
 		const int nInputChannels = conv.SelectedConvolution().Mixer.nInputChannels();
-
+		const int nOutputChannels = conv.SelectedConvolution().Mixer.nOutputChannels();
 #ifdef LIBSNDFILE
 		std::vector<float> pfInputSamples(cBufferLength * nInputChannels);
-		std::vector<float> pfOutputSamples(cBufferLength * nInputChannels);
+		std::vector<float> pfOutputSamples(cBufferLength * nOutputChannels);
 #else
-		std::vector<BYTE> pbInputSamples(cBufferLength,0);
-		std::vector<BYTE> pbOutputSamples(cBufferLength,0);
+		std::vector<BYTE> pbInputSamples(cBufferLength * pWave->nBitsPersample / 8 * nInputChannels ,0);
+		std::vector<BYTE> pbOutputSamples(cBufferLength * pWave->nBitsPersample / 8 * nOutputChannels,0);
 #endif
 
 #ifdef	LIBSNDFILE
-		// Write out in the same format as the input file, but with the right number of output channels
-		sf_info.channels = conv.SelectedConvolution().Mixer.nOutputChannels();	// select the first filter path
+		// Write out in the same format as the input file, but with the right number of output channels ...
+		sf_info.channels = nOutputChannels;
+
+		// ... but change to float format to retain max resolution
+		if(sf_info.format && (SF_FORMAT_WAV | SF_FORMAT_PCM_S8 | SF_FORMAT_PCM_16 | SF_FORMAT_PCM_24 |SF_FORMAT_PCM_U8))
+			sf_info.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT;
+
 		CWaveFileHandle WavOut(OUTPUTFILE, SFM_WRITE, &sf_info, sf_info.samplerate);
 #else
 		CWaveFileHandle WavOut;
-		if( FAILED( hr = WavOut->Open(OUTPUTFILE, WavIn->GetFormat(), WAVEFILE_WRITE ) ) )  // TODO:: fix for when different no of i/o channels
+		pWave->nChannels = nOutputChannels;
+		if( FAILED( hr = WavOut->Open(OUTPUTFILE, pWave, WAVEFILE_WRITE ) ) )
 		{
-			std::wcerr << "Failed to open " << std::basic_string< _TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE)) << " for writing" << std::endl;
+			std::wcerr << "Failed to open " << std::basic_string< TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE)) << " for writing" << std::endl;
 			throw(hr);
 		}
 #endif
@@ -232,7 +268,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 			DWORD dwBlocksToProcess = cBufferLength;
 #else
-			if (dwSizeRead % conv.Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
+			if (dwSizeRead % conv.`selectedConvolution.Mixer.wfexFilterFormat.Format.nBlockAlign != 0)
 			{
 				std::wcerr << "Failed to read a whole number of blocks. Read " << dwSizeRead << " bytes." << std::endl;
 				throw(std::length_error("Failed to read a whole number of blocks"));
@@ -249,24 +285,24 @@ int _tmain(int argc, _TCHAR* argv[])
 			// nPartitions == 0 => use overlap-save version
 			DWORD dwBufferSizeGenerated = nPartitions == 0 ?
 #ifdef LIBSNDFILE
-				conv.SelectedConvolution().doConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
+				conv.SelectedConvolution().doConvolution(InterleavedIO<BaseT>(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
 				reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
-				conv.SelectedConvolution().doConvolution(&pbInputSamples[0], &pbOutputSamples[0],
+				conv.SelectedConvolution().doConvolution(InterleavedIO<BaseT>(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
-				convertor.get_ptr(), convertor.get_ptr(),
+				convertor.get_ptr(), convertor.get_ptr()),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
-				/* fAttenuation_db */ fAttenuation)
+				/* fAttenuation_db */ fAttenuationDB)
 				:
 #ifdef LIBSNDFILE
-			conv.SelectedConvolution().doPartitionedConvolution(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
+			conv.SelectedConvolution().doPartitionedConvolution(InterleavedIO<BaseT>(reinterpret_cast<BYTE*>(&pfInputSamples[0]),
 				reinterpret_cast<BYTE*>(&pfOutputSamples[0]),
 #else
 			conv.SelectedConvolution().doPartitionedConvolution(&pbInputSamples[0], &pbOutputSamples[0],
 #endif
-				convertor.get_ptr(), convertor.get_ptr(),
+				convertor.get_ptr(), convertor.get_ptr()),
 				/* dwBlocksToProcess */ dwBlocksToProcess,
-				/* fAttenuation_db */ fAttenuation);
+				/* fAttenuation_db */ fAttenuationDB);
 
 #if defined(DEBUG) | defined(_DEBUG)
 				cdebug << "dwBufferSizeGenerated=" << dwBufferSizeGenerated << std::endl;
@@ -302,8 +338,13 @@ int _tmain(int argc, _TCHAR* argv[])
 #else
 			" bytes to " 
 #endif
-			<< std::basic_string< _TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE))
-			<< " in " << fElapsed << " milliseconds" << std::endl;
+			<< std::basic_string< TCHAR >(OUTPUTFILE, _tcslen(OUTPUTFILE))
+			<< " in " << std::setprecision(2) << fElapsed / 1000.0f << "s" <<
+#ifdef LIBSNDFILE
+			" (ie, at " << std::setprecision(2) <<  dwTotalSizeWritten / fElapsed / sf_info.samplerate * 1000.0f << " times real time)" <<
+#endif
+			
+			std::endl;
 
 #ifndef LIBSNDFILE
 		WavIn->Close();
@@ -323,7 +364,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	catch(const HRESULT& hr)
 	{	
-		std::wcerr << "Failed (" << std::hex << hr	<< std::dec << ")" << std::endl;
+		std::wcerr << "Failed (" << std::hex << hr	<< std::dec << "). Please report to jrp@dial.pipex.com" << std::endl;
 	}
 	catch (const char* what)
 	{
@@ -335,7 +376,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	catch (...)
 	{
-		std::wcerr << "Failed" <<std::endl;
+		std::wcerr << "Failed.  Please report to jrp@dial.pipex.com" <<std::endl;
 	}
 
 #if defined(DEBUG) | defined(_DEBUG)
