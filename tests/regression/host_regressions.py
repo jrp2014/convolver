@@ -9,6 +9,7 @@ Use --source to test another sample.h with the same API.
 """
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -61,9 +62,9 @@ def main():
     dither = dither.replace("\r\n", "\n")
     scaffold = (Path(__file__).with_name("host_regressions.cpp")).read_text()
     code = scaffold.replace("// INSERT_SOURCE_ADAPTERS", source_fragments(text, dither))
-    compiler = shutil.which("clang++") or shutil.which("c++")
+    compiler = shutil.which(os.environ.get("CXX", "clang++"))
     if compiler is None:
-        parser.error("a C++ compiler is required")
+        parser.error("Clang is required; set CXX to its executable path")
     failures = 0
     cases = ["pcm24", "pcm20", "pcm16", "inplace", "cross_alias", "accumulate", "double", "delays", "null_input", "null_delayed_history", "mixed_delays", "overlap", "null_output"]
     cases += [f"pcm32_{bits}" for bits in (16, 20, 24)]

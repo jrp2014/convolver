@@ -7,6 +7,7 @@ the oracle is independent, double-precision time-domain linear convolution.
 Requires the review branch delay-line API (not the original 4.3 release API).
 """
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -72,7 +73,7 @@ def main():
         source = Path(temp) / 'core.cpp'
         source.write_text(generate(args.revision))
         binary = Path(temp) / 'core'
-        subprocess.run(['clang++', '-std=c++17', '-O1', '-g', '-fms-extensions',
+        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O1', '-g', '-fms-extensions',
                         '-Wno-unknown-pragmas', '-Wno-ignored-attributes',
                         '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer',
                         str(source), '-o', str(binary)], check=True)

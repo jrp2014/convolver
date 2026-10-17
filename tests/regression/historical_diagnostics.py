@@ -4,6 +4,7 @@
 Extract only the ordered bad/fail clauses; parsing and Windows I/O are not run.
 """
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -46,7 +47,7 @@ int main() {
     with tempfile.TemporaryDirectory(prefix='convolver-diagnostics-') as tmp:
         cpp = Path(tmp) / 'test.cpp'; exe = Path(tmp) / 'test'
         cpp.write_text(code)
-        subprocess.run(['clang++', '-std=c++11', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', str(cpp), '-o', str(exe)], check=True)
+        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++11', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', str(cpp), '-o', str(exe)], check=True)
         return subprocess.run([str(exe)]).returncode
 
 

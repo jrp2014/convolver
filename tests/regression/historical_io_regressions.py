@@ -8,6 +8,7 @@ native Windows build, real descriptor I/O, or codec implementation is tested.
 empty-handle cleanup fixes; the newer explicit status/close tests are omitted.
 """
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -47,9 +48,9 @@ def main():
     code = harness.replace('// INSERT_SOURCE', production)
     if has_status_api:
         code = '#define HAS_STATUS_API\n' + code
-    compiler = shutil.which('clang++') or shutil.which('c++')
+    compiler = shutil.which(os.environ.get('CXX', 'clang++'))
     if compiler is None:
-        parser.error('a C++ compiler is required')
+        parser.error('Clang is required; set CXX to its executable path')
     failures = 0
     cases = ['fd_raw', 'fd_autodetect', 'fd_write', 'invalid_write', 'open_failure', 'diagnostics', 'formats', 'reject_formats', 'path_compatibility', 'default_handle']
     if has_status_api:

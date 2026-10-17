@@ -61,14 +61,30 @@ and the Windows SDK, it expects:
 - Boost (header-only parts)
 - FFTW 3 and libsndfile DLLs (only headers and import wrappers are in this repository)
 
-Nobody has built it from this repository yet.
+Native builds of these historical applications have not yet been verified.
+The new top-level CMake project currently runs regression tests; it does not
+yet build the Windows applications or a portable engine library.
 
 ## Portable regression checks
 
-Run `python3 tests/regression/run_all.py` with Clang and its AddressSanitizer and
-UndefinedBehaviorSanitizer runtimes available. These tests extract production
-C++ routines and compare them against independent expected results. They do
-not build the Windows applications or substitute for a native integration test.
+With CMake 3.20+, Python 3.8+ and Clang (including ASan/UBSan) on macOS or Linux:
+
+```sh
+cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++
+ctest --test-dir build --output-on-failure --parallel 2
+```
+
+The nine suites cover extracted production routines and preservation of the
+historical documentation. `python3 tests/regression/run_all.py` remains available.
+See [testing instructions and coverage limits](docs/testing.md). These checks do
+not substitute for a native build with real FFTW/libsndfile and host integration.
+
+## Modernization
+
+The [modernization assessment](docs/modernization.md) recommends a portable C++
+core and CLI, CMake builds, FFTW/vDSP backends with PFFFT benchmarking, retained
+libsndfile support, and staged performance work. It describes the native tests
+and compatibility requirements that must precede a modern release.
 
 ## Licence
 
