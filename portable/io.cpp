@@ -5,10 +5,13 @@
 #include <bit>
 #include <array>
 #include <cmath>
+#include <cerrno>
+#include <climits>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -121,7 +124,7 @@ sf_count_t frames(std::size_t samples, std::size_t channels) {
     return static_cast<sf_count_t>(n);
 }
 }
-struct AudioReader::Impl { Handle handle; AudioInfo info{}; bool raw = false; };
+struct AudioReader::Impl { Handle handle; AudioInfo info{}; bool raw = false, raw_stdin = false; };
 AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw) : impl_(std::make_unique<Impl>()) {
     SF_INFO sf{};
     if (raw) {
@@ -132,6 +135,17 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         if (path != "-" && std::filesystem::is_regular_file(path) && std::filesystem::file_size(path) % (4 * raw->channels))
             throw std::runtime_error("RAW input ends with an incomplete frame");
     } else validate_wave(path);
+#ifdef _WIN32
+    // libsndfile 1.2.2's ReadFile path treats ERROR_BROKEN_PIPE (normal pipe
+    // EOF) as an error. Use the CRT's EOF-aware byte reader for borrowed RAW
+    // stdin; file decoding and all output still use libsndfile.
+    if (raw && path == "-") {
+        if (_setmode(0, _O_BINARY) == -1) throw std::runtime_error("cannot set stdin to binary mode");
+        impl_->raw_stdin = true;
+        impl_->info = *raw;
+        return;
+    }
+#endif
     impl_->handle.file = open(path, SFM_READ, sf);
     if (!impl_->handle.file) throw error("cannot open audio input " + path.string(), nullptr);
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
@@ -141,7 +155,7 @@ AudioReader::~AudioReader() = default;
 AudioInfo AudioReader::info() const noexcept { return impl_->info; }
 std::size_t AudioReader::read(std::span<float> data) {
     auto* file = impl_->handle.file;
-    if (!file) throw std::logic_error("audio reader is closed");
+    if (!file && !impl_->raw_stdin) throw std::logic_error("audio reader is closed");
     const auto count = frames(data.size(), impl_->info.channels);
     if (!count) return 0;
     sf_count_t got;
@@ -150,8 +164,26 @@ std::size_t AudioReader::read(std::span<float> data) {
         if (data.size() > static_cast<std::size_t>(std::numeric_limits<sf_count_t>::max() / 4)) throw std::length_error("RAW buffer too large");
         // Reading bytes preserves incomplete frames on nonseekable inputs;
         // sf_readf_float silently drops their trailing samples/bytes.
-        const auto bytes = sf_read_raw(file, data.data(), static_cast<sf_count_t>(data.size() * 4));
-        if (bytes < 0 || sf_error(file)) throw error("RAW audio read failed", file);
+        sf_count_t bytes = 0;
+#ifdef _WIN32
+        if (impl_->raw_stdin) {
+            const auto wanted = static_cast<sf_count_t>(data.size() * 4);
+            while (bytes < wanted) {
+                const auto chunk = static_cast<unsigned>(std::min<sf_count_t>(wanted - bytes, INT_MAX));
+                const auto n = _read(0, reinterpret_cast<char*>(data.data()) + bytes, chunk);
+                if (n < 0) {
+                    if (errno == EINTR) continue;
+                    throw std::system_error(errno, std::generic_category(), "RAW stdin read failed");
+                }
+                if (n == 0) break;
+                bytes += n;
+            }
+        } else
+#endif
+        {
+            bytes = sf_read_raw(file, data.data(), static_cast<sf_count_t>(data.size() * 4));
+            if (bytes < 0 || sf_error(file)) throw error("RAW audio read failed", file);
+        }
         if (bytes % static_cast<sf_count_t>(4 * impl_->info.channels)) throw std::runtime_error("RAW input ends with an incomplete frame");
         auto* raw_bytes = reinterpret_cast<const unsigned char*>(data.data());
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / 4; ++i) {
@@ -163,12 +195,12 @@ std::size_t AudioReader::read(std::span<float> data) {
     } else {
         got = sf_readf_float(file, data.data(), count);
     }
-    if (got < 0 || sf_error(file)) throw error("audio read failed", file);
+    if (got < 0 || (file && sf_error(file))) throw error("audio read failed", file);
     for (std::size_t i = 0; i < static_cast<std::size_t>(got) * impl_->info.channels; ++i)
         if (!std::isfinite(data[i])) throw std::runtime_error("nonfinite audio sample");
     return static_cast<std::size_t>(got);
 }
-void AudioReader::close() { impl_->handle.close(); }
+void AudioReader::close() { impl_->raw_stdin = false; impl_->handle.close(); }
 struct AudioWriter::Impl {
     Handle handle;
     AudioInfo info{};

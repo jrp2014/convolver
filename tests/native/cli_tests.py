@@ -74,6 +74,24 @@ def main():
         near(struct.unpack('<4f',p.stdout), [.125,-.1875,.25,.1875])
         p=call(args+['--gain-db','6.020599913279624'],data=raw)
         near(struct.unpack('<4f',p.stdout), [.25,-.375,.5,.375])
+        # EOF after full/partial read buffers must retain every frame and tail.
+        for count in (0, 1, 4096, 4097):
+            payload=struct.pack('<%df' % count, *([.25]*count))
+            p=call(args,data=payload)
+            expected=([.125]+[.1875]*(count-1)+[.0625]) if count else []
+            near(struct.unpack('<%df' % (len(p.stdout)//4),p.stdout),expected)
+        # Normal pipe EOF must not hide incomplete samples or nonfinite input.
+        for payload in (b'\0', raw+b'\0', struct.pack('<f',float('nan'))):
+            call(args,ok=False,data=payload)
+        # A producer may split float samples across separate writes.
+        with subprocess.Popen([EXE,*map(str,args)],stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE,stderr=subprocess.PIPE) as p:
+            for byte in raw:
+                p.stdin.write(bytes([byte])); p.stdin.flush()
+            p.stdin.close(); p.stdin=None
+            output,errors=p.communicate(timeout=30)
+            assert p.returncode==0, errors
+            near(struct.unpack('<4f',output),[.125,-.1875,.25,.1875])
         # Referenced IRs and nested config/list files must never be overwritten.
         original_ir=ir.read_bytes()
         call(['--filter',cfg,'--input',src,'--output',ir],ok=False)

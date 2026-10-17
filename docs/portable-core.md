@@ -111,6 +111,11 @@ stdout during rendering. Incomplete RAW frames, nonfinite samples, broken pipes,
 short writes and detected finalization failures are errors. Caller-owned standard
 descriptors are not closed by the I/O wrappers.
 
+On Windows, RAW stdin uses the binary CRT reader to handle normal pipe EOF;
+libsndfile 1.2.2's Windows reader reports that condition as a system error. Files
+and output streams still use libsndfile. Partial-byte reads are accumulated before
+checking complete frames, so fragmented writes do not lose audio.
+
 Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
 validation, because libsndfile can otherwise silently accept truncation. Other
 input containers, including RF64, retain libsndfile's validation semantics; this

@@ -118,7 +118,7 @@ def check_links(base, paths):
             require(unquote(parsed.fragment) in pages[target].anchors,
                     'missing fragment: %s -> %s' % (source.name, url))
             counts['fragments'] += 1
-    inventory = Counter((str(path.relative_to(base)), attr, url)
+    inventory = Counter((path.relative_to(base).as_posix(), attr, url)
                         for path, attr, url in links)
     return counts, inventory
 
@@ -128,7 +128,7 @@ def check_archive(root):
     require(len(manifest['files']) == 99, 'expected 99 preserved files')
     paths = check_files(root, manifest['files'])
     base = (root / ARCHIVE).resolve()
-    require({str(p.relative_to(base)) for p in paths if p.suffix == '.html'} == PAGES,
+    require({p.relative_to(base).as_posix() for p in paths if p.suffix == '.html'} == PAGES,
             'original 18-page inventory changed')
     # README.md is the modern provenance note, not an archived website file.
     actual = {contained(base, p) for p in base.rglob('*')
@@ -161,7 +161,7 @@ def check_failure_detection():
         entries = []
         for name, data in fixtures.items():
             (base / name).write_bytes(data)
-            entries.append({'path': str(ARCHIVE / name), 'bytes': len(data),
+            entries.append({'path': (ARCHIVE / name).as_posix(), 'bytes': len(data),
                             'sha256': hashlib.sha256(data).hexdigest()})
         paths = check_files(root, entries)
         check_links(base, paths)
@@ -185,7 +185,7 @@ def check_failure_detection():
         image.write_bytes(fixtures['image.gif'])
         (base / 'other.html').write_bytes(b'<a name="different"></a>')
         fails(lambda: check_links(base, paths), 'missing fragment')
-        unsafe = dict(entries[0], path=str(ARCHIVE / '..' / 'outside'))
+        unsafe = dict(entries[0], path=(ARCHIVE / '..' / 'outside').as_posix())
         fails(lambda: check_files(root, [unsafe]), 'unsafe manifest path')
         (base / 'index.html').write_bytes(b'<a href="../outside">escape</a>')
         fails(lambda: check_links(base, paths), 'path escapes archive')
