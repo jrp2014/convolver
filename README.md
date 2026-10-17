@@ -14,7 +14,7 @@ The historical applications share the engine in [`convolver/convolution`](convol
 which does uniformly partitioned overlap-save convolution with FFTW.
 
 A new **portable C++20 core and CLI** in [`portable/`](portable) builds with
-CMake, FFTW and libsndfile. It supports native file rendering, RAW streaming and
+CMake, FFTW (portable) or Apple Accelerate, and libsndfile. It supports native file rendering, RAW streaming and
 the historical configuration format. See the [portable build and usage guide](docs/portable-core.md).
 
 Its text config format (`.cfg`) is still read by Roon, JRiver Media Center and
@@ -66,6 +66,9 @@ ctest --test-dir build-native --output-on-failure
 ./build-native/convolver --filter impulse.wav --input music.wav --output corrected.wav
 ```
 
+On Apple platforms, add `-DCONVOLVER_FFT_BACKEND=ACCELERATE` to use the system
+FFT framework without FFTW. See [backend measurements](docs/fft-backends.md).
+
 See [platform instructions and options](docs/portable-core.md) for macOS/Linux
 packages, Windows/vcpkg, sanitizer builds and CLI semantics.
 
@@ -95,16 +98,17 @@ ctest --test-dir build --output-on-failure --parallel 2
 
 These nine suites cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
-The default native build additionally runs three suites against the actual core,
-FFTW, libsndfile and CLI. See [testing instructions and coverage limits](docs/testing.md).
+The default native build additionally runs five suites against the actual core,
+the selected FFT backend, libsndfile and CLI. See [testing instructions and coverage limits](docs/testing.md).
 
 ## Modernization
 
-The [modernization assessment](docs/modernization.md) recommends a portable C++
-core and CLI, CMake builds, FFTW/vDSP backends with PFFFT benchmarking, retained
-libsndfile support, and staged performance work. The initial portable core/CLI
-milestone is implemented; alternative backends, plug-ins and performance tuning
-remain future work.
+The portable core/CLI, FFTW/Accelerate adapters, offline FFTW tuning and real-library
+tests are implemented. The [structure review and next milestones](docs/project-structure.md)
+prioritize independently consumable CMake packages, configuration compatibility,
+measured transform reuse and a host-ready lifecycle. The broader
+[modernization assessment](docs/modernization.md) records the alternatives and
+downstream history. Modern plug-ins and further DSP optimization remain future work.
 
 ## Licence
 

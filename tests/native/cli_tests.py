@@ -40,7 +40,7 @@ def call(args, ok=True, data=None):
     return p
 
 def main():
-    call(['--help']); assert b'FFTW' in call(['--version']).stdout
+    call(['--help']); assert b'FFT backend:' in call(['--version']).stdout
     with tempfile.TemporaryDirectory(prefix='convolver-cli-') as t:
         d=Path(t); src=d/'entrée.wav'; ir=d/'ir.wav'; dst=d/'sortie ü.wav'
         for count in (0,1,16,17,64):

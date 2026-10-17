@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace convolver {
@@ -20,12 +22,30 @@ struct Configuration {
     std::vector<FilterPath> paths;
 };
 
-// Prepared single-precision uniformly partitioned convolution using FFTW.
+// Backend selected when building the library; strings have static lifetime.
+const char* fft_backend_name() noexcept;
+const char* fft_backend_version() noexcept;
+
+enum class FftPlanning { estimate, measure, patient };
+struct FftOptions {
+    FftPlanning planning = FftPlanning::estimate;
+    bool wisdom_only = false; // Fail if the requested plans are not cached.
+};
+// FFTW wisdom is process-global. These operations are serialized with planning,
+// and must run outside audio processing. Other backends reject wisdom operations.
+bool fft_supports_wisdom() noexcept;
+void import_fft_wisdom(std::string_view wisdom);
+std::string export_fft_wisdom();
+// Prepare this block size's forward/inverse plans; no audio or filter is needed.
+// Use measure or patient; export_fft_wisdom() then saves accumulated plans.
+void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
+
+// Prepared single-precision uniformly partitioned convolution.
 // Construction/destruction must be outside processing and are serialized for
 // FFTW planning. Each instance has independent processing state.
 class Engine {
 public:
-    explicit Engine(const Configuration&, std::size_t block_frames = 256);
+    explicit Engine(const Configuration&, std::size_t block_frames = 256, FftOptions = {});
     ~Engine();
     Engine(Engine&&) noexcept;
     Engine& operator=(Engine&&) noexcept;

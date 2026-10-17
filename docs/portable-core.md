@@ -1,7 +1,7 @@
 # Portable core and CLI
 
 The new `portable/` implementation builds normal C++20 translation units against
-real FFTW (single precision) and libsndfile. It is independent of Windows/ATL and
+real FFTW or Apple Accelerate (single precision), plus libsndfile. It is independent of Windows/ATL and
 the historical plug-in wrappers. The original sources and their regression tests
 remain in place.
 
@@ -29,7 +29,59 @@ ctest --test-dir build-native --output-on-failure
 Use `-DCMAKE_PREFIX_PATH=/path/to/dependencies` for a separate installation.
 Configuration never downloads dependencies. CMake finds FFTW3f/SndFile package
 configs, with library/header discovery fallbacks (and pkg-config for libsndfile).
-The single-precision FFTW library is required even if double FFTW is installed.
+For the default FFTW backend, its single-precision library is required even if
+double FFTW is installed. On Apple platforms select the system framework instead:
+
+```sh
+cmake -S . -B build-accelerate -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_FFT_BACKEND=ACCELERATE
+cmake --build build-accelerate --parallel
+ctest --test-dir build-accelerate --output-on-failure
+```
+
+Accelerate builds neither search for nor link FFTW. Backend selection is per
+build, not a runtime switch; `--version` identifies the selected backend.
+See [FFT contracts, benchmarks and equivalence results](fft-backends.md).
+
+### FFTW plan tuning
+
+An optimized FFTW build supplies SIMD routines; measured planning selects among
+them for the transform size actually used. Run this once on the target machine
+with a Release binary and little competing CPU activity:
+
+```sh
+./build-native/convolver --tune-fft machine-b256.fftw --block-size 256
+./build-native/convolver --filter room.cfg --input music.wav --output corrected.wav \
+  --block-size 256 --fft-wisdom machine-b256.fftw
+```
+
+Tuning needs no input audio or IR. It prepares both transforms using `patient`
+planning by default; `--fft-plan measure` searches less extensively. The wisdom
+destination must be a **new file**; existing files and aliases are never replaced.
+Use a different filename when retuning, then replace an older cache deliberately.
+
+Normal rendering defaults to `estimate`, or accepts `--fft-plan measure|patient`
+to time plans during startup. `--fft-wisdom FILE` imports native single-precision
+FFTW wisdom and requires matching plans, with no silent measured fallback. A
+missing size or insufficient planning rigor fails before opening the audio
+output. Patient wisdom satisfies estimate/measure requests as well as patient;
+measure wisdom cannot satisfy patient. CLI wisdom input is limited to 1 MiB.
+
+Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
+Retune after changing them; loading successfully is **not** proof that old wisdom
+is optimal for a different CPU. The native wisdom format performs FFTW's own
+compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
+and does not guarantee a globally optimal plan. This step does not choose B or
+change B-frame latency. Accelerate rejects measured planning and wisdom options.
+See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
+
+Library callers can pass `FftOptions` to `Engine`, or call `tune_fft`, then
+`export_fft_wisdom`/`import_fft_wisdom`. Core APIs use strings, with file handling
+kept in the CLI. Wisdom is global to the FFTW library in the process. Convolver
+serializes its own planning, destruction and wisdom access; applications making
+other FFTW planner calls must coordinate those too. All preparation belongs
+outside the audio callback.
+
+### Windows build
 
 Windows/MSVC configuration, using an existing vcpkg installation:
 
@@ -40,8 +92,10 @@ cmake --build build-native --config Release
 ctest --test-dir build-native -C Release --output-on-failure
 ```
 
-These Windows instructions and Linux/MSVC CI jobs are provided for validation;
-local verification so far is macOS Apple Silicon with AppleClang. The historical
+The preceding FFTW baseline passed Linux/MSVC CI. The new backend abstraction
+and Accelerate implementation have been verified locally on macOS Apple Silicon
+with AppleClang; see [GitHub Actions](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
+for platform CI results. The historical
 Windows hosts have not been ported. Dependency package versions in CI follow the
 runner's package manager; `--version` records the linked versions. Pin a package
 baseline before making a reproducible binary release.
@@ -59,6 +113,8 @@ Build options:
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `CONVOLVER_BUILD_NATIVE` | ON | Core, I/O and CLI; requires real dependencies |
+| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW or ACCELERATE (Apple only) |
+| `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
 | `BUILD_TESTING` | ON | Native tests and documentation checks; requires Python 3.8+ |
 | `CONVOLVER_SANITIZERS` | OFF | ASan/UBSan instrumentation of native targets with GCC/Clang |
 | `CONVOLVER_LEGACY_TESTS` | ON for native Clang on macOS/Linux; OFF elsewhere | Existing sanitized extraction harnesses |
@@ -77,7 +133,8 @@ several channels. Lists select the first entry matching input rate and channel
 count. There is no resampling or nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
-count. FFT length is 2B; positive non-power-of-two B values also work. The core
+count. FFTW uses FFT length 2B; Accelerate rounds up to a power of two (at least
+four). Positive non-power-of-two B values work with either backend. The core
 has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
 it, matching the historical Pipe timing convention. No input frames means no
@@ -151,13 +208,15 @@ This implementation uses uniform partitioned overlap-add with an input-spectrum
 history. It preserves the reviewed engine's linear convolution and timing
 semantics while making ownership and lengths explicit. It is new portable
 production code, not an extraction test or an assertion that every historical
-host feature has been ported. FFTW scaling is applied once when preparing IR
-spectra. There is no FFT-backend selection or performance tuning yet.
+host feature has been ported. Both backends expose the same spectrum layout and
+scaling; 1/N normalization is applied once when preparing IR spectra. The first
+backend measurements are recorded in [the FFT guide](fft-backends.md).
 
 Prepared processing/reset performs no C++ heap allocation; a test guards that
 contract. This is not a hard real-time guarantee or instrumentation of every
-possible library/system allocation. Planning/destruction is serialized between
-these engine instances, outside processing. Other FFTW users in the same process
+possible library/system allocation. FFTW planning/destruction is serialized between
+these engine instances, outside processing. Accelerate owns an independent setup
+per instance. Other FFTW users in the same process
 must coordinate their planning too.
 
 Resource limits are deliberate: 1..256 channels, 1..768000 Hz, B up to 1048576,

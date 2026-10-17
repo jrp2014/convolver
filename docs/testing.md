@@ -3,7 +3,7 @@
 ## Native production tests
 
 The [portable build](portable-core.md) now compiles production C++20 translation
-units against real FFTW and libsndfile. Build before running CTest:
+units against the selected real FFT library and libsndfile. Build before running CTest:
 
 ```sh
 cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
@@ -11,11 +11,13 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **12 suites**: three native suites and the
-nine historical/documentation suites below. GCC and MSVC default to the four
+With Clang on macOS/Linux this runs **14 suites**: five native suites and the
+nine historical/documentation suites below. GCC and MSVC default to the six
 native/documentation suites; the old extraction adapters require Clang.
 
-- `native.engine`: independent double time-domain oracle, real FFTW, seeded
+- `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
+  forward/inverse normalization and padded lengths.
+- `native.engine`: independent double time-domain oracle, real FFT backend, seeded
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
   nonfinite data and a C++ heap-allocation guard during processing/reset.
@@ -27,11 +29,23 @@ native/documentation suites; the old extraction adapters require Clang.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+- `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
+  CLI processes against direct convolution, missing-plan failure before output
+  creation, malformed/oversized caches, Unicode filenames and source protection;
+  Accelerate rejects FFTW-only options. FFT and engine oracle suites also exercise
+  measured/patient plans and cached matrix processing with FFTW.
 
-Debug with ASan/UBSan and optimized Release have passed locally on Apple Silicon.
-CI now includes Linux Clang/GCC, macOS Clang and Windows MSVC, but those remote
-jobs have not run for this unpushed change. Local linked-library versions and
-source hashes are recorded in the [portable guide](portable-core.md).
+Debug with ASan/UBSan and optimized Release have passed all 14 suites locally
+for both FFTW and Accelerate on Apple Silicon. `backend_equivalence.py` compares
+both actual CLIs over 16 matrix/delay cases, including odd block sizes and both
+latency modes. See [the measurements and reproduction commands](fft-backends.md).
+
+The preceding FFTW baseline passed Linux Clang/GCC, macOS and Windows MSVC
+[CI at f78c22b](https://github.com/jrp2014/convolver/actions/runs/39078598572).
+CI also builds Accelerate and compares backend outputs on macOS; consult the
+[workflow runs](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
+for each commit's remote results. Local dependency source hashes are
+recorded in the [portable guide](portable-core.md).
 
 ## Run with CMake/CTest
 
@@ -106,7 +120,7 @@ the live-site comparison is a dated provenance record, not a network CI test.
 ## Gates for a native release
 
 The initial native core now supplies normally compiled production tests with
-real FFTW and libsndfile. Add every future backend to the same contract tests. Retain the
+the selected real FFT backend and libsndfile. Add every future backend to the same contract tests. Retain the
 independent direct-convolution oracle rather than relying only on agreement
 between FFT implementations.
 

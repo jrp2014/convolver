@@ -1,29 +1,35 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
-#include <fftw3.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <csignal>
+#include <cstdio>
+#include <fcntl.h>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <sys/stat.h>
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
 #include <io.h>
 #else
-#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
 namespace {
 constexpr auto help = R"(Convolver portable CLI
 Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
+       convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
   --block-size N       Partition payload in frames (default 256)
+  --fft-plan MODE      estimate (render default), measure, patient (tune default)
+  --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
+  --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
   --gain-db DB         Output gain in decibels (default 0)
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
@@ -31,7 +37,7 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
-  --version           Show the linked FFTW and libsndfile versions
+  --version           Show the FFT backend and libsndfile versions
 FILE may be '-' for stdin/stdout; standard streams require RAW float format.
 Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
 --keep-latency is used. Sample-rate/channel mismatches are errors; no resampling.
@@ -73,6 +79,37 @@ bool same_stdin(const std::filesystem::path& output) {
         input_info.st_ino==output_info.st_ino;
 #endif
 }
+std::string read_wisdom(const std::filesystem::path& path) {
+    if(path=="-") throw std::invalid_argument("wisdom requires a file path");
+    std::ifstream file(path,std::ios::binary);
+    if(!file) throw std::runtime_error("cannot open FFTW wisdom file");
+    constexpr std::size_t limit=1024*1024;
+    std::string text(limit+1,'\0');
+    file.read(text.data(),static_cast<std::streamsize>(text.size()));
+    if(file.bad()) throw std::runtime_error("cannot read FFTW wisdom file");
+    text.resize(static_cast<std::size_t>(file.gcount()));
+    if(text.size()>limit) throw std::runtime_error("FFTW wisdom file exceeds 1 MiB");
+    return text;
+}
+void write_new_wisdom(const std::filesystem::path& path,const std::string& text) {
+    // Exclusive creation protects existing files, including hard links/symlinks.
+#ifdef _WIN32
+    const int fd=_wopen(path.c_str(),_O_WRONLY|_O_CREAT|_O_EXCL|_O_BINARY,_S_IREAD|_S_IWRITE);
+#else
+    const int fd=open(path.c_str(),O_WRONLY|O_CREAT|O_EXCL,0666);
+#endif
+    if(fd<0) throw std::runtime_error("cannot create FFTW wisdom file (must be a new path)");
+#ifdef _WIN32
+    auto* stream=_fdopen(fd,"wb");
+    if(!stream) {_close(fd);throw std::runtime_error("cannot open FFTW wisdom stream");}
+#else
+    auto* stream=fdopen(fd,"wb");
+    if(!stream) {close(fd);throw std::runtime_error("cannot open FFTW wisdom stream");}
+#endif
+    const bool written=std::fwrite(text.data(),1,text.size(),stream)==text.size();
+    const bool closed=std::fclose(stream)==0;
+    if(!written || !closed) throw std::runtime_error("cannot finish FFTW wisdom file; remove incomplete file before retrying");
+}
 }
 int run(int argc, char** argv) {
     try {
@@ -80,6 +117,9 @@ int run(int argc, char** argv) {
         std::signal(SIGPIPE,SIG_IGN); // Surface closed consumers as I/O failures.
 #endif
         std::filesystem::path filter, input, output;
+        std::filesystem::path wisdom, tune;
+        convolver::FftOptions fft_options;
+        bool explicit_plan=false, audio_options=false;
         std::optional<convolver::RawSpec> raw;
         convolver::OutputFormat format=convolver::OutputFormat::wav_float;
         std::size_t block=256;
@@ -93,19 +133,31 @@ int run(int argc, char** argv) {
             };
             if(option=="--help") { std::cout<<help; return 0; }
             if(option=="--version") {
-                std::cout<<"Convolver portable\nFFTW "<<fftwf_version<<'\n'
+                std::cout<<"Convolver portable\nFFT backend: "<<convolver::fft_backend_name()<<" / "<<convolver::fft_backend_version()<<'\n'
                          <<convolver::sndfile_version()<<'\n'; return 0;
             }
             if(option=="--filter") filter=utf8_path(value());
             else if(option=="--input") input=utf8_path(value());
             else if(option=="--output") output=utf8_path(value());
+            else if(option=="--fft-wisdom") wisdom=utf8_path(value());
+            else if(option=="--tune-fft") tune=utf8_path(value());
+            else if(option=="--fft-plan") {
+                explicit_plan=true;
+                const auto mode=value();
+                if(mode=="estimate") fft_options.planning=convolver::FftPlanning::estimate;
+                else if(mode=="measure") fft_options.planning=convolver::FftPlanning::measure;
+                else if(mode=="patient") fft_options.planning=convolver::FftPlanning::patient;
+                else throw std::invalid_argument("FFT planning mode must be estimate, measure or patient");
+            }
             else if(option=="--block-size") block=count(value());
-            else if(option=="--keep-latency") keep=true;
+            else if(option=="--keep-latency") {keep=true;audio_options=true;}
             else if(option=="--raw-input") {
+                audio_options=true;
                 const auto rate=count(value()); const auto channels=count(value());
                 if(rate>768000 || channels>256) throw std::invalid_argument("RAW metadata exceeds supported limits");
                 raw=convolver::RawSpec{static_cast<int>(rate),channels};
             } else if(option=="--gain-db") {
+                audio_options=true;
                 auto text=value(); std::size_t end=0;
                 const double db=std::stod(text,&end);
                 const double linear=std::pow(10.,db/20.);
@@ -114,6 +166,7 @@ int run(int argc, char** argv) {
                     throw std::invalid_argument("gain must be finite and representable");
                 gain=static_cast<float>(linear);
             } else if(option=="--output-format") {
+                audio_options=true;
                 const auto name=value();
                 if(name=="wav-float") format=convolver::OutputFormat::wav_float;
                 else if(name=="wav-pcm16") format=convolver::OutputFormat::wav_pcm16;
@@ -123,10 +176,29 @@ int run(int argc, char** argv) {
                 else throw std::invalid_argument("unsupported output format: "+name);
             } else throw std::invalid_argument("unknown option: "+option);
         }
+        if((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
+            throw std::invalid_argument("tuning and wisdom require the FFTW backend");
+        if(!tune.empty()) {
+            if(tune=="-" || !filter.empty() || !input.empty() || !output.empty() || !wisdom.empty() || audio_options)
+                throw std::invalid_argument("--tune-fft needs a new file path and accepts only --block-size and --fft-plan");
+            // Reject existing targets before the potentially lengthy calibration.
+            if(std::filesystem::exists(std::filesystem::symlink_status(tune)))
+                throw std::invalid_argument("FFTW wisdom output must be a new file path");
+            if(!explicit_plan) fft_options.planning=convolver::FftPlanning::patient;
+            convolver::tune_fft(block,fft_options.planning);
+            write_new_wisdom(tune,convolver::export_fft_wisdom());
+            std::cout<<"Saved FFTW wisdom for block size "<<block<<" (forward and inverse plans)\n";
+            return 0;
+        }
         if(filter.empty() || input.empty() || output.empty())
             throw std::invalid_argument("--filter, --input and --output are required (see --help)");
         if(same_file(input,output) || same_file(filter,output) || (input=="-" && same_stdin(output)))
             throw std::invalid_argument("output must differ from input and filter");
+        if(!wisdom.empty()) {
+            if(same_file(wisdom,output)) throw std::invalid_argument("output must differ from FFTW wisdom file");
+            convolver::import_fft_wisdom(read_wisdom(wisdom));
+            fft_options.wisdom_only=true;
+        }
         convolver::AudioReader reader(input,raw);
         const auto info=reader.info();
         std::vector<std::filesystem::path> dependencies;
@@ -134,7 +206,7 @@ int run(int argc, char** argv) {
         for(const auto& source:dependencies)
             if(same_file(source,output))
                 throw std::invalid_argument("output must differ from referenced configuration and impulse files");
-        convolver::Engine engine(config,block);
+        convolver::Engine engine(config,block,fft_options);
         convolver::AudioWriter writer(output,{info.sample_rate,engine.output_channels()},format);
         constexpr std::size_t chunk=4096;
         std::vector<float> in(chunk*engine.input_channels()), out(chunk*engine.output_channels());

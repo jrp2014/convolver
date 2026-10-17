@@ -3,8 +3,13 @@
 Assessment: 17 October 2026, starting from `main` at `b3b479f`.
 This records the proposed architecture and delivery order at that baseline.
 Update, 18 October 2026: the initial [portable core and CLI](portable-core.md)
-now build with real FFTW/libsndfile and native tests. Alternative FFT backends,
-modern plug-ins and performance optimization remain proposed work.
+now build with real FFTW/libsndfile and native tests. Local changes add
+[Apple Accelerate, backend equivalence tests and measurements](fft-backends.md),
+plus measured FFTW planning and persisted wisdom. The current
+[structure review and delivery plan](project-structure.md) prioritizes library
+packaging, compatibility, transform reuse and lifecycle work. The design below
+records the original assessment; the portable guide describes shipped/local behavior.
+Modern plug-ins and further performance optimization remain proposed work.
 
 ## Recommended direction
 
@@ -170,8 +175,8 @@ is a compelling default replacement for libsndfile.
 
 ## Performance work, in priority order
 
-These are code-based opportunities, not measured speedup claims. There is no
-current end-to-end native performance baseline.
+These are code-based opportunities, not measured speedup claims. An
+[end-to-end native performance baseline](fft-backends.md) is now available.
 
 1. **Measure release builds.** Record processing time per callback (median,
    p95, p99 and maximum observed), deadline misses, memory, setup time and
@@ -186,9 +191,9 @@ current end-to-end native performance baseline.
    expanding every path into a dense channel matrix can cost more memory/work.
 3. **Improve memory access and MACs.** Contiguous aligned spectra, cache-friendly
    partition order, preallocated scratch, and SIMD complex multiply/accumulate
-   are the next candidates. Compare input-spectrum history (frequency-domain
-   delay lines) with the current future-output accumulation scheme. Neither is
-   automatically better for every routing graph.
+   are the next candidates. The portable implementation already uses input-spectrum
+   history (frequency-domain delay lines); the historical engine used future-output
+   accumulation. Neither is automatically better for every routing graph.
 4. **Tune partition scheduling.** First sweep uniform B values. Later add a
    small head and larger tail partitions, or a direct FIR head, for long IRs
    with low latency. Validate every transition and spread tail work across

@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 project(Convolver LANGUAGES CXX)
 
 include(CTest)
-option(CONVOLVER_BUILD_NATIVE "Build the portable FFTW/libsndfile core and CLI" ON)
+option(CONVOLVER_BUILD_NATIVE "Build the portable FFT/libsndfile core and CLI" ON)
 option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
+option(CONVOLVER_BUILD_BENCHMARKS "Build the native processing benchmark" OFF)
 set(legacy_default OFF)
 if(CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux)$" AND
    CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang)$" AND NOT CMAKE_CROSSCOMPILING)
@@ -13,23 +14,40 @@ option(CONVOLVER_LEGACY_TESTS "Run Clang extraction regression harnesses" ${lega
 
 if(CONVOLVER_BUILD_NATIVE)
     include(GNUInstallDirs)
-    find_package(FFTW3f CONFIG QUIET)
-    if(NOT TARGET FFTW3::fftw3f)
-        find_path(FFTW3F_INCLUDE_DIR fftw3.h REQUIRED)
-        find_library(FFTW3F_LIBRARY NAMES fftw3f libfftw3f-3 REQUIRED)
-        add_library(FFTW3::fftw3f UNKNOWN IMPORTED)
-        set_target_properties(FFTW3::fftw3f PROPERTIES
-            IMPORTED_LOCATION "${FFTW3F_LIBRARY}"
-            INTERFACE_INCLUDE_DIRECTORIES "${FFTW3F_INCLUDE_DIR}")
+    set(CONVOLVER_FFT_BACKEND "FFTW" CACHE STRING "FFT backend: FFTW or ACCELERATE")
+    set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS FFTW ACCELERATE)
+    string(TOUPPER "${CONVOLVER_FFT_BACKEND}" fft_backend)
+    if(fft_backend STREQUAL "FFTW")
+        find_package(FFTW3f CONFIG QUIET)
+        if(NOT TARGET FFTW3::fftw3f)
+            find_path(FFTW3F_INCLUDE_DIR fftw3.h REQUIRED)
+            find_library(FFTW3F_LIBRARY NAMES fftw3f libfftw3f-3 REQUIRED)
+            add_library(FFTW3::fftw3f UNKNOWN IMPORTED)
+            set_target_properties(FFTW3::fftw3f PROPERTIES
+                IMPORTED_LOCATION "${FFTW3F_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${FFTW3F_INCLUDE_DIR}")
+        endif()
+        # FFTW's exported targets do not always propagate the Windows DLL import
+        # macro. Functions can link via import-library thunks without it, but data
+        # symbols such as fftwf_version require __declspec(dllimport).
+        get_target_property(fftw3f_type FFTW3::fftw3f TYPE)
+        if(WIN32 AND fftw3f_type STREQUAL "SHARED_LIBRARY")
+            set_property(TARGET FFTW3::fftw3f APPEND PROPERTY
+                INTERFACE_COMPILE_DEFINITIONS FFTW_DLL)
+        endif()
+        set(fft_source portable/fft_fftw.cpp)
+        set(fft_library FFTW3::fftw3f)
+    elseif(fft_backend STREQUAL "ACCELERATE")
+        if(NOT APPLE)
+            message(FATAL_ERROR "The Accelerate FFT backend requires an Apple platform.")
+        endif()
+        find_library(ACCELERATE_LIBRARY Accelerate REQUIRED)
+        set(fft_source portable/fft_accelerate.cpp)
+        set(fft_library "${ACCELERATE_LIBRARY}")
+    else()
+        message(FATAL_ERROR "CONVOLVER_FFT_BACKEND must be FFTW or ACCELERATE.")
     endif()
-    # FFTW's exported targets do not always propagate the Windows DLL import
-    # macro. Functions can link via import-library thunks without it, but data
-    # symbols such as fftwf_version require __declspec(dllimport).
-    get_target_property(fftw3f_type FFTW3::fftw3f TYPE)
-    if(WIN32 AND fftw3f_type STREQUAL "SHARED_LIBRARY")
-        set_property(TARGET FFTW3::fftw3f APPEND PROPERTY
-            INTERFACE_COMPILE_DEFINITIONS FFTW_DLL)
-    endif()
+    message(STATUS "Convolver FFT backend: ${fft_backend}")
     find_package(SndFile CONFIG QUIET)
     if(NOT TARGET SndFile::sndfile)
         find_package(PkgConfig QUIET)
@@ -48,12 +66,12 @@ if(CONVOLVER_BUILD_NATIVE)
         endif()
     endif()
     find_package(Threads REQUIRED)
-    add_library(convolver_core portable/engine.cpp)
+    add_library(convolver_core portable/engine.cpp ${fft_source})
     target_include_directories(convolver_core PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
     target_compile_features(convolver_core PUBLIC cxx_std_20)
-    target_link_libraries(convolver_core PRIVATE FFTW3::fftw3f Threads::Threads)
+    target_link_libraries(convolver_core PRIVATE ${fft_library} Threads::Threads)
     add_library(convolver_io portable/io.cpp portable/config.cpp)
     target_include_directories(convolver_io PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -65,17 +83,26 @@ if(CONVOLVER_BUILD_NATIVE)
     if(MINGW)
         target_link_options(convolver_cli PRIVATE -municode)
     endif()
-    target_link_libraries(convolver_cli PRIVATE convolver_core convolver_io FFTW3::fftw3f)
+    target_link_libraries(convolver_cli PRIVATE convolver_core convolver_io)
     set(native_targets convolver_core convolver_io convolver_cli)
+    if(CONVOLVER_BUILD_BENCHMARKS)
+        add_executable(convolver_benchmark tests/native/benchmark.cpp)
+        target_link_libraries(convolver_benchmark PRIVATE convolver_core)
+        list(APPEND native_targets convolver_benchmark)
+    endif()
     if(BUILD_TESTING)
+        add_executable(convolver_fft_tests tests/native/fft_tests.cpp)
+        target_include_directories(convolver_fft_tests PRIVATE portable)
+        target_link_libraries(convolver_fft_tests PRIVATE convolver_core)
+        add_test(NAME native.fft COMMAND convolver_fft_tests)
         add_executable(convolver_engine_tests tests/native/engine_tests.cpp)
         target_link_libraries(convolver_engine_tests PRIVATE convolver_core)
         add_test(NAME native.engine COMMAND convolver_engine_tests)
         add_executable(convolver_io_tests tests/native/io_tests.cpp)
         target_link_libraries(convolver_io_tests PRIVATE convolver_io SndFile::sndfile)
         add_test(NAME native.io COMMAND convolver_io_tests)
-        set_tests_properties(native.engine native.io PROPERTIES LABELS "native;real-libraries" TIMEOUT 120)
-        list(APPEND native_targets convolver_engine_tests convolver_io_tests)
+        set_tests_properties(native.fft native.engine native.io PROPERTIES LABELS "native;real-libraries" TIMEOUT 120)
+        list(APPEND native_targets convolver_fft_tests convolver_engine_tests convolver_io_tests)
     endif()
     foreach(target IN LISTS native_targets)
         set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
@@ -111,6 +138,9 @@ if(BUILD_TESTING)
         add_test(NAME native.cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        add_test(NAME native.fft_planning COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/fft_planning_tests.py" "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(native.fft_planning PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)
@@ -124,8 +154,14 @@ if(BUILD_TESTING)
             message(FATAL_ERROR "Clang with ASan/UBSan runtimes is required for legacy tests.")
         endif()
         function(convolver_regression name labels)
+            set(test_environment "CXX=${CMAKE_CXX_COMPILER}" "PYTHONDONTWRITEBYTECODE=1")
+            if(APPLE AND CMAKE_OSX_SYSROOT)
+                # Extraction harnesses invoke the compiler outside CMake.
+                # Xcode's direct compiler path needs the selected SDK too.
+                list(APPEND test_environment "SDKROOT=${CMAKE_OSX_SYSROOT}")
+            endif()
             add_test(NAME regression.${name} COMMAND "${CMAKE_COMMAND}" -E env
-                "CXX=${CMAKE_CXX_COMPILER}" "PYTHONDONTWRITEBYTECODE=1"
+                ${test_environment}
                 "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/${name}.py")
             set_tests_properties(regression.${name} PROPERTIES
                 LABELS "regression;extracted-production;sanitizers;${labels}" TIMEOUT 300)
@@ -145,6 +181,6 @@ if(BUILD_TESTING)
     add_custom_target(check COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" USES_TERMINAL VERBATIM)
     if(CONVOLVER_BUILD_NATIVE)
-        add_dependencies(check convolver_cli convolver_engine_tests convolver_io_tests)
+        add_dependencies(check convolver_cli convolver_fft_tests convolver_engine_tests convolver_io_tests)
     endif()
 endif()

@@ -1,0 +1,7 @@
+{
+  "cases": 16,
+  "samples": 213324,
+  "max_absolute_error": 7.450580596923828e-07,
+  "rms_error": 8.191369197996806e-08,
+  "tolerance": "2e-5*(1+max(abs(a),abs(b)))"
+}

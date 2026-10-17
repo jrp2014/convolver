@@ -70,8 +70,8 @@ void close(const std::vector<float>& actual, const std::vector<double>& expected
         if (!std::isfinite(actual[i]) || std::abs(actual[i]-expected[i])>2e-5*(1+std::abs(expected[i])))
             throw std::runtime_error("oracle mismatch at " + std::to_string(i) + ": " + std::to_string(actual[i]) + " versus " + std::to_string(expected[i]));
 }
-void scenario(const Configuration& c, std::size_t b, const std::vector<float>& in) {
-    Engine engine(c,b);
+void scenario(const Configuration& c, std::size_t b, const std::vector<float>& in, FftOptions options={}) {
+    Engine engine(c,b,options);
     require(engine.latency_frames()==b,"latency");
     require(engine.tail_frames()==tail(c),"tail");
     auto expected=oracle(c,in,b);
@@ -110,6 +110,11 @@ void cases() {
         std::vector<float> in((1+random()%99)*c.input_channels);
         for(auto& x:in) x=sample(random);
         scenario(c,b,in);
+        if(trial<4 && fft_supports_wisdom()) {
+            scenario(c,b,in,{FftPlanning::measure,false});
+            scenario(c,b,in,{FftPlanning::patient,false});
+            scenario(c,b,in,{FftPlanning::patient,true});
+        }
     }
     // The largest input and output delays are on disconnected channels; they must not inflate tail.
     Configuration sparse{48000,2,2,0,{2,99},{88,3},{{{1,0,0},{{0,1}},{{1,1}}}}};

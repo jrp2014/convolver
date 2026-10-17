@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
-#include <fftw3.h>
+#include "fft.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <mutex>
 #include <stdexcept>
 #include <utility>
 
@@ -21,21 +20,6 @@ std::size_t checked_mul(std::size_t a,std::size_t b) {
     if (a && b>std::numeric_limits<std::size_t>::max()/a) throw std::length_error("sample count overflow");
     return a*b;
 }
-std::mutex& planner_mutex() { static std::mutex mutex; return mutex; }
-struct FftFree { void operator()(float* p) const noexcept { fftwf_free(p); } };
-using FftBuffer=std::unique_ptr<float,FftFree>;
-FftBuffer allocate_fft(std::size_t count) {
-    auto p=FftBuffer(static_cast<float*>(fftwf_malloc(checked_mul(count,sizeof(float)))));
-    if (!p) throw std::bad_alloc();
-    return p;
-}
-struct Plan {
-    fftwf_plan value=nullptr;
-    ~Plan() { if(value) {std::lock_guard lock(planner_mutex());fftwf_destroy_plan(value);} }
-    Plan()=default;
-    Plan(const Plan&)=delete;
-    Plan& operator=(const Plan&)=delete;
-};
 struct Delay {
     std::vector<float> samples;
     std::size_t position=0;
@@ -59,10 +43,11 @@ Validated validate(const Configuration& c,std::size_t b) {
     if ((!c.input_delays.empty() && c.input_delays.size()!=c.input_channels) || (!c.output_delays.empty() && c.output_delays.size()!=c.output_channels))
         throw std::invalid_argument("delay count must match channel count");
     if (c.paths.empty() || c.paths.size()>max_paths) throw std::invalid_argument("filter path count must be between 1 and 4096");
+    const auto n=detail::fft_size(b), bins=n/2+1;
     std::size_t storage=0;
     auto account=[&](std::size_t size){storage=checked_add(storage,size);if(storage>max_storage)throw std::length_error("prepared engine exceeds storage limit");};
     account(checked_mul(checked_add(c.input_channels,c.output_channels),b));
-    account(checked_add(checked_mul(b,2),checked_mul(b+1,4))); // FFT real input, forward output and inverse input.
+    account(detail::fft_storage(n)); // Backend-owned real, spectrum and scratch buffers.
     for (std::size_t channel=0;channel<c.input_channels+c.output_channels;++channel) {
         const auto d=channel<c.input_channels?delay_at(c.input_delays,channel):delay_at(c.output_delays,channel-c.input_channels);
         if (d>max_samples) throw std::length_error("delay exceeds 67108864 frames");
@@ -80,7 +65,7 @@ Validated validate(const Configuration& c,std::size_t b) {
         };
         routes(p.inputs,c.input_channels);routes(p.outputs,c.output_channels);
         const auto partitions=1+(p.impulse.size()-1)/b;
-        account(checked_mul(checked_mul(partitions,b+1),4)); // filter and input history, complex pairs.
+        account(checked_mul(checked_mul(partitions,bins),4)); // filter and input history, complex pairs.
         account(b); // overlap.
         bool has_input=false,has_output=false;
         std::size_t input_delay=0,output_delay=0;
@@ -96,64 +81,58 @@ struct Engine::Impl {
         std::vector<Route> inputs,outputs;
         std::size_t partitions,head=0;
         std::vector<float> filters,history,overlap;
-        Path(const FilterPath& p,std::size_t b):inputs(p.inputs),outputs(p.outputs),partitions(1+(p.impulse.size()-1)/b),
-            filters(partitions*(b+1)*2),history(filters.size()),overlap(b) {}
+        Path(const FilterPath& p,std::size_t b,std::size_t bins):inputs(p.inputs),outputs(p.outputs),partitions(1+(p.impulse.size()-1)/b),
+            filters(partitions*bins*2),history(filters.size()),overlap(b) {}
     };
-    std::size_t inputs,outputs,block,tail,position=0;
+    std::size_t inputs,outputs,block,tail,n,bins,position=0;
     std::vector<float> input_block,output_block;
     std::vector<Delay> input_delays,output_delays;
     std::vector<Path> paths;
-    // Buffers outlive plans, including during constructor failure unwinding.
-    FftBuffer time,frequency,sum;
-    Plan forward,inverse;
-    Impl(const Configuration& c,std::size_t b,Validated v):inputs(c.input_channels),outputs(c.output_channels),block(b),tail(v.tail),
-        input_block(inputs*b),output_block(outputs*b),time(allocate_fft(2*b)),frequency(allocate_fft(2*(b+1))),sum(allocate_fft(2*(b+1))) {
+    detail::RealFft fft;
+    float *time,*frequency,*sum;
+    Impl(const Configuration& c,std::size_t b,Validated v,FftOptions options):inputs(c.input_channels),outputs(c.output_channels),block(b),tail(v.tail),
+        n(detail::fft_size(b)),bins(n/2+1),input_block(inputs*b),output_block(outputs*b),fft(n,options),
+        time(fft.time()),frequency(fft.frequency()),sum(fft.sum()) {
         input_delays.reserve(inputs);output_delays.reserve(outputs);paths.reserve(c.paths.size());
         for (std::size_t i=0;i<inputs;++i) input_delays.emplace_back(delay_at(c.input_delays,i));
         for (std::size_t i=0;i<outputs;++i) output_delays.emplace_back(delay_at(c.output_delays,i));
-        {
-            std::lock_guard lock(planner_mutex());
-            forward.value=fftwf_plan_dft_r2c_1d(static_cast<int>(2*b),time.get(),reinterpret_cast<fftwf_complex*>(frequency.get()),FFTW_ESTIMATE);
-            inverse.value=fftwf_plan_dft_c2r_1d(static_cast<int>(2*b),reinterpret_cast<fftwf_complex*>(sum.get()),time.get(),FFTW_ESTIMATE);
-        }
-        if (!forward.value || !inverse.value) throw std::runtime_error("FFTW plan creation failed");
-        const float normalization=1.0f/static_cast<float>(2*b);
+        const float normalization=1.0f/static_cast<float>(n);
         for (const auto& source:c.paths) {
-            paths.emplace_back(source,b);
+            paths.emplace_back(source,b,bins);
             auto& path=paths.back();
             for (std::size_t p=0;p<path.partitions;++p) {
-                std::fill_n(time.get(),2*b,0);
+                std::fill_n(time,n,0.f);
                 const auto count=std::min(b,source.impulse.size()-p*b);
-                std::copy_n(source.impulse.data()+p*b,count,time.get());
-                fftwf_execute(forward.value);
-                for (std::size_t bin=0;bin<2*(b+1);++bin) path.filters[p*2*(b+1)+bin]=frequency.get()[bin]*normalization;
+                std::copy_n(source.impulse.data()+p*b,count,time);
+                fft.forward();
+                for (std::size_t bin=0;bin<2*bins;++bin) path.filters[p*2*bins+bin]=frequency[bin]*normalization;
             }
         }
     }
     void compute() noexcept {
-        const auto bins=block+1, stride=2*bins;
+        const auto stride=2*bins;
         std::fill(output_block.begin(),output_block.end(),0);
         for (auto& path:paths) {
-            std::fill_n(time.get(),2*block,0);
+            std::fill_n(time,n,0.f);
             for (const auto& route:path.inputs) for (std::size_t t=0;t<block;++t)
-                time.get()[t]+=input_block[t*inputs+route.channel]*route.gain;
-            fftwf_execute(forward.value);
-            std::copy_n(frequency.get(),stride,path.history.data()+path.head*stride);
-            std::fill_n(sum.get(),stride,0);
+                time[t]+=input_block[t*inputs+route.channel]*route.gain;
+            fft.forward();
+            std::copy_n(frequency,stride,path.history.data()+path.head*stride);
+            std::fill_n(sum,stride,0);
             for (std::size_t p=0;p<path.partitions;++p) {
                 const auto history=(path.head+path.partitions-p)%path.partitions;
                 const float* x=path.history.data()+history*stride;
                 const float* h=path.filters.data()+p*stride;
                 for(std::size_t j=0;j<stride;j+=2) {
-                    sum.get()[j]+=x[j]*h[j]-x[j+1]*h[j+1];
-                    sum.get()[j+1]+=x[j]*h[j+1]+x[j+1]*h[j];
+                    sum[j]+=x[j]*h[j]-x[j+1]*h[j+1];
+                    sum[j+1]+=x[j]*h[j+1]+x[j+1]*h[j];
                 }
             }
-            fftwf_execute(inverse.value);
+            fft.inverse();
             for(std::size_t t=0;t<block;++t) {
-                const float value=time.get()[t]+path.overlap[t];
+                const float value=time[t]+path.overlap[t];
                 for (const auto& route:path.outputs) output_block[t*outputs+route.channel]+=value*route.gain;
-                path.overlap[t]=time.get()[block+t];
+                path.overlap[t]=time[block+t];
             }
             if (++path.head==path.partitions) path.head=0;
         }
@@ -165,7 +144,13 @@ struct Engine::Impl {
         for(auto& p:paths) {p.head=0;std::fill(p.history.begin(),p.history.end(),0);std::fill(p.overlap.begin(),p.overlap.end(),0);}
     }
 };
-Engine::Engine(const Configuration& c,std::size_t b):impl_(std::make_unique<Impl>(c,b,validate(c,b))) {}
+void tune_fft(std::size_t b,FftPlanning planning) {
+    if(b==0 || b>(1u<<20)) throw std::invalid_argument("FFT block size must be between 1 and 1048576");
+    if(planning!=FftPlanning::measure && planning!=FftPlanning::patient)
+        throw std::invalid_argument("FFT tuning requires measure or patient planning");
+    detail::RealFft fft(detail::fft_size(b),{planning,false});
+}
+Engine::Engine(const Configuration& c,std::size_t b,FftOptions options):impl_(std::make_unique<Impl>(c,b,validate(c,b),options)) {}
 Engine::~Engine()=default;
 Engine::Engine(Engine&&) noexcept=default;
 Engine& Engine::operator=(Engine&&) noexcept=default;
