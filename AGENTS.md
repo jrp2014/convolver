@@ -25,7 +25,8 @@ says how to work on it safely. Keep it short and update it when a rule changes.
   Do not claim a change "builds" unless you compiled it.
 - Run `python3 tests/regression/run_all.py` before and after any engine change.
   It needs Python 3 and Clang with the AddressSanitizer/UBSan runtimes (on
-  Ubuntu: `apt-get install clang libclang-rt-18-dev`). CI runs it on Linux and macOS.
+  Ubuntu: `apt-get install clang libclang-rt-18-dev`; Claude Code cloud sessions
+  install it via `.claude/hooks/session-start.sh`). CI runs it on Linux and macOS.
 - The suites compile the real production functions by **slicing source files on
   text markers** (for example `// Convolution Constructor`, `\tstatic void
   StoreDelayed(`) and patching them. If you move, rename or reformat code the
