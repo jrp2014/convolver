@@ -39,8 +39,12 @@ The imported SVN history was checked against the `convolver3-3src.zip`
 release, and the `convolver4-3` tree against `convolver4-3src.zip`. Both match
 apart from the excluded files and line endings.
 
-Version 4.4 (July 2006) was released as an installer only, so 4.3 is the
-newest source.
+The original import stopped at the 4.3 source release. A subsequently supplied
+`homes.zip` contains corroborated 4.4 source snapshots and a separate tree
+labelled 4.5, alongside a 4.5 prerelease installer. Selected improvements have
+been recovered without replacing the reviewed engine or changing release
+identifiers. See the [comparison and recovery findings](docs/review-2026-10/reconciliation.md)
+for provenance, exclusions and validation limits.
 
 ## Building
 
@@ -54,6 +58,13 @@ and the Windows SDK, it expects:
 - FFTW 3 and libsndfile DLLs (only headers and import wrappers are in this repository)
 
 Nobody has built it from this repository yet.
+
+## Portable regression checks
+
+Run `python3 tests/regression/run_all.py` with Clang and its AddressSanitizer and
+UndefinedBehaviorSanitizer runtimes available. These tests extract production
+C++ routines and compare them against independent expected results. They do
+not build the Windows applications or substitute for a native integration test.
 
 ## Licence
 

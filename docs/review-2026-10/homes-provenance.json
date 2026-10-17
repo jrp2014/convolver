@@ -1,0 +1,605 @@
+{
+  "archive": {
+    "size": 503768512,
+    "sha256": "2b5cad28adcf5d8df21d6c9139941f4ab7607d2225ea29773642ee2beab74771",
+    "entry_count": 5506,
+    "name": "homes.zip"
+  },
+  "scope": "Archive inventory by content hashes and embedded version identifiers; filesystem and ZIP dates were not used for ordering. No installers or archived programs were executed. Selected source manifests exclude CVS, Release/Debug directories and BuildLog files.",
+  "nested_archives": [
+    {
+      "name": "convolver4-3icc.zip",
+      "size": 4179627,
+      "sha256": "5d1900b135fcbd39ea3260a10271a50519ae0552b665dd7eceadd37cd5f2389c",
+      "entries": 2,
+      "kind": "installer only"
+    },
+    {
+      "name": "convolver4-3vc++.zip",
+      "size": 1871122,
+      "sha256": "f0a787fe069849e6cad6247f4bb83670d74c5fc900c7913728ded9096ac7956d",
+      "entries": 2,
+      "kind": "installer only"
+    },
+    {
+      "name": "convolver.zip",
+      "size": 86492099,
+      "sha256": "251dbce76b034994c0907f16a5ab839e815b19e41913785f0f29f7da1b93f37a",
+      "entries": 710,
+      "kind": "source snapshot"
+    },
+    {
+      "name": "convolver4-5pre1.zip",
+      "size": 3324548,
+      "sha256": "660d6a49c46cdb934305d4bd02e6c365a16b1cf6936f6c32503767c94f261b8e",
+      "entries": 2,
+      "kind": "installer only"
+    },
+    {
+      "name": "Copy of convolver4-3src.zip",
+      "size": 41489814,
+      "sha256": "f5fae6e766d6904c935972ff58de62e1a6910a57c8a63e8e2ad7db33acbfefb6",
+      "entries": 429,
+      "kind": "source snapshot"
+    },
+    {
+      "name": "convolver4-4.zip",
+      "size": 3317205,
+      "sha256": "3f4935599d0557bc8978741f40e9aa274ca1fd20925ac9c6ae19ac8de1670c10",
+      "entries": 2,
+      "kind": "installer only"
+    },
+    {
+      "name": "convolver4-4vc++.zip",
+      "size": 3328757,
+      "sha256": "d225fe6eb3dede09e577b4a94f1b7eac79f89fa9cc9c40faad8f95b8c409bce3",
+      "entries": 2,
+      "kind": "installer only"
+    },
+    {
+      "name": "convolver4-3src.zip",
+      "size": 53142450,
+      "sha256": "8771f9ca391668dcfe7a83bc7b9d9807bb70d7fd4f96d712730e93b6668b8866",
+      "entries": 663,
+      "kind": "source snapshot"
+    },
+    {
+      "name": "convolver4-4icc.zip",
+      "size": 6658745,
+      "sha256": "9aadacbac626d2c96768f367e057bfd52980f24bb8c42f60972182deccadf7e4",
+      "entries": 2,
+      "kind": "installer only"
+    }
+  ],
+  "snapshots": {
+    "convolver.zip": {
+      "selected_file_count": 191,
+      "selected_manifest_sha256": "483b5dd1b99cf24e2884a80402c3c366d317891388eccc6480f63fc772f80d32",
+      "version_evidence": [
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 50,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 51,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 74,
+          "text": "VALUE \"ProductVersion\", \"4, 4, 0, 0\""
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 82,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 83,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 108,
+          "text": "VALUE \"ProductVersion\", \"4.4\""
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 56,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 57,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 81,
+          "text": "VALUE \"ProductVersion\", \"4, 4, 0, 0\""
+        },
+        {
+          "file": "Setup/Setup.vdproj",
+          "line": 660,
+          "text": "\"ProductVersion\" = \"8:4.4\""
+        },
+        {
+          "file": "convolverVST/convolverVST.h",
+          "line": 114,
+          "text": "virtual VstInt32 getVendorVersion () { return 4400; }"
+        }
+      ],
+      "selected_source_sha256": {
+        "convolution/channelpaths.cpp": "816da2ecbef70190678a05aa423799ef181802391242e5189bdfc779e8798758",
+        "convolution/convolution.cpp": "8259e804907b03619bd3930f16efa2331fdcd48f37e23dce24b1f16e2df57b15",
+        "convolution/sample.h": "fa72dec15e2550c2fcb5cd61e87420f0011a1723ee0a5ee2fc0b44a6abd42689",
+        "convolution/wavefile.cpp": "8d263097954c165067193850c72692451bc33504e113b278d56686145c987b1f",
+        "convolution/wavefile.h": "6f553a216b1df917925bf1758919affa753556353e480b546767b4fd1dd11b4f",
+        "convolverCMD/convolverCMD.cpp": "ba81952afa2fd1f00878ffca32fe09b86c0a7ae4d9149c94638b99df4cd62328",
+        "convolverPipe/convolverPipe.cpp": "2b496adc9476176cbf4c4a69a1f0c92928c23663b58a038825a97cc4503f5ef0"
+      }
+    },
+    "Copy of convolver4-3src.zip": {
+      "selected_file_count": 183,
+      "selected_manifest_sha256": "498ce6d15c343e7f74eed2578cc05bd9cf01886ba91f9322fa6baedc266fdc87",
+      "version_evidence": [
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 50,
+          "text": "FILEVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 51,
+          "text": "PRODUCTVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 74,
+          "text": "VALUE \"ProductVersion\", \"4, 3, 0, 0\""
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 82,
+          "text": "FILEVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 83,
+          "text": "PRODUCTVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 108,
+          "text": "VALUE \"ProductVersion\", \"4.3\""
+        },
+        {
+          "file": "Setup/Setup.vdproj",
+          "line": 668,
+          "text": "\"ProductVersion\" = \"8:4.3\""
+        },
+        {
+          "file": "convolverVST/convolverVST.h",
+          "line": 114,
+          "text": "virtual VstInt32 getVendorVersion () { return 4300; }"
+        }
+      ],
+      "selected_source_sha256": {
+        "convolution/channelpaths.cpp": "60a50322935b2ec605f8a0e4540397a24faa0dd848e0ef0af8d379121f8280a3",
+        "convolution/convolution.cpp": "8259e804907b03619bd3930f16efa2331fdcd48f37e23dce24b1f16e2df57b15",
+        "convolution/sample.h": "fa72dec15e2550c2fcb5cd61e87420f0011a1723ee0a5ee2fc0b44a6abd42689",
+        "convolution/wavefile.h": "fd81837a8cf12b69eea4e228448969e954433d98cee48bafb76e2e1fbbb9c460",
+        "convolverCMD/convolverCMD.cpp": "64f6635903b2fc6f692be75a8a3f9b3d996ab8b349a377f08b448f215a4df128"
+      }
+    },
+    "convolver4-3src.zip": {
+      "selected_file_count": 183,
+      "selected_manifest_sha256": "498ce6d15c343e7f74eed2578cc05bd9cf01886ba91f9322fa6baedc266fdc87",
+      "version_evidence": [
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 50,
+          "text": "FILEVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 51,
+          "text": "PRODUCTVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 74,
+          "text": "VALUE \"ProductVersion\", \"4, 3, 0, 0\""
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 82,
+          "text": "FILEVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 83,
+          "text": "PRODUCTVERSION 4,3,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 108,
+          "text": "VALUE \"ProductVersion\", \"4.3\""
+        },
+        {
+          "file": "Setup/Setup.vdproj",
+          "line": 668,
+          "text": "\"ProductVersion\" = \"8:4.3\""
+        },
+        {
+          "file": "convolverVST/convolverVST.h",
+          "line": 114,
+          "text": "virtual VstInt32 getVendorVersion () { return 4300; }"
+        }
+      ],
+      "selected_source_sha256": {
+        "convolution/channelpaths.cpp": "60a50322935b2ec605f8a0e4540397a24faa0dd848e0ef0af8d379121f8280a3",
+        "convolution/convolution.cpp": "8259e804907b03619bd3930f16efa2331fdcd48f37e23dce24b1f16e2df57b15",
+        "convolution/sample.h": "fa72dec15e2550c2fcb5cd61e87420f0011a1723ee0a5ee2fc0b44a6abd42689",
+        "convolution/wavefile.h": "fd81837a8cf12b69eea4e228448969e954433d98cee48bafb76e2e1fbbb9c460",
+        "convolverCMD/convolverCMD.cpp": "64f6635903b2fc6f692be75a8a3f9b3d996ab8b349a377f08b448f215a4df128"
+      }
+    },
+    "loose-convolver-": {
+      "selected_file_count": 191,
+      "selected_manifest_sha256": "483b5dd1b99cf24e2884a80402c3c366d317891388eccc6480f63fc772f80d32",
+      "version_evidence": [
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 50,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 51,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 74,
+          "text": "VALUE \"ProductVersion\", \"4, 4, 0, 0\""
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 82,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 83,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 108,
+          "text": "VALUE \"ProductVersion\", \"4.4\""
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 56,
+          "text": "FILEVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 57,
+          "text": "PRODUCTVERSION 4,4,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 81,
+          "text": "VALUE \"ProductVersion\", \"4, 4, 0, 0\""
+        },
+        {
+          "file": "Setup/Setup.vdproj",
+          "line": 660,
+          "text": "\"ProductVersion\" = \"8:4.4\""
+        },
+        {
+          "file": "convolverVST/convolverVST.h",
+          "line": 114,
+          "text": "virtual VstInt32 getVendorVersion () { return 4400; }"
+        }
+      ],
+      "selected_source_sha256": {
+        "convolution/channelpaths.cpp": "816da2ecbef70190678a05aa423799ef181802391242e5189bdfc779e8798758",
+        "convolution/convolution.cpp": "8259e804907b03619bd3930f16efa2331fdcd48f37e23dce24b1f16e2df57b15",
+        "convolution/sample.h": "fa72dec15e2550c2fcb5cd61e87420f0011a1723ee0a5ee2fc0b44a6abd42689",
+        "convolution/wavefile.cpp": "8d263097954c165067193850c72692451bc33504e113b278d56686145c987b1f",
+        "convolution/wavefile.h": "6f553a216b1df917925bf1758919affa753556353e480b546767b4fd1dd11b4f",
+        "convolverCMD/convolverCMD.cpp": "ba81952afa2fd1f00878ffca32fe09b86c0a7ae4d9149c94638b99df4cd62328",
+        "convolverPipe/convolverPipe.cpp": "2b496adc9476176cbf4c4a69a1f0c92928c23663b58a038825a97cc4503f5ef0"
+      }
+    },
+    "loose-convolver": {
+      "selected_file_count": 189,
+      "selected_manifest_sha256": "a43c9d7e3073d900f4c0bdf5376594368ba029760bfe011ae6bbb23e2bf4034e",
+      "version_evidence": [
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 50,
+          "text": "FILEVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 51,
+          "text": "PRODUCTVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverWMP/convolver.rc",
+          "line": 74,
+          "text": "VALUE \"ProductVersion\", \"4, 5, 0, 0\""
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 82,
+          "text": "FILEVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 83,
+          "text": "PRODUCTVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverFilter/convolverFilter.rc",
+          "line": 108,
+          "text": "VALUE \"ProductVersion\", \"4.5\""
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 56,
+          "text": "FILEVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 57,
+          "text": "PRODUCTVERSION 4,5,0,0"
+        },
+        {
+          "file": "convolverPipe/convolverPipe.rc",
+          "line": 81,
+          "text": "VALUE \"ProductVersion\", \"4, 5, 0, 0\""
+        },
+        {
+          "file": "Setup/Setup.vdproj",
+          "line": 434,
+          "text": "\"ProductVersion\" = \"8:4.5\""
+        },
+        {
+          "file": "convolverVST/convolverVST.h",
+          "line": 114,
+          "text": "virtual VstInt32 getVendorVersion () { return 4500; }"
+        }
+      ],
+      "selected_source_sha256": {
+        "convolution/channelpaths.cpp": "b38c34edab01185bbe74281b9483c9d3dc189019b3415234ffad0dbdd158ff8b",
+        "convolution/convolution.cpp": "c13000d8895c203272f2c9a033efcfe2f4689786b7ed38d91b3f749ca8c7adc1",
+        "convolution/sample.h": "eb772833473bb46054ef8b3382582bbc86ad09963240b5098ec2cb25e0aa00eb",
+        "convolution/wavefile.cpp": "8d263097954c165067193850c72692451bc33504e113b278d56686145c987b1f",
+        "convolution/wavefile.h": "6f553a216b1df917925bf1758919affa753556353e480b546767b4fd1dd11b4f",
+        "convolverCMD/convolverCMD.cpp": "dac07ac4d73d140eca4cf64558b40862555e4c5e93297c0e85b3f6e88e6bdac3",
+        "convolverPipe/convolverPipe.cpp": "2b496adc9476176cbf4c4a69a1f0c92928c23663b58a038825a97cc4503f5ef0"
+      }
+    }
+  },
+  "source_comparisons": [
+    {
+      "from": "convolver.zip",
+      "to": "loose-convolver-",
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    {
+      "from": "convolver4-3src.zip",
+      "to": "Copy of convolver4-3src.zip",
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    {
+      "from": "convolver4-3src.zip",
+      "to": "convolver.zip",
+      "added": [
+        "convolution/wavefile.cpp",
+        "convolverPipe/ReadMe.txt",
+        "convolverPipe/convolverPipe.cpp",
+        "convolverPipe/convolverPipe.rc",
+        "convolverPipe/convolverPipe.vcproj",
+        "convolverPipe/resource.h",
+        "convolverPipe/stdafx.cpp",
+        "convolverPipe/stdafx.h"
+      ],
+      "removed": [],
+      "changed": [
+        "Setup/Setup.vdproj",
+        "convolution/channelpaths.cpp",
+        "convolution/exception.h",
+        "convolution/wavefile.h",
+        "convolver.sln",
+        "convolverCMD/convolverCMD.cpp",
+        "convolverCMD/convolverCMD.vcproj",
+        "convolverFilter/convolverFilter.rc",
+        "convolverVST/convolverVST.cpp",
+        "convolverVST/convolverVST.h",
+        "convolverVST/convolverVSTEditor.cpp",
+        "convolverVST/convolverVSTEditor.h",
+        "convolverWMP/convolver.rc"
+      ]
+    },
+    {
+      "from": "loose-convolver-",
+      "to": "loose-convolver",
+      "added": [
+        "libsndfile/libsndfile-1.def"
+      ],
+      "removed": [
+        "bin/debug/libsndfile.def",
+        "bin/release/libsndfile.def",
+        "libsndfile/libsndfile.def"
+      ],
+      "changed": [
+        "Setup/Setup.vdproj",
+        "convolution/channelpaths.cpp",
+        "convolution/convolution.cpp",
+        "convolution/sample.h",
+        "convolver.sln",
+        "convolverCMD/convolverCMD.cpp",
+        "convolverCMD/convolverCMD.vcproj",
+        "convolverFilter/convolverFilter.rc",
+        "convolverFilter/convolverFilter.vcproj",
+        "convolverPipe/convolverPipe.rc",
+        "convolverPipe/convolverPipe.vcproj",
+        "convolverVST/convolverVST.cpp",
+        "convolverVST/convolverVST.h",
+        "convolverVST/convolverVST.vcproj",
+        "convolverVST/convolverVSTEditor.cpp",
+        "convolverVST/convolverVSTEditor.h",
+        "convolverWMP/convolver.rc",
+        "convolverWMP/convolverWMP.vcproj",
+        "fftw/fftw3.h",
+        "generate_test_IRs/generate_test_IRs.vcproj",
+        "libsndfile/sndfile.h",
+        "makeIR/makeIR.vcproj",
+        "perftest/perftest.vcproj"
+      ]
+    }
+  ],
+  "media_comparisons": [
+    {
+      "from": "convolver.zip",
+      "to": "loose-convolver-",
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    {
+      "from": "convolver4-3src.zip",
+      "to": "Copy of convolver4-3src.zip",
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    {
+      "from": "convolver4-3src.zip",
+      "to": "convolver.zip",
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    {
+      "from": "loose-convolver-",
+      "to": "loose-convolver",
+      "added": [
+        "PerfectDiracDelta-44100-2-2.wav",
+        "correction.zip",
+        "robot/Fender Bassman - Tweed Champ.wav",
+        "robot/Festival.wav",
+        "saw.wav.reapeaks"
+      ],
+      "removed": [
+        "diff.wav",
+        "saw.pk"
+      ],
+      "changed": [
+        "wisdom.fftw"
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "decision": "selective candidate",
+      "files": [
+        "convolution/channelpaths.cpp",
+        "convolution/convolution.cpp"
+      ],
+      "change": "4.5 snapshot checks stream badbit before failbit, preserving distinct fatal I/O diagnostics because badbit makes fail() true too. Keep existing checkout version strings; do not label as full4.5 release."
+    },
+    {
+      "decision": "selective candidate",
+      "files": [
+        "convolution/channelpaths.cpp"
+      ],
+      "change": "4.4 latency display adds nHalfPartitionLength tap count beside seconds. No DSP algorithm change."
+    },
+    {
+      "decision": "conditional candidate",
+      "files": [
+        "convolution/wavefile.h",
+        "convolution/wavefile.cpp",
+        "convolution/exception.h"
+      ],
+      "change": "4.4 fd-based libsndfile wrapper and formatlookup are self-contained plumbing used by Pipe. Useful only if adding an actual consumer; wavefile.cpp must be linked with that consumer. Keep LIBSNDFILE guards in mind because SndFileFormat exists only under LIBSNDFILE."
+    },
+    {
+      "decision": "defer",
+      "files": [
+        "convolverPipe/convolverPipe.cpp"
+      ],
+      "change": "4.4 addition has missing throw for zero nFilterLengths, zero-vector indexing risk, no EOF tail flush, and caught errors return initial S_OK. Same source in4.5; version alone does not demonstrate stable behavior."
+    },
+    {
+      "decision": "defer",
+      "files": [
+        "convolverCMD/convolverCMD.cpp"
+      ],
+      "change": "4.4 adds exactly one cBufferLength final zero block and changes non-libsndfile padding. Requires output length/channel and long-filter testing; not safe to infer correct general tail handling."
+    },
+    {
+      "decision": "exclude",
+      "files": [
+        "convolution/sample.h"
+      ],
+      "change": "4.5 disables both64-bit IEEE float registrations; capability reduction unsupported by explanation/test."
+    },
+    {
+      "decision": "exclude wholesale",
+      "files": [
+        "convolver.sln",
+        "Setup/Setup.vdproj",
+        "*.vcproj"
+      ],
+      "change": "4.5 rewrites Setup project identity and duplicates SourceCodeControl sections; projects retain external DScaler and oldSDK/library dependencies. No need to import version and build churn for selected source fixes."
+    },
+    {
+      "decision": "exclude",
+      "files": [
+        "Media/PerfectDiracDelta-44100-2-2.wav"
+      ],
+      "change": "Only newly named simple fixture:82bytes, IEEEfloat32 stereo44100Hz; data contains3frames [1,1],[0,0],[0,0], fact sample count0 despite filename2. Do not trust as a two-frame baseline without regeneration/documentation."
+    },
+    {
+      "decision": "exclude media bulk",
+      "files": [
+        "Media/correction.zip",
+        "Media/robot/Festival.wav",
+        "Media/robot/Fender Bassman - Tweed Champ.wav",
+        "Media/saw.wav.reapeaks",
+        "Media/wisdom.fftw"
+      ],
+      "change": "4.5-only media additions or generated cache have no established useful test contract or license provenance; saw.pk removed. Existing4.3/4.4 media hashes identical."
+    }
+  ],
+  "third_party": [
+    {
+      "component": "FFTW",
+      "finding": "fftw/config.h declares3.1 in both loose snapshots; bin/release/libfftw3f-3.dll containsfftw-3.1.2-sse. Header4.4\u21924.5 change only CVS $Id, explicitly not FFTW version. No new FFTW functionality demonstrated."
+    },
+    {
+      "component": "libsndfile",
+      "finding": "Release DLL string1.0.16 in4.4 versus1.0.17 in4.5; sndfile.h normalized text identical (line ending change only); definition file renamed libsndfile.def\u2192libsndfile-1.def and projects library reference shifts. Keep binary/header/import library coherent; do not import isolated binary updates."
+    },
+    {
+      "component": "licensing",
+      "finding": "Project gpl.txt persists; wavefile.cpp has GPLv2-or-later header. libsndfile header LGPLv2.1-or-later; FFTW header GPL. NewPipe source generated skeleton lacks file-local license statement but lives under projectGPL; binarySDK/media redistribution provenance was not established. Avoid new binary/media bundling."
+    }
+  ],
+  "validation_boundary": "Source inspection and byte/hash comparison only. No Windows compiler/runtime validation; snapshot labels do not prove release stability."
+}

@@ -297,13 +297,13 @@ peak_gain_(0)
 						szChannelPathsFileName);
 				}
 			}
+			else if (config_().bad())
+			{
+				throw channelPathsException("Fatal error opening/reading filter path file", szChannelPathsFileName);
+			}
 			else if (config_().fail())
 			{
 				throw channelPathsException("Bad filter sound file or config file syntax is incorrect", szChannelPathsFileName);
-			}
-			else if (config_().bad())
-			{
-				throw channelPathsException("Fatal error opening/reading Filter path file", szChannelPathsFileName);
 			}
 			else
 			{
@@ -465,10 +465,11 @@ const std::basic_string<TCHAR> ChannelPaths::DisplayChannelPaths() const
 
 		result
 			<< nSamplesPerSec()/1000.0f << TEXT("kHz ") 
-			<< nFilterLength() << TEXT(" taps Lag ") 
-			<< std::setprecision(2) << (float(nHalfPartitionLength()) / float(nSamplesPerSec())) <<
-			TEXT("s Estimated gain ") << estimated_gain_dB() <<
-			TEXT("dB Peak gain ") << peak_gain_dB() << TEXT("dB");
+			<< nFilterLength() << TEXT(" taps Lag: ")
+			<< std::setprecision(2) << nHalfPartitionLength() << TEXT(" taps ")
+			<< (float(nHalfPartitionLength()) / float(nSamplesPerSec()))
+			<< TEXT("s Estimated gain: ") << estimated_gain_dB()
+			<< TEXT("dB Peak gain: ") << peak_gain_dB() << TEXT("dB");
 	}
 	return result.str();
 }

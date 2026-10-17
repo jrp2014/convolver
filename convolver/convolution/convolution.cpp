@@ -565,13 +565,10 @@ void inline Convolution<T>::complex_mul(const fftwf_complex* const RESTRICT in1,
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index)
 	{
-		//result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		//result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
-
-		const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		result[index][0] = T1 - T2;
-		result[index][1] = ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		// Compute the cross terms directly: subtracting large products in the
+		// three-multiply identity can erase a small imaginary component.
+		result[index][0] = in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		result[index][1] = in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 	}
 }
 
@@ -586,13 +583,10 @@ void inline Convolution<T>::complex_mul_add(const fftwf_complex* const RESTRICT 
 #pragma vector aligned
 	for (ChannelBuffer::size_type index = 0; index < count/2+1; ++index)
 	{
-		//result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
-		//result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
-
-		const __declspec(align( 16 )) float T1 = in1[index][0] * in2[index][0];
-		const __declspec(align( 16 )) float T2 = in1[index][1] * in2[index][1];
-		result[index][0] += T1 - T2;
-		result[index][1] += ((in1[index][0] + in1[index][1]) * (in2[index][0] + in2[index][1])) - (T1 + T2);
+		// Compute the cross terms directly: subtracting large products in the
+		// three-multiply identity can erase a small imaginary component.
+		result[index][0] += in1[index][0] * in2[index][0] - in1[index][1] * in2[index][1];
+		result[index][1] += in1[index][0] * in2[index][1] + in1[index][1] * in2[index][0];
 	}
 }
 
@@ -939,13 +933,13 @@ nPartitions_(nPartitions)
 				Dump();
 #endif
 			}
-			else if (config().fail())
-			{
-				throw convolutionListException("Bad sound file or config file syntax is incorrect", szConfigFileName);
-			}
 			else if (config().bad())
 			{
 				throw convolutionListException("Fatal error opening/reading config file", szConfigFileName);
+			}
+			else if (config().fail())
+			{
+				throw convolutionListException("Bad sound file or config file syntax is incorrect", szConfigFileName);
 			}
 			else
 			{
