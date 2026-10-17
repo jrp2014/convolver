@@ -1,0 +1,72 @@
+{
+  "archive": "homes.zip",
+  "archive_sha256": "2b5cad28adcf5d8df21d6c9139941f4ab7607d2225ea29773642ee2beab74771",
+  "basis": "4.4 source files corroborated by nested convolver.zip; not filesystem dates",
+  "files": [
+    {
+      "destination": "convolver/convolution/wavefile.h",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/wavefile.h",
+      "archive_sha256": "6f553a216b1df917925bf1758919affa753556353e480b546767b4fd1dd11b4f",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolution/wavefile.cpp",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/wavefile.cpp",
+      "archive_sha256": "8d263097954c165067193850c72692451bc33504e113b278d56686145c987b1f",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolution/exception.h",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/exception.h",
+      "archive_sha256": "cf8372f9def3b6e2867df511beaeab3bca73738e3b4b37febc8247cb4ab45346",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/convolverPipe.cpp",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/convolverPipe.cpp",
+      "archive_sha256": "2b496adc9476176cbf4c4a69a1f0c92928c23663b58a038825a97cc4503f5ef0",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/convolverPipe.vcproj",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/convolverPipe.vcproj",
+      "archive_sha256": "ee3acc666596c0da06c8e05b61021614426e5f2f82c62343e98349776abc625f",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/convolverPipe.rc",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/convolverPipe.rc",
+      "archive_sha256": "21ed1a66d4bea1551b029287ab4ab628b90d16904d586c0b418538d33d99dea6",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/resource.h",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/resource.h",
+      "archive_sha256": "3724b0f66c4d668d89284c24463b4bb208c381f5e6df1ebc46a1357f8ccf9c40",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/stdafx.h",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/stdafx.h",
+      "archive_sha256": "160cfc552c0f2e5ebcf2adc116ae9eeafca16b06deaf7b3666c33ba5897e0da6",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/stdafx.cpp",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/stdafx.cpp",
+      "archive_sha256": "1f7f422b31adbafd316fe61dc61a73840a3862a863e330c93a691e2b9a604a2e",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    },
+    {
+      "destination": "convolver/convolverPipe/ReadMe.txt",
+      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolverPipe/ReadMe.txt",
+      "archive_sha256": "b312b462cf56a21bd87e2c82a93592f46ec8bdea61be4317ea748c0c8f492461",
+      "recovery": "Preserved 4.4 resource/metadata or source recovered with repairs; see archive-recovery.md"
+    }
+  ],
+  "new_files": [
+    "convolver/convolverPipe/pipe_helpers.h",
+    "docs/convolverPipe.md"
+  ],
+  "solution_registration": "Copied only convolverPipe project GUID and its three configuration mappings from convolver-/convolver.sln. Existing solution preserved."
+}

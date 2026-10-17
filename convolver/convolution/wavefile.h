@@ -32,6 +32,7 @@
 #include <libsndfile\sndfile.h>
 #include <locale>
 #include <algorithm>
+#include <stdexcept>
 
 class CWaveFileHandle
 {
@@ -45,12 +46,24 @@ public:
 
 	~CWaveFileHandle()
 	{
+		close();
+	};
+
+	// Explicit closure lets stream clients report errors while the destructor
+	// remains non-throwing. The caller retains ownership of an opened descriptor.
+	int close()
+	{
+		if(sndfile_ == NULL)
+			return 0;
 
 		sf_write_sync(sndfile_);
-
-		int result = sf_close (sndfile_);
+		// sf_close releases the error state, so preserve errors raised by sync.
+		const int streamError = sf_error(sndfile_);
+		const int closeResult = sf_close(sndfile_);
+		sndfile_ = NULL;
+		const int result = closeResult ? closeResult : streamError;
 #if defined(DEBUG) | defined(_DEBUG)
-		if (result)
+		if(result)
 		{
 			cdebug << "Failed to close cleanly: (" << result << ") " << sf_error_number(result) << std::endl;
 		}
@@ -59,7 +72,14 @@ public:
 			cdebug << "closed SNDFILE" << std::endl;
 		}
 #endif
-	};
+		return result;
+	}
+
+	// Query after a short read or write, before closing the handle.
+	int error() const
+	{
+		return sf_error(sndfile_);
+	}
 
 	CWaveFileHandle (const TCHAR path[MAX_PATH], int mode, SF_INFO *sfinfo, const DWORD& nSampleRate)
 	{
@@ -112,6 +132,42 @@ public:
 			throw wavfileException("Failed to open filter sound file:", path, "");
 		}
 	};
+
+	CWaveFileHandle (int fd, int mode, SF_INFO *sfinfo) : sndfile_(NULL)
+	{
+
+		if (mode == SFM_WRITE && sf_format_check (sfinfo) == false)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Invalid output file format specified." << std::endl;
+#endif
+			throw wavfileException("Invalid output format specified", fd, "");
+		}
+		else if(mode == SFM_READ)
+		{
+			if((sfinfo->format & SF_FORMAT_TYPEMASK) != SF_FORMAT_RAW)
+				sfinfo->format = 0;
+		}
+
+		sndfile_ = sf_open_fd (fd, mode, sfinfo, SF_FALSE /* Don't close file descriptor on sf_close */);
+
+#if defined(DEBUG) | defined(_DEBUG)
+		char  buffer [2048];
+		sf_command (sndfile_, SFC_GET_LOG_INFO, buffer, sizeof (buffer));
+
+		cdebug << "Opening file descriptor " << fd << ": " << std::endl << buffer;
+#endif
+		if(sndfile_ == NULL)
+		{
+#if defined(DEBUG) | defined(_DEBUG)
+			cdebug << "Failed to open file descriptor " << fd << std::endl;
+#endif
+			throw wavfileException("Failed to open file descriptor", fd, sf_strerror(NULL));
+		}
+	};
+
+
+
 
 	sf_count_t readf_float(float *ptr, sf_count_t frames) const
 	{
@@ -199,6 +255,49 @@ public:
 private:
 	CWaveFileHandle(const CWaveFileHandle& other);
 	CWaveFileHandle& operator=(const CWaveFileHandle& other);
+};
+
+
+struct SndFileFormat
+{
+	typedef unsigned int SndFileFormatType;
+
+	static const unsigned int nMajor = 21;
+	static const unsigned int nMinor = 22;
+
+	static const unsigned int nStrLen = sizeof(TEXT("VOX_ADPCM")) / sizeof(TCHAR) + 1;
+
+	struct SndFileMap
+	{
+		TCHAR id[nStrLen];
+		SndFileFormatType mask;
+	};
+
+	static const SndFileMap Major[nMajor];
+	static const SndFileMap Minor[nMinor];
+
+	static SndFileFormatType Lookup(const TCHAR* major, const TCHAR* minor)
+	{
+		SndFileFormatType result = 0;
+
+		for(SndFileFormatType i=0; i<nMajor; ++i)
+		{
+			if(_tcsncicmp(major, Major[i].id, nStrLen) == 0)
+			{
+				result = Major[i].mask;
+
+				for(SndFileFormatType j=0; j<nMinor; ++j)
+				{
+					if(_tcsncicmp(minor, Minor[j].id, nStrLen) == 0)
+					{
+						return result | Minor[j].mask;
+					}
+				}
+			}
+		}
+
+		throw std::range_error("Invalid sound format specification");
+	}
 };
 
 

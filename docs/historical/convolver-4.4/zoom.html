@@ -1,0 +1,235 @@
+
+
+
+
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<meta http-equiv="Content-Language" content="en-gb">
+
+<title>Convolver with ZoomPlayer Pro</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 6.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<style TYPE="text/css"> li { 
+padding: 7px; 
+} 
+</style>
+<!--mstheme--><link rel="stylesheet" type="text/css" href="_themes/journal/jour1000.css"><meta name="Microsoft Theme" content="journal 1000, default">
+<meta name="Microsoft Border" content="tlb, default">
+</head>
+
+<body  ><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+
+<p align="center">
+<img border="0" src="images/convolver.gif" width="38" height="14"><b><font size="5"> 
+Convolver</font></b> </p>
+<p align="center">
+<a href="index.html"><img src="_derived/home_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Home" align="middle"></a> <a href="news.html"><img src="_derived/news.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="News" align="middle"></a> <a href="download.html"><img src="_derived/download.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Download" align="middle"></a> <a href="usage.html"><img src="_derived/usage.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Usage" align="middle"></a> <a href="commands.html"><img src="_derived/commands.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Command line utilities" align="middle"></a> <a href="feedback.html"><img src="_derived/feedback.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Feedback" align="middle"></a> <a href="troubleshooting.html"><img src="_derived/troubleshooting.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Troubleshooting" align="middle"></a> <a href="links.html"><img src="_derived/links.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Links" align="middle"></a>
+</p>
+<h1 align="center">
+ZoomPlayer Pro</h1>
+
+</td></tr><!--msnavigation--></table><!--msnavigation--><table dir="ltr" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td valign="top" width="1%">
+
+<p>
+
+</p>
+<!-- SiteSearch Google -->
+<form method="get" action="http://www.google.co.uk/custom" target="_top">
+<table style="border: 0px; background-color: #FFFFFF">
+<tr>
+<td nowrap="nowrap" valign="top" align="left" height="32"></td>
+<td nowrap="nowrap">
+<input type="hidden" name="domains" value="convolver.sf.net">
+<input type="text" name="q" size="18" maxlength="255" value=""> </td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td nowrap="nowrap">
+<table>
+<tr>
+<td><input type="radio" name="sitesearch" value="">
+<font size="-2" color="#000000">Web</font> </td>
+<td>
+<input type="radio" name="sitesearch" value="convolver.sourceforge.net" checked="checked">
+<font size="-2" color="#000000">This site</font> </td>
+</tr>
+</table>
+<input type="submit" name="sa" value="Google Search">
+<input type="hidden" name="ie" value="windows-1252">
+<input type="hidden" name="oe" value="windows-1252">
+<input type="hidden" name="hl" value="en"></td>
+</tr>
+</table>
+</form>
+<!-- SiteSearch Google -->
+
+</td><td valign="top" width="24"></td><!--msnavigation--><td valign="top">
+<h1>Using Convolver with ZoomPlayer Pro</h1>
+<p>The following instructions describe configuration using ConvolverWrapper.&nbsp; 
+In practice, you will probably want to use the ConvolverFilter which is 
+equivalent, but allows different input and output formats (number of channels, 
+sample rate, etc) to be used.&nbsp; (In fact ZoomPlayer Pro may also be able to work with ConvolverWMP too, as it recognises 
+DMOs!)</p>
+<ol>
+<li >Install Convolver and ZoomPlayer Pro and run 
+ZoomPlayer Pro</li>
+<li >There are two ZoomPlayer modes (<a href="#Music_Media_mode">Music 
+/ Media</a> and <a href="#DVD_mode">DVD</a>). Taking them in turn:</li>
+</ol>
+<h2><a name="Music_Media_mode">Music / Media mode</a></h2>
+<ol>
+<li >Play a CD or MP3 or other media type for which you 
+want to configure Convolver. The following walkthrough assumes MP3.</li>
+<li >Right click on ZoomPlayer and select <b>Filter 
+Properties</b> and then <b>Graph Information</b>.&nbsp; You will be 
+presented with a list of filters.&nbsp; Remember the audio <i>Decoder</i> 
+filter that is being used.&nbsp; You will need to add Convolver Wrapper to 
+the graph after that decoder.<br>
+<img border="0" src="images/using_9.jpg" width="410" height="319"></li>
+<li >Close the <i>Graph Information </i>window 
+and hit <b>Ctrl-O</b>, for<b> Options / Setup</b></li>
+<li >Select <b>Advanced Mode</b></li>
+<li >Select <b>Filter Control</b></li>
+<li >Select the <b>Customized Media Playback </b>
+tab and check<b> Enable Customized Media Playback</b>:<br>
+<img border="0" src="images/using_3.jpg" width="706" height="400"></li>
+<li >On the <b>Settings &amp; Renderers</b> tab, 
+make sure that the <b>Use Indirect Connect</b> and, <i>optionally</i>,
+<b>Show Customized Media Graph creation Errors </b>checkboxes are 
+disabled. Select from the rendering filters and devices under the 
+checkboxes. (The defaults may be OK.). The selected renderers will 
+override any selection you made on the Standard Media Playback tab, 
+However, you should set the renders on both the Standard and 
+Customized media playback modes to the same values (in case 
+Customized Media Playback fails and drops to Standard mode) <br>
+<img border="0" src="images/using_10.jpg" width="706" height="400"></li>
+<li >Click on the <b>Audio &amp; Video Decoders</b> 
+Sub-Tab. You will be presented with two lists. One for Audio 
+Decoders and one for Video Decoders. Double clicking on any item in 
+either list will open its configuration dialog.</li>
+<li >Configure the audio format which you want 
+to convolve (eg,the MPEG Layer 3 Decoder for MP3).</li>
+<li >Click <b>Add Filter</b> and select <i>
+Convolver Wrapper</i> (and then OK):<br>
+<img border="0" src="images/using_11.jpg" width="320" height="468"></li>
+<li >Select the <i>Convolver Wrapper</i>:<br>
+<img border="0" src="images/using_12.jpg" width="606" height="285"></li>
+<li >... and <b>Filter Properties</b>.&nbsp; 
+This will lead a pause of a minute or two while Convolver tunes 
+itself for your system. Your patience will be rewarded by a window 
+like the following:<br>
+<img border="0" src="images/using_13.jpg" width="346" height="299"></li>
+<li >Get the config (text file specifying a set 
+of filter paths) that you want to use.&nbsp; (See the<a href="index.html"> 
+main page</a> for more details.)</li>
+<li >Calculate the optimum attenuation for your 
+filter paths. This too will take a short while.</li>
+<li >Click <b>OK</b>. and <b>Close</b> the <i>
+Advanced Options</i>.</li>
+<li >Close ZoomPlayer and restart it.</li>
+<li >Play the media that you originally 
+selected.&nbsp; You should be able to right click on ZoomPlayer and 
+select <b>Filter Properties</b>. <i>Convolver Wrapper</i> should 
+appear on the list.&nbsp; If you select <b>Graph Information</b> you 
+should see something like:<br>
+<img border="0" src="images/using_14.jpg" width="663" height="606"></li>
+<li >You are done!</li>
+</ol>
+<h2><a name="DVD_mode">DVD mode</a></h2>
+<ol>
+<li >The filter setup for this mode is 
+independent of the Music / Media mode setup.</li>
+<li >First create a text file called
+<font face="Courier New">ConvolverWrapper.filterdata</font> in<font face="Courier New"> 
+C:\Program Files\Zoom Player\DVDAutoGraph</font> with the 
+following 2-line contents:<br>
+<code>DefineFilter(ConvolverWrapper.dll)<br>
+AudioFilter(Name=ConvolverWrapper,CLSID={6105E395-1C5A-4B3E-9701-FB71C2523AB6},InPin=Input,OutPin=Output)</code>
+<p>You can also try <font face="Courier New">
+ConvolverFilter.filterdata</font>:</p>
+<code>DefineFilter(convolverFilter.ax)<br>
+AudioFilter(Name=ConvolverFilter,CLSID={2A0F29DC-2C05-4716-9522-3618687EAA5F},InPin=XForm 
+In,OutPin=XForm Out)</code>
+<p>or <font face="Courier New">ConvolverWrapperDMO.filterdata</font>:</p>
+<code>DefineFilter(ConvolverWrapper.dll)<br>
+AudioFilter(Name=ConvolverWrapper DMO,CLSID={6105E395-1C5A-4B3E-9701-FB71C2523AB6},DMOID={47427372-7AED-4E37-ABEB-7BD64C4184BF},InPin=Input,OutPin=Output)</code> 
+<p>Suitable files to be copied to
+<font face="Courier New">C:\Program Files\Zoom Player\DVDAutoGraph
+</font>can be found in<font face="Courier New"> C:\Program File\Convolver\Convolver</font></li>
+<li >Start ZoomPlayer Pro and switch to DVD mode 
+(<b>F10</b>)</li>
+<li >Right clock on ZoomPlayer and select 
+options/setup (<b>Ctrl-O</b>) and <b>DVD</b> and the <b>DVD 
+Setup</b> tab.</li>
+<li >Under <i>Additional Filters</i> select
+<b>Add</b> to get:<br>
+<img border="0" src="images/using_15.jpg" width="328" height="367"></li>
+<li >Double click on <i>ConvolverWrapper</i> 
+to get the following, after ensuring that the Decoders and 
+Renderers that you want to use are selected:<br>
+<img border="0" src="images/using_16.jpg" width="706" height="400"></li>
+<li >Click on the <b>C</b> next to <i>Audio 
+Decoder</i> to set the number of channels to be produced:<br>
+<img border="0" src="images/using_17.jpg" width="407" height="337"></li>
+<li >Click on the highlighted <b>C</b> next 
+to <i>Additional Filters (Add Button Below)</i> to configure 
+Convolver Wrapper. It may take a minute or two for Convolver to 
+tune itself to your system.&nbsp; Your patience will be rewarded 
+with something like:<br>
+<img border="0" src="images/using_18.jpg" width="346" height="299"></li>
+<li >Select a config file (see
+<a href="index.html">main page</a>) that 
+corresponds to the number of channels and sample rate that your 
+Audio Decoder generates.</li>
+<li >Calculate the optimum attenuation 
+(there will be a pause while this happens).</li>
+<li >Click <b>OK</b> and <b>Close</b> the <i>
+Advanced Options</i> dialogue.</li>
+<li >Restart ZoomPlayer (seems to be 
+required sometimes).</li>
+<li >Play a DVD of your choice.</li>
+<li >Right click on Zoom Player and select
+<b>Filter Properties</b>. Convolver Wrapper should appear on the 
+list.&nbsp; Select <b>Graph Information</b> and you should get 
+something like the following:<br>
+<img border="0" src="images/using_19.jpg" width="661" height="495"></li>
+<li >You are done!</li>
+</ol>
+<h2>Troubleshooting</h2>
+<p>If you get something like</p>
+<p>
+<img border="0" src="images/using_20.gif" width="607" height="308"></p>
+<p>followed by</p>
+<p>
+<img border="0" src="images/using_21.gif" width="931" height="92"></p>
+<p>it is likely that you selected a Convolver filter configuration that does not 
+match the output of your Audio Decoder.&nbsp; Check the number of channels and 
+sample rate that Convolver is using by going into ZoomPlayer's Options | DVD 
+Setup | Additional Filters (C) dialogue (with ConvolverWrapper selected).</p>
+
+<!--msnavigation--></td></tr><!--msnavigation--></table><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+<p>&nbsp;</p>
+<p style="text-align: center">
+<nobr>[&nbsp;<a href="index.html" target="">Home</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="usage.html" target="">Up</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="config.html" target="">Config&nbsp;file</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="vst.html" target="">ConvolverVST</a>&nbsp;]</nobr> <nobr>[&nbsp;ZoomPlayer&nbsp;Pro&nbsp;]</nobr> <nobr>[&nbsp;<a href="binaural.html" target="">Panned&nbsp;binaural&nbsp;demonstration</a>&nbsp;]</nobr></p>
+<h5>Send mail to
+<script type="text/javascript">var a = new Array('pip','@di','jrp','al.','ex.','com');document.write("<a href='mailto:"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"'>"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"</a>");</script>
+with questions or comments <span lang="en-gb">Convolver or </span>about this web 
+site.<br>
+Copyright © 2006-8 Convolver<br>
+Last modified:
+16-Jan-2008 20:24 -0000
+<a href="http://sourceforge.net">
+<img src="http://sflogo.sourceforge.net/sflogo.php?group_id=139099&amp;type=1" width="88" height="31" border="0" alt="SourceForge.net Logo"></a></h5>
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-348806-3";
+urchinTracker();
+</script>
+
+</td></tr><!--msnavigation--></table></body>
+</html>

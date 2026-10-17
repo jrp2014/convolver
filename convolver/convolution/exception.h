@@ -59,6 +59,31 @@ class wavfileException : public convolutionException
 public:
 	wavfileException(std::string what, const TCHAR* path, const char* strerror) :
 	  convolutionException("Problem with sound file (" + std::string(CT2CA(path)) + "): " + what + " " + std::string(strerror)) {}
+	  wavfileException(std::string what, int fd, const char* strerror) :
+	  convolutionException("Problem with file descriptor (")
+	  {
+		  std::ostringstream ss;
+		  ss << diagnostic_ ;
+
+		  switch (fd)
+		  {
+		  case 0:
+			  ss << "0:stdin";
+			  break;
+		  case 1:
+			  ss << "1:stdout";
+			  break;
+		  case 2:
+			  ss << "2:stderr";
+			  break;
+		  default:
+			  ss << fd;
+		  }
+
+		  ss << "): " + what + " " + std::string(strerror);
+		  diagnostic_ = ss.str();
+
+	  }
 };
 
 

@@ -1,5 +1,9 @@
 # Review branch reconciliation and historical recovery
 
+This is the record of the initial correctness merge. The subsequent owner-authorized
+[feature recovery](archive-recovery.md) supersedes the deferral of `convolverPipe`
+and its file-descriptor helpers below.
+
 Prepared 17 October 2026 and approved by the owner for a local commit and merge.
 This report records the pre-merge comparison of review branch `e380056` and
 main `33ed4b8`. Publishing to GitHub is not authorized.

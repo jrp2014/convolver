@@ -14,3 +14,7 @@
 *.WAV   binary
 *.pcm   binary
 *.flac  binary
+
+# Historical recovery provenance hashes refer to the exact archive bytes.
+docs/historical/convolver-4.4/** -text
+convolver/convolverPipe/convolverPipe.rc -text

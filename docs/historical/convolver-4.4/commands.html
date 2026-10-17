@@ -1,0 +1,113 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-gb">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Command line utilities</title>
+<!--mstheme--><link rel="stylesheet" type="text/css" href="_themes/journal/jour1000-109.css"><meta name="Microsoft Theme" content="journal 1000, default">
+<meta name="Microsoft Border" content="tlb, default">
+</head>
+
+<body><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+
+<p align="center">
+<img border="0" src="images/convolver.gif" width="38" height="14"><b><font size="5"> 
+Convolver</font></b> </p>
+<p align="center">
+<a href="index.html"><img src="_derived/home_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Home" align="middle"></a> <a href="news.html"><img src="_derived/news.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="News" align="middle"></a> <a href="download.html"><img src="_derived/download.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Download" align="middle"></a> <a href="usage.html"><img src="_derived/usage.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Usage" align="middle"></a> <img src="_derived/commands.html_cmp_journal000_hbtn_p.gif" width="144" height="21" border="0" alt="Command line utilities" align="middle"> <a href="feedback.html"><img src="_derived/feedback.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Feedback" align="middle"></a> <a href="troubleshooting.html"><img src="_derived/troubleshooting.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Troubleshooting" align="middle"></a> <a href="links.html"><img src="_derived/links.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Links" align="middle"></a>
+</p>
+<h1 align="center">
+Command line utilities</h1>
+
+</td></tr><!--msnavigation--></table><!--msnavigation--><table dir="ltr" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td valign="top" width="1%">
+
+<p>
+<a href="perftest.html"><img src="_derived/perftest.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="perftest"></a><br><a href="convolvercmd.html"><img src="_derived/convolvercmd.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="convolverCMD"></a><br><a href="convolverpipe.html"><img src="_derived/convolverpipe.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="ConvolverPipe"></a><br><a href="makeir.html"><img src="_derived/makeir.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="makeIR"></a><br><a href="comparewavs.html"><img src="_derived/comparewavs.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="comparewavs"></a>
+</p>
+<!-- SiteSearch Google -->
+<form method="get" action="http://www.google.co.uk/custom" target="_top">
+<table style="border: 0px; background-color: #FFFFFF">
+<tr>
+<td nowrap="nowrap" valign="top" align="left" height="32"></td>
+<td nowrap="nowrap">
+<input type="hidden" name="domains" value="convolver.sf.net">
+<input type="text" name="q" size="18" maxlength="255" value=""> </td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td nowrap="nowrap">
+<table>
+<tr>
+<td><input type="radio" name="sitesearch" value="">
+<font size="-2" color="#000000">Web</font> </td>
+<td>
+<input type="radio" name="sitesearch" value="convolver.sourceforge.net" checked="checked">
+<font size="-2" color="#000000">This site</font> </td>
+</tr>
+</table>
+<input type="submit" name="sa" value="Google Search">
+<input type="hidden" name="ie" value="windows-1252">
+<input type="hidden" name="oe" value="windows-1252">
+<input type="hidden" name="hl" value="en"></td>
+</tr>
+</table>
+</form>
+<!-- SiteSearch Google -->
+
+</td><td valign="top" width="24"></td><!--msnavigation--><td valign="top">
+
+<p>Convolver comes with a number of command line utilities that are used mainly 
+for testing, but may have wider application.&nbsp; They can be found in
+<font face="Courier New">C:\Program Files\Convolver\Convolver</font></p>
+<p>They are not maintained quite as frequently as Convolver itself. </p>
+<dl>
+<dt><a name="perftext" href="perftest.html">perftest</a></dt>
+<dd>runs successive optimum attenuation calculations with different partition 
+number values and so can be used determine the optimum number of partitions 
+for a particular filter.</dd>
+<dt><a href="convolvercmd.html">convolverCMD</a></dt>
+<dd><font face="Courier New">convolverCMD</font> convolves a filter with a sound 
+file off line so you can test manually what effect your filter has on a known wav file, 
+for example.</dd>
+<dt><a href="convolverpipe.html">convolverPipe</a></dt><dd>convolverPipe is 
+similar to convolverCMD but filters from stdin to stdout, so that it can be 
+used with <a href="http://www.slimdevices.com">SlimServer</a>, for example.</dd>
+<dt><a href="makeir.html">makeIR</a></dt>
+<dd><font face="Courier New">makeIR</font> generates a wav file from a text 
+file specification. This can be used to generate impulse response files manually.</dd>
+<dt>&nbsp;<a href="comparewavs.html">comparewavs</a></dt>
+<dd>Compares two wav files and outputs the difference to a third wav file.</dd>
+<dt>generate_dirac_delta&nbsp; <i>&lt;SamplesPerSec&gt; &lt;Channels&gt; &lt;Silence&gt;</i></dt>
+<dd>will generate a Perfect Dirac Delta function wav file, sample rate <i>SamplesPerSec</i>, with <i>Channels</i> channels, and <i>Silence</i> trailing 0s.</dd>
+</dl>
+
+<p>The utilities provide fairly rudimentary diagnostics.</p>
+<p>They need the .dll files in
+<font face="Courier New">C:\Program Files\Convolver\Convolver</font> to be 
+in the current directory, or your path.</p>
+
+<!--msnavigation--></td></tr><!--msnavigation--></table><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+<p>&nbsp;</p>
+<p style="text-align: center">
+<nobr>[&nbsp;<a href="index.html" target="">Home</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="news.html" target="">News</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="download.html" target="">Download</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="usage.html" target="">Usage</a>&nbsp;]</nobr> <nobr>[&nbsp;Command&nbsp;line&nbsp;utilities&nbsp;]</nobr> <nobr>[&nbsp;<a href="feedback.html" target="">Feedback</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="troubleshooting.html" target="">Troubleshooting</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="links.html" target="">Links</a>&nbsp;]</nobr></p>
+<h5>Send mail to
+<script type="text/javascript">var a = new Array('pip','@di','jrp','al.','ex.','com');document.write("<a href='mailto:"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"'>"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"</a>");</script>
+with questions or comments <span lang="en-gb">Convolver or </span>about this web 
+site.<br>
+Copyright © 2006-8 Convolver<br>
+Last modified:
+16-Jan-2008 20:24 -0000
+<a href="http://sourceforge.net">
+<img src="http://sflogo.sourceforge.net/sflogo.php?group_id=139099&amp;type=1" width="88" height="31" border="0" alt="SourceForge.net Logo"></a></h5>
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-348806-3";
+urchinTracker();
+</script>
+
+</td></tr><!--msnavigation--></table></body>
+
+</html>

@@ -1,0 +1,192 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Troubleshooting</title>
+<style TYPE="text/css"> li { 
+padding: 5px; 
+}
+</style>
+
+<!--mstheme--><link rel="stylesheet" type="text/css" href="_themes/journal/jour1000-109.css"><meta name="Microsoft Theme" content="journal 1000, default">
+<meta name="Microsoft Border" content="tlb, default">
+</head>
+
+<body><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+
+<p align="center">
+<img border="0" src="images/convolver.gif" width="38" height="14"><b><font size="5"> 
+Convolver</font></b> </p>
+<p align="center">
+<a href="index.html"><img src="_derived/home_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Home" align="middle"></a> <a href="news.html"><img src="_derived/news.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="News" align="middle"></a> <a href="download.html"><img src="_derived/download.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Download" align="middle"></a> <a href="usage.html"><img src="_derived/usage.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Usage" align="middle"></a> <a href="commands.html"><img src="_derived/commands.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Command line utilities" align="middle"></a> <a href="feedback.html"><img src="_derived/feedback.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Feedback" align="middle"></a> <img src="_derived/troubleshooting.html_cmp_journal000_hbtn_p.gif" width="144" height="21" border="0" alt="Troubleshooting" align="middle"> <a href="links.html"><img src="_derived/links.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Links" align="middle"></a>
+</p>
+<h1 align="center">
+Troubleshooting</h1>
+
+</td></tr><!--msnavigation--></table><!--msnavigation--><table dir="ltr" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td valign="top" width="1%">
+
+<p>
+
+</p>
+<!-- SiteSearch Google -->
+<form method="get" action="http://www.google.co.uk/custom" target="_top">
+<table style="border: 0px; background-color: #FFFFFF">
+<tr>
+<td nowrap="nowrap" valign="top" align="left" height="32"></td>
+<td nowrap="nowrap">
+<input type="hidden" name="domains" value="convolver.sf.net">
+<input type="text" name="q" size="18" maxlength="255" value=""> </td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td nowrap="nowrap">
+<table>
+<tr>
+<td><input type="radio" name="sitesearch" value="">
+<font size="-2" color="#000000">Web</font> </td>
+<td>
+<input type="radio" name="sitesearch" value="convolver.sourceforge.net" checked="checked">
+<font size="-2" color="#000000">This site</font> </td>
+</tr>
+</table>
+<input type="submit" name="sa" value="Google Search">
+<input type="hidden" name="ie" value="windows-1252">
+<input type="hidden" name="oe" value="windows-1252">
+<input type="hidden" name="hl" value="en"></td>
+</tr>
+</table>
+</form>
+<!-- SiteSearch Google -->
+
+</td><td valign="top" width="24"></td><!--msnavigation--><td valign="top">
+
+<h2>Troubleshooting</h2>
+<h3>Installation</h3>
+<ul>
+<li>If on installation you get a message to the effect that convolverWMP.dll 
+failed to register, check that you have Windows Media Player 9 or 10 installed.</li>
+</ul>
+<h3>Loading ConvolverFilter / ConvolverWrapper</h3>
+<ul>
+<li>These filters will not (yet) load with Sony applications such as AcidPro 
+as these require certain Sony-specific interfaces for displaying property pages 
+to be implemented.</li>
+</ul>
+<h3>Config files</h3>
+<ul>
+<li>Make sure that you are using the latest version of Convolver.&nbsp; The 
+format of the config files has changed a couple of times to accommodate new 
+features.</li>
+</ul>
+<h3>Playback</h3>
+<ul>
+<li>If ConvolverWMP is not engaged, that is if you don&#39;t get a little logo in 
+the bar at the bottom of Windows Media Player during playback</li>
+</ul>
+<img border="0" src="images/Untitled-1.gif" width="476" height="123">
+<p>and (so) you don&#39;t hear any effect, check that the filter sample rate (eg, 44.1kHz) 
+is the same as the sample rate of the filter that you have selected. Similarly for 
+the number of input and output channels (eg, stereo to stereo).&nbsp; You can select 
+the number of speakers from Windows Media Player | Tools |Options:</p>
+<p><img border="0" src="images/Untitled-4.gif" width="819" height="1006"></p>
+<p>Note that after you change the filter/config in ConvolverWMP following such a 
+mismatch, you may need to restart Windows Media Player to get it to retest ConvolverWMP&#39;s 
+compatibility with your playback setup (otherwise it may continue to assume that 
+ConvolverWMP is not applicable to the playback stream).</p>
+<ul>
+<li>If ConvolverWMP is engaged, and you don&#39;t hear anything, try increasing 
+the attenuation on the ConvolverWMP dialog.&nbsp; Start with the calculated 
+optimum value.</li>
+<li>If you still don&#39;t hear anything, check your drivers. For example, Sound 
+Blaster Live! 5.1, DR release 1.3.0 (according to Soundblaster auto update), 
+actual driver version 5.12.2.252, produces silence when used with 32-bit audio.&nbsp; 
+Use the MME drivers instead.</li>
+<li>If, after playing music of one format (sample rate, channels) you change 
+the filter to one with a different sample rate or a different number of input 
+or output channels, ConvolverWMP will issue a warning. You will need to select 
+music of the right format before Windows Media Player will play.&nbsp; Indeed 
+you may also need to restart Windows Media Player.</li>
+<li>Convolution, by its nature, generates a lag between the input and output.&nbsp; 
+ConvolverWrapper and ConvolverFilter will, therefore, generate only silence 
+until that lag (half the partition length) has passed.&nbsp; You may also need 
+to add some silence at the end of the input if you want all the valid input 
+to be processed when by ConvolverWrapper and ConvolverFilter.</li>
+</ul>
+<h3>ConvolverWrapper</h3>
+<p>ConvolverWrapper sets the output sample format type to be identical to the input 
+sample format type.&nbsp; ConvolverWMP (Convolver DSP plug-in) and ConvolverFilter 
+negotiate input and output format types independently.</p>
+<h3><a name="If_nothing_works">If nothing works, or you get noise, clicks, crashes, etc ...</a></h3>
+<ol>
+<li>Check that your system meets the <a href="index.html#Requirements">
+requirements set out at the bottom of the main page</a>.</li>
+<li>Confirm that <a href="perftest.html">perftest</a> runs from your 
+installation directory (normally
+<i>C:\Program Files\Convolver\Convolver</i>) using an impulse response file (filter, audio file) of your choice (in this example <i>Orwellian Assembly Hall.wav</i>)
+<blockquote>
+<pre>C:\Program Files\convolver\convolver>perftest 8 2 1 &quot;Orwellian Assembly Hall.wav&quot;
+2 Paths (Stereo to Stereo direct) 44.1kHz 50544 taps Lag: 25272 taps 0.57s Estimated gain: 30dB Peak gain: 70dB
+
+2 Paths (Stereo to Stereo direct) 44.1kHz 50544 taps Lag: 25272 taps 0.57s Estimated gain: 30dB Peak gain: 70dB
+Partitions      Rate    SecCalc SecLoad Attenuation     Filter Length   Partition Length        Iteration
+0       	53.8    0.213   0.168   -37.6   	50544   	50544   		1
+0       	53.8    0.213   0.167   -38.2   	50544   	50544  			2
+1       	50.8    0.225   0.163   -38.2   	50544   	50544  			1
+1       	52.7    0.218   0.17    -38.2   	50544   	50544   		2
+2       	51.9    0.221   0.17    -38.3   	50544   	25272   		1
+2       	53.6    0.214   0.178   -38.3   	50544   	25272   		2
+3       	57.4    0.2     0.163   -38.1   	50544   	16848   		1
+3       	55.7    0.206   0.165   -38.1   	50544   	16848   		2
+4       	46.3    0.247   0.161   -37.8   	50544   	12636   		1
+4       	50.1    0.229   0.222   -38.4   	50544   	12636   		2
+5       	53.2    0.217   0.166   -38.2   	50960   	10192   		1
+5       	52.4    0.22    0.161   -38.1   	50960   	10192   		2
+6       	51.4    0.223   0.161   -38.7   	50544   	8424    		1
+6       	52.3    0.219   0.164   -37.5   	50544   	8424    		2
+7       	51.6    0.224   0.162   -37.5   	50960   	7280    		1
+7       	51.4    0.225   0.172   -37.5   	50960   	7280    		2
+8       	42.1    0.272   0.172   -37.8   	50544   	6318    		1
+8       	40.7    0.282   0.161   -37.8   	50544   	6318    		2
+
+Total load time: 3.05s
+Total execution time: 4.07s</pre>
+</blockquote></li>
+<li>If you are running convolverVST, check that perftest runs from outside 
+the installation directory.&nbsp; This will require your installation 
+directory to be in your PATH.&nbsp; See the <a href="vst.html">convolverVST 
+page</a> for instructions on setting your PATH.</li>
+<li>Verify that ConvolverWMP (DSP plug-in) runs in Windows Media Player 
+9/10.&nbsp; See the <a href="usage.html">usage page</a> for instructions, 
+and the tips above.</li>
+<li>If you are getting strange noises, verify that ConvolverFilter runs from 
+Media Player Classic and make a note of the input and output formats being 
+used. (See the <a href="usage.html">usage page</a> for instructions.&nbsp; After selecting a file for playback (Ctrl-O), select Play | Filter | ConvolverFilter | Pin Info.)</li>
+<li>If you have more than one soundcard (or built-in sound and a soundcard) 
+try updating the drivers and/or using the other sound output device on your 
+system.</li>
+<li>Report the problem using the instructions on the<a href="feedback.html"> 
+feedback page</a>.</li>
+</ol>
+<!--msnavigation--></td></tr><!--msnavigation--></table><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+<p>&nbsp;</p>
+<p style="text-align: center">
+<nobr>[&nbsp;<a href="index.html" target="">Home</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="news.html" target="">News</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="download.html" target="">Download</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="usage.html" target="">Usage</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="commands.html" target="">Command&nbsp;line&nbsp;utilities</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="feedback.html" target="">Feedback</a>&nbsp;]</nobr> <nobr>[&nbsp;Troubleshooting&nbsp;]</nobr> <nobr>[&nbsp;<a href="links.html" target="">Links</a>&nbsp;]</nobr></p>
+<h5>Send mail to
+<script type="text/javascript">var a = new Array('pip','@di','jrp','al.','ex.','com');document.write("<a href='mailto:"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"'>"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"</a>");</script>
+with questions or comments <span lang="en-gb">Convolver or </span>about this web 
+site.<br>
+Copyright © 2006-8 Convolver<br>
+Last modified:
+16-Jan-2008 20:24 -0000
+<a href="http://sourceforge.net">
+<img src="http://sflogo.sourceforge.net/sflogo.php?group_id=139099&amp;type=1" width="88" height="31" border="0" alt="SourceForge.net Logo"></a></h5>
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-348806-3";
+urchinTracker();
+</script>
+
+</td></tr><!--msnavigation--></table></body></html>

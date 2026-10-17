@@ -8,6 +8,7 @@ to multichannel audio in real time, and ships as:
 - a DirectShow filter (`convolverFilter`)
 - a VST plug-in (`convolverVST`)
 - a command-line tool (`convolverCMD`)
+- a stdin/stdout streaming tool ([`convolverPipe`](docs/convolverPipe.md)), recovered from the historical 4.4 sources
 
 All of them share the engine in [`convolver/convolution`](convolver/convolution),
 which does uniformly partitioned overlap-save convolution with FFTW.
@@ -44,7 +45,10 @@ The original import stopped at the 4.3 source release. A subsequently supplied
 labelled 4.5, alongside a 4.5 prerelease installer. Selected improvements have
 been recovered without replacing the reviewed engine or changing release
 identifiers. See the [comparison and recovery findings](docs/review-2026-10/reconciliation.md)
-for provenance, exclusions and validation limits.
+for provenance, exclusions and validation limits. The subsequent
+[feature and documentation recovery](docs/review-2026-10/archive-recovery.md)
+restores `convolverPipe` and the [historical 4.4 website](docs/historical/convolver-4.4/README.md),
+including configuration examples, host guides and release history.
 
 ## Building
 

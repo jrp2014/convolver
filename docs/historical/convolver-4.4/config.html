@@ -1,0 +1,351 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Config file</title>
+<style type="text/css">
+li {
+	padding: 5px;
+}
+</style>
+<style type="text/css">
+dt {
+	padding: 5px;
+}
+</style>
+<style type="text/css">
+dd {
+	padding: 5px;
+}
+</style>
+<!--mstheme--><link rel="stylesheet" type="text/css" href="_themes/journal/jour1000-109.css"><meta name="Microsoft Theme" content="journal 1000, default">
+<meta name="Microsoft Border" content="tlb, default">
+</head>
+
+<body><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+
+<p align="center">
+<img border="0" src="images/convolver.gif" width="38" height="14"><b><font size="5"> 
+Convolver</font></b> </p>
+<p align="center">
+<a href="index.html"><img src="_derived/home_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Home" align="middle"></a> <a href="news.html"><img src="_derived/news.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="News" align="middle"></a> <a href="download.html"><img src="_derived/download.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Download" align="middle"></a> <a href="usage.html"><img src="_derived/usage.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Usage" align="middle"></a> <a href="commands.html"><img src="_derived/commands.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Command line utilities" align="middle"></a> <a href="feedback.html"><img src="_derived/feedback.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Feedback" align="middle"></a> <a href="troubleshooting.html"><img src="_derived/troubleshooting.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Troubleshooting" align="middle"></a> <a href="links.html"><img src="_derived/links.html_cmp_journal000_hbtn.gif" width="144" height="21" border="0" alt="Links" align="middle"></a>
+</p>
+<h1 align="center">
+Config file</h1>
+
+</td></tr><!--msnavigation--></table><!--msnavigation--><table dir="ltr" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td valign="top" width="1%">
+
+<p>
+<a href="configegs.html"><img src="_derived/configegs.html_cmp_journal000_vbtn.gif" width="144" height="21" border="0" alt="Config examples"></a>
+</p>
+<!-- SiteSearch Google -->
+<form method="get" action="http://www.google.co.uk/custom" target="_top">
+<table style="border: 0px; background-color: #FFFFFF">
+<tr>
+<td nowrap="nowrap" valign="top" align="left" height="32"></td>
+<td nowrap="nowrap">
+<input type="hidden" name="domains" value="convolver.sf.net">
+<input type="text" name="q" size="18" maxlength="255" value=""> </td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td nowrap="nowrap">
+<table>
+<tr>
+<td><input type="radio" name="sitesearch" value="">
+<font size="-2" color="#000000">Web</font> </td>
+<td>
+<input type="radio" name="sitesearch" value="convolver.sourceforge.net" checked="checked">
+<font size="-2" color="#000000">This site</font> </td>
+</tr>
+</table>
+<input type="submit" name="sa" value="Google Search">
+<input type="hidden" name="ie" value="windows-1252">
+<input type="hidden" name="oe" value="windows-1252">
+<input type="hidden" name="hl" value="en"></td>
+</tr>
+</table>
+</form>
+<!-- SiteSearch Google -->
+
+</td><td valign="top" width="24"></td><!--msnavigation--><td valign="top">
+
+<p>
+<img border="0" src="images/Drawing1.gif" width="496" height="961" align="right">For 
+the simplest applications, you can just
+<a href="usage.html#an_impulse_response_(IR)_file">use a sound file as a filter</a>.</p>
+<p>A config file allows you to specify more complex filters for specific applications.&nbsp; 
+The following is the format for version 3.0 and later.</p>
+<h3>Filter specification</h3>
+<p>A config file is a plain text file describing a filter by specifying:</p>
+<ul>
+<li>the filter sample rate in Hz (eg, 44100 or 48000)</li>
+<li>the number of input and output channels being supplied and accepted by your 
+setup (so 1 for mono, 2 for stereo, 6 for 5.1, etc).</li>
+<li>a channel to speaker mapping specification</li>
+<li>the delays to be applied to each input and output channels (in milliseconds)</li>
+<li>a list of the <i>paths</i> that comprise the filter:</li>
+</ul>
+<h3>Path</h3>
+<p>A filter path is specified in terms of:</p>
+<ul>
+<li>a <b>filter file</b> (impulse response file, of
+<a href="index.html#SoundFormats">one of the supported sound file types</a> 
+such as WAV) that must be of the specified filter sample rate.&nbsp; All the 
+filter files in the list of filter paths must be of the same length;</li>
+<li>the <b>channel from that filter</b> file to be used (0 for the first channel, 
+1 for the second, etc);</li>
+<li>the <b>input channels</b> that the filter path is to use.&nbsp; Typically, 
+a filter path will use just a single input channel, but it is possible for more 
+than one channel to be specified, in which case they are scaled and summed to 
+provide an aggregated input channel for the filter path;</li>
+<li>the <b>output channels</b> that the filter path is to use. Again, this will 
+typically be a single channel, but the output will be scaled and copied to all 
+channel is specified for the filter path.&nbsp; If a particular output channel 
+is specified as the output channel for more than one filter path, the (scaled) 
+outputs are summed.</li>
+</ul>
+<h3>Config file syntax</h3>
+<p>More specifically, the config file, which is a text file that specifies:</p>
+<ul>
+<li>the <b>sample rate, number of input and output channels</b> being supplied 
+and accepted by your setup, and a <b>channel to speaker mapping specification</b>&nbsp; 
+(on the initial line):
+<pre>&lt;filter sample rate&gt; &lt;number of input channels&gt; &lt;number of output channels&gt; &lt;output channel mask (hex)&gt;</pre>
+<p>where</p>
+<dl>
+<dt><font face="Courier New">&lt;filter sample rate&gt;</font>:</dt>
+<dd>will normally be 44100 for CDs or 48000 for DVDs</dd>
+<dt><font face="Courier New">&lt;number of ... channels&gt;</font>:</dt>
+<dd>The number of input and output channels will typically be the same for 
+straight room correction playback, but may be different if you are setting 
+up a cross-over that filters different frequency ranges to different channels, 
+for example.</dd>
+<dd>If the number of input / output channels that you specify here does 
+not correspond to the number of channels that you are playing, or the number 
+of channels that your output device expects, the filter may block playback, 
+or not be applied. A little logo (<img border="0" src="images/convolver.gif" width="38" height="14">) 
+will appear on the bottom of the Windows Media Player screen if Convolver 
+is active.</dd>
+<dd>Look under <i>Tools | Options | Devices | Speakers | Properties | Advanced</i> 
+to specify the number of speakers / output channels.&nbsp; The HCCD / 24-bit 
+setting on that tab has been reported to disable playback through the filter 
+under some circumstances. However, you need not use all the input and output 
+channels available on your system in the filter paths that you will go on 
+to specify.</dd>
+<dt><font face="Courier New">&lt;output channel mask&gt;</font>:</dt>
+<dd>This setting will often be 0, but can be used to indicate which channels 
+are present in the multi-channel output stream (in terms of speakers). It 
+is specified in hexadecimal (but without any 0x prefix). The least-significant 
+bit represents the front-left speaker, the next bit corresponds to the front-right 
+speaker, and so on. The channels that are specified in the channel mask 
+should be present in the order shown in the following table, beginning at 
+the top: </dd>
+<dd>
+<table cellspacing="0" id="table1" cellpadding="4">
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px; border-top-style: solid; border-top-width: 1px">
+<b>Speaker<br>
+position</b></td>
+<td valign="top" style="border-right-style: solid; border-right-width: 1px; border-top-style: solid; border-top-width: 1px">
+<b>Bit (hex)</b></td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px; border-top-style: solid; border-top-width: 1px">
+<b>Speaker<br>
+position</b></td>
+<td valign="top" style="border-right-style: solid; border-right-width: 1px; border-top-style: solid; border-top-width: 1px">
+<b>Bit (hex)</b></td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+front left</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;1</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+side left</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;200</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+front right</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;2</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+side right</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;400</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+front centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;4</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;800</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+low frequency</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;8</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top front left</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;1000</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+back left</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;10</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top front centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;2000</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+back right</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;20</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top front right</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;4000</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+front left of centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;40</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top back left</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;8000</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+front right of centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;80</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px">
+top back centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px">&nbsp;10000</td>
+</tr>
+<tr>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px; border-bottom-style: solid; border-bottom-width: 1px">
+back centre</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px; border-bottom-style: solid; border-bottom-width: 1px">&nbsp;100</td>
+<td valign="top" style="border-left-style: solid; border-left-width: 1px; border-bottom-style: solid; border-bottom-width: 1px">
+top back right</td>
+<td valign="top" align="right" style="border-right-style: solid; border-right-width: 1px; border-bottom-style: solid; border-bottom-width: 1px">&nbsp;20000</td>
+</tr>
+</table>
+</dd>
+<dd></dd>
+<dd>For example, if <font face="Courier New">&lt;number of output channels&gt;</font> 
+is set to 4 and <font face="Courier New">&lt;output channel mask&gt;</font> is 
+set to 33, the audio channels are intended for playback to the front-left, 
+front-right, back-left, and back-right speakers. Other common values to 
+try include 3F for 5.1, and FF or 63F for 7.1 playback.&nbsp; </dd>
+<dd>An <font face="Courier New">&lt;output channel mask&gt;</font> of 0 tells 
+the output audio device to render the first channel to the first port on 
+the device, the second channel to the second port on the device, and so 
+on. You should probably use a 0 value by default, since you can specify 
+which output channel numbers are to be used directly in the config file 
+through &lt;output channel<i>&gt;<sub>n</sub>.&lt;</i>weight&gt;<sub><i>n</i></sub> 
+settings.</dd>
+<dd>See
+<a href="http://www.microsoft.com/whdc/device/audio/multichaud.mspx">Multiple 
+Channel Audio Data and WAVE Files</a> and even
+<a href="http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/SpkrConfig5.doc">
+Audio Driver Support for Home Theater Speaker Configurations</a> for the 
+gory details (which vary slightly between different versions of XP)</dd>
+</dl>
+</li>
+<li>following by a line setting <b>delays</b>, in milliseconds, to be applied 
+to each input and output channel
+<pre>&lt;input channel delay&gt;<sub>0</sub> <i>...</i> &lt;input channel delay&gt;<i><sub>n</sub></i> &lt;output channel delay&gt;<sub>0</sub> <i>...</i> &lt;output channel delay&gt;<i><sub>m</sub></i></pre>
+Start with a rows of zeros.&nbsp; The delay cannot exceed half the partition 
+length.&nbsp; So if you are using a 44.1kHz and a filter that is 131072 taps 
+long, for example, you cannot delay by more than 1486ms (131072 / 44.1 / 2) 
+if you use 0 or 1 partitions, or 371ms if you are using 4 partitions.&nbsp; 
+This should not be a practical constraint unless you live in a football stadium 
+or are doing special effects. </li>
+<li>followed by a sequence of 4-line <b>filter path specifications </b>each 
+comprising the filter (impulse response) file, the channel to be used from that 
+IR file, the input and output channels that the filter path uses, and how the 
+inputs and outputs are to be scaled:
+<pre>&lt;filter filename&gt;
+&lt;filter channel&gt;
+&lt;input channel&gt;<sub>0</sub>.&lt;weight&gt;<sub>0</sub> <i>...</i> &lt;input channel&gt;<sub><i>n</i></sub>.&lt;weight&gt;<i><sub>n</sub></i>
+&lt;output channel&gt;<sub>0</sub>.&lt;weight&gt;<sub>0</sub> <i>...</i> &lt;output channel&gt;<i><sub>m</sub></i>.&lt;weight&gt;<i><sub>m</sub></i></pre>
+<p>where</p>
+<dl>
+<dt><font face="Courier New">&lt;filter filename&gt;</font>:</dt>
+<dd>a filter (impulse response) file.&nbsp; <font face="Courier New">Convolver</font> 
+will read any format supported by <font face="Courier New">
+<a href="http://www.mega-nerd.com/libsndfile/">libsndfile</a></font>. However, 
+you will probably want to stick to WAV files.&nbsp; Raw .PCM (or .pcm) files 
+are assumed to be mono 32-bit float files. All the filters for in a filter 
+path specification must be the same length.</dd>
+<dd>Impulse response filters for room correction can be generated by
+<a href="http://www.duffroomcorrection.com/wiki/Simple_Automated_IR_Measuring_Tool">
+RecImp</a> or by following the excellent
+<a href="http://www.duffroomcorrection.com/wiki/DRC_User_Guide">Jones Rush 
+User Guide</a>.</dd>
+<dd>If you want to generate filters for other applications, you will need 
+to look elsewhere.&nbsp; For example, you might want to
+<a href="http://www.duffroomcorrection.com/wiki/Generate_XO_in_Matlab">generate 
+digital cross-overs</a> or
+<a href="http://pcfarina.eng.unipr.it/public/papers/128-AES99.PDF">cross-talk 
+cancellation filters</a> or
+<a href="http://www2.hsu-hh.de/ant/dafx2002/DAFX_Book_Page/matlab.html">
+DAFX - Digital Audio Effects</a>.</dd>
+<dt><font face="Courier New">&lt;filter channel&gt;</font>:</dt>
+<dd>specifies the channel (staring at 0) <i>from the filter file</i> to 
+be used for this filter path.&nbsp; There are many stereo impulse response 
+files available on the internet.&nbsp; Since each filter path uses only 
+a single channel, this feature allow you to use the left and right (0 and 
+1) channels from these impulse response files in two separate filter paths, 
+for example.</dd>
+<dt><font face="Courier New">&lt;channel&gt;</font>:</dt>
+<dd>channel numbers start at 0. A filter path does not have to use all the 
+source channels as input.&nbsp; Output channels that have no filter path 
+associated with them will be fed with silence.</dd>
+<dt><font face="Courier New">&lt;scale&gt;</font>:</dt>
+<dd>scaling factors are applied to the samples from each input channel and, 
+after processing, to the resulting samples for each specified output channel.&nbsp; 
+A scaling factor of 0 implies no scaling (ie, a scaling factor of 1). Negative 
+scaling factors are allowed (which will result in phase inversion).&nbsp; 
+For straight inversion, don&#39;t use -0.0 for channel 0; use -0.99999 instead.</dd>
+</dl>
+</li>
+</ul>
+<p>The <a href="configegs.html">examples</a> should make this clearer.</p>
+<h3>Filter list</h3>
+<p>In situations where you are using several different formats (eg, stereo 44.1kHz 
+and 5.1 48kHz) it is convenient to be able to switch automatically between filters.</p>
+<p>So a config file can also comprise of a list of</p>
+<ul>
+<li>filter specification config file names of the type described above; and
+</li>
+<li>WAV impulse response filenames</li>
+</ul>
+<p>one per line.&nbsp; The filter used will then be the first to match the current 
+sound source (in terms of number of input and output channels and sample rate).&nbsp; 
+This allows you to play both stereo and 5.1 sources, say, without having to change 
+the config file.</p>
+
+<!--msnavigation--></td></tr><!--msnavigation--></table><!--msnavigation--><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td>
+
+<p>&nbsp;</p>
+<p style="text-align: center">
+<nobr>[&nbsp;<a href="index.html" target="">Home</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="usage.html" target="">Up</a>&nbsp;]</nobr> <nobr>[&nbsp;Config&nbsp;file&nbsp;]</nobr> <nobr>[&nbsp;<a href="vst.html" target="">ConvolverVST</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="zoom.html" target="">ZoomPlayer&nbsp;Pro</a>&nbsp;]</nobr> <nobr>[&nbsp;<a href="binaural.html" target="">Panned&nbsp;binaural&nbsp;demonstration</a>&nbsp;]</nobr></p>
+<h5>Send mail to
+<script type="text/javascript">var a = new Array('pip','@di','jrp','al.','ex.','com');document.write("<a href='mailto:"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"'>"+a[2]+a[1]+a[3]+a[0]+a[4]+a[5]+"</a>");</script>
+with questions or comments <span lang="en-gb">Convolver or </span>about this web 
+site.<br>
+Copyright © 2006-8 Convolver<br>
+Last modified:
+16-Jan-2008 20:24 -0000
+<a href="http://sourceforge.net">
+<img src="http://sflogo.sourceforge.net/sflogo.php?group_id=139099&amp;type=1" width="88" height="31" border="0" alt="SourceForge.net Logo"></a></h5>
+<script src="http://www.google-analytics.com/urchin.js" type="text/javascript">
+</script>
+<script type="text/javascript">
+_uacct = "UA-348806-3";
+urchinTracker();
+</script>
+
+</td></tr><!--msnavigation--></table></body>
+
+</html>

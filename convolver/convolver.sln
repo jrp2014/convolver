@@ -59,6 +59,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConvolverFilter", "convolve
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverVST", "convolverVST\convolverVST.vcproj", "{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convolverPipe", "convolverPipe\convolverPipe.vcproj", "{496A6724-2968-48AD-A3F0-91416DF0B4DA}"
+EndProject
 Global
 	GlobalSection(SourceCodeControl) = preSolution
 		SccNumberOfProjects = 21
@@ -224,6 +226,12 @@ Global
 		{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}.Release PIII|Win32.Build.0 = Release PIII|Win32
 		{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}.Release|Win32.ActiveCfg = Release|Win32
 		{6BC3076C-CD8A-4BD6-8A67-A05AFD6BC42A}.Release|Win32.Build.0 = Release|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Debug|Win32.Build.0 = Debug|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Release PIII|Win32.ActiveCfg = Release PIII|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Release PIII|Win32.Build.0 = Release PIII|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Release|Win32.ActiveCfg = Release|Win32
+		{496A6724-2968-48AD-A3F0-91416DF0B4DA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
