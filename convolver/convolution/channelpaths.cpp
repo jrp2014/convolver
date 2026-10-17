@@ -220,7 +220,7 @@ peak_gain_(0)
 
 					// 0 implies no scaling to be applied (ie, scale = 1)
 					if(scale == 0)
-						scale = fchannel < 0 ? -1.0f : 1.0f;
+						scale = _copysign(1.0, fchannel) < 0 ? -1.0f : 1.0f;
 
 					inChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
@@ -268,7 +268,7 @@ peak_gain_(0)
 
 					// 0 implies no scaling to be applied (ie, scale = 1)
 					if(scale == 0)
-						scale = fchannel < 0 ? -1.0f : 1.0f;
+						scale = _copysign(1.0, fchannel) < 0 ? -1.0f : 1.0f;
 
 					outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
@@ -297,13 +297,13 @@ peak_gain_(0)
 						szChannelPathsFileName);
 				}
 			}
+			else if (config_().bad())
+			{
+				throw channelPathsException("Fatal error opening/reading filter path file", szChannelPathsFileName);
+			}
 			else if (config_().fail())
 			{
 				throw channelPathsException("Bad filter sound file or config file syntax is incorrect", szChannelPathsFileName);
-			}
-			else if (config_().bad())
-			{
-				throw channelPathsException("Fatal error opening/reading Filter path file", szChannelPathsFileName);
 			}
 			else
 			{
@@ -406,7 +406,7 @@ peak_gain_(0)
 			inputScale += abs(Paths_[nPath].inChannel[nChannel].fScale);
 		}
 
-		for(WORD nChannel = 0; nChannel < Paths_[0].outChannel.size(); ++ nChannel)
+		for(WORD nChannel = 0; nChannel < Paths_[nPath].outChannel.size(); ++ nChannel)
 		{
 			estimated_output_gain_[Paths_[nPath].outChannel[nChannel].nChannel] += inputScale * Paths_[nPath].filter.estimated_gain() *
 				abs(Paths_[nPath].outChannel[nChannel].fScale);
@@ -465,10 +465,11 @@ const std::basic_string<TCHAR> ChannelPaths::DisplayChannelPaths() const
 
 		result
 			<< nSamplesPerSec()/1000.0f << TEXT("kHz ") 
-			<< nFilterLength() << TEXT(" taps Lag ") 
-			<< std::setprecision(2) << (float(nHalfPartitionLength()) / float(nSamplesPerSec())) <<
-			TEXT("s Estimated gain ") << estimated_gain_dB() <<
-			TEXT("dB Peak gain ") << peak_gain_dB() << TEXT("dB");
+			<< nFilterLength() << TEXT(" taps Lag: ")
+			<< std::setprecision(2) << nHalfPartitionLength() << TEXT(" taps ")
+			<< (float(nHalfPartitionLength()) / float(nSamplesPerSec()))
+			<< TEXT("s Estimated gain: ") << estimated_gain_dB()
+			<< TEXT("dB Peak gain: ") << peak_gain_dB() << TEXT("dB");
 	}
 	return result.str();
 }

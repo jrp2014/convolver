@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Run the portable tests of the canonical convolver/ tree. No extra Python packages."""
+from pathlib import Path
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+scripts = ('core_regressions.py', 'host_regressions.py', 'gain_regressions.py',
+           'branch_regressions.py', 'historical_diagnostics.py')
+failed = []
+for script in scripts:
+    print('\nRunning ' + script, flush=True)
+    result = subprocess.run([sys.executable, str(HERE / script)])
+    if result.returncode:
+        failed.append(script)
+if failed:
+    print('FAILED: ' + ', '.join(failed))
+    raise SystemExit(1)
+print('\nPASS: all five portable regression suites')

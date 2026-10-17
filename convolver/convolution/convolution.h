@@ -111,6 +111,8 @@ private:
 	ChannelBuffer		OutputBuffer_;				// The output for a particular path, before mixing
 	SampleBuffer		OutputBufferAccumulator_;	// For collecting path outputs
 	PartitionedBuffer	ComputationCircularBuffer_;	// Used as the output buffer for partitioned convolution
+	SampleBuffer		InputDelayLine_;			// Per input channel: (max input delay + 1) samples, circular
+	DWORD				nInputDelayIndex_;			// Write position in InputDelayLine_
 
 	const DWORD			nPartitions_;
 	DWORD				nInputBufferIndex_;			// placeholder
@@ -142,6 +144,17 @@ private:
 	void inline cmultadd(const ChannelBuffer& RESTRICT A, const ChannelBuffer& RESTRICT B, ChannelBuffer& RESTRICT C,
 		const ChannelBuffer::size_type N);
 #endif
+
+	static DWORD maxInputDelay(const ChannelPaths& Mixer)
+	{
+		DWORD nMax = 0;
+		for(WORD nChannel = 0; nChannel < Mixer.nInputChannels(); ++nChannel)
+		{
+			if(Mixer.nInputSamplesDelay()[nChannel] > nMax)
+				nMax = Mixer.nInputSamplesDelay()[nChannel];
+		}
+		return nMax;
+	}
 
 	// Used to check filter / partion lengths
 	bool isPowerOf2(int i) const

@@ -98,7 +98,31 @@ struct __declspec(novtable) __single_inheritance SampleIO
 		const float fAttenuationFactor,
 		const DWORD nInputBufferIndex,
 		DWORD& cbInputBytesProcessed,
-		DWORD& cbOutputBytesGenerated) = 0;
+		DWORD& cbOutputBytesGenerated,
+		SampleBuffer& InputDelayLine,
+		const DWORD nInputDelayIndex) = 0;
+
+protected:
+	// Store an input sample, delayed by the channel's input delay (if any).
+	// InputDelayLine[nChannel] is a circular buffer of (max input delay + 1) samples.
+	static void StoreDelayed(ChannelPaths const& Mixer, SampleBuffer& InputBuffer, SampleBuffer& InputDelayLine,
+		const SampleBuffer::size_type nChannel, const DWORD nInputBufferIndex, const DWORD nInputDelayIndex,
+		const T sample)
+	{
+		const DWORD nDelay = Mixer.nInputSamplesDelay()[nChannel];
+		if(nDelay == 0)
+		{
+			InputBuffer[nChannel][nInputBufferIndex] = sample;
+		}
+		else
+		{
+			ChannelBuffer& line = InputDelayLine[nChannel];
+			const DWORD nLength = static_cast<DWORD>(line.size());
+			assert(nDelay < nLength);
+			line[nInputDelayIndex] = sample;
+			InputBuffer[nChannel][nInputBufferIndex] = line[(nInputDelayIndex + nLength - nDelay) % nLength];
+		}
+	}
 
 protected:
 	const ConvertSample<T>* const input_sample_convertor_;
@@ -134,7 +158,9 @@ public:
 		const float fAttenuationFactor,
 		const DWORD nInputBufferIndex,
 		DWORD& cbInputBytesProcessed,
-		DWORD& cbOutputBytesGenerated)
+		DWORD& cbOutputBytesGenerated,
+		SampleBuffer& InputDelayLine,
+		const DWORD nInputDelayIndex)
 	{
 		//if(bStartWriting_)
 		//{
@@ -156,14 +182,11 @@ public:
 #pragma loop count (8)
 		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
 		{
-			// Get the next input sample and convert it to a float, and scale it and delay it circularly
-			DWORD nDelayedIndex = nInputBufferIndex + Mixer.nInputSamplesDelay()[nChannel];
-			if(nDelayedIndex >= Mixer.nPartitionLength())
-			{
-				nDelayedIndex -= Mixer.nPartitionLength();
-			}
-			input_sample_convertor_->GetSample(InputBuffer[nChannel][nDelayedIndex],
+			// Get the next input sample and convert it to a float, scale it and delay it
+			T sample = 0;
+			input_sample_convertor_->GetSample(sample,
 				pbInputDataPointer_, fAttenuationFactor, cbInputBytesProcessed);
+			SampleIO<T>::StoreDelayed(Mixer, InputBuffer, InputDelayLine, nChannel, nInputBufferIndex, nInputDelayIndex, sample);
 		} // nChannel
 	}
 
@@ -199,10 +222,27 @@ public:
 		const float fAttenuationFactor,
 		const DWORD nInputBufferIndex,
 		DWORD& cbInputBytesProcessed,
-		DWORD& cbOutputBytesGenerated)
+		DWORD& cbOutputBytesGenerated,
+		SampleBuffer& InputDelayLine,
+		const DWORD nInputDelayIndex)
 	{
-		//if(bStartWriting_)
-		//{
+		// Read every input before writing output: VST hosts may use the same
+		// buffers for input and output, including across channels.
+#pragma loop count (8)
+		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
+		{
+			T sample = 0;
+			if(inputs_[nChannel] != NULL)
+			{
+				const BYTE* pbInput = reinterpret_cast<const BYTE*>(&inputs_[nChannel][DataIndex_]);
+				this->input_sample_convertor_->GetSample(sample,
+					pbInput, fAttenuationFactor, cbInputBytesProcessed);
+			}
+			// Silence still advances the delay line so disconnected inputs drain.
+			SampleIO<T>::StoreDelayed(Mixer, InputBuffer, InputDelayLine, nChannel,
+				nInputBufferIndex, nInputDelayIndex, sample);
+		}
+
 		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nOutputChannels(); ++nChannel)
 		{
 			int nDelayedIndex = nInputBufferIndex - Mixer.nOutputSamplesDelay()[nChannel];
@@ -211,36 +251,13 @@ public:
 				nDelayedIndex += Mixer.nPartitionLength();
 			}
 
-			// TODO:: implement the add version
 			if(outputs_[nChannel] != NULL)
 			{
-				outputs_[nChannel][DataIndex_] = OutputBufferAccumulator[nChannel][nDelayedIndex];
-
-				cbOutputBytesGenerated += sizeof(T);
+				BYTE* pbOutput = reinterpret_cast<BYTE*>(&outputs_[nChannel][DataIndex_]);
+				this->output_sample_convertor_->PutSample(pbOutput,
+					OutputBufferAccumulator[nChannel][nDelayedIndex], nChannel, cbOutputBytesGenerated);
 			}
 		}
-
-		//}
-
-		// Get the next frame from pbInputDataPointer to InputBuffer_
-		// Output lags input by half a partition length
-#pragma loop count (8)
-		for (SampleBuffer::size_type nChannel = 0; nChannel<Mixer.nInputChannels(); ++nChannel)
-		{
-			// Get the next input sample and convert it to a float, and scale it and delay it circularly
-			DWORD nDelayedIndex = nInputBufferIndex + Mixer.nInputSamplesDelay()[nChannel];
-			if(nDelayedIndex >= Mixer.nPartitionLength())
-			{
-				nDelayedIndex -= Mixer.nPartitionLength();
-			}
-
-			if(inputs_[nChannel] != NULL)
-			{
-				InputBuffer[nChannel][nDelayedIndex] = inputs_[nChannel][DataIndex_] * fAttenuationFactor;
-
-				cbInputBytesProcessed += sizeof(T);
-			}
-		} // nChannel
 
 		DataIndex_++;
 	}
@@ -685,20 +702,14 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 		DWORD& nBytesProcessed) const
 	{
 
-		INT32 i = srcContainer[2];
-		i = ( i << 8 ) | srcContainer[1];
-
-		switch (validBits)
-		{
-		case 16:
-			break;
-		case 20:
-			i = (i << 4) | (srcContainer[0] >> 4);
-		case 24:
-			i = (i << 8) | srcContainer[0];
-		default:
-			assert(false);
-		};
+		assert(validBits == 16 || validBits == 20 || validBits == 24);
+		// Assemble unsigned bytes before removing unused low bits and extending
+		// the sign. Left-shifting a negative signed value would be undefined.
+		const DWORD packed = (static_cast<DWORD>(srcContainer[2]) << 16) |
+			(static_cast<DWORD>(srcContainer[1]) << 8) | srcContainer[0];
+		INT32 i = static_cast<INT32>(packed >> (24 - validBits));
+		if(i & (1 << (validBits - 1)))
+			i -= 1 << validBits;
 
 		const T Q = 2.0 / ((1 << validBits) - 1);
 
@@ -714,9 +725,11 @@ struct ConvertSample_pcm24 : ConvertSample<T>
 		const INT32 i = noiseshape_->shapenoise(srcSample < T(-1.0) ?
 			T(-1.0) : (srcSample > T(1.0) ?	T(1.0) : srcSample), dither_.get_ptr(), nChannel);
 
-		dstContainer[0] = static_cast<BYTE>(i & 0xff);
-		dstContainer[1] = static_cast<BYTE>((i >>  8) & 0xff);
-		dstContainer[2] = static_cast<BYTE>((i >> 16) & 0xff);
+		// WAVEFORMATEXTENSIBLE stores valid bits left-aligned in the container.
+		const DWORD packed = static_cast<DWORD>(i) << (24 - validBits);
+		dstContainer[0] = static_cast<BYTE>(packed & 0xff);
+		dstContainer[1] = static_cast<BYTE>((packed >>  8) & 0xff);
+		dstContainer[2] = static_cast<BYTE>((packed >> 16) & 0xff);
 
 		dstContainer += 3;
 		nBytesGenerated += 3;
@@ -820,9 +833,17 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 		const float fAttenuationFactor, 
 		DWORD& nBytesProcessed) const
 	{
+		assert(validBits == 16 || validBits == 20 || validBits == 24);
+		const DWORD packed = (static_cast<DWORD>(srcContainer[3]) << 24) |
+			(static_cast<DWORD>(srcContainer[2]) << 16) |
+			(static_cast<DWORD>(srcContainer[1]) << 8) | srcContainer[0];
+		INT32 i = static_cast<INT32>(packed >> (32 - validBits));
+		if(i & (1 << (validBits - 1)))
+			i -= 1 << validBits;
+
 		const T Q = 1.0 / ( (1 << (validBits-2)) - 0.5 + (1 << (validBits-2)) );
 
-		dstSample = (*reinterpret_cast<const INT32*>(srcContainer) + T(0.5)) * Q * fAttenuationFactor;
+		dstSample = (i + T(0.5)) * Q * fAttenuationFactor;
 
 		srcContainer += 4;
 		nBytesProcessed += 4;
@@ -831,8 +852,14 @@ struct ConvertSample_pcm32 : ConvertSample<T>
 	void PutSample(BYTE* & dstContainer, T srcSample, const WORD nChannel, DWORD& nBytesGenerated) const
 	{   
 		// Clip if exceeded full scale.
-		*(INT32 *)dstContainer = noiseshape_->shapenoise(srcSample < T(-1.0) ?
+		const INT32 i = noiseshape_->shapenoise(srcSample < T(-1.0) ?
 			T(-1.0) : (srcSample > T(1.0) ? T(1.0) : srcSample), dither_.get_ptr(), nChannel);
+
+		const DWORD packed = static_cast<DWORD>(i) << (32 - validBits);
+		dstContainer[0] = static_cast<BYTE>(packed & 0xff);
+		dstContainer[1] = static_cast<BYTE>((packed >>  8) & 0xff);
+		dstContainer[2] = static_cast<BYTE>((packed >> 16) & 0xff);
+		dstContainer[3] = static_cast<BYTE>((packed >> 24) & 0xff);
 
 		dstContainer += 4;
 		nBytesGenerated += 4;
