@@ -22,6 +22,14 @@ if(CONVOLVER_BUILD_NATIVE)
             IMPORTED_LOCATION "${FFTW3F_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${FFTW3F_INCLUDE_DIR}")
     endif()
+    # FFTW's exported targets do not always propagate the Windows DLL import
+    # macro. Functions can link via import-library thunks without it, but data
+    # symbols such as fftwf_version require __declspec(dllimport).
+    get_target_property(fftw3f_type FFTW3::fftw3f TYPE)
+    if(WIN32 AND fftw3f_type STREQUAL "SHARED_LIBRARY")
+        set_property(TARGET FFTW3::fftw3f APPEND PROPERTY
+            INTERFACE_COMPILE_DEFINITIONS FFTW_DLL)
+    endif()
     find_package(SndFile CONFIG QUIET)
     if(NOT TARGET SndFile::sndfile)
         find_package(PkgConfig QUIET)
