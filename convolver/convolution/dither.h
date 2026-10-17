@@ -235,11 +235,11 @@ protected:
 
 template <typename T, unsigned short validBits,
 typename distribution_type, typename base_generator_type >
-const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Q = 2.0 / ((1 << (validBits-2)) - 1 + (1 << (validBits-2)));
+const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Q = 1.0 / ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
 
 template <typename T, unsigned short validBits,
 typename distribution_type, typename base_generator_type >
-const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Qover2 = 1.0 / ((1 << (validBits-2)) - 1 + (1 << (validBits-2)));
+const T  SimpleDither<T, validBits, distribution_type, base_generator_type>::Qover2 = 0.5 / ((1 << (validBits-2)) - 0.5 + (1 << (validBits-2)));
 
 template <typename T, unsigned short validBits> 
 class RectangularDither : public SimpleDither<T, validBits>

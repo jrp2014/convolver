@@ -60,6 +60,8 @@ OutputBufferAccumulator_(Mixer.nOutputChannels(), Mixer.nPartitionLength()),
 InputBuffer_(Mixer.nInputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
 OutputBufferAccumulator_(Mixer.nOutputChannels(), ChannelBuffer(Mixer.nPartitionLength())),
 #endif
+InputDelayLine_(Mixer.nInputChannels(), ChannelBuffer(maxInputDelay(Mixer) + 1)),
+nInputDelayIndex_(0),
 nInputBufferIndex_(Mixer.nHalfPartitionLength()),
 nPartitionIndex_(0),
 nPreviousPartitionIndex_(nPartitions-1),
@@ -84,7 +86,9 @@ void Convolution<T>::Flush()
 	Zero(InputBufferAccumulator_);
 	Zero(ComputationCircularBuffer_);
 	Zero(OutputBufferAccumulator_);
+	Zero(InputDelayLine_);
 
+	nInputDelayIndex_ = 0;
 	nInputBufferIndex_ = 0;							// placeholder
 	nPartitionIndex_ = 0;							// for partitioned convolution
 	nPreviousPartitionIndex_ = nPartitions_ - 1;	// lags nPartitionIndex_ by 1
@@ -120,7 +124,14 @@ Convolution<T>::doPartitionedConvolution(SampleIO<T>& sampleio,
 			fAttenuationFactor,
 			nInputBufferIndex_,
 			cbInputBytesProcessed,
-			cbOutputBytesGenerated);
+			cbOutputBytesGenerated,
+			InputDelayLine_,
+			nInputDelayIndex_);
+
+		if(++nInputDelayIndex_ == InputDelayLine_[0].size())
+		{
+			nInputDelayIndex_ = 0;
+		}
 
 		// Got a frame
 
@@ -265,7 +276,14 @@ Convolution<T>::doConvolution(SampleIO<T>& sampleio,
 			fAttenuationFactor,
 			nInputBufferIndex_,
 			cbInputBytesProcessed,
-			cbOutputBytesGenerated);
+			cbOutputBytesGenerated,
+			InputDelayLine_,
+			nInputDelayIndex_);
+
+		if(++nInputDelayIndex_ == InputDelayLine_[0].size())
+		{
+			nInputDelayIndex_ = 0;
+		}
 
 		// Got a frame
 
@@ -1169,15 +1187,15 @@ const std::basic_string<TCHAR> ConvolutionList<T>::DisplayConvolutionList() cons
 	std::basic_string<TCHAR> result = TEXT("");
 	if(nConvolutionList_ > 0)
 	{
-		for(size_type i=1; i<nConvolutionList_ - 1; ++i)
+		for(size_type i=0; i<nConvolutionList_; ++i)
 		{
-			if(ConvolutionSelected() && selectedConvolutionIndex_ == i - 1)
+			if(ConvolutionSelected() && selectedConvolutionIndex_ == i)
 				result += TEXT(">");
 
-			result += ConvolutionList_[i-1].Mixer.DisplayChannelPaths() + TEXT("\n");
+			result += ConvolutionList_[i].Mixer.DisplayChannelPaths();
+			if(i + 1 < nConvolutionList_)
+				result += TEXT("\n");
 		}
-
-		result += ConvolutionList_[nConvolutionList_ - 1].Mixer.DisplayChannelPaths();
 	}
 	else
 	{

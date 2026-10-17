@@ -1,0 +1,15 @@
+-- clean cases
+power-of-2 filter, 1 partition                             taps=  8192 P= 1 L=  8192  max rel err = 4.6e-16
+power-of-2 filter, 4 partitions                            taps=  8192 P= 4 L=  2048  max rel err = 5.2e-16
+power-of-2 filter, 16 partitions                           taps=  8192 P=16 L=   512  max rel err = 5.4e-16
+odd length, 1 partition (padding harmless)                 taps=  7997 P= 1 L=  8000  max rel err = 5.6e-16
+output delay 37 samples                                    taps=  8192 P= 4 L=  2048  max rel err = 5.5e-16
+-- partition padding gap
+3 partitions, half-partition padded up                     taps=  8192 P= 3 L=  2744  max rel err = 3.6e-01
+  ... with proposed fix                                    taps=  8192 P= 3 L=  2744  max rel err = 6.0e-16
+7 partitions, odd length                                   taps= 10007 P= 7 L=  1440  max rel err = 7.3e-01
+  ... with proposed fix                                    taps= 10007 P= 7 L=  1440  max rel err = 6.2e-16
+-- input channel delay
+input delay 37 samples, 1 partition                        taps=  8192 P= 1 L=  8192  max rel err = 2.1e-03
+input delay 37 samples, 8 partitions                       taps=  8192 P= 8 L=  1024  max rel err = 1.3e-01
+  ... with proposed fix                                    taps=  8192 P= 8 L=  1024  max rel err = 4.8e-16

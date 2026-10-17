@@ -220,7 +220,7 @@ peak_gain_(0)
 
 					// 0 implies no scaling to be applied (ie, scale = 1)
 					if(scale == 0)
-						scale = fchannel < 0 ? -1.0f : 1.0f;
+						scale = _copysign(1.0, fchannel) < 0 ? -1.0f : 1.0f;
 
 					inChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
@@ -268,7 +268,7 @@ peak_gain_(0)
 
 					// 0 implies no scaling to be applied (ie, scale = 1)
 					if(scale == 0)
-						scale = fchannel < 0 ? -1.0f : 1.0f;
+						scale = _copysign(1.0, fchannel) < 0 ? -1.0f : 1.0f;
 
 					outChannel.push_back(ChannelPath::ScaledChannel(channel, scale));
 
@@ -406,7 +406,7 @@ peak_gain_(0)
 			inputScale += abs(Paths_[nPath].inChannel[nChannel].fScale);
 		}
 
-		for(WORD nChannel = 0; nChannel < Paths_[0].outChannel.size(); ++ nChannel)
+		for(WORD nChannel = 0; nChannel < Paths_[nPath].outChannel.size(); ++ nChannel)
 		{
 			estimated_output_gain_[Paths_[nPath].outChannel[nChannel].nChannel] += inputScale * Paths_[nPath].filter.estimated_gain() *
 				abs(Paths_[nPath].outChannel[nChannel].fScale);

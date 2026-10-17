@@ -284,7 +284,7 @@ struct FastArray : AlignedArray<T>
 		if( this != &other)
 //			std::uninitialized_copy(other.first_, other.first_ + other.size_, first_);
 		{
-			::CopyMemory(first_, other.first_, bsize_);
+			::CopyMemory(first_, other.first_, bsize_ < other.bsize_ ? bsize_ : other.bsize_);
 		}
 
 

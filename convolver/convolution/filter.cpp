@@ -126,7 +126,7 @@ estimated_gain_(0)
 	// .. or filter too small
 	if ( nHalfPartitionLength_ <= 0 )
 	{
-		filterException("Filter too short", szFilterFileName);
+		throw filterException("Filter too short", szFilterFileName);
 	}
 
 	if ( nHalfPartitionLength_ == 1 )
@@ -136,6 +136,12 @@ estimated_gain_(0)
 
 	DWORD nHalfPaddedPartitionLength = OptimalDFT::GetOptimalDFTSize(nHalfPartitionLength_);
 	DWORD nPaddedPartitionLength = nHalfPaddedPartitionLength * 2;
+
+	// The convolution engine advances one partition every nHalfPaddedPartitionLength input frames,
+	// so the impulse response must be sliced into blocks of exactly that many taps.  Slicing it into
+	// blocks of the unpadded length would insert (padded - unpadded) zeros between partitions.
+	// Trailing partitions that receive no taps are zeroed below.
+	nHalfPartitionLength_ = nHalfPaddedPartitionLength;
 
 #ifdef OOURA
 	// Initialize the Oooura workspace;
@@ -420,7 +426,7 @@ estimated_gain_(0)
 #ifdef FFTW
 		coeffs_[nPartition] *= static_cast<BaseT>(1.0L / nPaddedPartitionLength);
 #elif defined(OOURA) || defined(SIMPLE_OOURA)
-		coeffs_[nPartition] *= static_cast<BaseT>(1.0L / nPaddedPartitionLength);
+		coeffs_[nPartition] *= static_cast<BaseT>(2.0L / nPaddedPartitionLength);
 #else
 #error "No FFT package defined"
 #endif
