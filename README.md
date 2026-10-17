@@ -69,6 +69,8 @@ Run `python3 tests/regression/run_all.py` with Clang and its AddressSanitizer an
 UndefinedBehaviorSanitizer runtimes available. These tests extract production
 C++ routines and compare them against independent expected results. They do
 not build the Windows applications or substitute for a native integration test.
+CI runs them on Linux and macOS for every push and pull request. Agent and
+contributor rules are in [AGENTS.md](AGENTS.md).
 
 ## Licence
 
