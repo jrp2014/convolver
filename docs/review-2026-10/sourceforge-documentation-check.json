@@ -1,0 +1,319 @@
+{
+  "checked_date": "2026-10-17",
+  "method": "Downloaded known live HTML pages. Decoded UTF-8 with Windows-1252 fallback. Compared visible text with whitespace normalized and scripts/styles excluded; compared ordered hyperlinks/image references and preformatted example text (line endings normalized only). No dates used as version ordering. Historical archive bytes remain unchanged.",
+  "summary": {
+    "pages": 18,
+    "visible_text_matches": 18,
+    "hyperlink_image_matches": 18,
+    "preformatted_examples_matches": 18,
+    "additional_linked_same_site_pages": []
+  },
+  "pages": [
+    {
+      "page": "binaural.html",
+      "url": "https://convolver.sourceforge.net/binaural.html",
+      "live_sha256": "108eac2c0d3122a44dded5979fcf003f4d7e0434da5a68d6efa72810a20d6f61",
+      "archive_sha256": "4b7a6b3d54f0b662fbd25f1a23938846c2fbde6c22c3218010ad4c956ef41be3",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "commands.html",
+      "url": "https://convolver.sourceforge.net/commands.html",
+      "live_sha256": "1af04fd994a5f8bd187fbbea069ee409deb8a16b4814e84555643a2b040c06c2",
+      "archive_sha256": "945d7f93c3466a426b11ba51cea905a0336557921ce22dea9a8becdbbbc39913",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "comparewavs.html",
+      "url": "https://convolver.sourceforge.net/comparewavs.html",
+      "live_sha256": "95dd139602619aaee4ea755059ab0cf7c64b4dae3402fe68bb42d44c9a38aaa2",
+      "archive_sha256": "07bad3d73b12e7c16f97543dbbc75058839b688cedffd5c8061e71754431eb23",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "config.html",
+      "url": "https://convolver.sourceforge.net/config.html",
+      "live_sha256": "5fa69a2549c57912e68c624143eb5071a5baf9c59e584e8382409edef4f874f6",
+      "archive_sha256": "19bff674ed5b113e8e743018a601f10b5f794c9bbc0dbc60f8226cdd0dab077d",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "configegs.html",
+      "url": "https://convolver.sourceforge.net/configegs.html",
+      "live_sha256": "a883fa41a4bf180ba151491a92ed035a25801a4517cd47adbf4f2fd63a9edb5f",
+      "archive_sha256": "2b5cf0888b6320fcc2af34dd041d5a6529064127752e259040d4322307ab3865",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-109.css"
+      ]
+    },
+    {
+      "page": "convolvercmd.html",
+      "url": "https://convolver.sourceforge.net/convolvercmd.html",
+      "live_sha256": "4e169f61ff36f90c076fd67e800d3b1eeb42cab6faf8262b733ab8669564cbce",
+      "archive_sha256": "d9e1dd777b20eecb8b12c503819864d78e58a1766350da647f7a26ab5e983fa8",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "convolverpipe.html",
+      "url": "https://convolver.sourceforge.net/convolverpipe.html",
+      "live_sha256": "ce632bda6c6f8d31d6a92e2c3bca96fc877e0284936f305d4bb5ca93df195700",
+      "archive_sha256": "9b67c1866288222daaa3a8d77ed7c99c0dc32fea0c93b03c952ee9917ac9c06d",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "download.html",
+      "url": "https://convolver.sourceforge.net/download.html",
+      "live_sha256": "25e6b16571f11625c0b2a06d91ee816ed3dad97f2f4a6a34f382201fb2bbbfe1",
+      "archive_sha256": "1427ce756c896e8410f61ef8b2fdb18471983ea9d4116ff6b518c2eda8e2d22d",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "feedback.html",
+      "url": "https://convolver.sourceforge.net/feedback.html",
+      "live_sha256": "04b3fddc77378e566464b8831f4472d7a411cdf460098b284e836c1cf71e83f6",
+      "archive_sha256": "0e199c7fb797f158c225c7cf1d46f3dc0a8140b3a3a9ca1f61d7e622a8f7bd0c",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "index.html",
+      "url": "https://convolver.sourceforge.net/index.html",
+      "live_sha256": "d9a8865c382af0f993a022e01c4563e005d9ea6c926fbd9961d42c352d55c5d2",
+      "archive_sha256": "d9a8865c382af0f993a022e01c4563e005d9ea6c926fbd9961d42c352d55c5d2",
+      "bytes_identical": true,
+      "visible_text_identical": true,
+      "equal_after_line_endings": true,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000.css"
+      ]
+    },
+    {
+      "page": "links.html",
+      "url": "https://convolver.sourceforge.net/links.html",
+      "live_sha256": "d187a8c441843478a6fb85877526424e4f16a361b0e84b75cea21deb55c06323",
+      "archive_sha256": "3119e418c261258bd19edbe03fb11822cd2cda2447c0179b9dac864d74887973",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "makeir.html",
+      "url": "https://convolver.sourceforge.net/makeir.html",
+      "live_sha256": "1da7daaaf8158d464c716aacecda769ba27be83fba33bb23fd2a0ac157a3739f",
+      "archive_sha256": "ad8b9c4d31b4542428cefde45061b933327dbd29b5f589148cc68904462a88d6",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "news.html",
+      "url": "https://convolver.sourceforge.net/news.html",
+      "live_sha256": "7368f80815d2b5a906de85a030d8c465bba4c3eeacb317b8c41e7c189c1a2d60",
+      "archive_sha256": "cb323f09c5ea5d7038a4155fb94210b97bf31d4464a6c4eb8168bb7e853465a9",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000.css"
+      ]
+    },
+    {
+      "page": "perftest.html",
+      "url": "https://convolver.sourceforge.net/perftest.html",
+      "live_sha256": "fed88dc6b985accf2feaf1b0ab4646a22e5e4b67205b6e7b599a444522c30144",
+      "archive_sha256": "32cd70df570b9ad1affbd65de18059e7d2025354aec610a581af866f8b916147",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "troubleshooting.html",
+      "url": "https://convolver.sourceforge.net/troubleshooting.html",
+      "live_sha256": "d8e4901da38591258c5aece93bb7e45eb640cae82478c90a7fe8d6a6a30b1cd8",
+      "archive_sha256": "adb249e5ea75706de4ed626327eb4abb072335417e65eecb89db6fe84d88ce80",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000-109.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000-65001.css"
+      ]
+    },
+    {
+      "page": "usage.html",
+      "url": "https://convolver.sourceforge.net/usage.html",
+      "live_sha256": "89e352cc2d55d5c0861fe9d2fe1e8a170a7deb9211d5c8584c7f3720492628d7",
+      "archive_sha256": "71de424b4f5d18ad8041a0d93ee04303414a6b6b2f2d80dd7d7c8470348cbab3",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000.css"
+      ]
+    },
+    {
+      "page": "vst.html",
+      "url": "https://convolver.sourceforge.net/vst.html",
+      "live_sha256": "96cc706024d283f3b991765a1eb96aaca492281ce1e7f1ce0f520298cf6db482",
+      "archive_sha256": "037069608bc55173b580536a8a3df689c8d801f6b0666818df05b427f1c81fb5",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000.css"
+      ]
+    },
+    {
+      "page": "zoom.html",
+      "url": "https://convolver.sourceforge.net/zoom.html",
+      "live_sha256": "175f7b86b7762112584bfadad94b8791e5ada749ba308b70ee5dd59b537dbea3",
+      "archive_sha256": "c7992ec5df85202f034dc7f4ee23acc25f2109921d9ba7bce98e8bfa5312ad67",
+      "bytes_identical": false,
+      "visible_text_identical": true,
+      "equal_after_line_endings": false,
+      "hyperlinks_and_images_identical": true,
+      "preformatted_examples_identical": true,
+      "stylesheet_refs_archive": [
+        "_themes/journal/jour1000.css"
+      ],
+      "stylesheet_refs_live": [
+        "_themes/journal/jour1000.css"
+      ]
+    }
+  ]
+}

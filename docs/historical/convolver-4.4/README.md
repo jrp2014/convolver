@@ -15,3 +15,18 @@ The archive SHA-256 is `2b5cad28adcf5d8df21d6c9139941f4ab7607d2225ea29773642ee2b
 Recovery includes 18 documentation pages and their recursively referenced local assets: 99 original files, 1,696,463 bytes. The original `binaural.txt` and `custom-convert.conf` are examples that contain machine-specific paths and require adaptation. All local file references in the HTML and CSS resolve within the recovered site. Original fragment identifiers are checked separately in the manifest; any pre-existing mismatches are preserved. External URLs are historical and have not been checked. Original pages retain their external search form, SourceForge logo and Google Analytics script references; those require network access and are not necessary to read the local documentation.
 
 FrontPage authoring/publishing metadata, the Google verification page, unreferenced assets, installer archives, executable binaries and unrelated audio/control libraries were excluded. `_derived/` navigation images and `_themes/` CSS/images were retained where referenced because the published pages need them to display correctly. No archived program, installer or command example was executed.
+
+## Comparison with the published SourceForge site
+
+On 17 October 2026, all 18 pages were retrieved from
+[convolver.sourceforge.net](https://convolver.sourceforge.net/index.html) and
+compared with this recovered copy. All visible text matched after whitespace
+normalization; hyperlink/image references matched; preformatted examples matched
+with line endings normalized. No additional same-site HTML documentation pages
+were linked by the retrieved pages. HTML formatting and stylesheet references
+differ, so the original archive bytes were retained. This checks content, not
+filesystem timestamps or the old displayed modification dates.
+
+The [comparison record](../../review-2026-10/sourceforge-documentation-check.json)
+contains per-page URLs, hashes and results. Third-party linked destinations and
+live image bytes were not audited as part of this content comparison.

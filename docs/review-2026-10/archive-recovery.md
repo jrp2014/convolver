@@ -113,3 +113,16 @@ tests substitute a portable DFT for FFTW; pipe control-flow tests use simulated
 streams; audio-wrapper tests stub libsndfile. The recovered project retains old
 SDK/import-library expectations and the installer has not been rebuilt. Those
 limits are explicit in the maintained guide rather than hidden by the test count.
+
+## SourceForge documentation cross-check
+
+At the owner's further request, the 18 published HTML pages were fetched from
+[convolver.sourceforge.net](https://convolver.sourceforge.net/index.html) on
+17 October 2026. Every page matches the recovered site's visible text,
+hyperlink/image references and preformatted examples (normalizing whitespace
+for ordinary prose, and line endings only for examples). The pages link no
+additional same-site HTML documentation absent from the recovery. HTML formatting
+and theme stylesheet references differ, so the original archival copies were
+preserved. The [per-page comparison record](sourceforge-documentation-check.json)
+contains both source hashes and the verification method; dates were not used to
+infer which content should win. No further documentation content needed importing.
