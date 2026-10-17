@@ -1,60 +1,142 @@
 cmake_minimum_required(VERSION 3.20)
-
-# This project runs portable harnesses extracted from the production sources.
-# It does not build the historical Windows applications, plug-ins, or engine.
-project(ConvolverRegressionTests LANGUAGES CXX)
+project(Convolver LANGUAGES CXX)
 
 include(CTest)
+option(CONVOLVER_BUILD_NATIVE "Build the portable FFTW/libsndfile core and CLI" ON)
+option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
+set(legacy_default OFF)
+if(CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux)$" AND
+   CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang)$" AND NOT CMAKE_CROSSCOMPILING)
+    set(legacy_default ON)
+endif()
+option(CONVOLVER_LEGACY_TESTS "Run Clang extraction regression harnesses" ${legacy_default})
+
+if(CONVOLVER_BUILD_NATIVE)
+    include(GNUInstallDirs)
+    find_package(FFTW3f CONFIG QUIET)
+    if(NOT TARGET FFTW3::fftw3f)
+        find_path(FFTW3F_INCLUDE_DIR fftw3.h REQUIRED)
+        find_library(FFTW3F_LIBRARY NAMES fftw3f libfftw3f-3 REQUIRED)
+        add_library(FFTW3::fftw3f UNKNOWN IMPORTED)
+        set_target_properties(FFTW3::fftw3f PROPERTIES
+            IMPORTED_LOCATION "${FFTW3F_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${FFTW3F_INCLUDE_DIR}")
+    endif()
+    find_package(SndFile CONFIG QUIET)
+    if(NOT TARGET SndFile::sndfile)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(SNDFILE QUIET IMPORTED_TARGET sndfile)
+        endif()
+        if(TARGET PkgConfig::SNDFILE)
+            add_library(SndFile::sndfile ALIAS PkgConfig::SNDFILE)
+        else()
+            find_path(SNDFILE_INCLUDE_DIR sndfile.h REQUIRED)
+            find_library(SNDFILE_LIBRARY NAMES sndfile libsndfile-1 REQUIRED)
+            add_library(SndFile::sndfile UNKNOWN IMPORTED)
+            set_target_properties(SndFile::sndfile PROPERTIES
+                IMPORTED_LOCATION "${SNDFILE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${SNDFILE_INCLUDE_DIR}")
+        endif()
+    endif()
+    find_package(Threads REQUIRED)
+    add_library(convolver_core portable/engine.cpp)
+    target_include_directories(convolver_core PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+    target_compile_features(convolver_core PUBLIC cxx_std_20)
+    target_link_libraries(convolver_core PRIVATE FFTW3::fftw3f Threads::Threads)
+    add_library(convolver_io portable/io.cpp portable/config.cpp)
+    target_include_directories(convolver_io PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+    target_compile_features(convolver_io PUBLIC cxx_std_20)
+    target_link_libraries(convolver_io PRIVATE SndFile::sndfile)
+    add_executable(convolver_cli portable/main.cpp)
+    set_target_properties(convolver_cli PROPERTIES OUTPUT_NAME convolver)
+    if(MINGW)
+        target_link_options(convolver_cli PRIVATE -municode)
+    endif()
+    target_link_libraries(convolver_cli PRIVATE convolver_core convolver_io FFTW3::fftw3f)
+    set(native_targets convolver_core convolver_io convolver_cli)
+    if(BUILD_TESTING)
+        add_executable(convolver_engine_tests tests/native/engine_tests.cpp)
+        target_link_libraries(convolver_engine_tests PRIVATE convolver_core)
+        add_test(NAME native.engine COMMAND convolver_engine_tests)
+        add_executable(convolver_io_tests tests/native/io_tests.cpp)
+        target_link_libraries(convolver_io_tests PRIVATE convolver_io SndFile::sndfile)
+        add_test(NAME native.io COMMAND convolver_io_tests)
+        set_tests_properties(native.engine native.io PROPERTIES LABELS "native;real-libraries" TIMEOUT 120)
+        list(APPEND native_targets convolver_engine_tests convolver_io_tests)
+    endif()
+    foreach(target IN LISTS native_targets)
+        set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+        set_target_properties(${target} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+        if(APPLE)
+            set_target_properties(${target} PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+        elseif(UNIX)
+            set_target_properties(${target} PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+        endif()
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        else()
+            target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        endif()
+        if(CONVOLVER_SANITIZERS)
+            if(MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+                message(FATAL_ERROR "Native ASan/UBSan option requires GCC or Clang with sanitizer runtimes.")
+            endif()
+            target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+            target_link_options(${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all)
+        endif()
+    endforeach()
+    install(TARGETS convolver_core convolver_io convolver_cli
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(DIRECTORY include/convolver DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
+
 if(BUILD_TESTING)
-    if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux)$" OR CMAKE_CROSSCOMPILING)
-        message(FATAL_ERROR "The portable regression harnesses require a native macOS or Linux build.")
-    endif()
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang)$")
-        message(FATAL_ERROR "The regression harnesses require Clang. Configure with -DCMAKE_CXX_COMPILER=clang++.")
-    endif()
     find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
-
-    # The scripts always compile with ASan and UBSan; fail early if this Clang
-    # installation cannot compile and link with the required instrumentation.
-    include(CheckCXXSourceCompiles)
-    set(CMAKE_REQUIRED_FLAGS "-std=c++17 -fms-extensions -fsanitize=address,undefined -fno-sanitize-recover=all")
-    check_cxx_source_compiles("int main() { return 0; }" CONVOLVER_HAS_SANITIZERS)
-    unset(CMAKE_REQUIRED_FLAGS)
-    if(NOT CONVOLVER_HAS_SANITIZERS)
-        message(FATAL_ERROR "Clang with working AddressSanitizer and UndefinedBehaviorSanitizer runtimes is required.")
+    if(CONVOLVER_BUILD_NATIVE)
+        add_test(NAME native.cli COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/cli_tests.py" "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(native.cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
     endif()
-
-    function(convolver_regression name labels)
-        add_test(NAME regression.${name}
-            COMMAND "${CMAKE_COMMAND}" -E env
-                "CXX=${CMAKE_CXX_COMPILER}"
-                "PYTHONDONTWRITEBYTECODE=1"
-                "${Python3_EXECUTABLE}"
-                "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/${name}.py")
-        set_tests_properties(regression.${name} PROPERTIES
-            LABELS "regression;extracted-production;sanitizers;${labels}"
-            TIMEOUT 300)
-    endfunction()
-
-    convolver_regression(core_regressions "dsp")
-    convolver_regression(host_regressions "host;sample-conversion")
-    convolver_regression(gain_regressions "gain")
-    convolver_regression(branch_regressions "branches")
-    convolver_regression(historical_diagnostics "diagnostics")
-    convolver_regression(historical_io_regressions "io")
-    convolver_regression(pipe_regressions "pipe;io")
-    convolver_regression(pipe_dsp_regressions "pipe;dsp")
-
-    add_test(NAME documentation
-        COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
-            "${Python3_EXECUTABLE}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/documentation_regressions.py")
+    if(CONVOLVER_LEGACY_TESTS)
+        if(NOT legacy_default)
+            message(FATAL_ERROR "Legacy extraction tests require native macOS/Linux with Clang. Set CONVOLVER_LEGACY_TESTS=OFF for other toolchains.")
+        endif()
+        include(CheckCXXSourceCompiles)
+        set(CMAKE_REQUIRED_FLAGS "-std=c++17 -fms-extensions -fsanitize=address,undefined -fno-sanitize-recover=all")
+        check_cxx_source_compiles("int main() { return 0; }" CONVOLVER_HAS_SANITIZERS)
+        unset(CMAKE_REQUIRED_FLAGS)
+        if(NOT CONVOLVER_HAS_SANITIZERS)
+            message(FATAL_ERROR "Clang with ASan/UBSan runtimes is required for legacy tests.")
+        endif()
+        function(convolver_regression name labels)
+            add_test(NAME regression.${name} COMMAND "${CMAKE_COMMAND}" -E env
+                "CXX=${CMAKE_CXX_COMPILER}" "PYTHONDONTWRITEBYTECODE=1"
+                "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/${name}.py")
+            set_tests_properties(regression.${name} PROPERTIES
+                LABELS "regression;extracted-production;sanitizers;${labels}" TIMEOUT 300)
+        endfunction()
+        convolver_regression(core_regressions "dsp")
+        convolver_regression(host_regressions "host;sample-conversion")
+        convolver_regression(gain_regressions "gain")
+        convolver_regression(branch_regressions "branches")
+        convolver_regression(historical_diagnostics "diagnostics")
+        convolver_regression(historical_io_regressions "io")
+        convolver_regression(pipe_regressions "pipe;io")
+        convolver_regression(pipe_dsp_regressions "pipe;dsp")
+    endif()
+    add_test(NAME documentation COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+        "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/documentation_regressions.py")
     set_tests_properties(documentation PROPERTIES LABELS "docs;provenance" TIMEOUT 30)
-
-    add_custom_target(check
-        COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-        USES_TERMINAL
-        VERBATIM
-        COMMENT "Running sanitized portable regression harnesses")
+    add_custom_target(check COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" USES_TERMINAL VERBATIM)
+    if(CONVOLVER_BUILD_NATIVE)
+        add_dependencies(check convolver_cli convolver_engine_tests convolver_io_tests)
+    endif()
 endif()

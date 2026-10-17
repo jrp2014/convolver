@@ -1,5 +1,38 @@
 # Tests and their boundaries
 
+## Native production tests
+
+The [portable build](portable-core.md) now compiles production C++20 translation
+units against real FFTW and libsndfile. Build before running CTest:
+
+```sh
+cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
+cmake --build build-native --parallel
+ctest --test-dir build-native --output-on-failure
+```
+
+With Clang on macOS/Linux this runs **12 suites**: three native suites and the
+nine historical/documentation suites below. GCC and MSVC default to the four
+native/documentation suites; the old extraction adapters require Clang.
+
+- `native.engine`: independent double time-domain oracle, real FFTW, seeded
+  matrix routing/delays, awkward blocks and IR lengths, normalization, exact
+  latency/tail, chunk invariance, reset, multiple instances, invalid spans,
+  nonfinite data and a C++ heap-allocation guard during processing/reset.
+- `native.io`: real libsndfile float/PCM16/24/32 round trips and clipping,
+  legacy parser/config lists, relative paths, signed zero, malformed input,
+  truncation and RAW alignment. POSIX-specific tests also exercise fragmented
+  descriptors, borrowed descriptor ownership, broken pipes and injected WAV
+  header-finalization errors.
+- `native.cli`: subprocess file renders compared with independent expected
+  output; empty, exact and partial last blocks, gain/matrix routing, both latency
+  modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+
+Debug with ASan/UBSan and optimized Release have passed locally on Apple Silicon.
+CI now includes Linux Clang/GCC, macOS Clang and Windows MSVC, but those remote
+jobs have not run for this unpushed change. Local linked-library versions and
+source hashes are recorded in the [portable guide](portable-core.md).
+
 ## Run with CMake/CTest
 
 Requirements: CMake 3.20+, Python 3.8+, Clang/AppleClang with AddressSanitizer and
@@ -10,13 +43,13 @@ to run these tests once the toolchain is installed.
 From the repository root:
 
 ```sh
-cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++
+cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCONVOLVER_BUILD_NATIVE=OFF
 ctest --test-dir build --output-on-failure --parallel 2
 ```
 
 Alternatively, `cmake --build build --target check` runs the same suite.
 Each C++ regression script compiles its own temporary harness during the test;
-there is no separate native engine/application build target yet. CMake checks
+these extraction tests are separate from the native build targets. CMake checks
 the compiler and sanitizer link support during configuration. CTest runs the
 scripts using that selected compiler, overriding an inherited `CXX` variable.
 Pass compiler options through the harnesses when changing them deliberately;
@@ -72,16 +105,16 @@ the live-site comparison is a dated provenance record, not a network CI test.
 
 ## Gates for a native release
 
-The next essential step is to run the numerical fixtures through a **normally
-compiled production core linked to real FFT libraries**, and to exercise real
-libsndfile file/pipe I/O. Add every backend to the same contract tests. Retain the
+The initial native core now supplies normally compiled production tests with
+real FFTW and libsndfile. Add every future backend to the same contract tests. Retain the
 independent direct-convolution oracle rather than relying only on agreement
 between FFT implementations.
 
-Outstanding cases include full-width PCM32 saturation, nonzero noise shaping,
-CMD EOF/tail handling, actual host format negotiation and latency/tail reporting,
+Outstanding legacy cases include the original full-width PCM32 specialization,
+nonzero noise shaping, old CMD EOF/tail handling, actual host format negotiation and latency/tail reporting,
 malformed configuration/IR fuzzing, multi-instance/filter-switch behaviour, and
-callback allocation/deadline measurements. The portable CTest gate does not
+callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
+that does not fix the independent historical wrappers. The portable CTest gate does not
 establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.
 
 The [modernization plan](modernization.md) defines the backend, native-platform,

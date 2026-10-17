@@ -1,9 +1,10 @@
 # Modernizing Convolver
 
 Assessment: 17 October 2026, starting from `main` at `b3b479f`.
-This is a proposed architecture and delivery order, not a claim that the native
-port or alternative FFT backends already exist. The accompanying CMake project
-currently runs the portable regression harnesses only.
+This records the proposed architecture and delivery order at that baseline.
+Update, 18 October 2026: the initial [portable core and CLI](portable-core.md)
+now build with real FFTW/libsndfile and native tests. Alternative FFT backends,
+modern plug-ins and performance optimization remain proposed work.
 
 ## Recommended direction
 
@@ -218,11 +219,10 @@ evaluate FMA and CPU dispatch with the numerical suite enabled.
 
 ## CMake and tests
 
-The repository now has a **regression-only** CMake/CTest entry point and a
-macOS/Linux CI workflow. It requires Clang/AppleClang, Python and working address
-and undefined-behaviour sanitizers. Individual tests compile their extracted
-C++ harnesses when run. There is no native application/library target yet.
-See [testing instructions and coverage](testing.md).
+The initial regression-only CMake/CTest entry point has now been extended with
+native core, I/O, CLI and test targets. The extraction harnesses remain available
+as a separate Clang option. CI includes macOS/Linux and Windows native jobs.
+See [testing instructions and coverage](testing.md) for what has actually run.
 
 For the native port, use target-scoped C++ requirements, includes and dependency
 links. Suggested targets are `convolver_core`, `convolver_io`, `convolver_cli`
