@@ -1,0 +1,16 @@
+# Text is stored with LF line endings (as it was in CVS). Visual Studio 2005
+# solution and project files need CRLF, so check them out that way.
+* text=auto
+*.sln     text eol=crlf
+*.sln_old text eol=crlf
+*.vcproj  text eol=crlf
+*.icproj  text eol=crlf
+*.vdproj  text eol=crlf
+*.rc      text eol=crlf
+# Keep these byte-for-byte.
+*.rtf   -text
+*.fftw  -text
+*.wav   binary
+*.WAV   binary
+*.pcm   binary
+*.flac  binary
