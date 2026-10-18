@@ -16,7 +16,11 @@ from installers import prepare
 
 
 def run(command, success=True):
-    result = subprocess.run([str(arg) for arg in command], timeout=90)
+    arguments = [str(arg) for arg in command]
+    # NSIS parses these final tail arguments itself, including unquoted spaces.
+    invocation = (subprocess.list2cmdline(arguments[:-1]) + ' ' + arguments[-1]
+                  if arguments[-1].startswith(('/D=', '_?=')) else arguments)
+    result = subprocess.run(invocation, timeout=90)
     if (result.returncode == 0) != success:
         raise AssertionError(f'unexpected installer status {result.returncode}: {command}')
 
@@ -48,6 +52,7 @@ def check(nsis):
         run([nsis, '/DGENERATED=' + str(generated), '/DOUTPUT=' + str(setup), ROOT / 'packaging/windows/installer.nsi'])
         old, new = root / 'Install A', root / 'Install B'
         run([setup, '/S', '/D=' + str(old)])
+        assert (old / 'bin/tool.exe').is_file(), 'installer did not create the requested destination'
         custom = old / 'custom.vstpreset'
         custom.write_bytes(b'user')
         run([setup, '/S', '/D=' + str(new)])

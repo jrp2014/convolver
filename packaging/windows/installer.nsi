@@ -25,6 +25,7 @@ Var PreviousInstallDir
 Function .onInit
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP "This build requires x64 Windows."
+    SetErrorLevel 1
     Abort
   ${EndIf}
   SetRegView 64
@@ -32,6 +33,7 @@ Function .onInit
   ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
   ${If} $0 != 1
     MessageBox MB_ICONSTOP "Install the Microsoft Visual C++ v14 x64 Redistributable first. See the installation guide."
+    SetErrorLevel 1
     Abort
   ${EndIf}
 FunctionEnd
@@ -42,11 +44,13 @@ Section "Convolver"
   IfFileExists "$PreviousInstallDir\Uninstall.exe" 0 install
   ExecWait '"$PreviousInstallDir\Uninstall.exe" /S _?=$PreviousInstallDir' $0
   ${If} $0 != 0
+    SetErrorLevel 1
     Abort "Previous version could not be uninstalled. Close all plug-in hosts and retry."
   ${EndIf}
   ClearErrors
   Delete "$PreviousInstallDir\Uninstall.exe"
   ${If} ${Errors}
+    SetErrorLevel 1
     Abort "Cannot remove the previous uninstaller. Close hosts and retry."
   ${EndIf}
   RMDir "$PreviousInstallDir"
