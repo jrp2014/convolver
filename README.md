@@ -72,6 +72,10 @@ FFT framework without FFTW. See [backend measurements](docs/fft-backends.md).
 See [platform instructions and options](docs/portable-core.md) for macOS/Linux
 packages, Windows/vcpkg, sanitizer builds and CLI semantics.
 
+For a core-only build, installed CMake targets and repeatable presets, see
+[the package guide](docs/cmake-package.md). Contributors can use the
+[formatting, lint and testing workflow](CONTRIBUTING.md).
+
 ### Historical Windows builds
 
 The original build used Visual Studio 2005 (some projects also have Intel C++
@@ -99,13 +103,13 @@ ctest --test-dir build --output-on-failure --parallel 2
 These nine suites cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
 The default native build additionally runs five suites against the actual core,
-the selected FFT backend, libsndfile and CLI. See [testing instructions and coverage limits](docs/testing.md).
+the selected FFT backend, libsndfile and CLI, plus an external package-consumer suite. See [testing instructions and coverage limits](docs/testing.md).
 
 ## Modernization
 
 The portable core/CLI, FFTW/Accelerate adapters, offline FFTW tuning and real-library
 tests are implemented. The [structure review and next milestones](docs/project-structure.md)
-prioritize independently consumable CMake packages, configuration compatibility,
+record CMake packaging as implemented and prioritize configuration compatibility,
 measured transform reuse and a host-ready lifecycle. The broader
 [modernization assessment](docs/modernization.md) records the alternatives and
 downstream history. Modern plug-ins and further DSP optimization remain future work.

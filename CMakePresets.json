@@ -1,0 +1,147 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/presets/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CONVOLVER_BUILD_NATIVE": "ON",
+        "CONVOLVER_BUILD_IO": "ON",
+        "CONVOLVER_BUILD_CLI": "ON",
+        "CONVOLVER_FFT_BACKEND": "FFTW",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Portable Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "debug-sanitizers",
+      "inherits": "base",
+      "displayName": "Debug with ASan/UBSan (GCC or Clang)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CONVOLVER_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "core-only",
+      "inherits": "release",
+      "displayName": "Core and C++/consumer tests only",
+      "cacheVariables": {
+        "CONVOLVER_BUILD_IO": "OFF",
+        "CONVOLVER_BUILD_CLI": "OFF",
+        "CONVOLVER_LEGACY_TESTS": "OFF",
+        "CONVOLVER_DOCUMENTATION_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "accelerate",
+      "inherits": "release",
+      "displayName": "Apple Accelerate Release",
+      "cacheVariables": {
+        "CONVOLVER_FFT_BACKEND": "ACCELERATE"
+      }
+    },
+    {
+      "name": "accelerate-debug",
+      "inherits": "debug-sanitizers",
+      "displayName": "Apple Accelerate sanitizer build",
+      "cacheVariables": {
+        "CONVOLVER_FFT_BACKEND": "ACCELERATE"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "jobs": 2
+    },
+    {
+      "name": "debug-sanitizers",
+      "configurePreset": "debug-sanitizers",
+      "jobs": 2
+    },
+    {
+      "name": "core-only",
+      "configurePreset": "core-only",
+      "jobs": 2
+    },
+    {
+      "name": "accelerate",
+      "configurePreset": "accelerate",
+      "jobs": 2
+    },
+    {
+      "name": "accelerate-debug",
+      "configurePreset": "accelerate-debug",
+      "jobs": 2
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "debug-sanitizers",
+      "configurePreset": "debug-sanitizers",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "core-only",
+      "configurePreset": "core-only",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "accelerate",
+      "configurePreset": "accelerate",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "accelerate-debug",
+      "configurePreset": "accelerate-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    }
+  ]
+}

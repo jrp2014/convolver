@@ -1,8 +1,8 @@
 # Portable Convolver: structure and next milestones
 
 Review of the portable implementation, 18 October 2026, accompanying the FFT
-abstraction, Accelerate, measurements and wisdom support. This is the next development
-plan, not a claim that the proposed features have been implemented.
+abstraction, Accelerate, measurements and wisdom support. Milestone 1 below is
+implemented; subsequent sections describe planned work.
 
 ## Current boundaries
 
@@ -29,14 +29,18 @@ have a specific deployment or measured performance reason.
 
 ## 1. Make the core independently buildable and consumable
 
-**Observed gap:** target dependencies separate DSP from libsndfile, but the single
-`CONVOLVER_BUILD_NATIVE` option still configures core, I/O and CLI together. A core
-consumer must discover libsndfile even when it supplies coefficients in memory.
-The install copies headers/libraries but supplies no `find_package(Convolver)`
-package. There is no portable API version, shared-library export policy, preset
-file or clean downstream-consumer test.
+**Original gap (addressed by this milestone):** target dependencies separated DSP from libsndfile, but the single
+`CONVOLVER_BUILD_NATIVE` option configured core, I/O and CLI together. A core
+consumer had to discover libsndfile even when supplying coefficients in memory.
+Installation copied headers/libraries but supplied no `find_package(Convolver)`
+package. Portable package versioning, presets and downstream-consumer tests
+were also missing.
 
-Next change:
+Implemented: optional I/O/CLI builds, static `Convolver::core`/`Convolver::io`
+exports (portable version 0.1.0), schema-2 presets, relocated external-consumer
+tests, and contribution/tooling instructions. See [the package guide](cmake-package.md).
+Dependency baseline pinning and self-contained CLI bundles remain release work.
+The acceptance requirements guiding this milestone were:
 
 - Separate core, I/O, CLI, tests and benchmarks as build choices with explicit
   prerequisites. Core-only builds must not search for libsndfile or require Python.
@@ -135,8 +139,8 @@ and UI outside the DSP library.
 
 ## Recommended delivery order
 
-Deliver milestone 1 next: independent build choices, package exports, presets,
-consumer tests and contribution instructions. Follow with configuration
+Milestone 1 now supplies independent build choices, package exports, presets,
+consumer tests and contribution instructions. Continue with configuration
 inspection/compatibility fixtures, then one measured transform-reuse change.
 Keep the native numerical, real-file, historical and documentation gates through
 each step. Add a modern host only after its lifecycle contract is exercised.
@@ -144,3 +148,7 @@ each step. Add a modern host only after its lifecycle contract is exercised.
 The broader alternatives remain in [the modernization assessment](modernization.md);
 current build and test behavior is documented in [the portable guide](portable-core.md)
 and [test coverage](testing.md).
+
+Windows-style relative references in configs/lists are now normalized on all
+platforms, with regression coverage for mixed separators and file provenance.
+PCM16 dither remains explicitly deferred to the next audio-compatibility change.

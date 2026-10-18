@@ -9,7 +9,10 @@
 #include <vector>
 
 namespace convolver {
-struct Route { std::size_t channel; float gain = 1; };
+struct Route {
+    std::size_t channel;
+    float gain = 1;
+};
 struct FilterPath {
     std::vector<float> impulse;
     std::vector<Route> inputs, outputs;
@@ -44,7 +47,7 @@ void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
 // Construction/destruction must be outside processing and are serialized for
 // FFTW planning. Each instance has independent processing state.
 class Engine {
-public:
+  public:
     explicit Engine(const Configuration&, std::size_t block_frames = 256, FftOptions = {});
     ~Engine();
     Engine(Engine&&) noexcept;
@@ -60,10 +63,10 @@ public:
     // Exact interleaved frame counts; empty input means silence (drain).
     // Nonempty spans must contain at least frames * channels samples.
     // Input and output must not overlap. No allocation/planning in processing.
-    void process(std::span<const float> input, std::span<float> output,
-                 std::size_t frames);
-private:
+    void process(std::span<const float> input, std::span<float> output, std::size_t frames);
+
+  private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
-}
+} // namespace convolver
