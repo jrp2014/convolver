@@ -151,11 +151,11 @@ Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-floa
 
 PCM16 output is quantized by Convolver's own `Pcm16Quantizer`, not libsndfile:
 each sample is scaled by 32768, offset by the dither (in LSBs), rounded to the
-nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. The CLI
-dithers PCM16 by default. `--dither` selects `triangular` (default: independent
+nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. Dither
+is off by default. `--dither` selects `none` (default), `triangular` (independent
 TPDF, error power 1/4 LSB² at every signal level), `triangular-highpass` (the
 historical engine's "Triangular": per-channel difference of successive uniform
-values, same amplitude, high-pass error spectrum), `rectangular` or `none`.
+values, same amplitude, high-pass error spectrum) or `rectangular`.
 `--dither-seed N` (default 0) seeds the generator; the same seed, input and
 channel count give byte-identical output regardless of buffering. Dither is
 rejected for other output formats. There is no noise shaping. The library's

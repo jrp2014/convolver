@@ -33,8 +33,8 @@ resolution when new features justify it; keep private FFT storage free to evolve
 - **Compatibility/tooling:** Windows and mixed relative configuration paths,
   signed-zero routing semantics, real PCM/file tests, `.clang-format`,
   `.clang-tidy` and CI checks. PCM16 output uses a deterministic, seeded
-  quantizer with triangular (default in the CLI), historical high-pass
-  triangular, rectangular or no dither.
+  quantizer; dither (triangular, historical high-pass triangular or
+  rectangular) is opt-in.
 - **FFT selection and optimization:** FFTW and Accelerate behind one private
   contract; offline FFTW planning/wisdom; split real/imaginary spectra and
   vectorizable MAC loops. The [recorded measurements](fft-backends.md) distinguish

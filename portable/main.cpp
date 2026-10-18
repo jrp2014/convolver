@@ -36,8 +36,8 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
                       raw-float (little-endian IEEE float32)
-  --dither D           PCM16 only: triangular (default), triangular-highpass,
-                      rectangular or none. Other formats reject dither.
+  --dither D           PCM16 only: none (default), triangular, triangular-highpass
+                      or rectangular. Other formats reject dither.
   --dither-seed N      Dither generator seed (default 0); output is reproducible
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
@@ -294,12 +294,9 @@ int run(int argc, char** argv) {
         if (dither && *dither != convolver::Dither::none &&
             format != convolver::OutputFormat::wav_pcm16)
             throw std::invalid_argument("--dither applies only to wav-pcm16 output");
-        // PCM16 output is dithered unless the caller explicitly opts out.
-        const convolver::QuantizationOptions quantization{
-            format == convolver::OutputFormat::wav_pcm16
-                ? dither.value_or(convolver::Dither::triangular)
-                : convolver::Dither::none,
-            dither_seed};
+        // Dither is opt-in; PCM16 is plainly rounded by default.
+        const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
+                                                          dither_seed};
         convolver::AudioWriter writer(output, {info.sample_rate, engine.output_channels()}, format,
                                       quantization);
         constexpr std::size_t chunk = 4096;

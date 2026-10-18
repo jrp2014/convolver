@@ -156,8 +156,8 @@ recovery records remain available as provenance rather than current instructions
 ## Remaining priorities
 
 1. **PCM16 dither:** implemented after this review. PCM16 output now uses a
-   documented, seeded quantizer (TPDF by default in the CLI, plus the old
-   engine's high-pass triangular and rectangular choices); see
+   documented, seeded quantizer with opt-in TPDF, the old engine's
+   high-pass triangular and rectangular dither; see
    [the portable guide](docs/portable-core.md). Noise shaping is not implemented,
    so equivalence with the old engine holds only for its unshaped dither modes.
 2. **Host compatibility and delivery:** exercise named Windows/macOS DAWs,
