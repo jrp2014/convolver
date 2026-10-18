@@ -15,6 +15,8 @@ No commercial host is currently qualified; use the host's normal VST3 preset loa
 
 From the extracted package directory, create a new preset (the output must not exist):
 
+<!-- executable-example -->
+
 ```sh
 ./bin/convolver-vst3-preset presets/echo-48000-stereo/impulse.wav room.vstpreset
 ```

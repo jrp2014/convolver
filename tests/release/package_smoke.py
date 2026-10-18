@@ -12,6 +12,8 @@ import tempfile
 
 def check(root, validator=None, probe=None):
     root = Path(root).resolve()
+    from documentation_examples import check as check_documentation
+    check_documentation(root)
     for name in ('VST3/Convolver.vst3', 'presets/examples.json', 'docs/plugins/quickstart.md', 'licenses/Convolver.txt', 'VERSION.txt'):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':

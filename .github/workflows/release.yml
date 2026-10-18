@@ -1,0 +1,128 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Plug-in distribution candidates
+
+'on':
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sources:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check release contracts
+        run: |
+          python tests/release/manifest_tests.py
+          python tests/release/source_tests.py
+          python tests/release/artifact_tests.py
+          python tests/release/installer_tests.py
+          python tests/release/gate_tests.py
+      - name: Assemble corresponding source
+        run: >-
+          python scripts/release/build_sources.py
+          --cache build/downloads --fetch
+          --output build/Convolver-source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corresponding-source
+          path: build/Convolver-source.tar.gz
+          if-no-files-found: error
+
+  candidates:
+    needs: sources
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux-x86_64
+          - os: windows-2022
+            platform: windows-x86_64
+          - os: macos-14
+            platform: macos-arm64
+          - os: macos-15-intel
+            platform: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    env:
+      CANDIDATE_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - uses: actions/download-artifact@v4
+        with:
+          name: corresponding-source
+          path: build/source
+      - name: Fetch pinned installer compiler
+        if: runner.os == 'Windows'
+        run: python scripts/release/fetch_nsis.py --output build/nsis
+      - name: Build and verify Unix candidate
+        if: runner.os != 'Windows'
+        run: >-
+          python scripts/release/candidate.py
+          --archive build/source/Convolver-source.tar.gz
+          --platform "$CANDIDATE_PLATFORM"
+          --work build/candidate --output build/assets
+      - name: Build and verify Windows candidate
+        if: runner.os == 'Windows'
+        run: >-
+          python scripts/release/candidate.py
+          --archive build/source/Convolver-source.tar.gz
+          --platform windows-x86_64
+          --work build/candidate --output build/assets
+          --nsis build/nsis/nsis-3.11/makensis.exe
+      - name: Rebuild supplied source with networking disabled
+        if: runner.os == 'Linux'
+        run: >-
+          sudo unshare --net -- "$(command -v python)"
+          tests/release/source_build.py
+          --archive build/source/Convolver-source.tar.gz
+          --cmake "$(command -v cmake)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ matrix.platform }}
+          path: build/assets/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostics-${{ matrix.platform }}
+          path: |
+            build/candidate/**/LastTest.log
+            build/candidate/**/release-build-info-*.json
+
+  collect:
+    needs: candidates
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: candidate-*
+          merge-multiple: true
+          path: build/assets
+      - name: Check immutable preview inventory
+        run: >-
+          python scripts/release/collect_candidate.py
+          --root build/assets --output build/assets/candidate.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: complete-preview-candidate
+          path: build/assets/*
+          if-no-files-found: error

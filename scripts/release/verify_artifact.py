@@ -36,7 +36,7 @@ def inventory(root):
     for path in sorted(root.rglob('*')):
         if path.is_symlink():
             raise ValueError('symlinks are not permitted in the sealed distribution')
-        if path.is_file() and path.name != 'artifact-manifest.json':
+        if path.is_file() and path != root / 'artifact-manifest.json':
             files[path.relative_to(root).as_posix()] = sha256(path)
     return files
 

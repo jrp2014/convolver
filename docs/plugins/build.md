@@ -5,7 +5,7 @@ floors and DAW combinations have not yet been qualified for production.
 
 Use CMake 3.25+, a C++20 compiler and Ninja (or a Visual Studio generator).
 The core alone still uses CMake 3.20. Release pins and proposed platforms are in
-[the release policy](../../packaging/release-policy.json). Obtain dependencies
+`packaging/release-policy.json` in the matching source bundle. Obtain dependencies
 explicitly before configuring; normal core builds never download them.
 
 ## Existing development dependencies
@@ -53,7 +53,7 @@ cmake --build build-core
 ```
 
 This needs neither Python, libsndfile nor the VST3 SDK. Choose Accelerate on
-macOS or provide FFTW. See [the CMake package guide](../cmake-package.md) for
+macOS or provide FFTW. See `docs/cmake-package.md` in that source bundle for
 `Convolver::core`, `Convolver::host` and `Convolver::io` consumers.
 
 ## Pinned preview recipe

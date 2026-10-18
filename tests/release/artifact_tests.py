@@ -51,6 +51,14 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'inventory'):
                 self.verifier.verify_files(root, {})
 
+    def test_nested_manifest_is_inventory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'nested').mkdir()
+            (root / 'nested/artifact-manifest.json').write_text('unexpected')
+            with self.assertRaisesRegex(ValueError, 'inventory'):
+                self.verifier.verify_files(root, {})
+
     def test_source_archive_required(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaisesRegex(ValueError, 'source archive'):
