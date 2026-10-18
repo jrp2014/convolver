@@ -7,7 +7,7 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-18
 
 ### Added
 - Configuration compatibility corpus (`tests/compatibility/`): generated
@@ -89,5 +89,6 @@ Until 1.0 the C++ API may change between minor versions.
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
+[0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
 [0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b
