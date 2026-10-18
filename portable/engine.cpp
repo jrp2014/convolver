@@ -9,6 +9,11 @@
 
 namespace convolver {
 namespace {
+#if defined(_MSC_VER)
+#define CONVOLVER_RESTRICT __restrict
+#else
+#define CONVOLVER_RESTRICT __restrict__
+#endif
 // Bound both dimensions and total prepared storage before any large allocation.
 constexpr std::size_t max_channels=256, max_block=1U<<20, max_samples=1U<<26;
 constexpr std::size_t max_paths=4096, max_routes=4096, max_storage=1U<<28;
@@ -33,6 +38,26 @@ struct Delay {
 };
 std::size_t delay_at(const std::vector<std::size_t>& delays,std::size_t channel) {
     return delays.empty()?0:delays[channel];
+}
+// Prepared spectra are stored split per partition: bins real parts, then bins
+// imaginary parts. Split storage lets the multiply-accumulate vectorize with plain
+// loads on SSE/AVX and NEON instead of shuffling interleaved complex pairs.
+void deinterleave(const float* CONVOLVER_RESTRICT from,float* CONVOLVER_RESTRICT to,std::size_t bins,float scale) noexcept {
+    for (std::size_t j=0;j<bins;++j) {to[j]=from[2*j]*scale;to[bins+j]=from[2*j+1]*scale;}
+}
+void multiply(float* CONVOLVER_RESTRICT re,float* CONVOLVER_RESTRICT im,const float* CONVOLVER_RESTRICT x,const float* CONVOLVER_RESTRICT h,std::size_t bins) noexcept {
+    const float *xr=x,*xi=x+bins,*hr=h,*hi=h+bins;
+    for (std::size_t j=0;j<bins;++j) {
+        re[j]=xr[j]*hr[j]-xi[j]*hi[j];
+        im[j]=xr[j]*hi[j]+xi[j]*hr[j];
+    }
+}
+void multiply_accumulate(float* CONVOLVER_RESTRICT re,float* CONVOLVER_RESTRICT im,const float* CONVOLVER_RESTRICT x,const float* CONVOLVER_RESTRICT h,std::size_t bins) noexcept {
+    const float *xr=x,*xi=x+bins,*hr=h,*hi=h+bins;
+    for (std::size_t j=0;j<bins;++j) {
+        re[j]+=xr[j]*hr[j]-xi[j]*hi[j];
+        im[j]+=xr[j]*hi[j]+xi[j]*hr[j];
+    }
 }
 struct Validated {std::size_t tail=0;};
 Validated validate(const Configuration& c,std::size_t b) {
@@ -105,7 +130,7 @@ struct Engine::Impl {
                 const auto count=std::min(b,source.impulse.size()-p*b);
                 std::copy_n(source.impulse.data()+p*b,count,time);
                 fft.forward();
-                for (std::size_t bin=0;bin<2*bins;++bin) path.filters[p*2*bins+bin]=frequency[bin]*normalization;
+                deinterleave(frequency,path.filters.data()+p*2*bins,bins,normalization);
             }
         }
     }
@@ -117,17 +142,16 @@ struct Engine::Impl {
             for (const auto& route:path.inputs) for (std::size_t t=0;t<block;++t)
                 time[t]+=input_block[t*inputs+route.channel]*route.gain;
             fft.forward();
-            std::copy_n(frequency,stride,path.history.data()+path.head*stride);
-            std::fill_n(sum,stride,0);
-            for (std::size_t p=0;p<path.partitions;++p) {
+            deinterleave(frequency,path.history.data()+path.head*stride,bins,1.f);
+            // The forward spectrum is now in history, so frequency is free as the split accumulator.
+            float* re=frequency;
+            float* im=frequency+bins;
+            multiply(re,im,path.history.data()+path.head*stride,path.filters.data(),bins);
+            for (std::size_t p=1;p<path.partitions;++p) {
                 const auto history=(path.head+path.partitions-p)%path.partitions;
-                const float* x=path.history.data()+history*stride;
-                const float* h=path.filters.data()+p*stride;
-                for(std::size_t j=0;j<stride;j+=2) {
-                    sum[j]+=x[j]*h[j]-x[j+1]*h[j+1];
-                    sum[j+1]+=x[j]*h[j+1]+x[j+1]*h[j];
-                }
+                multiply_accumulate(re,im,path.history.data()+history*stride,path.filters.data()+p*stride,bins);
             }
+            for(std::size_t j=0;j<bins;++j) {sum[2*j]=re[j];sum[2*j+1]=im[j];}
             fft.inverse();
             for(std::size_t t=0;t<block;++t) {
                 const float value=time[t]+path.overlap[t];

@@ -137,6 +137,95 @@ benchmark of wisdom loading or patient planning. Saved wisdom support is now
 tested independently through fresh CLI processes, and FFT/engine oracles run
 estimate, measure and patient plans. See [the tuning workflow](portable-core.md#fftw-plan-tuning).
 
+## FFTW tuning on x86-64 and split spectra
+
+Measured 18 October 2026 on a 4-vCPU Intel Xeon cloud VM at 2.1 GHz (AVX-512),
+Ubuntu 24.04, Clang 18, `-O3 -DNDEBUG`. It is a shared virtual machine, so
+differences under about 5% are noise. FFTW 3.3.11 was built from the
+[FFTW/fftw3](https://github.com/FFTW/fftw3) `fftw-3.3.11` tag in three variants:
+scalar, `--enable-sse2 --enable-avx --enable-avx2`, and the same plus
+`--enable-avx512`. Ubuntu's packaged library (`fftw-3.3.10-sse2-avx`) was also
+measured. The M5 Max figures above predate the split-spectrum change below.
+
+### Where the time goes
+
+[`src/fft_breakdown.cpp`](benchmarks/src/fft_breakdown.cpp) times one path's
+forward FFT, partition multiply-accumulate and inverse FFT separately
+([raw data](benchmarks/2026-10-18-x86-fftw-builds.csv)). With the AVX2 build and
+MEASURE plans, the two FFTs are about 50% of per-block work for a 256-frame IR
+at B=64, 20% for 4096 frames at B=256, and under 4% for 16384 frames or more at
+B=128–256. Long
+filters spend almost all their time in the multiply-accumulate, so FFTW tuning
+alone cannot speed them up much.
+
+### FFTW build and planner findings
+
+| FFT pair time (forward + inverse), N=512 | ESTIMATE | MEASURE |
+| --- | ---: | ---: |
+| FFTW 3.3.11 scalar | 2.39 µs | 2.22 µs |
+| Ubuntu 3.3.10 SSE2/AVX | 1.26 µs | 0.94 µs |
+| FFTW 3.3.11 SSE2/AVX/AVX2 | 1.03 µs | 0.59 µs |
+| FFTW 3.3.11 + AVX-512 | 0.86 µs | 0.52 µs |
+
+- **SIMD codelets matter most**: AVX2 is 2–4× faster than scalar FFTW. FFTW
+  detects CPU features at run time, so enabling SSE2/AVX/AVX2 is safe on older
+  x86-64 CPUs.
+- **MEASURE plans** are another 1.2–1.8× on the FFT, at 0.1–0.5 s planning per
+  block size. Use `--tune-fft` once per machine and load the wisdom.
+- **PATIENT** matched MEASURE within noise while taking 2–5× longer to plan.
+- **AVX-512** added about 10% over AVX2 on the FFT. Not worth a custom build.
+- **`FFTW_DESTROY_INPUT`** on the out-of-place forward plan made no difference.
+- **FFTW's split-format guru plans** (`fftwf_plan_guru_split_dft_r2c`) were
+  about 2× slower than interleaved plans, so the engine keeps interleaved FFTs
+  and converts layout itself.
+
+Packaging, from the FFTW 3.3.11 sources, the
+[Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/f/fftw.rb)
+and the [vcpkg port](https://github.com/microsoft/vcpkg/tree/master/ports/fftw3):
+
+- Homebrew on Apple Silicon does **not** pass `--enable-neon`, so `brew install
+  fftw` there is scalar (`--version` reports plain `fftw-3.3.11`). Homebrew on
+  Intel enables SSE2/AVX/AVX2. Build FFTW yourself with `--enable-neon` on an ARM
+  Mac, as in the reproduction steps below.
+- vcpkg's `fftw3` has no SIMD unless features are requested. Windows CI now
+  installs `fftw3[core,sse2,avx,avx2]`. vcpkg's `neon` feature is limited to
+  Linux/Android ARM, so an arm64 macOS vcpkg build is scalar.
+- FFTW's own CMake build (used by vcpkg) only knows SSE/SSE2/AVX/AVX2 and NEON
+  (by vcpkg patch). AVX-512, SVE and generic SIMD need the autotools build.
+- FFTW 3.3.11 has cycle counters for Apple ARM and Linux AArch64 by default, so
+  MEASURE planning works there without extra configure flags.
+
+### Split spectrum storage
+
+The engine previously stored filter and history spectra as interleaved complex
+pairs. Each partition's multiply-accumulate then needed shuffles on x86. Spectra
+are now stored per partition as all real parts followed by all imaginary parts;
+the forward spectrum is split once per block and the sum is re-interleaved once
+before the inverse FFT. Arithmetic per bin is unchanged.
+[`src/spectrum_layout.cpp`](benchmarks/src/spectrum_layout.cpp) measured the
+multiply-accumulate alone at 1.4–1.8× faster with identical results
+([raw data](benchmarks/2026-10-18-x86-mac-layout.csv)).
+
+Full engine benchmark, seven alternating rounds of 0.3 s, median ns/frame, FFTW
+ESTIMATE plans ([raw data](benchmarks/2026-10-18-x86-split-spectra.csv)):
+
+| Case | Scalar FFTW, before | Scalar FFTW, after | AVX2 FFTW, before | AVX2 FFTW, after | Layout gain (AVX2) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| mono_short | 18.7 | 18.2 | 12.8 | 12.4 | 1.04× |
+| mono_room | 26.9 | 24.4 | 20.6 | 21.2 | 0.97× |
+| stereo_low_latency | 195.1 | 147.9 | 183.6 | 138.6 | 1.32× |
+| stereo_long | 456.3 | 381.0 | 411.2 | 335.2 | 1.23× |
+| matrix_short | 137.3 | 118.0 | 124.0 | 96.9 | 1.28× |
+| matrix_long | 901.6 | 838.6 | 952.9 | 814.1 | 1.17× |
+| stereo_large_block | 121.3 | 105.8 | 106.4 | 92.2 | 1.15× |
+| stereo_odd_size | 93.2 | 80.0 | 71.4 | 57.4 | 1.24× |
+
+On ARM, NEON's `ld2` de-interleaving loads make the old layout cheaper than on
+x86, so the gain there may be smaller; rerun `benchmark_backends.py` on the Mac
+to confirm. Larger gains for long filters need fewer multiply-accumulates rather
+than faster FFTs: sharing one forward FFT per input channel and one inverse per
+output (milestone 3), and non-uniform partitioning.
+
 ## Reproduce
 
 ### Building FFTW for this Apple Silicon Mac

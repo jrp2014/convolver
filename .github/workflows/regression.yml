@@ -67,7 +67,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install native dependencies
-        run: vcpkg install fftw3:x64-windows 'libsndfile[core]:x64-windows'
+        run: vcpkg install 'fftw3[core,sse2,avx,avx2]:x64-windows' 'libsndfile[core]:x64-windows'
       - name: Configure MSVC
         run: cmake -S . -B build -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
       - name: Build
