@@ -11,9 +11,9 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **18 suites**: seven native suites, the
+With Clang on macOS/Linux this runs **19 suites**: eight native suites, the
 configuration compatibility corpus, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to ten
+nine historical/documentation suites below. GCC and MSVC default to eleven
 native/compatibility/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
@@ -27,6 +27,10 @@ native/compatibility/package/documentation suites; the old extraction adapters r
   truncation and RAW alignment. POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors.
+- `native.config_parse`: the private configuration parser on its own: physical
+  line/column locations after BOM, comments, blank lines and CRLF, original
+  tokens with effective signed-zero/fractional routes and truncated delays, list
+  detection and include-chain formatting.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.

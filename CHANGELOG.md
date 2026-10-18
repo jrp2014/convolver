@@ -7,6 +7,21 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+## [Unreleased]
+
+### Added
+- Configuration compatibility corpus (`tests/compatibility/`): generated
+  fixtures rendered through the CLI and checked against an independent
+  direct-convolution reference at several block sizes and both latency modes.
+
+### Changed
+- Configuration errors report the file, physical line and column, and the
+  chain of enclosing lists. Rejected Windows drive, UNC and rooted paths name
+  an existing relative replacement when one is found beside the configuration.
+- The configuration parser is separated from list resolution and IR decoding
+  (`portable/config_parse.*`, private). Accepted configurations, selection and
+  rendered audio are unchanged.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added

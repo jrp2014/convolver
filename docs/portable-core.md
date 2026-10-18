@@ -201,7 +201,12 @@ and lists accept both `/` and Windows `\` separators, including mixed paths.
 Windows drive-letter, drive-relative and backslash-rooted/UNC paths require
 conversion to relative paths on macOS/Linux and produce an explicit diagnostic;
 no drive or network-share mapping is guessed. Native absolute paths remain
-platform-specific. Unequal
+platform-specific. Configuration
+errors name the file, physical line and column (a UTF-8 BOM is not counted),
+and for nested lists each enclosing list entry (`; included from filters.txt:2`).
+A rejected Windows path also names any existing file beside the configuration
+that matches its trailing part, as a suggested relative replacement; it is never
+loaded implicitly. Unequal
 IR lengths are a supported extension; each path is independently zero-padded,
 and the longest connected route determines the tail.
 

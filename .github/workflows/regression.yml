@@ -50,7 +50,7 @@ jobs:
         run: |
           sudo apt-get install -y clang-format-18 clang-tidy-18
           clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
-          clang-tidy-18 -p build portable/engine.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
+          clang-tidy-18 -p build portable/engine.cpp portable/config.cpp portable/config_parse.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
       - name: Linked versions
         run: ./build/convolver --version
       - name: Core-only preset without file or Python dependencies

@@ -325,6 +325,58 @@ void run(const fs::path& dir) {
     for (int i = 0; i < 17; ++i)
         text_file(dir / ("depth" + std::to_string(i)), "depth" + std::to_string(i + 1) + "\n");
     rejects([&] { load_configuration(dir / "depth0"); });
+    {
+        // Diagnostics name the physical line/column and the list include chain.
+        auto message = [](const fs::path& p) -> std::string {
+            try {
+                load_configuration(p, 48000, 1);
+            } catch (const std::exception& e) {
+                return e.what();
+            }
+            throw std::runtime_error("expected configuration rejection");
+        };
+        auto contains = [](const std::string& text, const std::string& part) {
+            return text.find(part) != std::string::npos;
+        };
+        text_file(dir / "located.cfg",
+                  "\xef\xbb\xbf// c\n\n48000 1 1 0\n0\n0\n\nir.wav\n0\n 1\n0\n");
+        require(
+            contains(message(dir / "located.cfg"), "located.cfg:9:2: route channel out of range"),
+            "physical line/column after BOM, comments and blank lines");
+        fs::create_directory(dir / "nest");
+        text_file(dir / "nest" / "broken.cfg", "48000 1 1 0\n0\n0\nmissing-ir.wav\n0\n0\n0\n");
+        text_file(dir / "nest" / "inner.txt", "// inner\nbroken.cfg\n");
+        text_file(dir / "outer.txt", "44100.wav\nnest\\inner.txt\n");
+        const auto chained = message(dir / "outer.txt");
+        require(contains(chained, "broken.cfg:4:1: filter 'missing-ir.wav'") &&
+                    contains(chained, "inner.txt:2; included from ") &&
+                    chained.ends_with("outer.txt:2"),
+                "nested list failures carry the include chain");
+#ifndef _WIN32
+        text_file(dir / "drive.cfg", "48000 1 1 0\n0\n0\nD:\\filters\\irs\\ir ü.wav\n0\n0\n0\n");
+        const auto drive = message(dir / "drive.cfg");
+        require(contains(drive, "drive.cfg:4:1: Windows drive/rooted paths") &&
+                    contains(drive, "a file exists at 'irs/ir ü.wav'"),
+                "nonportable path diagnostics name the line and an existing replacement");
+#endif
+        // Overwrite protection sees every visited text file and referenced IR, including
+        // unselected entries whose IRs are absent, in visiting order.
+        std::vector<fs::path> sources;
+        load_configuration(dir / "list.txt", 48000, 2, &sources);
+        require(sources ==
+                    std::vector<fs::path>{fs::weakly_canonical(dir / "list.txt"),
+                                          fs::weakly_canonical(dir / "unrelated.cfg"),
+                                          fs::weakly_canonical(dir / "missing-unused.wav"),
+                                          fs::weakly_canonical(dir / "good.cfg"),
+                                          fs::weakly_canonical(dir / fs::path(u8"ir ü.wav"))},
+                "list provenance order");
+        // Selection stops at the first match; later entries are not read.
+        text_file(dir / "later-broken.cfg", "48000 x\n");
+        text_file(dir / "early.txt", "good.cfg\nlater-broken.cfg\n");
+        require(load_configuration(dir / "early.txt", 48000, 2, &sources).sample_rate == 48000 &&
+                    sources.size() == 3,
+                "first-match early exit");
+    }
 #ifndef _WIN32
     descriptor_tests();
     {
