@@ -1,10 +1,7 @@
 {
   "schema": 1,
   "description": "Convolver configuration compatibility corpus. See README.md.",
-  "defaults": {
-    "block_sizes": [1, 3, 17, 256],
-    "latency_modes": ["trim", "keep"]
-  },
+  "defaults": {"block_sizes": [1, 3, 17, 256], "latency_modes": ["trim", "keep"]},
   "error_patterns": {
     "cycle": "configuration list cycle",
     "missing-asset": "cannot open audio input|cannot read",
@@ -25,33 +22,16 @@
       "label": "spec-derived",
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "A sound file used directly as the filter; unit impulse.",
-      "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0]]
-        }
-      },
+      "files": {"ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0]]}},
       "filter": "ir.wav",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 37
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 37},
       "expect": {
         "selected": "ir.wav",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 37
       },
       "portable_paths_warnings": []
@@ -69,11 +49,7 @@
         }
       },
       "filter": "ir.wav",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 40
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 40},
       "expect": {
         "selected": "ir.wav",
         "output_channels": 2,
@@ -81,18 +57,8 @@
         "input_delays": [0, 0],
         "output_delays": [0, 0],
         "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          },
-          {
-            "ir": "ir.wav",
-            "channel": 1,
-            "inputs": [[1, 1]],
-            "outputs": [[1, 1]]
-          }
+          {"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]},
+          {"ir": "ir.wav", "channel": 1, "inputs": [[1, 1]], "outputs": [[1, 1]]}
         ],
         "frames": 43
       },
@@ -104,35 +70,18 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Minimal one-path configuration.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 29
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 29},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 29
       },
       "portable_paths_warnings": []
@@ -143,35 +92,18 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Route -0 is channel 0 inverted.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "pcm16",
-          "channels": [[16384, -8192]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n-0\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[16384, -8192]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n-0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 31
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 31},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, -1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, -1]], "outputs": [[0, 1]]}],
         "frames": 32
       },
       "portable_paths_warnings": []
@@ -182,21 +114,11 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Fractional weights, a negative fractional route and a repeated input channel.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "pcm16",
-          "channels": [[8192, 4096, -2048]]
-        },
-        "room.cfg": {
-          "text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n0.5 1.25 0\n-1.5 0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[8192, 4096, -2048]]},
+        "room.cfg": {"text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n0.5 1.25 0\n-1.5 0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 33
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 33},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 2,
@@ -221,26 +143,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Two paths with swapped/cross routing, summed outputs and integer -1 inversion.",
       "files": {
-        "a.wav": {
-          "rate": 48000,
-          "format": "pcm16",
-          "channels": [[16384, 0, 8192]]
-        },
-        "b.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[0.25, -0.25, 0.0]]
-        },
-        "room.cfg": {
-          "text": "48000 2 3 0\n0 0\n0 0 0\na.wav\n0\n1\n0 2.5\nb.wav\n0\n0 -1\n1 0\n"
-        }
+        "a.wav": {"rate": 48000, "format": "pcm16", "channels": [[16384, 0, 8192]]},
+        "b.wav": {"rate": 48000, "format": "float", "channels": [[0.25, -0.25, 0.0]]},
+        "room.cfg": {"text": "48000 2 3 0\n0 0\n0 0 0\na.wav\n0\n1\n0 2.5\nb.wav\n0\n0 -1\n1 0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 24
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 24},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 3,
@@ -248,18 +156,8 @@
         "input_delays": [0, 0],
         "output_delays": [0, 0, 0],
         "paths": [
-          {
-            "ir": "a.wav",
-            "channel": 0,
-            "inputs": [[1, 1]],
-            "outputs": [[0, 1], [2, 0.5]]
-          },
-          {
-            "ir": "b.wav",
-            "channel": 0,
-            "inputs": [[0, 1], [1, -1]],
-            "outputs": [[1, 1], [0, 1]]
-          }
+          {"ir": "a.wav", "channel": 0, "inputs": [[1, 1]], "outputs": [[0, 1], [2, 0.5]]},
+          {"ir": "b.wav", "channel": 0, "inputs": [[0, 1], [1, -1]], "outputs": [[1, 1], [0, 1]]}
         ],
         "frames": 26
       },
@@ -276,21 +174,11 @@
           "format": "float",
           "channels": [[0.5, 0.0, 0.25, 0.0, -0.125, 0.0, 0.0, 0.0, 0.0625]]
         },
-        "short.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, 0.5]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nlong.wav\n0\n0\n0\nshort.wav\n0\n0\n0\n"
-        }
+        "short.wav": {"rate": 48000, "format": "float", "channels": [[1.0, 0.5]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nlong.wav\n0\n0\n0\nshort.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 20
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 20},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
@@ -298,18 +186,8 @@
         "input_delays": [0],
         "output_delays": [0],
         "paths": [
-          {
-            "ir": "long.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          },
-          {
-            "ir": "short.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
+          {"ir": "long.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]},
+          {"ir": "short.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}
         ],
         "frames": 28
       },
@@ -321,35 +199,18 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Selects the second channel of a stereo IR file.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, 0.0, 0.0], [0.5, 0.25, -0.125]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n1\n0\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, 0.0, 0.0], [0.5, 0.25, -0.125]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n1\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 19
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 19},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 1,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 1, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 21
       },
       "portable_paths_warnings": []
@@ -360,35 +221,18 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Input delay 1 ms and output delay 0.5 ms at 48 kHz (48 and 24 frames).",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, 0.5]]
-        },
-        "room.cfg": {
-          "text": "48000 2 2 0\n1 0\n0 0.5\nir.wav\n0\n0 1\n0 1\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, 0.5]]},
+        "room.cfg": {"text": "48000 2 2 0\n1 0\n0 0.5\nir.wav\n0\n0 1\n0 1\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 30
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 30},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 2,
         "channel_mask": 0,
         "input_delays": [48, 0],
         "output_delays": [0, 24],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1], [1, 1]],
-            "outputs": [[0, 1], [1, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1], [1, 1]], "outputs": [[0, 1], [1, 1]]}],
         "frames": 103
       },
       "portable_paths_warnings": []
@@ -399,35 +243,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Fractional-frame delays truncate: 0.05 ms at 44.1 kHz is 2.205 frames -> 2, 0.01 ms is 0.441 -> 0.",
       "files": {
-        "ir.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "44100 1 1 0\n0.05\n0.01\nir.wav\n0\n0\n0\n"
-        }
+        "ir.wav": {"rate": 44100, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "room.cfg": {"text": "44100 1 1 0\n0.05\n0.01\nir.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 44100,
-        "channels": 1,
-        "frames": 17
-      },
+      "input": {"rate": 44100, "channels": 1, "frames": 17},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [2],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 21
       },
       "portable_paths_warnings": []
@@ -438,35 +265,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Single-precision delay parsing: 0.0208333 ms at 48 kHz is 0.99999 frames -> 0; 0.0625 ms is exactly 3 frames.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "room.cfg": {
-          "text": "48000 2 1 0\n0.0208333 0.0625\n0\nir.wav\n0\n0 1\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0]]},
+        "room.cfg": {"text": "48000 2 1 0\n0.0208333 0.0625\n0\nir.wav\n0\n0 1\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 12
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 12},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0, 3],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1], [1, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1], [1, 1]], "outputs": [[0, 1]]}],
         "frames": 15
       },
       "portable_paths_warnings": []
@@ -477,33 +287,17 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "An impulse in the final input frame keeps the whole IR tail.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "pcm16",
-          "channels": [[16384, -8192, 4096, 0, 2048, 0, 1024]]
-        }
+        "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[16384, -8192, 4096, 0, 2048, 0, 1024]]}
       },
       "filter": "ir.wav",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 64,
-        "signal": "last-frame-impulse"
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 64, "signal": "last-frame-impulse"},
       "expect": {
         "selected": "ir.wav",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 70
       },
       "portable_paths_warnings": []
@@ -514,35 +308,20 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "// comments on their own lines and after values, plus blank lines.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[0.5, 0.25]]
-        },
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[0.5, 0.25]]},
         "room.cfg": {
           "text": "// Convolver corpus\n48000 1 1 0 // header\n\n0 // in\n0\n// path one\nir.wav\n0\n-0\n0\n\n"
         }
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 21
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 21},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, -1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, -1]], "outputs": [[0, 1]]}],
         "frames": 22
       },
       "portable_paths_warnings": []
@@ -553,37 +332,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "UTF-8 byte-order mark and CRLF line endings, as written by Windows editors.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n-0\n0\n",
-          "bom": true,
-          "crlf": true
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[0.5, 0.25]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n-0\n0\n", "bom": true, "crlf": true}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 21
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 21},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, -1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, -1]], "outputs": [[0, 1]]}],
         "frames": 22
       },
       "portable_paths_warnings": []
@@ -594,22 +354,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Hexadecimal output channel mask (3F, 5.1) is parsed and leaves audio unchanged.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, 0.5]]
-        },
-        "room.cfg": {
-          "text": "48000 1 6 3F\n0\n0 0 0 0 0 0\nir.wav\n0\n0\n0 1 2 3 4 5\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, 0.5]]},
+        "room.cfg": {"text": "48000 1 6 3F\n0\n0 0 0 0 0 0\nir.wav\n0\n0\n0 1 2 3 4 5\n"}
       },
       "filter": "room.cfg",
       "speaker_map": true,
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 16
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 16},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 6,
@@ -634,35 +384,18 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "IR reference relative to the configuration, not the working directory.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "configs/room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n../irs/ir.wav\n0\n0\n0\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "configs/room.cfg": {"text": "48000 1 1 0\n0\n0\n../irs/ir.wav\n0\n0\n0\n"}
       },
       "filter": "configs/room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "configs/room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": ["outside-tree"]
@@ -673,35 +406,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Windows separators in a relative reference load on every platform.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "configs/room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n..\\irs\\ir.wav\n0\n0\n0\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "configs/room.cfg": {"text": "48000 1 1 0\n0\n0\n..\\irs\\ir.wav\n0\n0\n0\n"}
       },
       "filter": "configs/room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "configs/room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": ["outside-tree"]
@@ -712,35 +428,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Mixed separators in a relative reference.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "configs/room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n..\\irs/ir.wav\n0\n0\n0\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "configs/room.cfg": {"text": "48000 1 1 0\n0\n0\n..\\irs/ir.wav\n0\n0\n0\n"}
       },
       "filter": "configs/room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "configs/room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": ["outside-tree"]
@@ -751,35 +450,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Filter given relative to the working directory; its references still resolve beside the configuration.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "configs/room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n../irs/ir.wav\n0\n0\n0\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "configs/room.cfg": {"text": "48000 1 1 0\n0\n0\n../irs/ir.wav\n0\n0\n0\n"}
       },
       "filter": "configs/room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "configs/room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "cwd": "configs",
@@ -792,35 +474,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "A native absolute IR path (forward slashes) is accepted where it exists.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n{root}/irs/ir.wav\n0\n0\n0\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\n{root}/irs/ir.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": ["absolute-reference"]
@@ -831,35 +496,18 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "UTF-8 names with spaces in the configuration, its directory and its IR.",
       "files": {
-        "räume/ir ü 1.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "Zimmer ö.cfg": {
-          "text": "48000 1 1 0\n0\n0\nräume/ir ü 1.wav\n0\n0\n0\n"
-        }
+        "räume/ir ü 1.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "Zimmer ö.cfg": {"text": "48000 1 1 0\n0\n0\nräume/ir ü 1.wav\n0\n0\n0\n"}
       },
       "filter": "Zimmer ö.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "Zimmer ö.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "räume/ir ü 1.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "räume/ir ü 1.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": []
@@ -870,52 +518,23 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "A list selects the first entry matching rate and input channels; a later matching entry with inverted gain is not used.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, 0.5]]
-        },
-        "ir44.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "r44.cfg": {
-          "text": "44100 2 2 0\n0 0\n0 0\nir44.wav\n0\n0\n0\n"
-        },
-        "r48mono.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"
-        },
-        "r48stereo.cfg": {
-          "text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n1\n0\n"
-        },
-        "r48stereo-b.cfg": {
-          "text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n-1\n0\n"
-        },
-        "filters.txt": {
-          "text": "r44.cfg\nr48mono.cfg\nr48stereo.cfg\nr48stereo-b.cfg\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, 0.5]]},
+        "ir44.wav": {"rate": 44100, "format": "float", "channels": [[1.0]]},
+        "r44.cfg": {"text": "44100 2 2 0\n0 0\n0 0\nir44.wav\n0\n0\n0\n"},
+        "r48mono.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"},
+        "r48stereo.cfg": {"text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n1\n0\n"},
+        "r48stereo-b.cfg": {"text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n-1\n0\n"},
+        "filters.txt": {"text": "r44.cfg\nr48mono.cfg\nr48stereo.cfg\nr48stereo-b.cfg\n"}
       },
       "filter": "filters.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 22
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 22},
       "expect": {
         "selected": "r48stereo.cfg",
         "output_channels": 2,
         "channel_mask": 0,
         "input_delays": [0, 0],
         "output_delays": [0, 0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[1, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[1, 1]], "outputs": [[0, 1]]}],
         "frames": 23
       },
       "portable_paths_warnings": []
@@ -926,40 +545,19 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "A list of sound files selects the IR with the matching sample rate.",
       "files": {
-        "ir44.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[-1.0]]
-        },
-        "ir48.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[0.5, 0.5]]
-        },
-        "filters.txt": {
-          "text": "ir44.wav\nir48.wav\n"
-        }
+        "ir44.wav": {"rate": 44100, "format": "float", "channels": [[-1.0]]},
+        "ir48.wav": {"rate": 48000, "format": "float", "channels": [[0.5, 0.5]]},
+        "filters.txt": {"text": "ir44.wav\nir48.wav\n"}
       },
       "filter": "filters.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 18
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 18},
       "expect": {
         "selected": "ir48.wav",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir48.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir48.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 19
       },
       "portable_paths_warnings": []
@@ -970,41 +568,20 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "An earlier, nonmatching entry may reference an IR that is not installed.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "unused.cfg": {
-          "text": "44100 1 1 0\n0\n0\nnot-installed.wav\n0\n0\n0\n"
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"
-        },
-        "filters.txt": {
-          "text": "unused.cfg\nroom.cfg\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "unused.cfg": {"text": "44100 1 1 0\n0\n0\nnot-installed.wav\n0\n0\n0\n"},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n"},
+        "filters.txt": {"text": "unused.cfg\nroom.cfg\n"}
       },
       "filter": "filters.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": []
@@ -1015,41 +592,20 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "A list naming a list in a subdirectory with Windows separators.",
       "files": {
-        "irs/ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "sets/room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n..\\irs\\ir.wav\n0\n0\n0\n"
-        },
-        "sets/inner.txt": {
-          "text": "room.cfg\n"
-        },
-        "outer.txt": {
-          "text": "sets\\inner.txt\n"
-        }
+        "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "sets/room.cfg": {"text": "48000 1 1 0\n0\n0\n..\\irs\\ir.wav\n0\n0\n0\n"},
+        "sets/inner.txt": {"text": "room.cfg\n"},
+        "outer.txt": {"text": "sets\\inner.txt\n"}
       },
       "filter": "outer.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "sets/room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "irs/ir.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "irs/ir.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
       "portable_paths_warnings": []
@@ -1060,21 +616,11 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "RAW float32 stdin delivered in 7-byte writes, splitting samples.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "pcm16",
-          "channels": [[8192, 4096, -2048]]
-        },
-        "room.cfg": {
-          "text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n0.5 1.25 0\n-1.5 0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[8192, 4096, -2048]]},
+        "room.cfg": {"text": "48000 2 2 0\n0 0\n0 0\nir.wav\n0\n0.5 1.25 0\n-1.5 0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 2,
-        "frames": 33
-      },
+      "input": {"rate": 48000, "channels": 2, "frames": 33},
       "stdin_chunk_bytes": 7,
       "expect": {
         "selected": "room.cfg",
@@ -1100,42 +646,21 @@
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "A reference whose letter case differs from the file on disk. It loads only where the filesystem ignores case; the portable-paths profile warns either way.",
       "files": {
-        "Irs/IR.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nirs/ir.wav\n0\n0\n0\n"
-        }
+        "Irs/IR.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nirs/ir.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 25
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 25},
       "expect": {
         "selected": "room.cfg",
         "output_channels": 1,
         "channel_mask": 0,
         "input_delays": [0],
         "output_delays": [0],
-        "paths": [
-          {
-            "ir": "Irs/IR.wav",
-            "channel": 0,
-            "inputs": [[0, 1]],
-            "outputs": [[0, 1]]
-          }
-        ],
+        "paths": [{"ir": "Irs/IR.wav", "channel": 0, "inputs": [[0, 1]], "outputs": [[0, 1]]}],
         "frames": 27
       },
-      "filesystem_expect": {
-        "case-sensitive": {
-          "error": "missing-asset"
-        }
-      },
+      "filesystem_expect": {"case-sensitive": {"error": "missing-asset"}},
       "portable_paths_warnings": ["case-mismatch"]
     },
     {
@@ -1143,43 +668,20 @@
       "label": "current-behavior",
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "Lists that include each other are rejected.",
-      "files": {
-        "a.txt": {
-          "text": "b.txt\n"
-        },
-        "b.txt": {
-          "text": "a.txt\n"
-        }
-      },
+      "files": {"a.txt": {"text": "b.txt\n"}, "b.txt": {"text": "a.txt\n"}},
       "filter": "a.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "cycle"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "cycle"}
     },
     {
       "id": "missing-selected-asset",
       "label": "spec-derived",
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "The selected configuration names an IR that does not exist.",
-      "files": {
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nmissing.wav\n0\n0\n0\n"
-        }
-      },
+      "files": {"room.cfg": {"text": "48000 1 1 0\n0\n0\nmissing.wav\n0\n0\n0\n"}},
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "missing-asset"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "missing-asset"}
     },
     {
       "id": "no-matching-entry",
@@ -1187,24 +689,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "No list entry matches the input; no resampling is attempted.",
       "files": {
-        "ir44.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "filters.txt": {
-          "text": "ir44.wav\n"
-        }
+        "ir44.wav": {"rate": 44100, "format": "float", "channels": [[1.0]]},
+        "filters.txt": {"text": "ir44.wav\n"}
       },
       "filter": "filters.txt",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "no-match"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "no-match"}
     },
     {
       "id": "ir-rate-mismatch",
@@ -1212,24 +702,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "Filter files must have the configuration sample rate.",
       "files": {
-        "ir44.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir44.wav\n0\n0\n0\n"
-        }
+        "ir44.wav": {"rate": 44100, "format": "float", "channels": [[1.0]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir44.wav\n0\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "invalid"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "invalid"}
     },
     {
       "id": "route-out-of-range",
@@ -1237,24 +715,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "An input route names a channel the header does not declare.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n1\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n1\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "invalid"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "invalid"}
     },
     {
       "id": "incomplete-path",
@@ -1262,24 +728,12 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "A path with three of its four lines.",
       "files": {
-        "ir.wav": {
-          "rate": 48000,
-          "format": "float",
-          "channels": [[1.0, -0.5, 0.25]]
-        },
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n"
-        }
+        "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
+        "room.cfg": {"text": "48000 1 1 0\n0\n0\nir.wav\n0\n0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "invalid"
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "invalid"}
     },
     {
       "id": "pre-3.0-format",
@@ -1287,70 +741,34 @@
       "evidence": "docs/historical/convolver-4.4/config.html",
       "description": "The format before version 3.0 had no delay lines (as in the bundled convolver/configs samples). It is rejected with a diagnostic saying which lines to add.",
       "files": {
-        "ir.wav": {
-          "rate": 44100,
-          "format": "float",
-          "channels": [[1.0]]
-        },
-        "room.cfg": {
-          "text": "44100 1 1 0\nir.wav\n0\n0.0\n0.0\n"
-        }
+        "ir.wav": {"rate": 44100, "format": "float", "channels": [[1.0]]},
+        "room.cfg": {"text": "44100 1 1 0\nir.wav\n0\n0.0\n0.0\n"}
       },
       "filter": "room.cfg",
-      "input": {
-        "rate": 44100,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "invalid"
-      }
+      "input": {"rate": 44100, "channels": 1, "frames": 4},
+      "expect": {"error": "invalid"}
     },
     {
       "id": "drive-letter-path",
       "label": "current-behavior",
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "A Windows drive-letter path. Rejected with an explicit diagnostic on macOS/Linux; on Windows it is an absolute path that does not exist here.",
-      "files": {
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\nC:\\convolver-corpus-missing\\ir.wav\n0\n0\n0\n"
-        }
-      },
+      "files": {"room.cfg": {"text": "48000 1 1 0\n0\n0\nC:\\convolver-corpus-missing\\ir.wav\n0\n0\n0\n"}},
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
-      "expect": {
-        "error": "nonportable-path"
-      },
-      "platform_expect": {
-        "windows": {
-          "error": "missing-asset"
-        }
-      }
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
+      "expect": {"error": "nonportable-path"},
+      "platform_expect": {"windows": {"error": "missing-asset"}}
     },
     {
       "id": "unc-path",
       "label": "current-behavior",
       "evidence": "docs/portable-core.md#compatibility-and-library-api",
       "description": "A UNC network path is rejected with an explicit diagnostic on macOS/Linux.",
-      "files": {
-        "room.cfg": {
-          "text": "48000 1 1 0\n0\n0\n\\\\server\\share\\ir.wav\n0\n0\n0\n"
-        }
-      },
+      "files": {"room.cfg": {"text": "48000 1 1 0\n0\n0\n\\\\server\\share\\ir.wav\n0\n0\n0\n"}},
       "filter": "room.cfg",
-      "input": {
-        "rate": 48000,
-        "channels": 1,
-        "frames": 4
-      },
+      "input": {"rate": 48000, "channels": 1, "frames": 4},
       "only": ["posix"],
-      "expect": {
-        "error": "nonportable-path"
-      }
+      "expect": {"error": "nonportable-path"}
     }
   ]
 }
