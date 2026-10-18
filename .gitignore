@@ -71,3 +71,6 @@ Testing/
 # Generated Visual Studio user/resource caches (may contain personal metadata)
 *.suo
 *.aps
+*.ncb
+*.user
+.vs/
