@@ -1,0 +1,55 @@
+name: Fuzz smoke tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Seconds per target (manual longer campaigns)
+        default: '600'
+
+permissions:
+  contents: read
+
+jobs:
+  libfuzzer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
+      - name: Configure Clang libFuzzer with ASan/UBSan
+        run: >
+          cmake -S . -B build-fuzz -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
+          -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_BUILD_FUZZERS=ON -DCONVOLVER_BUILD_TESTS=OFF
+          -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_DOCUMENTATION_TESTS=OFF
+      - name: Build fuzz targets
+        run: cmake --build build-fuzz --parallel 2 --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
+      - name: Run each target
+        env:
+          SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '60' }}
+        # The default shell uses pipefail, so a fuzzer failure fails the pipeline.
+        run: |
+          mkdir -p fuzz-out
+          status=0
+          for target in config_text config_list host_state ir_file; do
+            mkdir -p "fuzz-out/corpus/$target"
+            cp tests/fuzz/seeds/$target/* "fuzz-out/corpus/$target/"
+            ./build-fuzz/fuzz_$target "fuzz-out/corpus/$target" tests/fuzz/regressions/$target \
+              -max_total_time="$SECONDS_PER_TARGET" -max_len=65536 -timeout=2 -rss_limit_mb=512 \
+              -artifact_prefix="fuzz-out/$target-" 2>&1 | tee "fuzz-out/$target.log" | tail -5 \
+              || status=1
+          done
+          exit $status
+      - name: Keep crash inputs and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: |
+            fuzz-out/*-crash-*
+            fuzz-out/*-leak-*
+            fuzz-out/*-timeout-*
+            fuzz-out/*-oom-*
+            fuzz-out/*.log

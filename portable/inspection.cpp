@@ -58,17 +58,27 @@ class Inspector {
             syntax_only();
         else
             resolve();
-        bool errors = false;
-        for (const auto& d : report_.diagnostics)
-            errors = errors || d.severity == DiagnosticSeverity::error;
-        report_.valid = !errors && (options_.all_configurations ? !report_.configurations.empty()
-                                                                : report_.selected.has_value());
+        if (dropped_)
+            report_.diagnostics.push_back({"diagnostics-truncated",
+                                           DiagnosticSeverity::warning,
+                                           std::to_string(dropped_) +
+                                               " further diagnostics were not reported (limit " +
+                                               std::to_string(max_diagnostics) + ")",
+                                           {},
+                                           {}});
+        report_.valid = !errors_ && (options_.all_configurations ? !report_.configurations.empty()
+                                                                 : report_.selected.has_value());
         return std::move(report_);
     }
 
   private:
     void add(Diagnostic d) {
-        report_.diagnostics.push_back(std::move(d));
+        if (d.severity == DiagnosticSeverity::error)
+            ++errors_;
+        if (report_.diagnostics.size() < max_diagnostics)
+            report_.diagnostics.push_back(std::move(d));
+        else
+            ++dropped_;
     }
     void fail(const ConfigurationError& e) {
         add(diagnostic(e));
@@ -145,7 +155,7 @@ class Inspector {
         }
     }
     bool visit(const detail::Resolver::Leaf& l) {
-        const auto errors = report_.diagnostics.size();
+        const auto errors = errors_;
         InspectedConfiguration result;
         int rate = 0;
         std::size_t inputs = 0;
@@ -201,7 +211,7 @@ class Inspector {
                 e.included_from(*it);
             add(diagnostic(e));
         }
-        result.valid = report_.diagnostics.size() == errors;
+        result.valid = errors_ == errors;
         report_.configurations.push_back(std::move(result));
         // Selected rendering stops at the first match; all-entry mode continues.
         return !options_.all_configurations;
@@ -296,10 +306,7 @@ class Inspector {
             report_.selected = path;
         auto result = leaf(doc, {});
         portability(doc, {});
-        bool errors = false;
-        for (const auto& d : report_.diagnostics)
-            errors = errors || d.severity == DiagnosticSeverity::error;
-        result.valid = !errors;
+        result.valid = !errors_;
         report_.configurations.push_back(std::move(result));
     }
 
@@ -392,8 +399,10 @@ class Inspector {
         }
         return found;
     }
+    static constexpr std::size_t max_diagnostics = 256;
     InspectionOptions options_;
     InspectionReport report_;
+    std::size_t errors_ = 0, dropped_ = 0;
     std::size_t budget_ = 0;
 };
 } // namespace

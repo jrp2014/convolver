@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -22,6 +23,8 @@ inline constexpr std::size_t max_list_depth = 16;
 inline constexpr std::size_t max_list_visits = 4096;
 inline constexpr std::size_t max_filter_paths = 4096;
 inline constexpr std::size_t max_routes = 4096;
+// Configuration/list text read by one resolution; a shared sublist counts each read.
+inline constexpr std::size_t max_total_text_bytes = 16 * 1024 * 1024;
 
 // Physical 1-based line and byte column (a UTF-8 BOM is not counted). Zero means
 // the location is unknown or the whole file.
@@ -117,7 +120,10 @@ std::string read_configuration_text(const std::filesystem::path&);
 // Throws ConfigurationError (code "nonportable-path") for Windows drive, UNC and
 // rooted references on non-Windows platforms; the reason names any existing
 // relative replacement beside the owner.
-std::filesystem::path resolve_reference(const std::filesystem::path& owner, const ParsedReference&);
+// file_exists replaces the filesystem check used for that suggestion.
+using FileExists = std::function<bool(const std::filesystem::path&)>;
+std::filesystem::path resolve_reference(const std::filesystem::path& owner, const ParsedReference&,
+                                        const FileExists& = {});
 
 // Header, delays and routes without coefficients.
 Configuration configuration_graph(const ParsedConfiguration&);
@@ -153,7 +159,15 @@ class Resolver {
     // Lists, before their entries are visited.
     using ListObserver = std::function<void(const ParsedDocument&, const IncludeChain&)>;
 
-    explicit Resolver(Visitor, ErrorHandler = {}, ListObserver = {});
+    // Replaceable file access, for bounded in-memory fuzzing. Empty members use
+    // the filesystem, libsndfile and read_configuration_text.
+    struct Sources {
+        std::function<std::unique_ptr<AudioReader>(const std::filesystem::path&)> open_audio;
+        std::function<std::string(const std::filesystem::path&)> read_text;
+        std::function<std::filesystem::path(const std::filesystem::path&)> canonical;
+        FileExists exists;
+    };
+    explicit Resolver(Visitor, ErrorHandler = {}, ListObserver = {}, Sources = {});
     // Returns true if the visitor stopped traversal.
     bool run(const std::filesystem::path&);
     // Every configuration, list and referenced IR visited, canonical, in order.
@@ -166,6 +180,8 @@ class Resolver {
     Visitor visitor_;
     ErrorHandler on_error_;
     ListObserver on_list_;
+    Sources files_;
+    std::size_t text_bytes_ = 0;
     std::set<std::filesystem::path> active_;
     std::vector<std::filesystem::path> sources_;
     IncludeChain chain_;

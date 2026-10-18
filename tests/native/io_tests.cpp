@@ -320,6 +320,21 @@ void run(const fs::path& dir) {
         std::vector<float> x(1);
         require(r.read(x) == 1 && x[0] == 1, "odd-sized RIFF chunk padding");
     }
+    {
+        // Out-of-range metadata in a file is a data error (runtime_error), so list
+        // traversal and inspection diagnose it instead of failing as a caller error.
+        auto bytes = std::string(reinterpret_cast<const char*>(nan_wave), sizeof nan_wave);
+        bytes[27] = 1; // Sample rate 0x0100bb80.
+        text_file(dir / "rate.wav", bytes);
+        bool data_error = false;
+        try {
+            AudioReader r(dir / "rate.wav");
+        } catch (const std::invalid_argument&) {
+        } catch (const std::runtime_error&) {
+            data_error = true;
+        }
+        require(data_error, "out-of-range file sample rate is a runtime_error");
+    }
     text_file(dir / "huge.cfg", std::string(1024 * 1024 + 1, 'x'));
     rejects([&] { load_configuration(dir / "huge.cfg"); });
     for (int i = 0; i < 17; ++i)

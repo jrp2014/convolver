@@ -87,6 +87,7 @@ struct InspectionReport {
     std::optional<std::filesystem::path> selected;
     std::vector<SelectionStep> traversal;               // Files in visiting order.
     std::vector<InspectedConfiguration> configurations; // Leaves inspected in detail.
+    // At most 256, then one "diagnostics-truncated" warning counting the rest.
     std::vector<Diagnostic> diagnostics;
 };
 // Inspect what a configuration, sound file or list resolves to, using the same

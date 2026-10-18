@@ -21,6 +21,16 @@ void read_impulses(AudioReader& reader, std::vector<FilterPath>& paths,
                                  "filter channel " + std::to_string(*selected) +
                                      " out of range (file has " + std::to_string(channels) +
                                      " channels)");
+    // Reject oversized files before allocating for their samples.
+    if (const auto declared = reader.declared_frames()) {
+        if (*declared > (max_decoded_samples - budget) / channels)
+            throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+        if (selected)
+            paths.back().impulse.reserve(*declared);
+        else
+            for (auto& p : paths)
+                p.impulse.reserve(*declared);
+    }
     std::vector<float> buffer(4096 * channels);
     while (const auto frames = reader.read(buffer)) {
         const auto samples = frames * channels;
@@ -50,7 +60,8 @@ bool drive_letter(const std::string& name) {
 }
 // The longest trailing part of a Windows reference that exists beside owner,
 // offered as a suggested replacement. It is never loaded implicitly.
-std::string existing_suffix(const std::filesystem::path& owner, std::string name) {
+std::string existing_suffix(const std::filesystem::path& owner, std::string name,
+                            const FileExists& exists) {
     std::replace(name.begin(), name.end(), '\\', '/');
     std::vector<std::string> parts;
     std::size_t start = 0;
@@ -68,8 +79,9 @@ std::string existing_suffix(const std::filesystem::path& owner, std::string name
         std::string candidate;
         for (std::size_t j = i; j < parts.size(); ++j)
             candidate += (candidate.empty() ? "" : "/") + parts[j];
+        const auto path = owner.parent_path() / utf8_path(candidate);
         std::error_code ec;
-        if (std::filesystem::is_regular_file(owner.parent_path() / utf8_path(candidate), ec))
+        if (exists ? exists(path) : std::filesystem::is_regular_file(path, ec))
             return candidate;
     }
     return {};
@@ -90,7 +102,8 @@ std::string read_configuration_text(const std::filesystem::path& path) {
 }
 
 std::filesystem::path resolve_reference(const std::filesystem::path& owner,
-                                        const ParsedReference& ref) {
+                                        const ParsedReference& ref,
+                                        [[maybe_unused]] const FileExists& exists) {
     // The historical format originated on Windows. Treat both separators alike
     // in file references, without interpreting drive letters as POSIX filenames.
     const auto& name = ref.spelling;
@@ -102,7 +115,7 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
         std::string why = std::string("Windows drive/rooted paths must be changed to relative "
                                       "paths on this platform: ") +
                           name + " is a " + kind + " path with no meaning here; ";
-        const auto suggestion = existing_suffix(owner, name);
+        const auto suggestion = existing_suffix(owner, name, exists);
         if (!suggestion.empty())
             why += "a file exists at '" + suggestion +
                    "' beside this configuration; change the reference to that";
@@ -198,8 +211,24 @@ Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget) {
     return cfg;
 }
 
-Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list)
-    : visitor_(std::move(visitor)), on_error_(std::move(on_error)), on_list_(std::move(on_list)) {}
+Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list, Sources files)
+    : visitor_(std::move(visitor)), on_error_(std::move(on_error)), on_list_(std::move(on_list)),
+      files_(std::move(files)) {
+    if (!files_.open_audio)
+        files_.open_audio = [](const std::filesystem::path& p) -> std::unique_ptr<AudioReader> {
+            try {
+                return std::make_unique<AudioReader>(p);
+            } catch (const std::runtime_error&) {
+                return nullptr; // Bounded text validation distinguishes configs from damaged audio.
+            }
+        };
+    if (!files_.read_text)
+        files_.read_text = read_configuration_text;
+    if (!files_.canonical)
+        files_.canonical = [](const std::filesystem::path& p) {
+            return std::filesystem::weakly_canonical(p);
+        };
+}
 
 bool Resolver::run(const std::filesystem::path& path) {
     try {
@@ -215,7 +244,7 @@ bool Resolver::visit(const std::filesystem::path& path) {
     if (++visits_ > max_list_visits || active_.size() >= max_list_depth)
         throw ConfigurationError("limit", {path, 0, 0},
                                  "configuration list nesting/entry limit exceeded");
-    const auto canonical = std::filesystem::weakly_canonical(path);
+    const auto canonical = files_.canonical(path);
     sources_.push_back(canonical);
     if (!active_.insert(canonical).second)
         throw ConfigurationError("cycle", {path, 0, 0},
@@ -227,24 +256,23 @@ bool Resolver::visit(const std::filesystem::path& path) {
             active.erase(path);
         }
     } pop{active_, canonical};
-    std::unique_ptr<AudioReader> audio;
-    try {
-        audio = std::make_unique<AudioReader>(path);
-    } catch (const std::runtime_error&) { /* Bounded text validation below distinguishes configs
-                                             from damaged audio. */
-    }
-    if (audio)
+    if (const auto audio = files_.open_audio(path))
         return visitor_({path, chain_, nullptr, audio.get()});
-    const auto doc = parse_configuration_text(read_configuration_text(path), path);
+    const auto text = files_.read_text(path);
+    if (text.size() > max_total_text_bytes - text_bytes_)
+        throw ConfigurationError("limit", {path, 0, 0},
+                                 "configuration text read for one operation exceeds 16 MiB");
+    text_bytes_ += text.size();
+    const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
         for (const auto& p : doc.configuration.paths)
-            sources_.push_back(std::filesystem::weakly_canonical(resolve_reference(path, p.ir)));
+            sources_.push_back(files_.canonical(resolve_reference(path, p.ir, files_.exists)));
         return visitor_({path, chain_, &doc, nullptr});
     }
     if (on_list_)
         on_list_(doc, chain_);
     for (const auto& entry : doc.entries) {
-        const auto child = resolve_reference(path, entry);
+        const auto child = resolve_reference(path, entry, files_.exists);
         chain_.push_back(entry.location);
         struct PopChain {
             IncludeChain& chain;

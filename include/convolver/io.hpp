@@ -21,6 +21,9 @@ class AudioReader {
     AudioReader(const AudioReader&) = delete;
     AudioReader& operator=(const AudioReader&) = delete;
     AudioInfo info() const noexcept;
+    // Frame count the file declares, when known (never for streams). Reading may
+    // still fail earlier on a damaged file.
+    std::optional<std::size_t> declared_frames() const noexcept;
     std::size_t read(std::span<float> interleaved);
     void close();
 

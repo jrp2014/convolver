@@ -1,0 +1,11 @@
+// Convolver corpus
+48000 1 1 0 // header
+
+0 // in
+0
+// path one
+ir.wav
+0
+-0
+0
+

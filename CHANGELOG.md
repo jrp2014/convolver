@@ -25,6 +25,15 @@ Until 1.0 the C++ API may change between minor versions.
   accepted feature and what is known about other readers of the format.
 - A diagnostic for configurations in the format before 3.0 (no delay lines)
   that says which lines to add.
+- Boundary tests for every configuration, list, IR and host-state limit
+  (`native.limits`), and libFuzzer harnesses for configuration text, lists,
+  host state and IR files (`tests/fuzz/`, `-DCONVOLVER_BUILD_FUZZERS=ON` with
+  Clang). Committed seeds and regression inputs replay on every compiler as
+  `fuzz.replay.*`; CI fuzzes each target for 60 seconds.
+- `AudioReader::declared_frames()`: the frame count a file header declares.
+- Two new resolution limits: 16 MiB of configuration text read per load or
+  inspection, and 256 inspection diagnostics followed by one
+  `diagnostics-truncated` warning.
 
 ### Changed
 - Configuration errors report the file, physical line and column, and the
@@ -35,6 +44,13 @@ Until 1.0 the C++ API may change between minor versions.
 - The configuration parser is separated from list resolution and IR decoding
   (`portable/config_parse.*`, private). Accepted configurations, selection and
   rendered audio are unchanged.
+
+### Fixed
+- An IR whose header declares more than 64 Mi samples is rejected before any
+  sample is read, instead of after decoding up to the limit.
+- An audio file with an out-of-range sample rate or channel count in its header
+  is reported as an unreadable file. Previously the exception escaped
+  inspection and list traversal (found by fuzzing).
 
 ## [0.2.0] - 2026-10-18
 

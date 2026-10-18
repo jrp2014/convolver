@@ -158,6 +158,7 @@ sf_count_t frames(std::size_t samples, std::size_t channels) {
 struct AudioReader::Impl {
     Handle handle;
     AudioInfo info{};
+    std::optional<std::size_t> frames;
     bool raw = false, raw_stdin = false;
 };
 AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw)
@@ -192,11 +193,21 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     if (!impl_->handle.file)
         throw error("cannot open audio input " + path.string(), nullptr);
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
-    validate(impl_->info);
+    try {
+        validate(impl_->info);
+    } catch (const std::invalid_argument& e) {
+        // The file's own metadata is out of range: a data error, not a caller error.
+        throw std::runtime_error("unsupported audio input " + path.string() + ": " + e.what());
+    }
+    if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
+        impl_->frames = static_cast<std::size_t>(sf.frames);
 }
 AudioReader::~AudioReader() = default;
 AudioInfo AudioReader::info() const noexcept {
     return impl_->info;
+}
+std::optional<std::size_t> AudioReader::declared_frames() const noexcept {
+    return impl_->frames;
 }
 std::size_t AudioReader::read(std::span<float> data) {
     auto* file = impl_->handle.file;
