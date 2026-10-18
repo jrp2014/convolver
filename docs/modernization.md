@@ -46,9 +46,9 @@ for distribution; changing an FFT library does not relicense Convolver.
 
 ## Recommended next work
 
-1. **Audio compatibility:** implement the explicitly deferred PCM16 dither policy
-   with deterministic tests and clear clipping behavior. Keep optional noise
-   shaping and speaker metadata separate from that change.
+1. **Audio compatibility:** PCM16 dither is implemented (deterministic, seeded,
+   documented in the portable guide). Optional noise shaping and speaker
+   metadata remain separate work.
 2. **VST3 delivery:** test named Windows/macOS DAWs, including scan/load, silence,
    seeks, variable buffers, bypass automation, state reload, filter changes and
    multiple instances. Define minimum OS versions and bundle dependencies; provide
@@ -59,9 +59,9 @@ for distribution; changing an FFT library does not relicense Convolver.
    redistributable fixture corpus with per-consumer expectations. Preserve the
    original grammar and Windows relative-path support; version any new syntax.
    See the [detailed proposed interoperability plan](superpowers/plans/2026-10-18-configuration-interoperability.md).
-4. **Efficiency:** measure transform/history reuse for identical ordered input
-   mixes, then assess inverse-transform reuse separately. Split spectra are
-   already implemented. Consider nonuniform partitioning only for demonstrated
+4. **Efficiency:** forward transform/history reuse for identical ordered input
+   mixes and split spectra are implemented; inverse-transform reuse has been
+   assessed and remains a separate, non-bit-identical change. Consider nonuniform partitioning only for demonstrated
    long-IR/low-latency needs. Record setup, memory, numerical error and callback
    distributions alongside average throughput; retain allocation/ownership gates.
 

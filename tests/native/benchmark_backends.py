@@ -18,7 +18,7 @@ if args.rounds < 3 or args.seconds <= 0:
     parser.error('use at least three rounds and positive duration')
 rows = []
 for repeat in range(args.rounds):
-    for case in range(8):
+    for case in range(10):
         binaries = [args.fftw.resolve(), args.accelerate.resolve()]
         if (repeat+case) % 2:
             binaries.reverse()

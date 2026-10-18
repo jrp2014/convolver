@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <sndfile.h>
 #include <stdexcept>
 #include <vector>
 #ifndef _WIN32
@@ -132,7 +133,143 @@ void descriptor_tests() {
     std::signal(SIGPIPE, previous);
 }
 #endif
+std::vector<std::int16_t> pcm16_samples(const fs::path& p) {
+    SF_INFO info{};
+    SNDFILE* f = sf_open(p.string().c_str(), SFM_READ, &info);
+    require(f && (info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_16, "open PCM16 fixture");
+    std::vector<std::int16_t> s(static_cast<std::size_t>(info.frames * info.channels));
+    const auto got = sf_readf_short(f, s.data(), info.frames);
+    sf_close(f);
+    require(got == info.frames, "read PCM16 fixture");
+    return s;
+}
+std::vector<std::int16_t> quantize(Dither dither, std::uint64_t seed, const std::vector<float>& x,
+                                   std::size_t channels = 1) {
+    Pcm16Quantizer q(channels, {dither, seed});
+    std::vector<std::int16_t> y(x.size());
+    q.quantize(x, y);
+    return y;
+}
+// Error statistics in LSBs, measured independently of the convolution engine.
+struct ErrorStats {
+    double mean = 0, variance = 0, lag1 = 0, max_abs = 0;
+};
+ErrorStats error_stats(const std::vector<float>& x, const std::vector<std::int16_t>& y) {
+    std::vector<double> e(x.size());
+    ErrorStats s;
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        e[i] = y[i] - static_cast<double>(x[i]) * 32768.0;
+        s.mean += e[i];
+        s.max_abs = std::max(s.max_abs, std::abs(e[i]));
+    }
+    s.mean /= static_cast<double>(e.size());
+    double covariance = 0;
+    for (std::size_t i = 0; i < e.size(); ++i) {
+        s.variance += (e[i] - s.mean) * (e[i] - s.mean);
+        if (i)
+            covariance += (e[i] - s.mean) * (e[i - 1] - s.mean);
+    }
+    s.lag1 = covariance / s.variance;
+    s.variance /= static_cast<double>(e.size());
+    return s;
+}
+void dither_tests(const fs::path& dir) {
+    // Plain rounding: nearest LSB, ties toward +infinity, symmetric clipping bounds.
+    const std::vector<float> exact{0.4f / 32768,
+                                   0.5f / 32768,
+                                   0.6f / 32768,
+                                   -0.4f / 32768,
+                                   -0.5f / 32768,
+                                   -0.6f / 32768,
+                                   1.5f / 32768,
+                                   -1.5f / 32768,
+                                   1,
+                                   -1,
+                                   2,
+                                   -2,
+                                   0.999f,
+                                   -0.999f,
+                                   0};
+    const std::vector<std::int16_t> expected{0,     1,      1,     0,      0,     -1,     2, -1,
+                                             32767, -32768, 32767, -32768, 32735, -32735, 0};
+    require(quantize(Dither::none, 0, exact) == expected, "PCM16 rounding policy");
+    for (auto d : {Dither::rectangular, Dither::triangular, Dither::triangular_highpass}) {
+        const auto y = quantize(d, 7, {2, -2, 1, -1, 1, -1});
+        require(y[0] == 32767 && y[1] == -32768 && y[2] == 32767 && y[3] <= -32767 &&
+                    y[4] >= 32766 && y[5] <= -32767,
+                "dithered PCM16 clipping");
+    }
+    // Determinism: seed-dependent, chunk-independent, reproducible after reset.
+    std::vector<float> ramp(4096 * 3 + 6);
+    for (std::size_t i = 0; i < ramp.size(); ++i)
+        ramp[i] = 0.3f * std::sin(0.001f * static_cast<float>(i)) + 1e-5f;
+    for (auto d : {Dither::rectangular, Dither::triangular, Dither::triangular_highpass}) {
+        const auto whole = quantize(d, 42, ramp, 2);
+        require(whole == quantize(d, 42, ramp, 2), "dither is reproducible");
+        require(whole != quantize(d, 43, ramp, 2), "dither depends on seed");
+        Pcm16Quantizer q(2, {d, 42});
+        std::vector<std::int16_t> pieces(ramp.size());
+        for (std::size_t offset = 0, step = 2; offset < ramp.size(); step = step * 3 % 998 + 2) {
+            const auto n = std::min(step, ramp.size() - offset);
+            q.quantize(std::span<const float>(ramp).subspan(offset, n),
+                       std::span<std::int16_t>(pieces).subspan(offset, n));
+            offset += n;
+        }
+        require(whole == pieces, "dither is independent of chunk boundaries");
+        q.reset();
+        q.quantize(ramp, pieces);
+        require(whole == pieces, "reset restarts the dither sequence");
+    }
+    // A constant 0.25 LSB signal: plain rounding loses it (error -0.25 LSB); dither
+    // keeps it on average. RPDF error power still depends on the signal (3/16 LSB^2
+    // here); TPDF error power is 1/4 LSB^2 at every level. The high-pass TPDF has
+    // lag-1 error correlation -1/3, that is (-1/12) / (1/4).
+    const std::vector<float> quarter(200000, 0.25f / 32768);
+    const auto plain = error_stats(quarter, quantize(Dither::none, 0, quarter));
+    require(std::abs(plain.mean + 0.25) < 1e-9, "undithered rounding bias");
+    const auto rpdf = error_stats(quarter, quantize(Dither::rectangular, 1, quarter));
+    require(std::abs(rpdf.mean) < 0.01 && rpdf.max_abs <= 1.0 &&
+                std::abs(rpdf.variance - 0.1875) < 0.01,
+            "rectangular dither error statistics");
+    const auto tpdf = error_stats(quarter, quantize(Dither::triangular, 1, quarter));
+    require(std::abs(tpdf.mean) < 0.01 && tpdf.max_abs <= 1.5 &&
+                std::abs(tpdf.variance - 0.25) < 0.01 && std::abs(tpdf.lag1) < 0.02,
+            "triangular dither error statistics");
+    const auto highpass = error_stats(quarter, quantize(Dither::triangular_highpass, 1, quarter));
+    require(std::abs(highpass.mean) < 0.01 && highpass.max_abs <= 1.5 &&
+                std::abs(highpass.variance - 0.25) < 0.01 &&
+                std::abs(highpass.lag1 + 1. / 3) < 0.02,
+            "high-pass triangular dither error statistics");
+    // Error variance stays the same for other signal levels (no noise modulation).
+    for (float level : {0.f, 0.5f, 0.75f, 100.125f}) {
+        const std::vector<float> x(100000, level / 32768);
+        const auto s = error_stats(x, quantize(Dither::triangular, 5, x));
+        require(std::abs(s.mean) < 0.01 && std::abs(s.variance - 0.25) < 0.015,
+                "triangular dither error is signal independent");
+    }
+    // The writer produces exactly the quantizer's samples, over several writes.
+    const auto p = dir / "dither.wav";
+    {
+        AudioWriter w(p, {44100, 2}, OutputFormat::wav_pcm16, {Dither::triangular, 9});
+        w.write(std::span<const float>(ramp).first(10));
+        w.write(std::span<const float>(ramp).subspan(10));
+        w.close();
+    }
+    require(pcm16_samples(p) == quantize(Dither::triangular, 9, ramp, 2), "writer dither samples");
+    {
+        AudioWriter w(p, {44100, 2}, OutputFormat::wav_pcm16);
+        w.write(ramp);
+        w.close();
+    }
+    require(pcm16_samples(p) == quantize(Dither::none, 0, ramp, 2), "writer default rounding");
+    for (auto format : {OutputFormat::wav_float, OutputFormat::wav_pcm24, OutputFormat::wav_pcm32,
+                        OutputFormat::raw_float})
+        rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, format, {Dither::triangular}); });
+    rejects([&] { Pcm16Quantizer q(0); });
+    rejects([&] { Pcm16Quantizer q(1, {static_cast<Dither>(99)}); });
+}
 void run(const fs::path& dir) {
+    dither_tests(dir);
     const std::vector<float> samples{-1, 1, -.5f, .5f, 0, .125f, -.75f, .75f};
     for (auto format : {OutputFormat::wav_float, OutputFormat::wav_pcm16, OutputFormat::wav_pcm24,
                         OutputFormat::wav_pcm32, OutputFormat::raw_float}) {

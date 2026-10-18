@@ -63,7 +63,7 @@ proof for every possible filter or floating-point input.
 | Three-multiply complex cancellation | Direct complex products restored | Direct real/imaginary MACs, with cancellation and numerical-oracle coverage |
 | PCM24 sign/reduced valid-bit packing | Historical conversion fixes retained | Real libsndfile PCM16/24/32 round trips and endpoint/clipping checks; not a claim about every legacy wrapper |
 | VST2 aliasing, additive/double transfer, disconnected inputs | Extracted adapter fixes tested | Separate planar/in-place float/double HostProcessor and SDK adapter tests; internal DSP remains float |
-| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura is not a portable backend; portable PCM16 dither remains missing |
+| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura is not a portable backend; portable PCM16 dither added after this review |
 | Old CMD EOF and old host tail/lifecycle behavior | Original CMD/DMO/VST2 release gaps remain | New CLI explicitly drains; HostProcessor preserves stream history and handles bypass/filter changes; these do not repair the old applications |
 
 The merged historical fixes are exercised through extracted production routines
@@ -155,19 +155,23 @@ recovery records remain available as provenance rather than current instructions
 
 ## Remaining priorities
 
-1. **PCM16 dither:** explicitly deferred by the owner and still absent from the
-   portable output path. Add a documented, deterministic/testable quantization
-   policy before claiming equivalence with the old engine's dither behavior.
+1. **PCM16 dither:** implemented after this review. PCM16 output now uses a
+   documented, seeded quantizer with opt-in TPDF, the old engine's
+   high-pass triangular and rectangular dither; see
+   [the portable guide](docs/portable-core.md). Noise shaping is not implemented,
+   so equivalence with the old engine holds only for its unshaped dither modes.
 2. **Host compatibility and delivery:** exercise named Windows/macOS DAWs,
    silence/seek/reload/bypass and multiple instances; define minimum OS versions,
    dependency bundling, signing and installers. SDK validation is the starting gate.
 3. **Configuration interoperability:** inspection/validation output, redistributable
    fixtures for downstream profiles, bounded parser/state/IR fuzzing and speaker
    metadata. Add resampling only as an explicit, separately tested feature.
-4. **Measured efficiency:** reuse forward transforms/history for identical ordered
-   input mixes; evaluate inverse-transform sharing separately. Preserve routing
-   order, latency, tails and numerical tolerances. Measure callback distributions
-   and memory as well as throughput before adding further backends or partitioning.
+4. **Measured efficiency:** forward transform/history reuse for identical ordered
+   input mixes was implemented after this review, with bit-identical output and
+   1.2–1.4× faster dense matrices. The benchmark now reports p50/p99/max callback
+   times and peak memory. Inverse-transform sharing was evaluated and left as a
+   separate change because it alters summation order; see
+   [the measurements](docs/fft-backends.md#shared-forward-transforms).
 
 The [updated modernization plan](docs/modernization.md) separates these remaining
 choices from the core, package, FFT and VST3 work already implemented.

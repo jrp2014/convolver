@@ -15,6 +15,20 @@ Until 1.0 the C++ API may change between minor versions.
   `VERSION` file shared by the CMake package, CLI and VST3 bundle.
 - CLI and VST3 factory build identification including the Git revision and a
   marker for uncommitted changes. See [source versioning](docs/versioning.md).
+- PCM16 dither. `Pcm16Quantizer` and `QuantizationOptions` define a deterministic,
+  seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
+  `triangular_highpass` (the historical engine's "Triangular") modes.
+  CLI options `--dither` and `--dither-seed`; dither is off unless requested.
+- The benchmark reports p50, p99 and maximum single-block times and peak memory,
+  and has two 6×6 matrix cases.
+
+### Changed
+
+- Paths with identical ordered input routes share one forward FFT and spectrum
+  history. Output is bit-identical; dense routing matrices run 1.2 to 1.4 times
+  faster and use less memory.
+- PCM16 output rounds to nearest. libsndfile 1.2.2's float-to-PCM16 conversion
+  with clipping enabled rounds down, which added a -0.5 LSB bias.
 
 ## [0.2.0] - 2026-10-18
 

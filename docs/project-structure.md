@@ -32,7 +32,9 @@ resolution when new features justify it; keep private FFT storage free to evolve
   C++ ABI promise. See [package contracts](cmake-package.md).
 - **Compatibility/tooling:** Windows and mixed relative configuration paths,
   signed-zero routing semantics, real PCM/file tests, `.clang-format`,
-  `.clang-tidy` and CI checks. Portable PCM16 dither remains deferred.
+  `.clang-tidy` and CI checks. PCM16 output uses a deterministic, seeded
+  quantizer; dither (triangular, historical high-pass triangular or
+  rectangular) is opt-in.
 - **FFT selection and optimization:** FFTW and Accelerate behind one private
   contract; offline FFTW planning/wisdom; split real/imaginary spectra and
   vectorizable MAC loops. The [recorded measurements](fft-backends.md) distinguish
@@ -49,9 +51,9 @@ arbitrary threads; its ownership/thread contract remains part of the API.
 
 ## Next compatibility work
 
-The immediate audio-compatibility gap is PCM16 dither. Define its default/disable
-policy and verify quantization error, clipping and reproducibility independently
-of convolution accuracy. Keep noise shaping a separate, explicit choice.
+PCM16 dither is implemented with tests of quantization error, clipping and
+reproducibility that are independent of convolution accuracy. Noise shaping and
+PCM24 dither remain separate, explicit choices if they are wanted.
 
 Configuration import still combines parsing, selection and asset decoding; no
 inspection/validation command exposes the resolved graph. Add one grammar-backed
@@ -67,12 +69,14 @@ does not exercise every host's scan, state reload, silence, seek and bus behavio
 
 ## Next efficiency work
 
-`Engine::Impl::compute()` still performs forward FFT, spectrum history and inverse
-FFT per path. Identical ordered input mixes can share forward transforms/history;
-that optimization is not implemented. Preserve mixing order to avoid gratuitous
-rounding changes, and measure simple stereo as well as dense matrices.
+`Engine::Impl::compute()` runs one forward FFT and keeps one spectrum history per
+distinct ordered input mix; paths with identical input routes share it. Output is
+bit-identical to per-path transforms, and dense matrices run 1.2–1.4× faster
+([measurements](fft-backends.md#shared-forward-transforms)). Each path still has
+its own inverse FFT and overlap.
 
-Inverse-transform sharing needs a separate routing/overlap/delay design. The MAC
+Inverse-transform sharing was evaluated and left as separate work: it needs a
+routing/overlap/delay design and would change summation order. The MAC
 loop has already moved to split spectra; do not describe it as an unprofiled
 scalar baseline. Further packing, alignment, backend-native MACs or nonuniform
 partitioning should follow workload measurements. Saved FFTW wisdom chooses FFT

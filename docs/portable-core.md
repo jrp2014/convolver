@@ -145,10 +145,25 @@ has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
 it, matching the historical Pipe timing convention. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
-exceed unity. PCM output clips to its representable range via libsndfile.
+exceed unity. PCM24/PCM32 output clips to its representable range via libsndfile.
 
 Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
-There is no dither/noise-shaping option yet. The historical channel mask is
+
+PCM16 output is quantized by Convolver's own `Pcm16Quantizer`, not libsndfile:
+each sample is scaled by 32768, offset by the dither (in LSBs), rounded to the
+nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. Dither
+is off by default. `--dither` selects `none` (default), `triangular` (independent
+TPDF, error power 1/4 LSB² at every signal level), `triangular-highpass` (the
+historical engine's "Triangular": per-channel difference of successive uniform
+values, same amplitude, high-pass error spectrum) or `rectangular`.
+`--dither-seed N` (default 0) seeds the generator; the same seed, input and
+channel count give byte-identical output regardless of buffering. Dither is
+rejected for other output formats. There is no noise shaping. The library's
+`AudioWriter` defaults to no dither; pass `QuantizationOptions` to enable it.
+The tests check rounding/clipping endpoints, reproducibility, chunk independence
+and measured error mean, variance and correlation against the theoretical values.
+
+The historical channel mask is
 parsed and retained in Configuration, but the current WAV writer does not encode
 that mask; output channel order is preserved. Do not rely on WAV speaker labels.
 
