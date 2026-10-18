@@ -5,7 +5,7 @@
 <key>CFBundleIdentifier</key><string>org.convolver.vst3</string>
 <key>CFBundleName</key><string>Convolver</string>
 <key>CFBundlePackageType</key><string>BNDL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>0.1.0</string>
+<key>CFBundleShortVersionString</key><string>${Convolver_VERSION}</string>
+<key>CFBundleVersion</key><string>${Convolver_VERSION}</string>
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 </dict></plist>
