@@ -15,11 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        id: python
         with:
           python-version: '3.12'
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: '24'
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: >-
+            ${{ format('pre-commit-v1-{0}-{1}-py{2}-node{3}-{4}',
+            runner.os, runner.arch, steps.python.outputs.python-version, steps.node.outputs.node-version,
+            hashFiles('.pre-commit-config.yaml')) }}
       - name: Install lint runner
         run: python -m pip install pre-commit==4.5.1
       - name: Shell, Markdown, YAML and GitHub Actions checks
