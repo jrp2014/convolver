@@ -1,0 +1,137 @@
+# Tests and their boundaries
+
+## Native production tests
+
+The [portable build](portable-core.md) now compiles production C++20 translation
+units against the selected real FFT library and libsndfile. Build before running CTest:
+
+```sh
+cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
+cmake --build build-native --parallel
+ctest --test-dir build-native --output-on-failure
+```
+
+With Clang on macOS/Linux this runs **14 suites**: five native suites and the
+nine historical/documentation suites below. GCC and MSVC default to the six
+native/documentation suites; the old extraction adapters require Clang.
+
+- `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
+  forward/inverse normalization and padded lengths.
+- `native.engine`: independent double time-domain oracle, real FFT backend, seeded
+  matrix routing/delays, awkward blocks and IR lengths, normalization, exact
+  latency/tail, chunk invariance, reset, multiple instances, invalid spans,
+  nonfinite data and a C++ heap-allocation guard during processing/reset.
+- `native.io`: real libsndfile float/PCM16/24/32 round trips and clipping,
+  legacy parser/config lists, relative paths, signed zero, malformed input,
+  truncation and RAW alignment. POSIX-specific tests also exercise fragmented
+  descriptors, borrowed descriptor ownership, broken pipes and injected WAV
+  header-finalization errors.
+- `native.cli`: subprocess file renders compared with independent expected
+  output; empty, exact and partial last blocks, gain/matrix routing, both latency
+  modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+- `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
+  CLI processes against direct convolution, missing-plan failure before output
+  creation, malformed/oversized caches, Unicode filenames and source protection;
+  Accelerate rejects FFTW-only options. FFT and engine oracle suites also exercise
+  measured/patient plans and cached matrix processing with FFTW.
+
+Debug with ASan/UBSan and optimized Release have passed all 14 suites locally
+for both FFTW and Accelerate on Apple Silicon. `backend_equivalence.py` compares
+both actual CLIs over 16 matrix/delay cases, including odd block sizes and both
+latency modes. See [the measurements and reproduction commands](fft-backends.md).
+
+The preceding FFTW baseline passed Linux Clang/GCC, macOS and Windows MSVC
+[CI at f78c22b](https://github.com/jrp2014/convolver/actions/runs/39078598572).
+CI also builds Accelerate and compares backend outputs on macOS; consult the
+[workflow runs](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
+for each commit's remote results. Local dependency source hashes are
+recorded in the [portable guide](portable-core.md).
+
+## Run with CMake/CTest
+
+Requirements: CMake 3.20+, Python 3.8+, Clang/AppleClang with AddressSanitizer and
+UndefinedBehaviorSanitizer, and a native macOS or Linux environment. No Python
+third-party packages, old Windows SDKs, `homes.zip`, or network access are needed
+to run these tests once the toolchain is installed.
+
+From the repository root:
+
+```sh
+cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCONVOLVER_BUILD_NATIVE=OFF
+ctest --test-dir build --output-on-failure --parallel 2
+```
+
+Alternatively, `cmake --build build --target check` runs the same suite.
+Each C++ regression script compiles its own temporary harness during the test;
+these extraction tests are separate from the native build targets. CMake checks
+the compiler and sanitizer link support during configuration. CTest runs the
+scripts using that selected compiler, overriding an inherited `CXX` variable.
+Pass compiler options through the harnesses when changing them deliberately;
+these scripts do not inherit arbitrary CMake build-type or compiler flags.
+
+To run just the DSP tests or the documentation check:
+
+```sh
+ctest --test-dir build --output-on-failure -L dsp
+ctest --test-dir build --output-on-failure -L docs
+```
+
+The direct runner remains available:
+
+```sh
+python3 tests/regression/run_all.py
+```
+
+It uses `clang++` by default; `CXX` may name a Clang executable (not a command
+with flags). For documentation only, run
+`python3 tests/regression/documentation_regressions.py`; no compiler is needed.
+
+The GitHub Actions workflow runs the CMake/CTest entry point on macOS and Linux.
+Adding a workflow file does not establish that its remote jobs have passed.
+
+## Current coverage
+
+The tests below use the canonical `convolver/` source tree. Earlier local
+`tests/*.py` experiments aimed at a separate source snapshot are not the gate.
+
+| Suite | What it establishes | Boundary |
+| --- | --- | --- |
+| Core | 444 checks against independent double time-domain convolution; partition padding, routing/delays, chunks/reset, complex arithmetic | Actual DSP bodies with portable DFT and platform/file stubs; not real FFTW |
+| Host adapters | 44 debug/release cases; narrow PCM, aliases, additive/double output, disconnected inputs/delay history | Actual extracted sample adapters; Boost conversion boundary substituted; not a loaded plug-in |
+| Gain | Two unequal route-count cases | Extracted gain routines |
+| Branch regressions | Route signs, list display, dither constants, bundled Ooura full/tail round trips | Serial Ooura arithmetic, not the full alternate-backend engine |
+| Historical diagnostics | Eight stream-state cases | Extracted diagnostic clauses, not complete parser fuzzing |
+| Historical I/O | 32 debug/release cases plus legacy syntax/disabled-library checks | Actual wrapper/table code with mocked libsndfile; no codec or real file-descriptor integration |
+| Pipe | 274 argument, failure and EOF accounting checks | Actual entry point/helpers with stream/engine stubs |
+| Pipe DSP | 100 end-of-stream cases against direct convolution | Actual convolution bodies with DFT adapter; not real stdin/codecs |
+| Documentation | 99 archived file sizes/hashes, 18-page inventory, local links/fragments, saved audit consistency | Offline preservation check; does not re-fetch the live website or external URLs |
+
+All eight C++ suites enable ASan and UBSan with sanitizer failures fatal.
+Some extraction adapters repair old compiler syntax or replace platform
+boundaries. These are useful regression checks for reviewed behaviour, not proof
+that unmodified production translation units compile on a modern toolchain.
+
+The documentation checker also exercises seven failure cases on temporary
+fixtures: changed bytes, changed size, missing file, missing link target, missing
+fragment, and escaping manifest/link paths. Original archived bytes remain
+unchanged. The independently enumerated pages and saved manifest detect loss;
+the live-site comparison is a dated provenance record, not a network CI test.
+
+## Gates for a native release
+
+The initial native core now supplies normally compiled production tests with
+the selected real FFT backend and libsndfile. Add every future backend to the same contract tests. Retain the
+independent direct-convolution oracle rather than relying only on agreement
+between FFT implementations.
+
+Outstanding legacy cases include the original full-width PCM32 specialization,
+nonzero noise shaping, old CMD EOF/tail handling, actual host format negotiation and latency/tail reporting,
+malformed configuration/IR fuzzing, multi-instance/filter-switch behaviour, and
+callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
+that does not fix the independent historical wrappers. The portable CTest gate does not
+establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.
+
+The [modernization plan](modernization.md) defines the backend, native-platform,
+file/pipe, lifecycle and performance acceptance criteria. Add native production
+tests beside the existing regressions as each component becomes portable; only
+retire extraction harnesses once their failure cases are covered there.

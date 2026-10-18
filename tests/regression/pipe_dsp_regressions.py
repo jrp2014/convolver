@@ -4,6 +4,7 @@
 Uses the portable FFTW-compatible DFT adapter from core_regressions; this tests
 DSP/tail agreement, not Windows stdin or libsndfile codecs.
 """
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -83,7 +84,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='convolver-pipe-dsp-') as tmp:
         source = Path(tmp) / 'test.cpp'; executable = Path(tmp) / 'test'
         source.write_text(code)
-        subprocess.run(['clang++', '-std=c++17', '-O1', '-g', '-fms-extensions',
+        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O1', '-g', '-fms-extensions',
                         '-Wno-unknown-pragmas', '-Wno-ignored-attributes',
                         '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                         str(source), '-o', str(executable)], check=True)

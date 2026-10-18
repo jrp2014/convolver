@@ -1,53 +1,52 @@
 # Guidance for coding agents and contributors
 
-Convolver is a 2005–2006 Windows audio convolution engine (GPL-2.0-or-later)
-with several front ends: DirectShow filter, WMP DSP plug-in, VST 2 plug-in,
-`convolverCMD` (file to file) and `convolverPipe` (stdin to stdout). This file
-says how to work on it safely. Keep it short and update it when a rule changes.
+Convolver applies multichannel FIR filters to audio (GPL-2.0-or-later). The repo
+holds two implementations:
 
-## Layout
+- **Portable core (active):** C++20 library and CLI built with CMake.
+  `include/convolver/` (public API), `portable/` (engine, FFT backends,
+  libsndfile I/O, `.cfg` loader, CLI), `tests/native/`.
+- **Historical Windows code (preserved):** `convolver/` — the 2005–2006 engine
+  and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
+  2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-- `convolver/convolution/` – the shared DSP engine. This is the code that matters.
-  `filter.*` loads and partitions impulse responses, `convolution.*` runs
-  uniformly partitioned overlap-save convolution, `channelpaths.*` parses the
-  routing part of the `.cfg` format, `sample.h` converts sample formats and moves
-  frames between host buffers and the engine.
-- `convolver/convolver{CMD,Pipe,Filter,WMP,VST}/` – front ends. Windows only.
-- `convolver/Common/` – Microsoft DirectX sample framework (DXUT). Not ours; do not edit.
-- `convolver/Media/` – sample WAVs and impulse responses used for manual testing.
-- `tests/regression/` – the only tests that run anywhere today.
-- `docs/` – review and recovery records, the pipe guide, and the archived 4.4 website.
+Plans and decisions: `docs/project-structure.md` (next milestones),
+`docs/modernization.md`, `docs/portable-core.md`, `docs/testing.md`.
 
-## Building and testing
+## Build and test
 
-- The Windows targets need Visual Studio 2005-era toolchains, ATL, the DirectX
-  and Windows Media SDKs, FFTW and libsndfile DLLs. Nothing builds them in CI.
-  Do not claim a change "builds" unless you compiled it.
-- Run `python3 tests/regression/run_all.py` before and after any engine change.
-  It needs Python 3 and Clang with the AddressSanitizer/UBSan runtimes (on
-  Ubuntu: `apt-get install clang libclang-rt-18-dev`; Claude Code cloud sessions
-  install it via `.claude/hooks/session-start.sh`). CI runs it on Linux and macOS.
-- The suites compile the real production functions by **slicing source files on
-  text markers** (for example `// Convolution Constructor`, `\tstatic void
-  StoreDelayed(`) and patching them. If you move, rename or reformat code the
-  suites slice, update the matching `tests/regression/*.py` in the same change.
-  The long-term plan is to replace slicing with a normal library build.
-- Numerical changes must be checked against an independent oracle (the suites
-  use double-precision time-domain convolution). Report the worst error.
+```sh
+cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure --parallel 4
+```
+
+Needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and libsndfile; on
+Ubuntu `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev`.
+Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
+CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg).
+
+- Every DSP change must pass the direct double-precision oracle tests in
+  `tests/native/engine_tests.cpp`; report the worst error you observed.
+- `tests/regression/` compiles **historical** functions by slicing
+  `convolver/` source on text markers. If you edit those files, update the
+  matching `tests/regression/*.py` in the same change.
+- Do not claim something builds or passes unless you ran it.
 
 ## Rules
 
-- Do not reformat legacy files wholesale; it destroys `git blame` across 20 years
-  of history. Format only lines you change, matching the surrounding style
-  (tabs, Allman braces).
-- Line endings: text is LF in the repo; `.sln`, `.vcproj`, `.rc` are CRLF via
-  `.gitattributes`. Files under `docs/historical/` are byte-exact copies with
-  recorded hashes; never edit them.
-- The `.cfg` configuration format is used by Roon, JRiver and Audiolense. Any
-  parser change must keep existing files loading with identical results.
-- Real-time paths (`doConvolution`, `doPartitionedConvolution`, `sample.h`
-  `GetSample`/`PutSample`) must not allocate, lock or do I/O.
-- Third-party code (`Common/`, `fftw/` and `libsndfile/` headers) is vendored;
-  prefer updating it from upstream over local patches.
-- Keep commits focused, and explain the audible or numerical effect of any DSP
-  fix in the commit message.
+- Real-time path: `Engine::process` and everything it calls must not allocate,
+  lock or do I/O (`engine_tests.cpp` checks allocation). Preparation, FFTW
+  planning and wisdom stay outside processing.
+- `.cfg` compatibility is a product feature (Roon, JRiver and Audiolense use it).
+  Preserve relative paths, signed-zero routes, fractional route gains, delay
+  truncation and list selection. Syntax changes need a recorded decision.
+- Keep component boundaries in `docs/project-structure.md`; split files only
+  when a responsibility grows.
+- `docs/historical/` files are byte-exact copies with recorded hashes; never edit
+  them. Do not reformat files under `convolver/`; it destroys `git blame`.
+- Line endings: LF in the repo; `.sln`, `.vcproj`, `.rc` are CRLF via `.gitattributes`.
+- Vendored third-party code (`convolver/Common/`, `convolver/fftw/`,
+  `convolver/libsndfile/` headers) is not ours to patch.
+- New files carry `// SPDX-License-Identifier: GPL-2.0-or-later`.
+- Keep commits focused; state the audible or numerical effect of a DSP change.

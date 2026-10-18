@@ -5,6 +5,7 @@ Exercises argument validation, stream/short-write failures, bounded chunks and
 EOF tail accounting. Windows/libsndfile and FFT execution are adapter boundaries;
 core_regressions.py separately exercises the production convolution kernels.
 """
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -26,7 +27,7 @@ def main():
         cpp = Path(directory) / 'pipe.cpp'
         binary = Path(directory) / 'pipe'
         cpp.write_text(harness)
-        subprocess.run(['clang++', '-std=c++17', '-O1', '-g',
+        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O1', '-g',
                         '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                         '-fno-omit-frame-pointer', str(cpp), '-o', str(binary)], check=True)
         return subprocess.run([str(binary)]).returncode

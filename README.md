@@ -10,8 +10,12 @@ to multichannel audio in real time, and ships as:
 - a command-line tool (`convolverCMD`)
 - a stdin/stdout streaming tool ([`convolverPipe`](docs/convolverPipe.md)), recovered from the historical 4.4 sources
 
-All of them share the engine in [`convolver/convolution`](convolver/convolution),
+The historical applications share the engine in [`convolver/convolution`](convolver/convolution),
 which does uniformly partitioned overlap-save convolution with FFTW.
+
+A new **portable C++20 core and CLI** in [`portable/`](portable) builds with
+CMake, FFTW (portable) or Apple Accelerate, and libsndfile. It supports native file rendering, RAW streaming and
+the historical configuration format. See the [portable build and usage guide](docs/portable-core.md).
 
 Its text config format (`.cfg`) is still read by Roon, JRiver Media Center and
 Audiolense today.
@@ -52,6 +56,24 @@ including configuration examples, host guides and release history.
 
 ## Building
 
+For the portable implementation, install CMake, a C++20 compiler, FFTW (including
+its float library) and libsndfile development packages:
+
+```sh
+cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release
+cmake --build build-native --parallel
+ctest --test-dir build-native --output-on-failure
+./build-native/convolver --filter impulse.wav --input music.wav --output corrected.wav
+```
+
+On Apple platforms, add `-DCONVOLVER_FFT_BACKEND=ACCELERATE` to use the system
+FFT framework without FFTW. See [backend measurements](docs/fft-backends.md).
+
+See [platform instructions and options](docs/portable-core.md) for macOS/Linux
+packages, Windows/vcpkg, sanitizer builds and CLI semantics.
+
+### Historical Windows builds
+
 The original build used Visual Studio 2005 (some projects also have Intel C++
 `.icproj` files). Open `convolver/convolver.sln`. Beyond Visual Studio with ATL
 and the Windows SDK, it expects:
@@ -61,16 +83,34 @@ and the Windows SDK, it expects:
 - Boost (header-only parts)
 - FFTW 3 and libsndfile DLLs (only headers and import wrappers are in this repository)
 
-Nobody has built it from this repository yet.
+Native builds of these historical applications have not yet been verified.
+The top-level CMake project builds the portable implementation; it does not
+build these historical Windows applications.
 
 ## Portable regression checks
 
-Run `python3 tests/regression/run_all.py` with Clang and its AddressSanitizer and
-UndefinedBehaviorSanitizer runtimes available. These tests extract production
-C++ routines and compare them against independent expected results. They do
-not build the Windows applications or substitute for a native integration test.
-CI runs them on Linux and macOS for every push and pull request. Agent and
-contributor rules are in [AGENTS.md](AGENTS.md).
+With CMake 3.20+, Python 3.8+ and Clang (including ASan/UBSan) on macOS or Linux:
+
+```sh
+cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCONVOLVER_BUILD_NATIVE=OFF
+ctest --test-dir build --output-on-failure --parallel 2
+```
+
+These nine suites cover extracted production routines and preservation of the
+historical documentation. `python3 tests/regression/run_all.py` remains available.
+The default native build additionally runs five suites against the actual core,
+the selected FFT backend, libsndfile and CLI. See [testing instructions and coverage limits](docs/testing.md).
+
+## Modernization
+
+The portable core/CLI, FFTW/Accelerate adapters, offline FFTW tuning and real-library
+tests are implemented. The [structure review and next milestones](docs/project-structure.md)
+prioritize independently consumable CMake packages, configuration compatibility,
+measured transform reuse and a host-ready lifecycle. The broader
+[modernization assessment](docs/modernization.md) records the alternatives and
+downstream history. Modern plug-ins and further DSP optimization remain future work.
+
+Rules for contributors and coding agents are in [AGENTS.md](AGENTS.md).
 
 ## Licence
 

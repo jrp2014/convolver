@@ -1,8 +1,7 @@
-name: Regression tests
+name: Native and historical tests
 
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -10,28 +9,70 @@ permissions:
   contents: read
 
 jobs:
-  portable-regressions:
-    name: Portable regressions (${{ matrix.os }})
+  unix:
+    name: ${{ matrix.os }} / ${{ matrix.cxx }} / ${{ matrix.build }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            cxx: clang++
+            build: Debug
+            sanitizers: 'ON'
+          - os: ubuntu-latest
+            cxx: g++
+            build: Release
+            sanitizers: 'OFF'
+          - os: macos-latest
+            cxx: clang++
+            build: Debug
+            sanitizers: 'ON'
     steps:
       - uses: actions/checkout@v4
-
-      # Ubuntu's clang ships without the sanitizer runtimes the suites link against.
-      - name: Install Clang sanitizer runtimes
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux dependencies
         if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+      - name: macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install fftw libsndfile
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }}
+      - name: Build production targets and tests
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --parallel 2
+      - name: Linked versions
+        run: ./build/convolver --version
+      - name: Configure Accelerate
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build-accelerate -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_FFT_BACKEND=ACCELERATE -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_LEGACY_TESTS=OFF
+      - name: Build and test Accelerate
+        if: runner.os == 'macOS'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 libclang-rt-18-dev
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
-
-      - name: Show toolchain
-        run: |
-          clang++ --version
-          python3 --version
-
-      - name: Run portable regression suites
-        run: python3 tests/regression/run_all.py
+          cmake --build build-accelerate --parallel 2
+          ctest --test-dir build-accelerate --output-on-failure --parallel 2
+          ./build-accelerate/convolver --version
+      - name: Compare FFTW and Accelerate output
+        if: runner.os == 'macOS'
+        run: python tests/native/backend_equivalence.py build/convolver build-accelerate/convolver
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install native dependencies
+        run: vcpkg install fftw3:x64-windows 'libsndfile[core]:x64-windows'
+      - name: Configure MSVC
+        run: cmake -S . -B build -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test native libraries and CLI
+        run: ctest --test-dir build -C Release --output-on-failure --parallel 2
+      - name: Linked versions
+        run: ./build/Release/convolver.exe --version
