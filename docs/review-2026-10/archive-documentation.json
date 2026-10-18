@@ -1,14 +1,15 @@
 {
+  "path_redaction": "Personal identity in recorded member paths is replaced with jrp; archive and original-member hashes are unchanged.",
   "archive": {
     "name": "homes.zip",
     "sha256": "2b5cad28adcf5d8df21d6c9139941f4ab7607d2225ea29773642ee2beab74771"
   },
-  "source_prefix": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/",
+  "source_prefix": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/",
   "selection": "All 18 project documentation HTML pages; recursive local href/src/background/action and CSS url() closure. Google site-verification HTML, FrontPage authoring metadata and unreferenced assets excluded. Original bytes preserved. No ZIP or filesystem dates used for selection/order. Embedded news.html release history tops out at version 4.4; parallel convolver website text corroborates the recovered documentation. External URLs have not been fetched.",
   "files": [
     {
       "path": "docs/historical/convolver-4.4/_derived/binaural.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/binaural.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/binaural.html_cmp_journal000_vbtn.gif",
       "bytes": 308,
       "sha256": "5c5858b7d215c1835387abf9e189479f0c26058a868dd24dc4074b23462e5379",
       "parallel_site_sha256": "5c5858b7d215c1835387abf9e189479f0c26058a868dd24dc4074b23462e5379",
@@ -16,7 +17,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/commands.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_hbtn.gif",
       "bytes": 306,
       "sha256": "7af4536292067b929c99bce28939f1962d6028c7c4e6c5d3b36dbdf0dd3c3e7d",
       "parallel_site_sha256": "7af4536292067b929c99bce28939f1962d6028c7c4e6c5d3b36dbdf0dd3c3e7d",
@@ -24,7 +25,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/commands.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_hbtn_p.gif",
       "bytes": 306,
       "sha256": "33b04a8f1f16fd3efd39caaf2acf16be279eb52fb19b16fff36e732e4053286c",
       "parallel_site_sha256": "33b04a8f1f16fd3efd39caaf2acf16be279eb52fb19b16fff36e732e4053286c",
@@ -32,7 +33,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/commands.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/commands.html_cmp_journal000_vbtn.gif",
       "bytes": 306,
       "sha256": "7af4536292067b929c99bce28939f1962d6028c7c4e6c5d3b36dbdf0dd3c3e7d",
       "parallel_site_sha256": "7af4536292067b929c99bce28939f1962d6028c7c4e6c5d3b36dbdf0dd3c3e7d",
@@ -40,7 +41,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/comparewavs.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/comparewavs.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/comparewavs.html_cmp_journal000_vbtn.gif",
       "bytes": 258,
       "sha256": "133af232638be8a2a2c7a7d0ffb8097e8b1c0adfb0ada15e198df3744d6e80f1",
       "parallel_site_sha256": "133af232638be8a2a2c7a7d0ffb8097e8b1c0adfb0ada15e198df3744d6e80f1",
@@ -48,7 +49,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/config.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/config.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/config.html_cmp_journal000_vbtn.gif",
       "bytes": 233,
       "sha256": "edd2d5108e6e2cb3364eebfc3bedc1b1ec987fc160a60269776f16c355d4c28c",
       "parallel_site_sha256": "edd2d5108e6e2cb3364eebfc3bedc1b1ec987fc160a60269776f16c355d4c28c",
@@ -56,7 +57,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/configegs.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/configegs.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/configegs.html_cmp_journal000_vbtn.gif",
       "bytes": 280,
       "sha256": "316854c534aefdc6f17ac61a7d01826d7570bbd8ac0a7b551b0abadc2ff691ff",
       "parallel_site_sha256": "316854c534aefdc6f17ac61a7d01826d7570bbd8ac0a7b551b0abadc2ff691ff",
@@ -64,7 +65,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/convolvercmd.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/convolvercmd.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/convolvercmd.html_cmp_journal000_vbtn.gif",
       "bytes": 261,
       "sha256": "02444c68a7108b97424a88d4f820ec38d13ed9e933c8764f158c3cb9e533e416",
       "parallel_site_sha256": "02444c68a7108b97424a88d4f820ec38d13ed9e933c8764f158c3cb9e533e416",
@@ -72,7 +73,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/convolverpipe.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/convolverpipe.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/convolverpipe.html_cmp_journal000_vbtn.gif",
       "bytes": 257,
       "sha256": "91be2b13164df00bda77653284ca0c54022ea8fd4f29bdf266b1e414186aa87a",
       "parallel_site_sha256": "91be2b13164df00bda77653284ca0c54022ea8fd4f29bdf266b1e414186aa87a",
@@ -80,7 +81,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/download.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_hbtn.gif",
       "bytes": 235,
       "sha256": "903c1874e88c4aed073dc3a3e70d44a3409cf4f40dd2992a6723356800d9b887",
       "parallel_site_sha256": "903c1874e88c4aed073dc3a3e70d44a3409cf4f40dd2992a6723356800d9b887",
@@ -88,7 +89,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/download.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_hbtn_p.gif",
       "bytes": 235,
       "sha256": "82b99eef9853f85fec985b65157ebf23474ec5693da295438b4916d64e8585af",
       "parallel_site_sha256": "82b99eef9853f85fec985b65157ebf23474ec5693da295438b4916d64e8585af",
@@ -96,7 +97,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/download.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/download.html_cmp_journal000_vbtn.gif",
       "bytes": 235,
       "sha256": "903c1874e88c4aed073dc3a3e70d44a3409cf4f40dd2992a6723356800d9b887",
       "parallel_site_sha256": "903c1874e88c4aed073dc3a3e70d44a3409cf4f40dd2992a6723356800d9b887",
@@ -104,7 +105,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/feedback.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_hbtn.gif",
       "bytes": 230,
       "sha256": "d7824f4f3d39cbd036dc1833fc9d9ef0d9c6e237d4dbc7a778195c010b56f39d",
       "parallel_site_sha256": "d7824f4f3d39cbd036dc1833fc9d9ef0d9c6e237d4dbc7a778195c010b56f39d",
@@ -112,7 +113,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/feedback.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_hbtn_p.gif",
       "bytes": 230,
       "sha256": "ba6ba833918bd206bbe580479c3a8d57f2aa8c643da87dd5c9e167817443aae4",
       "parallel_site_sha256": "ba6ba833918bd206bbe580479c3a8d57f2aa8c643da87dd5c9e167817443aae4",
@@ -120,7 +121,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/feedback.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/feedback.html_cmp_journal000_vbtn.gif",
       "bytes": 230,
       "sha256": "d7824f4f3d39cbd036dc1833fc9d9ef0d9c6e237d4dbc7a778195c010b56f39d",
       "parallel_site_sha256": "d7824f4f3d39cbd036dc1833fc9d9ef0d9c6e237d4dbc7a778195c010b56f39d",
@@ -128,7 +129,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/home_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/home_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/home_cmp_journal000_hbtn.gif",
       "bytes": 201,
       "sha256": "9fccf78e52ebd1bdf54c07f40296918f5dc2628dac6bc4378b17ea3844d9728a",
       "parallel_site_sha256": "9fccf78e52ebd1bdf54c07f40296918f5dc2628dac6bc4378b17ea3844d9728a",
@@ -136,7 +137,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/home_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/home_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/home_cmp_journal000_hbtn_p.gif",
       "bytes": 201,
       "sha256": "ee2ef4407daf8ccd29153dc25b4bea9c3e944c3193bb21884bb81d8317405fe4",
       "parallel_site_sha256": "ee2ef4407daf8ccd29153dc25b4bea9c3e944c3193bb21884bb81d8317405fe4",
@@ -144,7 +145,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/links.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_hbtn.gif",
       "bytes": 203,
       "sha256": "90ef51d04e7f8819236e702df1017cf6f044ee039f6921280b29db21c8dc48ed",
       "parallel_site_sha256": "90ef51d04e7f8819236e702df1017cf6f044ee039f6921280b29db21c8dc48ed",
@@ -152,7 +153,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/links.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_hbtn_p.gif",
       "bytes": 203,
       "sha256": "352209db4bb7d0d295ae9453bb3cb50acbb969b815e2a3fe29c952faf4026851",
       "parallel_site_sha256": "352209db4bb7d0d295ae9453bb3cb50acbb969b815e2a3fe29c952faf4026851",
@@ -160,7 +161,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/links.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/links.html_cmp_journal000_vbtn.gif",
       "bytes": 203,
       "sha256": "90ef51d04e7f8819236e702df1017cf6f044ee039f6921280b29db21c8dc48ed",
       "parallel_site_sha256": "90ef51d04e7f8819236e702df1017cf6f044ee039f6921280b29db21c8dc48ed",
@@ -168,7 +169,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/makeir.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/makeir.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/makeir.html_cmp_journal000_vbtn.gif",
       "bytes": 215,
       "sha256": "a73afcea6c7249cb2f5477abcbb3171c4d96a72c420b182a7c6292586836af33",
       "parallel_site_sha256": "a73afcea6c7249cb2f5477abcbb3171c4d96a72c420b182a7c6292586836af33",
@@ -176,7 +177,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/news.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_hbtn.gif",
       "bytes": 202,
       "sha256": "9c7791e6313d0ebeb908f2a5eb0e1eef240ed4a3ee20bc92e38aa97b33430bbf",
       "parallel_site_sha256": "9c7791e6313d0ebeb908f2a5eb0e1eef240ed4a3ee20bc92e38aa97b33430bbf",
@@ -184,7 +185,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/news.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_hbtn_p.gif",
       "bytes": 202,
       "sha256": "f81378bcb6419384e4aa722d2e84bdff9c47674446d14006d5851624e6f97e0a",
       "parallel_site_sha256": "f81378bcb6419384e4aa722d2e84bdff9c47674446d14006d5851624e6f97e0a",
@@ -192,7 +193,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/news.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/news.html_cmp_journal000_vbtn.gif",
       "bytes": 202,
       "sha256": "9c7791e6313d0ebeb908f2a5eb0e1eef240ed4a3ee20bc92e38aa97b33430bbf",
       "parallel_site_sha256": "9c7791e6313d0ebeb908f2a5eb0e1eef240ed4a3ee20bc92e38aa97b33430bbf",
@@ -200,7 +201,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/perftest.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/perftest.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/perftest.html_cmp_journal000_vbtn.gif",
       "bytes": 224,
       "sha256": "bd01cc68a341a096dd50ef2ebcf13758718f32d049edad4ec13960a8fa533178",
       "parallel_site_sha256": "bd01cc68a341a096dd50ef2ebcf13758718f32d049edad4ec13960a8fa533178",
@@ -208,7 +209,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/troubleshooting.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_hbtn.gif",
       "bytes": 281,
       "sha256": "30b0bd7f1018b049779dbefbb0c2f227df773de0b0608483b3335fc367b15815",
       "parallel_site_sha256": "30b0bd7f1018b049779dbefbb0c2f227df773de0b0608483b3335fc367b15815",
@@ -216,7 +217,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/troubleshooting.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_hbtn_p.gif",
       "bytes": 281,
       "sha256": "83d1d3c1e1adacdc21851b5a905cd18879716cf7033c88180a4ef27e25f20c6e",
       "parallel_site_sha256": "83d1d3c1e1adacdc21851b5a905cd18879716cf7033c88180a4ef27e25f20c6e",
@@ -224,7 +225,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/troubleshooting.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/troubleshooting.html_cmp_journal000_vbtn.gif",
       "bytes": 281,
       "sha256": "30b0bd7f1018b049779dbefbb0c2f227df773de0b0608483b3335fc367b15815",
       "parallel_site_sha256": "30b0bd7f1018b049779dbefbb0c2f227df773de0b0608483b3335fc367b15815",
@@ -232,7 +233,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/usage.html_cmp_journal000_hbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_hbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_hbtn.gif",
       "bytes": 208,
       "sha256": "2cd4ccab16de416d8038a81bf67af96326b38a576b9b8ec5ecb1b3aa8f1053dc",
       "parallel_site_sha256": "2cd4ccab16de416d8038a81bf67af96326b38a576b9b8ec5ecb1b3aa8f1053dc",
@@ -240,7 +241,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/usage.html_cmp_journal000_hbtn_p.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_hbtn_p.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_hbtn_p.gif",
       "bytes": 208,
       "sha256": "fa03c35f2ca5d4b925ef52de3bd4818cf1a34cf08fea77679506cd19075c6d46",
       "parallel_site_sha256": "fa03c35f2ca5d4b925ef52de3bd4818cf1a34cf08fea77679506cd19075c6d46",
@@ -248,7 +249,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/usage.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/usage.html_cmp_journal000_vbtn.gif",
       "bytes": 208,
       "sha256": "2cd4ccab16de416d8038a81bf67af96326b38a576b9b8ec5ecb1b3aa8f1053dc",
       "parallel_site_sha256": "2cd4ccab16de416d8038a81bf67af96326b38a576b9b8ec5ecb1b3aa8f1053dc",
@@ -256,7 +257,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/vst.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/vst.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/vst.html_cmp_journal000_vbtn.gif",
       "bytes": 260,
       "sha256": "3468c448f61f5a13663b838f0f76f3eb630777b6e4c1ca79aa018473be92b5ba",
       "parallel_site_sha256": "3468c448f61f5a13663b838f0f76f3eb630777b6e4c1ca79aa018473be92b5ba",
@@ -264,7 +265,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_derived/zoom.html_cmp_journal000_vbtn.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_derived/zoom.html_cmp_journal000_vbtn.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_derived/zoom.html_cmp_journal000_vbtn.gif",
       "bytes": 270,
       "sha256": "7ad33ea59961c33a6952c6d1200ff59e4cd634c9c74412a426a0da41e1992be1",
       "parallel_site_sha256": "7ad33ea59961c33a6952c6d1200ff59e4cd634c9c74412a426a0da41e1992be1",
@@ -272,7 +273,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/banner_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/banner_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/banner_journal.gif",
       "bytes": 401,
       "sha256": "3795d8149e84cfdc559733dbd81e387a64feee14555838a93a68d91d9e3c5c33",
       "parallel_site_sha256": "3795d8149e84cfdc559733dbd81e387a64feee14555838a93a68d91d9e3c5c33",
@@ -280,7 +281,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/bull1_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull1_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull1_journal.gif",
       "bytes": 53,
       "sha256": "1d839bfb21d4e55aba55266d1f588d51700b3066044257d68487ab828ca9cd7c",
       "parallel_site_sha256": "1d839bfb21d4e55aba55266d1f588d51700b3066044257d68487ab828ca9cd7c",
@@ -288,7 +289,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/bull2_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull2_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull2_journal.gif",
       "bytes": 51,
       "sha256": "33300da82249ce6ebb03f7337afec4021b993a737c3942865cb3747284e54089",
       "parallel_site_sha256": "33300da82249ce6ebb03f7337afec4021b993a737c3942865cb3747284e54089",
@@ -296,7 +297,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/bull3_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull3_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/bull3_journal.gif",
       "bytes": 49,
       "sha256": "954a1e9a04a3f4136e0df741d9a1403bf024a620d7dd2362e32f3cdaf6ed039d",
       "parallel_site_sha256": "954a1e9a04a3f4136e0df741d9a1403bf024a620d7dd2362e32f3cdaf6ed039d",
@@ -304,7 +305,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/dot_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/dot_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/dot_journal.gif",
       "bytes": 43,
       "sha256": "0388c3fcb4321513c689eafca67f3900caed206ee5565bb0f6378f7f35d93d80",
       "parallel_site_sha256": "0388c3fcb4321513c689eafca67f3900caed206ee5565bb0f6378f7f35d93d80",
@@ -312,7 +313,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/jour1000-109.css",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/jour1000-109.css",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/jour1000-109.css",
       "bytes": 35306,
       "sha256": "bc504210865c8953b11c2e612c5e5925b3c29556733dff4a13757c1ca9cd0c92",
       "parallel_site_sha256": "bc504210865c8953b11c2e612c5e5925b3c29556733dff4a13757c1ca9cd0c92",
@@ -320,7 +321,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/jour1000.css",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/jour1000.css",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/jour1000.css",
       "bytes": 35303,
       "sha256": "b6b938627fee29c33b7046efc061ceec301c90417974a9627777c785705c0961",
       "parallel_site_sha256": "b6b938627fee29c33b7046efc061ceec301c90417974a9627777c785705c0961",
@@ -328,7 +329,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_home_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_home_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_home_journal.gif",
       "bytes": 187,
       "sha256": "cabc83576e5570bdac457a0568658061c20ffb379a40812dbc43378a62cf8291",
       "parallel_site_sha256": "cabc83576e5570bdac457a0568658061c20ffb379a40812dbc43378a62cf8291",
@@ -336,7 +337,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_hor_down_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_hor_down_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_hor_down_journal.gif",
       "bytes": 137,
       "sha256": "61d0b653866b24c9d26e31ef68f70d6f3c826162a444b210a46c605db551d8b8",
       "parallel_site_sha256": "61d0b653866b24c9d26e31ef68f70d6f3c826162a444b210a46c605db551d8b8",
@@ -344,7 +345,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_hor_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_hor_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_hor_journal.gif",
       "bytes": 137,
       "sha256": "8eba8d67cb13fd7485f020db2bd0a272fcfbe0f2fa01243869f33e15fc798a26",
       "parallel_site_sha256": "8eba8d67cb13fd7485f020db2bd0a272fcfbe0f2fa01243869f33e15fc798a26",
@@ -352,7 +353,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_next_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_next_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_next_journal.gif",
       "bytes": 197,
       "sha256": "f46531889d55a86695bcf8ffecd022aa2b18beab0c741dbbcb317a40566e97e5",
       "parallel_site_sha256": "f46531889d55a86695bcf8ffecd022aa2b18beab0c741dbbcb317a40566e97e5",
@@ -360,7 +361,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_prev_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_prev_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_prev_journal.gif",
       "bytes": 196,
       "sha256": "fb609f1d05287511824dd81618eb5eaea5974b39efff4cf800bd25b03634d621",
       "parallel_site_sha256": "fb609f1d05287511824dd81618eb5eaea5974b39efff4cf800bd25b03634d621",
@@ -368,7 +369,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_up_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_up_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_up_journal.gif",
       "bytes": 193,
       "sha256": "c9f346f9cb88f60be898027c9872e7ce643888e29dd1892f466bc01a8f1c1810",
       "parallel_site_sha256": "c9f346f9cb88f60be898027c9872e7ce643888e29dd1892f466bc01a8f1c1810",
@@ -376,7 +377,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_vert_down_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_vert_down_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_vert_down_journal.gif",
       "bytes": 137,
       "sha256": "61d0b653866b24c9d26e31ef68f70d6f3c826162a444b210a46c605db551d8b8",
       "parallel_site_sha256": "61d0b653866b24c9d26e31ef68f70d6f3c826162a444b210a46c605db551d8b8",
@@ -384,7 +385,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/nav_vert_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_vert_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/nav_vert_journal.gif",
       "bytes": 137,
       "sha256": "8eba8d67cb13fd7485f020db2bd0a272fcfbe0f2fa01243869f33e15fc798a26",
       "parallel_site_sha256": "8eba8d67cb13fd7485f020db2bd0a272fcfbe0f2fa01243869f33e15fc798a26",
@@ -392,7 +393,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/partgrad.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/partgrad.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/partgrad.gif",
       "bytes": 139,
       "sha256": "a6283adb61dba088007c9f67f9cb0592a450450d83928a67a51c031abbde9f15",
       "parallel_site_sha256": "a6283adb61dba088007c9f67f9cb0592a450450d83928a67a51c031abbde9f15",
@@ -400,7 +401,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/rule_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/rule_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/rule_journal.gif",
       "bytes": 155,
       "sha256": "b269c65748a2d0f27d9dbf7f7fc454150419020d93031a1edaf4af16e93a38f6",
       "parallel_site_sha256": "b269c65748a2d0f27d9dbf7f7fc454150419020d93031a1edaf4af16e93a38f6",
@@ -408,7 +409,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/toolgrad_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/toolgrad_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/toolgrad_journal.gif",
       "bytes": 151,
       "sha256": "2dc9a61a8157f1c37fc4fad9901fc54eb025acf00c9fddc7ff48bddb095e8fc1",
       "parallel_site_sha256": "2dc9a61a8157f1c37fc4fad9901fc54eb025acf00c9fddc7ff48bddb095e8fc1",
@@ -416,7 +417,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/_themes/journal/top_bar_button_journal.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/top_bar_button_journal.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/_themes/journal/top_bar_button_journal.gif",
       "bytes": 128,
       "sha256": "961c654d7d8d776f479ee1fac87dfddef9818ab9bbe4e95406aad2165650a0ad",
       "parallel_site_sha256": "961c654d7d8d776f479ee1fac87dfddef9818ab9bbe4e95406aad2165650a0ad",
@@ -424,7 +425,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/binaural.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/binaural.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/binaural.html",
       "bytes": 17992,
       "sha256": "4b7a6b3d54f0b662fbd25f1a23938846c2fbde6c22c3218010ad4c956ef41be3",
       "parallel_site_sha256": "51725cf2719cd8bb3cf4831dd5ffeb6e57e769e23c8a5eceb4e595167708d4b9",
@@ -433,7 +434,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/binaural.txt",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/binaural.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/binaural.txt",
       "bytes": 445,
       "sha256": "c9fa45b56300851dbe52c94263af81e344b749f0db7725e04f78db55c5806810",
       "parallel_site_sha256": "c9fa45b56300851dbe52c94263af81e344b749f0db7725e04f78db55c5806810",
@@ -441,7 +442,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/commands.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/commands.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/commands.html",
       "bytes": 7339,
       "sha256": "945d7f93c3466a426b11ba51cea905a0336557921ce22dea9a8becdbbbc39913",
       "parallel_site_sha256": "a7ac6de4ec0d5da06052a2db62122bc4e9818b8c9c83c4d9e43387f594701ae8",
@@ -450,7 +451,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/comparewavs.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/comparewavs.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/comparewavs.html",
       "bytes": 4969,
       "sha256": "07bad3d73b12e7c16f97543dbbc75058839b688cedffd5c8061e71754431eb23",
       "parallel_site_sha256": "06154c0b05bedc4ec679ba37e1a4ba193a2cac4c4632d7fec632592254e838b7",
@@ -459,7 +460,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/config.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/config.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/config.html",
       "bytes": 19839,
       "sha256": "19bff674ed5b113e8e743018a601f10b5f794c9bbc0dbc60f8226cdd0dab077d",
       "parallel_site_sha256": "0e9aa193b20e93cbc1b3ee4d81bdd0c05ceb8f544d6bec40b1ede69e835bb592",
@@ -468,7 +469,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/configegs.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/configegs.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/configegs.html",
       "bytes": 11391,
       "sha256": "2b5cf0888b6320fcc2af34dd041d5a6529064127752e259040d4322307ab3865",
       "parallel_site_sha256": "a883fa41a4bf180ba151491a92ed035a25801a4517cd47adbf4f2fd63a9edb5f",
@@ -477,7 +478,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/convolvercmd.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/convolvercmd.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/convolvercmd.html",
       "bytes": 5960,
       "sha256": "d9e1dd777b20eecb8b12c503819864d78e58a1766350da647f7a26ab5e983fa8",
       "parallel_site_sha256": "a91903cdd5bbd2648cea5c421bad2663e0c4eb3cd654f372a587d236e861a6de",
@@ -486,7 +487,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/convolverpipe.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/convolverpipe.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/convolverpipe.html",
       "bytes": 13953,
       "sha256": "9b67c1866288222daaa3a8d77ed7c99c0dc32fea0c93b03c952ee9917ac9c06d",
       "parallel_site_sha256": "ec55d3190bc542367d3a2d9e0e22c9e6b9e3fcf9f1efd2b94261ab2b49d28df0",
@@ -495,7 +496,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/custom-convert.conf",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/custom-convert.conf",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/custom-convert.conf",
       "bytes": 911,
       "sha256": "75f920cd962d25e8502cf1d5df3c476f91d196269999c1a2a4cd1f414ee3b523",
       "parallel_site_sha256": "75f920cd962d25e8502cf1d5df3c476f91d196269999c1a2a4cd1f414ee3b523",
@@ -503,7 +504,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/download.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/download.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/download.html",
       "bytes": 5086,
       "sha256": "1427ce756c896e8410f61ef8b2fdb18471983ea9d4116ff6b518c2eda8e2d22d",
       "parallel_site_sha256": "734c7720bd4f75e10ba6586f2322e4835d13f41617a2ad4cc39ba3cc704bfb99",
@@ -512,7 +513,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/feedback.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/feedback.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/feedback.html",
       "bytes": 5902,
       "sha256": "0e199c7fb797f158c225c7cf1d46f3dc0a8140b3a3a9ca1f61d7e622a8f7bd0c",
       "parallel_site_sha256": "ac186b84f5c55842d67a278846d1cf78c9c57991a59d31d42dc86f8a22db81c4",
@@ -521,7 +522,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/Drawing1.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/Drawing1.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/Drawing1.gif",
       "bytes": 24137,
       "sha256": "0a12b3d4c76b2222a6e1207e55d188e3d2ea9dc8629fd3d360ea4388b5714fb5",
       "parallel_site_sha256": "0a12b3d4c76b2222a6e1207e55d188e3d2ea9dc8629fd3d360ea4388b5714fb5",
@@ -529,7 +530,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/Untitled-1.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/Untitled-1.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/Untitled-1.gif",
       "bytes": 14461,
       "sha256": "099dc61b7102c631bf96e594f1a75699ce8e5c864e156b04bd4f3e8d37809bbb",
       "parallel_site_sha256": "099dc61b7102c631bf96e594f1a75699ce8e5c864e156b04bd4f3e8d37809bbb",
@@ -537,7 +538,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/Untitled-4.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/Untitled-4.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/Untitled-4.gif",
       "bytes": 127433,
       "sha256": "dc496ddb49b79e7ef7d73a1639c71a9102516f14e1776466c84e0ca259b603ae",
       "parallel_site_sha256": "dc496ddb49b79e7ef7d73a1639c71a9102516f14e1776466c84e0ca259b603ae",
@@ -545,7 +546,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/VSTLogoAlpha.png",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/VSTLogoAlpha.png",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/VSTLogoAlpha.png",
       "bytes": 213563,
       "sha256": "7f989e740c9dd5caf7832aa9bd2eca49b99c6aefbef4e2e3aacb04f65ee6f79d",
       "parallel_site_sha256": "7f989e740c9dd5caf7832aa9bd2eca49b99c6aefbef4e2e3aacb04f65ee6f79d",
@@ -553,7 +554,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/convolver.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/convolver.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/convolver.gif",
       "bytes": 148,
       "sha256": "19fbb4baad16a089f0d90ac5ad438fbc583f0a1b2e6e33eb9c5e04c6c9e3ec48",
       "parallel_site_sha256": "19fbb4baad16a089f0d90ac5ad438fbc583f0a1b2e6e33eb9c5e04c6c9e3ec48",
@@ -561,7 +562,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/index.2.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/index.2.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/index.2.jpg",
       "bytes": 31319,
       "sha256": "1b1405ecf9444b21158c9134e4208f0d52c0fa414101a318267221460084d1c5",
       "parallel_site_sha256": "1b1405ecf9444b21158c9134e4208f0d52c0fa414101a318267221460084d1c5",
@@ -569,7 +570,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/nsp_conventional2.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/nsp_conventional2.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/nsp_conventional2.gif",
       "bytes": 16157,
       "sha256": "c3130fdb022808a3925c90953b94e4426d5b7c72651ba56d08fd12ffff311258",
       "parallel_site_sha256": "c3130fdb022808a3925c90953b94e4426d5b7c72651ba56d08fd12ffff311258",
@@ -577,7 +578,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/usage.2.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/usage.2.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/usage.2.jpg",
       "bytes": 30812,
       "sha256": "867c2bcc3508382ab5a6529e950a62c6b462430a64b97c1ae80373a5d7311d5e",
       "parallel_site_sha256": "867c2bcc3508382ab5a6529e950a62c6b462430a64b97c1ae80373a5d7311d5e",
@@ -585,7 +586,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/usage.3.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/usage.3.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/usage.3.jpg",
       "bytes": 42788,
       "sha256": "40c95bba60045ea95d99992222aa90575f16ea7c4da6d33b3de7845379241c8f",
       "parallel_site_sha256": "40c95bba60045ea95d99992222aa90575f16ea7c4da6d33b3de7845379241c8f",
@@ -593,7 +594,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/usage.4.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/usage.4.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/usage.4.jpg",
       "bytes": 31032,
       "sha256": "190f5805f85e5b32bfba615208c2b6d063c17ccf44a646e414eff869473571a8",
       "parallel_site_sha256": "190f5805f85e5b32bfba615208c2b6d063c17ccf44a646e414eff869473571a8",
@@ -601,7 +602,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/usage.5.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/usage.5.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/usage.5.jpg",
       "bytes": 52146,
       "sha256": "e9be81af293f4b9c60a38f783c8ad7d06c6d7586c008f689403ad95ada122aad",
       "parallel_site_sha256": "e9be81af293f4b9c60a38f783c8ad7d06c6d7586c008f689403ad95ada122aad",
@@ -609,7 +610,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_10.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_10.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_10.jpg",
       "bytes": 94438,
       "sha256": "51dfd9c6325ef82af8a4c77aebf4f3720e4e4a2d6a9e3eb13d9b46b2d4415e48",
       "parallel_site_sha256": "51dfd9c6325ef82af8a4c77aebf4f3720e4e4a2d6a9e3eb13d9b46b2d4415e48",
@@ -617,7 +618,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_11.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_11.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_11.jpg",
       "bytes": 43884,
       "sha256": "d24664c153b58f86a3c74558f10c8d43cd6cbccca3d1d6f38b1755f2f7707b77",
       "parallel_site_sha256": "d24664c153b58f86a3c74558f10c8d43cd6cbccca3d1d6f38b1755f2f7707b77",
@@ -625,7 +626,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_12.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_12.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_12.jpg",
       "bytes": 57389,
       "sha256": "6b8b846faf34540c9558165ef075b7b04ecec79539cc664230752a1e01816255",
       "parallel_site_sha256": "6b8b846faf34540c9558165ef075b7b04ecec79539cc664230752a1e01816255",
@@ -633,7 +634,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_13.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_13.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_13.jpg",
       "bytes": 29773,
       "sha256": "a6dd182f95685a2f7bd99a3bdb8f8c95eb7b55da41cf85a15e959b35d2701386",
       "parallel_site_sha256": "a6dd182f95685a2f7bd99a3bdb8f8c95eb7b55da41cf85a15e959b35d2701386",
@@ -641,7 +642,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_14.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_14.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_14.jpg",
       "bytes": 95661,
       "sha256": "df2111d30bfa488801998417affa8c117541eb2834620bd9486ab6095516770e",
       "parallel_site_sha256": "df2111d30bfa488801998417affa8c117541eb2834620bd9486ab6095516770e",
@@ -649,7 +650,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_15.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_15.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_15.jpg",
       "bytes": 39446,
       "sha256": "e886e80ee9cbb9c912ba65ae2734dec19c6da16ba7c0d31aa13678400d0acacd",
       "parallel_site_sha256": "e886e80ee9cbb9c912ba65ae2734dec19c6da16ba7c0d31aa13678400d0acacd",
@@ -657,7 +658,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_16.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_16.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_16.jpg",
       "bytes": 96822,
       "sha256": "fa2a71d49ec4ee1c5109649743bd26304855de1962b7de4839ee4825b0b0b805",
       "parallel_site_sha256": "fa2a71d49ec4ee1c5109649743bd26304855de1962b7de4839ee4825b0b0b805",
@@ -665,7 +666,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_17.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_17.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_17.jpg",
       "bytes": 33246,
       "sha256": "fa684e02909399ec4086f608b8164677f3ef7160bfa2c4e6a9e1f09e8194cc04",
       "parallel_site_sha256": "fa684e02909399ec4086f608b8164677f3ef7160bfa2c4e6a9e1f09e8194cc04",
@@ -673,7 +674,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_18.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_18.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_18.jpg",
       "bytes": 30166,
       "sha256": "c3573b6c073cbba263c1b957a51f1fd5f04a71f00f752e6851bf2d77d1db3eb5",
       "parallel_site_sha256": "c3573b6c073cbba263c1b957a51f1fd5f04a71f00f752e6851bf2d77d1db3eb5",
@@ -681,7 +682,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_19.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_19.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_19.jpg",
       "bytes": 73957,
       "sha256": "7b2e8bd7412b9de43188af829a8a873e3028e307b8c1586b4d0930afcb5e2cd1",
       "parallel_site_sha256": "7b2e8bd7412b9de43188af829a8a873e3028e307b8c1586b4d0930afcb5e2cd1",
@@ -689,7 +690,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_20.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_20.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_20.gif",
       "bytes": 14744,
       "sha256": "9bddc7b5e6473104f1f1632091f16338a1a7e95bc26f121221db71fc48e5558f",
       "parallel_site_sha256": "9bddc7b5e6473104f1f1632091f16338a1a7e95bc26f121221db71fc48e5558f",
@@ -697,7 +698,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_21.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_21.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_21.gif",
       "bytes": 7832,
       "sha256": "08425ea2176ca5468a9ff55bda61e843e1177aa5bbd96f4f23d84c65395e65f1",
       "parallel_site_sha256": "08425ea2176ca5468a9ff55bda61e843e1177aa5bbd96f4f23d84c65395e65f1",
@@ -705,7 +706,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_3.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_3.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_3.jpg",
       "bytes": 81309,
       "sha256": "d394f7275aa9fb82c1ea4ad11ccce44ea7367509dfc9061183e26408efd9ed17",
       "parallel_site_sha256": "d394f7275aa9fb82c1ea4ad11ccce44ea7367509dfc9061183e26408efd9ed17",
@@ -713,7 +714,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/using_9.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/using_9.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/using_9.jpg",
       "bytes": 19166,
       "sha256": "5dd1e154c6350f7bec94cdd290d416ae1da5ef82d172ab9c94659fcba450d105",
       "parallel_site_sha256": "5dd1e154c6350f7bec94cdd290d416ae1da5ef82d172ab9c94659fcba450d105",
@@ -721,7 +722,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/vst.ht1.jpg",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/vst.ht1.jpg",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/vst.ht1.jpg",
       "bytes": 17288,
       "sha256": "02533a84b99c96494c942210a38eb39d45e73de8480c6509b363dd515d01d85a",
       "parallel_site_sha256": "02533a84b99c96494c942210a38eb39d45e73de8480c6509b363dd515d01d85a",
@@ -729,7 +730,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/images/wpnrq9t6.gif",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/images/wpnrq9t6.gif",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/images/wpnrq9t6.gif",
       "bytes": 75092,
       "sha256": "012cb148ebca264c32fabb63077e28f2df687a9c8ac9a4bb506843c395502796",
       "parallel_site_sha256": "012cb148ebca264c32fabb63077e28f2df687a9c8ac9a4bb506843c395502796",
@@ -737,7 +738,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/index.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/index.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/index.html",
       "bytes": 12008,
       "sha256": "d9a8865c382af0f993a022e01c4563e005d9ea6c926fbd9961d42c352d55c5d2",
       "parallel_site_sha256": "637bd46775b7a4dc09c0f2973addde5f0c19d3028604351851f0f27adbd91540",
@@ -746,7 +747,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/links.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/links.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/links.html",
       "bytes": 9428,
       "sha256": "3119e418c261258bd19edbe03fb11822cd2cda2447c0179b9dac864d74887973",
       "parallel_site_sha256": "1281789bc596e180d2c8af128a97dc4f9508ed2339dcd36f79cc9a2ca78a77f6",
@@ -755,7 +756,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/makeir.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/makeir.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/makeir.html",
       "bytes": 7085,
       "sha256": "ad8b9c4d31b4542428cefde45061b933327dbd29b5f589148cc68904462a88d6",
       "parallel_site_sha256": "79e26856a2decb50df6c7959d869cbe2b687ab8c3b26cc86f923dcec65b997ee",
@@ -764,7 +765,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/news.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/news.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/news.html",
       "bytes": 27825,
       "sha256": "cb323f09c5ea5d7038a4155fb94210b97bf31d4464a6c4eb8168bb7e853465a9",
       "parallel_site_sha256": "e8d960c05c0e434e6744d6888489e0d68ad2c98081df077635c0d87939e5f796",
@@ -773,7 +774,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/perftest.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/perftest.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/perftest.html",
       "bytes": 19873,
       "sha256": "32cd70df570b9ad1affbd65de18059e7d2025354aec610a581af866f8b916147",
       "parallel_site_sha256": "15f6a7807f4676c52bd4aabe82439fd9b148f3a2112d00995e71d48f1ddba2ba",
@@ -782,7 +783,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/troubleshooting.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/troubleshooting.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/troubleshooting.html",
       "bytes": 11160,
       "sha256": "adb249e5ea75706de4ed626327eb4abb072335417e65eecb89db6fe84d88ce80",
       "parallel_site_sha256": "b69127993d1088f3088c5c2089e6f16d4d2218731856ba175b70558af3fa827c",
@@ -791,7 +792,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/usage.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/usage.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/usage.html",
       "bytes": 13932,
       "sha256": "71de424b4f5d18ad8041a0d93ee04303414a6b6b2f2d80dd7d7c8470348cbab3",
       "parallel_site_sha256": "9fe019ba6356075fe2315080281856a08e567b54b7b767952213bf9862ebb831",
@@ -800,7 +801,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/vst.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/vst.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/vst.html",
       "bytes": 13638,
       "sha256": "037069608bc55173b580536a8a3df689c8d801f6b0666818df05b427f1c81fb5",
       "parallel_site_sha256": "7a7ec8a69e9d8ad8b5601d297cd425ecdc50f5323855948623f1a8cd88b7ce54",
@@ -809,7 +810,7 @@
     },
     {
       "path": "docs/historical/convolver-4.4/zoom.html",
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/zoom.html",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/zoom.html",
       "bytes": 12455,
       "sha256": "c7992ec5df85202f034dc7f4ee23acc25f2109921d9ba7bce98e8bfa5312ad67",
       "parallel_site_sha256": "56ae8bc49cc7dcb0205a3f272d0dd818365d492812eadff7b61d412c6ef08c46",
@@ -6337,7 +6338,7 @@
   ],
   "nested_source_document_scan": [
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/cmul/ReadMe.txt",
       "sha256": "abaf60c3280e9b8e4989d21757a1c107372f957f63094a1f2aa3b6fc2e12fc01",
       "matches_local": false,
@@ -6345,7 +6346,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/comparewavs/ReadMe.txt",
       "sha256": "17b2dbc6ee807275986bce997810ece4ce7f5335a68bc37790ad69ebb124eac5",
       "matches_local": false,
@@ -6353,7 +6354,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/convolverCMD/ReadMe.txt",
       "sha256": "1f72b1901da2186c169a7936d5ed6fb3425a30b8283ac7b85ea495a59c9955c5",
       "matches_local": false,
@@ -6361,7 +6362,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/convolverFilter/readme.txt",
       "sha256": "02550c39017efa841eaf6de721f1838414aa0ec6a90b45cac1141e6dc92ac665",
       "matches_local": false,
@@ -6369,7 +6370,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/convolverPipe/ReadMe.txt",
       "sha256": "b312b462cf56a21bd87e2c82a93592f46ec8bdea61be4317ea748c0c8f492461",
       "matches_local": false,
@@ -6377,7 +6378,7 @@
       "matches_local_ignoring_line_endings": false
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/convolverWMP/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6385,7 +6386,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/generate_test_IRs/ReadMe.txt",
       "sha256": "499f0e4643b4bf2819e30403160c57ecdc7acf49bcd560f20efb549120eb08f5",
       "matches_local": false,
@@ -6393,7 +6394,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6401,7 +6402,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/libsndfile/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6409,7 +6410,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/makeIR/ReadMe.txt",
       "sha256": "a7663e886a4eaeb87b9cd9515531944431e93edb21a96b1a2bd83b9a926ea296",
       "matches_local": false,
@@ -6417,7 +6418,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver.zip",
       "member": "convolver/perftest/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6425,7 +6426,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/cmul/ReadMe.txt",
       "sha256": "abaf60c3280e9b8e4989d21757a1c107372f957f63094a1f2aa3b6fc2e12fc01",
       "matches_local": false,
@@ -6433,7 +6434,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/comparewavs/ReadMe.txt",
       "sha256": "17b2dbc6ee807275986bce997810ece4ce7f5335a68bc37790ad69ebb124eac5",
       "matches_local": false,
@@ -6441,7 +6442,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/convolverCMD/ReadMe.txt",
       "sha256": "1f72b1901da2186c169a7936d5ed6fb3425a30b8283ac7b85ea495a59c9955c5",
       "matches_local": false,
@@ -6449,7 +6450,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/convolverFilter/readme.txt",
       "sha256": "02550c39017efa841eaf6de721f1838414aa0ec6a90b45cac1141e6dc92ac665",
       "matches_local": false,
@@ -6457,7 +6458,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/convolverWMP/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6465,7 +6466,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/generate_test_IRs/ReadMe.txt",
       "sha256": "499f0e4643b4bf2819e30403160c57ecdc7acf49bcd560f20efb549120eb08f5",
       "matches_local": false,
@@ -6473,7 +6474,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6481,7 +6482,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/libsndfile/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6489,7 +6490,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/makeIR/ReadMe.txt",
       "sha256": "a7663e886a4eaeb87b9cd9515531944431e93edb21a96b1a2bd83b9a926ea296",
       "matches_local": false,
@@ -6497,7 +6498,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Copy of convolver4-3src.zip",
       "member": "convolver/perftest/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6505,7 +6506,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/cmul/ReadMe.txt",
       "sha256": "abaf60c3280e9b8e4989d21757a1c107372f957f63094a1f2aa3b6fc2e12fc01",
       "matches_local": false,
@@ -6513,7 +6514,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/comparewavs/ReadMe.txt",
       "sha256": "17b2dbc6ee807275986bce997810ece4ce7f5335a68bc37790ad69ebb124eac5",
       "matches_local": false,
@@ -6521,7 +6522,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/convolverCMD/ReadMe.txt",
       "sha256": "1f72b1901da2186c169a7936d5ed6fb3425a30b8283ac7b85ea495a59c9955c5",
       "matches_local": false,
@@ -6529,7 +6530,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/convolverFilter/readme.txt",
       "sha256": "02550c39017efa841eaf6de721f1838414aa0ec6a90b45cac1141e6dc92ac665",
       "matches_local": false,
@@ -6537,7 +6538,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/convolverWMP/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6545,7 +6546,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/generate_test_IRs/ReadMe.txt",
       "sha256": "499f0e4643b4bf2819e30403160c57ecdc7acf49bcd560f20efb549120eb08f5",
       "matches_local": false,
@@ -6553,7 +6554,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/gpl.txt",
       "sha256": "40a607e086bc23f10e2953bcccdccdf857d26ad40b8cbdc974df96c678f51afa",
       "matches_local": false,
@@ -6561,7 +6562,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/libsndfile/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6569,7 +6570,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/makeIR/ReadMe.txt",
       "sha256": "a7663e886a4eaeb87b9cd9515531944431e93edb21a96b1a2bd83b9a926ea296",
       "matches_local": false,
@@ -6577,7 +6578,7 @@
       "matches_local_ignoring_line_endings": true
     },
     {
-      "archive_member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
+      "archive_member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver4-3src.zip",
       "member": "convolver/perftest/ReadMe.txt",
       "sha256": "67cf8e388db715112385a480a5f71999b17091d9defb38dba744746351b62c24",
       "matches_local": false,
@@ -6587,238 +6588,238 @@
   ],
   "outer_third_party_asset_notes": [
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/hslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/hslider_med.txt",
       "sha256": "956f80562afc5d430775b2fca30ea60aa44172ca9bdb84fc599d4320d3870611",
       "bytes": 119,
       "text": "; medium vertical slider\r\ntype slider\r\norientation horiz\r\nframe_size 54,25\r\nhandle_rect 57,0,71,25\r\nhandle_range 0,40\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/button_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/button_sm.txt",
       "sha256": "8200898c23999151a95e3e4cc56168c8f3542a0973253f160f7b5a816a373015",
       "bytes": 82,
       "text": "; small button with light\r\ntype animated\r\nmouse_response click\r\nframe_size 14,14\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/arrow_right.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/arrow_right.txt",
       "sha256": "40e06fabcf70d9295f8673d567cb3feba118ce46bbf1532cf00bd043fada2eca",
       "bytes": 84,
       "text": "; right facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 15,15\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/arrow_left.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/arrow_left.txt",
       "sha256": "aa5d2261ea863b4a7e79de2a21f3a26893efff9e6aaca25d4c6ab6911d68408f",
       "bytes": 85,
       "text": "; left facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 15,15\r\n\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/_Readme.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/_Readme.txt",
       "sha256": "44fa730311ae4a5706b4d7eb77ef4fb4a4d650aa50c4971799ec645f43cf9146",
       "bytes": 987,
       "text": "License Agreement\r\n\r\nYou may use these files for free with software SynthEdit, created by Jeff McClintock.\r\n\r\nYou may use these control elements on you on risk. Be aware that editing any text file may cause that some controls elements will be displayed incorrectly.\r\n\r\nYou may NOT sell or distribute this software by any way without a written permission from its author.\r\n\r\nIf you publish your VST/VSTi plugin where you used these control elements, you should inform your users that you did so. This information should be specified in \"ABOUT\" window of your plugin or in its manual. This information should look like:\r\n\r\nGraphic control elements created by Vera Kinter, URL http://www.artvera-music.com\r\nOR\r\nSome controls elements created by Vera Kinter, URL http://www.artvera-music.com\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n----------------------------------------------------------------\r\n\r\nIf you need to contact me, please use a contact form at http://www.artvera-music.com/.\r\n\r\nBest Wishes\r\nVera Kinter\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/vslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/vslider_med.txt",
       "sha256": "d39cc15618f4c8cfd332177d8fd1caef5ad103a1d9b0184adfc66ed669777de2",
       "bytes": 118,
       "text": "; medium vertical slider\r\ntype slider\r\norientation vert\r\nframe_size 25,54\r\nhandle_rect 1,57,25,71\r\nhandle_range 0,40\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/knob_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/knob_med.txt",
       "sha256": "c4a912f5232df062c9397b2c1142191f537f79b7fe15bbcbe1c48a5fef16a80d",
       "bytes": 71,
       "text": "; medium knob\r\ntype animated\r\nframe_size 33,32\r\nmouse_response rotary\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/knob_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Halved/knob_sm.txt",
       "sha256": "29b6afbd6742d43524e07958b0f5ac1bfc0555b29b7007f87d915b70f5ca885c",
       "bytes": 68,
       "text": "; small knob\r\ntype animated\r\nframe_size 25,24\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/hslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/hslider_med.txt",
       "sha256": "2734add77828134c9e9f9e9d0e4c9e90905ede405dc235ed5d4e43b1d0249620",
       "bytes": 120,
       "text": "; medium vertical slider\r\ntype slider\r\norientation horiz\r\nframe_size 100,19\r\nhandle_rect 104,2,134,19\r\nhandle_range 0,70",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/button_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/button_sm.txt",
       "sha256": "3c963ca1360362e2b8064323276556e08d76cbcec3fd9ec3dd3b98d3a45a016d",
       "bytes": 82,
       "text": "; small button with light\r\ntype animated\r\nmouse_response click\r\nframe_size 35,18\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/arrow_right.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/arrow_right.txt",
       "sha256": "a1fd8f11f6b9da181ae24629b0267209aff120c6f14eeb0a3f6960a4095e2341",
       "bytes": 84,
       "text": "; right facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 17,17\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/arrow_left.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/arrow_left.txt",
       "sha256": "0b58ba37cc17d4d07daf1bd0cbe06bd2e5520a6a95b40eb5a6980655843a9c55",
       "bytes": 85,
       "text": "; left facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 17,17\r\n\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/_Readme.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/_Readme.txt",
       "sha256": "44fa730311ae4a5706b4d7eb77ef4fb4a4d650aa50c4971799ec645f43cf9146",
       "bytes": 987,
       "text": "License Agreement\r\n\r\nYou may use these files for free with software SynthEdit, created by Jeff McClintock.\r\n\r\nYou may use these control elements on you on risk. Be aware that editing any text file may cause that some controls elements will be displayed incorrectly.\r\n\r\nYou may NOT sell or distribute this software by any way without a written permission from its author.\r\n\r\nIf you publish your VST/VSTi plugin where you used these control elements, you should inform your users that you did so. This information should be specified in \"ABOUT\" window of your plugin or in its manual. This information should look like:\r\n\r\nGraphic control elements created by Vera Kinter, URL http://www.artvera-music.com\r\nOR\r\nSome controls elements created by Vera Kinter, URL http://www.artvera-music.com\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n----------------------------------------------------------------\r\n\r\nIf you need to contact me, please use a contact form at http://www.artvera-music.com/.\r\n\r\nBest Wishes\r\nVera Kinter\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/vslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/vslider_med.txt",
       "sha256": "900c1054d8476fdc30e9f4d109342e71ed86460bb1cad0e665cf594c61179473",
       "bytes": 121,
       "text": "; medium vertical slider\r\ntype slider\r\norientation vert\r\nframe_size 20,101\r\nhandle_rect 4,106,20,136\r\nhandle_range 1,71\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/knob_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/knob_med.txt",
       "sha256": "7c05d3314b5e8f895da8a9be8c826ebc2715a4d35fd804279ab484e39e6d5d40",
       "bytes": 71,
       "text": "; medium knob\r\ntype animated\r\nframe_size 47,46\r\nmouse_response vertical",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/knob_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Numeric-Blue/knob_sm.txt",
       "sha256": "bc84c54e7b8d87279463519d4f0e75bd06a6a5e5a340b0493702b750c8edfc71",
       "bytes": 68,
       "text": "; small knob\r\ntype animated\r\nframe_size 40,40\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/hslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/hslider_med.txt",
       "sha256": "a5481d6e9a11a9bdf5fe80c52c52548dc47d68806682ae0cee95aa0e97994adb",
       "bytes": 121,
       "text": "; medium vertical slider\r\ntype slider\r\norientation horiz\r\nframe_size 146,22\r\nhandle_rect 150,1,180,22\r\nhandle_range 0,116",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/button_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/button_sm.txt",
       "sha256": "944e0d6bb32543a0122effde2e61c98380d580485e4adbcf94092e97b1a0222a",
       "bytes": 82,
       "text": "; small button with light\r\ntype animated\r\nmouse_response click\r\nframe_size 34,23\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/arrow_right.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/arrow_right.txt",
       "sha256": "545b0ea0ddee6f53f0763da5aed1384d429bb24df0495774b8a2956a57ce16a0",
       "bytes": 84,
       "text": "; right facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 24,20\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/arrow_left.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/arrow_left.txt",
       "sha256": "f3b92494e5fbb560a9fd29ae0fbfcc4c33f50e043eba4367817e484e26af2a60",
       "bytes": 85,
       "text": "; left facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 24,20\r\n\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/_Readme.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/_Readme.txt",
       "sha256": "44fa730311ae4a5706b4d7eb77ef4fb4a4d650aa50c4971799ec645f43cf9146",
       "bytes": 987,
       "text": "License Agreement\r\n\r\nYou may use these files for free with software SynthEdit, created by Jeff McClintock.\r\n\r\nYou may use these control elements on you on risk. Be aware that editing any text file may cause that some controls elements will be displayed incorrectly.\r\n\r\nYou may NOT sell or distribute this software by any way without a written permission from its author.\r\n\r\nIf you publish your VST/VSTi plugin where you used these control elements, you should inform your users that you did so. This information should be specified in \"ABOUT\" window of your plugin or in its manual. This information should look like:\r\n\r\nGraphic control elements created by Vera Kinter, URL http://www.artvera-music.com\r\nOR\r\nSome controls elements created by Vera Kinter, URL http://www.artvera-music.com\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n----------------------------------------------------------------\r\n\r\nIf you need to contact me, please use a contact form at http://www.artvera-music.com/.\r\n\r\nBest Wishes\r\nVera Kinter\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/vslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/vslider_med.txt",
       "sha256": "c3c7e6739203a76dbca469727e9714d83cbb2292842a8a640f6c59023315f1d9",
       "bytes": 119,
       "text": "; medium vertical slider\r\ntype slider\r\norientation vert\r\nframe_size 31,78\r\nhandle_rect 3,82,31,103\r\nhandle_range 1,57\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/knob_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/knob_med.txt",
       "sha256": "027d55f9709cd66f84eb405097de001b9efaf13bc62bdb6896b3dfde2547bc73",
       "bytes": 69,
       "text": "; medium knob\r\ntype animated\r\nframe_size 56,56\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/knob_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Rotating-Teal/knob_sm.txt",
       "sha256": "554ca8b520f57d47bbb2cd74f8d73f4a34f8856553b205bd70bbedae338c9e6f",
       "bytes": 68,
       "text": "; small knob\r\ntype animated\r\nframe_size 38,38\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/hslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/hslider_med.txt",
       "sha256": "8300c8d6e5d8546b431f42c5e87575ddc2651ca7b9174e01523496be33eff259",
       "bytes": 118,
       "text": "; medium vertical slider\r\ntype slider\r\norientation horiz\r\nframe_size 93,22\r\nhandle_rect 97,2,129,22\r\nhandle_range 1,62",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/button_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/button_sm.txt",
       "sha256": "39e1dfa1679c0d5f9ce723b111dcb43dd4a1eeb1deb5b740edc0c66ab68eb3fa",
       "bytes": 82,
       "text": "; small button with light\r\ntype animated\r\nmouse_response click\r\nframe_size 30,21\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/arrow_right.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/arrow_right.txt",
       "sha256": "2c6ed66f86b9b4e7f8690b6b82bcfcab5e66ec6d0d0d4b07feb2f1eb6b4a71d7",
       "bytes": 84,
       "text": "; right facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 19,20\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/arrow_left.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/arrow_left.txt",
       "sha256": "300287c1c377e903253fe9fe9536b8ed3561011f825ad8aaa7e5f821ab9ccca8",
       "bytes": 85,
       "text": "; left facing arrow button\r\ntype animated\r\nmouse_response click\r\nframe_size 19,20\r\n\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/_Readme.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/_Readme.txt",
       "sha256": "44fa730311ae4a5706b4d7eb77ef4fb4a4d650aa50c4971799ec645f43cf9146",
       "bytes": 987,
       "text": "License Agreement\r\n\r\nYou may use these files for free with software SynthEdit, created by Jeff McClintock.\r\n\r\nYou may use these control elements on you on risk. Be aware that editing any text file may cause that some controls elements will be displayed incorrectly.\r\n\r\nYou may NOT sell or distribute this software by any way without a written permission from its author.\r\n\r\nIf you publish your VST/VSTi plugin where you used these control elements, you should inform your users that you did so. This information should be specified in \"ABOUT\" window of your plugin or in its manual. This information should look like:\r\n\r\nGraphic control elements created by Vera Kinter, URL http://www.artvera-music.com\r\nOR\r\nSome controls elements created by Vera Kinter, URL http://www.artvera-music.com\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n----------------------------------------------------------------\r\n\r\nIf you need to contact me, please use a contact form at http://www.artvera-music.com/.\r\n\r\nBest Wishes\r\nVera Kinter\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/vslider_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/vslider_med.txt",
       "sha256": "d9119d21c5ef79e341095cea7aee19617890d8ccc4c95e5569aef96d6ac7282c",
       "bytes": 119,
       "text": "; medium vertical slider\r\ntype slider\r\norientation vert\r\nframe_size 26,93\r\nhandle_rect 6,96,26,128\r\nhandle_range 1,62\r\n",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/knob_med.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/knob_med.txt",
       "sha256": "751a37cec77dacdd452ad6043d5de9b09564238b64acdadd488cfc8097e1920d",
       "bytes": 69,
       "text": "; medium knob\r\ntype animated\r\nframe_size 46,50\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/knob_sm.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/VSTinterface/VK_Mini-Grey/knob_sm.txt",
       "sha256": "f47b92f3e90f604a2014d23c4264641c8f8ec45d46ac3964dbe8c4617d559f71",
       "bytes": 68,
       "text": "; small knob\r\ntype animated\r\nframe_size 33,32\r\nmouse_response rotary",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Media/Noisevault/Synthetic/nv_synthetic_1.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Media/Noisevault/Synthetic/nv_synthetic_1.txt",
       "sha256": "e1e2e2b169596e4c5f26dc0d1652f68f8917601d9c1af02cfdc2d1d698242688",
       "bytes": 1718,
       "text": "Hello all!\r\n\r\nThis is the first selection of custom Noisevault synthetic impulses.\r\n\r\nThis collection concentrates mostly on vast lush spaces.\r\n\r\nEverything in this collection was made by hand from purely synthetic\r\nsources. By this I mean there are no 'real' spaces here, nor was my\r\nintent to make impulses that would sound like a real space. These\r\nimpulses were designed to sound giant, smooth and luxurious.\r\n\r\nThey were hand made and edited at 192/64float (believe it or not) and\r\ncarefully converted to 44.1/32float.\r\n\r\nHere are some usage notes:\r\n\r\n1. These impulses are mostly quite long. This means your computer\r\nmight choke on some of them, and also they may not be appropriate for\r\nconventional use as they stand. You should feel FREE to adjust the\r\nlength of these responses in your convolution tool, and to apply an\r\nenvelope to them. Even loading them up into your favorite two track\r\neditor and editing them is a good idea! Of course, the reason I made\r\nthem long was so you could use them long if you wished.\r\n\r\n2. Some of these impulses are NOT subtle. You may find that mixing\r\nthem quite low will sound excellent. The subtlety is in your hands.\r\nSimilar to the length, I wanted to give the headroom to mix these in\r\nas strongly as you would like. But don't just listen to a 50/50 mix\r\nwhen you judge them. :)\r\n\r\n3. There is no pre delay built into any of these impulses. That too is\r\nin YOUR hands. Reverb almost always sounds cooler if there is some\r\npre-delay that corresponds to the source, or even the size of the verb.\r\nBut you will need to tweak that too.\r\n\r\nI really want to know what you folks think of these and if I should\r\ntry my hand at more!\r\n\r\nJames (cAPSLOCK) \r\njames@noisevault.com",
       "decision": "Excluded: optional third-party assets, not project documentation or required website assets."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Media/Noisevault/Lexicon/READ ME.txt",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Media/Noisevault/Lexicon/READ ME.txt",
       "sha256": "06cd3d7b5d8a528f085b120919606e4cd8481efd0b99470e8a65898bf3499de7",
       "bytes": 1634,
       "text": "Lexicon PCM91 Impulses:\r\n---------------------------------------\r\n\r\nThis is a comprehensive collection of reverb-only presets from a Lexicon PCM91.  All halls, plates, rooms, and post production presets included.  No delay, gated, or special effect type presets are included, as these would have limited usefulness and can be easily accomplished using other plugins.\r\n\r\nRecorded and edited in Sonar 3 at 24/44.1 via an M-Audio Delta1010 interface.    To take full advantage of the 24 bit resolution, make sure your recording software and audio card are also set to 24 bit depth as the tails will be much smoother as they approach the noise floor.\r\n\r\nThese reverb impulses I think capture the true character of a PCM91 better than any other impulses out there.  Classic Lexicon sound: wide and lush, gorgeous.  \r\n\r\nHope you get some good use out of these impulses, I've spent quite a few bleary-eyed late nights making them. Not to mention hours and hours of mind-numbing A/B comparisons with the actual unit.   \r\n\r\nFor a description of each preset visit http://www.lexiconpro.com/downloads/index.asp.   \r\n\r\nEnjoy!\r\n\r\n\r\n\r\nLexicon PCM81 Impulses:\r\n---------------------------------------\r\n\r\nThis is a collection of all the presets from the reverb section of the PCM81.  Obviously the modulation/chorus/pitch shift presets  would be of no use.   All recorded and edited in the same way as above.\r\n\r\nThese have a different character than the PCM91,  but are still definitely worth having in my opinion. Variety is a good thing! Enjoy!   \r\n\r\nAny comments or feedback would be appreciated.\r\n\r\n-Mark Blosser  (mblosser@neo.rr.com)\r\n\r\n     \r\n",
@@ -6836,7 +6837,7 @@
   },
   "other_nested_archive_scan": [
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/Impulses.ZIP",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/Impulses.ZIP",
       "sha256": "8a3864235d161b2f83201efc71e367e66ef0581928ab65ee71a4296155f17c5d",
       "entries": 15,
       "documentation_members": [
@@ -6864,7 +6865,7 @@
       "decision": "Not recovered: machine-specific 8-input/7-output crossover examples and a two-sample-rate filter-selection list; these illustrate existing documented configuration capabilities, require their associated custom impulse responses and add no new feature implementation."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver/Media/correction.zip",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver/Media/correction.zip",
       "sha256": "77c1be9eb6dffff7d65d9911790d21a09e524d8ac7fe193322203e0ff9572a36",
       "entries": 3,
       "documentation_members": [
@@ -6877,14 +6878,14 @@
       "decision": "Not recovered: machine-specific stereo Acourate correction configuration with absolute paths and two raw .dbl responses; existing config.html and usage.html already document these capabilities."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/bin/release/convolverPipe.zip",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/bin/release/convolverPipe.zip",
       "sha256": "e7edf27772577948dcaef557994cf7bb818ba58054109c712069389481c54f4a",
       "entries": 1,
       "documentation_members": [],
       "decision": "Not recovered: media or executable package, no additional project documentation."
     },
     {
-      "member": "homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/bin/release/convolverCMD.zip",
+      "member": "homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/bin/release/convolverCMD.zip",
       "sha256": "8df921d5cf34134ab6d60ff4d5d6464e1017d8b401fe6e354b290486d5db91f4",
       "entries": 1,
       "documentation_members": [],

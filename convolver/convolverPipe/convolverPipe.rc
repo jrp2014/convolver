@@ -74,7 +74,7 @@ BEGIN
             VALUE "FileDescription", "convolution Application"
             VALUE "FileVersion", "4, 4, 0, 0"
             VALUE "InternalName", "convolverPipe"
-            VALUE "LegalCopyright", "GPL Copyright (C) 2006 John Pavel"
+            VALUE "LegalCopyright", "GPL Copyright (C) 2006 jrp"
             VALUE "LegalTrademarks", "convolver"
             VALUE "OriginalFilename", "convolverPipe.exe"
             VALUE "ProductName", " convolverPipe"

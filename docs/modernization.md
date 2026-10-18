@@ -288,7 +288,7 @@ Preserving the format has value beyond this implementation:
   convolver. Recovering the maintained adaptation's source could avoid repeating
   portability work; its fixes cannot be inferred from that credit alone.
   [Album Player manual, section 6.3](https://albumplayer.ru/linux/album_player_linux_manual_ru.pdf)
-- **Audiolense/JRiver:** Audiolense's author credits John Pavel's configuration
+- **Audiolense/JRiver:** Audiolense's author credits jrp's configuration
   protocol and describes arranging JRiver support. This establishes format
   adoption, not shared DSP code.
   [Author's account](https://www.avnirvana.com/threads/al-filter-wav-file-inquiry.13436/)

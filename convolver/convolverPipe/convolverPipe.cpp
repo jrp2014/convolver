@@ -1,6 +1,6 @@
 // convolverPipe.cpp: stdin -> convolution -> stdout.
 // Restored from the corroborated historical Convolver 4.4 project in homes.zip.
-// Copyright (C) 2006 John Pavel; GNU GPL version 2 or, at your option, later.
+// Copyright (C) 2006 jrp; GNU GPL version 2 or, at your option, later.
 // See the repository COPYING file. Argument and stream safety repairs are local.
 #include "convolution\config.h"
 #include "stdafx.h"

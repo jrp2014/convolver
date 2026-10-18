@@ -1,6 +1,6 @@
 # Convolver
 
-Convolver is a Windows audio convolution engine by John Pavel. It applies
+Convolver is a Windows audio convolution engine by jrp. It applies
 impulse-response filters (typically for digital room correction or crossovers)
 to multichannel audio in real time, and ships as:
 

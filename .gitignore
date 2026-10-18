@@ -67,3 +67,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Generated Visual Studio user/resource caches (may contain personal metadata)
+*.suo
+*.aps

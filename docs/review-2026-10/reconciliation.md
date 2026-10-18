@@ -38,8 +38,8 @@ These qualify the corresponding wording in the original branch review.
 It contains 5,506 entries including macOS metadata, with 503,768,512 compressed
 file bytes. ZIP/filesystem dates were not used to choose a version.
 
-Paths below are relative to the archive directory
-`homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/`.
+Paths below are relative to the archive directory (personal identity replaced by `jrp`)
+`homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/`.
 
 | Source | Embedded version evidence | Conclusion |
 | --- | --- | --- |

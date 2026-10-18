@@ -16,7 +16,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PREFIX = 'homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/'
+SOURCE_SUFFIX = '/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/'
 
 
 def fragments(wave, exception, tables):
@@ -37,7 +37,13 @@ def main():
     args = parser.parse_args()
     if args.archive:
         with zipfile.ZipFile(args.archive) as archive:
-            sources = [archive.read(PREFIX + name).decode('latin-1').replace('\r\n', '\n')
+            # Locate the corroborated source without recording its personal home prefix.
+            prefixes = {name[:-len('wavefile.h')] for name in archive.namelist()
+                        if name.endswith(SOURCE_SUFFIX + 'wavefile.h')}
+            if len(prefixes) != 1:
+                parser.error('archive must contain exactly one matching 4.4 source directory')
+            prefix = prefixes.pop()
+            sources = [archive.read(prefix + name).decode('latin-1').replace('\r\n', '\n')
                        for name in ('wavefile.h', 'exception.h', 'wavefile.cpp')]
     else:
         sources = [(args.source_dir / name).read_text(encoding='latin-1')

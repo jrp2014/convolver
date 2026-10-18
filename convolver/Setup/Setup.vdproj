@@ -671,7 +671,7 @@
         "ARPHELPLINK" = "8:http://convolver.sourceforge.net"
         "Title" = "8:Convolver"
         "Subject" = "8:Convolution FIR"
-        "ARPCONTACT" = "8:John Pavel"
+        "ARPCONTACT" = "8:jrp"
         "Keywords" = "8:Convolver Convolution plugin plug-in DSP FIR filter WMP WMP10 Windows Media Player"
         "ARPCOMMENTS" = "8:DSP plug-in for Windows Media Player thatr eads an impulse response (wave file) and convolve it with the input stream."
         "ARPURLINFOABOUT" = "8:http://convolver.sourceforge.net"
