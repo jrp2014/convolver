@@ -51,17 +51,14 @@ external core/host/I/O consumer, and verifies components and source-tree use wit
 without a parent CTest setup. Core-only configuration runs five C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
-The preceding FFT-backend milestone passed 14 suites locally for both libraries;
-the current package milestone adds the consumer gate. `backend_equivalence.py` compares
-both actual CLIs over 16 matrix/delay cases, including odd block sizes and both
-latency modes. See [the measurements and reproduction commands](fft-backends.md).
-
-The preceding FFTW baseline passed Linux Clang/GCC, macOS and Windows MSVC
-[CI at f78c22b](https://github.com/jrp2014/convolver/actions/runs/39078598572).
-CI also builds Accelerate and compares backend outputs on macOS; consult the
-[workflow runs](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
-for each commit's remote results. Local dependency source hashes are
-recorded in the [portable guide](portable-core.md).
+`backend_equivalence.py` separately compares both actual CLIs over 16 matrix/delay
+cases, including odd block sizes and both latency modes. See
+[measurements and reproduction commands](fft-backends.md). The
+[current validation record](review-2026-10/current-validation.md) pins fresh local
+results and Linux/Windows/macOS CI evidence to source baseline `5df874e`.
+Consult the [native workflow](../.github/workflows/regression.yml) and
+[VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
+file alone is not evidence that a job passed.
 
 ## Run with CMake/CTest
 
@@ -147,7 +144,7 @@ callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
 that does not fix the independent historical wrappers. The portable CTest gate does not
 establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.
 
-The [modernization plan](modernization.md) defines the backend, native-platform,
-file/pipe, lifecycle and performance acceptance criteria. Add native production
-tests beside the existing regressions as each component becomes portable; only
-retire extraction harnesses once their failure cases are covered there.
+The [current review](../REVIEW.md) separates implemented native behavior from
+remaining legacy and release gaps. The [modernization plan](modernization.md)
+prioritizes future compatibility and performance evidence. Only retire extraction
+harnesses once their failure cases have equivalent production coverage.

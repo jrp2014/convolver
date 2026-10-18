@@ -1,5 +1,9 @@
 # Historical feature and documentation recovery
 
+> **Historical provenance record.** Statements about pending work, authorization,
+> local-only commits and publishing describe the original review stage. For the
+> current repository and validation status, see [REVIEW.md](../../REVIEW.md).
+
 The owner approved the correctness commit and local merge on 17 October 2026,
 then explicitly requested recovery of archive features including `convolverPipe`
 and documentation. The initial fixes were committed as `cca3e90` and merged into

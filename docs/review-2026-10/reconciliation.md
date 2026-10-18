@@ -1,5 +1,9 @@
 # Review branch reconciliation and historical recovery
 
+> **Historical provenance record.** Statements about pending work, authorization,
+> local-only commits and publishing describe the original review stage. For the
+> current repository and validation status, see [REVIEW.md](../../REVIEW.md).
+
 This is the record of the initial correctness merge. The subsequent owner-authorized
 [feature recovery](archive-recovery.md) supersedes the deferral of `convolverPipe`
 and its file-descriptor helpers below.

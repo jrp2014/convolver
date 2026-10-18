@@ -1,160 +1,96 @@
-# Portable Convolver: structure and next milestones
+# Portable Convolver: current structure and next milestones
 
-Review of the portable implementation, 18 October 2026, accompanying the FFT
-abstraction, Accelerate, measurements and wisdom support. Milestone 1 below is
-implemented; subsequent sections describe planned work.
+Reviewed 18 October 2026 at `5df874e`, portable **0.2.0**. This replaces the
+[early portable structure review](archive/reviews/early-portable-structure.md).
+See the [repository review](../REVIEW.md) for correctness findings and evidence.
 
 ## Current boundaries
 
 | Component | Files | Responsibility |
 | --- | --- | --- |
-| Public DSP API | `include/convolver/engine.hpp` | In-memory routes, coefficients, latency/tail, reset and processing; FFT preparation options |
-| DSP implementation | `portable/engine.cpp` | Validation, partitioned overlap-add, history, delays and routing |
-| FFT adapters | `portable/fft.hpp`, `fft_fftw.cpp`, `fft_accelerate.cpp` | Prepared transforms, buffers and normalization contract; build selects one backend |
-| File/configuration adapter | `include/convolver/io.hpp`, `portable/io.cpp`, `portable/config.cpp` | libsndfile, historical config/list import and IR loading |
-| CLI | `portable/main.cpp` | Arguments, safe file selection, render/drain, RAW streams and offline FFT tuning |
-| Tests/measurements | `tests/native/`, `tests/regression/`, `docs/benchmarks/` | Real libraries and independent oracles; historical checks; performance evidence |
-| Preserved implementation | `convolver/`, `docs/historical/` | Historical hosts, sources and documentation with provenance |
+| Core API | `include/convolver/engine.hpp` | In-memory routes/coefficients, preparation options, processing, reset, latency/tail |
+| DSP | `portable/engine.cpp` | Validated uniform overlap-add, split-spectrum MACs, per-path history, delay rings and routing |
+| FFT | `portable/fft.hpp`, `portable/fft_fftw.cpp`, `portable/fft_accelerate.cpp` | Prepared real transforms, packing/scaling, private buffers; one backend selected at build time |
+| Host and state | `include/convolver/host.hpp`, `portable/host.cpp`, `portable/state.cpp` | Planar/in-place buffers, persistent stream state, bypass, prepared replacement/crossfade, deferred destruction, bounded serialization |
+| File/configuration | `include/convolver/io.hpp`, `portable/io.cpp`, `portable/config.cpp` | libsndfile, historical config/list import, portable path handling and IR loading |
+| CLI | `portable/main.cpp` | Safe file/RAW rendering, latency policy, full drain and offline FFTW planning/wisdom |
+| VST3 | `plugins/vst3/` | SDK processor/controller, bus/state/automation adaptation and embedded-preset tool |
+| Build/package | `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | Optional components, dependency discovery, install/export and consumer verification |
+| Verification | `tests/native/`, `tests/consumer/`, `tests/vst3/`, `tests/regression/` | Independent references, real libraries, external consumers, SDK and historical extraction tests |
+| Preserved implementation | `convolver/`, `docs/historical/`, `docs/review-2026-10/` | Historical hosts, recovered documentation and dated provenance |
 
-Keep these boundaries. The implementation is small enough that a wholesale file
-move would add churn without resolving its main problems. Make further splits
-when responsibilities grow: CLI argument parsing, preparation, and new host
-adapters are natural seams. The canonical spectrum layout is currently private;
-retain that freedom to change it without breaking callers.
+Keep platform, SDK and decoding dependencies at their boundaries. A wholesale
+file move adds little value now. Split CLI parsing/preparation or configuration
+resolution when new features justify it; keep private FFT storage free to evolve.
 
-FFTW 3.3.11 with NEON is already a working native Apple Silicon baseline.
-Accelerate provides an independent Apple implementation. Keep libsndfile in the
-I/O adapter. Additional FFT libraries, SIMD variants and device backends should
-have a specific deployment or measured performance reason.
+## Implemented milestones
 
-## 1. Make the core independently buildable and consumable
+- **Independent package:** static C++20 `Convolver::core`, `Convolver::host` and
+  optional `Convolver::io`; installed and source-tree consumers; relocatable
+  package paths; release/sanitizer/core-only/Accelerate presets. Core-only has no
+  libsndfile/Python requirement. Version matching is within minor 0.2, not a stable
+  C++ ABI promise. See [package contracts](cmake-package.md).
+- **Compatibility/tooling:** Windows and mixed relative configuration paths,
+  signed-zero routing semantics, real PCM/file tests, `.clang-format`,
+  `.clang-tidy` and CI checks. Portable PCM16 dither remains deferred.
+- **FFT selection and optimization:** FFTW and Accelerate behind one private
+  contract; offline FFTW planning/wisdom; split real/imaginary spectra and
+  vectorizable MAC loops. The [recorded measurements](fft-backends.md) distinguish
+  Apple backend/planning experiments from the later x86 split-spectrum results.
+- **Host lifecycle and VST3:** persistent processing history, prepared filter
+  replacement, warm-up/crossfade, delayed dry bypass and control-thread retirement;
+  optional SDK 3.8.1 adapter, embedded presets and actual validator CI. These are
+  implemented, with [documented limits](vst3.md), rather than future architecture.
 
-**Original gap (addressed by this milestone):** target dependencies separated DSP from libsndfile, but the single
-`CONVOLVER_BUILD_NATIVE` option configured core, I/O and CLI together. A core
-consumer had to discover libsndfile even when supplying coefficients in memory.
-Installation copied headers/libraries but supplied no `find_package(Convolver)`
-package. Portable package versioning, presets and downstream-consumer tests
-were also missing.
+The core's checked interleaved API and the nonthrowing host boundary serve
+different callers. Retain that separation. The host layer does not grant freedom
+to prepare filters, destroy active processors or invoke control methods from
+arbitrary threads; its ownership/thread contract remains part of the API.
 
-Implemented: optional I/O/CLI builds, static `Convolver::core`/`Convolver::io`
-exports (portable version 0.1.0), schema-2 presets, relocated external-consumer
-tests, and contribution/tooling instructions. See [the package guide](cmake-package.md).
-Dependency baseline pinning and self-contained CLI bundles remain release work.
-The acceptance requirements guiding this milestone were:
+## Next compatibility work
 
-- Separate core, I/O, CLI, tests and benchmarks as build choices with explicit
-  prerequisites. Core-only builds must not search for libsndfile or require Python.
-- Export namespaced CMake targets, initially `Convolver::core` and
-  `Convolver::io`. Support both `add_subdirectory` and installed consumption.
-  Recreate dependency targets in the package config; do not bake developer paths
-  into exported interfaces. Follow the [CMake package/export guide](https://cmake.org/cmake/help/latest/guide/importing-exporting/index.html).
-- Define the portable library's version/API policy separately from recovered
-  historical version numbers. Start with an explicitly evolving C++ API; defer a
-  stable C ABI until an actual consumer needs it. Test static linking first and
-  explicitly handle Windows symbol exports before claiming shared-library support.
-- Add [CMake presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html)
-  compatible with the project's stated minimum, for release, sanitizer and backend
-  configurations. Keep local dependency paths in ignored user presets.
-- Pin dependency baselines for release artifacts, record compiler/architecture
-  and linked versions, and add a short contribution guide. Keep historical source
-  and documentation inventories unchanged.
+The immediate audio-compatibility gap is PCM16 dither. Define its default/disable
+policy and verify quantization error, clipping and reproducibility independently
+of convolution accuracy. Keep noise shaping a separate, explicit choice.
 
-**Acceptance:** a tiny external application builds and runs an impulse test using
-only the installed core on Linux, Windows and macOS; also test subproject use,
-core-only configuration, both Apple backends, and a relocated installation with
-its dependencies available. Test the installed CLI and runtime dependency lookup
-separately. Passing source-tree tests does not establish package usability.
+Configuration import still combines parsing, selection and asset decoding; no
+inspection/validation command exposes the resolved graph. Add one grammar-backed
+inspection path reporting files, sample rate, routes, delays, latency, tail and
+estimated storage. Build a small redistributable compatibility corpus with
+consumer-specific profiles. Preserve route order and list-selection semantics.
+Speaker masks, RF64, optional resampling and wider VST3 layouts each need their
+own acceptance tests. Parser/state/IR fuzzing should have bounded resource use.
 
-## 2. Make configuration compatibility an explicit product feature
+For VST3, prioritize named Windows/macOS DAW tests and repeatable release bundles
+before adding a custom UI or another host API. SDK validation is necessary but
+does not exercise every host's scan, state reload, silence, seek and bus behavior.
 
-**Observed gap:** `load_configuration` parses text, selects list entries and
-decodes IRs in one operation. There is no inspection/validation command or public
-description of the selected graph. The historical channel mask is retained but
-not written as WAV speaker metadata. Existing parser tests do not constitute a
-downstream compatibility corpus.
+## Next efficiency work
 
-Separate parsed configuration and resolved assets internally as inspection needs
-grow; do not introduce a second grammar. Add a validation/inspection CLI that
-reports selected files, rate, routes, channel count, B-frame algorithmic latency,
-tail and estimated prepared storage. Preserve relative paths, signed zero,
-fractional route weights, delay truncation and list-selection behavior.
+`Engine::Impl::compute()` still performs forward FFT, spectrum history and inverse
+FFT per path. Identical ordered input mixes can share forward transforms/history;
+that optimization is not implemented. Preserve mixing order to avoid gratuitous
+rounding changes, and measure simple stereo as well as dense matrices.
 
-Publish small generated IRs/configurations with direct-convolution reference
-outputs. Label downstream profiles individually: format support in Roon/JRiver
-does not prove shared DSP code or identical list/path semantics. Record sources
-and verified limitations in [the downstream assessment](modernization.md#documentation-and-downstream-compatibility).
-Treat RF64 output, speaker masks, dither and optional offline resampling as
-separate compatibility features with focused file tests.
+Inverse-transform sharing needs a separate routing/overlap/delay design. The MAC
+loop has already moved to split spectra; do not describe it as an unprofiled
+scalar baseline. Further packing, alignment, backend-native MACs or nonuniform
+partitioning should follow workload measurements. Saved FFTW wisdom chooses FFT
+plans, not Convolver block size or partition scheduling.
 
-**Acceptance:** preserved historical examples and negative cases run offline;
-validation gives useful file/line errors; changing syntax requires a versioned
-format decision. Decoder/parser fuzzing has bounded time/memory and sanitizer
-coverage. The archival documentation stays byte-identical.
+Acceptance for each DSP optimization: unchanged public behavior, latency and
+finite tail; direct-double oracle and cross-backend tests; cancellation/long-decay
+cases; no new processing allocations; setup, storage and callback timing as well
+as throughput measurements. Avoid blanket fast-math or machine-specific release
+binaries without a deliberate compatibility policy.
 
-## 3. Optimize redundant work before expanding the backend list
+## Release and maintenance gates
 
-**Observed opportunity:** `Engine::Impl::compute()` performs a forward FFT,
-stores a spectrum history and performs an inverse FFT for every path. Matrix
-paths can share identical input mixes. Identical mixes currently repeat both
-transform and history work. The complex multiply/accumulate loop is scalar C++;
-its generated vectorization and memory cost have not been profiled here.
+Keep native production, package-consumer, historical and documentation checks.
+Add race/transition stress and deadline-distribution evidence without equating
+heap guards or average throughput with hard realtime guarantees. Development
+packages are relocatable but still require compatible dependencies; installers,
+minimum OS/toolchain policy, dependency pinning/bundling and signing remain work.
 
-First benchmark and implement forward-transform/history reuse for *identical*
-ordered input mixes, retaining per-path filters and output behavior. Compare
-mono, diagonal and dense matrices: an optimization that only benefits dense
-matrices must not impose a large cost on simple stereo. Avoid canonicalizing
-route order in the first change because it changes floating-point summation.
-
-Then profile partition MACs and memory traffic. Consider aligned spectra, loop
-layout, and backend-native packing/MAC only when measurements support them.
-Output-spectrum accumulation can reduce inverse transforms, but requires a
-separate review of routing, overlap, delay and summation semantics. Introduce
-nonuniform partitioning later, for demonstrated long-IR/low-latency workloads.
-
-**Acceptance for each optimization:** unchanged API/latency/tail, direct-double
-oracle and cross-backend tests, cancellation-heavy and long-decay cases, no new
-processing allocations, and published setup/memory/throughput/callback-tail
-measurements. Benchmark optimized binaries on a quiet machine. Keep FFTW
-single-threaded initially and avoid blanket fast-math. Saved FFTW wisdom tunes
-plans; it does not select Convolver's block size or partition schedule.
-
-## 4. Establish a host-ready lifecycle before adding plug-ins
-
-The initial host lifecycle, thin VST3 adapter and compatibility tests are now
-implemented; see [VST3 documentation](vst3.md). The original gaps and acceptance
-criteria below explain this work; actual DAW validation and release packaging
-remain outstanding.
-
-**Observed gap:** the engine prepares data in its constructor and has reset and
-arbitrary-chunk processing, but has no filter replacement, crossfade, separate
-immutable prepared-filter object, or plug-in host adapter. Its checked process
-entry point can throw on invalid spans/nonfinite input. C++ heap checks and
-average benchmark throughput do not establish real-time safety.
-
-When a host requires it, separate prepared filter data from mutable stream state;
-prepare replacements off-thread, align latency, warm/crossfade deliberately and
-retire old objects off-thread. Choose planar/in-place adaptation from the host's
-needs while retaining the tested interleaved CLI boundary. Define invalid-input,
-bypass, reset, seek, bus-change, denormal and concurrent-instance behavior.
-
-**Acceptance:** allocation/lock and lifetime checks on the callback path,
-transition stress tests, deadline distributions and host integration tests.
-Then add a VST3 or CLAP adapter according to intended hosts. Keep device management
-and UI outside the DSP library.
-
-## Recommended delivery order
-
-Milestone 1 now supplies independent build choices, package exports, presets,
-consumer tests and contribution instructions. The user prioritizes host lifecycle/VST3 compatibility ahead of further FFT
-optimization. Configuration inspection/compatibility fixtures and measured
-transform reuse remain later work.
-Keep the native numerical, real-file, historical and documentation gates through
-each step. Add a modern host only after its lifecycle contract is exercised.
-
-The broader alternatives remain in [the modernization assessment](modernization.md);
-current build and test behavior is documented in [the portable guide](portable-core.md)
-and [test coverage](testing.md).
-
-Windows-style relative references in configs/lists are now normalized on all
-platforms, with regression coverage for mixed separators and file provenance.
-PCM16 dither remains explicitly deferred to the next audio-compatibility change.
+The [modernization plan](modernization.md) records the remaining choices;
+[testing](testing.md) defines the evidence actually provided today.

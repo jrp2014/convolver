@@ -1,5 +1,6 @@
 {
   "classification_date": "2026-10-17",
+  "redaction_note": "Personal attribution is rendered as jrp at the owner's request; these text fields are redacted transcriptions. Package/member hashes and binary markers are unchanged.",
   "scope": "Read-only provenance inspection of public documentation and published binaries. No downloaded binaries were executed; no authors were contacted.",
   "original_reference": {
     "url": "https://sourceforge.net/projects/convolver/files/convolver-source/convolver4-3src.zip/convolver4-3src.zip/download",
@@ -10,7 +11,7 @@
         "path": "convolver/convolution/channelpaths.h",
         "line": 100,
         "definition": "class ChannelPaths",
-        "copyright": "Copyright (C) 2005,2006 John Pavel"
+        "copyright": "Copyright (C) 2005,2006 jrp"
       },
       {
         "path": "convolver/convolution/samplebuffer.h",
@@ -161,7 +162,7 @@
       "sources": [
         {
           "url": "https://www.alanjordan.org/DRCDesigner/DrcDesignerHelp.html",
-          "evidence": "Author says the package includes John Pavel's Convolver VST and describes installing convolver4-4vc++.zip."
+          "evidence": "Author says the package includes jrp's Convolver VST and describes installing convolver4-4vc++.zip."
         }
       ],
       "limitations": "Current DRC Designer download's binary contents and identity were not inspected."
@@ -172,7 +173,7 @@
       "sources": [
         {
           "url": "https://www.avnirvana.com/threads/al-filter-wav-file-inquiry.13436/",
-          "evidence": "Audiolense author juicehifi, post 16 dated 2024-03-29, credits John Pavel with the format and describes persuading JRiver to implement it."
+          "evidence": "Audiolense author juicehifi, post 16 dated 2024-03-29, credits jrp with the format and describes persuading JRiver to implement it."
         }
       ]
     },
@@ -192,7 +193,7 @@
       "sources": [
         {
           "url": "https://accuratesound.ca/hlc-plugin/",
-          "evidence": "Product page links John Pavel's config.html as the supported configuration format."
+          "evidence": "Product page links jrp's config.html as the supported configuration format."
         }
       ]
     },
@@ -222,7 +223,7 @@
     }
   ],
   "reproduction": {
-    "command": "python3 tests/inspect_downstream.py --check",
+    "command": "python3 docs/review-2026-10/inspect_downstream.py --check",
     "behaviour": "Fetches the three public archives into memory, reads the specified members without filesystem extraction, checks hashes/lengths/PE-or-ELF headers/markers and prints JSON. Does not execute downloaded content. --package selects one recorded package.",
     "interpretation": "Matching evidence identifies the inspected artifacts; it is not a convolution correctness, performance, licensing-compliance or compatibility test. Upstream downloads may change, producing a mismatch."
   }

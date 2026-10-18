@@ -1,24 +1,22 @@
 # Convolver
 
-Convolver is a Windows audio convolution engine by jrp. It applies
-impulse-response filters (typically for digital room correction or crossovers)
-to multichannel audio in real time, and ships as:
+Convolver applies impulse-response filters for room correction, crossovers and
+multichannel audio routing. The current **portable 0.2.0** implementation provides
+a C++20 core, file/RAW-stream CLI and optional VST3 plug-in, using CMake, FFTW or
+Apple Accelerate, and libsndfile at the file boundary.
 
-- a Windows Media Player DSP plug-in (`convolverWMP`)
-- a DirectShow filter (`convolverFilter`)
-- a VST plug-in (`convolverVST`)
-- a command-line tool (`convolverCMD`)
-- a stdin/stdout streaming tool ([`convolverPipe`](docs/convolverPipe.md)), recovered from the historical 4.4 sources
+Start with the [portable guide](docs/portable-core.md),
+[package guide](docs/cmake-package.md) or [VST3 guide](docs/vst3.md).
+The [current repository review](REVIEW.md) records correctness, completed
+milestones, verification evidence and remaining compatibility work.
 
-The historical applications share the engine in [`convolver/convolution`](convolver/convolution),
-which does uniformly partitioned overlap-save convolution with FFTW.
-
-A new **portable C++20 core and CLI** in [`portable/`](portable) builds with
-CMake, FFTW (portable) or Apple Accelerate, and libsndfile. It supports native file rendering, RAW streaming and
-the historical configuration format. See the [portable build and usage guide](docs/portable-core.md).
-
-Its text config format (`.cfg`) is still read by Roon, JRiver Media Center and
-Audiolense today.
+The historical Windows applications by jrp are preserved separately: WMP DSP
+(`convolverWMP`), DirectShow (`convolverFilter`), VST2 (`convolverVST`), command-line
+(`convolverCMD`) and recovered 4.4 streaming [`convolverPipe`](docs/convolverPipe.md).
+They share the old overlap-save engine in
+[`convolver/convolution`](convolver/convolution); the portable engine uses
+partitioned overlap-add. The [downstream evidence](docs/review-2026-10/downstream-evidence.json)
+documents both derivative implementations and wider adoption of the text format.
 
 ## Where this code came from
 
@@ -102,23 +100,19 @@ ctest --test-dir build --output-on-failure --parallel 2
 
 These nine suites cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
-The default native build additionally runs five suites against the actual core,
+The default native build additionally runs seven suites against the actual core,
 the selected FFT backend, libsndfile and CLI, plus an external package-consumer suite. See [testing instructions and coverage limits](docs/testing.md).
 
 ## Modernization
 
-The portable core/CLI, FFTW/Accelerate adapters, offline FFTW tuning and real-library
-tests are implemented. The [structure review and next milestones](docs/project-structure.md)
-record CMake packaging as implemented and prioritize configuration compatibility,
-measured transform reuse and a host-ready lifecycle. The broader
-[modernization assessment](docs/modernization.md) records the alternatives and
-downstream history. Modern plug-ins and further DSP optimization remain future work.
+Core/CLI, FFTW/Accelerate, offline planning, split-spectrum MACs, package exports,
+Windows config paths, host lifecycle and VST3 are implemented. The
+[structure review](docs/project-structure.md) and
+[modernization plan](docs/modernization.md) identify remaining dither,
+interoperability, DAW/release validation and measured optimization work.
+Earlier 4.3 assessments are in the [review archive](docs/archive/reviews/README.md).
 
 ## Licence
 
 GNU General Public License, version 2 or (at your option) any later version.
 See [COPYING](COPYING).
-
-The optional [VST3 adapter and host lifecycle](docs/vst3.md) supports embedded-filter
-presets, mono/stereo and float/double host buffers. See its build and compatibility
-limits before using developer bundles in a DAW.
