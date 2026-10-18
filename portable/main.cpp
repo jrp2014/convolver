@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
+#include "file.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <csignal>
-#include <cstdio>
-#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -101,35 +100,6 @@ std::string read_wisdom(const std::filesystem::path& path) {
     if (text.size() > limit)
         throw std::runtime_error("FFTW wisdom file exceeds 1 MiB");
     return text;
-}
-void write_new_wisdom(const std::filesystem::path& path, const std::string& text) {
-    // Exclusive creation protects existing files, including hard links/symlinks.
-#ifdef _WIN32
-    const int fd =
-        _wopen(path.c_str(), _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY, _S_IREAD | _S_IWRITE);
-#else
-    const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0666);
-#endif
-    if (fd < 0)
-        throw std::runtime_error("cannot create FFTW wisdom file (must be a new path)");
-#ifdef _WIN32
-    auto* stream = _fdopen(fd, "wb");
-    if (!stream) {
-        _close(fd);
-        throw std::runtime_error("cannot open FFTW wisdom stream");
-    }
-#else
-    auto* stream = fdopen(fd, "wb");
-    if (!stream) {
-        close(fd);
-        throw std::runtime_error("cannot open FFTW wisdom stream");
-    }
-#endif
-    const bool written = std::fwrite(text.data(), 1, text.size(), stream) == text.size();
-    const bool closed = std::fclose(stream) == 0;
-    if (!written || !closed)
-        throw std::runtime_error(
-            "cannot finish FFTW wisdom file; remove incomplete file before retrying");
 }
 } // namespace
 int run(int argc, char** argv) {
@@ -238,7 +208,8 @@ int run(int argc, char** argv) {
             if (!explicit_plan)
                 fft_options.planning = convolver::FftPlanning::patient;
             convolver::tune_fft(block, fft_options.planning);
-            write_new_wisdom(tune, convolver::export_fft_wisdom());
+            const auto wisdom_text = convolver::export_fft_wisdom();
+            convolver::detail::write_new_file(tune, std::as_bytes(std::span(wisdom_text)));
             std::cout << "Saved FFTW wisdom for block size " << block
                       << " (forward and inverse plans)\n";
             return 0;

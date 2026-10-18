@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/io.hpp"
+#include "file.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
-#include <cstdio>
 #include <iostream>
 #include <stdexcept>
 using namespace Steinberg;
@@ -21,19 +21,9 @@ int make_preset(const std::filesystem::path& input, const std::filesystem::path&
         component.seek(0, IBStream::kIBSeekSet, nullptr);
         if (!PresetFile::savePreset(&preset, convolver::vst3::processor_id, &component))
             throw std::runtime_error("cannot encode VST3 preset");
-#ifdef _WIN32
-        auto* file = _wfopen(output.c_str(), L"wbx");
-#else
-        auto* file = std::fopen(output.c_str(), "wbx");
-#endif
-        if (!file)
-            throw std::runtime_error("cannot create preset (output must not exist)");
-        auto size = static_cast<std::size_t>(preset.getSize());
-        bool complete = std::fwrite(preset.getData(), 1, size, file) == size;
-        if (std::fclose(file) != 0)
-            complete = false;
-        if (!complete)
-            throw std::runtime_error("preset write failed");
+        convolver::detail::write_new_file(
+            output,
+            std::as_bytes(std::span(preset.getData(), static_cast<std::size_t>(preset.getSize()))));
         std::cout << "Created self-contained VST3 preset\n";
         return 0;
     } catch (const std::exception& e) {
