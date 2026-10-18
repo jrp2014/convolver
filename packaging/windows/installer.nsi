@@ -2,7 +2,7 @@
 Unicode true
 !include "MUI2.nsh"
 !include "x64.nsh"
-!include "${GENERATED}/version.nsh"
+!include "${GENERATED}\version.nsh"
 Name "Convolver ${CONVOLVER_VERSION}"
 OutFile "${OUTPUT}"
 InstallDir "$PROGRAMFILES64\Convolver"
@@ -51,7 +51,7 @@ Section "Convolver"
   ${EndIf}
   RMDir "$PreviousInstallDir"
   install:
-  !include "${GENERATED}/install-files.nsh"
+  !include "${GENERATED}\install-files.nsh"
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Convolver" "InstallDir" "$INSTDIR"
@@ -62,7 +62,7 @@ SectionEnd
 
 Section "Uninstall"
   SetRegView 64
-  !include "${GENERATED}/uninstall-files.nsh"
+  !include "${GENERATED}\uninstall-files.nsh"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
   DeleteRegKey HKLM "Software\Convolver"
