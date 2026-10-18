@@ -1,0 +1,31 @@
+---
+# Preserve recovered source/documents and archived review evidence.
+exclude: >-
+  ^(archives/|convolver/|source/|review/|docs/historical/|docs/archive/)
+
+repos:
+  - repo: https://github.com/ryanrhee/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.0
+    hooks:
+      - id: markdownlint-cli2
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict]
+  - repo: local
+    hooks:
+      - id: actionlint
+        name: GitHub Actions and embedded ShellCheck
+        entry: actionlint
+        language: python
+        additional_dependencies:
+          - actionlint-py==1.7.12.25
+          - shellcheck-py==0.11.0.1
+        types: [yaml]
+        files: ^\.github/workflows/
+        args: [-shellcheck=shellcheck]

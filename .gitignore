@@ -67,6 +67,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+.venv-lint/
 
 # Generated Visual Studio user/resource caches (may contain personal metadata)
 *.suo
@@ -75,3 +76,6 @@ Testing/
 # Python release-tool caches
 __pycache__/
 *.pyc
+*.ncb
+*.user
+.vs/
