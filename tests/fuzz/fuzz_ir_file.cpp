@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 
 namespace {
 struct Scratch {
@@ -36,15 +37,20 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         if (!file)
             return 0;
     }
+    std::optional<convolver::AudioReader> reader;
     try {
-        convolver::AudioReader reader(scratch());
+        reader.emplace(scratch());
+    } catch (const std::runtime_error&) {
+        return 0; // libsndfile/WAV validation rejected the file.
+    }
+    try {
         std::size_t budget = 0;
-        const auto cfg = convolver::detail::decode_audio_filter(reader, budget);
-        if (cfg.paths.size() != reader.info().channels ||
+        const auto cfg = convolver::detail::decode_audio_filter(*reader, scratch(), budget);
+        if (cfg.paths.size() != reader->info().channels ||
             budget > convolver::detail::max_decoded_samples)
             std::abort();
-    } catch (const std::runtime_error&) {
-        // Includes ConfigurationError and libsndfile/WAV validation failures.
+    } catch (const convolver::detail::ConfigurationError&) {
+        // Decoding failures must be located diagnostics, never other exceptions.
     }
     return 0;
 }

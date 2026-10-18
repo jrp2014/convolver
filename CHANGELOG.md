@@ -7,6 +7,20 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+## [Unreleased]
+
+### Fixed
+
+- `--inspect --all-configurations` no longer aborts on a sound file with
+  NaN or infinite samples, or on a symlink loop in a list or filter
+  reference. Each is reported as one failed entry (`damaged-asset` or
+  `unreadable`, with its location) and the remaining entries are checked.
+  Rendering reports the same located errors.
+- Triangular PCM16 dither draws its two random values in a fixed order, so a
+  seed gives the same samples on every compiler. GCC and Clang output is
+  unchanged; another compiler may have used the opposite order. A test pins
+  the sequence.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added
@@ -126,6 +140,7 @@ Until 1.0 the C++ API may change between minor versions.
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.2.1

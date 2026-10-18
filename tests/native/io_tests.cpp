@@ -307,6 +307,23 @@ void dither_tests(const fs::path& dir) {
                     y[4] >= 32766 && y[5] <= -32767,
                 "dithered PCM16 clipping");
     }
+    // The seed fixes the output on every compiler. Values from an independent
+    // splitmix64 model; triangular draws the minuend first.
+    {
+        std::vector<float> small(12);
+        for (std::size_t i = 0; i < small.size(); ++i)
+            small[i] = (static_cast<float>(i) - 6) / 65536.0f;
+        using V = std::vector<std::int16_t>;
+        require(quantize(Dither::rectangular, 12345, small, 2) ==
+                    V{-3, -3, -2, -2, -1, -1, 0, 0, 1, 2, 2, 2},
+                "rectangular dither sequence for seed 12345");
+        require(quantize(Dither::triangular, 12345, small, 2) ==
+                    V{-3, -3, -2, -2, -1, -1, 0, 1, 1, 2, 2, 2},
+                "triangular dither sequence for seed 12345");
+        require(quantize(Dither::triangular_highpass, 12345, small, 2) ==
+                    V{-3, -3, -2, -1, -1, 0, 0, 1, 1, 1, 3, 3},
+                "high-pass triangular dither sequence for seed 12345");
+    }
     // Determinism: seed-dependent, chunk-independent, reproducible after reset.
     std::vector<float> ramp(4096 * 3 + 6);
     for (std::size_t i = 0; i < ramp.size(); ++i)

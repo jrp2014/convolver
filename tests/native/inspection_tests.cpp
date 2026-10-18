@@ -202,6 +202,42 @@ void run(const fs::path& dir) {
         require(!dash.valid && has_code(dash, "missing-asset"), "'-' as a filter is diagnosed");
     }
     {
+        // A sound file that cannot be decoded, or a symlink loop, is one failed
+        // entry in all-entry mode; the next entry is still validated.
+        InspectionOptions all;
+        all.all_configurations = true;
+        {
+            // IEEE float WAV, one channel, samples 1, NaN, 0 (AudioWriter refuses NaN).
+            const unsigned char nan_wav[] = {
+                'R', 'I',  'F', 'F', 48,   0,    0,  0, 'W',  'A',  'V',  'E',  'f', 'm',
+                't', ' ',  16,  0,   0,    0,    3,  0, 1,    0,    0x80, 0xbb, 0,   0,
+                0,   0xee, 2,   0,   4,    0,    32, 0, 'd',  'a',  't',  'a',  12,  0,
+                0,   0,    0,   0,   0x80, 0x3f, 0,  0, 0xc0, 0x7f, 0,    0,    0,   0};
+            std::ofstream f(dir / "nan.wav", std::ios::binary);
+            f.write(reinterpret_cast<const char*>(nan_wav), sizeof nan_wav);
+        }
+        text_file(dir / "nan.txt", "nan.wav\nroom.cfg\n");
+        const auto nan = inspect_configuration(dir / "nan.txt", all);
+        require(!nan.valid && nan.configurations.size() == 2 && !nan.configurations[0].valid &&
+                    nan.configurations[1].valid && has_code(nan, "damaged-asset"),
+                "an undecodable sound file is reported and its siblings validated");
+        std::error_code ec;
+        fs::create_symlink("loop2.txt", dir / "loop1.txt", ec);
+        if (!ec)
+            fs::create_symlink("loop1.txt", dir / "loop2.txt", ec);
+        if (!ec) { // Windows needs a privilege to create symlinks.
+            text_file(dir / "loop.txt", "loop1.txt\nroom.cfg\n");
+            const auto loop = inspect_configuration(dir / "loop.txt", all);
+            require(!loop.valid && loop.configurations.size() == 1 &&
+                        loop.configurations[0].valid && has_code(loop, "unreadable"),
+                    "a symlink loop is reported and its siblings validated");
+            text_file(dir / "loopir.cfg", "48000 1 1 0\n0\n0\nloop1.txt\n0\n0\n0\n");
+            const auto ir = inspect_configuration(dir / "loopir.cfg");
+            require(!ir.valid && has_code(ir, "unreadable") && ir.diagnostics[0].location.line == 4,
+                    "a symlink loop as a filter is located at its line");
+        }
+    }
+    {
         InspectionOptions options;
         options.expected_rate = 96000;
         const auto none = inspect_configuration(dir / "list.txt", options);
@@ -313,9 +349,11 @@ void run(const fs::path& dir) {
     auto after = listing(dir);
     for (const auto& p : before)
         after.erase(p);
-    for (const auto* name : {"absent.cfg", "two.txt", "bad.cfg", "unrelated.cfg", "list.txt",
-                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",
-                             "drive.txt", "outer.txt", "sub.txt", "dash.cfg"})
+    for (const auto* name :
+         {"absent.cfg", "two.txt",    "bad.cfg",   "unrelated.cfg", "list.txt",
+          "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg",   "odd.cfg",
+          "drive.txt",  "outer.txt",  "sub.txt",   "dash.cfg",      "nan.wav",
+          "nan.txt",    "loop1.txt",  "loop2.txt", "loop.txt",      "loopir.cfg"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

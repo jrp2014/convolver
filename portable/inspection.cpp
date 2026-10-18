@@ -188,7 +188,7 @@ class Inspector {
             budget_ = 0;
         try {
             if (l.audio) {
-                auto cfg = detail::decode_audio_filter(*l.audio, budget_);
+                auto cfg = detail::decode_audio_filter(*l.audio, l.path, budget_);
                 for (auto& f : result.paths) {
                     f.ir_sample_rate = rate;
                     f.ir_file_channels = inputs;
