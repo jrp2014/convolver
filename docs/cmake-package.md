@@ -53,6 +53,10 @@ find_package(Convolver 0.1 REQUIRED COMPONENTS core io)
 target_link_libraries(my_app PRIVATE Convolver::core Convolver::io)
 ```
 
+`Convolver::host` adds the prepared planar host lifecycle and embedded-state codec.
+Request `COMPONENTS host` to use it; it depends only on core and has no SDK/file I/O
+dependency. See [VST3 and host lifecycle](vst3.md).
+
 `Convolver::io` provides file/configuration functions and links libsndfile.
 Missing required components fail clearly; optional components can be inspected
 through `Convolver_core_FOUND` and `Convolver_io_FOUND`.

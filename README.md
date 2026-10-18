@@ -118,3 +118,7 @@ downstream history. Modern plug-ins and further DSP optimization remain future w
 
 GNU General Public License, version 2 or (at your option) any later version.
 See [COPYING](COPYING).
+
+The optional [VST3 adapter and host lifecycle](docs/vst3.md) supports embedded-filter
+presets, mono/stereo and float/double host buffers. See its build and compatibility
+limits before using developer bundles in a DAW.

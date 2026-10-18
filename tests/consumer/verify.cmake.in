@@ -32,6 +32,8 @@ function(consumer name)
 endfunction()
 consumer(installed-core -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
     -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+consumer(installed-host -DCONSUMER_HOST=ON -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
+    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
 consumer(source-core "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"
     -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
 consumer(source-no-ctest "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"

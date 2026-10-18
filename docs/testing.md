@@ -11,8 +11,8 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **15 suites**: five native suites, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to seven
+With Clang on macOS/Linux this runs **17 suites**: seven native suites, one package-consumer suite and the
+nine historical/documentation suites below. GCC and MSVC default to nine
 native/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
@@ -35,9 +35,20 @@ native/package/documentation suites; the old extraction adapters require Clang.
   Accelerate rejects FFTW-only options. FFT and engine oracle suites also exercise
   measured/patient plans and cached matrix processing with FFTW.
 
+- `native.host`: planar/in-place float and double buffers, invalid samples,
+  bypass/reset, concurrent and queued filter replacements, with a callback heap guard.
+- `native.state`: embedded configuration round trips, truncation, corrupt headers,
+  invalid coefficients and bounded decoding.
+
+The optional [VST3 build](vst3.md) adds three tests: actual SDK-interface lifecycle
+and audio tests, embedded preset generation/loading after deleting the source IR,
+plus the SDK validator loading the built plug-in. These cover preactivation tail
+queries, silent-input tails, automation offsets and failed state restore rollback.
+They do not establish compatibility in a particular commercial DAW.
+
 `packaging.consumer` installs and relocates the package, builds and runs an
-external core/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs three C++/package
+external core/host/I/O consumer, and verifies components and source-tree use with and
+without a parent CTest setup. Core-only configuration runs five C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
 The preceding FFT-backend milestone passed 14 suites locally for both libraries;

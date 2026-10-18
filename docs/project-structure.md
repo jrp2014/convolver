@@ -120,6 +120,11 @@ plans; it does not select Convolver's block size or partition schedule.
 
 ## 4. Establish a host-ready lifecycle before adding plug-ins
 
+The initial host lifecycle, thin VST3 adapter and compatibility tests are now
+implemented; see [VST3 documentation](vst3.md). The original gaps and acceptance
+criteria below explain this work; actual DAW validation and release packaging
+remain outstanding.
+
 **Observed gap:** the engine prepares data in its constructor and has reset and
 arbitrary-chunk processing, but has no filter replacement, crossfade, separate
 immutable prepared-filter object, or plug-in host adapter. Its checked process
@@ -140,8 +145,9 @@ and UI outside the DSP library.
 ## Recommended delivery order
 
 Milestone 1 now supplies independent build choices, package exports, presets,
-consumer tests and contribution instructions. Continue with configuration
-inspection/compatibility fixtures, then one measured transform-reuse change.
+consumer tests and contribution instructions. The user prioritizes host lifecycle/VST3 compatibility ahead of further FFT
+optimization. Configuration inspection/compatibility fixtures and measured
+transform reuse remain later work.
 Keep the native numerical, real-file, historical and documentation gates through
 each step. Add a modern host only after its lifecycle contract is exercised.
 

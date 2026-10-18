@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#ifdef CONSUMER_HOST
+#include "convolver/host.hpp"
+#endif
 #include <convolver/engine.hpp>
 #ifdef CONSUMER_IO
 #include <convolver/io.hpp>
@@ -10,6 +13,15 @@
 #include <vector>
 
 int main() {
+#ifdef CONSUMER_HOST
+    convolver::Configuration hc{48000, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    convolver::HostProcessor host(hc, 8, 4);
+    float input[8] = {1}, output[8] = {};
+    const float* inputs[] = {input};
+    float* outputs[] = {output};
+    if (!host.process(inputs, outputs, 8) || std::abs(output[4] - 1) > 1e-5)
+        return 1;
+#endif
     try {
         const std::vector<float> h = {1, -.5f, .25f}, x = {1, .5f, -1, 0, .25f};
         convolver::Configuration c{48000, 1, 1, 0, {}, {}, {{h, {{0, 1}}, {{0, 1}}}}};

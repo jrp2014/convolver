@@ -19,8 +19,8 @@ The portable code uses `.clang-format`; CI checks LLVM clang-format **18**.
 Format only these modern sources:
 
 ```sh
-clang-format-18 -i include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp
-clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp
+clang-format-18 -i include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
+clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
 ```
 
 Historical directories are also excluded by `.clang-format-ignore`. Formatting
@@ -30,7 +30,7 @@ Presets export `compile_commands.json`. Run the correctness-oriented checks in
 `.clang-tidy` against the translation units present in that build:
 
 ```sh
-clang-tidy-18 -p build/presets/release portable/engine.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp
+clang-tidy-18 -p build/presets/release portable/engine.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
 ```
 
 For an Accelerate build replace `fft_fftw.cpp` with `fft_accelerate.cpp`. Match
@@ -50,3 +50,7 @@ Compatibility changes need fixtures for the affected config/path or file
 semantics. Dither remains a planned audio-compatibility feature: current integer
 output rounds/clips without adding dither, including PCM16. Do not silently
 change that behavior in a build-system or formatting patch.
+
+For host changes, run the optional SDK build and its validator/adapter/preset
+tests as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests
+separately from SDK validation.

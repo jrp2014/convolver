@@ -116,6 +116,12 @@ Validated validate(const Configuration& c, std::size_t b) {
     return result;
 }
 } // namespace
+std::size_t configuration_tail_frames(const Configuration& c, std::size_t block) {
+    return validate(c, block).tail;
+}
+void validate_configuration(const Configuration& c, std::size_t block) {
+    (void)validate(c, block);
+}
 struct Engine::Impl {
     struct Path {
         std::vector<Route> inputs, outputs;

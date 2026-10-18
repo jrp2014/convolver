@@ -1,0 +1,47 @@
+name: VST3 compatibility
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vst3:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: steinbergmedia/vst3sdk
+          ref: 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96 # SDK 3.8.1 build 84
+          path: build-sdk
+          submodules: false
+      - name: SDK dependencies
+        working-directory: build-sdk
+        run: git submodule update --init --depth 1 base cmake pluginterfaces public.sdk
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+      - name: macOS libraries
+        if: runner.os == 'macOS'
+        run: brew install fftw libsndfile
+      - name: Windows libraries
+        if: runner.os == 'Windows'
+        run: vcpkg install fftw3:x64-windows 'libsndfile[core]:x64-windows'
+      - name: Configure Unix
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk -DCONVOLVER_LEGACY_TESTS=OFF
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
+      - name: Build actual plugin, preset tool and SDK validator
+        run: cmake --build build-vst3 --config Release --parallel 2
+      - name: Core, host, preset and VST3 compatibility
+        run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2

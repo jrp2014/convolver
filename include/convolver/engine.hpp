@@ -25,6 +25,11 @@ struct Configuration {
     std::vector<FilterPath> paths;
 };
 
+// Validate dimensions, coefficients and prepared-storage limits without FFT planning.
+void validate_configuration(const Configuration&, std::size_t block_frames = 256);
+// Validate and return FIR/routing support, excluding latency, without FFT planning.
+std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
+
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;
 const char* fft_backend_version() noexcept;
