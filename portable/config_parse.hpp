@@ -140,7 +140,7 @@ struct DecodedIr {
 std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg,
                                        std::size_t& budget);
 // A sound file used directly: diagonal routing, decoded coefficients.
-Configuration decode_audio_filter(AudioReader&, std::size_t& budget);
+Configuration decode_audio_filter(AudioReader&, std::size_t& budget, const SourceLocation&);
 
 // Walks a configuration, sound file or (nested) list in entry order, with the
 // historical limits and cycle detection, and hands each leaf to a visitor.
@@ -177,6 +177,7 @@ class Resolver {
 
   private:
     bool visit(const std::filesystem::path&);
+    std::filesystem::path canonical(const std::filesystem::path&, const SourceLocation&);
     Visitor visitor_;
     ErrorHandler on_error_;
     ListObserver on_list_;

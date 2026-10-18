@@ -39,7 +39,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     try {
         convolver::AudioReader reader(scratch());
         std::size_t budget = 0;
-        const auto cfg = convolver::detail::decode_audio_filter(reader, budget);
+        const auto cfg = convolver::detail::decode_audio_filter(reader, budget, {scratch(), 0, 0});
         if (cfg.paths.size() != reader.info().channels ||
             budget > convolver::detail::max_decoded_samples)
             std::abort();

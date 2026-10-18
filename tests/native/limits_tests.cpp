@@ -56,8 +56,65 @@ void silent_u8_wave(const fs::path& path, std::size_t frames) {
     fs::resize_file(path, sizeof header + frames);
 }
 
+// Canonicalization failures must use the same located error path on every OS,
+// including Windows runners without symlink privileges. Only the OS operation
+// is substituted; traversal, parsing and continuation use production code.
+void canonical_errors(const fs::path& dir) {
+    using namespace detail;
+    text_file(dir / "canonical-list.txt", "bad.cfg\ngood.cfg\n");
+    text_file(dir / "good.cfg", "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n");
+    for (const auto* failing : {"bad.cfg", "ir.wav"}) {
+        Resolver::Sources files;
+        files.canonical = [&](const fs::path& p) {
+            if (p.filename() == failing)
+                throw fs::filesystem_error("canonical", p,
+                                           std::make_error_code(std::errc::permission_denied));
+            return p;
+        };
+        std::vector<ConfigurationError> errors;
+        std::vector<fs::path> visited;
+        Resolver resolver(
+            [&](const Resolver::Leaf& leaf) {
+                visited.push_back(leaf.path);
+                return false;
+            },
+            [&](const ConfigurationError& e) {
+                errors.push_back(e);
+                return true;
+            },
+            {}, files);
+        resolver.run(dir / "canonical-list.txt");
+        if (std::string_view(failing) == "bad.cfg") {
+            require(visited == std::vector<fs::path>{dir / "good.cfg"},
+                    "canonical error must allow the valid sibling");
+            require(errors.size() == 1 && errors[0].code() == "unreadable" &&
+                        errors[0].location().file == dir / "bad.cfg" &&
+                        errors[0].include_chain().size() == 1 &&
+                        errors[0].include_chain()[0].line == 1,
+                    "canonical error must carry its file and include chain");
+        } else {
+            require(visited.empty() && errors.size() == 2 &&
+                        errors[1].location().file == dir / "good.cfg" &&
+                        errors[1].location().line == 4 && errors[1].code() == "unreadable",
+                    "IR canonical error must carry the reference location");
+        }
+    }
+    Resolver::Sources files;
+    files.canonical = [](const fs::path&) -> fs::path { throw std::bad_alloc(); };
+    Resolver resolver([](const Resolver::Leaf&) { return false; },
+                      [](const ConfigurationError&) { return true; }, {}, files);
+    bool exhausted = false;
+    try {
+        resolver.run(dir / "canonical-list.txt");
+    } catch (const std::bad_alloc&) {
+        exhausted = true;
+    }
+    require(exhausted, "resource exhaustion must not become an input diagnostic");
+}
+
 void run(const fs::path& dir) {
     using namespace detail;
+    canonical_errors(dir);
     {
         AudioWriter w(dir / "ir.wav", {48000, 1}, OutputFormat::wav_float);
         const std::vector<float> one{1};

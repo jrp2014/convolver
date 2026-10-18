@@ -196,7 +196,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
     return result;
 }
 
-Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget) {
+Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
+                                  const SourceLocation& where) {
     const auto info = audio.info();
     Configuration cfg;
     cfg.sample_rate = info.sample_rate;
@@ -208,7 +209,13 @@ Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget) {
         cfg.paths[c].inputs.push_back({c, 1});
         cfg.paths[c].outputs.push_back({c, 1});
     }
-    read_impulses(audio, cfg.paths, {}, budget, {});
+    try {
+        read_impulses(audio, cfg.paths, {}, budget, where);
+    } catch (const ConfigurationError&) {
+        throw;
+    } catch (const std::runtime_error& e) {
+        throw ConfigurationError("damaged-asset", where, e.what());
+    }
     return cfg;
 }
 
@@ -241,13 +248,22 @@ bool Resolver::run(const std::filesystem::path& path) {
     }
 }
 
+std::filesystem::path Resolver::canonical(const std::filesystem::path& path,
+                                          const SourceLocation& where) {
+    try {
+        return files_.canonical(path);
+    } catch (const std::filesystem::filesystem_error& e) {
+        throw ConfigurationError("unreadable", where, e.what());
+    }
+}
+
 bool Resolver::visit(const std::filesystem::path& path) {
     if (++visits_ > max_list_visits || active_.size() >= max_list_depth)
         throw ConfigurationError("limit", {path, 0, 0},
                                  "configuration list nesting/entry limit exceeded");
-    const auto canonical = files_.canonical(path);
-    sources_.push_back(canonical);
-    if (!active_.insert(canonical).second)
+    const auto resolved = canonical(path, {path, 0, 0});
+    sources_.push_back(resolved);
+    if (!active_.insert(resolved).second)
         throw ConfigurationError("cycle", {path, 0, 0},
                                  "configuration list cycle: " + utf8_string(path));
     struct Pop {
@@ -256,7 +272,7 @@ bool Resolver::visit(const std::filesystem::path& path) {
         ~Pop() {
             active.erase(path);
         }
-    } pop{active_, canonical};
+    } pop{active_, resolved};
     if (const auto audio = files_.open_audio(path))
         return visitor_({path, chain_, nullptr, audio.get()});
     const auto text = files_.read_text(path);
@@ -267,7 +283,8 @@ bool Resolver::visit(const std::filesystem::path& path) {
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
         for (const auto& p : doc.configuration.paths)
-            sources_.push_back(files_.canonical(resolve_reference(path, p.ir, files_.exists)));
+            sources_.push_back(
+                canonical(resolve_reference(path, p.ir, files_.exists), p.ir.location));
         return visitor_({path, chain_, &doc, nullptr});
     }
     if (on_list_)
@@ -328,7 +345,7 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
             const auto info = leaf.audio->info();
             if (!detail::matches(info.sample_rate, info.channels, expected_rate, expected_inputs))
                 return false;
-            selected = detail::decode_audio_filter(*leaf.audio, budget);
+            selected = detail::decode_audio_filter(*leaf.audio, budget, {leaf.path, 0, 0});
             return true;
         }
         const auto& parsed = leaf.document->configuration;

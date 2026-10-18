@@ -7,6 +7,18 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+## [Unreleased]
+
+### Fixed
+
+- Inspection reports direct sound-file decoding and filesystem resolution failures
+  as located diagnostics, and continues with later entries in `--all-configurations`.
+- Invalid UTF-8 warnings now affect `--warnings-as-errors`, JSON validity, stderr
+  and the exit status, including invalid bytes in diagnostic messages.
+- Triangular PCM16 dither explicitly sequences random draws for reproducible output
+  across compilers. Its noise distribution is unchanged; a compiler that previously
+  evaluated the right operand first will produce a different seeded noise sequence.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added

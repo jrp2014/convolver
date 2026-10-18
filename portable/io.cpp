@@ -259,9 +259,13 @@ void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t>
         case Dither::rectangular:
             d = uniform() - 0.5f;
             break;
-        case Dither::triangular:
-            d = uniform() - uniform();
+        case Dither::triangular: {
+            // Sequence RNG draws explicitly: subtraction operands are unordered.
+            const float first = uniform();
+            const float second = uniform();
+            d = first - second;
             break;
+        }
         case Dither::triangular_highpass: {
             const float u = uniform();
             d = u - previous_[channel_];

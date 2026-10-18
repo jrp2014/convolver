@@ -417,9 +417,8 @@ void print_report(const InspectionReport& r, bool validate, bool warnings_as_err
         out << " (syntax only; IR files not checked)";
     out << '\n';
 }
-} // namespace
 
-std::string report_json(const InspectionReport& r, bool validate, bool warnings_as_errors) {
+Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as_errors) {
     Json j;
     j.open('{');
     j.key("schema_version");
@@ -487,17 +486,9 @@ std::string report_json(const InspectionReport& r, bool validate, bool warnings_
     for (const auto& c : r.configurations)
         configuration(j, c);
     j.close(']');
-    std::vector<Diagnostic> diagnostics = r.diagnostics;
-    if (j.replaced_invalid_utf8)
-        diagnostics.push_back({"invalid-utf8",
-                               DiagnosticSeverity::warning,
-                               "a reported name is not valid UTF-8; invalid bytes are shown as "
-                               "U+FFFD. Rename the file using UTF-8",
-                               {},
-                               {}});
     j.key("diagnostics");
     j.open('[');
-    for (const auto& d : diagnostics) {
+    for (const auto& d : r.diagnostics) {
         j.open('{');
         j.key("code");
         j.string(d.code);
@@ -512,7 +503,24 @@ std::string report_json(const InspectionReport& r, bool validate, bool warnings_
     }
     j.close(']');
     j.close('}');
-    return j.out;
+    return j;
+}
+} // namespace
+
+std::string report_json(InspectionReport& r, bool validate, bool warnings_as_errors) {
+    auto json = serialize_report(r, validate, warnings_as_errors);
+    if (json.replaced_invalid_utf8) {
+        // Include diagnostic strings in the encoding check. Record the warning
+        // before deciding validity, printing stderr or choosing the exit status.
+        r.diagnostics.push_back({"invalid-utf8",
+                                 DiagnosticSeverity::warning,
+                                 "reported text is not valid UTF-8; invalid bytes are shown as "
+                                 "U+FFFD. Use UTF-8 for file names and configuration text",
+                                 {},
+                                 {}});
+        json = serialize_report(r, validate, warnings_as_errors);
+    }
+    return std::move(json.out);
 }
 
 bool is_inspection(int argc, char** argv) {
@@ -601,10 +609,12 @@ int run_inspection(int argc, char** argv) {
         return 2;
     }
     try {
-        const auto report = inspect_configuration(path, options);
+        auto report = inspect_configuration(path, options);
+        // Use the same encoding check for JSON and human-readable reports.
+        const auto serialized = report_json(report, validate, warnings_as_errors);
         print_diagnostics(report);
         if (json)
-            std::cout << report_json(report, validate, warnings_as_errors) << '\n';
+            std::cout << serialized << '\n';
         else
             print_report(report, validate, warnings_as_errors);
         std::cout.flush();

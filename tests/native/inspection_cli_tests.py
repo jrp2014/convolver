@@ -35,6 +35,74 @@ def report(args, code=0, cwd=None):
     return data
 
 
+def damaged_audio_reports():
+    # A failed direct sound-file leaf must not abort JSON or its valid sibling.
+    with tempfile.TemporaryDirectory(prefix='convolver-damaged-') as t:
+        d = Path(t)
+        wav(d / 'bad.wav', [float('nan')])
+        wav(d / 'good.wav', [1])
+        (d / 'inner.txt').write_text('bad.wav\ngood.wav\n')
+        (d / 'outer.txt').write_text('inner.txt\n')
+        r = report(['--inspect', 'bad.wav'], 1, d)
+        assert r['diagnostics'][0]['code'] == 'damaged-asset'
+        assert r['diagnostics'][0]['file'] == 'bad.wav'
+        r = report(['--validate', 'outer.txt', '--all-configurations'], 1, d)
+        assert [c['valid'] for c in r['configurations']] == [False, True]
+        diag = r['diagnostics'][0]
+        assert diag['code'] == 'damaged-asset' and diag['file'] == 'bad.wav'
+        assert diag['include_chain'] == [
+            {'file': 'outer.txt', 'line': 1, 'column': 1},
+            {'file': 'inner.txt', 'line': 1, 'column': 1}], diag
+
+
+def filesystem_error_reports():
+    # POSIX symlink loops exercise real canonicalization failures. Windows
+    # symlink creation needs privileges; the resolver unit test covers it there.
+    if os.name == 'nt':
+        return
+    with tempfile.TemporaryDirectory(prefix='convolver-symlink-') as t:
+        d = Path(t)
+        (d / 'loop.cfg').symlink_to('loop.cfg')
+        wav(d / 'good.wav', [1])
+        (d / 'inner.txt').write_text('loop.cfg\ngood.wav\n')
+        (d / 'outer.txt').write_text('inner.txt\n')
+        r = report(['--inspect', 'loop.cfg'], 1, d)
+        assert r['diagnostics'][0]['code'] == 'unreadable'
+        r = report(['--validate', 'outer.txt', '--all-configurations'], 1, d)
+        assert [c['file'] for c in r['configurations']] == ['good.wav']
+        assert r['configurations'][0]['valid']
+        diag = r['diagnostics'][0]
+        assert diag['file'] == 'loop.cfg'
+        assert diag['include_chain'] == [
+            {'file': 'outer.txt', 'line': 1, 'column': 1},
+            {'file': 'inner.txt', 'line': 1, 'column': 1}], diag
+        # A referenced IR needs its configuration location, too.
+        (d / 'ir.cfg').write_text('48000 1 1 0\n0\n0\nloop.cfg\n0\n0\n0\n')
+        r = report(['--inspect', 'ir.cfg'], 1, d)
+        diag = r['diagnostics'][0]
+        assert diag['code'] == 'unreadable' and diag['file'] == 'ir.cfg'
+        assert diag['line'] == 4 and diag['column'] == 1, diag
+
+
+def invalid_utf8_warnings():
+    if os.name == 'nt':
+        return  # Windows paths cannot contain arbitrary non-UTF-8 bytes.
+    with tempfile.TemporaryDirectory(prefix='convolver-encoding-') as t:
+        d = Path(t)
+        (d / 'bytes.cfg').write_bytes(b'48000 1 1 0\n0\n0\nbad\xff.wav\n0\n0\n0\n')
+        args = ['--inspect', 'bytes.cfg', '--syntax-only']
+        r = report(args, cwd=d)
+        assert [x['code'] for x in r['diagnostics']] == ['invalid-utf8']
+        r = report([*args, '--warnings-as-errors'], 1, d)
+        assert [x['code'] for x in r['diagnostics']] == ['invalid-utf8']
+        p = call([*args, '--warnings-as-errors'], 1, d)
+        assert b'[invalid-utf8]' in p.stderr and b'Invalid' in p.stdout
+        # Invalid bytes only in an error message must also be noticed.
+        (d / 'error.cfg').write_bytes(b'48000 1 1 0\n0\n0\nir.wav\n0\nwrong\xff\n0\n')
+        r = report(['--inspect', 'error.cfg', '--syntax-only'], 1, d)
+        assert any(x['code'] == 'invalid-utf8' for x in r['diagnostics']), r
+
+
 def main():
     assert b'--inspect' in call(['--help'], 0).stdout
     assert b'--syntax-only' in call(['--inspect', '--help'], 0).stdout
@@ -160,4 +228,7 @@ def main():
 
 
 if __name__ == '__main__':
+    damaged_audio_reports()
+    filesystem_error_reports()
+    invalid_utf8_warnings()
     main()

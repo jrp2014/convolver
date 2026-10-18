@@ -307,6 +307,11 @@ void dither_tests(const fs::path& dir) {
                     y[4] >= 32766 && y[5] <= -32767,
                 "dithered PCM16 clipping");
     }
+    // Fixed seed-to-sample sequence across compilers, not just within one build.
+    const std::vector<std::int16_t> triangular_expected{1, 0,  -1, -1, 0, 0, 0, 0,
+                                                        0, -1, 1,  0,  0, 0, 0, 0};
+    require(quantize(Dither::triangular, 42, std::vector<float>(16)) == triangular_expected,
+            "triangular dither fixed sequence");
     // Determinism: seed-dependent, chunk-independent, reproducible after reset.
     std::vector<float> ramp(4096 * 3 + 6);
     for (std::size_t i = 0; i < ramp.size(); ++i)
