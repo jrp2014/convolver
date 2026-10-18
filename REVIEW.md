@@ -166,10 +166,12 @@ recovery records remain available as provenance rather than current instructions
 3. **Configuration interoperability:** inspection/validation output, redistributable
    fixtures for downstream profiles, bounded parser/state/IR fuzzing and speaker
    metadata. Add resampling only as an explicit, separately tested feature.
-4. **Measured efficiency:** reuse forward transforms/history for identical ordered
-   input mixes; evaluate inverse-transform sharing separately. Preserve routing
-   order, latency, tails and numerical tolerances. Measure callback distributions
-   and memory as well as throughput before adding further backends or partitioning.
+4. **Measured efficiency:** forward transform/history reuse for identical ordered
+   input mixes was implemented after this review, with bit-identical output and
+   1.2–1.4× faster dense matrices. The benchmark now reports p50/p99/max callback
+   times and peak memory. Inverse-transform sharing was evaluated and left as a
+   separate change because it alters summation order; see
+   [the measurements](docs/fft-backends.md#shared-forward-transforms).
 
 The [updated modernization plan](docs/modernization.md) separates these remaining
 choices from the core, package, FFT and VST3 work already implemented.

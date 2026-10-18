@@ -14,8 +14,13 @@ Until 1.0 the C++ API may change between minor versions.
   seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
   `triangular_highpass` (the historical engine's "Triangular") modes.
   CLI options `--dither` and `--dither-seed`.
+- The benchmark reports p50, p99 and maximum single-block times and peak memory,
+  and has two 6×6 matrix cases.
 
 ### Changed
+- Paths with identical ordered input routes share one forward FFT and spectrum
+  history. Output is bit-identical; dense routing matrices run 1.2 to 1.4 times
+  faster and use less memory.
 - The CLI now dithers PCM16 output with TPDF by default; use `--dither none` for
   plain rounding.
 - PCM16 output rounds to nearest. libsndfile 1.2.2's float-to-PCM16 conversion

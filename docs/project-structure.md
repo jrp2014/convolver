@@ -69,12 +69,14 @@ does not exercise every host's scan, state reload, silence, seek and bus behavio
 
 ## Next efficiency work
 
-`Engine::Impl::compute()` still performs forward FFT, spectrum history and inverse
-FFT per path. Identical ordered input mixes can share forward transforms/history;
-that optimization is not implemented. Preserve mixing order to avoid gratuitous
-rounding changes, and measure simple stereo as well as dense matrices.
+`Engine::Impl::compute()` runs one forward FFT and keeps one spectrum history per
+distinct ordered input mix; paths with identical input routes share it. Output is
+bit-identical to per-path transforms, and dense matrices run 1.2–1.4× faster
+([measurements](fft-backends.md#shared-forward-transforms)). Each path still has
+its own inverse FFT and overlap.
 
-Inverse-transform sharing needs a separate routing/overlap/delay design. The MAC
+Inverse-transform sharing was evaluated and left as separate work: it needs a
+routing/overlap/delay design and would change summation order. The MAC
 loop has already moved to split spectra; do not describe it as an unprofiled
 scalar baseline. Further packing, alignment, backend-native MACs or nonuniform
 partitioning should follow workload measurements. Saved FFTW wisdom chooses FFT

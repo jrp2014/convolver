@@ -58,9 +58,9 @@ for distribution; changing an FFT library does not relicense Convolver.
 3. **Interoperability:** add config inspection/validation, bounded fuzzing and a
    redistributable fixture corpus with per-consumer expectations. Preserve the
    original grammar and Windows relative-path support; version any new syntax.
-4. **Efficiency:** measure transform/history reuse for identical ordered input
-   mixes, then assess inverse-transform reuse separately. Split spectra are
-   already implemented. Consider nonuniform partitioning only for demonstrated
+4. **Efficiency:** forward transform/history reuse for identical ordered input
+   mixes and split spectra are implemented; inverse-transform reuse has been
+   assessed and remains a separate, non-bit-identical change. Consider nonuniform partitioning only for demonstrated
    long-IR/low-latency needs. Record setup, memory, numerical error and callback
    distributions alongside average throughput; retain allocation/ownership gates.
 
