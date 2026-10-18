@@ -30,6 +30,10 @@ Until 1.0 the C++ API may change between minor versions.
   host state and IR files (`tests/fuzz/`, `-DCONVOLVER_BUILD_FUZZERS=ON` with
   Clang). Committed seeds and regression inputs replay on every compiler as
   `fuzz.replay.*`; CI fuzzes each target for 60 seconds.
+- `--speaker-map config` labels WAV output channels with the configuration's
+  hex channel mask (WAVE_FORMAT_EXTENSIBLE), and `OutputMetadata` is an optional
+  fourth `AudioWriter` argument. Masks must name one known speaker per output
+  channel; samples keep their order. Without the flag output is unchanged.
 - `AudioReader::declared_frames()`: the frame count a file header declares.
 - Two new resolution limits: 16 MiB of configuration text read per load or
   inspection, and 256 inspection diagnostics followed by one

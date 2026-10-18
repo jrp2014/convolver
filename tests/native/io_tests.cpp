@@ -8,8 +8,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
+#include <optional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 #ifndef _WIN32
 #include <fcntl.h>
@@ -132,6 +135,111 @@ void descriptor_tests() {
     std::signal(SIGPIPE, previous);
 }
 #endif
+// The fmt chunk of a RIFF/WAVE file, parsed without libsndfile.
+struct WaveFormat {
+    unsigned tag = 0, channels = 0, bits = 0, sub_format = 0;
+    std::optional<std::uint32_t> mask;
+};
+WaveFormat wave_format(const fs::path& p) {
+    std::ifstream f(p, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(f)), {});
+    const auto u = [&](std::size_t at, int n) {
+        std::uint32_t v = 0;
+        for (int i = n - 1; i >= 0; --i)
+            v = v << 8 | static_cast<unsigned char>(bytes.at(at + i));
+        return v;
+    };
+    require(bytes.compare(0, 4, "RIFF") == 0 && bytes.compare(8, 4, "WAVE") == 0, "RIFF header");
+    for (std::size_t at = 12; at + 8 <= bytes.size();) {
+        const auto length = u(at + 4, 4);
+        if (bytes.compare(at, 4, "fmt ") == 0) {
+            WaveFormat w;
+            w.tag = u(at + 8, 2);
+            w.channels = u(at + 10, 2);
+            w.bits = u(at + 22, 2);
+            if (w.tag == 0xfffe) {
+                require(length >= 40 && u(at + 24, 2) == 22, "extensible fmt size");
+                w.mask = u(at + 28, 4);
+                w.sub_format = u(at + 32, 2);
+            }
+            return w;
+        }
+        at += 8 + length + (length & 1);
+    }
+    throw std::runtime_error("no fmt chunk");
+}
+// Opt-in speaker masks: exact dwChannelMask in the header, samples in channel order.
+void speaker_tests(const fs::path& dir) {
+    struct Case {
+        std::size_t channels;
+        std::uint32_t mask;
+        OutputFormat format;
+        unsigned tag, bits;
+    };
+    for (const auto& c : {Case{2, 0x3, OutputFormat::wav_float, 3, 32},
+                          Case{2, 0x3, OutputFormat::wav_pcm16, 1, 16},
+                          Case{6, 0x3f, OutputFormat::wav_float, 3, 32},
+                          Case{6, 0x3f, OutputFormat::wav_pcm24, 1, 24},
+                          Case{4, 0x603, OutputFormat::wav_pcm32, 1, 32},
+                          Case{1, 0x20000, OutputFormat::wav_float, 3, 32},
+                          Case{18, 0x3ffff, OutputFormat::wav_float, 3, 32}}) {
+        const auto out = dir / ("speakers-" + std::to_string(c.channels) + "-" +
+                                std::to_string(static_cast<int>(c.format)) + ".wav");
+        // Two frames per channel: an impulse identifying the channel, then its negation.
+        std::vector<float> samples;
+        for (int frame = 0; frame < 2; ++frame)
+            for (std::size_t ch = 0; ch < c.channels; ++ch)
+                samples.push_back((frame ? -1.f : 1.f) * static_cast<float>(ch + 1) / 8);
+        {
+            AudioWriter w(out, {48000, c.channels}, c.format, {c.mask});
+            w.write(samples);
+            w.close();
+        }
+        const auto fmt = wave_format(out);
+        require(fmt.tag == 0xfffe && fmt.mask == c.mask && fmt.sub_format == c.tag &&
+                    fmt.bits == c.bits && fmt.channels == c.channels,
+                "WAVE_FORMAT_EXTENSIBLE header carries the exact channel mask");
+        AudioReader r(out);
+        std::vector<float> back(samples.size());
+        require(r.info().channels == c.channels && r.read(back) == 2 && back == samples,
+                "speaker-labelled samples keep their channel order");
+    }
+    // Zero leaves the speakers unspecified: the same file as without metadata.
+    const std::vector<float> stereo{.5f, -.25f};
+    const auto plain = dir / "speakers-default.wav", zero = dir / "speakers-zero.wav";
+    for (const auto& [path, metadata] :
+         {std::pair{plain, OutputMetadata{}}, std::pair{zero, OutputMetadata{0}}}) {
+        AudioWriter w(path, {48000, 2}, OutputFormat::wav_float, metadata);
+        w.write(stereo);
+        w.close();
+    }
+    const auto bytes = [](const fs::path& p) {
+        std::ifstream f(p, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), {});
+    };
+    require(bytes(plain) == bytes(zero) && wave_format(zero).tag == 3 && !wave_format(zero).mask,
+            "a zero mask writes the unchanged plain WAV");
+    // Invalid explicit requests fail before the output exists.
+    struct Bad {
+        std::size_t channels;
+        std::uint32_t mask;
+        OutputFormat format;
+    };
+    for (const auto& b : {Bad{6, 0x3, OutputFormat::wav_float},        // too few speakers
+                          Bad{2, 0x7, OutputFormat::wav_pcm16},        // too many speakers
+                          Bad{1, 0x40000, OutputFormat::wav_float},    // unknown bit
+                          Bad{1, 0x80000000, OutputFormat::wav_float}, // SPEAKER_ALL
+                          Bad{2, 0x3, OutputFormat::raw_float}}) {     // RAW has no header
+        const auto out = dir / "speakers-bad.wav";
+        bool threw = false;
+        try {
+            AudioWriter(out, {48000, b.channels}, b.format, {b.mask});
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        require(threw && !fs::exists(out), "invalid speaker mask rejected before opening");
+    }
+}
 void run(const fs::path& dir) {
     const std::vector<float> samples{-1, 1, -.5f, .5f, 0, .125f, -.75f, .75f};
     for (auto format : {OutputFormat::wav_float, OutputFormat::wav_pcm16, OutputFormat::wav_pcm24,
@@ -441,6 +549,7 @@ int main() {
     try {
         fs::create_directory(dir);
         run(dir);
+        speaker_tests(dir);
         fs::remove_all(dir);
         std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {

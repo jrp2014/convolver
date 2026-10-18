@@ -148,9 +148,36 @@ output audio frames. Gain is a finite decibel value; finite float output can
 exceed unity. PCM output clips to its representable range via libsndfile.
 
 Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
-There is no dither/noise-shaping option yet. The historical channel mask is
-parsed and retained in Configuration, but the current WAV writer does not encode
-that mask; output channel order is preserved. Do not rely on WAV speaker labels.
+There is no dither/noise-shaping option yet.
+
+### Speaker labels
+
+By default WAV output has a plain header with no speaker labels, as before.
+`--speaker-map config` labels the output channels with the configuration's hex
+channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
+
+```sh
+./build-native/convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
+```
+
+- The mask uses the WAVE speaker bits (`0x1` front left, `0x2` front right,
+  `0x4` centre, `0x8` LFE, `0x10`/`0x20` back left/right, `0x200`/`0x400` side
+  left/right, up to `0x20000` top back right). Output channel N takes the Nth set
+  bit counting from bit 0, as WAVE defines, so `3F` labels six channels as
+  FL FR FC LFE BL BR. Samples are never reordered: put the paths' outputs in that
+  order in the configuration.
+- The mask must name exactly as many speakers as there are output channels, and
+  only bits 0 to 17 are accepted. Otherwise the render stops before the output is
+  created.
+- A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
+  the CLI says so on stderr and writes the plain header.
+- `raw-float` output has no header, so it cannot be combined with the flag.
+- After writing, the CLI reads the finished header back and fails if the labels
+  are not exactly the requested mask, so a libsndfile that cannot write them is
+  reported rather than silently ignored.
+
+The library equivalent is `AudioWriter(path, info, format, OutputMetadata{mask})`;
+the default `OutputMetadata{}` keeps the plain header.
 
 Output paths must differ from input, configuration/list files and referenced IRs,
 including filesystem aliases. A regular file redirected to stdin is protected

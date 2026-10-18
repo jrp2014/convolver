@@ -64,7 +64,7 @@ statements; "not tested" means nobody has run these fixtures in that program.
 | Selected IR channel | yes | `ir-channel-select` | not tested | not tested | not tested |
 | Delays, truncated to frames | yes | `integer-frame-delays`, `truncated-delays`, `delay-float-precision` | not tested | not tested | not tested |
 | Unequal IR lengths (the 4.4 specification required equal lengths) | yes, extension | `unequal-ir-lengths` | unknown | unknown | unknown |
-| Hex channel mask | yes, parsed and reported | `hex-channel-mask` | not tested | not tested | not tested |
+| Hex channel mask | yes, parsed and reported; written as WAV speaker labels only with `--speaker-map config` | `hex-channel-mask` | not tested | not tested | not tested |
 | `//` comments and blank lines | yes | `comments-blank-lines` | not tested | not tested | not tested |
 | UTF-8 BOM, CRLF line endings | yes | `bom-crlf` | not tested | not tested | not tested |
 | Relative paths beside the configuration | yes | `relative-posix-parent`, `cwd-relative-filter` | documented (required) | not tested | not tested |

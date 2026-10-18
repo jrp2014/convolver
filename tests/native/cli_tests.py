@@ -39,6 +39,46 @@ def call(args, ok=True, data=None):
     assert (p.returncode == 0) == ok, (args, p.returncode, p.stderr.decode(errors='replace'))
     return p
 
+def channel_mask(path):
+    """dwChannelMask from an extensible fmt chunk, parsed without libsndfile; None if plain."""
+    data = Path(path).read_bytes(); pos = 12
+    while pos + 8 <= len(data):
+        tag, size = struct.unpack_from('<4sI', data, pos)
+        if tag == b'fmt ':
+            fmt = struct.unpack_from('<H', data, pos + 8)[0]
+            return struct.unpack_from('<I', data, pos + 28)[0] if fmt == 0xfffe else None
+        pos += 8 + size + (size & 1)
+    raise AssertionError('no fmt chunk')
+
+def speaker_map_tests(d):
+    """--speaker-map config labels WAV channels with the configuration's mask."""
+    ir=d/'sm-ir.wav'; src=d/'sm-in.wav'; out=d/'sm-out.wav'
+    pcm(ir,[16384]); pcm(src,[8192,-4096,2048,-1024,4096,1024],channels=2)
+    def config(mask, outputs):
+        # Input 0 feeds output o with weight 0.(o+1), so each channel is distinguishable.
+        cfg=d/'sm.cfg'
+        cfg.write_text('48000 2 %d %x\n0 0\n%s\n' % (outputs, mask, ' '.join('0'*outputs)) +
+                       ''.join('sm-ir.wav\n0\n0\n%d.%d\n' % (o, o+1) for o in range(outputs)))
+        return cfg
+    for mask, outputs, fmt in ((0x3,2,'wav-float'), (0x3f,6,'wav-pcm24'), (0x3f,6,'wav-float')):
+        cfg=config(mask, outputs)
+        base=['--filter',cfg,'--input',src,'--output',out,'--output-format',fmt]
+        call(base); plain=out.read_bytes(); assert channel_mask(out) is None
+        call(base+['--speaker-map','config']); assert channel_mask(out)==mask, hex(channel_mask(out) or 0)
+        if fmt=='wav-float':
+            ch,rate,labelled=floats(out); assert ch==outputs
+            out.write_bytes(plain); assert floats(out)[2]==labelled, 'labels must not reorder samples'
+    # Zero mask: an unlabelled file and a note; mismatched masks and RAW fail before output.
+    cfg=config(0,2)
+    p=call(['--filter',cfg,'--input',src,'--output',out,'--speaker-map','config'])
+    assert channel_mask(out) is None and b'no speaker mask' in p.stderr
+    for args in ([config(0x7,2)], [config(0x3,2), '--output-format', 'raw-float'],
+                 [config(0x40001,2)]):
+        out.unlink(missing_ok=True)
+        p=call(['--filter',args[0],'--input',src,'--output',out,'--speaker-map','config',*args[1:]],ok=False)
+        assert not out.exists() and b'speaker' in p.stderr, p.stderr
+    call(['--filter',config(0x3,2),'--input',src,'--output',out,'--speaker-map','wave'],ok=False)
+
 def main():
     call(['--help']); assert b'FFT backend:' in call(['--version']).stdout
     with tempfile.TemporaryDirectory(prefix='convolver-cli-') as t:
@@ -114,6 +154,7 @@ def main():
         call(['--filter',ir,'--input','-','--output',dst],ok=False,data=raw)
         call(['--filter',ir,'--input','-','--raw-input','44100','1','--output',dst],ok=False,data=raw)
         call(args,data=b'')
+        speaker_map_tests(d)
     print('PASS: native CLI files, matrices, EOF, gain, errors and real RAW pipes')
 
 if __name__=='__main__': main()

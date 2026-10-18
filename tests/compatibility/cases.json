@@ -604,6 +604,7 @@
         }
       },
       "filter": "room.cfg",
+      "speaker_map": true,
       "input": {
         "rate": 48000,
         "channels": 1,

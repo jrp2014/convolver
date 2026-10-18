@@ -32,6 +32,19 @@ def filesystem_case(directory):
         probe.unlink()
 
 
+def wave_channel_mask(path):
+    """dwChannelMask of a WAVE_FORMAT_EXTENSIBLE header, or None for a plain header."""
+    data = Path(path).read_bytes()
+    pos = 12
+    while pos + 8 <= len(data):
+        tag, size = struct.unpack_from('<4sI', data, pos)
+        if tag == b'fmt ':
+            fmt = struct.unpack_from('<H', data, pos + 8)[0]
+            return struct.unpack_from('<I', data, pos + 28)[0] if fmt == 0xfffe else None
+        pos += 8 + size + (size & 1)
+    raise AssertionError('missing fmt chunk')
+
+
 def read_float_wav(path):
     data = Path(path).read_bytes()
     assert data[:4] in (b'RIFF', b'RF64') and data[8:12] == b'WAVE', 'not a WAV file'
@@ -232,6 +245,18 @@ def check_case(exe, manifest, case, root):
             compare('%s block %d %s' % (case['id'], block, mode), actual, expected,
                     expect['frames'], offset)
             runs += 1
+    if case.get('speaker_map'):
+        # Opt-in labels: the header carries the configuration's mask, samples unchanged.
+        p = run(exe, ['--filter', filter_arg, '--input', str(root / 'input.wav'),
+                      '--output', str(output), '--speaker-map', 'config'], cwd)
+        assert p.returncode == 0, '%s speaker map: %s' % (case['id'], p.stderr.decode())
+        mask = wave_channel_mask(output)
+        assert mask == expect['channel_mask'], '%s: speaker mask %r' % (case['id'], mask)
+        compare('%s speaker map' % case['id'], read_float_wav(output)[1], expected,
+                expect['frames'], 0)
+        runs += 1
+    elif output.exists():
+        assert wave_channel_mask(output) is None, '%s: unrequested speaker mask' % case['id']
     inspect(exe, case, root, filter_arg, cwd, manifest)
     return 'rendered %d ways, inspected' % runs
 

@@ -71,6 +71,14 @@ on Windows. Today:
   a drive-letter path is an ordinary absolute path (`missing-asset` when absent);
   the UNC case runs only on macOS/Linux.
 
+## Speaker labels
+
+Rendered WAV files have plain headers unless `--speaker-map config` is given; the
+runner checks that no case gains a channel mask by accident. A case with
+`"speaker_map": true` (today `hex-channel-mask`) is rendered once more with the
+flag, and the runner reads `dwChannelMask` from the WAVE_FORMAT_EXTENSIBLE header
+itself and checks it equals the configuration's mask, with the same samples.
+
 ## Adding a case
 
 Keep fixtures tiny and generated; do not copy third-party filters. Run the new

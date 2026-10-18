@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -36,6 +37,9 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
                       raw-float (little-endian IEEE float32)
+  --speaker-map config
+                      Label WAV output channels with the configuration's channel
+                      mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
@@ -149,7 +153,7 @@ int run(int argc, char** argv) {
         convolver::OutputFormat format = convolver::OutputFormat::wav_float;
         std::size_t block = 256;
         float gain = 1;
-        bool keep = false;
+        bool keep = false, speaker_map = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -211,6 +215,11 @@ int run(int argc, char** argv) {
                     linear > std::numeric_limits<float>::max())
                     throw std::invalid_argument("gain must be finite and representable");
                 gain = static_cast<float>(linear);
+            } else if (option == "--speaker-map") {
+                audio_options = true;
+                if (value() != "config")
+                    throw std::invalid_argument("--speaker-map accepts only 'config'");
+                speaker_map = true;
             } else if (option == "--output-format") {
                 audio_options = true;
                 const auto name = value();
@@ -229,6 +238,8 @@ int run(int argc, char** argv) {
             } else
                 throw std::invalid_argument("unknown option: " + option);
         }
+        if (speaker_map && format == convolver::OutputFormat::raw_float)
+            throw std::invalid_argument("--speaker-map needs WAV output; raw-float has no header");
         if ((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
             throw std::invalid_argument("tuning and wisdom require the FFTW backend");
         if (!tune.empty()) {
@@ -268,7 +279,27 @@ int run(int argc, char** argv) {
                 throw std::invalid_argument(
                     "output must differ from referenced configuration and impulse files");
         convolver::Engine engine(config, block, fft_options);
-        convolver::AudioWriter writer(output, {info.sample_rate, engine.output_channels()}, format);
+        convolver::OutputMetadata metadata;
+        if (speaker_map) {
+            metadata.channel_mask = config.channel_mask;
+            if (!metadata.channel_mask)
+                std::cerr << "convolver: the configuration declares no speaker mask; the output "
+                             "channels stay unlabelled\n";
+        }
+        const auto open_output = [&] {
+            try {
+                return convolver::AudioWriter(output, {info.sample_rate, engine.output_channels()},
+                                              format, metadata);
+            } catch (const std::invalid_argument& e) {
+                if (!metadata.channel_mask)
+                    throw;
+                std::ostringstream text;
+                text << "--speaker-map: the configuration's channel mask 0x" << std::hex
+                     << metadata.channel_mask << " cannot label this output: " << e.what();
+                throw std::invalid_argument(text.str());
+            }
+        };
+        auto writer = open_output();
         constexpr std::size_t chunk = 4096;
         std::vector<float> in(chunk * engine.input_channels()),
             out(chunk * engine.output_channels());

@@ -94,8 +94,11 @@ Windows bundles use static FFTW to avoid reliance on a host's DLL search path.
 
 Windows-style relative paths in `.cfg` and list files now work on all platforms,
 including mixed separators. Absolute Windows drive paths are not automatically
-mapped onto a Mac filesystem. The historical channel mask is retained in the
-configuration but not emitted as WAV speaker metadata.
+mapped onto a Mac filesystem; they fail with a diagnostic naming the line and,
+where one exists, a relative replacement. The historical channel mask is
+retained in the configuration and written as WAV speaker labels only on request
+(`--speaker-map config`; header bytes checked independently of libsndfile by
+`native.io`, `native.cli` and the compatibility corpus).
 
 ## Verification evidence and limits
 
