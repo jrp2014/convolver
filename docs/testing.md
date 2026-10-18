@@ -150,3 +150,18 @@ The [current review](../REVIEW.md) separates implemented native behavior from
 remaining legacy and release gaps. The [modernization plan](modernization.md)
 prioritizes future compatibility and performance evidence. Only retire extraction
 harnesses once their failure cases have equivalent production coverage.
+
+## Plug-in candidate checks
+
+The read-only candidate workflow builds native preview archives on Windows x64,
+Linux x64 and both macOS architectures. It checks runtime dependency closure,
+source inventories, final ZIP relocation, executable quickstart examples and
+real SDK validation. Windows also compiles a fixture installer and exercises
+changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
+the supplied source with networking disabled. See the
+[qualification record](releases/developer-preview.md) for external gates.
+
+Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
+policy rejects ad-hoc code. These runs retain signature-integrity and standalone
+adapter checks but omit all dynamic SDK bundle loading; they are not release
+qualification. Never bypass system security to turn those checks green.

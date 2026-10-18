@@ -35,6 +35,17 @@ class GateTests(unittest.TestCase):
             evidence = {kind: {'result': 'passed', 'artifact_sha256': digest, 'record': 'https://example.org/qualification/1'} for kind in self.policy['required_production_evidence']}
             evidence['host'].update(host='REAPER', host_version='test-fixture', os_build='fixture', architecture=platform['architecture'], sample_rates=[44100,48000,96000], channels=[1,2])
             self.candidate['platforms'].append({'id': platform['id'], 'artifact': name, 'source_commit': 'a'*40, 'source': 'source.tar.gz', 'notices': True, 'signed': True, 'notarized': True, 'evidence': evidence})
+            record = self.candidate['platforms'][-1]
+            record['installers'] = []
+            record['installer_evidence'] = {}
+            if platform['os'] in ('Windows', 'Darwin'):
+                installer = name + ('.exe' if platform['os'] == 'Windows' else '.pkg')
+                installer_hash = self.add_asset(installer, 'installer')
+                record['installers'].append(installer)
+                qualification = copy.deepcopy(record)
+                for item in qualification['evidence'].values():
+                    item['artifact_sha256'] = installer_hash
+                record['installer_evidence'][installer] = qualification
 
     def add_asset(self, name, kind):
         file = self.root / name
@@ -42,6 +53,34 @@ class GateTests(unittest.TestCase):
         digest = sha256(file)
         self.candidate['assets'].append({'name': name, 'sha256': digest, 'kind': kind})
         return digest
+
+    def test_unassociated_binary(self):
+        self.add_asset('unqualified.exe', 'binary')
+        with self.assertRaisesRegex(ValueError, 'binary'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_unassociated_installer(self):
+        self.add_asset('unqualified-unsigned-setup.exe', 'installer')
+        with self.assertRaisesRegex(ValueError, 'installer'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_missing_installer(self):
+        self.candidate['platforms'][0]['installers'] = []
+        with self.assertRaisesRegex(ValueError, 'installer'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_unsigned_installer(self):
+        record = self.candidate['platforms'][0]
+        record['installer_evidence'][record['installers'][0]]['signed'] = False
+        with self.assertRaisesRegex(ValueError, 'signed'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_changed_installer_with_stale_evidence(self):
+        name = self.candidate['platforms'][0]['installers'][0]
+        (self.root / name).write_bytes(b'new installer')
+        next(a for a in self.candidate['assets'] if a['name'] == name)['sha256'] = sha256(self.root / name)
+        with self.assertRaisesRegex(ValueError, 'stale'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
 
     def test_complete_fixture(self):
         self.gate.check(self.candidate, self.policy, self.root, production=True)

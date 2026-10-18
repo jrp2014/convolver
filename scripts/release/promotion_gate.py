@@ -7,6 +7,23 @@ import re
 from contract import load_policy, sha256
 
 
+def check_qualification(record, platform, policy, digest):
+    if platform['os'] in ('Windows', 'Darwin') and record.get('signed') is not True:
+        raise ValueError('production Windows/macOS artifacts must be signed')
+    if platform['os'] == 'Darwin' and record.get('notarized') is not True:
+        raise ValueError('production macOS artifacts must be notarized')
+    for kind in policy['required_production_evidence']:
+        evidence = record.get('evidence', {}).get(kind, {})
+        if (evidence.get('result') != 'passed' or evidence.get('artifact_sha256') != digest or
+                not evidence.get('record', '').startswith('https://')):
+            raise ValueError('missing/failed/stale production evidence: ' + kind)
+    host = record['evidence']['host']
+    if (not all(host.get(key) for key in ('host', 'host_version', 'os_build')) or
+            host.get('architecture') != platform['architecture'] or
+            set(host.get('sample_rates', [])) != {44100, 48000, 96000} or set(host.get('channels', [])) != {1, 2}):
+        raise ValueError('host evidence lacks required platform/rate/layout coverage')
+
+
 def check(candidate, policy, root, production=False):
     if candidate.get('schema') != 1 or candidate.get('version') != policy['version']:
         raise ValueError('candidate version/schema mismatch')
@@ -23,11 +40,16 @@ def check(candidate, policy, root, production=False):
         path = root / name
         if path.is_symlink() or not path.is_file() or sha256(path) != asset.get('sha256'):
             raise ValueError('missing asset or changed asset hash: ' + name)
+        if asset.get('kind') not in ('binary', 'source', 'manifest', 'installer'):
+            raise ValueError('unclassified candidate asset')
         assets[name] = asset
     expected = {p['id']: p for p in policy['platforms']}
     records = candidate.get('platforms', [])
     if len(records) != len(expected) or {p.get('id') for p in records} != set(expected):
         raise ValueError('missing/duplicate/unexpected platform in candidate')
+    if {name for name, asset in assets.items() if asset['kind'] == 'binary'} != {p['artifact'].format(version=policy['version']) for p in policy['platforms']}:
+        raise ValueError('unclassified or missing platform binary asset')
+    qualified_installers = set()
     for record in records:
         platform = expected[record['id']]
         name = platform['artifact'].format(version=policy['version'])
@@ -40,20 +62,18 @@ def check(candidate, policy, root, production=False):
             raise ValueError('matching source archive and notices required')
         if not production:
             continue
-        if platform['os'] in ('Windows', 'Darwin') and record.get('signed') is not True:
-            raise ValueError('production Windows/macOS artifacts must be signed')
-        if platform['os'] == 'Darwin' and record.get('notarized') is not True:
-            raise ValueError('production macOS artifacts must be notarized')
-        for kind in policy['required_production_evidence']:
-            evidence = record.get('evidence', {}).get(kind, {})
-            if (evidence.get('result') != 'passed' or evidence.get('artifact_sha256') != assets[name]['sha256'] or
-                    not evidence.get('record', '').startswith('https://')):
-                raise ValueError('missing/failed/stale production evidence: ' + kind)
-        host = record['evidence']['host']
-        if (not all(host.get(key) for key in ('host', 'host_version', 'os_build')) or
-                host.get('architecture') != platform['architecture'] or
-                set(host.get('sample_rates', [])) != {44100, 48000, 96000} or set(host.get('channels', [])) != {1, 2}):
-            raise ValueError('host evidence lacks required platform/rate/layout coverage')
+        check_qualification(record, platform, policy, assets[name]['sha256'])
+        installers = record.get('installers', [])
+        if platform['os'] in ('Windows', 'Darwin') and not installers:
+            raise ValueError('missing production installer')
+        for installer in installers:
+            if installer in qualified_installers or assets.get(installer, {}).get('kind') != 'installer':
+                raise ValueError('invalid/duplicate installer association')
+            check_qualification(record.get('installer_evidence', {}).get(installer, {}),
+                                platform, policy, assets[installer]['sha256'])
+            qualified_installers.add(installer)
+    if production and {name for name, asset in assets.items() if asset['kind'] == 'installer'} != qualified_installers:
+        raise ValueError('unqualified installer asset')
     return sorted(assets)
 
 

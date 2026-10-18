@@ -1,6 +1,6 @@
 # Building and consuming the portable library
 
-The portable package is at **0.2.0** (see [CHANGELOG.md](../CHANGELOG.md)), independently of the historical Convolver
+The portable package version comes from [VERSION](../VERSION), independently of the historical Convolver
 release numbers. It provides static C++20 libraries. The API is evolving: package
 version checks accept compatible patch releases within the same minor version,
 but this is not a stable binary ABI promise. Rebuild consumers with the same
@@ -122,3 +122,10 @@ execute test applications, or disable all tests. Tests inherit the selected
 compiler, generator, SDK, dependency prefixes and Windows toolchain/triplet.
 The normal GitHub matrix runs these checks on Linux, Windows and macOS; Apple
 also exercises Accelerate. CI results belong to the specific tested commit.
+
+## Optional plug-in distributions
+
+The `release-vst3` preset enables the separate `PluginDistribution` installation
+component. It stages the SDK bundle, converter, presets, notices and user guide;
+it does not replace the C++ library exports above. See the
+[pinned source recipe](plugins/build.md) and [preview qualification record](releases/developer-preview.md).

@@ -19,3 +19,13 @@ Close hosts before replacing the bundle. Preserve project backups and custom pre
 To remove an archive installation, remove only the bundle you copied and the
 extracted package directory. Host projects and user-created presets are yours.
 See [the quickstart](quickstart.md) after your host rescans.
+
+Preview installers are also produced for Windows and macOS, but their real-machine
+installation and trust paths remain unqualified. Windows installs the plug-in
+for all users and tools in the selected Convolver directory; upgrading removes
+the previous owned files before replacing them. Close hosts before uninstalling;
+a locked file causes failure and leaves the uninstaller available for retry.
+macOS packages install into `/Library/Audio/Plug-Ins/VST3` and
+`/Library/Application Support/Convolver`; the latter contains `uninstall.sh`.
+Run that script with administrator privileges only for an installation you intend
+to remove. Both uninstallers preserve unrelated files and custom presets.

@@ -116,6 +116,7 @@ bundle; separate tests call the real processor/controller SDK interfaces.
 
 The VST3 CI matrix runs on Linux, Windows and macOS. These automated checks are
 not proof of hard real-time deadlines or compatibility with every DAW. Commercial
-DAW testing, installers, dependency bundling, signing/notarization and a custom
-file-picker editor remain separate release work. PCM dither remains deferred;
+The [plug-in distribution guide](plugins/index.md) covers pinned preview archives,
+installer templates and corresponding source. Signing, clean installation, DAW
+qualification and a custom file-picker editor remain separate work. PCM dither remains deferred;
 VST3 exchanges floating-point audio.

@@ -90,3 +90,7 @@ retains those distinctions. Reuse downstream fixes only after obtaining and
 comparing actual source, preserving licensing/provenance, and running focused
 regressions. Do not infer that an old defect persists merely because a binary
 retains an original class name.
+
+The [plug-in distribution implementation](plugins/index.md) now provides pinned
+preview packaging and source builds. Signing, clean installation and named-host
+qualification remain gates in the [release record](releases/developer-preview.md).

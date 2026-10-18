@@ -69,6 +69,11 @@ jobs:
       - name: Fetch pinned installer compiler
         if: runner.os == 'Windows'
         run: python scripts/release/fetch_nsis.py --output build/nsis
+      - name: Exercise installer upgrade and locked-file recovery
+        if: runner.os == 'Windows'
+        run: >-
+          python tests/release/windows_installer.py
+          --nsis build/nsis/nsis-3.11/makensis.exe
       - name: Build and verify Unix candidate
         if: runner.os != 'Windows'
         run: >-

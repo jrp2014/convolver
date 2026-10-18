@@ -8,6 +8,7 @@ OutFile "${OUTPUT}"
 InstallDir "$PROGRAMFILES64\Convolver"
 InstallDirRegKey HKLM "Software\Convolver" "InstallDir"
 RequestExecutionLevel admin
+Var PreviousInstallDir
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -27,6 +28,7 @@ Function .onInit
     Abort
   ${EndIf}
   SetRegView 64
+  ReadRegStr $PreviousInstallDir HKLM "Software\Convolver" "InstallDir"
   ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
   ${If} $0 != 1
     MessageBox MB_ICONSTOP "Install the Microsoft Visual C++ v14 x64 Redistributable first. See the installation guide."
@@ -36,11 +38,18 @@ FunctionEnd
 
 Section "Convolver"
   SetRegView 64
-  IfFileExists "$INSTDIR\Uninstall.exe" 0 install
-  ExecWait '"$INSTDIR\Uninstall.exe" /S _?=$INSTDIR' $0
+  StrCmp $PreviousInstallDir "" install
+  IfFileExists "$PreviousInstallDir\Uninstall.exe" 0 install
+  ExecWait '"$PreviousInstallDir\Uninstall.exe" /S _?=$PreviousInstallDir' $0
   ${If} $0 != 0
     Abort "Previous version could not be uninstalled. Close all plug-in hosts and retry."
   ${EndIf}
+  ClearErrors
+  Delete "$PreviousInstallDir\Uninstall.exe"
+  ${If} ${Errors}
+    Abort "Cannot remove the previous uninstaller. Close hosts and retry."
+  ${EndIf}
+  RMDir "$PreviousInstallDir"
   install:
   !include "${GENERATED}/install-files.nsh"
   SetOutPath "$INSTDIR"

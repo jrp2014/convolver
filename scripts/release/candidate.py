@@ -125,7 +125,8 @@ def build(archive, identifier, work, output, cmake, nsis=None):
               [(zip_path, 'binary'), (source_archive, 'source'), (sidecar, 'manifest')] + ([(installer, 'installer')] if installer else [])]
     record = dict(id=identifier, artifact=zip_path.name, source_commit=manifest['source_commit'], source=source_archive.name,
                   notices=True, signed=False, notarized=False, evidence={}, automated='passed',
-                  source_rebuild='passed', final_archive='passed')
+                  source_rebuild='passed', final_archive='passed',
+                  installers=[installer.name] if installer else [], installer_evidence={})
     (output / (identifier + '-candidate.json')).write_text(json.dumps(dict(schema=1, version=policy['version'], source_commit=manifest['source_commit'], assets=assets, platform=record), indent=2) + '\n')
 
 

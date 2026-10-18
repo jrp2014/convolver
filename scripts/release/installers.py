@@ -60,7 +60,8 @@ def prepare(stage, output, system, policy):
             parent, basename = target.rsplit('\\', 1)
             source = str((stage / name).resolve()).replace('$', '$$').replace('"', '$\\"')
             install += [f'SetOutPath "{parent}"', f'File /oname="{basename}" "{source}"']
-            uninstall += [f'Delete "{target}"']
+            uninstall += ['ClearErrors', f'Delete "{target}"', '${If} ${Errors}',
+                          'SetErrorLevel 1', 'Abort "Close plug-in hosts and retry uninstall."', '${EndIf}']
             while parent not in ('$INSTDIR', '$COMMONFILES64\\VST3', '$COMMONFILES64'):
                 directories.add(parent)
                 parent = parent.rsplit('\\', 1)[0]
