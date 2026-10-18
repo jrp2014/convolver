@@ -10,6 +10,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [0.3.0] - 2026-10-18
 
 ### Added
+
 - Configuration compatibility corpus (`tests/compatibility/`): generated
   fixtures rendered through the CLI and checked against an independent
   direct-convolution reference at several block sizes and both latency modes.
@@ -40,6 +41,7 @@ Until 1.0 the C++ API may change between minor versions.
   `diagnostics-truncated` warning.
 
 ### Changed
+
 - Configuration errors report the file, physical line and column, and the
   chain of enclosing lists. Rejected Windows drive, UNC and rooted paths name
   an existing relative replacement when one is found beside the configuration.
@@ -51,15 +53,26 @@ Until 1.0 the C++ API may change between minor versions.
   than 16 MiB of configuration text in one load are now rejected (see Added).
 
 ### Fixed
+
 - An IR whose header declares more than 64 Mi samples is rejected before any
   sample is read, instead of after decoding up to the limit.
 - An audio file with an out-of-range sample rate or channel count in its header
   is reported as an unreadable file. Previously the exception escaped
   inspection and list traversal (found by fuzzing).
 
+## [0.2.1] - 2026-10-18
+
+### Added
+
+- Automatic patch versions and annotated source tags on `main`, with one
+  `VERSION` file shared by the CMake package, CLI and VST3 bundle.
+- CLI and VST3 factory build identification including the Git revision and a
+  marker for uncommitted changes. See [source versioning](docs/versioning.md).
+
 ## [0.2.0] - 2026-10-18
 
 ### Added
+
 - Portable host lifecycle (`Convolver::host`) and a VST3 adapter built against
   VST3 SDK 3.8.1, with adapter, preset and SDK validator tests in CI.
 - Documented streaming contract for hosts.
@@ -67,6 +80,7 @@ Until 1.0 the C++ API may change between minor versions.
   FFTW build flags, planner modes, and packaging gaps on Apple Silicon and vcpkg.
 
 ### Changed
+
 - Filter and history spectra are stored split per partition (real parts, then
   imaginary parts) so the multiply-accumulate vectorises. Output is unchanged;
   long filters run 1.15 to 1.3 times faster on x86-64.
@@ -79,6 +93,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [0.1.0] - 2026-10-18
 
 ### Added
+
 - Portable C++20 convolution core with FFTW and Apple Accelerate backends,
   FFTW wisdom support, and a libsndfile command-line tool.
 - `.cfg` reader compatible with the historical Convolver format.
@@ -87,9 +102,11 @@ Until 1.0 the C++ API may change between minor versions.
   Windows.
 
 ### Fixed
+
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.3.0
+[0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
 [0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b

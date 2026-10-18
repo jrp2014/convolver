@@ -11,10 +11,11 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **27 suites**: twelve native suites, four
+With Clang on macOS/Linux this runs **28 suites**: twelve native suites, four
 fuzz-input replays, the configuration compatibility corpus, one package-consumer
-suite and the nine historical/documentation suites below. GCC and MSVC default to
-nineteen native/fuzz-replay/compatibility/package/documentation suites; the old
+suite, the [source versioning](versioning.md) suite and the nine
+historical/documentation suites below. GCC and MSVC default to twenty
+native/fuzz-replay/compatibility/package/versioning/documentation suites; the old
 extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,

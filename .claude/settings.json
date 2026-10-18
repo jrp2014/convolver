@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cmake -S . -B build:*)",
+      "Bash(cmake --build build:*)",
+      "Bash(ctest --test-dir build:*)",
+      "Bash(python3 tests/regression/run_all.py)",
+      "Bash(python3 tests/regression/*.py)"
+    ]
+  }
+}

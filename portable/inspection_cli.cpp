@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "inspection_cli.hpp"
 #include "convolver/io.hpp"
+#include "convolver_version.hpp"
 #include <array>
 #include <charconv>
 #include <cstdio>
@@ -11,9 +12,6 @@
 #include <utility>
 #include <vector>
 
-#ifndef CONVOLVER_VERSION
-#define CONVOLVER_VERSION "unknown"
-#endif
 
 namespace convolver::cli {
 namespace {
@@ -430,7 +428,7 @@ std::string report_json(const InspectionReport& r, bool validate, bool warnings_
     j.key("convolver");
     j.open('{');
     j.key("version");
-    j.string(CONVOLVER_VERSION);
+    j.string(CONVOLVER_VERSION_STRING);
     j.key("fft_backend");
     j.string(fft_backend_name());
     j.key("fft_backend_version");

@@ -1,6 +1,7 @@
+---
 name: Fuzz smoke tests
 
-on:
+'on':
   push:
   pull_request:
   workflow_dispatch:
@@ -25,7 +26,9 @@ jobs:
           -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_BUILD_FUZZERS=ON -DCONVOLVER_BUILD_TESTS=OFF
           -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_DOCUMENTATION_TESTS=OFF
       - name: Build fuzz targets
-        run: cmake --build build-fuzz --parallel 2 --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
+        run: >
+          cmake --build build-fuzz --parallel 2
+          --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
       - name: Run each target
         env:
           SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '60' }}

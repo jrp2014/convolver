@@ -60,6 +60,7 @@ for distribution; changing an FFT library does not relicense Convolver.
    [configuration compatibility](configuration-compatibility.md). Remaining:
    per-consumer fixtures tested in named programs, bounded fuzzing. Preserve the
    original grammar and Windows relative-path support; version any new syntax.
+   See the [detailed proposed interoperability plan](superpowers/plans/2026-10-18-configuration-interoperability.md).
 4. **Efficiency:** measure transform/history reuse for identical ordered input
    mixes, then assess inverse-transform reuse separately. Split spectra are
    already implemented. Consider nonuniform partitioning only for demonstrated

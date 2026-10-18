@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
+#include "convolver_version.hpp"
 #include "file.hpp"
 #include "inspection_cli.hpp"
 #include <algorithm>
@@ -42,7 +43,7 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
-  --version           Show the FFT backend and libsndfile versions
+  --version           Show Convolver, source, FFT backend and libsndfile versions
 FILE may be '-' for stdin/stdout; standard streams require RAW float format.
 Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
 --keep-latency is used. Sample-rate/channel mismatches are errors; no resampling.
@@ -136,8 +137,9 @@ int run(int argc, char** argv) {
                 return 0;
             }
             if (option == "--version") {
-                std::cout << "Convolver portable\nFFT backend: " << convolver::fft_backend_name()
-                          << " / " << convolver::fft_backend_version() << '\n'
+                std::cout << "Convolver portable " << CONVOLVER_VERSION_STRING
+                          << "\nFFT backend: " << convolver::fft_backend_name() << " / "
+                          << convolver::fft_backend_version() << '\n'
                           << convolver::sndfile_version() << '\n';
                 return 0;
             }

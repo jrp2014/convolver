@@ -39,11 +39,41 @@ Apple SDKs. CI uses the Linux clang-tidy 18 toolchain. Fix real diagnostics rath
 than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
 
+## Shell, Markdown and YAML checks
+
+Use Python 3.12 and Node.js 24 for the same environment as the lint CI job.
+Install the pinned runner in an isolated environment:
+
+```sh
+python3 -m venv .venv-lint
+. .venv-lint/bin/activate
+python -m pip install pre-commit==4.5.1
+pre-commit run --all-files --show-diff-on-failure
+```
+
+On Windows, create the environment with `py -3.12 -m venv .venv-lint` and
+activate it in PowerShell with `.venv-lint\Scripts\Activate.ps1`, then run the
+same pip and pre-commit commands. Optionally run `pre-commit install` to check
+staged files automatically before each commit. The first run downloads the
+pinned tools; subsequent runs reuse their isolated environments.
+
+The configuration runs ShellCheck, markdownlint-cli2, strict yamllint, and
+actionlint with ShellCheck for Bash embedded in GitHub Actions workflows.
+Historical source, recovered documentation and archived review evidence are
+excluded. Markdown allows soft-wrapped prose and repeated subheadings under
+different parent sections; other diagnostics should be fixed at their source.
+These checks are development tools and do not add package runtime dependencies.
+Use `pre-commit run --files <paths>` to include new files before staging them;
+`--all-files` checks files already tracked by Git.
+
 ## Scope and versions
 
-The portable CMake package is versioned separately from archived releases. The
-initial static 0.1 API can evolve between minor versions; no stable binary ABI is
-promised. Installed dependency versions remain externally managed. A future
+The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes
+on `main` receive automatic patch versions and annotated Git tags; see
+[source versioning](docs/versioning.md) for scope, deliberate minor/major bumps
+and recovery. The pre-1.0 API can evolve between minor versions; no stable binary
+ABI is promised. Archived releases retain their separate history.
+Installed dependency versions remain externally managed. A future
 binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
