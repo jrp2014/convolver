@@ -112,6 +112,8 @@ Windows config paths, host lifecycle and VST3 are implemented. The
 interoperability, DAW/release validation and measured optimization work.
 Earlier 4.3 assessments are in the [review archive](docs/archive/reviews/README.md).
 
+Rules for contributors and coding agents are in [AGENTS.md](AGENTS.md).
+
 ## Licence
 
 GNU General Public License, version 2 or (at your option) any later version.

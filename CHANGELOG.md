@@ -27,6 +27,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [0.2.0] - 2026-10-18
 
 ### Added
+
 - Portable host lifecycle (`Convolver::host`) and a VST3 adapter built against
   VST3 SDK 3.8.1, with adapter, preset and SDK validator tests in CI.
 - Documented streaming contract for hosts.
@@ -34,6 +35,7 @@ Until 1.0 the C++ API may change between minor versions.
   FFTW build flags, planner modes, and packaging gaps on Apple Silicon and vcpkg.
 
 ### Changed
+
 - Filter and history spectra are stored split per partition (real parts, then
   imaginary parts) so the multiply-accumulate vectorises. Output is unchanged;
   long filters run 1.15 to 1.3 times faster on x86-64.
@@ -46,6 +48,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [0.1.0] - 2026-10-18
 
 ### Added
+
 - Portable C++20 convolution core with FFTW and Apple Accelerate backends,
   FFTW wisdom support, and a libsndfile command-line tool.
 - `.cfg` reader compatible with the historical Convolver format.
@@ -54,6 +57,7 @@ Until 1.0 the C++ API may change between minor versions.
   Windows.
 
 ### Fixed
+
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 

@@ -1,0 +1,14 @@
+---
+config:
+  # Markdown is soft-wrapped; commands, URLs and tables can exceed prose width.
+  MD013: false
+  # Repeated subheadings are useful under different implementation tasks.
+  MD024:
+    siblings_only: true
+ignores:
+  - 'archives/**'
+  - 'convolver/**'
+  - 'source/**'
+  - 'review/**'
+  - 'docs/archive/**'
+  - 'docs/historical/**'
