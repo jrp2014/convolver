@@ -7,6 +7,11 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+## Unreleased
+
+- Add a pinned VST3 distribution policy, explicit source-build checks and a release preset.
+  Platform floors and named hosts remain unverified; portable package version stays 0.2.0.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added
