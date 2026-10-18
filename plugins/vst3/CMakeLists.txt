@@ -29,6 +29,17 @@ if(CMAKE_GENERATOR STREQUAL "Ninja Multi-Config")
     set(CMAKE_BUILD_TYPE "$<CONFIG>")
 endif()
 add_subdirectory("${CONVOLVER_VST3_SDK}" sdk EXCLUDE_FROM_ALL)
+# SDK Windows tools receive UTF-8 arguments but construct narrow filesystem paths.
+# Give those tools a UTF-8 process code page so Unicode bundle paths round-trip.
+# This changes only our test tools, not the plug-in or the user's host process.
+if(WIN32)
+    foreach(sdk_tool IN ITEMS validator moduleinfotool)
+        if(TARGET ${sdk_tool})
+            target_link_options(${sdk_tool} PRIVATE
+                "/MANIFEST:EMBED" "/MANIFESTINPUT:${PROJECT_SOURCE_DIR}/tests/vst3/windows-utf8.manifest")
+        endif()
+    endforeach()
+endif()
 set(SDK_ROOT "${CONVOLVER_VST3_SDK}")
 set(public_sdk_SOURCE_DIR "${SDK_ROOT}/public.sdk")
 set(pluginterfaces_SOURCE_DIR "${SDK_ROOT}/pluginterfaces")
