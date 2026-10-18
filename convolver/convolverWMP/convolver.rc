@@ -67,7 +67,7 @@ BEGIN
             VALUE "FileDescription", "Convolver WMP plug-in Module"
             VALUE "FileVersion", "4, 3, 0, 0"
             VALUE "InternalName", "ConvolverWMP"
-            VALUE "LegalCopyright", "Copyright GPL 2005, 2006 John Pavel"
+            VALUE "LegalCopyright", "Copyright GPL 2005, 2006 jrp"
             VALUE "LegalTrademarks", "convolver"
             VALUE "OriginalFilename", "convolverWMP.dll"
             VALUE "ProductName", "Convolver WMP plug-in Module"

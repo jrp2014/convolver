@@ -100,7 +100,7 @@ BEGIN
             VALUE "FileDescription", "convolver DirectShow Transform Filter"
             VALUE "FileVersion", "4.3"
             VALUE "InternalName", "convolverFilter.ax"
-            VALUE "LegalCopyright", "Copyright GPL 2005, 2006 John Pavel"
+            VALUE "LegalCopyright", "Copyright GPL 2005, 2006 jrp"
             VALUE "LegalTrademarks", "convolver convolverFilter"
             VALUE "OLESelfRegister", "AM20"
             VALUE "OriginalFilename", "convolverFilter.ax"

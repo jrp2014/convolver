@@ -3,15 +3,17 @@
 Convolver applies multichannel FIR filters to audio (GPL-2.0-or-later). The repo
 holds two implementations:
 
-- **Portable core (active):** C++20 library and CLI built with CMake.
-  `include/convolver/` (public API), `portable/` (engine, FFT backends,
-  libsndfile I/O, `.cfg` loader, CLI), `tests/native/`.
+- **Portable core (active):** C++20 library, CLI and VST3 adapter built with
+  CMake. `include/convolver/` (public API), `portable/` (engine, host lifecycle,
+  FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/vst3/`,
+  `tests/native/`, `tests/consumer/`.
 - **Historical Windows code (preserved):** `convolver/` — the 2005–2006 engine
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-Plans and decisions: `docs/project-structure.md` (next milestones),
-`docs/modernization.md`, `docs/portable-core.md`, `docs/testing.md`.
+Start with `CONTRIBUTING.md` (build, presets, formatting, analysis) and
+`REVIEW.md` (current review and priorities). Plans: `docs/project-structure.md`;
+behaviour: `docs/portable-core.md`, `docs/testing.md`, `docs/vst3.md`.
 
 ## Build and test
 
@@ -21,8 +23,8 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure --parallel 4
 ```
 
-Needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and libsndfile; on
-Ubuntu `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev`.
+Needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and libsndfile. On Ubuntu:
+`apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev clang-format-18 clang-tidy-18`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
 CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg).
 
@@ -31,6 +33,8 @@ CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpk
 - `tests/regression/` compiles **historical** functions by slicing
   `convolver/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
+- Portable sources must pass `clang-format-18 --dry-run --Werror` and the
+  `.clang-tidy` checks (CI enforces both; commands in `CONTRIBUTING.md`).
 - Do not claim something builds or passes unless you ran it.
 
 ## Rules

@@ -2,13 +2,13 @@ convolverPipe
 =============
 
 Restored from the historical 4.4 source tree in homes.zip:
-  homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/
+  homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/
   convolver/convolver-/convolverPipe/
 
 The source, Visual Studio 2005 project, and 4.4 version resource were recovered
 from that tree. Archive timestamps were not used to choose the version.
 Generated build outputs, user settings and source-control bindings are omitted.
-Copyright (C) 2006 John Pavel. GNU GPL v2 or later; see ../../COPYING.
+Copyright (C) 2006 jrp. GNU GPL v2 or later; see ../../COPYING.
 
 The original nine-position command line is retained:
   convolverPipe nPartitions nTuningRigour fAttenuationDB nFilterLengths

@@ -1,0 +1,44 @@
+# Changelog
+
+Changes to the portable C++ core, CLI and plug-ins. The portable package is
+versioned separately from the historical Windows releases (1.x to 4.4), whose
+release notes are archived in [docs/historical](docs/historical).
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Until 1.0 the C++ API may change between minor versions.
+
+## [0.2.0] - 2026-10-18
+
+### Added
+- Portable host lifecycle (`Convolver::host`) and a VST3 adapter built against
+  VST3 SDK 3.8.1, with adapter, preset and SDK validator tests in CI.
+- Documented streaming contract for hosts.
+- FFT backend notes and benchmarks (`docs/fft-backends.md`, `docs/benchmarks/`):
+  FFTW build flags, planner modes, and packaging gaps on Apple Silicon and vcpkg.
+
+### Changed
+- Filter and history spectra are stored split per partition (real parts, then
+  imaginary parts) so the multiply-accumulate vectorises. Output is unchanged;
+  long filters run 1.15 to 1.3 times faster on x86-64.
+- Windows CI builds FFTW with SSE2, AVX and AVX2.
+- Windows VST3 builds link FFTW statically so hosts can load the plug-in.
+- VST3 factory and macOS bundle versions now come from the CMake project version.
+- The package version check accepts only matching minor versions, so consumers
+  must now ask for `find_package(Convolver 0.2 ...)`.
+
+## [0.1.0] - 2026-10-18
+
+### Added
+- Portable C++20 convolution core with FFTW and Apple Accelerate backends,
+  FFTW wisdom support, and a libsndfile command-line tool.
+- `.cfg` reader compatible with the historical Convolver format.
+- CMake package exports (`Convolver::core`, `Convolver::io`), presets, and
+  native oracle, sanitizer and historical regression tests on Linux, macOS and
+  Windows.
+
+### Fixed
+- Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
+  documentation and config paths.
+
+[0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
+[0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b

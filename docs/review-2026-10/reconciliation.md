@@ -1,5 +1,9 @@
 # Review branch reconciliation and historical recovery
 
+> **Historical provenance record.** Statements about pending work, authorization,
+> local-only commits and publishing describe the original review stage. For the
+> current repository and validation status, see [REVIEW.md](../../REVIEW.md).
+
 This is the record of the initial correctness merge. The subsequent owner-authorized
 [feature recovery](archive-recovery.md) supersedes the deferral of `convolverPipe`
 and its file-descriptor helpers below.
@@ -38,8 +42,8 @@ These qualify the corresponding wording in the original branch review.
 It contains 5,506 entries including macOS metadata, with 503,768,512 compressed
 file bytes. ZIP/filesystem dates were not used to choose a version.
 
-Paths below are relative to the archive directory
-`homes/DOMAIN=JOHNPAVEL/jrp/My Documents/Visual Studio 2008/Projects/convolver/`.
+Paths below are relative to the archive directory (personal identity replaced by `jrp`)
+`homes/DOMAIN=jrp/jrp/My Documents/Visual Studio 2008/Projects/convolver/`.
 
 | Source | Embedded version evidence | Conclusion |
 | --- | --- | --- |

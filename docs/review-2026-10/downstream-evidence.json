@@ -1,0 +1,230 @@
+{
+  "classification_date": "2026-10-17",
+  "redaction_note": "Personal attribution is rendered as jrp at the owner's request; these text fields are redacted transcriptions. Package/member hashes and binary markers are unchanged.",
+  "scope": "Read-only provenance inspection of public documentation and published binaries. No downloaded binaries were executed; no authors were contacted.",
+  "original_reference": {
+    "url": "https://sourceforge.net/projects/convolver/files/convolver-source/convolver4-3src.zip/convolver4-3src.zip/download",
+    "sha256": "8771f9ca391668dcfe7a83bc7b9d9807bb70d7fd4f96d712730e93b6668b8866",
+    "bytes": 53142450,
+    "distinguishing_definitions": [
+      {
+        "path": "convolver/convolution/channelpaths.h",
+        "line": 100,
+        "definition": "class ChannelPaths",
+        "copyright": "Copyright (C) 2005,2006 jrp"
+      },
+      {
+        "path": "convolver/convolution/samplebuffer.h",
+        "line": 124,
+        "definition": "struct FastArray : AlignedArray<T>"
+      },
+      {
+        "path": "convolver/convolution/exception.h",
+        "line": 43,
+        "definition": "class channelPathsException : public convolutionException"
+      },
+      {
+        "path": "convolver/convolution/convolution.cpp",
+        "line": 702,
+        "definition": "HRESULT Convolution<T>::calculateOptimumAttenuation(T& fAttenuation_db, const bool overlapsave)"
+      }
+    ]
+  },
+  "inspected_packages": [
+    {
+      "id": "albumplayer-windows-x32",
+      "url": "https://albumplayer.ru/ap2convolver_x32.zip",
+      "archive_format": "zip",
+      "sha256": "54aeb01a081550c5c810f0dee302d2cdee80163d9c2ced2cdd52cb6221213f9e",
+      "bytes": 4183553,
+      "member": {
+        "path": "VST32/convolverVST.dll",
+        "sha256": "e42ff382d0a7f191fd0e180831f9d38bd6870a4cc207824c5e3ca54bbf2d1758",
+        "bytes": 590336,
+        "zip_member_timestamp": "2017-12-06T08:25:46",
+        "binary_header": {
+          "format": "PE",
+          "bits": 32,
+          "machine": "0x014c",
+          "machine_name": "I386"
+        },
+        "markers": [
+          "ConvolverVST for Album Player",
+          "convolver.sf.net, albumplayer.ru",
+          ".?AVChannelPaths@@",
+          ".?AVchannelPathsException@@",
+          ".?AU?$FastArray@M@@",
+          ".?AVConvolverVST@@",
+          ".?AVConvolverVSTEditor@@"
+        ]
+      }
+    },
+    {
+      "id": "albumplayer-windows-x64",
+      "url": "https://albumplayer.ru/ap2convolver_x64.zip",
+      "archive_format": "zip",
+      "sha256": "62461432c91aa7ead0c8dfedc584b2ef74c8c48ea34fe820e67cb75dd8658495",
+      "bytes": 5294191,
+      "member": {
+        "path": "VST64/convolverVST.dll",
+        "sha256": "207c22a9bf2714170816111d02a3d073d280df9afc9b0775e4e807cf3f48143d",
+        "bytes": 657408,
+        "zip_member_timestamp": "2017-12-06T08:31:32",
+        "binary_header": {
+          "format": "PE",
+          "bits": 64,
+          "machine": "0x8664",
+          "machine_name": "AMD64"
+        },
+        "markers": [
+          "ConvolverVST for Album Player",
+          "convolver.sf.net, albumplayer.ru",
+          ".?AVChannelPaths@@",
+          ".?AVchannelPathsException@@",
+          ".?AU?$FastArray@M@@",
+          ".?AVConvolverVST@@",
+          ".?AVConvolverVSTEditor@@"
+        ]
+      }
+    },
+    {
+      "id": "albumplayer-linux-x64",
+      "url": "https://albumplayer.ru/linux/aplayer64.tar.gz",
+      "archive_format": "tar.gz",
+      "sha256": "556c5736fc0559d19f80e988543da6e58138be050be7239ea5af803cad1116f3",
+      "bytes": 7215435,
+      "member": {
+        "path": "aplayer/aplayer",
+        "sha256": "c60f661e4ab4ac8f886004092bf3cf01e808eb54db5655fae806b5b3611c3f27",
+        "bytes": 6332176,
+        "binary_header": {
+          "format": "ELF",
+          "bits": 64,
+          "machine": 62,
+          "machine_name": "AMD64"
+        },
+        "markers": [
+          "int Convolution::calculateOptimumAttenuation(float&, bool)",
+          "void Convolution::mix_input(const ChannelPaths::ChannelPath&)",
+          "void Convolution::mix_output(const ChannelPaths::ChannelPath&, SampleBuffer&, const ChannelBuffer&, unsigned int)",
+          "unsigned int ChannelPaths::nFFTWPartitionLength() const",
+          "unsigned int ChannelPaths::nHalfPartitionLength() const",
+          "unsigned int ChannelPaths::nFilterLength() const",
+          "9FastArrayIfE",
+          "12ChannelPaths"
+        ]
+      }
+    }
+  ],
+  "classifications": [
+    {
+      "project": "Album Player",
+      "classification": "Derivative implementation: Windows 32/64-bit ConvolverVST adaptation and Linux 64-bit core port",
+      "basis": "Distinctive original core class/function names in published binaries, adapted product/vendor strings, official manual attribution and developer description of adaptation.",
+      "sources": [
+        {
+          "url": "https://albumplayer.ru/english.html",
+          "evidence": "Links both inspected Windows Convolver packages."
+        },
+        {
+          "url": "https://albumplayer.ru/linux/english.html",
+          "evidence": "Links inspected Linux x64 package; page lists Album Player 2.19 and update date 2026-09-17."
+        },
+        {
+          "url": "https://albumplayer.ru/linux/album_player_linux_manual_ru.pdf",
+          "evidence": "Printed p.3 credits ConvolverVST among components used; p.32 identifies it as the prototype and links its configuration documentation."
+        },
+        {
+          "url": "https://hi-fi-forum.net/forum/printthread.php?page=124&tid=142398",
+          "evidence": "Igor_A reply dated 2023-07-15 describes adapting original plugin settings handling and filename display for Album Player."
+        }
+      ],
+      "limitations": "Not a source diff or runtime validation. No source files or separate licence document were found in these sampled archives, and no source link was found on the two official landing pages; this does not establish that source is unavailable elsewhere. ZIP timestamps are not verified release dates. Windows architecture does not establish internal floating-point precision."
+    },
+    {
+      "project": "cPlay / cicsPlay",
+      "classification": "Documented external ConvolverVST plugin hosting; embedded Convolver engine reuse unproved",
+      "sources": [
+        {
+          "url": "http://www.cicsmemoryplayer.com/index.php?n=CPlay.Specifications",
+          "evidence": "Documents VST 2.4.2 single-plugin hosting and libsamplerate/SoX resampling."
+        },
+        {
+          "url": "https://www.alanjordan.org/DRCDesigner/DrcDesignerHelp.html",
+          "evidence": "Instructions select the separate convolverVST.dll inside cPlay."
+        }
+      ],
+      "limitations": "No public cicsPlay source located. Today's SourceForge projects/cplay page describes a different Bash/mplayer project."
+    },
+    {
+      "project": "DRC Designer",
+      "classification": "Documented binary distribution and integration",
+      "sources": [
+        {
+          "url": "https://www.alanjordan.org/DRCDesigner/DrcDesignerHelp.html",
+          "evidence": "Author says the package includes jrp's Convolver VST and describes installing convolver4-4vc++.zip."
+        }
+      ],
+      "limitations": "Current DRC Designer download's binary contents and identity were not inspected."
+    },
+    {
+      "project": "Audiolense / JRiver",
+      "classification": "Configuration format adoption; DSP source reuse unproved",
+      "sources": [
+        {
+          "url": "https://www.avnirvana.com/threads/al-filter-wav-file-inquiry.13436/",
+          "evidence": "Audiolense author juicehifi, post 16 dated 2024-03-29, credits jrp with the format and describes persuading JRiver to implement it."
+        }
+      ]
+    },
+    {
+      "project": "Roon",
+      "classification": "Configuration format adoption with documented differences",
+      "sources": [
+        {
+          "url": "https://help.roonlabs.com/portal/en/kb/articles/dsp-engine-convolution",
+          "evidence": "Explicit Convolver-format support; requires relative paths and ZIP packaging and excludes configurations listing other configurations."
+        }
+      ]
+    },
+    {
+      "project": "Hang Loose Convolver",
+      "classification": "Configuration format adoption; DSP source reuse unproved",
+      "sources": [
+        {
+          "url": "https://accuratesound.ca/hlc-plugin/",
+          "evidence": "Product page links jrp's config.html as the supported configuration format."
+        }
+      ]
+    },
+    {
+      "project": "CamillaGUI / CamillaDSP",
+      "classification": "Source-confirmed configuration format importer; original DSP source reuse not established",
+      "sources": [
+        {
+          "url": "https://github.com/HEnquist/camillagui-backend/blob/3c753054ca2a8225476712f917e6ab4124eb4888/backend/convolver_config_import.py",
+          "evidence": "Python ConvolverConfig class cites original specification and translates routing, delays and FIR references into CamillaDSP configuration."
+        }
+      ]
+    },
+    {
+      "project": "Equalizer APO",
+      "classification": "Different documented convolution library lineage",
+      "sources": [
+        {
+          "url": "https://sourceforge.net/p/equalizerapo/discussion/general/thread/24dfd2eb/",
+          "evidence": "Maintainer identifies libHybridConv as its convolution engine."
+        },
+        {
+          "url": "https://github.com/mirror/equalizerapo/blob/53d885f7f1a097b457e17a5206b7d60f647877a8/libHybridConv-0.1.1/libHybridConv.h",
+          "evidence": "Library source credits Christian Borss, 2009."
+        }
+      ]
+    }
+  ],
+  "reproduction": {
+    "command": "python3 docs/review-2026-10/inspect_downstream.py --check",
+    "behaviour": "Fetches the three public archives into memory, reads the specified members without filesystem extraction, checks hashes/lengths/PE-or-ELF headers/markers and prints JSON. Does not execute downloaded content. --package selects one recorded package.",
+    "interpretation": "Matching evidence identifies the inspected artifacts; it is not a convolution correctness, performance, licensing-compliance or compatibility test. Upstream downloads may change, producing a mismatch."
+  }
+}

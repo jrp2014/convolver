@@ -40,13 +40,24 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }}
+        run: cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Build production targets and tests
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure --parallel 2
+      - name: Portable formatting and static analysis
+        if: runner.os == 'Linux' && matrix.cxx == 'clang++'
+        run: |
+          sudo apt-get install -y clang-format-18 clang-tidy-18
+          clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
+          clang-tidy-18 -p build portable/engine.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
       - name: Linked versions
         run: ./build/convolver --version
+      - name: Core-only preset without file or Python dependencies
+        run: |
+          cmake --preset core-only -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
+          cmake --build --preset core-only
+          ctest --preset core-only
       - name: Configure Accelerate
         if: runner.os == 'macOS'
         run: cmake -S . -B build-accelerate -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_FFT_BACKEND=ACCELERATE -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_LEGACY_TESTS=OFF
@@ -67,7 +78,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install native dependencies
-        run: vcpkg install fftw3:x64-windows 'libsndfile[core]:x64-windows'
+        run: vcpkg install 'fftw3[core,sse2,avx,avx2]:x64-windows' 'libsndfile[core]:x64-windows'
       - name: Configure MSVC
         run: cmake -S . -B build -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
       - name: Build
@@ -76,3 +87,8 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure --parallel 2
       - name: Linked versions
         run: ./build/Release/convolver.exe --version
+      - name: Core-only MSVC build and consumer tests
+        run: |
+          cmake -S . -B build-core -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_BUILD_IO=OFF -DCONVOLVER_BUILD_CLI=OFF -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
+          cmake --build build-core --config Release --parallel 2
+          ctest --test-dir build-core -C Release --output-on-failure --parallel 2

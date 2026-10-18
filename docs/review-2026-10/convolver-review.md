@@ -1,119 +1,34 @@
-# Convolver 4.3: correctness review and options for modernising it
+# Convolver review: current repository
 
-*Reviewed 17 Oct 2026. Source: `convolver-source/convolver4-3src.zip` from SourceForge (6 July 2006). This is the newest release that ships source; 4.4 (19 July 2006) contains only an installer.*
+Updated 18 October 2026 for portable **0.2.0**, source baseline `5df874e`.
+The authoritative [current review](../../REVIEW.md) now covers both the recovered
+historical tree and the portable core, CLI, packages and VST3 adapter.
 
-## Summary
+The former 4.3-only assessment is preserved as the
+[archived branch review](../archive/reviews/4.3-branch-review.md). Its Python
+model and [saved results](model-results.txt) remain historical evidence; they
+are not the current real-library test gate.
 
-The core convolution algorithm is correct. In its default setup, which is 0 or 1 partitions, it matches a direct convolution to rounding error. I found two bugs that do change the sound, and both occur only in particular setups:
+## What changed since that review
 
-1. **Some partition counts add gaps to the filter.** When the filter length does not split into convenient FFT sizes, zeros are inserted between partitions and the result is a different filter. Errors in my tests were 36–73% of the signal level.
-2. **Input channel delays corrupt the signal.** Any non-zero input delay in a config file overwrites some samples just before they are processed. Errors were 0.2% with 1 partition and 13% with 8 partitions.
+- The old partition-stride and delay-history defects, plus the additional PCM,
+  aliasing, gain and complex-arithmetic fixes, were reconciled into the historical
+  source. See the [merge record](reconciliation.md) for the selected implementations
+  and corrections to the original review's wording.
+- The archive supplied corroborated 4.4 features and the SourceForge documentation.
+  This was selective recovery, not a complete stable 4.5 release.
+- The portable engine is a separate overlap-add implementation with real FFTW and
+  Accelerate tests against independent references, split-spectrum MACs and explicit
+  latency/tail behavior. It is no longer a proposed port tested only in Python.
+- Package exports/presets, external-consumer checks, Windows configuration paths,
+  formatting/static-analysis tooling, host lifecycle and the optional VST3 adapter
+  are implemented. VST3 supports embedded presets and mono/stereo streaming.
+- Portable PCM16 dither, commercial DAW validation, release packaging and broader
+  configuration interoperability remain work to do. Historical Windows wrappers
+  are not certified by portable or extracted tests.
 
-There are also several smaller bugs. Each has a proposed fix in the same commit as this file, in `convolver/convolution/`. I checked the logic of the two main fixes with a Python model of the engine. I could not compile the patch here, because the code needs Visual Studio 2005, ATL and the Windows SDK.
-
-### What the review covers
-
-- **Read in full:** the shared engine in `convolution/` (`convolution.cpp/.h`, `filter.cpp`, `channelpaths.cpp`, `sample.h`, `samplebuffer.h`, `ffthelp.cpp`, `dither.h`) and `convolverCMD`.
-- **Checked only for how they call the engine:** the WMP DMO, the DirectShow filters, the VST GUI, `DXUT` and the bundled FFTW and libsndfile.
-
-## How I tested it
-
-[convolver_model.py](convolver_model.py) ports `Filter::Filter` and `Convolution::doPartitionedConvolution` to Python line by line. It keeps the same circular input buffer, the same half-partition indexing, the same "output-side" circular accumulator of partition spectra, the same delay handling and the same FFT-size table, which it reads from `ffthelp.cpp`. It then compares the output with `numpy.convolve`. Results are in [model-results.txt](model-results.txt).
-
-| Case | Max error (relative) |
-|---|---|
-| Power-of-2 filter, 1 / 4 / 16 partitions | ~5e-16 (exact) |
-| Odd length, 1 partition | ~6e-16 (exact) |
-| Output delay 37 samples | ~5e-16 (exact) |
-| 8192 taps, 3 partitions | **0.36** → 6e-16 with fix |
-| 10007 taps, 7 partitions | **0.73** → 6e-16 with fix |
-| Input delay 37 samples, 8 partitions | **0.13** → 5e-16 with fix |
-
-The algorithm is a uniformly partitioned overlap-save convolution. It accumulates X·H<sub>p</sub> into a ring of future output blocks instead of keeping a delay line of past input spectra. That arrangement is valid and costs the same amount of work. The latency is one half-partition, which matches `cbLookAhead` and the "Lag" figure shown on the property page.
-
-## Bugs that change the output
-
-### 1. Zeros inserted between partitions (`filter.cpp`)
-
-`Filter::Filter` sets `nHalf = ceil(taps / P)` and then rounds the FFT block size up to an FFTW-friendly size `L = GetOptimalDFTSize(nHalf)`. However, it still slices the impulse response into chunks of `nHalf` taps. The engine moves forward one partition every `L` samples, so partition *p* is delayed by an extra `p·(L − nHalf)` samples. The effect is a run of zeros at every partition boundary.
-
-Which common setups are affected:
-
-| Taps | 2 | 3 | 4 | 8 | 16 partitions |
-|---|---|---|---|---|---|
-| 16384 / 32768 / 65536 / 131072 | ok | gap 26 / 12 / 24 / 49 | ok | ok | ok |
-| 22050 | ok | ok | gap 31 | gap 15 | gap 7 |
-| 44100 | ok | ok | ok | gap 31 | gap 15 |
-| 88200 | ok | ok | ok | ok | gap 31 |
-| 48000 / 96000 | ok | ok | ok | ok | ok |
-
-This explains why the code "works in practice". The default setting is 0 partitions, which always works, and DRC normally produces power-of-2 filters. A 1-second IR at 44.1 kHz with 8 or 16 partitions, or any filter with 3 partitions, is processed wrongly.
-
-**Fix:** after padding, set `nHalfPartitionLength_ = nHalfPaddedPartitionLength` so the IR is sliced at the padded size. Any trailing partitions that receive no taps are already zeroed.
-
-### 2. Input channel delays overwrite unprocessed samples (`sample.h`)
-
-`TransferFrame` applies an input delay *d* by writing each sample *d* slots ahead in the circular input buffer, which holds 2L samples. In the last *d* frames of each half-block, those writes wrap around into the start of the *older* half before that half has been transformed. The previous block's samples are therefore replaced with samples from the following block. The damage falls on the last taps of every partition, so it gets worse as the partition count rises. Output delays are implemented differently and are correct.
-
-The documentation describes input delays as supported up to half a partition, for cross-talk cancellation and similar uses.
-
-**Fix:** keep a small per-channel delay line of (max delay + 1) samples in `Convolution`, and always write into the block buffer at the current index. This changes the `TransferFrame` signature. Its only callers are in `convolution.cpp`.
-
-## Smaller bugs (all fixed in the patch)
-
-| Where | Problem | Effect |
-|---|---|---|
-| `channelpaths.cpp` gain loop | Loops over `Paths_[0].outChannel` for every path | Wrong "estimated/peak gain" when paths have different numbers of outputs, and possible out-of-range reads |
-| `channelpaths.cpp` scale parsing | `-0` gives +1 because `-0.0 < 0` is false | The documented workaround is `-0.99999`; the fix uses the sign bit |
-| `samplebuffer.h` `FastArray::operator=` | Copies the destination size from a shorter source (N into N+2) | Reads 2 floats past the end of the buffer on the fast mix path. Harmless today because FFTW ignores them, but still out of bounds |
-| `dither.h` `SimpleDither::Q` | Q = 2/(2<sup>b−1</sup>−1), which is 2 LSB, not the 1 LSB the comment states | Dither noise about 6 dB higher than intended. This looks unintended |
-| `filter.cpp` | `filterException("Filter too short")` is created but never thrown | A 0-length filter later divides by zero |
-| `filter.cpp` Ooura path | The last, partial partition is scaled by 1/N instead of 2/N | Half gain on that partition. Ooura builds only, which are currently compiled out |
-| `convolution.cpp` `DisplayConvolutionList` | Loop runs from 1 to n−2 | With 3 or more filters in a list, the second-to-last filter is never shown and the selection marker can go missing |
-
-## Not fixed, but worth knowing
-
-- **"Calculate optimum attenuation" is an estimate, not a guarantee.** It feeds the filter uniform white noise and measures the peak output. A filter with a narrow boost, such as bass boost, can produce a higher peak on a sine at that frequency than on noise, so clipping is still possible. The docs call the figure "probably conservative". The only safe bound is the displayed peak gain, Σ|h|. Output saturates rather than wrapping. (I inferred this from the method rather than measuring it.)
-- **Documentation details.**
-  - "1 partition … overlap-add" is not accurate: the code runs the same overlap-save algorithm through the partitioned path.
-  - The figure labelled "taps" is P × padded FFT size, which is about twice the real number of taps. The docs mention this.
-- **`convolverCMD`.**
-  - The test `sf_info.format && (SF_FORMAT_WAV | …)` is always true, so the output is always a float WAV whatever the input format was.
-  - The output keeps the L-sample latency at the start.
-  - The last buffer is zero-padded to a full buffer, so part of the convolution tail can be cut off.
-- **Code that does not build.** The non-libsndfile and Ooura branches do not compile (unbalanced brackets, `OOURA_SIMPLE` vs `SIMPLE_OOURA`, a stray backtick). They should be deleted rather than repaired.
-- **Hazards for a port to another compiler.**
-  - `abs()` on floats, as in `calculateOptimumAttenuation` and the channel parsing, quietly becomes integer `abs` on other compilers if only `<cstdlib>` is in scope. The optimum attenuation would then come out as +∞.
-  - FFTW plans are run on other arrays that are only 16-byte aligned. With a modern AVX build of FFTW, all buffers must come from `fftwf_malloc`, or the plans must be made with `FFTW_UNALIGNED`.
-- **The J.River reports of static and a property-page crash** (from the sibling thread's research) do not map clearly onto anything above. A user on a 44.1 kHz IR with 8 or 16 partitions would have heard bug 1 as a badly wrong filter rather than as static. This is unconfirmed.
-
-## Options for making it relevant again
-
-**Context.** Convolver's audience was room-correction users, plus some people using it for convolution reverb (about 62k downloads, still around 580 a year). On Windows, Equalizer APO now does system-wide convolution and can host VST plugins. CamillaDSP (Linux, Mac and Windows) and PipeWire's filter-chain do the same matrix-mixing FIR job. The WMP DSP-plugin and DirectShow hosts are effectively dead. Two licensing changes help:
-
-- **VST3 has been MIT-licensed since October 2025** ([Steinberg press release](https://ocl-steinberg-live.steinberg.net/_storage/asset/819253/storage/master/Press%20Release%20-%202025-10-29%20-%20VST%203.8%20-%20EN.pdf), [Sonicstate](https://sonicstate.com/news/2025/10/30/vst-3-now-available-under-mit-license)).
-- **CLAP is MIT** as well.
-
-Shipping a plugin is therefore no longer a licensing problem. Note that VST2, which ConvolverVST uses, can no longer be licensed for new distribution.
-
-What still sets Convolver apart is the combination of:
-
-- arbitrary input/output matrix mixing with per-path scaling and per-channel delays;
-- automatic filter choice by channel count and sample rate;
-- dither and noise shaping;
-- one plain config format that covers all of the above.
-
-| Option | What it involves | Effort | Who it reaches |
-|---|---|---|---|
-| **A. Rescue the engine** (recommended first step) | Move to GitHub. History can be kept by converting the SourceForge CVS with cvs2git; the zip contains CVS metadata. Apply the patch. Extract `convolution/` as a portable C++20 library: replace `TCHAR`/ATL/`DWORD` with standard types, Boost with `<random>` and `unique_ptr`, and the hand-rolled arrays with `fftwf_malloc` buffers. Build with CMake and run CI on Linux, macOS and Windows. Turn the Python model into unit tests against direct convolution. | Small to medium | Mainly you. It is the base for everything below |
-| **B. Plugin rebuild** | Wrap the library as VST3, CLAP and AU using JUCE (GPLv3 or commercial, which suits your "GPLv2 or later") or iPlug2. Port the property page to a cross-platform GUI. | Medium | DAWs, and system-wide use on Windows through Equalizer APO's VST host |
-| **C. Linux and streamer route** | Build an LV2 (or LADSPA) plugin or a small CLI that reads the config format. It can then run inside PipeWire filter-chain, or as a successor to `convolverPipe` for Lyrion (SlimServer's successor), moOde and Volumio. | Small once A is done | Hi-fi streamer and Raspberry Pi users, who are today's DRC crowd |
-| **D. Interop rather than a new player** | A converter from Convolver config files to CamillaDSP YAML, Equalizer APO `Convolution:`/`Copy:` lines, or PipeWire filter-chain graphs. | Small | Existing users with old configs. It also accepts that those tools have taken over the niche |
-| **E. Engine upgrades** (any of A–C) | Non-uniform partitioning (Gardner / Garcia / Wefers): short head blocks with long tail blocks give near-zero latency even with long IRs, compared with 93 ms today for 65536 taps and 16 partitions. Also: multithreading across paths, AVX via FFTW or pffft, and an option for double-precision accumulation. | Medium | Live and video use, where latency matters |
-
-**My recommendation:** do A, then either B or C depending on whether you care more about Windows and DAW users or about streamer and hi-fi users, and add D cheaply alongside. Without a modern host, upgrading the engine (E) changes nothing anyone can hear, so it should come last.
-
-## Files
-
-- The fixes are in `convolver/convolution/`, in the same commit as this file.
-- [convolver_model.py](convolver_model.py) and [model-results.txt](model-results.txt): the Python model and its results. Run it from the repository root with `python3 docs/review-2026-10/convolver_model.py convolver/convolution/ffthelp.cpp`.
+See [fresh validation evidence](current-validation.md),
+[test boundaries](../testing.md), [current architecture](../project-structure.md)
+and [remaining modernization priorities](../modernization.md).
+The [downstream evidence](downstream-evidence.json) distinguishes derivative
+engine lineage from configuration-format adoption.

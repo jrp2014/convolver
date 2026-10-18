@@ -11,9 +11,9 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **14 suites**: five native suites and the
-nine historical/documentation suites below. GCC and MSVC default to the six
-native/documentation suites; the old extraction adapters require Clang.
+With Clang on macOS/Linux this runs **17 suites**: seven native suites, one package-consumer suite and the
+nine historical/documentation suites below. GCC and MSVC default to nine
+native/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
@@ -22,7 +22,7 @@ native/documentation suites; the old extraction adapters require Clang.
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
   nonfinite data and a C++ heap-allocation guard during processing/reset.
 - `native.io`: real libsndfile float/PCM16/24/32 round trips and clipping,
-  legacy parser/config lists, relative paths, signed zero, malformed input,
+  legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation and RAW alignment. POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors.
@@ -35,17 +35,30 @@ native/documentation suites; the old extraction adapters require Clang.
   Accelerate rejects FFTW-only options. FFT and engine oracle suites also exercise
   measured/patient plans and cached matrix processing with FFTW.
 
-Debug with ASan/UBSan and optimized Release have passed all 14 suites locally
-for both FFTW and Accelerate on Apple Silicon. `backend_equivalence.py` compares
-both actual CLIs over 16 matrix/delay cases, including odd block sizes and both
-latency modes. See [the measurements and reproduction commands](fft-backends.md).
+- `native.host`: planar/in-place float and double buffers, invalid samples,
+  bypass/reset, concurrent and queued filter replacements, with a callback heap guard.
+- `native.state`: embedded configuration round trips, truncation, corrupt headers,
+  invalid coefficients and bounded decoding.
 
-The preceding FFTW baseline passed Linux Clang/GCC, macOS and Windows MSVC
-[CI at f78c22b](https://github.com/jrp2014/convolver/actions/runs/39078598572).
-CI also builds Accelerate and compares backend outputs on macOS; consult the
-[workflow runs](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
-for each commit's remote results. Local dependency source hashes are
-recorded in the [portable guide](portable-core.md).
+The optional [VST3 build](vst3.md) adds three tests: actual SDK-interface lifecycle
+and audio tests, embedded preset generation/loading after deleting the source IR,
+plus the SDK validator loading the built plug-in. These cover preactivation tail
+queries, silent-input tails, automation offsets and failed state restore rollback.
+They do not establish compatibility in a particular commercial DAW.
+
+`packaging.consumer` installs and relocates the package, builds and runs an
+external core/host/I/O consumer, and verifies components and source-tree use with and
+without a parent CTest setup. Core-only configuration runs five C++/package
+suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
+
+`backend_equivalence.py` separately compares both actual CLIs over 16 matrix/delay
+cases, including odd block sizes and both latency modes. See
+[measurements and reproduction commands](fft-backends.md). The
+[current validation record](review-2026-10/current-validation.md) pins fresh local
+results and Linux/Windows/macOS CI evidence to source baseline `5df874e`.
+Consult the [native workflow](../.github/workflows/regression.yml) and
+[VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
+file alone is not evidence that a job passed.
 
 ## Run with CMake/CTest
 
@@ -131,7 +144,7 @@ callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
 that does not fix the independent historical wrappers. The portable CTest gate does not
 establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.
 
-The [modernization plan](modernization.md) defines the backend, native-platform,
-file/pipe, lifecycle and performance acceptance criteria. Add native production
-tests beside the existing regressions as each component becomes portable; only
-retire extraction harnesses once their failure cases are covered there.
+The [current review](../REVIEW.md) separates implemented native behavior from
+remaining legacy and release gaps. The [modernization plan](modernization.md)
+prioritizes future compatibility and performance evidence. Only retire extraction
+harnesses once their failure cases have equivalent production coverage.

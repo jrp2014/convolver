@@ -1,5 +1,5 @@
 // Convolver pipe front end, recovered from the historical 4.4 project.
-// Copyright (C) 2006 John Pavel; GNU GPL version 2 or, at your option, later.
+// Copyright (C) 2006 jrp; GNU GPL version 2 or, at your option, later.
 // See the repository COPYING file. Safety and streaming repairs are local additions.
 #pragma once
 

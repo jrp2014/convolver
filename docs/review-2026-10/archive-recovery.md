@@ -1,5 +1,9 @@
 # Historical feature and documentation recovery
 
+> **Historical provenance record.** Statements about pending work, authorization,
+> local-only commits and publishing describe the original review stage. For the
+> current repository and validation status, see [REVIEW.md](../../REVIEW.md).
+
 The owner approved the correctness commit and local merge on 17 October 2026,
 then explicitly requested recovery of archive features including `convolverPipe`
 and documentation. The initial fixes were committed as `cca3e90` and merged into
@@ -43,14 +47,14 @@ local repairs are documented here and in Git rather than relabelling the whole
 project as 4.5. The archive's 4.5 tree and prerelease installer do not establish a
 stable 4.5 release. File dates played no role in choosing the source.
 
-[Feature provenance](archive-feature-provenance.json) records exact source member
-names and SHA-256 hashes. The new `pipe_helpers.h`, tests and current guide are
+[Feature provenance](archive-feature-provenance.json) records source member
+names with personal identity replaced by `jrp`, and original SHA-256 hashes. The new `pipe_helpers.h`, tests and current guide are
 local additions, not claims about historical source content.
 
 ## Recovered documentation
 
 A broader archive search found the published site at
-`homes/DOMAIN=JOHNPAVEL/jrp/My Documents/My Web Sites/convolverpub/`.
+`homes/DOMAIN=jrp/jrp/My Documents/My Web Sites/convolverpub/`.
 Its release history ends at version 4.4. That identifies the documented product
 line, not a reliable date for every page; pages may have received later edits.
 The parallel authoring-site copy corroborates the visible text of all 18 pages.

@@ -1,0 +1,48 @@
+cmake_minimum_required(VERSION 3.20)
+function(run)
+    execute_process(COMMAND ${ARGV} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(NOT result EQUAL 0)
+        message(FATAL_ERROR "Command failed (${result}): ${ARGV}\n${output}\n${error}")
+    endif()
+endfunction()
+
+set(root "@CMAKE_CURRENT_BINARY_DIR@/consumer-test")
+file(REMOVE_RECURSE "${root}")
+file(MAKE_DIRECTORY "${root}/source")
+# The installed consumer has no access to Convolver's source/header directories.
+file(COPY "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/CMakeLists.txt"
+    "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/main.cpp" DESTINATION "${root}/source")
+run("@CMAKE_COMMAND@" --install "@CMAKE_CURRENT_BINARY_DIR@" --prefix "${root}/original" --config "${CONFIG}")
+file(RENAME "${root}/original" "${root}/relocated prefix")
+set(package "${root}/relocated prefix/@package_dir@")
+set(generator_options)
+if(NOT "@CMAKE_GENERATOR_PLATFORM@" STREQUAL "")
+    list(APPEND generator_options -A "@CMAKE_GENERATOR_PLATFORM@")
+endif()
+if(NOT "@CMAKE_GENERATOR_TOOLSET@" STREQUAL "")
+    list(APPEND generator_options -T "@CMAKE_GENERATOR_TOOLSET@")
+endif()
+function(consumer name)
+    run("@CMAKE_COMMAND@" -S "${root}/source" -B "${root}/${name}"
+        -G "@CMAKE_GENERATOR@" ${generator_options}
+        -C "@CMAKE_CURRENT_BINARY_DIR@/consumer-cache.cmake"
+        "-DConvolver_DIR=${package}" ${ARGN})
+    run("@CMAKE_COMMAND@" --build "${root}/${name}" --config "${CONFIG}" --parallel 2)
+    run("@CMAKE_CTEST_COMMAND@" --test-dir "${root}/${name}" -C "${CONFIG}" --output-on-failure)
+endfunction()
+consumer(installed-core -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
+    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+consumer(installed-host -DCONSUMER_HOST=ON -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
+    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+consumer(source-core "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"
+    -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+consumer(source-no-ctest "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"
+    -DCONSUMER_CTEST=OFF -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
+    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+if(@CONVOLVER_BUILD_IO@)
+    consumer(installed-io -DCONSUMER_IO=ON)
+else()
+    consumer(missing-io -DMISSING_COMPONENT=io)
+endif()
+consumer(missing-component -DMISSING_COMPONENT=nonexistent)
+message(STATUS "Installed core, relocated package, components and source-tree consumer passed")
