@@ -88,6 +88,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare vcpkg binary cache
+        id: vcpkg-cache
+        shell: pwsh
+        run: |
+          $cache = Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$cache" >> $env:GITHUB_ENV
+          "VCPKG_BINARY_SOURCES=clear;default,readwrite" >> $env:GITHUB_ENV
+          $revision = git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the vcpkg revision' }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+          "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+      - name: Cache vcpkg binary archives
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-binary-cache
+          key: >-
+            ${{ format('vcpkg-v1-{0}-{1}-x64-windows--{2}-{3}-{4}',
+            runner.os, runner.arch, steps.vcpkg-cache.outputs.image,
+            steps.vcpkg-cache.outputs.revision, hashFiles('.github/workflows/regression.yml')) }}
+          restore-keys: |
+            vcpkg-v1-${{ runner.os }}-${{ runner.arch }}-x64-windows--
       - name: Install native dependencies
         run: vcpkg install 'fftw3[core,sse2,avx,avx2]:x64-windows' 'libsndfile[core]:x64-windows'
       - name: Configure MSVC

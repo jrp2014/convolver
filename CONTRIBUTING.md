@@ -66,6 +66,21 @@ These checks are development tools and do not add package runtime dependencies.
 Use `pre-commit run --files <paths>` to include new files before staging them;
 `--all-files` checks files already tracked by Git.
 
+CI caches pre-commit environments by operating system, architecture, exact Python
+and Node versions, and `.pre-commit-config.yaml`. Windows jobs cache vcpkg binary
+archives separately for dynamic and static triplets. Their keys include the runner
+image, vcpkg revision and workflow dependency recipe; fallback archives are still
+checked by vcpkg's ABI matching before reuse. Only dependency archives are cached,
+not installed trees, Convolver builds or test results. Dependency installation,
+lint and every build/test step run even on a cache hit.
+
+To verify caching, compare two successful runs of the same workflow revision:
+the first should save a cache and the next should restore it. For vcpkg, also check
+the install log for restored packages rather than relying only on the Actions
+cache hit. Branch caches are scoped by GitHub, so the first run on `main` may be
+cold after testing a feature branch. Bump the `v1` key prefix to discard a cache
+generation if needed; an unavailable cache must only affect build time.
+
 ## Scope and versions
 
 The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes

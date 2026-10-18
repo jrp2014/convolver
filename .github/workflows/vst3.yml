@@ -33,6 +33,30 @@ jobs:
       - name: macOS libraries
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
+      - name: Prepare vcpkg binary cache
+        id: vcpkg-cache
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $cache = Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$cache" >> $env:GITHUB_ENV
+          "VCPKG_BINARY_SOURCES=clear;default,readwrite" >> $env:GITHUB_ENV
+          $revision = git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the vcpkg revision' }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+          "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+      - name: Cache vcpkg binary archives
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-binary-cache
+          key: >-
+            ${{ format('vcpkg-v1-{0}-{1}-x64-windows-static-md--{2}-{3}-{4}',
+            runner.os, runner.arch, steps.vcpkg-cache.outputs.image,
+            steps.vcpkg-cache.outputs.revision, hashFiles('.github/workflows/vst3.yml')) }}
+          restore-keys: |
+            vcpkg-v1-${{ runner.os }}-${{ runner.arch }}-x64-windows-static-md--
       - name: Windows libraries
         if: runner.os == 'Windows'
         shell: pwsh
