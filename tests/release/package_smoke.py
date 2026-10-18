@@ -4,7 +4,9 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import platform
 import subprocess
+import sys
 import tempfile
 
 
@@ -12,6 +14,8 @@ def check(root, validator=None, probe=None):
     root = Path(root).resolve()
     for name in ('VST3/Convolver.vst3', 'presets/examples.json', 'docs/plugins/quickstart.md', 'licenses/Convolver.txt', 'VERSION.txt'):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
+    if platform.system() == 'Darwin':
+        subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
     tool = root / 'bin/convolver-vst3-preset'
     if not tool.exists():
         tool = tool.with_suffix('.exe')
@@ -43,8 +47,10 @@ def check(root, validator=None, probe=None):
         result = subprocess.run([str(tool), str(bad), str(relocated / 'bad.vstpreset')], capture_output=True)
         assert result.returncode and b'invalid configuration' in result.stderr, result.stderr
         assert not (relocated / 'bad.vstpreset').exists(), 'malformed input left an output'
+        if platform.system() == 'Darwin':
+            subprocess.run(['codesign', '--verify', '--deep', '--strict', str(relocated / 'VST3/Convolver.vst3')], check=True)
         if validator:
-            subprocess.run([str(validator), str(relocated / 'VST3/Convolver.vst3')], check=True)
+            subprocess.run([sys.executable, str(Path(__file__).resolve().parents[1] / 'vst3/validate_bundle.py'), str(validator), str(relocated / 'VST3/Convolver.vst3')], check=True)
     print('Relocated converter, embedded examples and requested SDK checks passed')
 
 

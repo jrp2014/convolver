@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--build', required=True)
 parser.add_argument('--config', required=True)
 parser.add_argument('--cmake', required=True)
-parser.add_argument('--validator', type=Path, required=True)
+parser.add_argument('--validator', type=Path)
 parser.add_argument('--probe', type=Path, required=True)
 args = parser.parse_args()
 with tempfile.TemporaryDirectory(prefix='convolver-stage-') as temporary:

@@ -55,3 +55,38 @@ cmake --build build-core
 This needs neither Python, libsndfile nor the VST3 SDK. Choose Accelerate on
 macOS or provide FFTW. See [the CMake package guide](../cmake-package.md) for
 `Convolver::core`, `Convolver::host` and `Convolver::io` consumers.
+
+## Pinned preview recipe
+
+The release recipe builds static FFTW and libsndfile (built-in formats only;
+optional FLAC/Ogg/MP3 codecs are disabled), and uses Accelerate for macOS plug-ins.
+The following commands work in a Unix shell or a Visual Studio developer terminal
+with Python and CMake on `PATH` (use one line per command in PowerShell):
+
+```sh
+python scripts/release/build_dependencies.py --cache build/downloads --work build/deps --fetch
+cmake --preset release-vst3 -DCONVOLVER_VST3_SDK="$PWD/build/deps/sources/vst3sdk" \
+  -DCMAKE_PREFIX_PATH="$PWD/build/deps/prefix" \
+  -DCONVOLVER_DISTRIBUTION_LICENSE_DIR="$PWD/build/deps/licenses"
+cmake --build --preset release-vst3
+ctest --preset release-vst3
+cmake --install build/presets/release-vst3 --config Release --prefix stage --component PluginDistribution
+```
+
+On macOS add `-DCONVOLVER_FFT_BACKEND=ACCELERATE -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`.
+Use `$PWD` in PowerShell or absolute paths in cmd. `--fetch` explicitly permits
+network acquisition; omitting it requires the already supplied, hash-checked sources.
+No optional CPU instruction set is enabled in release FFTW. Windows uses static
+libraries and the dynamic MSVC runtime consistently.
+
+`build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
+assembles **committed** source and the pinned dependency archives. Then
+`python tests/release/source_build.py --archive build/Convolver-source.tar.gz`
+rebuilds dependencies, core, converter, SDK and external consumers from a fresh
+extraction without fetching. Add `--backend ACCELERATE` on macOS.
+
+On a Mac that rejects ad-hoc bundles, set `-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF`
+(or `--exclude-validator` for the source smoke). This disables **both** the SDK
+validator and moduleinfo tool's bundle loading. It leaves signature-integrity and
+standalone adapter tests enabled, but cannot produce release qualification.
+Use CI for actual bundle loading. Do not repeatedly retry a rejected local bundle.

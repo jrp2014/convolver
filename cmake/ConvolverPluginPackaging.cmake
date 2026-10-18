@@ -16,6 +16,7 @@ if(CONVOLVER_DISTRIBUTION_LICENSE_DIR)
     install(DIRECTORY "${CONVOLVER_DISTRIBUTION_LICENSE_DIR}/" DESTINATION licenses COMPONENT PluginDistribution)
 endif()
 set(source_commit "unknown")
+set(source_dirty false)
 if(EXISTS "${PROJECT_SOURCE_DIR}/SOURCE_COMMIT")
     file(STRINGS "${PROJECT_SOURCE_DIR}/SOURCE_COMMIT" source_commit LIMIT_COUNT 1)
 else()
@@ -23,11 +24,16 @@ else()
     if(Git_FOUND)
         execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
             OUTPUT_VARIABLE source_commit OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+        execute_process(COMMAND "${GIT_EXECUTABLE}" status --porcelain --untracked-files=normal
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" OUTPUT_VARIABLE source_status COMMAND_ERROR_IS_FATAL ANY)
+        if(source_status)
+            set(source_dirty true)
+        endif()
     endif()
 endif()
 # Generated from the actual configure/build, never hand-copied into policy.
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/release-build-info-$<CONFIG>.json" CONTENT
-"{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
+"{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_dirty\": ${source_dirty},\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
 # The SDK supplies the whole bundle path, including configuration expressions.
 install(DIRECTORY "${convolver_bundle}" DESTINATION VST3 COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
 install(TARGETS convolver_vst3_preset RUNTIME DESTINATION bin COMPONENT PluginDistribution)
@@ -46,10 +52,14 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)
 # Relocation is mandatory for release archives, tested with actual SDK tools.
 if(CONVOLVER_BUILD_TESTS)
+    set(validator_argument)
+    if(CONVOLVER_VST3_RUNTIME_VALIDATION)
+        set(validator_argument --validator "$<TARGET_FILE:validator>")
+    endif()
     add_test(NAME release.stage COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tests/release/staging.py" --build "${CMAKE_BINARY_DIR}"
         --cmake "${CMAKE_COMMAND}" --config "$<CONFIG>"
-        --validator "$<TARGET_FILE:validator>" --probe "$<TARGET_FILE:convolver_vst3_package_probe>")
+        ${validator_argument} --probe "$<TARGET_FILE:convolver_vst3_package_probe>")
     set_tests_properties(release.stage PROPERTIES LABELS "packaging;vst3;real-libraries" TIMEOUT 180)
     add_dependencies(check convolver_plugin_examples convolver_vst3_package_probe)
 endif()
