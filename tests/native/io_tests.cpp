@@ -8,9 +8,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
+#include <optional>
 #include <sndfile.h>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 #ifndef _WIN32
 #include <fcntl.h>
@@ -133,6 +136,111 @@ void descriptor_tests() {
     std::signal(SIGPIPE, previous);
 }
 #endif
+// The fmt chunk of a RIFF/WAVE file, parsed without libsndfile.
+struct WaveFormat {
+    unsigned tag = 0, channels = 0, bits = 0, sub_format = 0;
+    std::optional<std::uint32_t> mask;
+};
+WaveFormat wave_format(const fs::path& p) {
+    std::ifstream f(p, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(f)), {});
+    const auto u = [&](std::size_t at, int n) {
+        std::uint32_t v = 0;
+        for (int i = n - 1; i >= 0; --i)
+            v = v << 8 | static_cast<unsigned char>(bytes.at(at + i));
+        return v;
+    };
+    require(bytes.compare(0, 4, "RIFF") == 0 && bytes.compare(8, 4, "WAVE") == 0, "RIFF header");
+    for (std::size_t at = 12; at + 8 <= bytes.size();) {
+        const auto length = u(at + 4, 4);
+        if (bytes.compare(at, 4, "fmt ") == 0) {
+            WaveFormat w;
+            w.tag = u(at + 8, 2);
+            w.channels = u(at + 10, 2);
+            w.bits = u(at + 22, 2);
+            if (w.tag == 0xfffe) {
+                require(length >= 40 && u(at + 24, 2) == 22, "extensible fmt size");
+                w.mask = u(at + 28, 4);
+                w.sub_format = u(at + 32, 2);
+            }
+            return w;
+        }
+        at += 8 + length + (length & 1);
+    }
+    throw std::runtime_error("no fmt chunk");
+}
+// Opt-in speaker masks: exact dwChannelMask in the header, samples in channel order.
+void speaker_tests(const fs::path& dir) {
+    struct Case {
+        std::size_t channels;
+        std::uint32_t mask;
+        OutputFormat format;
+        unsigned tag, bits;
+    };
+    for (const auto& c : {Case{2, 0x3, OutputFormat::wav_float, 3, 32},
+                          Case{2, 0x3, OutputFormat::wav_pcm16, 1, 16},
+                          Case{6, 0x3f, OutputFormat::wav_float, 3, 32},
+                          Case{6, 0x3f, OutputFormat::wav_pcm24, 1, 24},
+                          Case{4, 0x603, OutputFormat::wav_pcm32, 1, 32},
+                          Case{1, 0x20000, OutputFormat::wav_float, 3, 32},
+                          Case{18, 0x3ffff, OutputFormat::wav_float, 3, 32}}) {
+        const auto out = dir / ("speakers-" + std::to_string(c.channels) + "-" +
+                                std::to_string(static_cast<int>(c.format)) + ".wav");
+        // Two frames per channel: an impulse identifying the channel, then its negation.
+        std::vector<float> samples;
+        for (int frame = 0; frame < 2; ++frame)
+            for (std::size_t ch = 0; ch < c.channels; ++ch)
+                samples.push_back((frame ? -1.f : 1.f) * static_cast<float>(ch + 1) / 8);
+        {
+            AudioWriter w(out, {48000, c.channels}, c.format, {}, {c.mask});
+            w.write(samples);
+            w.close();
+        }
+        const auto fmt = wave_format(out);
+        require(fmt.tag == 0xfffe && fmt.mask == c.mask && fmt.sub_format == c.tag &&
+                    fmt.bits == c.bits && fmt.channels == c.channels,
+                "WAVE_FORMAT_EXTENSIBLE header carries the exact channel mask");
+        AudioReader r(out);
+        std::vector<float> back(samples.size());
+        require(r.info().channels == c.channels && r.read(back) == 2 && back == samples,
+                "speaker-labelled samples keep their channel order");
+    }
+    // Zero leaves the speakers unspecified: the same file as without metadata.
+    const std::vector<float> stereo{.5f, -.25f};
+    const auto plain = dir / "speakers-default.wav", zero = dir / "speakers-zero.wav";
+    for (const auto& [path, metadata] :
+         {std::pair{plain, OutputMetadata{}}, std::pair{zero, OutputMetadata{0}}}) {
+        AudioWriter w(path, {48000, 2}, OutputFormat::wav_float, {}, metadata);
+        w.write(stereo);
+        w.close();
+    }
+    const auto bytes = [](const fs::path& p) {
+        std::ifstream f(p, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), {});
+    };
+    require(bytes(plain) == bytes(zero) && wave_format(zero).tag == 3 && !wave_format(zero).mask,
+            "a zero mask writes the unchanged plain WAV");
+    // Invalid explicit requests fail before the output exists.
+    struct Bad {
+        std::size_t channels;
+        std::uint32_t mask;
+        OutputFormat format;
+    };
+    for (const auto& b : {Bad{6, 0x3, OutputFormat::wav_float},        // too few speakers
+                          Bad{2, 0x7, OutputFormat::wav_pcm16},        // too many speakers
+                          Bad{1, 0x40000, OutputFormat::wav_float},    // unknown bit
+                          Bad{1, 0x80000000, OutputFormat::wav_float}, // SPEAKER_ALL
+                          Bad{2, 0x3, OutputFormat::raw_float}}) {     // RAW has no header
+        const auto out = dir / "speakers-bad.wav";
+        bool threw = false;
+        try {
+            AudioWriter(out, {48000, b.channels}, b.format, {}, {b.mask});
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        require(threw && !fs::exists(out), "invalid speaker mask rejected before opening");
+    }
+}
 std::vector<std::int16_t> pcm16_samples(const fs::path& p) {
     SF_INFO info{};
     SNDFILE* f = sf_open(p.string().c_str(), SFM_READ, &info);
@@ -457,11 +565,78 @@ void run(const fs::path& dir) {
         std::vector<float> x(1);
         require(r.read(x) == 1 && x[0] == 1, "odd-sized RIFF chunk padding");
     }
+    {
+        // Out-of-range metadata in a file is a data error (runtime_error), so list
+        // traversal and inspection diagnose it instead of failing as a caller error.
+        auto bytes = std::string(reinterpret_cast<const char*>(nan_wave), sizeof nan_wave);
+        bytes[27] = 1; // Sample rate 0x0100bb80.
+        text_file(dir / "rate.wav", bytes);
+        bool data_error = false;
+        try {
+            AudioReader r(dir / "rate.wav");
+        } catch (const std::invalid_argument&) {
+        } catch (const std::runtime_error&) {
+            data_error = true;
+        }
+        require(data_error, "out-of-range file sample rate is a runtime_error");
+    }
     text_file(dir / "huge.cfg", std::string(1024 * 1024 + 1, 'x'));
     rejects([&] { load_configuration(dir / "huge.cfg"); });
     for (int i = 0; i < 17; ++i)
         text_file(dir / ("depth" + std::to_string(i)), "depth" + std::to_string(i + 1) + "\n");
     rejects([&] { load_configuration(dir / "depth0"); });
+    {
+        // Diagnostics name the physical line/column and the list include chain.
+        auto message = [](const fs::path& p) -> std::string {
+            try {
+                load_configuration(p, 48000, 1);
+            } catch (const std::exception& e) {
+                return e.what();
+            }
+            throw std::runtime_error("expected configuration rejection");
+        };
+        auto contains = [](const std::string& text, const std::string& part) {
+            return text.find(part) != std::string::npos;
+        };
+        text_file(dir / "located.cfg",
+                  "\xef\xbb\xbf// c\n\n48000 1 1 0\n0\n0\n\nir.wav\n0\n 1\n0\n");
+        require(
+            contains(message(dir / "located.cfg"), "located.cfg:9:2: route channel out of range"),
+            "physical line/column after BOM, comments and blank lines");
+        fs::create_directory(dir / "nest");
+        text_file(dir / "nest" / "broken.cfg", "48000 1 1 0\n0\n0\nmissing-ir.wav\n0\n0\n0\n");
+        text_file(dir / "nest" / "inner.txt", "// inner\nbroken.cfg\n");
+        text_file(dir / "outer.txt", "44100.wav\nnest\\inner.txt\n");
+        const auto chained = message(dir / "outer.txt");
+        require(contains(chained, "broken.cfg:4:1: filter 'missing-ir.wav'") &&
+                    contains(chained, "inner.txt:2; included from ") &&
+                    chained.ends_with("outer.txt:2"),
+                "nested list failures carry the include chain");
+#ifndef _WIN32
+        text_file(dir / "drive.cfg", "48000 1 1 0\n0\n0\nD:\\filters\\irs\\ir ü.wav\n0\n0\n0\n");
+        const auto drive = message(dir / "drive.cfg");
+        require(contains(drive, "drive.cfg:4:1: Windows drive/rooted paths") &&
+                    contains(drive, "a file exists at 'irs/ir ü.wav'"),
+                "nonportable path diagnostics name the line and an existing replacement");
+#endif
+        // Overwrite protection sees every visited text file and referenced IR, including
+        // unselected entries whose IRs are absent, in visiting order.
+        std::vector<fs::path> sources;
+        load_configuration(dir / "list.txt", 48000, 2, &sources);
+        require(sources ==
+                    std::vector<fs::path>{fs::weakly_canonical(dir / "list.txt"),
+                                          fs::weakly_canonical(dir / "unrelated.cfg"),
+                                          fs::weakly_canonical(dir / "missing-unused.wav"),
+                                          fs::weakly_canonical(dir / "good.cfg"),
+                                          fs::weakly_canonical(dir / fs::path(u8"ir ü.wav"))},
+                "list provenance order");
+        // Selection stops at the first match; later entries are not read.
+        text_file(dir / "later-broken.cfg", "48000 x\n");
+        text_file(dir / "early.txt", "good.cfg\nlater-broken.cfg\n");
+        require(load_configuration(dir / "early.txt", 48000, 2, &sources).sample_rate == 48000 &&
+                    sources.size() == 3,
+                "first-match early exit");
+    }
 #ifndef _WIN32
     descriptor_tests();
     {
@@ -511,6 +686,7 @@ int main() {
     try {
         fs::create_directory(dir);
         run(dir);
+        speaker_tests(dir);
         fs::remove_all(dir);
         std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {

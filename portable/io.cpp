@@ -7,14 +7,17 @@
 #include <cerrno>
 #include <climits>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <sndfile.h>
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
 #include <system_error>
 #include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -31,6 +34,70 @@ void validate(AudioInfo info) {
 }
 std::runtime_error error(const std::string& action, SNDFILE* file) {
     return std::runtime_error(action + ": " + sf_strerror(file));
+}
+// WAVE speaker bit -> libsndfile channel-map value. The enumerations differ in
+// order (front left is SF_CHANNEL_MAP_LEFT, not SF_CHANNEL_MAP_FRONT_LEFT).
+constexpr std::array<int, 18> speaker_map{SF_CHANNEL_MAP_LEFT,
+                                          SF_CHANNEL_MAP_RIGHT,
+                                          SF_CHANNEL_MAP_CENTER,
+                                          SF_CHANNEL_MAP_LFE,
+                                          SF_CHANNEL_MAP_REAR_LEFT,
+                                          SF_CHANNEL_MAP_REAR_RIGHT,
+                                          SF_CHANNEL_MAP_FRONT_LEFT_OF_CENTER,
+                                          SF_CHANNEL_MAP_FRONT_RIGHT_OF_CENTER,
+                                          SF_CHANNEL_MAP_REAR_CENTER,
+                                          SF_CHANNEL_MAP_SIDE_LEFT,
+                                          SF_CHANNEL_MAP_SIDE_RIGHT,
+                                          SF_CHANNEL_MAP_TOP_CENTER,
+                                          SF_CHANNEL_MAP_TOP_FRONT_LEFT,
+                                          SF_CHANNEL_MAP_TOP_FRONT_CENTER,
+                                          SF_CHANNEL_MAP_TOP_FRONT_RIGHT,
+                                          SF_CHANNEL_MAP_TOP_REAR_LEFT,
+                                          SF_CHANNEL_MAP_TOP_REAR_CENTER,
+                                          SF_CHANNEL_MAP_TOP_REAR_RIGHT};
+static_assert(known_speaker_bits == (1u << speaker_map.size()) - 1);
+void validate_speakers(std::uint32_t mask, std::size_t channels, OutputFormat format) {
+    if (!mask)
+        return;
+    if (format == OutputFormat::raw_float)
+        throw std::invalid_argument("a speaker map needs WAV output; RAW has no header");
+    if (mask & ~known_speaker_bits)
+        throw std::invalid_argument("speaker mask has unknown speaker bits (only 0x3ffff are "
+                                    "defined): 0x" +
+                                    [&] {
+                                        char text[9];
+                                        std::snprintf(text, sizeof text, "%x", mask);
+                                        return std::string(text);
+                                    }());
+    if (static_cast<std::size_t>(std::popcount(mask)) != channels)
+        throw std::invalid_argument("speaker mask names " + std::to_string(std::popcount(mask)) +
+                                    " speakers for " + std::to_string(channels) +
+                                    " output channels");
+}
+// The dwChannelMask a RIFF/WAVE file declares, or nothing if it has none.
+std::optional<std::uint32_t> declared_speakers(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    std::array<unsigned char, 12> head{};
+    file.read(reinterpret_cast<char*>(head.data()), head.size());
+    if (!file || std::string_view(reinterpret_cast<char*>(head.data()), 4) != "RIFF")
+        return std::nullopt;
+    for (int chunk = 0; chunk < 64; ++chunk) {
+        std::array<unsigned char, 8> header{};
+        file.read(reinterpret_cast<char*>(header.data()), header.size());
+        if (!file)
+            return std::nullopt;
+        const auto length = detail::read_le32(std::as_bytes(std::span(header)).subspan(4));
+        if (std::string_view(reinterpret_cast<char*>(header.data()), 4) == "fmt ") {
+            std::array<unsigned char, 24> fmt{};
+            file.read(reinterpret_cast<char*>(fmt.data()), fmt.size());
+            const auto bytes = std::as_bytes(std::span(fmt));
+            if (!file || length < 40 || detail::read_le16(bytes) != 0xfffe)
+                return std::nullopt;
+            return detail::read_le32(bytes.subspan(20));
+        }
+        file.seekg(static_cast<std::streamoff>(length + (length & 1u)), std::ios::cur);
+    }
+    return std::nullopt;
 }
 void validate_raw_stdin(std::size_t channels) {
     // On a seekable descriptor libsndfile reports a whole-frame count, which
@@ -217,6 +284,7 @@ void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t>
 struct AudioReader::Impl {
     Handle handle;
     AudioInfo info{};
+    std::optional<std::size_t> frames;
     bool raw = false, raw_stdin = false;
 };
 AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw)
@@ -251,11 +319,21 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     if (!impl_->handle.file)
         throw error("cannot open audio input " + path.string(), nullptr);
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
-    validate(impl_->info);
+    try {
+        validate(impl_->info);
+    } catch (const std::invalid_argument& e) {
+        // The file's own metadata is out of range: a data error, not a caller error.
+        throw std::runtime_error("unsupported audio input " + path.string() + ": " + e.what());
+    }
+    if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
+        impl_->frames = static_cast<std::size_t>(sf.frames);
 }
 AudioReader::~AudioReader() = default;
 AudioInfo AudioReader::info() const noexcept {
     return impl_->info;
+}
+std::optional<std::size_t> AudioReader::declared_frames() const noexcept {
+    return impl_->frames;
 }
 std::size_t AudioReader::read(std::span<float> data) {
     auto* file = impl_->handle.file;
@@ -321,6 +399,8 @@ void AudioReader::close() {
 struct AudioWriter::Impl {
     Handle handle;
     AudioInfo info{};
+    std::filesystem::path path;
+    std::uint32_t speakers = 0;
     bool raw = false;
     std::size_t frame_bytes = 0;
     std::optional<Pcm16Quantizer> pcm16;
@@ -329,14 +409,17 @@ struct AudioWriter::Impl {
     std::uint64_t wav_remaining = std::uint64_t(UINT32_MAX) - 4096;
 };
 AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputFormat format,
-                         QuantizationOptions quantization)
+                         QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
     validate(info);
+    validate_speakers(metadata.channel_mask, info.channels, format);
     if (quantization.dither != Dither::none && format != OutputFormat::wav_pcm16)
         throw std::invalid_argument("dither applies only to PCM16 output");
     if (format == OutputFormat::wav_pcm16)
         impl_->pcm16.emplace(info.channels, quantization);
     impl_->info = info;
+    impl_->path = path;
+    impl_->speakers = metadata.channel_mask;
     impl_->raw = format == OutputFormat::raw_float;
     impl_->frame_bytes = info.channels * (format == OutputFormat::wav_pcm16   ? 2
                                           : format == OutputFormat::wav_pcm24 ? 3
@@ -363,12 +446,26 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     default:
         throw std::invalid_argument("unknown audio output format");
     }
+    if (impl_->speakers)
+        sf.format = (sf.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
     if (!sf_format_check(&sf))
         throw std::invalid_argument("unsupported audio output format");
     impl_->handle.file = open(path, SFM_WRITE, sf);
     if (!impl_->handle.file)
         throw error("cannot open audio output " + path.string(), nullptr);
     sf_command(impl_->handle.file, SFC_SET_CLIPPING, nullptr, SF_TRUE);
+    if (impl_->speakers) {
+        // Channels take the set bits in increasing order, as WAVE requires.
+        std::vector<int> map;
+        for (std::size_t bit = 0; bit < speaker_map.size(); ++bit)
+            if (impl_->speakers & (1u << bit))
+                map.push_back(speaker_map[bit]);
+        // libsndfile falls back to a default mask when it rejects a map.
+        if (sf_command(impl_->handle.file, SFC_SET_CHANNEL_MAP_INFO, map.data(),
+                       static_cast<int>(map.size() * sizeof(int))) != SF_TRUE)
+            throw std::runtime_error(std::string(sf_version_string()) +
+                                     " cannot write this speaker map to " + path.string());
+    }
 }
 AudioWriter::~AudioWriter() = default;
 void AudioWriter::write(std::span<const float> data) {
@@ -415,7 +512,12 @@ void AudioWriter::close() {
     // sf_close. Finalize the WAV header while its error state is inspectable.
     if (impl_->handle.file && !impl_->raw)
         sf_command(impl_->handle.file, SFC_UPDATE_HEADER_NOW, nullptr, 0);
+    const bool check_speakers = impl_->handle.file && impl_->speakers;
     impl_->handle.close();
+    // Confirm the finished header carries the requested labels.
+    if (check_speakers && declared_speakers(impl_->path) != impl_->speakers)
+        throw std::runtime_error("audio output " + impl_->path.string() +
+                                 " was written without the requested speaker mask");
 }
 const char* sndfile_version() noexcept {
     return sf_version_string();

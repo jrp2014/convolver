@@ -3,6 +3,7 @@
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
 #include "file.hpp"
+#include "inspection_cli.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -12,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -28,6 +30,7 @@ namespace {
 constexpr auto help = R"(Convolver portable CLI
 Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
        convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
+       convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
   --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
@@ -36,6 +39,9 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
                       raw-float (little-endian IEEE float32)
+  --speaker-map config
+                      Label WAV output channels with the configuration's channel
+                      mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
   --dither D           PCM16 only: none (default), triangular, triangular-highpass
                       or rectangular. Other formats reject dither.
   --dither-seed N      Dither generator seed (default 0); output is reproducible
@@ -109,6 +115,8 @@ std::string read_wisdom(const std::filesystem::path& path) {
 }
 } // namespace
 int run(int argc, char** argv) {
+    if (convolver::cli::is_inspection(argc, argv))
+        return convolver::cli::run_inspection(argc, argv);
     try {
 #ifdef SIGPIPE
         std::signal(SIGPIPE, SIG_IGN); // Surface closed consumers as I/O failures.
@@ -123,7 +131,7 @@ int run(int argc, char** argv) {
         std::uint64_t dither_seed = 0;
         std::size_t block = 256;
         float gain = 1;
-        bool keep = false;
+        bool keep = false, speaker_map = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -186,6 +194,11 @@ int run(int argc, char** argv) {
                     linear > std::numeric_limits<float>::max())
                     throw std::invalid_argument("gain must be finite and representable");
                 gain = static_cast<float>(linear);
+            } else if (option == "--speaker-map") {
+                audio_options = true;
+                if (value() != "config")
+                    throw std::invalid_argument("--speaker-map accepts only 'config'");
+                speaker_map = true;
             } else if (option == "--output-format") {
                 audio_options = true;
                 const auto name = value();
@@ -224,6 +237,8 @@ int run(int argc, char** argv) {
             } else
                 throw std::invalid_argument("unknown option: " + option);
         }
+        if (speaker_map && format == convolver::OutputFormat::raw_float)
+            throw std::invalid_argument("--speaker-map needs WAV output; raw-float has no header");
         if ((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
             throw std::invalid_argument("tuning and wisdom require the FFTW backend");
         if (!tune.empty()) {
@@ -270,8 +285,28 @@ int run(int argc, char** argv) {
         // Dither is opt-in; PCM16 is plainly rounded by default.
         const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
                                                           dither_seed};
-        convolver::AudioWriter writer(output, {info.sample_rate, engine.output_channels()}, format,
-                                      quantization);
+        convolver::OutputMetadata metadata;
+        if (speaker_map) {
+            metadata.channel_mask = config.channel_mask;
+            if (!metadata.channel_mask)
+                std::cerr << "convolver: the configuration declares no speaker mask; the output "
+                             "channels stay unlabelled\n";
+        }
+        const auto open_output = [&] {
+            try {
+                return convolver::AudioWriter(output, {info.sample_rate, engine.output_channels()},
+                                              format, quantization, metadata);
+            } catch (const std::invalid_argument& e) {
+                if (!metadata.channel_mask)
+                    throw;
+                std::ostringstream text;
+                text << "--speaker-map: the configuration's channel mask 0x" << std::hex
+                     << metadata.channel_mask << " cannot label this output: " << e.what();
+                throw std::invalid_argument(text.str());
+            }
+        };
+        auto writer = open_output();
+
         constexpr std::size_t chunk = 4096;
         std::vector<float> in(chunk * engine.input_channels()),
             out(chunk * engine.output_channels());

@@ -11,9 +11,12 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **18 suites**: eight native suites, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to ten
-native/package/documentation suites; the old extraction adapters require Clang.
+With Clang on macOS/Linux this runs **28 suites**: twelve native suites, four
+fuzz-input replays, the configuration compatibility corpus, one package-consumer
+suite, the [source versioning](versioning.md) suite and the nine
+historical/documentation suites below. GCC and MSVC default to twenty
+native/fuzz-replay/compatibility/package/versioning/documentation suites; the old
+extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
@@ -26,9 +29,39 @@ native/package/documentation suites; the old extraction adapters require Clang.
   truncation and RAW alignment. POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors.
+- `native.config_parse`: the private configuration parser on its own: physical
+  line/column locations after BOM, comments, blank lines and CRLF, original
+  tokens with effective signed-zero/fractional routes and truncated delays, list
+  detection and include-chain formatting.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+- `native.inspection`: the inspection API's selection traversal, located and
+  chained diagnostics, syntax-only null fields, all-entry validation after
+  failures, and agreement of `analyze_configuration` with Engine latency/tail at
+  odd block sizes; it also checks that inspection changes no FFTW wisdom and
+  creates no files.
+- `native.inspection_cli`: `--inspect`/`--validate` modes, exit codes 0/1/2,
+  rejected render options, deterministic JSON, escaping of quotes, backslashes,
+  tabs and Unicode in names, invalid UTF-8 filenames on Linux, the
+  `portable-paths` profile with `--warnings-as-errors`, and diagnosis of every
+  bundled historical sample in `convolver/configs/`.
+- `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
+  rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
+  independent direct-convolution reference, then inspected to check the reported
+  selection, routes, delays and tail, and the `portable-paths` warnings, against
+  the same expectations: routes, signed zero, delays, BOM/CRLF,
+  relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
+- `native.limits`: every resource limit accepted at its value and rejected just
+  beyond it, using the production constants: 1 MiB per text file, 16 nesting
+  levels, 4096 list visits, 16 MiB of configuration text per resolution (shared
+  sublists counted per read), 16 Mi frames per delay and 64 Mi delay frames in
+  total, 64 Mi decoded IR samples (an oversized file is rejected from its header
+  without decoding), 256 diagnostics plus a truncation marker, and 64 MiB of host
+  state.
+- `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
+  `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../tests/fuzz/README.md)
+  run once through its harness on every compiler, without libFuzzer.
 - `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
   CLI processes against direct convolution, missing-plan failure before output
   creation, malformed/oversized caches, Unicode filenames and source protection;
@@ -115,7 +148,7 @@ The tests below use the canonical `convolver/` source tree. Earlier local
 | Host adapters | 44 debug/release cases; narrow PCM, aliases, additive/double output, disconnected inputs/delay history | Actual extracted sample adapters; Boost conversion boundary substituted; not a loaded plug-in |
 | Gain | Two unequal route-count cases | Extracted gain routines |
 | Branch regressions | Route signs, list display, dither constants, bundled Ooura full/tail round trips | Serial Ooura arithmetic, not the full alternate-backend engine |
-| Historical diagnostics | Eight stream-state cases | Extracted diagnostic clauses, not complete parser fuzzing |
+| Historical diagnostics | Eight stream-state cases | Extracted diagnostic clauses; the portable parser is fuzzed separately |
 | Historical I/O | 32 debug/release cases plus legacy syntax/disabled-library checks | Actual wrapper/table code with mocked libsndfile; no codec or real file-descriptor integration |
 | Pipe | 274 argument, failure and EOF accounting checks | Actual entry point/helpers with stream/engine stubs |
 | Pipe DSP | 100 end-of-stream cases against direct convolution | Actual convolution bodies with DFT adapter; not real stdin/codecs |
@@ -141,7 +174,7 @@ between FFT implementations.
 
 Outstanding legacy cases include the original full-width PCM32 specialization,
 nonzero noise shaping, old CMD EOF/tail handling, actual host format negotiation and latency/tail reporting,
-malformed configuration/IR fuzzing, multi-instance/filter-switch behaviour, and
+long-running configuration/IR fuzzing campaigns (CI runs 60 s per target), multi-instance/filter-switch behaviour, and
 callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
 that does not fix the independent historical wrappers. The portable CTest gate does not
 establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.

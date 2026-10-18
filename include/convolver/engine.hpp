@@ -25,6 +25,21 @@ struct Configuration {
     std::vector<FilterPath> paths;
 };
 
+// Timing and storage an Engine would have for this configuration and block size,
+// computed by the same validation used at construction, without FFT planning or
+// spectral allocation. Throws as validate_configuration does.
+struct ConfigurationAnalysis {
+    std::size_t latency_frames = 0; // Engine::latency_frames()
+    std::size_t tail_frames = 0;    // Engine::tail_frames()
+    std::size_t fft_frames = 0;     // Real transform length per partition.
+    // Prepared float buffers the engine accounts against its storage limit: block
+    // and delay lines, routes, filter/input spectra, overlap and backend transform
+    // buffers. Excludes FFT plan internals, allocator overhead and file decoding.
+    // Paths sharing an input mix share history, so this is an upper bound.
+    std::size_t accounted_buffer_bytes = 0;
+    std::vector<std::size_t> partitions_per_path;
+};
+ConfigurationAnalysis analyze_configuration(const Configuration&, std::size_t block_frames = 256);
 // Validate dimensions, coefficients and prepared-storage limits without FFT planning.
 void validate_configuration(const Configuration&, std::size_t block_frames = 256);
 // Validate and return FIR/routing support, excluding latency, without FFT planning.

@@ -74,10 +74,9 @@ void multiply_accumulate(float* CONVOLVER_RESTRICT re, float* CONVOLVER_RESTRICT
         im[j] += xr[j] * hi[j] + xi[j] * hr[j];
     }
 }
-struct Validated {
-    std::size_t tail = 0;
-};
-Validated validate(const Configuration& c, std::size_t b) {
+// Shared by validation, tail queries, analysis and Engine construction so the
+// accounting formulas exist once. No FFT planning or spectral allocation here.
+ConfigurationAnalysis validate(const Configuration& c, std::size_t b) {
     if (!b || b > max_block)
         throw std::invalid_argument("block frames must be between 1 and 1048576");
     if (c.sample_rate <= 0 || c.sample_rate > 768000)
@@ -107,7 +106,10 @@ Validated validate(const Configuration& c, std::size_t b) {
             throw std::length_error("delay exceeds 67108864 frames");
         account(d + 1);
     }
-    Validated result;
+    ConfigurationAnalysis result;
+    result.latency_frames = b;
+    result.fft_frames = n;
+    result.partitions_per_path.reserve(c.paths.size());
     for (const auto& p : c.paths) {
         if (p.impulse.empty() || p.impulse.size() > max_samples)
             throw std::invalid_argument("impulse length must be between 1 and 67108864");
@@ -129,6 +131,7 @@ Validated validate(const Configuration& c, std::size_t b) {
         const auto partitions = 1 + (p.impulse.size() - 1) / b;
         // Filter and input history, complex pairs. Paths sharing an input mix share
         // history, so this per-path count is an upper bound.
+        result.partitions_per_path.push_back(partitions);
         account(checked_mul(checked_mul(partitions, bins), 4));
         account(b); // overlap.
         bool has_input = false, has_output = false;
@@ -144,15 +147,19 @@ Validated validate(const Configuration& c, std::size_t b) {
                 output_delay = std::max(output_delay, delay_at(c.output_delays, r.channel));
             }
         if (has_input && has_output)
-            result.tail =
-                std::max(result.tail,
+            result.tail_frames =
+                std::max(result.tail_frames,
                          checked_add(p.impulse.size() - 1, checked_add(input_delay, output_delay)));
     }
+    result.accounted_buffer_bytes = checked_mul(storage, sizeof(float));
     return result;
 }
 } // namespace
+ConfigurationAnalysis analyze_configuration(const Configuration& c, std::size_t block) {
+    return validate(c, block);
+}
 std::size_t configuration_tail_frames(const Configuration& c, std::size_t block) {
-    return validate(c, block).tail;
+    return validate(c, block).tail_frames;
 }
 void validate_configuration(const Configuration& c, std::size_t block) {
     (void)validate(c, block);
@@ -186,8 +193,8 @@ struct Engine::Impl {
     std::vector<Path> paths;
     detail::RealFft fft;
     float *time, *frequency, *sum;
-    Impl(const Configuration& c, std::size_t b, Validated v, FftOptions options)
-        : inputs(c.input_channels), outputs(c.output_channels), block(b), tail(v.tail),
+    Impl(const Configuration& c, std::size_t b, const ConfigurationAnalysis& v, FftOptions options)
+        : inputs(c.input_channels), outputs(c.output_channels), block(b), tail(v.tail_frames),
           n(detail::fft_size(b)), bins(n / 2 + 1), input_block(inputs * b),
           output_block(outputs * b), fft(n, options), time(fft.time()), frequency(fft.frequency()),
           sum(fft.sum()) {

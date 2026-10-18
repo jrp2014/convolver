@@ -163,9 +163,34 @@ rejected for other output formats. There is no noise shaping. The library's
 The tests check rounding/clipping endpoints, reproducibility, chunk independence
 and measured error mean, variance and correlation against the theoretical values.
 
-The historical channel mask is
-parsed and retained in Configuration, but the current WAV writer does not encode
-that mask; output channel order is preserved. Do not rely on WAV speaker labels.
+### Speaker labels
+
+By default WAV output has a plain header with no speaker labels, as before.
+`--speaker-map config` labels the output channels with the configuration's hex
+channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
+
+```sh
+./build-native/convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
+```
+
+- The mask uses the WAVE speaker bits (`0x1` front left, `0x2` front right,
+  `0x4` centre, `0x8` LFE, `0x10`/`0x20` back left/right, `0x200`/`0x400` side
+  left/right, up to `0x20000` top back right). Output channel N takes the Nth set
+  bit counting from bit 0, as WAVE defines, so `3F` labels six channels as
+  FL FR FC LFE BL BR. Samples are never reordered: put the paths' outputs in that
+  order in the configuration.
+- The mask must name exactly as many speakers as there are output channels, and
+  only bits 0 to 17 are accepted. Otherwise the render stops before the output is
+  created.
+- A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
+  the CLI says so on stderr and writes the plain header.
+- `raw-float` output has no header, so it cannot be combined with the flag.
+- After writing, the CLI reads the finished header back and fails if the labels
+  are not exactly the requested mask, so a libsndfile that cannot write them is
+  reported rather than silently ignored.
+
+The library equivalent is `AudioWriter(path, info, format, {}, OutputMetadata{mask})`;
+the default `OutputMetadata{}` keeps the plain header.
 
 Output paths must differ from input, configuration/list files and referenced IRs,
 including filesystem aliases. A regular file redirected to stdin is protected
@@ -201,6 +226,56 @@ is not a complete validator for every supported codec. Additional codecs depend
 on how the installed libsndfile was built. Output is currently ordinary WAV or
 RAW; use RAW for streams that can exceed WAV's 4 GiB container limit.
 
+## Inspecting and validating configurations
+
+`--inspect` shows what a configuration, sound file or list resolves to without
+rendering; `--validate` checks it and prints a one-line result. Both use the
+loader's own parser, list selection and limits, decode the selected IRs, and run
+the engine's validation and storage accounting. Neither plans FFTs, changes FFTW
+wisdom or writes files.
+
+```sh
+convolver --inspect room.cfg
+convolver --inspect filters.txt --sample-rate 48000 --input-channels 2 --json
+convolver --validate room.cfg --block-size 256
+convolver --validate filters.txt --all-configurations --json
+convolver --inspect room.cfg --syntax-only --json
+```
+
+- Selection matches rendering: the first list entry matching `--sample-rate` and
+  `--input-channels` (or the first entry with neither). The report lists each
+  visited file and why it was skipped. Unselected entries' IR files are not opened.
+- `--all-configurations` validates every leaf of a list, continues after a failed
+  entry, and fails if any entry fails. It cannot be combined with selectors.
+- `--syntax-only` reads one configuration file's text, checks grammar, routes and
+  delays and resolves references lexically, without opening IRs. Coefficient,
+  latency, tail and storage fields are null, and the result says so.
+- `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
+  validation fails. Diagnostics are also printed to stderr.
+- Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
+  `--warnings-as-errors` makes warnings fail.
+
+A report gives, per inspected configuration, the rate, channel counts and raw
+channel mask; declared delay tokens and milliseconds beside effective frames;
+ordered routes with their source tokens and effective channel/gain (`-0` is
+channel 0, gain -1); each IR's spelling, line, resolved path, channel, rate and
+decoded length; partitions per path; latency (one block) and the FIR/delay tail
+separately; and `accounted_buffer_bytes`, the engine's prepared float buffers
+(an upper bound: paths with the same input mix share their history). That
+estimate excludes FFT plan internals, allocator overhead and file decoding
+buffers; it is not total process memory. Diagnostics carry a stable `code`,
+severity, message, file, line, column and the chain of enclosing list entries.
+Resolved paths are machine-specific; source spellings are kept as written.
+
+[Configuration compatibility](configuration-compatibility.md) lists what the corpus
+verifies, the `portable-paths` profile's warnings and what is known about other
+programs that read the format.
+
+The same report is available to C++ code through `convolver::inspect_configuration`
+in `convolver/inspection.hpp` (`Convolver::io`), and the core's
+`convolver::analyze_configuration` returns latency, tail, FFT length, accounted
+storage and partitions for an in-memory `Configuration`.
+
 ## Compatibility and library API
 
 Configuration syntax follows the [archived specification](historical/convolver-4.4/config.html):
@@ -216,7 +291,12 @@ and lists accept both `/` and Windows `\` separators, including mixed paths.
 Windows drive-letter, drive-relative and backslash-rooted/UNC paths require
 conversion to relative paths on macOS/Linux and produce an explicit diagnostic;
 no drive or network-share mapping is guessed. Native absolute paths remain
-platform-specific. Unequal
+platform-specific. Configuration
+errors name the file, physical line and column (a UTF-8 BOM is not counted),
+and for nested lists each enclosing list entry (`; included from filters.txt:2`).
+A rejected Windows path also names any existing file beside the configuration
+that matches its trailing part, as a suggested relative replacement; it is never
+loaded implicitly. Unequal
 IR lengths are a supported extension; each path is independently zero-padded,
 and the longest connected route determines the tail.
 

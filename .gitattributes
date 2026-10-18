@@ -18,3 +18,7 @@
 # Historical recovery provenance hashes refer to the exact archive bytes.
 docs/historical/convolver-4.4/** -text
 convolver/convolverPipe/convolverPipe.rc -text
+
+# Fuzz inputs are exact bytes (CRLF and BOM seeds included).
+tests/fuzz/seeds/** -text
+tests/fuzz/regressions/** -text

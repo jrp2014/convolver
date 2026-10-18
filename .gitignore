@@ -75,3 +75,4 @@ Testing/
 *.ncb
 *.user
 .vs/
+__pycache__/

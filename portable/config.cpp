@@ -1,109 +1,42 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// Loader orchestration: list traversal and selection, reference resolution and IR
+// decoding. Text grammar lives in config_parse.cpp.
+#include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include <algorithm>
-#include <charconv>
-#include <cmath>
 #include <fstream>
-#include <locale>
-#include <set>
-#include <sstream>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
-namespace convolver {
+namespace convolver::detail {
 namespace {
-constexpr std::size_t max_samples = 64 * 1024 * 1024;
-constexpr std::size_t max_delay = 16 * 1024 * 1024;
-constexpr std::size_t max_text = 1024 * 1024;
-struct Context {
-    std::set<std::filesystem::path> active;
-    std::vector<std::filesystem::path> sources;
-    std::size_t visits = 0, samples = 0;
-};
-std::runtime_error invalid(const std::string& why) {
-    return std::runtime_error("invalid configuration: " + why);
-}
-std::string trim(std::string s) {
-    const auto first = s.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos)
-        return {};
-    return s.substr(first, s.find_last_not_of(" \t\r\n") - first + 1);
-}
-std::vector<std::string> tokens(const std::string& line) {
-    std::istringstream stream(line);
-    stream.imbue(std::locale::classic());
-    std::vector<std::string> result;
-    std::string item;
-    while (stream >> item)
-        result.push_back(item);
-    return result;
-}
-std::size_t integer(const std::string& s, std::size_t limit, int base = 10) {
-    std::string_view v(s);
-    if (base == 16 && v.size() > 2 && v[0] == '0' && (v[1] == 'x' || v[1] == 'X'))
-        v.remove_prefix(2);
-    std::size_t result = 0;
-    const auto [end, error] = std::from_chars(v.data(), v.data() + v.size(), result, base);
-    if (error != std::errc{} || end != v.data() + v.size() || result > limit)
-        throw invalid("integer out of range: " + s);
-    return result;
-}
-float number(const std::string& s) {
-    // Match the historical parser's single-precision route and delay values.
-    std::istringstream stream(s);
-    stream.imbue(std::locale::classic());
-    float result;
-    if (!(stream >> result) || !stream.eof() || !std::isfinite(result))
-        throw invalid("nonfinite or malformed number: " + s);
-    return result;
-}
-bool matches(const Configuration& cfg, int rate, std::size_t channels) {
-    return (!rate || rate == cfg.sample_rate) && (!channels || channels == cfg.input_channels);
-}
-std::vector<std::string> lines(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
-        throw invalid("cannot read " + path.string());
-    std::string text(max_text + 1, '\0');
-    file.read(text.data(), static_cast<std::streamsize>(text.size()));
-    if (file.bad())
-        throw invalid("read failed: " + path.string());
-    text.resize(static_cast<std::size_t>(file.gcount()));
-    if (text.size() > max_text)
-        throw invalid("text exceeds 1 MiB");
-    if (text.find('\0') != std::string::npos)
-        throw invalid("binary or damaged audio file");
-    for (unsigned char c : text)
-        if (c < 32 && c != '\n' && c != '\r' && c != '\t')
-            throw invalid("binary or damaged audio file");
-    if (text.starts_with("\xef\xbb\xbf"))
-        text.erase(0, 3);
-    std::vector<std::string> result;
-    std::istringstream stream(text);
-    std::string line;
-    while (std::getline(stream, line)) {
-        const auto comment = line.find("//");
-        if (comment != std::string::npos)
-            line.erase(comment);
-        line = trim(std::move(line));
-        if (!line.empty())
-            result.push_back(std::move(line));
-    }
-    if (result.empty())
-        throw invalid("empty file");
-    return result;
-}
 void read_impulses(AudioReader& reader, std::vector<FilterPath>& paths,
-                   std::optional<std::size_t> selected, Context& context) {
+                   std::optional<std::size_t> selected, std::size_t& budget,
+                   const SourceLocation& where) {
     const auto channels = reader.info().channels;
     if (selected && *selected >= channels)
-        throw invalid("filter channel out of range");
+        throw ConfigurationError("ir-channel", where,
+                                 "filter channel " + std::to_string(*selected) +
+                                     " out of range (file has " + std::to_string(channels) +
+                                     " channels)");
+    // Reject oversized files before allocating for their samples.
+    if (const auto declared = reader.declared_frames()) {
+        if (*declared > (max_decoded_samples - budget) / channels)
+            throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+        if (selected)
+            paths.back().impulse.reserve(*declared);
+        else
+            for (auto& p : paths)
+                p.impulse.reserve(*declared);
+    }
     std::vector<float> buffer(4096 * channels);
     while (const auto frames = reader.read(buffer)) {
         const auto samples = frames * channels;
-        if (samples > max_samples - context.samples)
-            throw invalid("decoded impulse data exceeds 64 Mi samples");
-        context.samples += samples;
+        if (samples > max_decoded_samples - budget)
+            throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+        budget += samples;
         if (selected) {
             for (std::size_t f = 0; f < frames; ++f)
                 paths.back().impulse.push_back(buffer[f * channels + *selected]);
@@ -115,149 +48,272 @@ void read_impulses(AudioReader& reader, std::vector<FilterPath>& paths,
     }
     reader.close();
     if (paths.back().impulse.empty())
-        throw invalid("empty impulse response");
+        throw ConfigurationError("empty-ir", where, "empty impulse response");
 }
-std::vector<std::size_t> delays(const std::string& line, std::size_t count, int rate) {
-    const auto fields = tokens(line);
-    if (fields.size() != count)
-        throw invalid("delay count differs from channel count");
-    std::vector<std::size_t> result;
-    std::size_t total = 0;
-    for (const auto& field : fields) {
-        const float ms = number(field);
-        const double frames = static_cast<float>(rate) * ms / 1000.0;
-        if (ms < 0 || frames > static_cast<double>(max_delay))
-            throw invalid("delay out of range");
-        const auto truncated = static_cast<std::size_t>(frames);
-        if (truncated > max_samples - total)
-            throw invalid("total delay storage exceeds limit");
-        total += truncated;
-        result.push_back(truncated);
+std::filesystem::path utf8_path(const std::string& text) {
+    return std::filesystem::path(std::u8string(text.begin(), text.end()));
+}
+#ifndef _WIN32
+bool drive_letter(const std::string& name) {
+    return name.size() >= 2 && name[1] == ':' &&
+           ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'));
+}
+// The longest trailing part of a Windows reference that exists beside owner,
+// offered as a suggested replacement. It is never loaded implicitly.
+std::string existing_suffix(const std::filesystem::path& owner, std::string name,
+                            const FileExists& exists) {
+    std::replace(name.begin(), name.end(), '\\', '/');
+    std::vector<std::string> parts;
+    std::size_t start = 0;
+    while (start <= name.size()) {
+        const auto end = std::min(name.find('/', start), name.size());
+        if (end > start)
+            parts.push_back(name.substr(start, end - start));
+        start = end + 1;
     }
-    return result;
-}
-std::vector<Route> routes(const std::string& line, std::size_t channels) {
-    const auto fields = tokens(line);
-    if (fields.empty() || fields.size() > 4096)
-        throw invalid("route count out of range");
-    std::vector<Route> result;
-    for (const auto& field : fields) {
-        float integral = 0;
-        float gain = std::modf(number(field), &integral);
-        if (std::abs(integral) >= static_cast<float>(channels))
-            throw invalid("route channel out of range");
-        if (gain == 0)
-            gain = std::copysign(1.0f, integral);
-        result.push_back({static_cast<std::size_t>(std::abs(integral)), gain});
+    if (!parts.empty() && drive_letter(parts.front()))
+        parts.front().erase(0, 2);
+    if (!parts.empty() && parts.front().empty())
+        parts.erase(parts.begin());
+    for (std::size_t i = 0; i < parts.size(); ++i) {
+        std::string candidate;
+        for (std::size_t j = i; j < parts.size(); ++j)
+            candidate += (candidate.empty() ? "" : "/") + parts[j];
+        const auto path = owner.parent_path() / utf8_path(candidate);
+        std::error_code ec;
+        if (exists ? exists(path) : std::filesystem::is_regular_file(path, ec))
+            return candidate;
     }
-    return result;
+    return {};
 }
-std::filesystem::path relative(const std::filesystem::path& owner, const std::string& name) {
+#endif
+} // namespace
+
+std::string read_configuration_text(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        throw ConfigurationError("unreadable", {path, 0, 0}, "cannot read " + utf8_string(path));
+    std::string text(max_text_bytes + 1, '\0');
+    file.read(text.data(), static_cast<std::streamsize>(text.size()));
+    if (file.bad())
+        throw ConfigurationError("unreadable", {path, 0, 0}, "read failed: " + utf8_string(path));
+    text.resize(static_cast<std::size_t>(file.gcount()));
+    return text;
+}
+
+std::filesystem::path resolve_reference(const std::filesystem::path& owner,
+                                        const ParsedReference& ref,
+                                        [[maybe_unused]] const FileExists& exists) {
     // The historical format originated on Windows. Treat both separators alike
     // in file references, without interpreting drive letters as POSIX filenames.
+    const auto& name = ref.spelling;
 #ifndef _WIN32
-    const bool drive = name.size() >= 2 && name[1] == ':' &&
-                       ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'));
-    if (drive || (!name.empty() && name.front() == '\\'))
-        throw invalid(
-            "Windows drive/rooted paths must be changed to relative paths on this platform: " +
-            name);
+    if (drive_letter(name) || (!name.empty() && name.front() == '\\')) {
+        const auto kind = drive_letter(name)         ? "drive-letter"
+                          : name.starts_with("\\\\") ? "UNC network"
+                                                     : "backslash-rooted";
+        std::string why = std::string("Windows drive/rooted paths must be changed to relative "
+                                      "paths on this platform: ") +
+                          name + " is a " + kind + " path with no meaning here; ";
+        const auto suggestion = existing_suffix(owner, name, exists);
+        if (!suggestion.empty())
+            why += "a file exists at '" + suggestion +
+                   "' beside this configuration; change the reference to that";
+        else
+            why += "copy the file into or beside this configuration's folder and give its path "
+                   "relative to this configuration (for example irs/filter.wav)";
+        throw ConfigurationError("nonportable-path", ref.location, why);
+    }
 #endif
     auto normalized = name;
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
-    const std::u8string utf8(normalized.begin(), normalized.end());
-    const std::filesystem::path p(utf8);
+    const auto p = utf8_path(normalized);
     return p.is_absolute() ? p : owner.parent_path() / p;
 }
-std::optional<Configuration> load(const std::filesystem::path& path, int rate, std::size_t inputs,
-                                  Context& context) {
-    if (++context.visits > 4096 || context.active.size() >= 16)
-        throw invalid("configuration list nesting/entry limit exceeded");
-    const auto canonical = std::filesystem::weakly_canonical(path);
-    context.sources.push_back(canonical);
-    if (!context.active.insert(canonical).second)
-        throw invalid("configuration list cycle: " + path.string());
-    struct Pop {
-        Context& context;
-        std::filesystem::path path;
-        ~Pop() {
-            context.active.erase(path);
-        }
-    } pop{context, canonical};
-    std::optional<AudioReader> audio;
-    try {
-        audio.emplace(path);
-    } catch (const std::runtime_error&) { /* Bounded text validation below distinguishes configs
-                                             from damaged audio. */
-    }
-    if (audio) {
-        const auto info = audio->info();
-        Configuration cfg;
-        cfg.sample_rate = info.sample_rate;
-        cfg.input_channels = cfg.output_channels = info.channels;
-        if (!matches(cfg, rate, inputs))
-            return {};
-        cfg.input_delays.resize(info.channels);
-        cfg.output_delays.resize(info.channels);
-        cfg.paths.resize(info.channels);
-        for (std::size_t c = 0; c < info.channels; ++c) {
-            cfg.paths[c].inputs.push_back({c, 1});
-            cfg.paths[c].outputs.push_back({c, 1});
-        }
-        read_impulses(*audio, cfg.paths, {}, context);
-        return cfg;
-    }
-    const auto content = lines(path);
-    const auto header = tokens(content.front());
-    const auto& first = header.front();
-    const bool numeric = first.find_first_not_of("+-0123456789") == std::string::npos;
-    if (!numeric) {
-        for (const auto& entry : content) {
-            if (auto cfg = load(relative(path, entry), rate, inputs, context))
-                return cfg;
-        }
-        return {};
-    }
-    if (header.size() != 4 || content.size() < 7 || (content.size() - 3) % 4)
-        throw invalid("expected header, two delay lines, and four lines per filter path");
+
+bool matches(int sample_rate, std::size_t input_channels, int rate, std::size_t inputs) {
+    return (!rate || rate == sample_rate) && (!inputs || inputs == input_channels);
+}
+
+Configuration configuration_graph(const ParsedConfiguration& parsed) {
     Configuration cfg;
-    cfg.sample_rate = static_cast<int>(integer(header[0], 768000));
-    cfg.input_channels = integer(header[1], 256);
-    cfg.output_channels = integer(header[2], 256);
-    cfg.channel_mask = static_cast<std::uint32_t>(integer(header[3], 0xffffffffu, 16));
-    if (!cfg.sample_rate || !cfg.input_channels || !cfg.output_channels)
-        throw invalid("zero rate or channel count");
-    cfg.input_delays = delays(content[1], cfg.input_channels, cfg.sample_rate);
-    cfg.output_delays = delays(content[2], cfg.output_channels, cfg.sample_rate);
-    if ((content.size() - 3) / 4 > 4096)
-        throw invalid("too many filter paths");
-    for (std::size_t i = 3; i < content.size(); i += 4) {
-        integer(content[i + 1], 255);
-        context.sources.push_back(std::filesystem::weakly_canonical(relative(path, content[i])));
+    cfg.sample_rate = parsed.sample_rate;
+    cfg.input_channels = parsed.input_channels;
+    cfg.output_channels = parsed.output_channels;
+    cfg.channel_mask = parsed.channel_mask;
+    for (const auto& d : parsed.input_delays)
+        cfg.input_delays.push_back(d.frames);
+    for (const auto& d : parsed.output_delays)
+        cfg.output_delays.push_back(d.frames);
+    for (const auto& p : parsed.paths) {
         FilterPath filter;
-        filter.inputs = routes(content[i + 2], cfg.input_channels);
-        filter.outputs = routes(content[i + 3], cfg.output_channels);
+        for (const auto& r : p.inputs)
+            filter.inputs.push_back({r.channel, r.gain});
+        for (const auto& r : p.outputs)
+            filter.outputs.push_back({r.channel, r.gain});
         cfg.paths.push_back(std::move(filter));
-    }
-    // Lists select by stream properties. Validate unrelated entries' text, but
-    // do not require their IR assets to be installed or decode them into memory.
-    if (!matches(cfg, rate, inputs))
-        return {};
-    for (std::size_t i = 3; i < content.size(); i += 4) {
-        const auto channel = integer(content[i + 1], 255);
-        const auto ir_path = relative(path, content[i]);
-        AudioReader ir(ir_path);
-        if (ir.info().sample_rate != cfg.sample_rate)
-            throw invalid("filter sample rate differs from configuration");
-        // read_impulses targets the last path, so decode into a single path and
-        // transfer only its coefficients after all routing has been validated.
-        std::vector<FilterPath> decoded(1);
-        read_impulses(ir, decoded, channel, context);
-        cfg.paths[(i - 3) / 4].impulse = std::move(decoded.front().impulse);
     }
     return cfg;
 }
-} // namespace
+
+std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
+                                       std::size_t& budget) {
+    std::vector<DecodedIr> result;
+    const auto& parsed = doc.configuration;
+    for (std::size_t i = 0; i < parsed.paths.size(); ++i) {
+        const auto& path = parsed.paths[i];
+        const auto resolved = resolve_reference(doc.source, path.ir);
+        std::optional<AudioReader> ir;
+        try {
+            ir.emplace(resolved);
+        } catch (const std::exception& e) {
+            // Includes a bare "-": standard input cannot be a filter.
+            throw ConfigurationError("missing-asset", path.ir.location,
+                                     "filter '" + path.ir.spelling + "': " + e.what());
+        }
+        const auto info = ir->info();
+        if (info.sample_rate != cfg.sample_rate)
+            throw ConfigurationError("rate-mismatch", path.ir.location,
+                                     "filter sample rate differs from configuration (" +
+                                         std::to_string(info.sample_rate) + " Hz file, " +
+                                         std::to_string(cfg.sample_rate) + " Hz configuration)");
+        // read_impulses targets the last path, so decode into a single path and
+        // transfer only its coefficients after all routing has been validated.
+        std::vector<FilterPath> decoded(1);
+        try {
+            read_impulses(*ir, decoded, path.ir_channel, budget,
+                          path.ir_channel < info.channels ? path.ir.location
+                                                          : path.channel_location);
+        } catch (const ConfigurationError&) {
+            throw;
+        } catch (const std::runtime_error& e) {
+            throw ConfigurationError("damaged-asset", path.ir.location,
+                                     "filter '" + path.ir.spelling + "': " + e.what());
+        }
+        result.push_back({resolved, info, decoded.front().impulse.size()});
+        cfg.paths[i].impulse = std::move(decoded.front().impulse);
+    }
+    return result;
+}
+
+Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget) {
+    const auto info = audio.info();
+    Configuration cfg;
+    cfg.sample_rate = info.sample_rate;
+    cfg.input_channels = cfg.output_channels = info.channels;
+    cfg.input_delays.resize(info.channels);
+    cfg.output_delays.resize(info.channels);
+    cfg.paths.resize(info.channels);
+    for (std::size_t c = 0; c < info.channels; ++c) {
+        cfg.paths[c].inputs.push_back({c, 1});
+        cfg.paths[c].outputs.push_back({c, 1});
+    }
+    read_impulses(audio, cfg.paths, {}, budget, {});
+    return cfg;
+}
+
+Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list, Sources files)
+    : visitor_(std::move(visitor)), on_error_(std::move(on_error)), on_list_(std::move(on_list)),
+      files_(std::move(files)) {
+    if (!files_.open_audio)
+        files_.open_audio = [](const std::filesystem::path& p) -> std::unique_ptr<AudioReader> {
+            try {
+                return std::make_unique<AudioReader>(p);
+            } catch (const std::exception&) {
+                return nullptr; // Bounded text validation distinguishes configs from damaged audio.
+            }
+        };
+    if (!files_.read_text)
+        files_.read_text = read_configuration_text;
+    if (!files_.canonical)
+        files_.canonical = [](const std::filesystem::path& p) {
+            return std::filesystem::weakly_canonical(p);
+        };
+}
+
+bool Resolver::run(const std::filesystem::path& path) {
+    try {
+        return visit(path);
+    } catch (const ConfigurationError& e) {
+        if (on_error_ && on_error_(e))
+            return false;
+        throw;
+    }
+}
+
+bool Resolver::visit(const std::filesystem::path& path) {
+    if (++visits_ > max_list_visits || active_.size() >= max_list_depth)
+        throw ConfigurationError("limit", {path, 0, 0},
+                                 "configuration list nesting/entry limit exceeded");
+    const auto canonical = files_.canonical(path);
+    sources_.push_back(canonical);
+    if (!active_.insert(canonical).second)
+        throw ConfigurationError("cycle", {path, 0, 0},
+                                 "configuration list cycle: " + utf8_string(path));
+    struct Pop {
+        std::set<std::filesystem::path>& active;
+        std::filesystem::path path;
+        ~Pop() {
+            active.erase(path);
+        }
+    } pop{active_, canonical};
+    if (const auto audio = files_.open_audio(path))
+        return visitor_({path, chain_, nullptr, audio.get()});
+    const auto text = files_.read_text(path);
+    if (text.size() > max_total_text_bytes - text_bytes_)
+        throw ConfigurationError("limit", {path, 0, 0},
+                                 "configuration text read for one operation exceeds 16 MiB");
+    text_bytes_ += text.size();
+    const auto doc = parse_configuration_text(text, path);
+    if (doc.kind == ParsedDocument::Kind::configuration) {
+        for (const auto& p : doc.configuration.paths)
+            sources_.push_back(files_.canonical(resolve_reference(path, p.ir, files_.exists)));
+        return visitor_({path, chain_, &doc, nullptr});
+    }
+    if (on_list_)
+        on_list_(doc, chain_);
+    // A handler sees the whole chain of enclosing lists; a rethrown error gains
+    // the outer entries as it propagates.
+    const auto handled = [&](const ConfigurationError& e, std::size_t outer) {
+        if (!on_error_)
+            return false;
+        auto full = e;
+        for (std::size_t i = outer; i-- > 0;)
+            full.included_from(chain_[i]);
+        return on_error_(full);
+    };
+    for (const auto& entry : doc.entries) {
+        std::filesystem::path child;
+        try {
+            child = resolve_reference(path, entry, files_.exists);
+        } catch (const ConfigurationError& e) {
+            // Located at the entry itself, so this list is not added to the chain.
+            if (handled(e, chain_.size()))
+                continue;
+            throw;
+        }
+        chain_.push_back(entry.location);
+        struct PopChain {
+            IncludeChain& chain;
+            ~PopChain() {
+                chain.pop_back();
+            }
+        } pop_chain{chain_};
+        try {
+            if (visit(child))
+                return true;
+        } catch (ConfigurationError& e) {
+            e.included_from(entry.location);
+            if (handled(e, chain_.size() - 1))
+                continue;
+            throw;
+        }
+    }
+    return false;
+}
+} // namespace convolver::detail
+
+namespace convolver {
 Configuration load_configuration(const std::filesystem::path& path, int expected_rate,
                                  std::size_t expected_inputs,
                                  std::vector<std::filesystem::path>* source_paths) {
@@ -265,11 +321,31 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
         throw std::invalid_argument("expected audio properties out of range");
     if (path == "-")
         throw std::invalid_argument("configuration must be a file");
-    Context context;
-    if (auto cfg = load(path, expected_rate, expected_inputs, context)) {
+    std::optional<Configuration> selected;
+    std::size_t budget = 0; // Decoded samples across the whole operation.
+    detail::Resolver resolver([&](const detail::Resolver::Leaf& leaf) {
+        if (leaf.audio) {
+            const auto info = leaf.audio->info();
+            if (!detail::matches(info.sample_rate, info.channels, expected_rate, expected_inputs))
+                return false;
+            selected = detail::decode_audio_filter(*leaf.audio, budget);
+            return true;
+        }
+        const auto& parsed = leaf.document->configuration;
+        // Lists select by stream properties. Unrelated entries' text is validated,
+        // but their IR assets need not be installed and are not decoded.
+        if (!detail::matches(parsed.sample_rate, parsed.input_channels, expected_rate,
+                             expected_inputs))
+            return false;
+        auto cfg = detail::configuration_graph(parsed);
+        detail::decode_impulses(*leaf.document, cfg, budget);
+        selected = std::move(cfg);
+        return true;
+    });
+    if (resolver.run(path) && selected) {
         if (source_paths)
-            *source_paths = std::move(context.sources);
-        return std::move(*cfg);
+            *source_paths = resolver.sources();
+        return std::move(*selected);
     }
     throw std::runtime_error("no configuration matches the input sample rate and channel count");
 }

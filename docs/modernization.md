@@ -55,8 +55,10 @@ for distribution; changing an FFT library does not relicense Convolver.
    signing/notarization and installers. Start from the existing thin adapter and
    embedded presets. A custom editor, wider bus layouts or CLAP should follow user
    needs rather than precede this compatibility work.
-3. **Interoperability:** add config inspection/validation, bounded fuzzing and a
-   redistributable fixture corpus with per-consumer expectations. Preserve the
+3. **Interoperability:** config inspection/validation, the fixture corpus and the
+   `portable-paths` profile are implemented; see
+   [configuration compatibility](configuration-compatibility.md). Remaining:
+   per-consumer fixtures tested in named programs, bounded fuzzing. Preserve the
    original grammar and Windows relative-path support; version any new syntax.
    See the [detailed proposed interoperability plan](superpowers/plans/2026-10-18-configuration-interoperability.md).
 4. **Efficiency:** forward transform/history reuse for identical ordered input
