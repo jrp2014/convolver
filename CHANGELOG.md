@@ -10,6 +10,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [Unreleased]
 
 ### Added
+
 - PCM16 dither. `Pcm16Quantizer` and `QuantizationOptions` define a deterministic,
   seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
   `triangular_highpass` (the historical engine's "Triangular") modes.
@@ -18,6 +19,7 @@ Until 1.0 the C++ API may change between minor versions.
   and has two 6×6 matrix cases.
 
 ### Changed
+
 - Paths with identical ordered input routes share one forward FFT and spectrum
   history. Output is bit-identical; dense routing matrices run 1.2 to 1.4 times
   faster and use less memory.
