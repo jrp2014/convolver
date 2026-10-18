@@ -11,6 +11,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Automatic patch versions and annotated source tags on `main`, with one
+  `VERSION` file shared by the CMake package, CLI and VST3 bundle.
+- CLI and VST3 factory build identification including the Git revision and a
+  marker for uncommitted changes. See [source versioning](docs/versioning.md).
 - PCM16 dither. `Pcm16Quantizer` and `QuantizationOptions` define a deterministic,
   seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
   `triangular_highpass` (the historical engine's "Triangular") modes.
@@ -64,4 +68,5 @@ Until 1.0 the C++ API may change between minor versions.
   documentation and config paths.
 
 [0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b
