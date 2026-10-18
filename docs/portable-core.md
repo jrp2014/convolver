@@ -145,10 +145,23 @@ has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
 it, matching the historical Pipe timing convention. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
-exceed unity. PCM output clips to its representable range via libsndfile.
+exceed unity. PCM24/PCM32 output clips to its representable range via libsndfile.
 
 Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
-There is no dither/noise-shaping option yet.
+
+PCM16 output is quantized by Convolver's own `Pcm16Quantizer`, not libsndfile:
+each sample is scaled by 32768, offset by the dither (in LSBs), rounded to the
+nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. Dither
+is off by default. `--dither` selects `none` (default), `triangular` (independent
+TPDF, error power 1/4 LSB² at every signal level), `triangular-highpass` (the
+historical engine's "Triangular": per-channel difference of successive uniform
+values, same amplitude, high-pass error spectrum) or `rectangular`.
+`--dither-seed N` (default 0) seeds the generator; the same seed, input and
+channel count give byte-identical output regardless of buffering. Dither is
+rejected for other output formats. There is no noise shaping. The library's
+`AudioWriter` defaults to no dither; pass `QuantizationOptions` to enable it.
+The tests check rounding/clipping endpoints, reproducibility, chunk independence
+and measured error mean, variance and correlation against the theoretical values.
 
 ### Speaker labels
 
@@ -176,7 +189,7 @@ channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE heade
   are not exactly the requested mask, so a libsndfile that cannot write them is
   reported rather than silently ignored.
 
-The library equivalent is `AudioWriter(path, info, format, OutputMetadata{mask})`;
+The library equivalent is `AudioWriter(path, info, format, {}, OutputMetadata{mask})`;
 the default `OutputMetadata{}` keeps the plain header.
 
 Output paths must differ from input, configuration/list files and referenced IRs,
@@ -247,8 +260,9 @@ channel mask; declared delay tokens and milliseconds beside effective frames;
 ordered routes with their source tokens and effective channel/gain (`-0` is
 channel 0, gain -1); each IR's spelling, line, resolved path, channel, rate and
 decoded length; partitions per path; latency (one block) and the FIR/delay tail
-separately; and `accounted_buffer_bytes`, the engine's prepared float buffers.
-That estimate excludes FFT plan internals, allocator overhead and file decoding
+separately; and `accounted_buffer_bytes`, the engine's prepared float buffers
+(an upper bound: paths with the same input mix share their history). That
+estimate excludes FFT plan internals, allocator overhead and file decoding
 buffers; it is not total process memory. Diagnostics carry a stable `code`,
 severity, message, file, line, column and the chain of enclosing list entries.
 Resolved paths are machine-specific; source spellings are kept as written.

@@ -77,9 +77,10 @@ Installed dependency versions remain externally managed. A future
 binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
-semantics. Dither remains a planned audio-compatibility feature: current integer
-output rounds/clips without adding dither, including PCM16. Do not silently
-change that behavior in a build-system or formatting patch.
+semantics. PCM16 quantization and dither follow the documented policy in
+[the portable guide](docs/portable-core.md); PCM24/PCM32 use libsndfile's
+conversion without dither. Do not silently change either behavior in a
+build-system or formatting patch, and keep noise shaping a separate, explicit option.
 
 For host changes, run the optional SDK build and its validator/adapter/preset
 tests as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests

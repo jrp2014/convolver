@@ -216,7 +216,71 @@ sf_count_t frames(std::size_t samples, std::size_t channels) {
         throw std::length_error("audio buffer too large");
     return static_cast<sf_count_t>(n);
 }
+std::uint64_t splitmix64(std::uint64_t& state) noexcept {
+    std::uint64_t z = (state += 0x9e3779b97f4a7c15ULL);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
 } // namespace
+Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options)
+    : channels_(channels), options_(options), state_(options.seed) {
+    if (channels == 0 || channels > 256)
+        throw std::invalid_argument("quantizer channels must be 1..256");
+    switch (options.dither) {
+    case Dither::none:
+    case Dither::rectangular:
+    case Dither::triangular:
+    case Dither::triangular_highpass:
+        break;
+    default:
+        throw std::invalid_argument("unknown dither");
+    }
+    reset();
+}
+float Pcm16Quantizer::uniform() noexcept {
+    // 24 random bits give exactly representable floats in [0, 1).
+    return static_cast<float>(splitmix64(state_) >> 40) * 0x1p-24f;
+}
+void Pcm16Quantizer::reset() noexcept {
+    state_ = options_.seed;
+    channel_ = 0;
+    previous_.assign(options_.dither == Dither::triangular_highpass ? channels_ : 0, 0.f);
+    for (auto& v : previous_)
+        v = uniform();
+}
+void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t> out) noexcept {
+    const auto count = std::min(in.size(), out.size());
+    for (std::size_t i = 0; i < count; ++i) {
+        float d = 0;
+        switch (options_.dither) {
+        case Dither::none:
+            break;
+        case Dither::rectangular:
+            d = uniform() - 0.5f;
+            break;
+        case Dither::triangular:
+            d = uniform() - uniform();
+            break;
+        case Dither::triangular_highpass: {
+            const float u = uniform();
+            d = u - previous_[channel_];
+            previous_[channel_] = u;
+            break;
+        }
+        }
+        if (++channel_ == channels_)
+            channel_ = 0;
+        // Double keeps the scaled float sample and dither exact before rounding.
+        const double x = std::floor(static_cast<double>(in[i]) * 32768.0 + d + 0.5);
+        if (std::isnan(x))
+            out[i] = 0;
+        else
+            out[i] = x >= 32767.0    ? std::int16_t{32767}
+                     : x <= -32768.0 ? std::int16_t{-32768}
+                                     : static_cast<std::int16_t>(x);
+    }
+}
 struct AudioReader::Impl {
     Handle handle;
     AudioInfo info{};
@@ -339,14 +403,20 @@ struct AudioWriter::Impl {
     std::uint32_t speakers = 0;
     bool raw = false;
     std::size_t frame_bytes = 0;
+    std::optional<Pcm16Quantizer> pcm16;
+    std::vector<std::int16_t> pcm16_buffer;
     // Reserve ample room for the WAV headers written by this wrapper.
     std::uint64_t wav_remaining = std::uint64_t(UINT32_MAX) - 4096;
 };
 AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputFormat format,
-                         OutputMetadata metadata)
+                         QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
     validate(info);
     validate_speakers(metadata.channel_mask, info.channels, format);
+    if (quantization.dither != Dither::none && format != OutputFormat::wav_pcm16)
+        throw std::invalid_argument("dither applies only to PCM16 output");
+    if (format == OutputFormat::wav_pcm16)
+        impl_->pcm16.emplace(info.channels, quantization);
     impl_->info = info;
     impl_->path = path;
     impl_->speakers = metadata.channel_mask;
@@ -412,7 +482,26 @@ void AudioWriter::write(std::span<const float> data) {
         static_cast<std::uint64_t>(count) > impl_->wav_remaining / impl_->frame_bytes)
         throw std::length_error(
             "WAV output exceeds 4 GiB container limit; select raw-float for a larger stream");
-    const auto written = sf_writef_float(file, data.data(), count);
+    sf_count_t written;
+    if (impl_->pcm16) {
+        // Bound scratch memory; the quantizer carries its state across calls.
+        constexpr std::size_t chunk_frames = 4096;
+        const auto channels = impl_->info.channels;
+        impl_->pcm16_buffer.resize(std::min(data.size(), chunk_frames * channels));
+        written = 0;
+        for (std::size_t offset = 0; offset < data.size();) {
+            const auto n = std::min(data.size() - offset, impl_->pcm16_buffer.size());
+            const auto part = std::span<std::int16_t>(impl_->pcm16_buffer).first(n);
+            impl_->pcm16->quantize(data.subspan(offset, n), part);
+            const auto frames_here = static_cast<sf_count_t>(n / channels);
+            const auto got = sf_writef_short(file, part.data(), frames_here);
+            written += got;
+            if (got != frames_here)
+                break;
+            offset += n;
+        }
+    } else
+        written = sf_writef_float(file, data.data(), count);
     if (written != count || sf_error(file))
         throw error("audio write failed or was short", file);
     if (!impl_->raw)

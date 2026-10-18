@@ -35,6 +35,7 @@ struct ConfigurationAnalysis {
     // Prepared float buffers the engine accounts against its storage limit: block
     // and delay lines, routes, filter/input spectra, overlap and backend transform
     // buffers. Excludes FFT plan internals, allocator overhead and file decoding.
+    // Paths sharing an input mix share history, so this is an upper bound.
     std::size_t accounted_buffer_bytes = 0;
     std::vector<std::size_t> partitions_per_path;
 };

@@ -2,6 +2,7 @@
 #include "convolver/engine.hpp"
 #include "fft.hpp"
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -128,10 +129,11 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t b) {
         routes(p.inputs, c.input_channels);
         routes(p.outputs, c.output_channels);
         const auto partitions = 1 + (p.impulse.size() - 1) / b;
+        // Filter and input history, complex pairs. Paths sharing an input mix share
+        // history, so this per-path count is an upper bound.
         result.partitions_per_path.push_back(partitions);
-        account(checked_mul(checked_mul(partitions, bins),
-                            4)); // filter and input history, complex pairs.
-        account(b);              // overlap.
+        account(checked_mul(checked_mul(partitions, bins), 4));
+        account(b); // overlap.
         bool has_input = false, has_output = false;
         std::size_t input_delay = 0, output_delay = 0;
         for (const auto& r : p.inputs)
@@ -162,18 +164,32 @@ std::size_t configuration_tail_frames(const Configuration& c, std::size_t block)
 void validate_configuration(const Configuration& c, std::size_t block) {
     (void)validate(c, block);
 }
+// Paths whose ordered input routes are identical (channel and gain bits) produce
+// the same mixed block, so they share one forward transform and spectrum history.
+bool same_mix(const std::vector<Route>& a, const std::vector<Route>& b) noexcept {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](const Route& x, const Route& y) {
+        return x.channel == y.channel &&
+               std::bit_cast<std::uint32_t>(x.gain) == std::bit_cast<std::uint32_t>(y.gain);
+    });
+}
 struct Engine::Impl {
+    struct Mix {
+        std::vector<Route> routes;
+        std::size_t partitions = 0, head = 0; // History ring covers the longest member path.
+        std::vector<float> history;
+    };
     struct Path {
-        std::vector<Route> inputs, outputs;
-        std::size_t partitions, head = 0;
-        std::vector<float> filters, history, overlap;
-        Path(const FilterPath& p, std::size_t b, std::size_t bins)
-            : inputs(p.inputs), outputs(p.outputs), partitions(1 + (p.impulse.size() - 1) / b),
-              filters(partitions * bins * 2), history(filters.size()), overlap(b) {}
+        std::vector<Route> outputs;
+        std::size_t mix, partitions;
+        std::vector<float> filters, overlap;
+        Path(const FilterPath& p, std::size_t m, std::size_t b, std::size_t bins)
+            : outputs(p.outputs), mix(m), partitions(1 + (p.impulse.size() - 1) / b),
+              filters(partitions * bins * 2), overlap(b) {}
     };
     std::size_t inputs, outputs, block, tail, n, bins, position = 0;
     std::vector<float> input_block, output_block;
     std::vector<Delay> input_delays, output_delays;
+    std::vector<Mix> mixes;
     std::vector<Path> paths;
     detail::RealFft fft;
     float *time, *frequency, *sum;
@@ -191,8 +207,14 @@ struct Engine::Impl {
             output_delays.emplace_back(delay_at(c.output_delays, i));
         const float normalization = 1.0f / static_cast<float>(n);
         for (const auto& source : c.paths) {
-            paths.emplace_back(source, b, bins);
+            std::size_t m = 0;
+            while (m < mixes.size() && !same_mix(mixes[m].routes, source.inputs))
+                ++m;
+            if (m == mixes.size())
+                mixes.push_back({source.inputs, 0, 0, {}});
+            paths.emplace_back(source, m, b, bins);
             auto& path = paths.back();
+            mixes[m].partitions = std::max(mixes[m].partitions, path.partitions);
             for (std::size_t p = 0; p < path.partitions; ++p) {
                 std::fill_n(time, n, 0.f);
                 const auto count = std::min(b, source.impulse.size() - p * b);
@@ -201,24 +223,31 @@ struct Engine::Impl {
                 deinterleave(frequency, path.filters.data() + p * 2 * bins, bins, normalization);
             }
         }
+        for (auto& mix : mixes)
+            mix.history.assign(mix.partitions * bins * 2, 0.f);
     }
     void compute() noexcept {
         const auto stride = 2 * bins;
         std::fill(output_block.begin(), output_block.end(), 0.f);
-        for (auto& path : paths) {
+        // One forward transform per distinct ordered input mix, in route order.
+        for (auto& mix : mixes) {
             std::fill_n(time, n, 0.f);
-            for (const auto& route : path.inputs)
+            for (const auto& route : mix.routes)
                 for (std::size_t t = 0; t < block; ++t)
                     time[t] += input_block[t * inputs + route.channel] * route.gain;
             fft.forward();
-            deinterleave(frequency, path.history.data() + path.head * stride, bins, 1.f);
-            // The spectrum is now in history, so frequency is the split accumulator.
+            deinterleave(frequency, mix.history.data() + mix.head * stride, bins, 1.f);
+        }
+        // Paths keep their configured order, so output accumulation order is unchanged.
+        for (auto& path : paths) {
+            const auto& mix = mixes[path.mix];
+            // Spectra are in history, so frequency is the split accumulator.
             float* re = frequency;
             float* im = frequency + bins;
-            multiply(re, im, path.history.data() + path.head * stride, path.filters.data(), bins);
+            multiply(re, im, mix.history.data() + mix.head * stride, path.filters.data(), bins);
             for (std::size_t p = 1; p < path.partitions; ++p) {
-                const auto history = (path.head + path.partitions - p) % path.partitions;
-                multiply_accumulate(re, im, path.history.data() + history * stride,
+                const auto history = (mix.head + mix.partitions - p) % mix.partitions;
+                multiply_accumulate(re, im, mix.history.data() + history * stride,
                                     path.filters.data() + p * stride, bins);
             }
             for (std::size_t j = 0; j < bins; ++j) {
@@ -232,9 +261,10 @@ struct Engine::Impl {
                     output_block[t * outputs + route.channel] += value * route.gain;
                 path.overlap[t] = time[block + t];
             }
-            if (++path.head == path.partitions)
-                path.head = 0;
         }
+        for (auto& mix : mixes)
+            if (++mix.head == mix.partitions)
+                mix.head = 0;
     }
     void reset() noexcept {
         position = 0;
@@ -244,11 +274,12 @@ struct Engine::Impl {
             d.reset();
         for (auto& d : output_delays)
             d.reset();
-        for (auto& p : paths) {
-            p.head = 0;
-            std::fill(p.history.begin(), p.history.end(), 0.f);
-            std::fill(p.overlap.begin(), p.overlap.end(), 0.f);
+        for (auto& m : mixes) {
+            m.head = 0;
+            std::fill(m.history.begin(), m.history.end(), 0.f);
         }
+        for (auto& p : paths)
+            std::fill(p.overlap.begin(), p.overlap.end(), 0.f);
     }
 };
 void tune_fft(std::size_t b, FftPlanning planning) {

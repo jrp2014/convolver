@@ -33,8 +33,9 @@ Until 1.0 the C++ API may change between minor versions.
   `fuzz.replay.*`; CI fuzzes each target for 60 seconds.
 - `--speaker-map config` labels WAV output channels with the configuration's
   hex channel mask (WAVE_FORMAT_EXTENSIBLE), and `OutputMetadata` is an optional
-  fourth `AudioWriter` argument. Masks must name one known speaker per output
-  channel; samples keep their order. Without the flag output is unchanged.
+  fifth `AudioWriter` argument, after `QuantizationOptions`. Masks must name
+  one known speaker per output channel; samples keep their order. Without the
+  flag output is unchanged.
 - `AudioReader::declared_frames()`: the frame count a file header declares.
 - Two new resolution limits: 16 MiB of configuration text read per load or
   inspection, and 256 inspection diagnostics followed by one
@@ -59,6 +60,25 @@ Until 1.0 the C++ API may change between minor versions.
 - An audio file with an out-of-range sample rate or channel count in its header
   is reported as an unreadable file. Previously the exception escaped
   inspection and list traversal (found by fuzzing).
+
+## [0.2.2] - 2026-10-18
+
+### Added
+
+- PCM16 dither. `Pcm16Quantizer` and `QuantizationOptions` define a deterministic,
+  seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
+  `triangular_highpass` (the historical engine's "Triangular") modes.
+  CLI options `--dither` and `--dither-seed`; dither is off unless requested.
+- The benchmark reports p50, p99 and maximum single-block times and peak memory,
+  and has two 6×6 matrix cases.
+
+### Changed
+
+- Paths with identical ordered input routes share one forward FFT and spectrum
+  history. Output is bit-identical; dense routing matrices run 1.2 to 1.4 times
+  faster and use less memory.
+- PCM16 output rounds to nearest. libsndfile 1.2.2's float-to-PCM16 conversion
+  with clipping enabled rounds down, which added a -0.5 LSB bias.
 
 ## [0.2.1] - 2026-10-18
 
@@ -106,7 +126,8 @@ Until 1.0 the C++ API may change between minor versions.
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.3.0
+[0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.2...v0.3.0
+[0.2.2]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
 [0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b

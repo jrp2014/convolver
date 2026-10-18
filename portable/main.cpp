@@ -8,9 +8,11 @@
 #include <charconv>
 #include <cmath>
 #include <csignal>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -40,6 +42,9 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --speaker-map config
                       Label WAV output channels with the configuration's channel
                       mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
+  --dither D           PCM16 only: none (default), triangular, triangular-highpass
+                      or rectangular. Other formats reject dither.
+  --dither-seed N      Dither generator seed (default 0); output is reproducible
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
@@ -122,6 +127,8 @@ int run(int argc, char** argv) {
         bool explicit_plan = false, audio_options = false;
         std::optional<convolver::RawSpec> raw;
         convolver::OutputFormat format = convolver::OutputFormat::wav_float;
+        std::optional<convolver::Dither> dither;
+        std::uint64_t dither_seed = 0;
         std::size_t block = 256;
         float gain = 1;
         bool keep = false, speaker_map = false;
@@ -207,6 +214,26 @@ int run(int argc, char** argv) {
                     format = convolver::OutputFormat::raw_float;
                 else
                     throw std::invalid_argument("unsupported output format: " + name);
+            } else if (option == "--dither") {
+                audio_options = true;
+                const auto name = value();
+                if (name == "none")
+                    dither = convolver::Dither::none;
+                else if (name == "rectangular")
+                    dither = convolver::Dither::rectangular;
+                else if (name == "triangular")
+                    dither = convolver::Dither::triangular;
+                else if (name == "triangular-highpass")
+                    dither = convolver::Dither::triangular_highpass;
+                else
+                    throw std::invalid_argument("unsupported dither: " + name);
+            } else if (option == "--dither-seed") {
+                audio_options = true;
+                const auto text = value();
+                const auto [end, error] =
+                    std::from_chars(text.data(), text.data() + text.size(), dither_seed);
+                if (error != std::errc{} || end != text.data() + text.size())
+                    throw std::invalid_argument("dither seed must be a non-negative integer");
             } else
                 throw std::invalid_argument("unknown option: " + option);
         }
@@ -252,6 +279,12 @@ int run(int argc, char** argv) {
                 throw std::invalid_argument(
                     "output must differ from referenced configuration and impulse files");
         convolver::Engine engine(config, block, fft_options);
+        if (dither && *dither != convolver::Dither::none &&
+            format != convolver::OutputFormat::wav_pcm16)
+            throw std::invalid_argument("--dither applies only to wav-pcm16 output");
+        // Dither is opt-in; PCM16 is plainly rounded by default.
+        const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
+                                                          dither_seed};
         convolver::OutputMetadata metadata;
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;
@@ -262,7 +295,7 @@ int run(int argc, char** argv) {
         const auto open_output = [&] {
             try {
                 return convolver::AudioWriter(output, {info.sample_rate, engine.output_channels()},
-                                              format, metadata);
+                                              format, quantization, metadata);
             } catch (const std::invalid_argument& e) {
                 if (!metadata.channel_mask)
                     throw;
@@ -273,6 +306,7 @@ int run(int argc, char** argv) {
             }
         };
         auto writer = open_output();
+
         constexpr std::size_t chunk = 4096;
         std::vector<float> in(chunk * engine.input_channels()),
             out(chunk * engine.output_channels());

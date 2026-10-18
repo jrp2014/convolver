@@ -37,6 +37,33 @@ CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpk
   `.clang-tidy` checks (CI enforces both; commands in `CONTRIBUTING.md`).
 - Do not claim something builds or passes unless you ran it.
 
+## Versioning
+
+- `VERSION` is the single `MAJOR.MINOR.PATCH` source for the portable CMake
+  package, CLI and VST3 bundle. Do not hardcode copies elsewhere. Historical
+  Windows resource versions and `convolver*` tags have separate histories.
+- For ordinary changes, leave `VERSION` and tags alone. After a push to `main`,
+  **Version source changes** increments PATCH, commits `VERSION` and atomically
+  publishes an annotated `vX.Y.Z` tag. Feature branches and PRs do not create tags.
+  Concurrent pushes may be grouped into one version; repeat runs are no-ops.
+- `SOURCE_PATHS` in `scripts/version_source.py` defines what counts: sources,
+  tests, CMake files, scripts and workflows. Changes confined to `docs/` or
+  top-level Markdown files (including this file) do not bump the version.
+- For an intentional minor/major milestone, edit `VERSION` in that change and
+  reset the lower components (for example, `0.3.0`). The workflow honours the
+  higher number. Before 1.0, API incompatibilities belong in minor versions;
+  preserve the package's matching-minor compatibility policy. Record noteworthy
+  changes in `CHANGELOG.md`; do not change plug-in IDs or state-format versions
+  merely to match a package version.
+- On `main`, use `git pull --ff-only` after the bot's version commit; fetch tags
+  when looking up versions. Never move or overwrite published tags. CLI/VST3
+  build identifiers append the Git revision and `.dirty` for uncommitted files;
+  numeric package/bundle versions remain `MAJOR.MINOR.PATCH`.
+- Source tags identify revisions, not passing CI or production binary releases.
+  Test versioning with `python3 tests/versioning_tests.py`. For workflow recovery,
+  follow [the versioning guide](docs/versioning.md): the helper creates commits
+  and tags even without `--push`, so it is **not a dry run**.
+
 ## Rules
 
 - Real-time path: `Engine::process` and everything it calls must not allocate,

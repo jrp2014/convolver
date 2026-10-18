@@ -193,6 +193,56 @@ void cases() {
     moved.reset();
     close(run(moved, in, expected_one.size(), {7}), expected_one);
 }
+// Paths with identical ordered input routes share one forward transform and history.
+// Check sharing against the oracle and against separately prepared single-path engines.
+void shared_input_mixes() {
+    std::mt19937 random(0x5aa7ed);
+    std::uniform_real_distribution<float> sample(-.6f, .6f);
+    for (std::size_t trial = 0; trial < 24; ++trial) {
+        const std::size_t b = 1 + random() % 19;
+        Configuration c{48000, 2, 3, 0, {random() % 9, random() % 9}, {}, {}};
+        if (trial % 2)
+            c.output_delays = {random() % 9, random() % 9, random() % 9};
+        const float g = sample(random);
+        // Same channels in a different order, and signed zero gains, are distinct mixes.
+        const std::vector<std::vector<Route>> pool{{{0, 1}},           {{1, g}},
+                                                   {{0, g}, {1, .5f}}, {{1, .5f}, {0, g}},
+                                                   {{0, 0.f}, {1, 1}}, {{0, -0.f}, {1, 1}}};
+        const auto count = 2 + random() % 7;
+        for (std::size_t path = 0; path < count; ++path) {
+            FilterPath p;
+            // Members of one mix get different lengths, so their partition counts differ.
+            p.impulse.resize(1 + random() % (b * 5 + 4));
+            for (auto& x : p.impulse)
+                x = sample(random);
+            p.inputs = pool[random() % pool.size()];
+            p.outputs = {{random() % 3, sample(random)}};
+            if (random() % 2)
+                p.outputs.push_back({random() % 3, sample(random)});
+            c.paths.push_back(std::move(p));
+        }
+        std::vector<float> in((1 + random() % 120) * c.input_channels);
+        for (auto& x : in)
+            x = sample(random);
+        scenario(c, b, in);
+        Engine shared(c, b);
+        const auto frames = oracle(c, in, b).size() / c.output_channels;
+        const auto together = run(shared, in, frames, {5, 1, 13});
+        std::vector<double> separate(together.size());
+        for (const auto& path : c.paths) {
+            Configuration single = c;
+            single.paths = {path};
+            Engine alone(single, b);
+            const auto part = run(alone, in, frames, {frames});
+            for (std::size_t i = 0; i < part.size(); ++i)
+                separate[i] += part[i];
+        }
+        for (std::size_t i = 0; i < together.size(); ++i)
+            if (std::abs(together[i] - separate[i]) > 1e-6 * (1 + std::abs(separate[i])))
+                throw std::runtime_error("shared mix differs from separate paths at " +
+                                         std::to_string(i));
+    }
+}
 void no_processing_allocation() {
     Engine engine(mono(std::vector<float>(71, .01f)), 7);
     std::vector<float> input(100, 1), output(100);
@@ -201,6 +251,23 @@ void no_processing_allocation() {
         engine.process(input, output, 100);
         engine.process({}, output, 100);
         engine.reset();
+    } catch (...) {
+        forbid_allocation = false;
+        throw;
+    }
+    forbid_allocation = false;
+    Configuration c{48000, 2, 2, 0, {}, {}, {}};
+    for (const std::size_t length :
+         {std::size_t{5}, std::size_t{40}, std::size_t{17}, std::size_t{3}})
+        c.paths.push_back(
+            {std::vector<float>(length, .01f), {{length % 2, 1}}, {{0, 1}, {1, .5f}}});
+    Engine shared(c, 4);
+    std::vector<float> stereo(200, 1), stereo_out(200);
+    forbid_allocation = true;
+    try {
+        shared.process(stereo, stereo_out, 100);
+        shared.process({}, stereo_out, 100);
+        shared.reset();
     } catch (...) {
         forbid_allocation = false;
         throw;
@@ -270,6 +337,7 @@ void invalid() {
 int main() {
     try {
         cases();
+        shared_input_mixes();
         invalid();
         no_processing_allocation();
         std::cout << "native engine tests passed\n";

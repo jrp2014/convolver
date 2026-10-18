@@ -226,6 +226,51 @@ to confirm. Larger gains for long filters need fewer multiply-accumulates rather
 than faster FFTs: sharing one forward FFT per input channel and one inverse per
 output (milestone 3), and non-uniform partitioning.
 
+### Shared forward transforms
+
+Paths whose ordered input routes are identical (same channels, same order,
+bit-identical gains) mix the same block, so the engine now runs one forward FFT
+per distinct mix and keeps one spectrum history ring for it, sized for the
+longest member path. Paths still multiply, inverse-transform and accumulate in
+their configured order, so output is bit-identical to the previous engine; this
+was checked on 20 randomized 3×3 configurations with delays and mixed inputs,
+comparing the old and new libraries byte for byte. Memory falls by one history
+ring per shared path.
+
+Release builds, FFTW 3.3.10 (Ubuntu, AVX2), GCC 13.3, Intel Xeon @ 2.10 GHz on a
+shared cloud VM, so differences under about 7% are noise (`stereo_long` shares
+nothing yet reads 0.93×). Five alternating rounds of 0.4 s per case, medians;
+p99 is over 4096 single-block calls after the throughput run; RSS is the whole
+process peak. `matrix6_short` and `matrix6_long` are new 6×6 matrix cases (36
+paths, 6 distinct mixes):
+
+| Case | Paths | Before ns/frame | After ns/frame | Speed-up | Before p99 µs | After p99 µs | Before RSS KiB | After RSS KiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mono_short | 1 | 15.5 | 15.1 | 1.03× | 1.8 | 1.4 | 12448 | 12448 |
+| mono_room | 1 | 21.1 | 21.3 | 0.99× | 9.3 | 10.1 | 12448 | 12448 |
+| stereo_low_latency | 2 | 159.2 | 154.1 | 1.03× | 42.8 | 33.6 | 12448 | 12448 |
+| stereo_long | 2 | 362.1 | 388.2 | 0.93× | 159.7 | 169.5 | 12448 | 12448 |
+| matrix_short | 4 | 100.7 | 100.7 | 1.00× | 26.5 | 25.2 | 12448 | 12448 |
+| matrix_long | 4 | 940.2 | 789.3 | 1.19× | 329.6 | 315.5 | 12448 | 12448 |
+| stereo_large_block | 2 | 115.8 | 106.6 | 1.09× | 181.7 | 173.6 | 12448 | 12448 |
+| stereo_odd_size | 2 | 70.5 | 68.9 | 1.02× | 26.8 | 24.5 | 12448 | 12448 |
+| matrix6_short | 36 | 451.6 | 329.2 | 1.37× | 98.9 | 72.9 | 12448 | 12448 |
+| matrix6_long | 36 | 2345.6 | 1767.3 | 1.33× | 866.6 | 673.9 | 18196 | 14232 |
+
+Gains appear only where several paths read one mix: dense matrices (1.2–1.4×,
+with p99 callback time falling by about the same factor). Diagonal stereo and
+mono have one path per mix and are unchanged.
+
+Inverse-transform sharing was evaluated but not implemented. Paths with identical
+ordered output routes could sum their spectra and run one inverse FFT and one
+overlap buffer, which would save the inverse FFT for every extra path into the
+same outputs (30 of 36 inverses in the 6×6 cases). Unlike forward sharing it
+changes summation order (frequency domain instead of time domain after the
+inverse), so output would no longer be bit-identical, only within the oracle
+tolerance. It also needs care with output delays and the per-path output gains.
+It is a reasonable next step for dense matrices, as a separate, separately
+measured change.
+
 ## Reproduce
 
 ### Building FFTW for this Apple Silicon Mac
