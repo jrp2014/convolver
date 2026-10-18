@@ -108,7 +108,7 @@ the selected FFT backend, libsndfile and CLI, plus an external package-consumer 
 Core/CLI, FFTW/Accelerate, offline planning, split-spectrum MACs, package exports,
 Windows config paths, host lifecycle and VST3 are implemented. The
 [structure review](docs/project-structure.md) and
-[modernization plan](docs/modernization.md) identify remaining dither,
+[modernization plan](docs/modernization.md) identify remaining
 interoperability, DAW/release validation and measured optimization work.
 Earlier 4.3 assessments are in the [review archive](docs/archive/reviews/README.md).
 

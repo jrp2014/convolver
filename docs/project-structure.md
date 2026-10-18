@@ -32,7 +32,9 @@ resolution when new features justify it; keep private FFT storage free to evolve
   C++ ABI promise. See [package contracts](cmake-package.md).
 - **Compatibility/tooling:** Windows and mixed relative configuration paths,
   signed-zero routing semantics, real PCM/file tests, `.clang-format`,
-  `.clang-tidy` and CI checks. Portable PCM16 dither remains deferred.
+  `.clang-tidy` and CI checks. PCM16 output uses a deterministic, seeded
+  quantizer with triangular (default in the CLI), historical high-pass
+  triangular, rectangular or no dither.
 - **FFT selection and optimization:** FFTW and Accelerate behind one private
   contract; offline FFTW planning/wisdom; split real/imaginary spectra and
   vectorizable MAC loops. The [recorded measurements](fft-backends.md) distinguish
@@ -49,9 +51,9 @@ arbitrary threads; its ownership/thread contract remains part of the API.
 
 ## Next compatibility work
 
-The immediate audio-compatibility gap is PCM16 dither. Define its default/disable
-policy and verify quantization error, clipping and reproducibility independently
-of convolution accuracy. Keep noise shaping a separate, explicit choice.
+PCM16 dither is implemented with tests of quantization error, clipping and
+reproducibility that are independent of convolution accuracy. Noise shaping and
+PCM24 dither remain separate, explicit choices if they are wanted.
 
 Configuration import still combines parsing, selection and asset decoding; no
 inspection/validation command exposes the resolved graph. Add one grammar-backed

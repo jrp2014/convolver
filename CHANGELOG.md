@@ -7,6 +7,20 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
+## [Unreleased]
+
+### Added
+- PCM16 dither. `Pcm16Quantizer` and `QuantizationOptions` define a deterministic,
+  seeded policy with `none`, `rectangular`, `triangular` (TPDF) and
+  `triangular_highpass` (the historical engine's "Triangular") modes.
+  CLI options `--dither` and `--dither-seed`.
+
+### Changed
+- The CLI now dithers PCM16 output with TPDF by default; use `--dither none` for
+  plain rounding.
+- PCM16 output rounds to nearest. libsndfile 1.2.2's float-to-PCM16 conversion
+  with clipping enabled rounds down, which added a -0.5 LSB bias.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added

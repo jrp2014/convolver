@@ -107,6 +107,27 @@ def main():
                               '--raw-input','48000','1','--output',str(raw_path),
                               '--output-format','raw-float'],stdin=redirected,capture_output=True)
         assert p.returncode!=0 and raw_path.read_bytes()==raw
+        # PCM16 output is dithered by default, reproducibly; explicit none rounds.
+        pcm(ir,[13107]); pcm(src,[((i*379)%12001)-6000 for i in range(4000)])
+        def shorts(path):
+            with wave.open(str(path),'rb') as f:
+                assert f.getsampwidth()==2
+                return struct.unpack('<%dh' % f.getnframes(), f.readframes(f.getnframes()))
+        base=['--filter',ir,'--input',src,'--output',dst,'--output-format','wav-pcm16']
+        exact=[(((i*379)%12001)-6000)*13107/32768 for i in range(4000)]
+        call(base+['--dither','none']); plain=shorts(dst)
+        assert all(a==math.floor(b+.5) for a,b in zip(plain,exact) if abs(b%1-.5)>.01)
+        call(base); first=shorts(dst); call(base+['--dither','triangular','--dither-seed','0'])
+        assert shorts(dst)==first and first!=plain
+        assert all(abs(a-b)<=1.5 for a,b in zip(first,exact))
+        call(base+['--dither-seed','1']); assert shorts(dst)!=first
+        for mode in ('rectangular','triangular-highpass'):
+            call(base+['--dither',mode]); assert all(abs(a-b)<=1.5 for a,b in zip(shorts(dst),exact))
+        for extra in (['--dither','bogus'],['--dither-seed','-1'],['--dither-seed','x'],
+                      ['--output-format','wav-pcm24','--dither','triangular'],
+                      ['--output-format','wav-float','--dither','rectangular']):
+            call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)
+        call(['--filter',ir,'--input',src,'--output',dst,'--dither','none'])
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size','0'], ['--block-size','-1'], ['--gain-db','nan'], ['--unknown']):
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)

@@ -63,7 +63,7 @@ proof for every possible filter or floating-point input.
 | Three-multiply complex cancellation | Direct complex products restored | Direct real/imaginary MACs, with cancellation and numerical-oracle coverage |
 | PCM24 sign/reduced valid-bit packing | Historical conversion fixes retained | Real libsndfile PCM16/24/32 round trips and endpoint/clipping checks; not a claim about every legacy wrapper |
 | VST2 aliasing, additive/double transfer, disconnected inputs | Extracted adapter fixes tested | Separate planar/in-place float/double HostProcessor and SDK adapter tests; internal DSP remains float |
-| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura is not a portable backend; portable PCM16 dither remains missing |
+| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura is not a portable backend; portable PCM16 dither added after this review |
 | Old CMD EOF and old host tail/lifecycle behavior | Original CMD/DMO/VST2 release gaps remain | New CLI explicitly drains; HostProcessor preserves stream history and handles bypass/filter changes; these do not repair the old applications |
 
 The merged historical fixes are exercised through extracted production routines
@@ -155,9 +155,11 @@ recovery records remain available as provenance rather than current instructions
 
 ## Remaining priorities
 
-1. **PCM16 dither:** explicitly deferred by the owner and still absent from the
-   portable output path. Add a documented, deterministic/testable quantization
-   policy before claiming equivalence with the old engine's dither behavior.
+1. **PCM16 dither:** implemented after this review. PCM16 output now uses a
+   documented, seeded quantizer (TPDF by default in the CLI, plus the old
+   engine's high-pass triangular and rectangular choices); see
+   [the portable guide](docs/portable-core.md). Noise shaping is not implemented,
+   so equivalence with the old engine holds only for its unshaped dither modes.
 2. **Host compatibility and delivery:** exercise named Windows/macOS DAWs,
    silence/seek/reload/bypass and multiple instances; define minimum OS versions,
    dependency bundling, signing and installers. SDK validation is the starting gate.
