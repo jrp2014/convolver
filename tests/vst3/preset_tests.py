@@ -16,9 +16,11 @@ with tempfile.TemporaryDirectory() as directory:
         wav.writeframes(struct.pack('<hh', 16384, 8192))
     preset = root / 'filter ü.vstpreset'
     subprocess.run([sys.argv[1], str(impulse), str(preset)], check=True)
+    original = preset.read_bytes()
+    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True)
+    assert result.returncode != 0 and preset.read_bytes() == original
     impulse.unlink()
     subprocess.run([sys.argv[2], str(preset)], check=True)
-    original = preset.read_bytes()
     result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True)
     assert result.returncode != 0 and preset.read_bytes() == original
     print('Preset embeds filters and survives removal of original IR')

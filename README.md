@@ -104,7 +104,7 @@ ctest --test-dir build --output-on-failure --parallel 2
 
 These nine suites cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
-The default native build additionally runs seven suites against the actual core,
+The default native build additionally runs eight suites against the actual core,
 the selected FFT backend, libsndfile and CLI, plus an external package-consumer suite. See [testing instructions and coverage limits](docs/testing.md).
 
 ## Modernization

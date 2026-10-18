@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/io.hpp"
+#include "bytes.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -33,13 +34,6 @@ void validate(AudioInfo info) {
 }
 std::runtime_error error(const std::string& action, SNDFILE* file) {
     return std::runtime_error(action + ": " + sf_strerror(file));
-}
-std::uint32_t little32(const unsigned char* b) {
-    return std::uint32_t(b[0]) | (std::uint32_t(b[1]) << 8) | (std::uint32_t(b[2]) << 16) |
-           (std::uint32_t(b[3]) << 24);
-}
-unsigned little16(const unsigned char* b) {
-    return unsigned(b[0]) | (unsigned(b[1]) << 8);
 }
 // WAVE speaker bit -> libsndfile channel-map value. The enumerations differ in
 // order (front left is SF_CHANNEL_MAP_LEFT, not SF_CHANNEL_MAP_FRONT_LEFT).
@@ -92,13 +86,14 @@ std::optional<std::uint32_t> declared_speakers(const std::filesystem::path& path
         file.read(reinterpret_cast<char*>(header.data()), header.size());
         if (!file)
             return std::nullopt;
-        const auto length = little32(header.data() + 4);
+        const auto length = detail::read_le32(std::as_bytes(std::span(header)).subspan(4));
         if (std::string_view(reinterpret_cast<char*>(header.data()), 4) == "fmt ") {
             std::array<unsigned char, 24> fmt{};
             file.read(reinterpret_cast<char*>(fmt.data()), fmt.size());
-            if (!file || length < 40 || little16(fmt.data()) != 0xfffe)
+            const auto bytes = std::as_bytes(std::span(fmt));
+            if (!file || length < 40 || detail::read_le16(bytes) != 0xfffe)
                 return std::nullopt;
-            return little32(fmt.data() + 20);
+            return detail::read_le32(bytes.subspan(20));
         }
         file.seekg(static_cast<std::streamoff>(length + (length & 1u)), std::ios::cur);
     }
@@ -135,7 +130,8 @@ void validate_wave(const std::filesystem::path& path) {
         std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
         std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
         return;
-    const std::uint64_t end = std::uint64_t(little32(bytes.data() + 4)) + 8;
+    const std::uint64_t end =
+        std::uint64_t(detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4))) + 8;
     if (end < 12 || end > std::filesystem::file_size(path))
         throw std::runtime_error("truncated or invalid RIFF/WAVE size");
     unsigned block_align = 0;
@@ -150,7 +146,7 @@ void validate_wave(const std::filesystem::path& path) {
         file.read(reinterpret_cast<char*>(bytes.data()), 8);
         if (!file)
             throw std::runtime_error("cannot read RIFF/WAVE chunk header");
-        const auto length = little32(bytes.data() + 4);
+        const auto length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
         const auto chunk_end = position + 8 + length + (length & 1u);
         if (chunk_end > end)
             throw std::runtime_error("truncated RIFF/WAVE chunk");
@@ -163,11 +159,11 @@ void validate_wave(const std::filesystem::path& path) {
             file.read(reinterpret_cast<char*>(bytes.data()), std::min<std::uint32_t>(length, 40));
             if (!file)
                 throw std::runtime_error("cannot read WAV format");
-            unsigned format = little16(bytes.data());
+            unsigned format = detail::read_le16(std::as_bytes(std::span(bytes)));
             if (format == 0xfffe && length >= 40)
-                format = little16(bytes.data() + 24);
+                format = detail::read_le16(std::as_bytes(std::span(bytes)).subspan(24));
             pcm_or_float = format == 1 || format == 3;
-            block_align = little16(bytes.data() + 12);
+            block_align = detail::read_le16(std::as_bytes(std::span(bytes)).subspan(12));
         }
         position = chunk_end;
     }
@@ -316,10 +312,9 @@ std::size_t AudioReader::read(std::span<float> data) {
         }
         if (bytes % static_cast<sf_count_t>(4 * impl_->info.channels))
             throw std::runtime_error("RAW input ends with an incomplete frame");
-        auto* raw_bytes = reinterpret_cast<const unsigned char*>(data.data());
+        const auto raw_bytes = std::as_bytes(data);
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / 4; ++i) {
-            const auto* b = raw_bytes + i * 4;
-            const std::uint32_t bits = little32(b);
+            const auto bits = detail::read_le32(raw_bytes.subspan(i * 4));
             data[i] = std::bit_cast<float>(bits);
         }
         got = bytes / static_cast<sf_count_t>(4 * impl_->info.channels);
