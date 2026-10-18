@@ -1,0 +1,36 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Version source changes
+
+'on':
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Check the latest main so a newer queued run also picks up earlier changes.
+concurrency:
+  group: source-version
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify versioning behavior
+        run: python tests/versioning_tests.py
+      - name: Commit version and publish tag
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python scripts/version_source.py --push

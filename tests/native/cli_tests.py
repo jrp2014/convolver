@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end CLI checks through real FFTW and libsndfile, no Python packages."""
 import math
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -40,7 +41,10 @@ def call(args, ok=True, data=None):
     return p
 
 def main():
-    call(['--help']); assert b'FFT backend:' in call(['--version']).stdout
+    call(['--help'])
+    version = call(['--version']).stdout
+    assert re.match(rb'Convolver portable [0-9]+\.[0-9]+\.[0-9]+(?:\+g[0-9a-f]+(?:\.dirty)?)?\n', version), version
+    assert b'FFT backend:' in version
     with tempfile.TemporaryDirectory(prefix='convolver-cli-') as t:
         d=Path(t); src=d/'entrée.wav'; ir=d/'ir.wav'; dst=d/'sortie ü.wav'
         for count in (0,1,16,17,64):

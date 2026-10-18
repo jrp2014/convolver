@@ -68,9 +68,12 @@ Use `pre-commit run --files <paths>` to include new files before staging them;
 
 ## Scope and versions
 
-The portable CMake package is versioned separately from archived releases. The
-initial static 0.1 API can evolve between minor versions; no stable binary ABI is
-promised. Installed dependency versions remain externally managed. A future
+The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes
+on `main` receive automatic patch versions and annotated Git tags; see
+[source versioning](docs/versioning.md) for scope, deliberate minor/major bumps
+and recovery. The pre-1.0 API can evolve between minor versions; no stable binary
+ABI is promised. Archived releases retain their separate history.
+Installed dependency versions remain externally managed. A future
 binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
