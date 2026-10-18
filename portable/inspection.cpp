@@ -3,8 +3,11 @@
 // engine's own validation/accounting, so a report cannot disagree with a render.
 #include "convolver/inspection.hpp"
 #include "config_parse.hpp"
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
+#include <utility>
 
 namespace convolver {
 namespace {
@@ -168,6 +171,8 @@ class Inspector {
         }
         step.outcome = options_.all_configurations ? "validated" : "selected";
         report_.traversal.push_back(std::move(step));
+        if (l.document)
+            portability(*l.document, l.chain);
         try {
             if (l.audio) {
                 auto cfg = detail::decode_audio_filter(*l.audio, budget_);
@@ -213,6 +218,7 @@ class Inspector {
                                   [this](const ParsedDocument& doc, const detail::IncludeChain& c) {
                                       report_.traversal.push_back({doc.source, chain(c), "list",
                                                                    std::nullopt, std::nullopt});
+                                      portability(doc, c);
                                   });
         bool stopped = false;
         try {
@@ -289,6 +295,7 @@ class Inspector {
         else
             report_.selected = path;
         auto result = leaf(doc, {});
+        portability(doc, {});
         bool errors = false;
         for (const auto& d : report_.diagnostics)
             errors = errors || d.severity == DiagnosticSeverity::error;
@@ -296,6 +303,95 @@ class Inspector {
         report_.configurations.push_back(std::move(result));
     }
 
+    // InspectionProfile::portable_paths: warn about references that work here but
+    // will not travel. Nothing is rewritten and selection is unaffected.
+    void portability(const ParsedDocument& doc, const detail::IncludeChain& c) {
+        if (options_.profile != InspectionProfile::portable_paths)
+            return;
+        const auto& refs = doc.kind == ParsedDocument::Kind::list ? doc.entries : [&] {
+            std::vector<detail::ParsedReference> irs;
+            for (const auto& p : doc.configuration.paths)
+                irs.push_back(p.ir);
+            return irs;
+        }();
+        for (const auto& ref : refs)
+            for (auto& [code, message] : portability_problems(doc.source, ref.spelling))
+                add({code, DiagnosticSeverity::warning, message, position(ref.location), chain(c)});
+    }
+    std::vector<std::pair<std::string, std::string>>
+    portability_problems(const std::filesystem::path& owner, std::string spelling) const {
+        std::vector<std::pair<std::string, std::string>> found;
+        const auto quoted = "'" + spelling + "'";
+        for (const char bad : std::string_view("<>\"|?*"))
+            if (spelling.find(bad) != std::string::npos) {
+                found.emplace_back("windows-invalid-name",
+                                   quoted + " contains a character Windows filenames cannot use");
+                break;
+            }
+        std::replace(spelling.begin(), spelling.end(), '\\', '/');
+        const auto lexical = std::filesystem::path(std::u8string(spelling.begin(), spelling.end()));
+        if (lexical.has_root_name() || lexical.has_root_directory()) {
+            found.emplace_back("absolute-reference",
+                               quoted + " is an absolute path, which only resolves on this "
+                                        "machine; give the path relative to the configuration");
+            return found;
+        }
+        std::error_code ec;
+        const auto root =
+            std::filesystem::absolute(report_.path, ec).parent_path().lexically_normal();
+        const auto target =
+            std::filesystem::absolute(owner.parent_path() / lexical, ec).lexically_normal();
+        const auto inside = target.lexically_relative(root);
+        if (!ec && (inside.empty() || *inside.begin() == ".."))
+            found.emplace_back("outside-tree",
+                               quoted + " points outside the folder of " +
+                                   detail::utf8_string(report_.path.filename()) +
+                                   "; a copy of that folder alone will not include it");
+        // Compare each component with the stored directory entry, so case differences
+        // are found even where this filesystem ignores case.
+        auto dir = owner.parent_path();
+        for (const auto& part : lexical) {
+            const auto name = part.u8string();
+            if (name.empty() || name == u8".")
+                continue;
+            if (name == u8"..") {
+                dir /= part;
+                continue;
+            }
+            std::optional<std::u8string> folded;
+            bool exact = false;
+            std::size_t seen = 0;
+            for (auto it = std::filesystem::directory_iterator(dir.empty() ? "." : dir, ec);
+                 !ec && it != std::filesystem::directory_iterator() && ++seen < 100000;
+                 it.increment(ec)) {
+                const auto entry = it->path().filename().u8string();
+                if (entry == name) {
+                    exact = true;
+                    break;
+                }
+                if (!folded && entry.size() == name.size() &&
+                    std::equal(entry.begin(), entry.end(), name.begin(), [](char8_t a, char8_t b) {
+                        auto lower = [](char8_t x) {
+                            return x >= u8'A' && x <= u8'Z' ? static_cast<char8_t>(x + 32) : x;
+                        };
+                        return lower(a) == lower(b);
+                    }))
+                    folded = entry;
+            }
+            if (exact) {
+                dir /= part;
+                continue;
+            }
+            if (folded)
+                found.emplace_back("case-mismatch",
+                                   quoted + " differs in letter case from the disk: '" +
+                                       std::string(name.begin(), name.end()) + "' is '" +
+                                       std::string(folded->begin(), folded->end()) +
+                                       "'; case-sensitive filesystems will not find it");
+            break;
+        }
+        return found;
+    }
     InspectionOptions options_;
     InspectionReport report_;
     std::size_t budget_ = 0;

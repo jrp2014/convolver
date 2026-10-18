@@ -189,6 +189,22 @@ ParsedDocument parse_configuration_text(std::string_view text,
     if (header.size() != 4)
         p.fail(h.number, h.column,
                "header must be: sample rate, input channels, output channels, hex channel mask");
+    if (content.size() >= 2) {
+        // Before version 3.0 the header was followed directly by filter paths.
+        const auto& second = content[1];
+        std::istringstream probe(second.tokens.front().text);
+        probe.imbue(std::locale::classic());
+        float value = 0;
+        if (!(probe >> value) || !probe.eof())
+            p.fail(second.number, second.column,
+                   "expected a line of input delays after the header, found '" + second.text +
+                       "'. This looks like a pre-3.0 configuration without delay lines: insert "
+                       "a line of " +
+                       std::string(header.size() > 1 ? header[1].text : "input-count") +
+                       " zeros (input delays) and a line of " +
+                       std::string(header.size() > 2 ? header[2].text : "output-count") +
+                       " zeros (output delays) after the header");
+    }
     if (content.size() < 3)
         p.fail(content.back().number, 0, "expected input and output delay lines after the header");
     if (content.size() < 7 || (content.size() - 3) % 4) {

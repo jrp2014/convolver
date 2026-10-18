@@ -23,6 +23,15 @@ import generate_fixtures as fixtures  # noqa: E402
 PLATFORM = 'windows' if os.name == 'nt' else 'posix'
 
 
+def filesystem_case(directory):
+    probe = Path(directory) / 'Case-Probe'
+    probe.write_bytes(b'')
+    try:
+        return 'case-insensitive' if (Path(directory) / 'case-probe').exists() else 'case-sensitive'
+    finally:
+        probe.unlink()
+
+
 def read_float_wav(path):
     data = Path(path).read_bytes()
     assert data[:4] in (b'RIFF', b'RF64') and data[8:12] == b'WAVE', 'not a WAV file'
@@ -111,6 +120,21 @@ def run(exe, args, cwd, data=None, chunk=None):
         return subprocess.CompletedProcess(p.args, p.returncode, out, err)
 
 
+def portable(exe, case, filter_arg, cwd, spec):
+    """The portable-paths profile reports exactly the expected warnings."""
+    args = ['--validate', filter_arg, '--json', '--profile', 'portable-paths', '--sample-rate',
+            str(spec['rate']), '--input-channels', str(spec['channels'])]
+    p = run(exe, args, cwd)
+    report = json.loads(p.stdout.decode('utf-8'))
+    warnings = sorted(d['code'] for d in report['diagnostics'] if d['severity'] == 'warning')
+    assert warnings == sorted(case['portable_paths_warnings']), (case['id'], warnings)
+    if 'error' not in case['expect']:
+        strict = run(exe, args + ['--warnings-as-errors'], cwd)
+        assert strict.returncode == (1 if warnings else 0), (case['id'], strict.returncode)
+        native = json.loads(run(exe, args[:4] + ['convolver'] + args[5:], cwd).stdout)
+        assert not native['diagnostics'], (case['id'], 'native profile warned')
+
+
 def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
     """The inspection report must describe the same graph the render produced."""
     spec = case['input']
@@ -119,6 +143,8 @@ def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
     report = json.loads(p.stdout.decode('utf-8'))
     cid, expect = case['id'], case['expect']
     assert report['schema_version'] == 1, cid
+    if 'portable_paths_warnings' in case:
+        portable(exe, case, filter_arg, cwd, spec)
     if 'error' in expect:
         codes = manifest['error_codes'][expect['error']]
         assert p.returncode == 1 and not report['valid'], '%s: inspection accepted it' % cid
@@ -154,6 +180,7 @@ def check_case(exe, manifest, case, root):
     if PLATFORM not in case.get('only', [PLATFORM]):
         return 'skipped (%s)' % PLATFORM
     expect = case.get('platform_expect', {}).get(PLATFORM, case['expect'])
+    expect = case.get('filesystem_expect', {}).get(filesystem_case(root.parent), expect)
     case = dict(case, expect=expect)
     inputs = fixtures.generate_case(case, root)
     cwd = root / case.get('cwd', 'elsewhere')

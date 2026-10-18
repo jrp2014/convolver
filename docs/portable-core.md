@@ -226,6 +226,10 @@ buffers; it is not total process memory. Diagnostics carry a stable `code`,
 severity, message, file, line, column and the chain of enclosing list entries.
 Resolved paths are machine-specific; source spellings are kept as written.
 
+[Configuration compatibility](configuration-compatibility.md) lists what the corpus
+verifies, the `portable-paths` profile's warnings and what is known about other
+programs that read the format.
+
 The same report is available to C++ code through `convolver::inspect_configuration`
 in `convolver/inspection.hpp` (`Convolver::io`), and the core's
 `convolver::analyze_configuration` returns latency, tail, FFT length, accounted

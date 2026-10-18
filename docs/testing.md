@@ -41,11 +41,14 @@ native/compatibility/package/documentation suites; the old extraction adapters r
   creates no files.
 - `native.inspection_cli`: `--inspect`/`--validate` modes, exit codes 0/1/2,
   rejected render options, deterministic JSON, escaping of quotes, backslashes,
-  tabs and Unicode in names, and invalid UTF-8 filenames on Linux.
+  tabs and Unicode in names, invalid UTF-8 filenames on Linux, the
+  `portable-paths` profile with `--warnings-as-errors`, and diagnosis of every
+  bundled historical sample in `convolver/configs/`.
 - `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
-  selection, routes, delays and tail against the same expectations: routes, signed zero, delays, BOM/CRLF,
+  selection, routes, delays and tail, and the `portable-paths` warnings, against
+  the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
 - `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
   CLI processes against direct convolution, missing-plan failure before output

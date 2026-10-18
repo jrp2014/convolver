@@ -53,7 +53,8 @@
           }
         ],
         "frames": 37
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "wav-stereo-diagonal",
@@ -94,7 +95,8 @@
           }
         ],
         "frames": 43
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "cfg-identity",
@@ -132,7 +134,8 @@
           }
         ],
         "frames": 29
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "signed-zero-inversion",
@@ -170,7 +173,8 @@
           }
         ],
         "frames": 32
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "fractional-repeated-routes",
@@ -208,7 +212,8 @@
           }
         ],
         "frames": 35
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "cross-channel-mixing",
@@ -257,7 +262,8 @@
           }
         ],
         "frames": 26
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "unequal-ir-lengths",
@@ -306,7 +312,8 @@
           }
         ],
         "frames": 28
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "ir-channel-select",
@@ -344,7 +351,8 @@
           }
         ],
         "frames": 21
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "integer-frame-delays",
@@ -382,7 +390,8 @@
           }
         ],
         "frames": 103
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "truncated-delays",
@@ -420,7 +429,8 @@
           }
         ],
         "frames": 21
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "delay-float-precision",
@@ -458,7 +468,8 @@
           }
         ],
         "frames": 15
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "last-frame-impulse",
@@ -494,7 +505,8 @@
           }
         ],
         "frames": 70
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "comments-blank-lines",
@@ -532,7 +544,8 @@
           }
         ],
         "frames": 22
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "bom-crlf",
@@ -572,7 +585,8 @@
           }
         ],
         "frames": 22
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "hex-channel-mask",
@@ -610,7 +624,8 @@
           }
         ],
         "frames": 17
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "relative-posix-parent",
@@ -648,7 +663,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": ["outside-tree"]
     },
     {
       "id": "relative-windows-separators",
@@ -686,7 +702,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": ["outside-tree"]
     },
     {
       "id": "relative-mixed-separators",
@@ -724,7 +741,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": ["outside-tree"]
     },
     {
       "id": "cwd-relative-filter",
@@ -764,7 +782,8 @@
         "frames": 27
       },
       "cwd": "configs",
-      "filter_arg": "relative"
+      "filter_arg": "relative",
+      "portable_paths_warnings": ["outside-tree"]
     },
     {
       "id": "absolute-native-path",
@@ -802,7 +821,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": ["absolute-reference"]
     },
     {
       "id": "unicode-and-spaces",
@@ -840,7 +860,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "list-first-match",
@@ -895,7 +916,8 @@
           }
         ],
         "frames": 23
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "list-of-sound-files",
@@ -938,7 +960,8 @@
           }
         ],
         "frames": 19
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "list-missing-unselected-asset",
@@ -982,7 +1005,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "nested-list-windows-separators",
@@ -1026,7 +1050,8 @@
           }
         ],
         "frames": 27
-      }
+      },
+      "portable_paths_warnings": []
     },
     {
       "id": "raw-pipe-split-writes",
@@ -1065,7 +1090,52 @@
           }
         ],
         "frames": 35
-      }
+      },
+      "portable_paths_warnings": []
+    },
+    {
+      "id": "case-differs",
+      "label": "current-behavior",
+      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "description": "A reference whose letter case differs from the file on disk. It loads only where the filesystem ignores case; the portable-paths profile warns either way.",
+      "files": {
+        "Irs/IR.wav": {
+          "rate": 48000,
+          "format": "float",
+          "channels": [[1.0, -0.5, 0.25]]
+        },
+        "room.cfg": {
+          "text": "48000 1 1 0\n0\n0\nirs/ir.wav\n0\n0\n0\n"
+        }
+      },
+      "filter": "room.cfg",
+      "input": {
+        "rate": 48000,
+        "channels": 1,
+        "frames": 25
+      },
+      "expect": {
+        "selected": "room.cfg",
+        "output_channels": 1,
+        "channel_mask": 0,
+        "input_delays": [0],
+        "output_delays": [0],
+        "paths": [
+          {
+            "ir": "Irs/IR.wav",
+            "channel": 0,
+            "inputs": [[0, 1]],
+            "outputs": [[0, 1]]
+          }
+        ],
+        "frames": 27
+      },
+      "filesystem_expect": {
+        "case-sensitive": {
+          "error": "missing-asset"
+        }
+      },
+      "portable_paths_warnings": ["case-mismatch"]
     },
     {
       "id": "list-cycle",
@@ -1203,6 +1273,31 @@
       "filter": "room.cfg",
       "input": {
         "rate": 48000,
+        "channels": 1,
+        "frames": 4
+      },
+      "expect": {
+        "error": "invalid"
+      }
+    },
+    {
+      "id": "pre-3.0-format",
+      "label": "spec-derived",
+      "evidence": "docs/historical/convolver-4.4/config.html",
+      "description": "The format before version 3.0 had no delay lines (as in the bundled convolver/configs samples). It is rejected with a diagnostic saying which lines to add.",
+      "files": {
+        "ir.wav": {
+          "rate": 44100,
+          "format": "float",
+          "channels": [[1.0]]
+        },
+        "room.cfg": {
+          "text": "44100 1 1 0\nir.wav\n0\n0.0\n0.0\n"
+        }
+      },
+      "filter": "room.cfg",
+      "input": {
+        "rate": 44100,
         "channels": 1,
         "frames": 4
       },

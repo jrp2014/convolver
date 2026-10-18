@@ -100,6 +100,19 @@ def main():
         p = call(['--inspect', str(d / 'room.cfg')], 0)
         assert b'latency 256 frames, tail 26 frames' in p.stdout
 
+        # Profiles add warnings; only --warnings-as-errors makes them fail.
+        (d / 'abs.cfg').write_text('48000 1 1 0\n0\n0\n%s\n0\n0\n0\n' %
+                                   (d / 'ir.wav').resolve().as_posix())
+        p = call(['--validate', str(d / 'abs.cfg'), '--profile', 'portable-paths'], 0)
+        assert b'[absolute-reference]' in p.stderr and p.stdout.startswith(b'valid: ')
+        assert not call(['--validate', str(d / 'abs.cfg')], 0).stderr
+        r = report(['--validate', str(d / 'abs.cfg'), '--profile', 'portable-paths',
+                    '--warnings-as-errors'], 1)
+        assert r['warnings_as_errors'] and r['profile'] == 'portable-paths'
+        assert [x['severity'] for x in r['diagnostics']] == ['warning']
+        call(['--validate', str(d / 'abs.cfg'), '--warnings-as-errors'], 0)
+        (d / 'abs.cfg').unlink()
+
         # Usage errors exit 2 without a report.
         cfg = str(d / 'room.cfg')
         for args in (['--inspect', cfg, '--validate', cfg], ['--inspect'],
@@ -138,6 +151,11 @@ def main():
 
         # No output, wisdom or other files were created.
         assert sorted(d.rglob('*')) == before, set(d.rglob('*')) ^ set(before)
+    # Bundled pre-portable samples are diagnosed (exit 1), never crash or pass.
+    samples = Path(__file__).resolve().parents[2] / 'convolver' / 'configs'
+    for sample in sorted(samples.rglob('*.txt')):
+        p = call(['--validate', str(sample), '--all-configurations', '--json'], 1)
+        assert json.loads(p.stdout)['diagnostics'], sample
     print('PASS: inspection CLI modes, exit codes, JSON escaping and determinism')
 
 

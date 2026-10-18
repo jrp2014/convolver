@@ -211,6 +211,68 @@ void run(const fs::path& dir) {
         require(report.valid && report.configurations[0].paths[0].reference == odd_text,
                 "Unicode reference spelling");
     }
+    // Profiles: portable-paths adds warnings only; it never changes validity of errors.
+    {
+        fs::create_directory(dir / "pack");
+        fs::create_directory(dir / "pack" / "irs");
+        wave(dir / "pack" / "irs" / "a.wav", 48000, 1, {1, .5f});
+        const auto absolute = fs::absolute(dir / "pack" / "irs" / "a.wav").generic_u8string();
+        text_file(dir / "pack" / "abs.cfg", "48000 1 1 0\n0\n0\n" +
+                                                std::string(absolute.begin(), absolute.end()) +
+                                                "\n0\n0\n0\n");
+        text_file(dir / "pack" / "mixed.cfg", "48000 1 1 0\n0\n0\nirs\\./a.wav\n0\n0\n0\n");
+        text_file(dir / "pack" / "up.cfg", "48000 1 1 0\n0\n0\n../long.wav\n0\n0\n0\n");
+        text_file(dir / "pack" / "gone.cfg", "48000 1 1 0\n0\n0\nirs/none.wav\n0\n0\n0\n");
+        InspectionOptions native, portable;
+        portable.profile = InspectionProfile::portable_paths;
+        auto warnings = [](const InspectionReport& r) {
+            std::vector<std::string> codes;
+            for (const auto& d : r.diagnostics)
+                if (d.severity == DiagnosticSeverity::warning)
+                    codes.push_back(d.code);
+            return codes;
+        };
+        const auto abs_native = inspect_configuration(dir / "pack" / "abs.cfg", native);
+        const auto abs_portable = inspect_configuration(dir / "pack" / "abs.cfg", portable);
+        require(abs_native.valid && abs_native.diagnostics.empty(), "native absolute path valid");
+        require(abs_portable.valid &&
+                    warnings(abs_portable) == std::vector<std::string>{"absolute-reference"} &&
+                    abs_portable.diagnostics[0].location.line == 4,
+                "absolute path is a located warning under portable-paths");
+        const auto mixed = inspect_configuration(dir / "pack" / "mixed.cfg", portable);
+        require(mixed.valid && mixed.diagnostics.empty(),
+                "existing relative mixed-separator path needs no warning");
+        const auto up = inspect_configuration(dir / "pack" / "up.cfg", portable);
+        require(up.valid && warnings(up) == std::vector<std::string>{"outside-tree"} &&
+                    inspect_configuration(dir / "pack" / "up.cfg", native).diagnostics.empty(),
+                "'..' outside the configuration folder is a packaging warning only");
+        for (const auto& options : {native, portable}) {
+            const auto gone = inspect_configuration(dir / "pack" / "gone.cfg", options);
+            require(!gone.valid && has_code(gone, "missing-asset"),
+                    "missing IR is an error under either profile");
+        }
+        auto syntax = portable;
+        syntax.syntax_only = true;
+        require(warnings(inspect_configuration(dir / "pack" / "abs.cfg", syntax)) ==
+                    std::vector<std::string>{"absolute-reference"},
+                "syntax-only applies the profile");
+#ifndef _WIN32
+        wave(dir / "pack" / "a?b.wav", 48000, 1, {1});
+        text_file(dir / "pack" / "q.cfg", "48000 1 1 0\n0\n0\na?b.wav\n0\n0\n0\n");
+        require(warnings(inspect_configuration(dir / "pack" / "q.cfg", portable)) ==
+                    std::vector<std::string>{"windows-invalid-name"},
+                "names Windows cannot store are warned about");
+#endif
+        text_file(dir / "pack" / "case.cfg", "48000 1 1 0\n0\n0\nIRS/A.wav\n0\n0\n0\n");
+        const auto cased = inspect_configuration(dir / "pack" / "case.cfg", portable);
+        require(warnings(cased) == std::vector<std::string>{"case-mismatch"},
+                "case differences from the stored names are warned about on every filesystem");
+        text_file(dir / "pack" / "list.txt", "C.CFG\nabs.cfg\n");
+        text_file(dir / "pack" / "c.cfg", "48000 1 1 0\n0\n0\nirs/a.wav\n0\n0\n0\n");
+        const auto list = inspect_configuration(dir / "pack" / "list.txt", portable);
+        require(has_code(list, "case-mismatch"), "list entries are checked too");
+        fs::remove_all(dir / "pack");
+    }
     // Inspection never plans FFTs or creates files.
     if (fft_supports_wisdom())
         require(export_fft_wisdom() == wisdom, "inspection changed FFTW wisdom");

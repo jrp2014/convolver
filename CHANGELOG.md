@@ -18,6 +18,13 @@ Until 1.0 the C++ API may change between minor versions.
   `--input-channels` and `--warnings-as-errors`.
 - `convolver::inspect_configuration` (`convolver/inspection.hpp`, in
   `Convolver::io`) and `convolver::analyze_configuration` (core).
+- `--profile portable-paths` (`InspectionProfile::portable_paths`): warnings
+  for absolute references, references leaving the configuration's folder,
+  letter-case differences from the names on disk, and names Windows cannot
+  store. `docs/configuration-compatibility.md` records the evidence for each
+  accepted feature and what is known about other readers of the format.
+- A diagnostic for configurations in the format before 3.0 (no delay lines)
+  that says which lines to add.
 
 ### Changed
 - Configuration errors report the file, physical line and column, and the

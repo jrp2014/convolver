@@ -83,6 +83,12 @@ int main() {
                 "incomplete second path points at its first line");
         located("48000 1 1 0\n0\n0\nir.wav\n256\n0\n0\n", 5, 1, "IR channel limit");
         located("48000 1 1 0 x\n0\n0\nir.wav\n0\n0\n0\n", 1, 1, "header field count");
+        located("44100 2 2 0\nD:\\media\\center.pcm\n0\n0.0\n0.0\n", 2, 1,
+                "pre-3.0 configuration without delay lines");
+        require(std::string(rejected("44100 2 2 0\nir.wav\n0\n0\n0\n").what())
+                        .find("pre-3.0 configuration without delay lines: insert a line of 2 "
+                              "zeros") != std::string::npos,
+                "pre-3.0 diagnostic says what to add");
         require(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").code() == "syntax", "code");
         require(std::string(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").what()) ==
                     "invalid configuration: t.cfg:6:1: route channel out of range: 2 (1 "
