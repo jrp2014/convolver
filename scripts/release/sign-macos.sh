@@ -28,7 +28,7 @@ codesign --force --options runtime --timestamp --sign "$CONVOLVER_APPLICATION_ID
 codesign --verify --deep --strict "$bundle"
 codesign --verify --strict "$stage/bin/convolver-vst3-preset"
 python3 "$script_dir/installers.py" --stage "$stage" --output "$work" --system Darwin
-version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/packaging/release-policy.json")
+version=$(cat "$repo/VERSION")
 pkgbuild --root "$work/plugin-payload" --component-plist "$work/component.plist" \
     --identifier org.convolver.pkg.vst3 --version "$version" \
     --install-location /Library/Audio/Plug-Ins/VST3 "$work/Convolver-vst3.pkg"

@@ -1,6 +1,6 @@
 # Build the VST3 plug-in
 
-These are developer builds of portable Convolver 0.2.0. Supported operating-system
+These are developer builds of portable Convolver. Supported operating-system
 floors and DAW combinations have not yet been qualified for production.
 
 Use CMake 3.25+, a C++20 compiler and Ninja (or a Visual Studio generator).

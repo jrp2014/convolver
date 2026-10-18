@@ -17,7 +17,10 @@ def assemble(policy_path, cache, output, fetch=False, revision='HEAD'):
     policy = load_policy(policy_path)
     commit = subprocess.check_output(['git', '-C', str(root), 'rev-parse', revision + '^{commit}'], text=True).strip()
     tracked_policy = subprocess.check_output(['git', '-C', str(root), 'show', commit + ':packaging/release-policy.json'])
-    if json.loads(tracked_policy) != policy:
+    committed_policy = json.loads(tracked_policy)
+    committed_policy['version'] = subprocess.check_output(
+        ['git', '-C', str(root), 'show', commit + ':VERSION'], text=True).strip()
+    if committed_policy != policy:
         raise ValueError('policy differs from the requested source commit; commit the policy first')
     if output.exists():
         raise ValueError('source archive output already exists')

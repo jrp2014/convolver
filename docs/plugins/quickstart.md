@@ -1,6 +1,6 @@
 # First audible output
 
-Convolver 0.2.0 developer preview needs a VST3 host. Installing a plug-in does
+Convolver developer preview needs a VST3 host. Installing a plug-in does
 not add convolution to an ordinary player or route system audio automatically.
 No commercial host is currently qualified; use the host's normal VST3 preset loader.
 

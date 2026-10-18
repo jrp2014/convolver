@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "convolver_version.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/main/pluginfactory.h"
 using namespace Steinberg;

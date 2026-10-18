@@ -7,10 +7,16 @@ release notes are archived in [docs/historical](docs/historical).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Until 1.0 the C++ API may change between minor versions.
 
-## Unreleased
+## [Unreleased]
 
-- Add a pinned VST3 distribution policy, explicit source-build checks and a release preset.
-  Platform floors and named hosts remain unverified; portable package version stays 0.2.0.
+### Added
+
+- Pinned VST3 preview distributions, corresponding source, synthetic presets,
+  installer templates and read-only candidate CI. Production qualification remains incomplete.
+- Automatic patch versions and annotated source tags on `main`, with one
+  `VERSION` file shared by the CMake package, CLI and VST3 bundle.
+- CLI and VST3 factory build identification including the Git revision and a
+  marker for uncommitted changes. See [source versioning](docs/versioning.md).
 
 ## [0.2.0] - 2026-10-18
 
@@ -50,4 +56,5 @@ Until 1.0 the C++ API may change between minor versions.
   documentation and config paths.
 
 [0.2.0]: https://github.com/jrp2014/convolver/compare/82cf94b...v0.2.0
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/jrp2014/convolver/commit/82cf94b

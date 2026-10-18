@@ -17,7 +17,7 @@ class PolicyTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('contract', script)
         cls.contract = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.contract)
-        cls.policy = json.loads((ROOT / 'packaging/release-policy.json').read_text())
+        cls.policy = cls.contract.load_policy(ROOT / 'packaging/release-policy.json')
 
     def test_repository_policy(self):
         self.contract.validate_policy(self.policy, ROOT)

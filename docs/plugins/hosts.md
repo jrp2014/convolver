@@ -1,6 +1,6 @@
 # Host qualification
 
-No named DAW is currently qualified for portable Convolver 0.2.0. Automated SDK
+No named DAW is currently qualified for portable Convolver. Automated SDK
 validation, standalone adapter tests and manual DAW tests are different evidence.
 REAPER on Windows/macOS/Linux is the proposed first smoke host. Ableton Live and
 Cubase need available licences/testers; no compatibility claim is inferred.

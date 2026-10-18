@@ -17,7 +17,9 @@ def sha256(path):
 def load_policy(path):
     path = Path(path)
     policy = json.loads(path.read_text(encoding='utf-8'))
-    validate_policy(policy, path.resolve().parents[1])
+    source = path.resolve().parents[1]
+    policy['version'] = (source / 'VERSION').read_text(encoding='utf-8').strip()
+    validate_policy(policy, source)
     return policy
 
 
@@ -27,9 +29,9 @@ def validate_policy(policy, source=None):
     if not re.fullmatch(r'\d+\.\d+\.\d+', policy.get('version', '')):
         raise ValueError('invalid version')
     if source:
-        match = re.search(r'project\(Convolver VERSION ([\d.]+)', (Path(source) / 'CMakeLists.txt').read_text())
-        if not match or match[1] != policy['version']:
-            raise ValueError('policy version conflicts with CMake project version')
+        version = (Path(source) / 'VERSION').read_text(encoding='utf-8').strip()
+        if version != policy['version']:
+            raise ValueError('policy version conflicts with VERSION')
     if not re.fullmatch(r'[0-9a-f]{40}', policy.get('base_commit', '')):
         raise ValueError('base_commit must be an immutable revision')
     required = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk', 'fftw', 'libsndfile'}

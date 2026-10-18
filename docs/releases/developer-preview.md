@@ -1,4 +1,4 @@
-# Portable 0.2.0 developer-preview release record
+# Portable developer-preview release record
 
 Author: jrp. Started 18 October 2026. This records implementation and unfulfilled
 qualification gates; it is not a production release announcement.
@@ -63,3 +63,11 @@ See upstream [FFTW terms](https://www.fftw.org/faq/section1.html#isfftwfree),
 [libsndfile licence](https://libsndfile.github.io/libsndfile/),
 [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
 and [Microsoft SignTool](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool).
+
+## Candidate workflow
+
+The candidate workflow downloads checksum-pinned dependencies, builds and tests
+four native platforms, and uploads unsigned preview artifacts with corresponding
+source. It has read-only repository permissions and cannot publish releases.
+Version numbers come from the same root `VERSION` file as the portable package.
+No production release or merge into `main` is part of this work.

@@ -1,6 +1,5 @@
 {
   "schema": 1,
-  "version": "0.2.0",
   "channel": "developer-preview",
   "base_commit": "0bf77d003870bba9a72244f68efa9eb288010d7b",
   "dependencies": {

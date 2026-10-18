@@ -1,0 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#pragma once
+
+#define CONVOLVER_VERSION_STRING "@CONVOLVER_BUILD_VERSION@"

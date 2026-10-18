@@ -1,6 +1,6 @@
 # Convolver plug-ins
 
-Portable Convolver **0.2.0** applies FIR filters to a continuous audio stream.
+Portable Convolver applies FIR filters to a continuous audio stream.
 The current VST3 build is a developer preview. Production downloads, minimum-OS
 qualification and named-host certification are not yet available.
 

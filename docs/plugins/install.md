@@ -1,6 +1,6 @@
 # Install a developer preview
 
-Portable Convolver 0.2.0 archives contain `VST3/Convolver.vst3`, `bin/`, `presets/`,
+Portable Convolver archives contain `VST3/Convolver.vst3`, `bin/`, `presets/`,
 `docs/` and `licenses/`. Keep the complete VST3 bundle. These are unsigned developer
 previews, with no production OS/host qualification or published release yet.
 
