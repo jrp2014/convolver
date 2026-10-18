@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Release policy rejects ambiguous or incomplete candidate contracts."""
 import copy
 import importlib.util

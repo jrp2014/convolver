@@ -70,3 +70,13 @@ if(CONVOLVER_BUILD_IO)
         add_dependencies(check convolver_vst3_preset)
     endif()
 endif()
+
+if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
+    add_executable(convolver_vst3_package_probe "${PROJECT_SOURCE_DIR}/tests/vst3/package_probe.cpp"
+        processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+    target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+    target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting)
+    if(APPLE)
+        target_link_libraries(convolver_vst3_package_probe PRIVATE "-framework Cocoa")
+    endif()
+endif()

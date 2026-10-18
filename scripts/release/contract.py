@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Shared release contracts. No third-party Python packages are required."""
 import hashlib
 import json

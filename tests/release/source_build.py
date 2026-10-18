@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Build a supplied source tree in a fresh directory; never fetch implicitly."""
 import argparse
 from pathlib import Path
