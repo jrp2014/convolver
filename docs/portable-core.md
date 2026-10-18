@@ -104,20 +104,26 @@ Targets: `convolver_core`, `convolver_io`, `convolver_cli` (executable name
 `convolver`). `cmake --build build-native --target check` builds native tests and
 runs CTest. `cmake --install build-native --prefix /desired/prefix` installs the
 CLI, libraries and headers. Libraries can also be consumed with `add_subdirectory`
-and linked through their CMake target names. Installed CMake package exports and
-self-contained binary bundles are not supplied yet. Shared dependencies must
-remain installed; this is not a redistributable app bundle.
+through `Convolver::core` and `Convolver::io`. Installed CMake package exports,
+component selection and presets are described in [the package guide](cmake-package.md).
+The libraries are static; shared dependencies must remain installed. This is not
+a self-contained redistributable app bundle.
 
 Build options:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `CONVOLVER_BUILD_NATIVE` | ON | Core, I/O and CLI; requires real dependencies |
+| `CONVOLVER_BUILD_NATIVE` | ON | Enable portable targets; OFF retains regression-only mode |
+| `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
+| `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
 | `CONVOLVER_FFT_BACKEND` | FFTW | FFTW or ACCELERATE (Apple only) |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
-| `BUILD_TESTING` | ON | Native tests and documentation checks; requires Python 3.8+ |
+| `BUILD_TESTING` | ON at top level | Master test switch |
+| `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
+| `CONVOLVER_PACKAGE_TESTS` | ON | Installed/relocated and source-tree C++ consumer tests |
+| `CONVOLVER_DOCUMENTATION_TESTS` | Same as I/O on first configure | Historical documentation checks; requires Python |
 | `CONVOLVER_SANITIZERS` | OFF | ASan/UBSan instrumentation of native targets with GCC/Clang |
-| `CONVOLVER_LEGACY_TESTS` | ON for native Clang on macOS/Linux; OFF elsewhere | Existing sanitized extraction harnesses |
+| `CONVOLVER_LEGACY_TESTS` | ON with I/O and native Clang on macOS/Linux; OFF elsewhere | Existing sanitized extraction harnesses |
 
 ## File rendering
 
@@ -190,8 +196,12 @@ unit magnitude, and `-0` means inverted channel zero. Delays use the historical
 float parsing and truncation from milliseconds to integer frames.
 
 Relative paths resolve beside the configuration/list that contains them, not
-from the process working directory. Text paths use UTF-8. Absolute paths remain
-platform-specific; archived Windows paths need adapting on macOS/Linux. Unequal
+from the process working directory. Text paths use UTF-8. References in configs
+and lists accept both `/` and Windows `\` separators, including mixed paths.
+Windows drive-letter, drive-relative and backslash-rooted/UNC paths require
+conversion to relative paths on macOS/Linux and produce an explicit diagnostic;
+no drive or network-share mapping is guessed. Native absolute paths remain
+platform-specific. Unequal
 IR lengths are a supported extension; each path is independently zero-padded,
 and the longest connected route determines the tail.
 

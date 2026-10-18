@@ -9,7 +9,10 @@
 #include <vector>
 
 namespace convolver {
-struct Route { std::size_t channel; float gain = 1; };
+struct Route {
+    std::size_t channel;
+    float gain = 1;
+};
 struct FilterPath {
     std::vector<float> impulse;
     std::vector<Route> inputs, outputs;
@@ -21,6 +24,11 @@ struct Configuration {
     std::vector<std::size_t> input_delays, output_delays;
     std::vector<FilterPath> paths;
 };
+
+// Validate dimensions, coefficients and prepared-storage limits without FFT planning.
+void validate_configuration(const Configuration&, std::size_t block_frames = 256);
+// Validate and return FIR/routing support, excluding latency, without FFT planning.
+std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
 
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;
@@ -44,7 +52,7 @@ void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
 // Construction/destruction must be outside processing and are serialized for
 // FFTW planning. Each instance has independent processing state.
 class Engine {
-public:
+  public:
     explicit Engine(const Configuration&, std::size_t block_frames = 256, FftOptions = {});
     ~Engine();
     Engine(Engine&&) noexcept;
@@ -60,10 +68,10 @@ public:
     // Exact interleaved frame counts; empty input means silence (drain).
     // Nonempty spans must contain at least frames * channels samples.
     // Input and output must not overlap. No allocation/planning in processing.
-    void process(std::span<const float> input, std::span<float> output,
-                 std::size_t frames);
-private:
+    void process(std::span<const float> input, std::span<float> output, std::size_t frames);
+
+  private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
-}
+} // namespace convolver
