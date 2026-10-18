@@ -3,6 +3,15 @@ set(CONVOLVER_VST3_SDK "" CACHE PATH "VST3 SDK 3.8.1 source directory with submo
 if(NOT EXISTS "${CONVOLVER_VST3_SDK}/public.sdk/source/vst/vstaudioeffect.h")
     message(FATAL_ERROR "Set CONVOLVER_VST3_SDK to SDK 3.8.1 with base/cmake/pluginterfaces/public.sdk submodules")
 endif()
+# The SDK's Windows host tools use LoadLibraryW, which does not search the
+# plug-in's directory for dependent DLLs. Keep the plug-in independent of the
+# host executable's DLL search path; retain the ordinary dynamic MSVC runtime.
+if(WIN32 AND TARGET FFTW3::fftw3f)
+    get_target_property(fftw_type FFTW3::fftw3f TYPE)
+    if(fftw_type STREQUAL "SHARED_LIBRARY")
+        message(FATAL_ERROR "Windows VST3 builds need static FFTW; use vcpkg's x64-windows-static-md triplet")
+    endif()
+endif()
 set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "" FORCE)
 set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "" FORCE)

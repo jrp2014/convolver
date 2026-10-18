@@ -44,6 +44,12 @@ Local FFTW and Accelerate sanitizer gates and a ThreadSanitizer host run passed.
 Actual module loading on this Mac is blocked by system policy rejecting ad-hoc
 signatures; do not bypass it. CI must validate the loadable bundle on all three OSes.
 
+Independent final review found no remaining important issues. Linux and macOS
+CI passed the actual SDK validator. Initial Windows CI compiled the plug-in but
+failed module loading because SDK LoadLibraryW did not search its directory for
+FFTW's DLL. The Windows plug-in recipe now uses static-md dependencies; ordinary
+core/CLI CI continues testing dynamic Windows libraries.
+
 Preset-first workflow confirmed by user. Compatibility
 before speed confirmed; particular DAWs not specified. SDK test results must not
 be described as actual commercial-DAW validation.

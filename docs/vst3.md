@@ -20,7 +20,18 @@ cmake --build build-vst3 --config Release --parallel 2
 ctest --test-dir build-vst3 -C Release --output-on-failure
 ```
 
-On Windows, add the vcpkg toolchain/triplet as in the portable guide. On Apple,
+On Windows, use static libraries with the dynamic MSVC runtime so the plug-in
+can load independently of the DAW's DLL search path:
+
+```powershell
+vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
+cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON `
+  -DCONVOLVER_VST3_SDK=C:/path/to/vst3sdk `
+  "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+```
+
+Use a fresh build directory when changing triplets. On Apple,
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` removes the plug-in's FFTW dependency.
 The preset-writing tool still needs libsndfile. Core-only plug-in builds can
 turn I/O and CLI off; the preset writer is then omitted.
