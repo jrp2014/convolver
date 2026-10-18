@@ -57,6 +57,7 @@ be described as actual commercial-DAW validation.
 ## Completed validation
 
 Commit `5bcbef3` passed all seven CI jobs before publishing main:
+
 - [Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/39085968706): Linux Clang/GCC, Windows MSVC and macOS; package consumers, sanitizers, format/tidy and backend equivalence.
 - [VST3 compatibility](https://github.com/jrp2014/convolver/actions/runs/39085968819): Linux, Windows and macOS, each loading the actual bundle with the SDK validator and checking the embedded preset workflow.
 

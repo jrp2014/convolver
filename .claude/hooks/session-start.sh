@@ -12,8 +12,8 @@ fi
 ver=$(clang++ --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1)
 ver=${ver:-18}
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
-pkgs="cmake libfftw3-dev libsndfile1-dev libclang-rt-${ver}-dev clang-format-18 clang-tidy-18"
-$SUDO apt-get install -y $pkgs >/dev/null 2>&1 || {
+pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18)
+$SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1 || {
   $SUDO apt-get update -qq >/dev/null 2>&1
-  $SUDO apt-get install -y $pkgs >/dev/null 2>&1
-} || echo "Could not install: $pkgs; the CMake build or sanitizer tests may fail." >&2
+  $SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1
+} || echo "Could not install: ${pkgs[*]}; the CMake build or sanitizer tests may fail." >&2
