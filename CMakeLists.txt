@@ -177,6 +177,10 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME native.fft_planning COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/fft_planning_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.fft_planning PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        add_test(NAME compatibility.corpus COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
+            "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(compatibility.corpus PROPERTIES LABELS "compatibility;real-libraries;cli" TIMEOUT 300)
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)

@@ -11,9 +11,10 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **17 suites**: seven native suites, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to nine
-native/package/documentation suites; the old extraction adapters require Clang.
+With Clang on macOS/Linux this runs **18 suites**: seven native suites, the
+configuration compatibility corpus, one package-consumer suite and the
+nine historical/documentation suites below. GCC and MSVC default to ten
+native/compatibility/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
@@ -29,6 +30,10 @@ native/package/documentation suites; the old extraction adapters require Clang.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+- `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
+  rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
+  independent direct-convolution reference: routes, signed zero, delays, BOM/CRLF,
+  relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
 - `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
   CLI processes against direct convolution, missing-plan failure before output
   creation, malformed/oversized caches, Unicode filenames and source protection;
