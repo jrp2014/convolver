@@ -12,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-
 namespace convolver::cli {
 namespace {
 constexpr auto usage = R"(Usage: convolver --inspect CONFIG [options]
