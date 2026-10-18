@@ -43,7 +43,7 @@ def call(args, ok=True, data=None):
 def main():
     call(['--help'])
     version = call(['--version']).stdout
-    assert re.match(rb'Convolver portable [0-9]+\.[0-9]+\.[0-9]+(?:\+g[0-9a-f]+(?:\.dirty)?)?\n', version), version
+    assert re.fullmatch(rb'Convolver portable [0-9]+\.[0-9]+\.[0-9]+(?:\+g[0-9a-f]+(?:\.dirty)?)?', version.splitlines()[0]), version
     assert b'FFT backend:' in version
     with tempfile.TemporaryDirectory(prefix='convolver-cli-') as t:
         d=Path(t); src=d/'entrée.wav'; ir=d/'ir.wav'; dst=d/'sortie ü.wav'

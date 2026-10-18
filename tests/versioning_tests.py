@@ -157,7 +157,9 @@ class VersioningTests(GitFixture):
         self.git("push", "origin", "main")
         source = self.git("rev-parse", "HEAD")
         hook = remote / "hooks/update"
-        hook.write_text('#!/bin/sh\n[ "$1" != "refs/heads/main" ]\n', encoding="utf-8")
+        # Git for Windows runs hooks with sh, which also needs an LF shebang.
+        with hook.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write('#!/bin/sh\n[ "$1" != "refs/heads/main" ]\n')
         hook.chmod(0o755)
         self.run_version("--push", ok=False)
         self.assertIn(source, self.git("ls-remote", "origin", "refs/heads/main"))
