@@ -7,6 +7,7 @@ IR samples). The CLI is never used to produce expectations.
 
 Usage: run_corpus.py CONVOLVER_EXE [CASE_ID ...]
 """
+import json
 import math
 import os
 from pathlib import Path
@@ -110,6 +111,45 @@ def run(exe, args, cwd, data=None, chunk=None):
         return subprocess.CompletedProcess(p.args, p.returncode, out, err)
 
 
+def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
+    """The inspection report must describe the same graph the render produced."""
+    spec = case['input']
+    p = run(exe, ['--inspect', filter_arg, '--json', '--sample-rate', str(spec['rate']),
+                  '--input-channels', str(spec['channels']), '--block-size', str(block)], cwd)
+    report = json.loads(p.stdout.decode('utf-8'))
+    cid, expect = case['id'], case['expect']
+    assert report['schema_version'] == 1, cid
+    if 'error' in expect:
+        codes = manifest['error_codes'][expect['error']]
+        assert p.returncode == 1 and not report['valid'], '%s: inspection accepted it' % cid
+        found = [d['code'] for d in report['diagnostics'] if d['severity'] == 'error']
+        assert found and found[0] in codes, '%s: diagnostic codes %r, expected one of %r' % (
+            cid, found, codes)
+        return
+    assert p.returncode == 0 and report['valid'], '%s: %s' % (cid, report['diagnostics'])
+    selected = report['selection']['selected']
+    assert (cwd / selected).resolve() == (root / expect['selected']).resolve(), (cid, selected)
+    leaf = report['configurations'][0]
+    assert leaf['coefficients_verified'], cid
+    assert leaf['output_channels'] == expect['output_channels'], cid
+    assert leaf['channel_mask'] == expect.get('channel_mask', 0), cid
+    assert [d['frames'] for d in leaf['input_delays']] == expect['input_delays'], cid
+    assert [d['frames'] for d in leaf['output_delays']] == expect['output_delays'], cid
+    assert len(leaf['paths']) == len(expect['paths']), cid
+    for got, want in zip(leaf['paths'], expect['paths']):
+        assert got['ir']['channel'] == want['channel'], cid
+        for side in ('inputs', 'outputs'):
+            routes = [[r['channel'], r['gain']] for r in got[side]]
+            assert len(routes) == len(want[side]) and all(
+                a[0] == b[0] and abs(a[1] - b[1]) < 1e-6 for a, b in zip(routes, want[side])), (
+                cid, side, routes)
+    timing = leaf['timing']
+    assert timing['latency_frames'] == block, cid
+    assert timing['tail_frames'] == expect['frames'] - spec['frames'], (
+        '%s: inspected tail %d, rendered tail %d' % (cid, timing['tail_frames'],
+                                                     expect['frames'] - spec['frames']))
+
+
 def check_case(exe, manifest, case, root):
     if PLATFORM not in case.get('only', [PLATFORM]):
         return 'skipped (%s)' % PLATFORM
@@ -133,6 +173,7 @@ def check_case(exe, manifest, case, root):
         assert re.search(pattern, stderr), '%s: diagnostic %r does not match %r' % (
             case['id'], stderr, pattern)
         assert not output.exists(), '%s: failed render created output' % case['id']
+        inspect(exe, case, root, filter_arg, cwd, manifest)
         return 'diagnosed ' + expect['error']
     expected = reference(case, inputs)
     defaults = manifest['defaults']
@@ -164,7 +205,8 @@ def check_case(exe, manifest, case, root):
             compare('%s block %d %s' % (case['id'], block, mode), actual, expected,
                     expect['frames'], offset)
             runs += 1
-    return 'rendered %d ways' % runs
+    inspect(exe, case, root, filter_arg, cwd, manifest)
+    return 'rendered %d ways, inspected' % runs
 
 
 def main(argv):

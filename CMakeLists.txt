@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Convolver VERSION 0.2.0 LANGUAGES CXX)
+project(Convolver VERSION 0.3.0 LANGUAGES CXX)
 
 include(CMakeDependentOption)
 include(GNUInstallDirs)
@@ -70,18 +70,21 @@ if(CONVOLVER_BUILD_NATIVE)
     set(native_targets convolver_core convolver_host)
     if(CONVOLVER_BUILD_IO)
         find_package(ConvolverSndFile REQUIRED)
-        add_library(convolver_io STATIC portable/io.cpp portable/config.cpp portable/config_parse.cpp)
+        add_library(convolver_io STATIC portable/io.cpp portable/config.cpp portable/config_parse.cpp
+            portable/inspection.cpp)
         add_library(Convolver::io ALIAS convolver_io)
         set_target_properties(convolver_io PROPERTIES EXPORT_NAME io)
         target_include_directories(convolver_io PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
         target_compile_features(convolver_io PUBLIC cxx_std_20)
-        target_link_libraries(convolver_io PRIVATE SndFile::sndfile)
+        # Inspection reports the engine's own latency/tail/storage analysis.
+        target_link_libraries(convolver_io PUBLIC Convolver::core PRIVATE SndFile::sndfile)
         list(APPEND native_targets convolver_io)
     endif()
     if(CONVOLVER_BUILD_CLI)
-        add_executable(convolver_cli portable/main.cpp)
+        add_executable(convolver_cli portable/main.cpp portable/inspection_cli.cpp)
+        target_compile_definitions(convolver_cli PRIVATE CONVOLVER_VERSION="${PROJECT_VERSION}")
         set_target_properties(convolver_cli PROPERTIES OUTPUT_NAME convolver)
         if(MINGW)
             target_link_options(convolver_cli PRIVATE -municode)
@@ -118,8 +121,12 @@ if(CONVOLVER_BUILD_NATIVE)
             target_include_directories(convolver_config_parse_tests PRIVATE portable)
             target_link_libraries(convolver_config_parse_tests PRIVATE convolver_io)
             add_test(NAME native.config_parse COMMAND convolver_config_parse_tests)
-            list(APPEND native_tests native.io native.config_parse)
-            list(APPEND test_targets convolver_io_tests convolver_config_parse_tests)
+            add_executable(convolver_inspection_tests tests/native/inspection_tests.cpp)
+            target_link_libraries(convolver_inspection_tests PRIVATE convolver_io)
+            add_test(NAME native.inspection COMMAND convolver_inspection_tests)
+            list(APPEND native_tests native.io native.config_parse native.inspection)
+            list(APPEND test_targets convolver_io_tests convolver_config_parse_tests
+                convolver_inspection_tests)
         endif()
         set_tests_properties(${native_tests} PROPERTIES LABELS "native;real-libraries" TIMEOUT 120)
         list(APPEND native_targets ${test_targets})
@@ -155,7 +162,8 @@ if(CONVOLVER_BUILD_NATIVE)
         install(TARGETS convolver_io EXPORT ConvolverIOTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
         install(EXPORT ConvolverIOTargets NAMESPACE Convolver:: DESTINATION ${package_dir})
-        install(FILES include/convolver/io.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
+        install(FILES include/convolver/io.hpp include/convolver/inspection.hpp
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
     endif()
     if(CONVOLVER_BUILD_CLI)
         install(TARGETS convolver_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -181,6 +189,9 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME native.fft_planning COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/fft_planning_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.fft_planning PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        add_test(NAME native.inspection_cli COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/inspection_cli_tests.py" "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(native.inspection_cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
         add_test(NAME compatibility.corpus COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
             "$<TARGET_FILE:convolver_cli>")

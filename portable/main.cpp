@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
+#include "inspection_cli.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -26,6 +27,7 @@ namespace {
 constexpr auto help = R"(Convolver portable CLI
 Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
        convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
+       convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
   --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
@@ -133,6 +135,8 @@ void write_new_wisdom(const std::filesystem::path& path, const std::string& text
 }
 } // namespace
 int run(int argc, char** argv) {
+    if (convolver::cli::is_inspection(argc, argv))
+        return convolver::cli::run_inspection(argc, argv);
     try {
 #ifdef SIGPIPE
         std::signal(SIGPIPE, SIG_IGN); // Surface closed consumers as I/O failures.

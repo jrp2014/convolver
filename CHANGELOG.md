@@ -13,11 +13,18 @@ Until 1.0 the C++ API may change between minor versions.
 - Configuration compatibility corpus (`tests/compatibility/`): generated
   fixtures rendered through the CLI and checked against an independent
   direct-convolution reference at several block sizes and both latency modes.
+- `convolver --inspect` and `convolver --validate`, with `--json` (report
+  schema 1), `--syntax-only`, `--all-configurations`, `--sample-rate`,
+  `--input-channels` and `--warnings-as-errors`.
+- `convolver::inspect_configuration` (`convolver/inspection.hpp`, in
+  `Convolver::io`) and `convolver::analyze_configuration` (core).
 
 ### Changed
 - Configuration errors report the file, physical line and column, and the
   chain of enclosing lists. Rejected Windows drive, UNC and rooted paths name
   an existing relative replacement when one is found beside the configuration.
+- `Convolver::io` now links `Convolver::core`. The package version is 0.3.0;
+  consumers ask for `find_package(Convolver 0.3 ...)`.
 - The configuration parser is separated from list resolution and IR decoding
   (`portable/config_parse.*`, private). Accepted configurations, selection and
   rendered audio are unchanged.

@@ -11,9 +11,9 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **19 suites**: eight native suites, the
+With Clang on macOS/Linux this runs **21 suites**: ten native suites, the
 configuration compatibility corpus, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to eleven
+nine historical/documentation suites below. GCC and MSVC default to thirteen
 native/compatibility/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
@@ -34,9 +34,18 @@ native/compatibility/package/documentation suites; the old extraction adapters r
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+- `native.inspection`: the inspection API's selection traversal, located and
+  chained diagnostics, syntax-only null fields, all-entry validation after
+  failures, and agreement of `analyze_configuration` with Engine latency/tail at
+  odd block sizes; it also checks that inspection changes no FFTW wisdom and
+  creates no files.
+- `native.inspection_cli`: `--inspect`/`--validate` modes, exit codes 0/1/2,
+  rejected render options, deterministic JSON, escaping of quotes, backslashes,
+  tabs and Unicode in names, and invalid UTF-8 filenames on Linux.
 - `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
-  independent direct-convolution reference: routes, signed zero, delays, BOM/CRLF,
+  independent direct-convolution reference, then inspected to check the reported
+  selection, routes, delays and tail against the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
 - `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
   CLI processes against direct convolution, missing-plan failure before output

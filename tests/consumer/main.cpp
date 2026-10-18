@@ -4,6 +4,7 @@
 #endif
 #include <convolver/engine.hpp>
 #ifdef CONSUMER_IO
+#include <convolver/inspection.hpp>
 #include <convolver/io.hpp>
 #include <filesystem>
 #endif
@@ -31,6 +32,9 @@ int main() {
         writer.write(h);
         writer.close();
         c = convolver::load_configuration(path, 48000, 1);
+        const auto report = convolver::inspect_configuration(path);
+        if (!report.valid || report.configurations.at(0).analysis->tail_frames != h.size() - 1)
+            throw std::runtime_error("installed inspection API mismatch");
         std::filesystem::remove(path);
 #endif
         convolver::Engine engine(c, 3);

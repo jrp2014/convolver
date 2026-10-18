@@ -12,6 +12,13 @@
     "invalid": "invalid configuration",
     "nonportable-path": "Windows drive/rooted paths"
   },
+  "error_codes": {
+    "cycle": ["cycle"],
+    "missing-asset": ["missing-asset", "unreadable"],
+    "no-match": ["no-match"],
+    "invalid": ["syntax", "rate-mismatch", "ir-channel", "engine", "limit"],
+    "nonportable-path": ["nonportable-path"]
+  },
   "cases": [
     {
       "id": "wav-identity",

@@ -186,6 +186,51 @@ is not a complete validator for every supported codec. Additional codecs depend
 on how the installed libsndfile was built. Output is currently ordinary WAV or
 RAW; use RAW for streams that can exceed WAV's 4 GiB container limit.
 
+## Inspecting and validating configurations
+
+`--inspect` shows what a configuration, sound file or list resolves to without
+rendering; `--validate` checks it and prints a one-line result. Both use the
+loader's own parser, list selection and limits, decode the selected IRs, and run
+the engine's validation and storage accounting. Neither plans FFTs, changes FFTW
+wisdom or writes files.
+
+```sh
+convolver --inspect room.cfg
+convolver --inspect filters.txt --sample-rate 48000 --input-channels 2 --json
+convolver --validate room.cfg --block-size 256
+convolver --validate filters.txt --all-configurations --json
+convolver --inspect room.cfg --syntax-only --json
+```
+
+- Selection matches rendering: the first list entry matching `--sample-rate` and
+  `--input-channels` (or the first entry with neither). The report lists each
+  visited file and why it was skipped. Unselected entries' IR files are not opened.
+- `--all-configurations` validates every leaf of a list, continues after a failed
+  entry, and fails if any entry fails. It cannot be combined with selectors.
+- `--syntax-only` reads one configuration file's text, checks grammar, routes and
+  delays and resolves references lexically, without opening IRs. Coefficient,
+  latency, tail and storage fields are null, and the result says so.
+- `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
+  validation fails. Diagnostics are also printed to stderr.
+- Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
+  `--warnings-as-errors` makes warnings fail.
+
+A report gives, per inspected configuration, the rate, channel counts and raw
+channel mask; declared delay tokens and milliseconds beside effective frames;
+ordered routes with their source tokens and effective channel/gain (`-0` is
+channel 0, gain -1); each IR's spelling, line, resolved path, channel, rate and
+decoded length; partitions per path; latency (one block) and the FIR/delay tail
+separately; and `accounted_buffer_bytes`, the engine's prepared float buffers.
+That estimate excludes FFT plan internals, allocator overhead and file decoding
+buffers; it is not total process memory. Diagnostics carry a stable `code`,
+severity, message, file, line, column and the chain of enclosing list entries.
+Resolved paths are machine-specific; source spellings are kept as written.
+
+The same report is available to C++ code through `convolver::inspect_configuration`
+in `convolver/inspection.hpp` (`Convolver::io`), and the core's
+`convolver::analyze_configuration` returns latency, tail, FFT length, accounted
+storage and partitions for an in-memory `Configuration`.
+
 ## Compatibility and library API
 
 Configuration syntax follows the [archived specification](historical/convolver-4.4/config.html):
