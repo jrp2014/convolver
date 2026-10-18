@@ -29,7 +29,7 @@ checkout branch isolates tracked changes; leave unrelated recovery files alone.
 3. [x] Optional SDK build, processor/controller/factory and preset writer in
    `plugins/vst3`. Actual SDK-interface tests, SDK validator, standard preset
    round-trip; no SDK dependency in the ordinary core build. Test failure first.
-4. [ ] CI matrix, docs, format/tidy, full FFTW/Accelerate and SDK suites; independent
+4. [x] CI matrix, docs, format/tidy, full FFTW/Accelerate and SDK suites; independent
    review and regression tests for important findings. Commit after local tests,
    fast-forward local main, publish CI branch from that exact commit if necessary
    to obtain CI before pushing main, then push main and check final CI.
@@ -53,3 +53,15 @@ core/CLI CI continues testing dynamic Windows libraries.
 Preset-first workflow confirmed by user. Compatibility
 before speed confirmed; particular DAWs not specified. SDK test results must not
 be described as actual commercial-DAW validation.
+
+## Completed validation
+
+Commit `5bcbef3` passed all seven CI jobs before publishing main:
+- [Native and historical tests](https://github.com/jrp2014/convolver/actions/runs/39085968706): Linux Clang/GCC, Windows MSVC and macOS; package consumers, sanitizers, format/tidy and backend equivalence.
+- [VST3 compatibility](https://github.com/jrp2014/convolver/actions/runs/39085968819): Linux, Windows and macOS, each loading the actual bundle with the SDK validator and checking the embedded preset workflow.
+
+Local evidence: FFTW/Accelerate sanitizer suites 17/17 each; core-only package
+5/5; SDK-interface/preset suites 11/11 (local bundle load excluded for the stated
+OS-policy reason); standalone ThreadSanitizer host test passed. Independent
+review's two important findings were fixed and verified with failing-then-passing
+regressions. Commercial DAW and callback-deadline measurements remain future work.

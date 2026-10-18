@@ -72,6 +72,11 @@ is not claimed to migrate automatically.
 
 ## Processing and lifecycle
 
+The host owns the audio device, clock and scheduling. Each callback supplies the
+next section of one continuous stream; convolution history persists between
+callbacks. Processing produces one output frame per input frame, with the delay
+reported below. The plug-in performs no file I/O in this streaming path.
+
 Latency is always 256 samples, independent of the DAW callback length. The adapter
 handles variable blocks, in-place host buffers, zero-length/parameter-only calls,
 inactive channels and silence flags. Silent input still drains the wet tail.
