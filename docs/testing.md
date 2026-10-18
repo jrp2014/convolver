@@ -11,8 +11,8 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **17 suites**: seven native suites, one package-consumer suite and the
-nine historical/documentation suites below. GCC and MSVC default to nine
+With Clang on macOS/Linux this runs **18 suites**: eight native suites, one package-consumer suite and the
+nine historical/documentation suites below. GCC and MSVC default to ten
 native/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
@@ -37,8 +37,10 @@ native/package/documentation suites; the old extraction adapters require Clang.
 
 - `native.host`: planar/in-place float and double buffers, invalid samples,
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard.
-- `native.state`: embedded configuration round trips, truncation, corrupt headers,
+- `native.state`: fixed version-1 wire fixture, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
+- `native.utilities`: little-endian byte order and bounds, exclusive binary file
+  creation, Unicode paths, link/overwrite protection and competing creators.
 
 The optional [VST3 build](vst3.md) adds three tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR,
@@ -48,7 +50,7 @@ They do not establish compatibility in a particular commercial DAW.
 
 `packaging.consumer` installs and relocates the package, builds and runs an
 external core/host/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs five C++/package
+without a parent CTest setup. Core-only configuration runs six C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares both actual CLIs over 16 matrix/delay

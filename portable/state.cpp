@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "bytes.hpp"
 #include "convolver/host.hpp"
 #include <bit>
 #include <limits>
@@ -12,8 +13,9 @@ struct Writer {
     void word(std::size_t n) {
         if (n > std::numeric_limits<std::uint32_t>::max() || data.size() > max_host_state_bytes - 4)
             throw std::length_error("host state exceeds limit");
-        for (int i = 0; i < 4; ++i)
-            data.push_back(std::byte((n >> (8 * i)) & 255));
+        const auto offset = data.size();
+        data.resize(offset + 4);
+        detail::write_le32(std::span(data).subspan(offset), static_cast<std::uint32_t>(n));
     }
     void sample(float v) {
         word(std::bit_cast<std::uint32_t>(v));
@@ -24,9 +26,7 @@ struct Reader {
     std::uint32_t word() {
         if (data.size() < 4)
             throw std::invalid_argument("truncated host state");
-        std::uint32_t n = 0;
-        for (int i = 0; i < 4; ++i)
-            n |= std::uint32_t(data[i]) << (8 * i);
+        const auto n = detail::read_le32(data);
         data = data.subspan(4);
         return n;
     }

@@ -184,9 +184,9 @@ std::optional<Configuration> load(const std::filesystem::path& path, int rate, s
             context.active.erase(path);
         }
     } pop{context, canonical};
-    std::unique_ptr<AudioReader> audio;
+    std::optional<AudioReader> audio;
     try {
-        audio = std::make_unique<AudioReader>(path);
+        audio.emplace(path);
     } catch (const std::runtime_error&) { /* Bounded text validation below distinguishes configs
                                              from damaged audio. */
     }

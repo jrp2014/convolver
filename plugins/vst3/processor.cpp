@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "processor.hpp"
+#include "bytes.hpp"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include <algorithm>
@@ -30,12 +31,10 @@ bool transfer(IBStream* stream, void* data, std::size_t size, bool writing) {
 }
 } // namespace
 HostState read_state(IBStream* stream) {
-    std::array<unsigned char, 4> header{};
+    std::array<std::byte, 4> header{};
     if (!transfer(stream, header.data(), 4, false))
         throw std::invalid_argument("missing state length");
-    std::uint32_t size = 0;
-    for (int i = 0; i < 4; ++i)
-        size |= std::uint32_t(header[i]) << (8 * i);
+    const auto size = detail::read_le32(header);
     if (size > max_host_state_bytes || size < 12)
         throw std::invalid_argument("invalid state length");
     std::vector<std::byte> bytes(size);
@@ -45,9 +44,8 @@ HostState read_state(IBStream* stream) {
 }
 bool write_state(IBStream* stream, const HostState& state) {
     auto bytes = encode_host_state(state);
-    std::array<unsigned char, 4> header{};
-    for (int i = 0; i < 4; ++i)
-        header[i] = static_cast<unsigned char>((bytes.size() >> (8 * i)) & 255);
+    std::array<std::byte, 4> header{};
+    detail::write_le32(header, static_cast<std::uint32_t>(bytes.size()));
     return transfer(stream, header.data(), 4, true) &&
            transfer(stream, bytes.data(), bytes.size(), true);
 }
