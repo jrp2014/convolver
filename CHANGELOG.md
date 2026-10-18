@@ -46,8 +46,9 @@ Until 1.0 the C++ API may change between minor versions.
 - `Convolver::io` now links `Convolver::core`. The package version is 0.3.0;
   consumers ask for `find_package(Convolver 0.3 ...)`.
 - The configuration parser is separated from list resolution and IR decoding
-  (`portable/config_parse.*`, private). Accepted configurations, selection and
-  rendered audio are unchanged.
+  (`portable/config_parse.*`, private). Selection and rendered audio are
+  unchanged, and so are accepted configurations, except that lists reading more
+  than 16 MiB of configuration text in one load are now rejected (see Added).
 
 ### Fixed
 - An IR whose header declares more than 64 Mi samples is rejected before any

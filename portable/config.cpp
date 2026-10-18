@@ -166,7 +166,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         std::optional<AudioReader> ir;
         try {
             ir.emplace(resolved);
-        } catch (const std::runtime_error& e) {
+        } catch (const std::exception& e) {
+            // Includes a bare "-": standard input cannot be a filter.
             throw ConfigurationError("missing-asset", path.ir.location,
                                      "filter '" + path.ir.spelling + "': " + e.what());
         }
@@ -218,7 +219,7 @@ Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list,
         files_.open_audio = [](const std::filesystem::path& p) -> std::unique_ptr<AudioReader> {
             try {
                 return std::make_unique<AudioReader>(p);
-            } catch (const std::runtime_error&) {
+            } catch (const std::exception&) {
                 return nullptr; // Bounded text validation distinguishes configs from damaged audio.
             }
         };
@@ -271,8 +272,26 @@ bool Resolver::visit(const std::filesystem::path& path) {
     }
     if (on_list_)
         on_list_(doc, chain_);
+    // A handler sees the whole chain of enclosing lists; a rethrown error gains
+    // the outer entries as it propagates.
+    const auto handled = [&](const ConfigurationError& e, std::size_t outer) {
+        if (!on_error_)
+            return false;
+        auto full = e;
+        for (std::size_t i = outer; i-- > 0;)
+            full.included_from(chain_[i]);
+        return on_error_(full);
+    };
     for (const auto& entry : doc.entries) {
-        const auto child = resolve_reference(path, entry, files_.exists);
+        std::filesystem::path child;
+        try {
+            child = resolve_reference(path, entry, files_.exists);
+        } catch (const ConfigurationError& e) {
+            // Located at the entry itself, so this list is not added to the chain.
+            if (handled(e, chain_.size()))
+                continue;
+            throw;
+        }
         chain_.push_back(entry.location);
         struct PopChain {
             IncludeChain& chain;
@@ -285,7 +304,7 @@ bool Resolver::visit(const std::filesystem::path& path) {
                 return true;
         } catch (ConfigurationError& e) {
             e.included_from(entry.location);
-            if (on_error_ && on_error_(e))
+            if (handled(e, chain_.size() - 1))
                 continue;
             throw;
         }

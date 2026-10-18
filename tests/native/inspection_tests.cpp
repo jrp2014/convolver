@@ -168,6 +168,40 @@ void run(const fs::path& dir) {
                 "selected mode stops at the first entry before the cycle");
     }
     {
+        // An entry that cannot resolve here (a drive path on macOS/Linux, a missing
+        // file on Windows) is reported and its siblings are still validated, in the
+        // root list and in a nested one, with the whole chain of enclosing lists.
+        InspectionOptions all;
+        all.all_configurations = true;
+        text_file(dir / "drive.txt", "C:\\absent\\x.cfg\nroom.cfg\nbad.cfg\n");
+        const auto root = inspect_configuration(dir / "drive.txt", all);
+        require(!root.valid && root.configurations.size() == 1 &&
+                    root.configurations[0].file == dir / "room.cfg" && has_code(root, "syntax"),
+                "entries after an unresolvable one are validated");
+        text_file(dir / "outer.txt", "sub.txt\nroom.cfg\n");
+        text_file(dir / "sub.txt", "C:\\absent\\x.cfg\nbad.cfg\n");
+        const auto nested = inspect_configuration(dir / "outer.txt", all);
+        const Diagnostic* bad = nullptr;
+        for (const auto& d : nested.diagnostics)
+            if (d.location.file.filename() == "bad.cfg")
+                bad = &d;
+        require(bad && nested.configurations.size() == 1, "nested siblings are validated");
+        require(bad->include_chain.size() == 2 &&
+                    bad->include_chain[0].file.filename() == "outer.txt" &&
+                    bad->include_chain[0].line == 1 &&
+                    bad->include_chain[1].file.filename() == "sub.txt" &&
+                    bad->include_chain[1].line == 2,
+                "all-entry diagnostics carry every enclosing list entry");
+        // A bare "-" beside a configuration in the working directory is a missing
+        // filter, reported in the report rather than thrown.
+        const auto previous = fs::current_path();
+        fs::current_path(dir);
+        text_file("dash.cfg", "48000 1 1 0\n0\n0\n-\n0\n0\n0\n");
+        const auto dash = inspect_configuration("dash.cfg");
+        fs::current_path(previous);
+        require(!dash.valid && has_code(dash, "missing-asset"), "'-' as a filter is diagnosed");
+    }
+    {
         InspectionOptions options;
         options.expected_rate = 96000;
         const auto none = inspect_configuration(dir / "list.txt", options);
@@ -280,7 +314,8 @@ void run(const fs::path& dir) {
     for (const auto& p : before)
         after.erase(p);
     for (const auto* name : {"absent.cfg", "two.txt", "bad.cfg", "unrelated.cfg", "list.txt",
-                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg"})
+                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",
+                             "drive.txt", "outer.txt", "sub.txt", "dash.cfg"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

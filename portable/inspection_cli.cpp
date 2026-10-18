@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "inspection_cli.hpp"
 #include "convolver/io.hpp"
+#include <array>
 #include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #ifndef CONVOLVER_VERSION
@@ -517,10 +519,27 @@ std::string report_json(const InspectionReport& r, bool validate, bool warnings_
 }
 
 bool is_inspection(int argc, char** argv) {
+    // Skip the values of render options, so a file named "--validate" stays a file.
+    constexpr std::array<std::pair<std::string_view, int>, 11> render_values{{
+        {"--filter", 1},
+        {"--input", 1},
+        {"--output", 1},
+        {"--fft-plan", 1},
+        {"--fft-wisdom", 1},
+        {"--tune-fft", 1},
+        {"--block-size", 1},
+        {"--gain-db", 1},
+        {"--output-format", 1},
+        {"--speaker-map", 1},
+        {"--raw-input", 2},
+    }};
     for (int i = 1; i < argc; ++i) {
         const std::string_view a = argv[i];
         if (a == "--inspect" || a == "--validate")
             return true;
+        for (const auto& [option, values] : render_values)
+            if (a == option)
+                i += values;
     }
     return false;
 }

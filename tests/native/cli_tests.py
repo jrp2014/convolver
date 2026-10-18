@@ -155,6 +155,11 @@ def main():
         call(['--filter',ir,'--input','-','--raw-input','44100','1','--output',dst],ok=False,data=raw)
         call(args,data=b'')
         speaker_map_tests(d)
+        # An option value spelled like an inspection flag is still a value.
+        pcm(d/'v-ir.wav',[16384]); pcm(d/'v-in.wav',[1000,-1000])
+        p=subprocess.run([EXE,'--filter','v-ir.wav','--input','v-in.wav','--output','--validate'],
+                         cwd=d,capture_output=True)
+        assert p.returncode==0 and (d/'--validate').is_file(), p.stderr
     print('PASS: native CLI files, matrices, EOF, gain, errors and real RAW pipes')
 
 if __name__=='__main__': main()

@@ -183,6 +183,9 @@ class Inspector {
         report_.traversal.push_back(std::move(step));
         if (l.document)
             portability(*l.document, l.chain);
+        // Rendering decodes one leaf, so each validated entry gets the full budget.
+        if (options_.all_configurations)
+            budget_ = 0;
         try {
             if (l.audio) {
                 auto cfg = detail::decode_audio_filter(*l.audio, budget_);

@@ -39,6 +39,23 @@ bool contains(const std::string& s, const char* part) {
     return s.find(part) != std::string::npos;
 }
 
+// A mono 8-bit WAV of silence with the given (even) frame count, written
+// sparsely where the filesystem allows.
+void silent_u8_wave(const fs::path& path, std::size_t frames) {
+    unsigned char header[44] = {'R', 'I', 'F',  'F',  0,   0,   0,    0,    'W', 'A', 'V',
+                                'E', 'f', 'm',  't',  ' ', 16,  0,    0,    0,   1,   0,
+                                1,   0,   0x80, 0xbb, 0,   0,   0x80, 0xbb, 0,   0,   1,
+                                0,   8,   0,    'd',  'a', 't', 'a',  0,    0,   0,   0};
+    const auto data = static_cast<std::uint32_t>(frames);
+    const std::uint32_t riff = 36 + data;
+    for (int i = 0; i < 4; ++i) {
+        header[4 + i] = static_cast<unsigned char>(riff >> (8 * i));
+        header[40 + i] = static_cast<unsigned char>(data >> (8 * i));
+    }
+    text_file(path, std::string(reinterpret_cast<const char*>(header), sizeof header));
+    fs::resize_file(path, sizeof header + frames);
+}
+
 void run(const fs::path& dir) {
     using namespace detail;
     {
@@ -115,19 +132,9 @@ void run(const fs::path& dir) {
     // 256 MiB, so the accepted side is covered by the identical comparison.)
     {
         // An even data size needs no RIFF pad byte.
-        const std::uint32_t frames = static_cast<std::uint32_t>(max_decoded_samples + 2);
-        unsigned char header[44] = {'R', 'I', 'F',  'F',  0,   0,   0,    0,    'W', 'A', 'V',
-                                    'E', 'f', 'm',  't',  ' ', 16,  0,    0,    0,   1,   0,
-                                    1,   0,   0x80, 0xbb, 0,   0,   0x80, 0xbb, 0,   0,   1,
-                                    0,   8,   0,    'd',  'a', 't', 'a',  0,    0,   0,   0};
-        const std::uint32_t riff = 36 + frames;
-        for (int i = 0; i < 4; ++i) {
-            header[4 + i] = static_cast<unsigned char>(riff >> (8 * i));
-            header[40 + i] = static_cast<unsigned char>(frames >> (8 * i));
-        }
+        const auto frames = max_decoded_samples + 2;
         const auto big = dir / "declared-huge.wav";
-        text_file(big, std::string(reinterpret_cast<const char*>(header), sizeof header));
-        fs::resize_file(big, sizeof header + frames); // Sparse where supported.
+        silent_u8_wave(big, frames);
         const auto started = std::chrono::steady_clock::now();
         require(contains(rejection([&] { load_configuration(big); }, "64 Mi + 2 samples"),
                          "64 Mi samples"),
@@ -162,6 +169,20 @@ void run(const fs::path& dir) {
         const auto report = inspect_configuration(dir / "shared.txt", all);
         require(!report.valid && report.diagnostics.back().code == "limit",
                 "all-entry inspection shares the text budget");
+    }
+    // Each entry validated with --all-configurations gets the decode budget a
+    // render would: two entries sharing an IR of more than half the limit pass.
+    {
+        silent_u8_wave(dir / "half.wav", max_decoded_samples / 2 + 2);
+        text_file(dir / "half1.cfg", "48000 1 1 0\n0\n0\nhalf.wav\n0\n0\n0\n");
+        text_file(dir / "half2.cfg", "48000 2 2 0\n0 0\n0 0\nhalf.wav\n0\n0\n0\n");
+        text_file(dir / "halves.txt", "half1.cfg\nhalf2.cfg\n");
+        InspectionOptions all;
+        all.all_configurations = true;
+        const auto report = inspect_configuration(dir / "halves.txt", all);
+        require(report.valid && report.configurations.size() == 2,
+                "the decode budget applies per validated entry");
+        fs::remove(dir / "half.wav");
     }
     // At most 256 diagnostics, then one truncation marker.
     {

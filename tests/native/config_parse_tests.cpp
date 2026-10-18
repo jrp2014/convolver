@@ -89,6 +89,14 @@ int main() {
                         .find("pre-3.0 configuration without delay lines: insert a line of 2 "
                               "zeros") != std::string::npos,
                 "pre-3.0 diagnostic says what to add");
+        // A malformed delay is reported as one, not as a pre-3.0 file.
+        for (const auto* delay : {"0,5", "nan", "x"}) {
+            const std::string what =
+                rejected("48000 1 1 0\n" + std::string(delay) + "\n0\nir.wav\n0\n0\n0\n").what();
+            require(what.find("pre-3.0") == std::string::npos &&
+                        what.find("t.cfg:2:") != std::string::npos,
+                    "malformed delays are not called pre-3.0");
+        }
         require(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").code() == "syntax", "code");
         require(std::string(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").what()) ==
                     "invalid configuration: t.cfg:6:1: route channel out of range: 2 (1 "

@@ -2,6 +2,8 @@
 // Legacy configuration text grammar with physical source locations. This file has
 // no filesystem or audio decoder access; config.cpp resolves references.
 #include "config_parse.hpp"
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <locale>
@@ -195,7 +197,18 @@ ParsedDocument parse_configuration_text(std::string_view text,
         std::istringstream probe(second.tokens.front().text);
         probe.imbue(std::locale::classic());
         float value = 0;
-        if (!(probe >> value) || !probe.eof())
+        // Only a token that reads like a file name gets the pre-3.0 hint; other
+        // malformed delays fall through to the delay parser's own error.
+        const auto& token = second.tokens.front().text;
+        const auto dot = token.rfind('.');
+        const bool file_like =
+            token.find_first_of("/\\") != std::string::npos ||
+            (dot != std::string::npos && dot + 1 < token.size() &&
+             std::all_of(token.begin() + static_cast<std::ptrdiff_t>(dot) + 1, token.end(),
+                         [](unsigned char c) { return std::isalnum(c) != 0; }) &&
+             std::any_of(token.begin() + static_cast<std::ptrdiff_t>(dot) + 1, token.end(),
+                         [](unsigned char c) { return std::isalpha(c) != 0; }));
+        if (file_like && (!(probe >> value) || !probe.eof()))
             p.fail(second.number, second.column,
                    "expected a line of input delays after the header, found '" + second.text +
                        "'. This looks like a pre-3.0 configuration without delay lines: insert "
