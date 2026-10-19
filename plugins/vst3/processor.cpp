@@ -62,12 +62,17 @@ tresult PLUGIN_API Processor::initialize(FUnknown* context) {
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
                                                  SpeakerArrangement* out, int32 no) {
-    if (active_ || ni != 1 || no != 1 || !in || !out || in[0] != out[0] ||
-        (in[0] != SpeakerArr::kMono && in[0] != SpeakerArr::kStereo))
+    if (active_ || ni != 1 || no != 1 || !in || !out)
+        return kResultFalse;
+    const auto inputs = SpeakerArr::getChannelCount(in[0]);
+    const auto outputs = SpeakerArr::getChannelCount(out[0]);
+    if (inputs < 1 || inputs > max_bus_channels || outputs < 1 || outputs > max_bus_channels)
         return kResultFalse;
     auto result = AudioEffect::setBusArrangements(in, ni, out, no);
-    if (result == kResultOk)
-        channels_ = SpeakerArr::getChannelCount(in[0]);
+    if (result == kResultOk) {
+        inputs_ = inputs;
+        outputs_ = outputs;
+    }
     return result;
 }
 tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
@@ -85,15 +90,17 @@ Configuration Processor::configuration(const HostState& state) const {
     if (state.configuration) {
         const auto& c = *state.configuration;
         if (c.sample_rate != processSetup.sampleRate ||
-            c.input_channels != static_cast<std::size_t>(channels_) ||
-            c.output_channels != static_cast<std::size_t>(channels_))
+            c.input_channels != static_cast<std::size_t>(inputs_) ||
+            c.output_channels != static_cast<std::size_t>(outputs_))
             throw std::invalid_argument("preset rate/layout does not match the host");
         return c;
     }
+    // Without a preset, input c passes to output c; outputs without an input are silent.
     Configuration c;
     c.sample_rate = static_cast<int>(processSetup.sampleRate);
-    c.input_channels = c.output_channels = channels_;
-    for (int i = 0; i < channels_; ++i)
+    c.input_channels = inputs_;
+    c.output_channels = outputs_;
+    for (int i = 0; i < std::min(inputs_, outputs_); ++i)
         c.paths.push_back(
             {{1}, {{static_cast<std::size_t>(i), 1}}, {{static_cast<std::size_t>(i), 1}}});
     return c;
@@ -130,9 +137,8 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
         if (host_) {
             host_->replace(configuration(next));
             tail_.store(static_cast<uint32>(host_->tail_frames()));
-        } else if (next.configuration &&
-                   (next.configuration->input_channels != next.configuration->output_channels ||
-                    next.configuration->input_channels > 2))
+        } else if (next.configuration && (next.configuration->input_channels > max_bus_channels ||
+                                          next.configuration->output_channels > max_bus_channels))
             return kResultFalse;
         if (!host_)
             tail_.store(next.configuration
@@ -157,13 +163,13 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
     }
 }
 template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 count) noexcept {
-    std::array<const T*, 2> in{};
-    std::array<T*, 2> out{};
+    std::array<const T*, max_bus_channels> in{};
+    std::array<T*, max_bus_channels> out{};
     if (d.numInputs && d.inputs && getAudioInput(0)->isActive()) {
         auto& bus = d.inputs[0];
-        if (bus.numChannels != channels_)
+        if (bus.numChannels != inputs_)
             return false;
-        for (int c = 0; c < channels_; ++c)
+        for (int c = 0; c < inputs_; ++c)
             if (!(bus.silenceFlags & (uint64(1) << c))) {
                 if constexpr (std::is_same_v<T, float>) {
                     if (bus.channelBuffers32 && bus.channelBuffers32[c])
@@ -176,9 +182,9 @@ template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 co
     }
     if (d.numOutputs && d.outputs && getAudioOutput(0)->isActive()) {
         auto& bus = d.outputs[0];
-        if (bus.numChannels != channels_)
+        if (bus.numChannels != outputs_)
             return false;
-        for (int c = 0; c < channels_; ++c) {
+        for (int c = 0; c < outputs_; ++c) {
             if constexpr (std::is_same_v<T, float>) {
                 if (bus.channelBuffers32 && bus.channelBuffers32[c])
                     out[c] = bus.channelBuffers32[c] + start;
@@ -190,7 +196,7 @@ template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 co
         bus.silenceFlags = 0; // Do not propagate input silence across a convolution tail.
     }
     host_->set_bypass(bypass_.load());
-    return host_->process(std::span(in).first(channels_), std::span(out).first(channels_), count);
+    return host_->process(std::span(in).first(inputs_), std::span(out).first(outputs_), count);
 }
 tresult PLUGIN_API Processor::process(ProcessData& d) {
     if (d.numSamples < 0 || d.numSamples > processSetup.maxSamplesPerBlock || d.numInputs < 0 ||

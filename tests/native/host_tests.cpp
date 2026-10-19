@@ -154,12 +154,58 @@ void queued_replacements() {
     for (auto v : output)
         require(std::abs(v - 3) < 1e-5, "queued replacement waits for control collection");
 }
+void unequal_channels() {
+    // Two inputs, three outputs: input 0 feeds output 2 at half gain, input 1
+    // feeds outputs 0 and 1 through one delayed path.
+    Configuration c{48000, 2, 3, 0, {}, {}, {}};
+    c.paths.push_back({{.5f}, {{0, 1}}, {{2, 1}}});
+    c.paths.push_back({{0, 1}, {{1, 1}}, {{0, 1}, {1, -1}}});
+    HostProcessor host(c, 32, 8);
+    std::array<float, 32> left{}, right{}, a{}, b{}, d{};
+    left[0] = 1;
+    right[0] = 2;
+    const float* in[] = {left.data(), right.data()};
+    float* out[] = {a.data(), b.data(), d.data()};
+    audio_thread = true;
+    bool ok = host.process(in, out, 32);
+    audio_thread = false;
+    require(ok, "unequal layout rejected");
+    for (int i = 0; i < 32; ++i) {
+        require(std::abs(a[i] - (i == 9 ? 2.f : 0.f)) < 1e-6, "unequal route 1->0");
+        require(std::abs(b[i] - (i == 9 ? -2.f : 0.f)) < 1e-6, "unequal route 1->1");
+        require(std::abs(d[i] - (i == 8 ? .5f : 0.f)) < 1e-6, "unequal route 0->2");
+    }
+    float* too_many[] = {a.data(), b.data(), d.data(), d.data()};
+    const float* too_many_in[] = {left.data(), right.data(), left.data()};
+    require(!host.process(in, too_many, 32) && !host.process(too_many_in, out, 32),
+            "extra channels accepted");
+    host.reset();
+    host.set_bypass(true);
+    left.fill(1);
+    right.fill(3);
+    for (int k = 0; k < 4; ++k)
+        host.process(in, out, 32);
+    for (int i = 0; i < 32; ++i)
+        require(a[i] == 1 && b[i] == 3 && d[i] == 0, "unequal bypass mapping");
+    auto mismatch = c;
+    mismatch.output_channels = 2;
+    mismatch.paths.resize(1);
+    mismatch.paths[0].outputs = {{1, 1}};
+    bool rejected = false;
+    try {
+        host.replace(mismatch);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "replacement changed output channels");
+}
 int main() {
     try {
         numeric<float>();
         numeric<double>();
         lifecycle();
         queued_replacements();
+        unequal_channels();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

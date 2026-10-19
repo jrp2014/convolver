@@ -10,6 +10,8 @@ namespace convolver::vst3 {
 inline const Steinberg::FUID processor_id(0x73A81329, 0xE6484ADF, 0x9DA7D731, 0xA8C94201);
 inline const Steinberg::FUID controller_id(0x622AD87C, 0x23664CCF, 0xB157473F, 0xBCD4A6B9);
 inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
+// One input and one output bus, each with 1 to 8 channels (counts may differ).
+inline constexpr int max_bus_channels = 8;
 HostState read_state(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {
@@ -46,7 +48,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::unique_ptr<HostProcessor> host_;
     std::atomic<bool> bypass_{false};
     std::atomic<Steinberg::uint32> tail_{0};
-    int channels_ = 2;
+    int inputs_ = 2, outputs_ = 2;
     bool active_ = false;
 };
 class Controller final : public Steinberg::Vst::EditController {

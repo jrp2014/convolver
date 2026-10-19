@@ -58,13 +58,24 @@ configuration list into a new preset:
 With Visual Studio the executable is in `plugins/vst3/Release/`. The output must
 not already exist. Presets embed coefficients, gains, routes and delays; the DAW
 project's saved state therefore does not depend on the original filter paths.
-Select a configuration matching the DAW's sample rate and mono/stereo layout.
-A configuration list uses the importer's ordinary first-match behavior when no
-rate/layout was specified; prepare a preset from the intended individual config
-when the list contains multiple alternatives.
+Select a configuration matching the DAW's sample rate and bus layout. For a
+configuration list, `--sample-rate HZ`, `--input-channels N` and
+`--output-channels N` (before the file names) choose the first matching entry,
+as the CLI does; without them the first entry is used:
 
-Supported buses are one mono input/output pair or one stereo input/output pair,
-including cross-channel filter routes. Other arrangements are rejected. 32-bit
+```sh
+./build-vst3/plugins/vst3/convolver-vst3-preset --sample-rate 48000 \
+  --input-channels 2 --output-channels 6 filters.txt upmix.vstpreset
+```
+
+The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
+and the counts may differ (for example stereo in, 5.1 out), as the historical
+VST 2 plug-in allowed. Any speaker arrangement with that many channels is
+accepted; channels are numbered in the host's bus order, which is the order the
+configuration's routes refer to. A preset must match the bus channel counts and
+the sample rate, or activation fails. Without a preset the plug-in passes input
+*c* to output *c* and leaves outputs without a matching input silent; bypass uses
+the same mapping. More than 8 channels, or more than one bus, is rejected. 32-bit
 and 64-bit host buffers are supported, with **single-precision internal DSP**.
 Sample-rate mismatches are rejected; there is no implicit IR resampling or
 pitch/timing change. This plug-in has a new VST3 identity: old VST2 project state

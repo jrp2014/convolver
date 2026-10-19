@@ -16,7 +16,7 @@ struct HostProcessor::Impl {
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
     const int rate;
-    const std::size_t channels, maximum, block;
+    const std::size_t inputs, outputs, maximum, block;
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
@@ -26,15 +26,16 @@ struct HostProcessor::Impl {
     float dry_mix = 0;
     bool bypass = false;
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
-        : rate(c.sample_rate), channels(c.input_channels), maximum(maximum_), block(block_) {
-        if (!channels || channels != c.output_channels || channels > 256 || !maximum ||
-            maximum > (1U << 20) || channels * maximum > (1U << 24))
+        : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
+          maximum(maximum_), block(block_) {
+        if (!inputs || !outputs || inputs > 256 || outputs > 256 || !maximum ||
+            maximum > (1U << 20) || std::max(inputs, outputs) * maximum > (1U << 24))
             throw std::invalid_argument("invalid host channel count or callback capacity");
         auto prepared = std::make_unique<Prepared>(c, block);
-        input.resize(channels * maximum);
-        wet.resize(input.size());
-        old_wet.resize(input.size());
-        dry.resize(channels * block);
+        input.resize(inputs * maximum);
+        wet.resize(outputs * maximum);
+        old_wet.resize(wet.size());
+        dry.resize(outputs * block);
         tail.store(prepared->engine.tail_frames());
         current = prepared.release();
     }
@@ -53,7 +54,7 @@ struct HostProcessor::Impl {
         }
     }
     void replace(const Configuration& c) {
-        if (c.sample_rate != rate || c.input_channels != channels || c.output_channels != channels)
+        if (c.sample_rate != rate || c.input_channels != inputs || c.output_channels != outputs)
             throw std::invalid_argument("replacement must preserve sample rate and channels");
         auto prepared = std::make_unique<Prepared>(c, block);
         collect();
@@ -72,9 +73,9 @@ struct HostProcessor::Impl {
         dry_mix = bypass ? 1.f : 0.f;
     }
     template <class T>
-    bool process(std::span<const T* const> inputs, std::span<T* const> outputs,
+    bool process(std::span<const T* const> in, std::span<T* const> out,
                  std::size_t frames) noexcept {
-        if (frames > maximum || inputs.size() > channels || outputs.size() > channels)
+        if (frames > maximum || in.size() > inputs || out.size() > outputs)
             return false;
         if (!frames)
             return true;
@@ -87,9 +88,9 @@ struct HostProcessor::Impl {
             }
         }
         for (std::size_t t = 0; t < frames; ++t)
-            for (std::size_t c = 0; c < channels; ++c) {
-                double v = c < inputs.size() && inputs[c] ? inputs[c][t] : 0;
-                input[t * channels + c] =
+            for (std::size_t c = 0; c < inputs; ++c) {
+                double v = c < in.size() && in[c] ? in[c][t] : 0;
+                input[t * inputs + c] =
                     std::isfinite(v) && std::abs(v) <= std::numeric_limits<float>::max()
                         ? static_cast<float>(v)
                         : 0.f;
@@ -102,9 +103,9 @@ struct HostProcessor::Impl {
                 previous->engine.process(input, old_wet, frames);
         } catch (...) {
             reset();
-            for (auto out : outputs)
-                if (out)
-                    std::fill_n(out, frames, T(0));
+            for (auto channel : out)
+                if (channel)
+                    std::fill_n(channel, frames, T(0));
             return false;
         }
         bool invalid_output = false;
@@ -120,10 +121,12 @@ struct HostProcessor::Impl {
                 }
             }
             dry_mix = std::clamp(dry_mix + (bypass ? 1.f / 64 : -1.f / 64), 0.f, 1.f);
-            for (std::size_t c = 0; c < channels; ++c) {
-                auto index = t * channels + c;
-                float dry_value = dry[dry_position * channels + c];
-                dry[dry_position * channels + c] = input[index];
+            for (std::size_t c = 0; c < outputs; ++c) {
+                // Bypass passes input c to output c; outputs without an input are silent.
+                auto index = t * outputs + c;
+                auto& delayed = dry[dry_position * outputs + c];
+                float dry_value = delayed;
+                delayed = c < inputs ? input[t * inputs + c] : 0.f;
                 double value = wet[index];
                 if (previous)
                     value = (1.0 - blend) * old_wet[index] + blend * value;
@@ -132,8 +135,8 @@ struct HostProcessor::Impl {
                     value = 0;
                     invalid_output = true;
                 }
-                if (c < outputs.size() && outputs[c])
-                    outputs[c][t] = static_cast<T>(value);
+                if (c < out.size() && out[c])
+                    out[c][t] = static_cast<T>(value);
             }
             if (++dry_position == block)
                 dry_position = 0;
