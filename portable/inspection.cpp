@@ -27,22 +27,29 @@ Diagnostic diagnostic(const ConfigurationError& e) {
     return {e.code(), DiagnosticSeverity::error, e.reason(), position(e.location()),
             chain(e.include_chain())};
 }
-std::string mismatch(int rate, std::size_t inputs, const InspectionOptions& o) {
-    const bool bad_rate = o.expected_rate && o.expected_rate != rate;
-    const bool bad_inputs = o.expected_inputs && o.expected_inputs != inputs;
-    if (bad_rate && bad_inputs)
-        return "rate-and-input-mismatch";
-    if (bad_rate)
-        return "rate-mismatch";
-    return bad_inputs ? "input-mismatch" : "";
+std::string mismatch(int rate, std::size_t inputs, std::size_t outputs,
+                     const InspectionOptions& o) {
+    std::string text;
+    auto add = [&](bool bad, const char* name) {
+        if (bad)
+            text += (text.empty() ? "" : "-and-") + std::string(name);
+    };
+    add(o.expected_rate && o.expected_rate != rate, "rate");
+    add(o.expected_inputs && o.expected_inputs != inputs, "input");
+    add(o.expected_outputs && o.expected_outputs != outputs, "output");
+    return text.empty() ? text : text + "-mismatch";
 }
 std::string selectors(const InspectionOptions& o) {
     std::string text;
+    auto add = [&](const std::string& part) { text += (text.empty() ? "" : " and ") + part; };
     if (o.expected_rate)
-        text = "sample rate " + std::to_string(o.expected_rate) + " Hz";
+        add("sample rate " + std::to_string(o.expected_rate) + " Hz");
     if (o.expected_inputs)
-        text += (text.empty() ? "" : " and ") + std::to_string(o.expected_inputs) +
-                " input channel" + (o.expected_inputs == 1 ? "" : "s");
+        add(std::to_string(o.expected_inputs) + " input channel" +
+            (o.expected_inputs == 1 ? "" : "s"));
+    if (o.expected_outputs)
+        add(std::to_string(o.expected_outputs) + " output channel" +
+            (o.expected_outputs == 1 ? "" : "s"));
     return text;
 }
 
@@ -82,8 +89,8 @@ class Inspector {
     }
     void fail(const ConfigurationError& e) {
         add(diagnostic(e));
-        report_.traversal.push_back(
-            {e.location().file, chain(e.include_chain()), "failed", std::nullopt, std::nullopt});
+        report_.traversal.push_back({e.location().file, chain(e.include_chain()), "failed",
+                                     std::nullopt, std::nullopt, std::nullopt});
     }
     InspectedConfiguration leaf(const ParsedDocument& doc, const detail::IncludeChain& c) {
         const auto& p = doc.configuration;
@@ -158,20 +165,21 @@ class Inspector {
         const auto errors = errors_;
         InspectedConfiguration result;
         int rate = 0;
-        std::size_t inputs = 0;
+        std::size_t inputs = 0, outputs = 0;
         if (l.audio) {
             const auto info = l.audio->info();
             rate = info.sample_rate;
-            inputs = info.channels;
+            inputs = outputs = info.channels;
             result = sound_leaf(l.path, info, l.chain);
         } else {
             rate = l.document->configuration.sample_rate;
             inputs = l.document->configuration.input_channels;
+            outputs = l.document->configuration.output_channels;
             result = leaf(*l.document, l.chain);
         }
-        SelectionStep step{l.path, chain(l.chain), "", rate, inputs};
+        SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
         if (!options_.all_configurations) {
-            step.outcome = mismatch(rate, inputs, options_);
+            step.outcome = mismatch(rate, inputs, outputs, options_);
             if (!step.outcome.empty()) {
                 // As in rendering, an unselected entry's IRs are not opened.
                 report_.traversal.push_back(std::move(step));
@@ -226,13 +234,13 @@ class Inspector {
                 fail(e);
                 return true;
             };
-        detail::Resolver resolver([this](const detail::Resolver::Leaf& l) { return visit(l); },
-                                  on_error,
-                                  [this](const ParsedDocument& doc, const detail::IncludeChain& c) {
-                                      report_.traversal.push_back({doc.source, chain(c), "list",
-                                                                   std::nullopt, std::nullopt});
-                                      portability(doc, c);
-                                  });
+        detail::Resolver resolver(
+            [this](const detail::Resolver::Leaf& l) { return visit(l); }, on_error,
+            [this](const ParsedDocument& doc, const detail::IncludeChain& c) {
+                report_.traversal.push_back(
+                    {doc.source, chain(c), "list", std::nullopt, std::nullopt, std::nullopt});
+                portability(doc, c);
+            });
         bool stopped = false;
         try {
             stopped = resolver.run(report_.path);
@@ -292,13 +300,18 @@ class Inspector {
         }
         const auto& p = doc.configuration;
         if (doc.kind == ParsedDocument::Kind::list) {
-            report_.traversal.push_back({path, {}, "list", std::nullopt, std::nullopt});
+            report_.traversal.push_back(
+                {path, {}, "list", std::nullopt, std::nullopt, std::nullopt});
             scope("this is a configuration list");
             return;
         }
-        const auto outcome = mismatch(p.sample_rate, p.input_channels, options_);
-        report_.traversal.push_back(
-            {path, {}, outcome.empty() ? "selected" : outcome, p.sample_rate, p.input_channels});
+        const auto outcome = mismatch(p.sample_rate, p.input_channels, p.output_channels, options_);
+        report_.traversal.push_back({path,
+                                     {},
+                                     outcome.empty() ? "selected" : outcome,
+                                     p.sample_rate,
+                                     p.input_channels,
+                                     p.output_channels});
         if (!outcome.empty())
             add({"no-match",
                  DiagnosticSeverity::error,
@@ -413,13 +426,14 @@ class Inspector {
 InspectionReport inspect_configuration(const std::filesystem::path& path,
                                        const InspectionOptions& options) {
     if (options.expected_rate < 0 || options.expected_rate > 768000 ||
-        options.expected_inputs > 256)
+        options.expected_inputs > 256 || options.expected_outputs > 256)
         throw std::invalid_argument("expected audio properties out of range");
     if (!options.block_frames || options.block_frames > (1u << 20))
         throw std::invalid_argument("block frames must be between 1 and 1048576");
-    if (options.all_configurations && (options.expected_rate || options.expected_inputs))
+    if (options.all_configurations &&
+        (options.expected_rate || options.expected_inputs || options.expected_outputs))
         throw std::invalid_argument(
-            "all-configuration validation cannot be combined with rate or input selectors");
+            "all-configuration validation cannot be combined with rate or channel selectors");
     if (options.all_configurations && options.syntax_only)
         throw std::invalid_argument("syntax-only and all-configuration modes are exclusive");
     if (path.empty() || path == "-")

@@ -136,7 +136,10 @@ The filter may be an IR sound file, a historical configuration, or a configurati
 list. A direct multichannel IR maps each IR channel to the corresponding input
 and output; a mono IR requires mono input. Use a config to apply one mono IR to
 several channels. Lists select the first entry matching input rate and channel
-count. There is no resampling or nearest-rate substitution.
+count. `--output-channels N` also requires N output channels, as the historical
+engine also chose by the output format the playback device accepted (a sound
+file counts as having as many outputs as inputs). There is no resampling or
+nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
 count. FFTW uses FFT length 2B; Accelerate rounds up to a power of two (at least
@@ -281,9 +284,10 @@ convolver --validate filters.txt --all-configurations --json
 convolver --inspect room.cfg --syntax-only --json
 ```
 
-- Selection matches rendering: the first list entry matching `--sample-rate` and
-  `--input-channels` (or the first entry with neither). The report lists each
-  visited file and why it was skipped. Unselected entries' IR files are not opened.
+- Selection matches rendering: the first list entry matching `--sample-rate`,
+  `--input-channels` and `--output-channels` (or the first entry with none). The
+  report lists each visited file and why it was skipped, for example
+  `rate-and-output-mismatch`. Unselected entries' IR files are not opened.
 - `--all-configurations` validates every leaf of a list, continues after a failed
   entry, and fails if any entry fails. It cannot be combined with selectors.
 - `--syntax-only` reads one configuration file's text, checks grammar, routes and

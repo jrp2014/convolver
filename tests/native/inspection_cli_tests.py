@@ -140,6 +140,13 @@ def main():
         assert r['selection']['selected'] == 'room.cfg'
         assert [s['outcome'] for s in r['selection']['traversal']] == [
             'list', 'rate-and-input-mismatch', 'input-mismatch', 'selected']
+        assert r['selection']['expected_output_channels'] is None
+        r = report(['--inspect', 'list.txt', '--output-channels', '2'], cwd=d)
+        assert r['selection']['selected'] == 'room.cfg'
+        assert r['selection']['expected_output_channels'] == 2
+        assert [(s['outcome'], s['output_channels']) for s in r['selection']['traversal']] == [
+            ('list', None), ('output-mismatch', 1), ('output-mismatch', 1), ('selected', 2)]
+        call(['--inspect', 'list.txt', '--all-configurations', '--output-channels', '2'], 2, d)
         r = report(['--validate', 'list.txt', '--sample-rate', '48000'], 1, d)
         diag = r['diagnostics'][0]
         assert diag['code'] == 'missing-asset' and diag['file'] == 'absent.cfg' and \

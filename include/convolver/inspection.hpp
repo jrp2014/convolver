@@ -15,11 +15,12 @@ enum class InspectionProfile {
     portable_paths, // Also warn about references that will not travel to other machines.
 };
 struct InspectionOptions {
-    int expected_rate = 0;           // Zero: unspecified, as load_configuration.
-    std::size_t expected_inputs = 0; // Zero: unspecified.
-    std::size_t block_frames = 256;  // For latency/tail/storage analysis.
-    bool syntax_only = false;        // One configuration text; IRs are not opened.
-    bool all_configurations = false; // Validate every list leaf; no selectors allowed.
+    int expected_rate = 0;            // Zero: unspecified, as load_configuration.
+    std::size_t expected_inputs = 0;  // Zero: unspecified.
+    std::size_t expected_outputs = 0; // Zero: unspecified.
+    std::size_t block_frames = 256;   // For latency/tail/storage analysis.
+    bool syntax_only = false;         // One configuration text; IRs are not opened.
+    bool all_configurations = false;  // Validate every list leaf; no selectors allowed.
     InspectionProfile profile = InspectionProfile::convolver;
 };
 // Physical 1-based line and byte column; zero means unknown or the whole file.
@@ -72,11 +73,12 @@ struct InspectedConfiguration {
 struct SelectionStep {
     std::filesystem::path file;
     std::vector<SourcePosition> include_chain;
-    // "list", "selected", "validated", "rate-mismatch", "input-mismatch",
-    // "rate-and-input-mismatch" or "failed".
+    // "list", "selected", "validated", "failed", or the mismatching properties
+    // joined by "-and-" before "-mismatch", in the order rate, input, output:
+    // for example "rate-mismatch", "rate-and-input-mismatch", "output-mismatch".
     std::string outcome;
     std::optional<int> sample_rate;
-    std::optional<std::size_t> input_channels;
+    std::optional<std::size_t> input_channels, output_channels;
 };
 struct InspectionReport {
     static constexpr int schema_version = 1;

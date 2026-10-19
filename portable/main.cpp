@@ -53,6 +53,8 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
                       third-order, ninth-order or sony-sbm (error feedback)
   --valid-bits N       Integer PCM only: quantize to N significant bits (8 up to
                       the container), stored left-justified, e.g. 20 in wav-pcm24
+  --output-channels N  From a configuration list, select the first entry with N
+                      output channels (as well as the input rate and channels)
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
@@ -139,7 +141,7 @@ int run(int argc, char** argv) {
         std::uint64_t dither_seed = 0;
         convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
         unsigned valid_bits = 0;
-        std::size_t block = 256;
+        std::size_t block = 256, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
         bool keep = false, speaker_map = false;
@@ -183,6 +185,11 @@ int run(int argc, char** argv) {
                 else
                     throw std::invalid_argument(
                         "FFT planning mode must be estimate, measure or patient");
+            } else if (option == "--output-channels") {
+                audio_options = true;
+                output_channels = count(value());
+                if (output_channels > 256)
+                    throw std::invalid_argument("--output-channels must be 1..256");
             } else if (option == "--block-size")
                 block = count(value());
             else if (option == "--keep-latency") {
@@ -323,8 +330,10 @@ int run(int argc, char** argv) {
         convolver::AudioReader reader(input, raw);
         const auto info = reader.info();
         std::vector<std::filesystem::path> dependencies;
-        const auto config =
-            convolver::load_configuration(filter, info.sample_rate, info.channels, &dependencies);
+        const auto config = convolver::load_configuration(
+            filter,
+            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels},
+            &dependencies);
         for (const auto& source : dependencies)
             if (same_file(source, output))
                 throw std::invalid_argument(

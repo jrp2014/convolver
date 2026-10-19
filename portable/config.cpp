@@ -131,8 +131,11 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
     return p.is_absolute() ? p : owner.parent_path() / p;
 }
 
-bool matches(int sample_rate, std::size_t input_channels, int rate, std::size_t inputs) {
-    return (!rate || rate == sample_rate) && (!inputs || inputs == input_channels);
+bool matches(int sample_rate, std::size_t input_channels, std::size_t output_channels,
+             const ConfigurationSelection& s) {
+    return (!s.sample_rate || s.sample_rate == sample_rate) &&
+           (!s.input_channels || s.input_channels == input_channels) &&
+           (!s.output_channels || s.output_channels == output_channels);
 }
 
 Configuration configuration_graph(const ParsedConfiguration& parsed) {
@@ -334,7 +337,14 @@ namespace convolver {
 Configuration load_configuration(const std::filesystem::path& path, int expected_rate,
                                  std::size_t expected_inputs,
                                  std::vector<std::filesystem::path>* source_paths) {
-    if (expected_rate < 0 || expected_rate > 768000 || expected_inputs > 256)
+    return load_configuration(path, ConfigurationSelection{expected_rate, expected_inputs, 0},
+                              source_paths);
+}
+Configuration load_configuration(const std::filesystem::path& path,
+                                 const ConfigurationSelection& selection,
+                                 std::vector<std::filesystem::path>* source_paths) {
+    if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
+        selection.input_channels > 256 || selection.output_channels > 256)
         throw std::invalid_argument("expected audio properties out of range");
     if (path == "-")
         throw std::invalid_argument("configuration must be a file");
@@ -343,7 +353,8 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
     detail::Resolver resolver([&](const detail::Resolver::Leaf& leaf) {
         if (leaf.audio) {
             const auto info = leaf.audio->info();
-            if (!detail::matches(info.sample_rate, info.channels, expected_rate, expected_inputs))
+            // A sound file maps each channel to the same output channel.
+            if (!detail::matches(info.sample_rate, info.channels, info.channels, selection))
                 return false;
             selected = detail::decode_audio_filter(*leaf.audio, budget, {leaf.path, 0, 0});
             return true;
@@ -351,8 +362,8 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
         const auto& parsed = leaf.document->configuration;
         // Lists select by stream properties. Unrelated entries' text is validated,
         // but their IR assets need not be installed and are not decoded.
-        if (!detail::matches(parsed.sample_rate, parsed.input_channels, expected_rate,
-                             expected_inputs))
+        if (!detail::matches(parsed.sample_rate, parsed.input_channels, parsed.output_channels,
+                             selection))
             return false;
         auto cfg = detail::configuration_graph(parsed);
         detail::decode_impulses(*leaf.document, cfg, budget);
@@ -364,6 +375,10 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
             *source_paths = resolver.sources();
         return std::move(*selected);
     }
-    throw std::runtime_error("no configuration matches the input sample rate and channel count");
+    throw std::runtime_error(selection.output_channels
+                                 ? "no configuration matches the input sample rate, input "
+                                   "channel count and output channel count"
+                                 : "no configuration matches the input sample rate and channel "
+                                   "count");
 }
 } // namespace convolver

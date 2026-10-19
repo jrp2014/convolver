@@ -102,6 +102,20 @@ def automatic_gain_tests(d):
         near(out,[v/32768*0.25*10**(db/20) for v in values]) if mode=='no-clip' else None
     call(['--filter',ir,'--input',src,'--output',dst,'--gain-db','loud'],ok=False)
 
+def output_selection_tests(d):
+    """--output-channels selects list entries by output count, as the historical engine did."""
+    ir=d/'os-ir.wav'; src=d/'os-in.wav'; dst=d/'os-out.wav'
+    pcm(ir,[16384]); pcm(src,[1000,-2000,3000])
+    (d/'os-wide.cfg').write_text('48000 1 3 0\n0\n0 0 0\nos-ir.wav\n0\n0\n0 1 2\n')
+    (d/'os-narrow.cfg').write_text('48000 1 1 0\n0\n0\nos-ir.wav\n0\n0\n0\n')
+    (d/'os-list.txt').write_text('os-wide.cfg\nos-narrow.cfg\n')
+    base=['--filter',d/'os-list.txt','--input',src,'--output',dst]
+    call(base); assert floats(dst)[0]==3
+    call(base+['--output-channels','1']); assert floats(dst)[0]==1
+    call(base+['--output-channels','3']); assert floats(dst)[0]==3
+    p=call(base+['--output-channels','2'],ok=False)
+    assert b'output channel count' in p.stderr, p.stderr
+
 def speaker_map_tests(d):
     """--speaker-map config labels WAV channels with the configuration's mask."""
     ir=d/'sm-ir.wav'; src=d/'sm-in.wav'; out=d/'sm-out.wav'
@@ -229,6 +243,7 @@ def main():
         call(['--filter',ir,'--input',src,'--output',dst,'--dither','none'])
         integer_format_tests(d)
         automatic_gain_tests(d)
+        output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size','0'], ['--block-size','-1'], ['--gain-db','nan'], ['--unknown']):
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)

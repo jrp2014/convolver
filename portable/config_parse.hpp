@@ -127,8 +127,9 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner, cons
 
 // Header, delays and routes without coefficients.
 Configuration configuration_graph(const ParsedConfiguration&);
-bool matches(int sample_rate, std::size_t input_channels, int expected_rate,
-             std::size_t expected_inputs);
+// Zero expected values are unspecified and match anything.
+bool matches(int sample_rate, std::size_t input_channels, std::size_t output_channels,
+             const ConfigurationSelection&);
 
 struct DecodedIr {
     std::filesystem::path resolved;

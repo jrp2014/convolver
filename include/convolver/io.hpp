@@ -131,8 +131,18 @@ class AudioWriter {
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+// Stream properties a configuration must match; zero means unspecified. The
+// historical engine also selected list entries by the output format the
+// playback device accepted, which output_channels reproduces.
+struct ConfigurationSelection {
+    int sample_rate = 0;
+    std::size_t input_channels = 0, output_channels = 0;
+};
 // IR audio file, legacy .cfg, or configuration list. A list selects the first
-// entry matching both expected properties; zero means unspecified.
+// entry matching every specified property. A sound file has as many outputs as
+// inputs.
+Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
+                                 std::vector<std::filesystem::path>* source_paths = nullptr);
 Configuration load_configuration(const std::filesystem::path&, int expected_rate = 0,
                                  std::size_t expected_inputs = 0,
                                  std::vector<std::filesystem::path>* source_paths = nullptr);

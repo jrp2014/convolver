@@ -18,6 +18,7 @@ constexpr auto usage = R"(Usage: convolver --inspect CONFIG [options]
        convolver --validate CONFIG [options]
   --sample-rate HZ         Select as rendering would for this input rate
   --input-channels N       Select as rendering would for this input channel count
+  --output-channels N      Select as rendering would for this output channel count
   --block-size N           Partition size for latency/tail/storage (default 256)
   --all-configurations     Validate every list entry (no rate/channel selectors)
   --syntax-only            Check one configuration's text; do not open IR files
@@ -454,6 +455,8 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
     r.options.expected_rate ? j.value(r.options.expected_rate) : j.null();
     j.key("expected_input_channels");
     r.options.expected_inputs ? j.number(r.options.expected_inputs) : j.null();
+    j.key("expected_output_channels");
+    r.options.expected_outputs ? j.number(r.options.expected_outputs) : j.null();
     j.key("block_frames");
     j.number(r.options.block_frames);
     j.key("reason");
@@ -477,6 +480,8 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
         j.optional(s.sample_rate);
         j.key("input_channels");
         j.optional(s.input_channels);
+        j.key("output_channels");
+        j.optional(s.output_channels);
         j.close('}');
     }
     j.close(']');
@@ -525,7 +530,7 @@ std::string report_json(InspectionReport& r, bool validate, bool warnings_as_err
 
 bool is_inspection(int argc, char** argv) {
     // Skip the values of render options, so a file named "--validate" stays a file.
-    constexpr std::array<std::pair<std::string_view, int>, 11> render_values{{
+    constexpr std::array<std::pair<std::string_view, int>, 17> render_values{{
         {"--filter", 1},
         {"--input", 1},
         {"--output", 1},
@@ -537,6 +542,12 @@ bool is_inspection(int argc, char** argv) {
         {"--output-format", 1},
         {"--speaker-map", 1},
         {"--raw-input", 2},
+        {"--dither", 1},
+        {"--dither-seed", 1},
+        {"--noise-shaping", 1},
+        {"--valid-bits", 1},
+        {"--output-channels", 1},
+        {"--fft-time-limit", 1},
     }};
     for (int i = 1; i < argc; ++i) {
         const std::string_view a = argv[i];
@@ -576,6 +587,8 @@ int run_inspection(int argc, char** argv) {
                 options.expected_rate = static_cast<int>(count(value(), 768000, "--sample-rate"));
             else if (option == "--input-channels")
                 options.expected_inputs = count(value(), 256, "--input-channels");
+            else if (option == "--output-channels")
+                options.expected_outputs = count(value(), 256, "--output-channels");
             else if (option == "--block-size")
                 options.block_frames = count(value(), 1u << 20, "--block-size");
             else if (option == "--all-configurations")
@@ -597,9 +610,10 @@ int run_inspection(int argc, char** argv) {
             } else
                 throw Usage(option + " is not available with --inspect or --validate");
         }
-        if (options.all_configurations && (options.expected_rate || options.expected_inputs))
-            throw Usage("--all-configurations cannot be combined with --sample-rate or "
-                        "--input-channels");
+        if (options.all_configurations &&
+            (options.expected_rate || options.expected_inputs || options.expected_outputs))
+            throw Usage("--all-configurations cannot be combined with --sample-rate, "
+                        "--input-channels or --output-channels");
         if (options.all_configurations && options.syntax_only)
             throw Usage("--all-configurations and --syntax-only are mutually exclusive");
         if (path.empty() || path == "-")

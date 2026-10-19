@@ -793,6 +793,20 @@ void run(const fs::path& dir) {
     text_file(dir / "list.txt", "44100.wav\ngood.cfg\n");
     require(load_configuration(dir / "list.txt", 48000, 2).sample_rate == 48000, "list selection");
     rejects([&] { load_configuration(dir / "list.txt", 96000, 1); });
+    // Selection by output channels, as the historical engine chose by output format.
+    text_file(dir / "upmix.cfg", "48000 2 6 0\n0 0\n0 0 0 0 0 0\nir ü.wav\n0\n0\n0 1 2 3 4 5\n");
+    text_file(dir / "outputs.txt", "44100.wav\nupmix.cfg\ngood.cfg\n");
+    require(load_configuration(dir / "outputs.txt", ConfigurationSelection{48000, 2, 0})
+                    .output_channels == 6,
+            "unspecified outputs select the first entry");
+    require(load_configuration(dir / "outputs.txt", ConfigurationSelection{48000, 2, 2})
+                    .output_channels == 2,
+            "select by output channels");
+    require(load_configuration(dir / "outputs.txt", ConfigurationSelection{0, 0, 1}).sample_rate ==
+                44100,
+            "a sound file has as many outputs as inputs");
+    rejects([&] { load_configuration(dir / "outputs.txt", ConfigurationSelection{48000, 2, 3}); });
+    rejects([&] { load_configuration(dir / "outputs.txt", ConfigurationSelection{0, 0, 257}); });
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
     text_file(dir / "list.txt", "unrelated.cfg\ngood.cfg\n");
     require(load_configuration(dir / "list.txt", 48000, 2).sample_rate == 48000,
