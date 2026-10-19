@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/io.hpp"
+#include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
