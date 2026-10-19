@@ -145,23 +145,52 @@ has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
 it, matching the historical Pipe timing convention. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
-exceed unity. PCM24/PCM32 output clips to its representable range via libsndfile.
+exceed unity. Integer output clips to its representable range.
 
-Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
+Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
+`wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
 
-PCM16 output is quantized by Convolver's own `Pcm16Quantizer`, not libsndfile:
-each sample is scaled by 32768, offset by the dither (in LSBs), rounded to the
-nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. Dither
-is off by default. `--dither` selects `none` (default), `triangular` (independent
-TPDF, error power 1/4 LSB² at every signal level), `triangular-highpass` (the
-historical engine's "Triangular": per-channel difference of successive uniform
-values, same amplitude, high-pass error spectrum) or `rectangular`.
-`--dither-seed N` (default 0) seeds the generator; the same seed, input and
-channel count give byte-identical output regardless of buffering. Dither is
-rejected for other output formats. There is no noise shaping. The library's
-`AudioWriter` defaults to no dither; pass `QuantizationOptions` to enable it.
-The tests check rounding/clipping endpoints, reproducibility, chunk independence
-and measured error mean, variance and correlation against the theoretical values.
+Every integer format is quantized by Convolver's own `Quantizer`, not libsndfile:
+with B significant bits, each sample is scaled by 2^(B-1), offset by the dither
+(in LSBs) and the noise-shaping feedback, rounded to the nearest integer (ties
+toward +infinity) and clipped to [-2^(B-1), 2^(B-1) - 1]. PCM16 output is
+unchanged from 0.3 (`Pcm16Quantizer` is now the 16-bit case). PCM24 and PCM32
+used libsndfile's conversion before 0.4; they now follow the same rule, which
+can differ from it by at most one LSB.
+
+Dither is off by default. `--dither` selects `none` (default), `triangular`
+(independent TPDF, error power 1/4 LSB² at every signal level),
+`triangular-highpass` (the historical engine's "Triangular": per-channel
+difference of successive uniform values, same amplitude, high-pass error
+spectrum) or `rectangular`. `--dither-seed N` (default 0) seeds the generator;
+the same seed, input and channel count give byte-identical output regardless of
+buffering. Float and RAW formats reject dither, noise shaping and valid bits.
+
+`--noise-shaping` selects one of the historical engine's error-feedback shapers:
+`simple` (first order), `second-order`, `third-order`, `ninth-order` or
+`sony-sbm` (the historical "Pseudo Sony SBM"), or `none` (default). Each
+subtracts a fixed combination of the channel's previous quantization errors
+before rounding, so the error spectrum is the rounding error filtered by
+1 - Σ c_k z^-k, moving noise away from the frequencies where hearing is most
+sensitive at the cost of more total noise. The fed-back error is taken before
+clipping, so overload cannot make a shaper run away (the historical code could
+wrap). The coefficients are in `include/convolver/io.hpp`. Shaping works with or
+without dither; use it with dither.
+
+`--valid-bits N` quantizes to N significant bits (8 up to the container size)
+and stores them left-justified with the low bits zero, in a
+WAVE_FORMAT_EXTENSIBLE header that declares N as `wValidBitsPerSample`, for
+example 20 valid bits in `wav-pcm24` or 24 in `wav-pcm32`, as the historical
+engine offered. Dither and shaping then act at that resolution.
+
+The library's `AudioWriter` defaults to plain rounding; pass `QuantizationOptions`
+to enable dither, shaping or valid bits. The tests check rounding/clipping
+endpoints for 8 to 32 bits, reproducibility, chunk independence, measured
+dither error mean, variance and correlation, that each shaper's output error
+equals a bounded rounding residual through the historical coefficients, that its
+measured error spectrum follows 1 - Σ c_k z^-k within 15%, recovery after
+clipping, and exact stored samples and header fields for every container and
+valid-bit combination.
 
 ### Speaker labels
 

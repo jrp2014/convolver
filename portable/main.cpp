@@ -37,14 +37,18 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
   --gain-db DB         Output gain in decibels (default 0)
   --keep-latency       Keep the leading block of algorithmic latency
-  --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
-                      raw-float (little-endian IEEE float32)
+  --output-format F   wav-float (default), wav-pcm8, wav-pcm16, wav-pcm24,
+                      wav-pcm32, raw-float (little-endian IEEE float32)
   --speaker-map config
                       Label WAV output channels with the configuration's channel
                       mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
-  --dither D           PCM16 only: none (default), triangular, triangular-highpass
-                      or rectangular. Other formats reject dither.
+  --dither D           Integer PCM only: none (default), triangular,
+                      triangular-highpass or rectangular
   --dither-seed N      Dither generator seed (default 0); output is reproducible
+  --noise-shaping S    Integer PCM only: none (default), simple, second-order,
+                      third-order, ninth-order or sony-sbm (error feedback)
+  --valid-bits N       Integer PCM only: quantize to N significant bits (8 up to
+                      the container), stored left-justified, e.g. 20 in wav-pcm24
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
@@ -129,6 +133,8 @@ int run(int argc, char** argv) {
         convolver::OutputFormat format = convolver::OutputFormat::wav_float;
         std::optional<convolver::Dither> dither;
         std::uint64_t dither_seed = 0;
+        convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
+        unsigned valid_bits = 0;
         std::size_t block = 256;
         float gain = 1;
         bool keep = false, speaker_map = false;
@@ -204,6 +210,8 @@ int run(int argc, char** argv) {
                 const auto name = value();
                 if (name == "wav-float")
                     format = convolver::OutputFormat::wav_float;
+                else if (name == "wav-pcm8")
+                    format = convolver::OutputFormat::wav_pcm8;
                 else if (name == "wav-pcm16")
                     format = convolver::OutputFormat::wav_pcm16;
                 else if (name == "wav-pcm24")
@@ -227,6 +235,29 @@ int run(int argc, char** argv) {
                     dither = convolver::Dither::triangular_highpass;
                 else
                     throw std::invalid_argument("unsupported dither: " + name);
+            } else if (option == "--noise-shaping") {
+                audio_options = true;
+                const auto name = value();
+                if (name == "none")
+                    shaping = convolver::NoiseShaping::none;
+                else if (name == "simple")
+                    shaping = convolver::NoiseShaping::simple;
+                else if (name == "second-order")
+                    shaping = convolver::NoiseShaping::second_order;
+                else if (name == "third-order")
+                    shaping = convolver::NoiseShaping::third_order;
+                else if (name == "ninth-order")
+                    shaping = convolver::NoiseShaping::ninth_order;
+                else if (name == "sony-sbm")
+                    shaping = convolver::NoiseShaping::sony_sbm;
+                else
+                    throw std::invalid_argument("unsupported noise shaping: " + name);
+            } else if (option == "--valid-bits") {
+                audio_options = true;
+                const auto bits = count(value());
+                if (bits < 8 || bits > 32)
+                    throw std::invalid_argument("--valid-bits must be between 8 and 32");
+                valid_bits = static_cast<unsigned>(bits);
             } else if (option == "--dither-seed") {
                 audio_options = true;
                 const auto text = value();
@@ -239,6 +270,16 @@ int run(int argc, char** argv) {
         }
         if (speaker_map && format == convolver::OutputFormat::raw_float)
             throw std::invalid_argument("--speaker-map needs WAV output; raw-float has no header");
+        const auto bits = convolver::container_bits(format);
+        if (!bits && dither && *dither != convolver::Dither::none)
+            throw std::invalid_argument("--dither applies only to integer PCM output");
+        if (!bits && shaping != convolver::NoiseShaping::none)
+            throw std::invalid_argument("--noise-shaping applies only to integer PCM output");
+        if (valid_bits && valid_bits > bits)
+            throw std::invalid_argument(
+                bits ? "--valid-bits exceeds the output container's " + std::to_string(bits) +
+                           " bits"
+                     : std::string("--valid-bits applies only to integer PCM output"));
         if ((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
             throw std::invalid_argument("tuning and wisdom require the FFTW backend");
         if (!tune.empty()) {
@@ -279,12 +320,9 @@ int run(int argc, char** argv) {
                 throw std::invalid_argument(
                     "output must differ from referenced configuration and impulse files");
         convolver::Engine engine(config, block, fft_options);
-        if (dither && *dither != convolver::Dither::none &&
-            format != convolver::OutputFormat::wav_pcm16)
-            throw std::invalid_argument("--dither applies only to wav-pcm16 output");
-        // Dither is opt-in; PCM16 is plainly rounded by default.
+        // Dither and shaping are opt-in; integer PCM is plainly rounded by default.
         const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
-                                                          dither_seed};
+                                                          dither_seed, shaping, valid_bits};
         convolver::OutputMetadata metadata;
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;

@@ -375,17 +375,304 @@ void dither_tests(const fs::path& dir) {
         w.close();
     }
     require(pcm16_samples(p) == quantize(Dither::none, 0, ramp, 2), "writer default rounding");
-    for (auto format : {OutputFormat::wav_float, OutputFormat::wav_pcm24, OutputFormat::wav_pcm32,
-                        OutputFormat::raw_float})
+    for (auto format : {OutputFormat::wav_float, OutputFormat::raw_float}) {
         rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, format, {Dither::triangular}); });
+        rejects([&] {
+            AudioWriter w(dir / "x.wav", {48000, 1}, format, {{}, 0, NoiseShaping::simple});
+        });
+        rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, format, {{}, 0, {}, 16}); });
+    }
     rejects([&] { Pcm16Quantizer q(0); });
     rejects([&] { Pcm16Quantizer q(1, {static_cast<Dither>(99)}); });
 }
+std::vector<std::int32_t> quantize_bits(unsigned bits, QuantizationOptions options,
+                                        const std::vector<float>& x, std::size_t channels = 1) {
+    Quantizer q(channels, bits, options);
+    std::vector<std::int32_t> y(x.size());
+    q.quantize(x, y);
+    return y;
+}
+// Raw little-endian integer samples and format fields read without libsndfile.
+struct WaveData {
+    unsigned tag = 0, bits = 0, valid_bits = 0, channels = 0;
+    std::uint32_t mask = 0;
+    std::vector<std::int64_t> samples; // Container values; 8-bit is unsigned.
+};
+WaveData read_wave(const fs::path& p) {
+    std::ifstream f(p, std::ios::binary);
+    std::vector<unsigned char> b((std::istreambuf_iterator<char>(f)), {});
+    auto u16 = [&](std::size_t i) { return unsigned(b.at(i) | (b.at(i + 1) << 8)); };
+    auto u32 = [&](std::size_t i) { return std::uint32_t(u16(i) | (u16(i + 2) << 16)); };
+    require(b.size() > 12 && std::string(b.begin(), b.begin() + 4) == "RIFF", "RIFF header");
+    WaveData w;
+    for (std::size_t pos = 12; pos + 8 <= b.size();) {
+        const std::string tag(b.begin() + static_cast<long>(pos),
+                              b.begin() + static_cast<long>(pos) + 4);
+        const auto length = u32(pos + 4);
+        if (tag == "fmt ") {
+            w.tag = u16(pos + 8);
+            w.channels = u16(pos + 10);
+            w.bits = w.valid_bits = u16(pos + 22);
+            if (w.tag == 0xfffe) {
+                w.valid_bits = u16(pos + 26);
+                w.mask = u32(pos + 28);
+            }
+        } else if (tag == "data") {
+            const auto width = w.bits / 8;
+            for (std::size_t i = pos + 8; i + width <= pos + 8 + length; i += width) {
+                std::uint64_t v = 0;
+                for (unsigned k = 0; k < width; ++k)
+                    v |= std::uint64_t(b.at(i + k)) << (8 * k);
+                if (width > 1 && (v >> (w.bits - 1)) & 1)
+                    w.samples.push_back(static_cast<std::int64_t>(v) - (std::int64_t(1) << w.bits));
+                else
+                    w.samples.push_back(static_cast<std::int64_t>(v));
+            }
+        }
+        pos += 8 + length + (length & 1u);
+    }
+    return w;
+}
+const std::vector<double>& shaper_coefficients(NoiseShaping s) {
+    // Copied from the historical dither.h, independently of the implementation.
+    static const std::vector<double> none, simple{1}, second{1.287, -0.651},
+        third{1.329, -0.735, 0.0646},
+        ninth{2.203, -3.210, 3.970, -4.404, 3.668, -2.656, 1.644, -0.767, 0.118},
+        sbm{1.47933,   -1.59032,  1.64436,    -1.36613,   0.926704,    -0.557931,
+            -0.267859, -0.106726, -0.0285161, 0.00123066, -0.00616555, 0.003067};
+    switch (s) {
+    case NoiseShaping::simple:
+        return simple;
+    case NoiseShaping::second_order:
+        return second;
+    case NoiseShaping::third_order:
+        return third;
+    case NoiseShaping::ninth_order:
+        return ninth;
+    case NoiseShaping::sony_sbm:
+        return sbm;
+    default:
+        return none;
+    }
+}
+// Error power in eight equal bands from 0 to half the sample rate, measured by
+// an averaged periodogram, and the power predicted for white residual power
+// sigma2 through the shaper's noise transfer 1 - sum c_k z^-k.
+using Bands = std::array<double, 8>;
+Bands measured_bands(const std::vector<double>& e) {
+    constexpr std::size_t n = 1024;
+    constexpr double pi = 3.141592653589793;
+    // Hann window and half-overlapped segments limit leakage into deep notches.
+    std::vector<double> window(n), cosine(n), sine(n);
+    double power = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        window[i] = 0.5 - 0.5 * std::cos(2 * pi * double(i) / double(n));
+        power += window[i] * window[i];
+        cosine[i] = std::cos(2 * pi * double(i) / double(n));
+        sine[i] = std::sin(2 * pi * double(i) / double(n));
+    }
+    Bands bands{};
+    std::size_t segments = 0;
+    for (std::size_t start = 0; start + n <= e.size(); start += n / 2, ++segments)
+        for (std::size_t k = 1; k < n / 2; ++k) {
+            double re = 0, im = 0;
+            for (std::size_t i = 0; i < n; ++i) {
+                const double x = window[i] * e[start + i];
+                re += x * cosine[(k * i) % n];
+                im -= x * sine[(k * i) % n];
+            }
+            bands[k * 8 / (n / 2)] += (re * re + im * im) / power;
+        }
+    for (auto& b : bands)
+        b /= double(segments);
+    return bands;
+}
+Bands predicted_bands(const std::vector<double>& c, double sigma2) {
+    constexpr std::size_t n = 1024;
+    Bands bands{};
+    for (std::size_t k = 1; k < n / 2; ++k) {
+        const double w = 2 * 3.141592653589793 * double(k) / double(n);
+        double re = 1, im = 0;
+        for (std::size_t j = 0; j < c.size(); ++j) {
+            re -= c[j] * std::cos(w * double(j + 1));
+            im += c[j] * std::sin(w * double(j + 1));
+        }
+        bands[k * 8 / (n / 2)] += sigma2 * (re * re + im * im);
+    }
+    return bands;
+}
+void quantizer_tests(const fs::path& dir) {
+    // Rounding and clipping at every container size, independent of libsndfile.
+    for (unsigned bits : {8u, 12u, 20u, 24u, 32u}) {
+        const double s = std::ldexp(1.0, static_cast<int>(bits) - 1);
+        const std::vector<float> x{0,
+                                   2,
+                                   -2,
+                                   1,
+                                   -1,
+                                   static_cast<float>(1.5 / s),
+                                   static_cast<float>(-1.5 / s),
+                                   static_cast<float>(0.4 / s)};
+        const auto y = quantize_bits(bits, {}, x);
+        const auto high = static_cast<std::int64_t>(s) - 1, low = -static_cast<std::int64_t>(s);
+        require(y[0] == 0 && y[1] == high && y[2] == low && y[3] == high && y[4] == low &&
+                    y[5] == 2 && y[6] == -1 && y[7] == 0,
+                "integer rounding and clipping");
+    }
+    // The PCM16 wrapper is exactly the 16-bit quantizer, dither sequence included.
+    std::vector<float> ramp(5000);
+    for (std::size_t i = 0; i < ramp.size(); ++i)
+        ramp[i] = 0.4f * std::sin(0.01f * static_cast<float>(i));
+    for (auto d : {Dither::none, Dither::triangular, Dither::triangular_highpass}) {
+        const auto wide = quantize_bits(16, {d, 3}, ramp, 2);
+        const auto narrow = quantize(d, 3, ramp, 2);
+        require(std::equal(wide.begin(), wide.end(), narrow.begin()), "PCM16 wrapper");
+    }
+    rejects([&] { Quantizer q(1, 7); });
+    rejects([&] { Quantizer q(1, 33); });
+    rejects([&] { Quantizer q(1, 16, {{}, 0, static_cast<NoiseShaping>(42)}); });
+
+    // Noise shaping. With the historical coefficients c, y = round(S x - H + d)
+    // where H = sum c_k e[n-k] and e = y - (S x - H). Recomputing e from the
+    // output must give a plain rounding residual (|e| <= 1/2 undithered, < 3/2
+    // with TPDF); other coefficients would leave their difference in e. Shaping
+    // must also push error power out of the low band.
+    std::vector<float> music(4096 * 6);
+    for (std::size_t i = 0; i < music.size(); ++i)
+        music[i] = 0.3f * std::sin(0.0021f * static_cast<float>(i)) +
+                   0.01f * std::sin(0.37f * static_cast<float>(i));
+    for (auto shaping :
+         {NoiseShaping::none, NoiseShaping::simple, NoiseShaping::second_order,
+          NoiseShaping::third_order, NoiseShaping::ninth_order, NoiseShaping::sony_sbm}) {
+        for (auto d : {Dither::none, Dither::triangular}) {
+            for (unsigned bits : {8u, 16u}) {
+                const auto y = quantize_bits(bits, {d, 11, shaping}, music);
+                const auto& c = shaper_coefficients(shaping);
+                const double scale = std::ldexp(1.0, static_cast<int>(bits) - 1);
+                std::vector<double> e(music.size()), total(music.size());
+                double worst = 0;
+                for (std::size_t n = 0; n < music.size(); ++n) {
+                    total[n] = static_cast<double>(y[n]) - static_cast<double>(music[n]) * scale;
+                    double feedback = 0;
+                    for (std::size_t k = 0; k < c.size() && k < n; ++k)
+                        feedback += c[k] * e[n - 1 - k];
+                    e[n] = static_cast<double>(y[n]) -
+                           (static_cast<double>(music[n]) * scale - feedback);
+                    worst = std::max(worst, std::abs(e[n]));
+                }
+                require(worst <= (d == Dither::none ? 0.5 + 1e-6 : 1.5 + 1e-6),
+                        "noise-shaper residual is a rounding error");
+                if (bits != 16 || d != Dither::triangular)
+                    continue;
+                // TPDF dither (1/6 LSB^2) plus rounding (1/12) leaves white e of
+                // power 1/4; its shaped spectrum must follow the transfer function.
+                const auto got = measured_bands(total);
+                const auto want = predicted_bands(c, 0.25);
+                for (std::size_t b = 0; b < got.size(); ++b)
+                    require(got[b] > 0.85 * want[b] && got[b] < 1.18 * want[b],
+                            "shaped error spectrum follows the noise transfer function");
+            }
+        }
+        // Overload: the shaper stays bounded and recovers after clipping.
+        std::vector<float> loud(2000, 1.5f);
+        loud.insert(loud.end(), 2000, 0.25f);
+        const auto y = quantize_bits(16, {Dither::triangular, 1, shaping}, loud);
+        for (std::size_t i = 3000; i < y.size(); ++i)
+            require(std::abs(y[i] - 8192) < 64, "noise shaper recovers after clipping");
+        // NaN and infinity neither escape nor disturb later samples.
+        Quantizer q(1, 16, {Dither::none, 0, shaping});
+        std::vector<float> bad{std::numeric_limits<float>::quiet_NaN(),
+                               std::numeric_limits<float>::infinity(),
+                               -std::numeric_limits<float>::infinity(),
+                               0,
+                               0,
+                               0};
+        std::vector<std::int32_t> out(bad.size());
+        q.quantize(bad, out);
+        require(out[0] == 0 && out[1] == 32767 && out[2] == -32768 && out[3] == 0 && out[4] == 0 &&
+                    out[5] == 0,
+                "nonfinite samples with noise shaping");
+    }
+    // Shaped output is reproducible and independent of chunking and reset.
+    {
+        const QuantizationOptions o{Dither::triangular_highpass, 5, NoiseShaping::ninth_order};
+        const auto whole = quantize_bits(16, o, music, 2);
+        Quantizer q(2, 16, o);
+        std::vector<std::int32_t> pieces(music.size());
+        for (std::size_t offset = 0, step = 2; offset < music.size(); step = step * 5 % 994 + 2) {
+            const auto n = std::min(step, music.size() - offset);
+            q.quantize(std::span<const float>(music).subspan(offset, n),
+                       std::span<std::int32_t>(pieces).subspan(offset, n));
+            offset += n;
+        }
+        require(whole == pieces, "noise shaping is independent of chunk boundaries");
+        q.reset();
+        q.quantize(music, pieces);
+        require(whole == pieces, "reset clears the shaper");
+    }
+
+    // Writers: every integer format stores exactly the quantizer's samples,
+    // left-justified for reduced valid bits, with matching header fields.
+    struct Case {
+        OutputFormat format;
+        unsigned container, valid;
+        std::uint32_t mask;
+    };
+    for (const auto& c :
+         {Case{OutputFormat::wav_pcm8, 8, 8, 0}, Case{OutputFormat::wav_pcm16, 16, 16, 0},
+          Case{OutputFormat::wav_pcm24, 24, 24, 0}, Case{OutputFormat::wav_pcm24, 24, 20, 0},
+          Case{OutputFormat::wav_pcm24, 24, 16, 0x3}, Case{OutputFormat::wav_pcm32, 32, 32, 0},
+          Case{OutputFormat::wav_pcm32, 32, 24, 0x3}, Case{OutputFormat::wav_pcm32, 32, 20, 0},
+          Case{OutputFormat::wav_pcm16, 16, 12, 0}}) {
+        const auto p = dir / "bits.wav";
+        const QuantizationOptions o{Dither::triangular, 21, NoiseShaping::third_order,
+                                    c.valid == c.container ? 0 : c.valid};
+        {
+            AudioWriter w(p, {44100, 2}, c.format, o, {c.mask});
+            w.write(std::span<const float>(ramp).first(1000));
+            w.write(std::span<const float>(ramp).subspan(1000));
+            w.close();
+        }
+        const auto expected = quantize_bits(c.valid, o, ramp, 2);
+        const auto got = read_wave(p);
+        const bool extensible = c.mask || c.valid != c.container;
+        require(got.bits == c.container && got.valid_bits == c.valid && got.mask == c.mask &&
+                    got.channels == 2 && (got.tag == 0xfffe) == extensible,
+                "integer WAV header fields");
+        require(got.samples.size() == expected.size(), "integer WAV sample count");
+        for (std::size_t i = 0; i < expected.size(); ++i) {
+            const auto stored = c.container == 8 ? got.samples[i] - 128 : got.samples[i];
+            require(stored ==
+                        std::int64_t(expected[i]) * (std::int64_t(1) << (c.container - c.valid)),
+                    "integer WAV samples");
+        }
+        // libsndfile reads reduced-valid-bit files at their full scale.
+        AudioReader r(p);
+        std::vector<float> back(ramp.size());
+        require(r.read(back) == ramp.size() / 2, "integer WAV readback");
+        for (std::size_t i = 0; i < ramp.size(); ++i)
+            require(std::abs(back[i] - ramp[i]) < std::ldexp(40.0, -static_cast<int>(c.valid)),
+                    "integer WAV readback level");
+    }
+    rejects(
+        [&] { AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm24, {{}, 0, {}, 7}); });
+    rejects([&] {
+        AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm24, {{}, 0, {}, 25});
+    });
+    rejects(
+        [&] { AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm8, {{}, 0, {}, 16}); });
+    require(container_bits(OutputFormat::wav_pcm8) == 8 &&
+                container_bits(OutputFormat::wav_float) == 0 &&
+                container_bits(OutputFormat::raw_float) == 0,
+            "container bits");
+}
 void run(const fs::path& dir) {
     dither_tests(dir);
+    quantizer_tests(dir);
     const std::vector<float> samples{-1, 1, -.5f, .5f, 0, .125f, -.75f, .75f};
-    for (auto format : {OutputFormat::wav_float, OutputFormat::wav_pcm16, OutputFormat::wav_pcm24,
-                        OutputFormat::wav_pcm32, OutputFormat::raw_float}) {
+    for (auto format :
+         {OutputFormat::wav_float, OutputFormat::wav_pcm8, OutputFormat::wav_pcm16,
+          OutputFormat::wav_pcm24, OutputFormat::wav_pcm32, OutputFormat::raw_float}) {
         const auto p = dir / "roundtrip.audio";
         {
             AudioWriter w(p, {48000, 2}, format);
@@ -403,7 +690,8 @@ void run(const fs::path& dir) {
         std::vector<float> eof_buffer(2);
         require(r.read(eof_buffer) == 0, "EOF");
         for (std::size_t i = 0; i < samples.size(); ++i)
-            if (std::abs(result[i] - samples[i]) >= .00004f)
+            if (std::abs(result[i] - samples[i]) >=
+                (format == OutputFormat::wav_pcm8 ? .008f : .00004f))
                 throw std::runtime_error(
                     "sample roundtrip format=" + std::to_string(static_cast<int>(format)) +
                     " index=" + std::to_string(i) + " got=" + std::to_string(result[i]));
@@ -412,8 +700,8 @@ void run(const fs::path& dir) {
         r.close();
         rejects([&] { r.read(result); });
     }
-    for (auto format :
-         {OutputFormat::wav_pcm16, OutputFormat::wav_pcm24, OutputFormat::wav_pcm32}) {
+    for (auto format : {OutputFormat::wav_pcm8, OutputFormat::wav_pcm16, OutputFormat::wav_pcm24,
+                        OutputFormat::wav_pcm32}) {
         const auto p = dir / "clip.wav";
         {
             AudioWriter w(p, {48000, 1}, format);
@@ -424,7 +712,8 @@ void run(const fs::path& dir) {
         AudioReader r(p);
         std::vector<float> x(4);
         require(r.read(x) == 4, "clip frames");
-        require(x[0] <= -.9999f && x[1] <= -.9999f && x[2] >= .9999f && x[3] >= .9999f,
+        const float top = format == OutputFormat::wav_pcm8 ? .99f : .9999f;
+        require(x[0] <= -top && x[1] <= -top && x[2] >= top && x[3] >= top,
                 "PCM clipping endpoints");
     }
     rejects([&] { AudioReader r(dir / "missing.wav"); });

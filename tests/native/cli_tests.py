@@ -51,6 +51,43 @@ def channel_mask(path):
         pos += 8 + size + (size & 1)
     raise AssertionError('no fmt chunk')
 
+def wave_fields(path):
+    """(format tag, container bits, valid bits, mask, raw sample bytes) without libsndfile."""
+    data = Path(path).read_bytes(); pos = 12; fields = None; payload = None
+    while pos + 8 <= len(data):
+        tag, size = struct.unpack_from('<4sI', data, pos)
+        if tag == b'fmt ':
+            fmt, _, _, _, _, bits = struct.unpack_from('<HHIIHH', data, pos + 8)
+            valid, mask = struct.unpack_from('<HI', data, pos + 26) if fmt == 0xfffe else (bits, 0)
+            fields = (fmt, bits, valid, mask)
+        if tag == b'data': payload = data[pos+8:pos+8+size]
+        pos += 8 + size + (size & 1)
+    return (*fields, payload)
+
+def integer_format_tests(d):
+    """Dither, noise shaping, PCM8 and valid bits through the CLI."""
+    ir=d/'if-ir.wav'; src=d/'if-in.wav'; dst=d/'if-out.wav'
+    pcm(ir,[32767]); pcm(src,[(((i*379)%12001)-6000) for i in range(3000)])
+    base=['--filter',ir,'--input',src,'--output',dst]
+    call(base+['--output-format','wav-pcm8'])
+    fmt,bits,valid,mask,payload=wave_fields(dst)
+    assert (fmt,bits,valid)==(1,8,8) and len(payload)==3000
+    exact=[(((i*379)%12001)-6000)*32767/32768/256 for i in range(3000)]
+    assert all(abs((b-128)-x)<=0.5+1e-6 for b,x in zip(payload,exact))
+    for fmt_name,container in (('wav-pcm24',24),('wav-pcm32',32)):
+        for shaping in ('simple','second-order','third-order','ninth-order','sony-sbm'):
+            call(base+['--output-format',fmt_name,'--valid-bits','16','--dither','triangular',
+                       '--noise-shaping',shaping])
+            fmt,bits,valid,mask,payload=wave_fields(dst)
+            assert (fmt,bits,valid,mask)==(0xfffe,container,16,0), (fmt,bits,valid,mask)
+            width=container//8
+            values=[int.from_bytes(payload[i:i+width],'little',signed=True)
+                    for i in range(0,len(payload),width)]
+            assert all(v % (1<<(container-16))==0 for v in values)
+            assert values!=[0]*len(values)
+    call(base+['--output-format','wav-pcm24','--dither','rectangular','--noise-shaping','none'])
+    fmt,bits,valid,mask,_=wave_fields(dst); assert (fmt,bits,valid)==(1,24,24)
+
 def speaker_map_tests(d):
     """--speaker-map config labels WAV channels with the configuration's mask."""
     ir=d/'sm-ir.wav'; src=d/'sm-in.wav'; out=d/'sm-out.wav'
@@ -169,10 +206,14 @@ def main():
         for mode in ('rectangular','triangular-highpass'):
             call(base+['--dither',mode]); assert all(abs(a-b)<=1.5 for a,b in zip(shorts(dst),exact))
         for extra in (['--dither','bogus'],['--dither-seed','-1'],['--dither-seed','x'],
-                      ['--output-format','wav-pcm24','--dither','triangular'],
-                      ['--output-format','wav-float','--dither','rectangular']):
+                      ['--output-format','wav-float','--dither','rectangular'],
+                      ['--output-format','raw-float','--dither','triangular'],
+                      ['--noise-shaping','bogus'],['--output-format','wav-float','--noise-shaping','simple'],
+                      ['--valid-bits','7'],['--valid-bits','17'],['--output-format','wav-pcm8','--valid-bits','9'],
+                      ['--output-format','wav-float','--valid-bits','16']):
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)
         call(['--filter',ir,'--input',src,'--output',dst,'--dither','none'])
+        integer_format_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size','0'], ['--block-size','-1'], ['--gain-db','nan'], ['--unknown']):
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)
