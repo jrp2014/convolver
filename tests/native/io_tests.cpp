@@ -14,6 +14,7 @@
 #include <optional>
 #include <sndfile.h>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 #ifndef _WIN32
@@ -550,6 +551,13 @@ void quantizer_tests(const fs::path& dir) {
                 const auto y = quantize_bits(bits, {d, 11, shaping}, music);
                 const auto& c = shaper_coefficients(shaping);
                 const double scale = std::ldexp(1.0, static_cast<int>(bits) - 1);
+                // Recovering e from the output divides by the noise transfer
+                // function. Sony SBM's has a zero outside the unit circle
+                // (|z| = 1.084), so a last-bit difference between this
+                // recomputation and the quantizer's own (for example a fused
+                // multiply-add on arm64) grows 1.084 times per sample. Checking
+                // its first 192 samples keeps that growth below 1e-7.
+                const std::size_t checked = shaping == NoiseShaping::sony_sbm ? 192 : music.size();
                 std::vector<double> e(music.size()), total(music.size());
                 double worst = 0;
                 for (std::size_t n = 0; n < music.size(); ++n) {
@@ -559,10 +567,15 @@ void quantizer_tests(const fs::path& dir) {
                         feedback += c[k] * e[n - 1 - k];
                     e[n] = static_cast<double>(y[n]) -
                            (static_cast<double>(music[n]) * scale - feedback);
-                    worst = std::max(worst, std::abs(e[n]));
+                    if (n < checked)
+                        worst = std::max(worst, std::abs(e[n]));
                 }
-                require(worst <= (d == Dither::none ? 0.5 + 1e-6 : 1.5 + 1e-6),
-                        "noise-shaper residual is a rounding error");
+                if (worst > (d == Dither::none ? 0.5 + 1e-6 : 1.5 + 1e-6))
+                    throw std::runtime_error(
+                        "noise-shaper residual is not a rounding error: shaper " +
+                        std::to_string(static_cast<int>(shaping)) + ", " + std::to_string(bits) +
+                        " bits, dither " + std::to_string(static_cast<int>(d)) + ", worst " +
+                        std::to_string(worst));
                 if (bits != 16 || d != Dither::triangular)
                     continue;
                 // TPDF dither (1/6 LSB^2) plus rounding (1/12) leaves white e of
