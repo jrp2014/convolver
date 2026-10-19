@@ -34,6 +34,10 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
        convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
+                      or exhaustive
+  --fft-time-limit S   Limit each FFTW plan search to S seconds (best plan so
+                      far is used); the historical "Take 1 minute" was
+                      --fft-plan patient --fft-time-limit 30
   --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
   --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
   --gain-db DB         Output gain in decibels (default 0), or 'auto' for the
@@ -182,9 +186,19 @@ int run(int argc, char** argv) {
                     fft_options.planning = convolver::FftPlanning::measure;
                 else if (mode == "patient")
                     fft_options.planning = convolver::FftPlanning::patient;
+                else if (mode == "exhaustive")
+                    fft_options.planning = convolver::FftPlanning::exhaustive;
                 else
                     throw std::invalid_argument(
-                        "FFT planning mode must be estimate, measure or patient");
+                        "FFT planning mode must be estimate, measure, patient or exhaustive");
+            } else if (option == "--fft-time-limit") {
+                const auto text = value();
+                std::size_t end = 0;
+                const double seconds = std::stod(text, &end);
+                if (end != text.size() || !(seconds > 0) || seconds > 86400)
+                    throw std::invalid_argument(
+                        "--fft-time-limit must be a number of seconds, above 0 and at most 86400");
+                fft_options.time_limit_seconds = seconds;
             } else if (option == "--output-channels") {
                 audio_options = true;
                 output_channels = count(value());
@@ -299,17 +313,21 @@ int run(int argc, char** argv) {
                      : std::string("--valid-bits applies only to integer PCM output"));
         if ((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
             throw std::invalid_argument("tuning and wisdom require the FFTW backend");
+        if (fft_options.time_limit_seconds > 0 &&
+            fft_options.planning == convolver::FftPlanning::estimate && tune.empty())
+            throw std::invalid_argument(
+                "--fft-time-limit needs --fft-plan measure, patient or exhaustive");
         if (!tune.empty()) {
             if (tune == "-" || !filter.empty() || !input.empty() || !output.empty() ||
                 !wisdom.empty() || audio_options)
                 throw std::invalid_argument("--tune-fft needs a new file path and accepts only "
-                                            "--block-size and --fft-plan");
+                                            "--block-size, --fft-plan and --fft-time-limit");
             // Reject existing targets before the potentially lengthy calibration.
             if (std::filesystem::exists(std::filesystem::symlink_status(tune)))
                 throw std::invalid_argument("FFTW wisdom output must be a new file path");
             if (!explicit_plan)
                 fft_options.planning = convolver::FftPlanning::patient;
-            convolver::tune_fft(block, fft_options.planning);
+            convolver::tune_fft(block, fft_options);
             const auto wisdom_text = convolver::export_fft_wisdom();
             convolver::detail::write_new_file(tune, std::as_bytes(std::span(wisdom_text)));
             std::cout << "Saved FFTW wisdom for block size " << block

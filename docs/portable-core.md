@@ -55,16 +55,23 @@ with a Release binary and little competing CPU activity:
 ```
 
 Tuning needs no input audio or IR. It prepares both transforms using `patient`
-planning by default; `--fft-plan measure` searches less extensively. The wisdom
+planning by default; `--fft-plan measure` searches less extensively and
+`--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
+longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
+seconds and keeps the best plan found by then, as the historical engine's "Take 1
+minute" choice did (`--fft-plan patient --fft-time-limit 30`). A search the limit
+cuts short may not be stored as reusable wisdom for that mode; tune without a
+limit when the wisdom is for `--fft-wisdom`. The wisdom
 destination must be a **new file**; existing files and aliases are never replaced.
 Use a different filename when retuning, then replace an older cache deliberately.
 
-Normal rendering defaults to `estimate`, or accepts `--fft-plan measure|patient`
-to time plans during startup. `--fft-wisdom FILE` imports native single-precision
+Normal rendering defaults to `estimate`, or accepts
+`--fft-plan measure|patient|exhaustive` (optionally with `--fft-time-limit`) to
+time plans during startup. `--fft-wisdom FILE` imports native single-precision
 FFTW wisdom and requires matching plans, with no silent measured fallback. A
 missing size or insufficient planning rigor fails before opening the audio
-output. Patient wisdom satisfies estimate/measure requests as well as patient;
-measure wisdom cannot satisfy patient. CLI wisdom input is limited to 1 MiB.
+output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
+patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
 
 Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
 Retune after changing them; loading successfully is **not** proof that old wisdom

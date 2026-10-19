@@ -169,6 +169,9 @@ void cases() {
             scenario(c, b, in, {FftPlanning::measure, false});
             scenario(c, b, in, {FftPlanning::patient, false});
             scenario(c, b, in, {FftPlanning::patient, true});
+            scenario(c, b, in, {FftPlanning::exhaustive, false});
+            scenario(c, b, in, {FftPlanning::exhaustive, true});
+            scenario(c, b, in, {FftPlanning::patient, false, 0.5});
         }
     }
     // The largest input and output delays are on disconnected channels; they must not inflate tail.

@@ -16,14 +16,15 @@ int main() {
         const auto modes =
             convolver::fft_supports_wisdom()
                 ? std::vector{convolver::FftPlanning::estimate, convolver::FftPlanning::measure,
-                              convolver::FftPlanning::patient}
+                              convolver::FftPlanning::patient, convolver::FftPlanning::exhaustive}
                 : std::vector{convolver::FftPlanning::estimate};
         for (auto mode : modes)
             for (std::size_t b : {1, 2, 3, 7, 8, 17, 64, 127}) {
                 const auto n = convolver::detail::fft_size(b);
                 if (n < 2 * b || n % 2)
                     throw std::runtime_error("FFT length contract");
-                convolver::detail::RealFft fft(n, {mode, false});
+                // A time limit must still yield a correct plan.
+                convolver::detail::RealFft fft(n, {mode, false, b % 2 ? 0.05 : 0.0});
                 for (int kind = 0; kind < 4; ++kind) {
                     std::vector<float> input(n);
                     for (std::size_t i = 0; i < n; ++i)

@@ -29,11 +29,27 @@ unsigned planning_flags(FftOptions options) {
     case FftPlanning::patient:
         flags = FFTW_PATIENT;
         break;
+    case FftPlanning::exhaustive:
+        flags = FFTW_EXHAUSTIVE;
+        break;
     default:
         throw std::invalid_argument("invalid FFT planning mode");
     }
+    if (!(options.time_limit_seconds >= 0) || options.time_limit_seconds > 86400)
+        throw std::invalid_argument("FFT planning time limit must be 0 to 86400 seconds");
     return flags | (options.wisdom_only ? FFTW_WISDOM_ONLY : 0u);
 }
+// FFTW's time limit is planner-global; hold it only while this plan is made.
+struct TimeLimit {
+    explicit TimeLimit(double seconds) {
+        fftwf_set_timelimit(seconds > 0 ? seconds : FFTW_NO_TIMELIMIT);
+    }
+    ~TimeLimit() {
+        fftwf_set_timelimit(FFTW_NO_TIMELIMIT);
+    }
+    TimeLimit(const TimeLimit&) = delete;
+    TimeLimit& operator=(const TimeLimit&) = delete;
+};
 } // namespace
 const char* fft_backend_name() noexcept {
     return "FFTW";
@@ -93,6 +109,7 @@ struct RealFft::Impl {
         : time(allocate(n)), frequency(allocate(n + 2)), sum(allocate(n + 2)) {
         const auto flags = planning_flags(options);
         std::lock_guard lock(planner_mutex());
+        const TimeLimit limit(options.time_limit_seconds);
         forward.value =
             fftwf_plan_dft_r2c_1d(static_cast<int>(n), time.get(),
                                   reinterpret_cast<fftwf_complex*>(frequency.get()), flags);
