@@ -12,6 +12,8 @@ Convolver's GPL-2.0-or-later. Upstream: <http://www.kurims.kyoto-u.ac.jp/~ooura/
 The copy is taken from the historical engine's `convolver/fft/fftsg.cpp` (the
 version distributed with DRC, which names the sample type `DLReal`). Changes,
 listed at the top of the file: single precision, a private C++ namespace, thread
-support removed, `<cmath>` included outside the namespace. The transform code is
-otherwise unchanged; it is third-party code and is not reformatted or linted.
+support removed, `<cmath>` included outside the namespace, and namespace-scope
+prototypes in place of block-scope ones (MSVC binds those to the global
+namespace). The transform code is otherwise unchanged; it is third-party code
+and is not reformatted or linted.
 `tests/native/fft_tests.cpp` checks the backend against a direct DFT.

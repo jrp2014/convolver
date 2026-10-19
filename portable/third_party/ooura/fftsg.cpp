@@ -15,7 +15,8 @@
 // namespace convolver::detail::ooura so they cannot collide with another copy
 // of Ooura's code in a plug-in host; the optional pthread/Windows thread support
 // is removed (USE_CDFT_THREADS is never defined); <math.h> is included as <cmath>
-// before the namespace. The algorithms are unchanged. See README.md here.
+// before the namespace; block-scope prototypes are replaced by namespace-scope
+// ones. The algorithms are unchanged. See README.md here.
 #include <cmath>
 
 #undef USE_CDFT_THREADS
@@ -23,10 +24,49 @@
 #undef USE_CDFT_WINTHREADS
 
 namespace convolver::detail::ooura {
+using DLReal = float;
+
+// Namespace-scope prototypes replace the original block-scope ones, which
+// MSVC binds to the global namespace.
+void cdft(int n, int isgn, DLReal *a, int *ip, DLReal *w);
+void rdft(int n, int isgn, DLReal *a, int *ip, DLReal *w);
+void ddct(int n, int isgn, DLReal *a, int *ip, DLReal *w);
+void ddst(int n, int isgn, DLReal *a, int *ip, DLReal *w);
+void dfct(int n, DLReal *a, DLReal *t, int *ip, DLReal *w);
+void dfst(int n, DLReal *a, DLReal *t, int *ip, DLReal *w);
+void makewt(int nw, int *ip, DLReal *w);
+void makeipt(int nw, int *ip);
+void makect(int nc, int *ip, DLReal *c);
+void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
+void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
+void bitrv2(int n, int *ip, DLReal *a);
+void bitrv2conj(int n, int *ip, DLReal *a);
+void bitrv216(DLReal *a);
+void bitrv216neg(DLReal *a);
+void bitrv208(DLReal *a);
+void bitrv208neg(DLReal *a);
+void cftf1st(int n, DLReal *a, DLReal *w);
+void cftb1st(int n, DLReal *a, DLReal *w);
+void cftrec4(int n, DLReal *a, int nw, DLReal *w);
+int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w);
+void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
+void cftmdl1(int n, DLReal *a, DLReal *w);
+void cftmdl2(int n, DLReal *a, DLReal *w);
+void cftfx41(int n, DLReal *a, int nw, DLReal *w);
+void cftf161(DLReal *a, DLReal *w);
+void cftf162(DLReal *a, DLReal *w);
+void cftf081(DLReal *a, DLReal *w);
+void cftf082(DLReal *a, DLReal *w);
+void cftf040(DLReal *a);
+void cftb040(DLReal *a);
+void cftx020(DLReal *a);
+void rftfsub(int n, DLReal *a, int nc, DLReal *c);
+void rftbsub(int n, DLReal *a, int nc, DLReal *c);
+void dctsub(int n, DLReal *a, int nc, DLReal *c);
+void dstsub(int n, DLReal *a, int nc, DLReal *c);
 using std::atan;
 using std::cos;
 using std::sin;
-using DLReal = float;
 
 /*
 Fast Fourier/Cosine/Sine Transform
@@ -44,12 +84,6 @@ functions
     dfct: Cosine Transform of RDFT (Real Symmetric DFT)
     dfst: Sine Transform of RDFT (Real Anti-symmetric DFT)
 function prototypes
-    void cdft(int, int, DLReal *, int *, DLReal *);
-    void rdft(int, int, DLReal *, int *, DLReal *);
-    void ddct(int, int, DLReal *, int *, DLReal *);
-    void ddst(int, int, DLReal *, int *, DLReal *);
-    void dfct(int, DLReal *, DLReal *, int *, DLReal *);
-    void dfst(int, DLReal *, DLReal *, int *, DLReal *);
 macro definitions
     USE_CDFT_PTHREADS : default=not defined
         CDFT_THREADS_BEGIN_N  : must be >= 512, default=8192
@@ -314,9 +348,6 @@ Appendix :
 
 void cdft(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
     int nw;
     
     nw = ip[0];
@@ -334,12 +365,6 @@ void cdft(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 
 void rdft(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void makect(int nc, int *ip, DLReal *c);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void rftfsub(int n, DLReal *a, int nc, DLReal *c);
-    void rftbsub(int n, DLReal *a, int nc, DLReal *c);
     int nw, nc;
     DLReal xi;
     
@@ -378,13 +403,6 @@ void rdft(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 
 void ddct(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void makect(int nc, int *ip, DLReal *c);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void rftfsub(int n, DLReal *a, int nc, DLReal *c);
-    void rftbsub(int n, DLReal *a, int nc, DLReal *c);
-    void dctsub(int n, DLReal *a, int nc, DLReal *c);
     int j, nw, nc;
     DLReal xr;
     
@@ -434,13 +452,6 @@ void ddct(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 
 void ddst(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void makect(int nc, int *ip, DLReal *c);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void rftfsub(int n, DLReal *a, int nc, DLReal *c);
-    void rftbsub(int n, DLReal *a, int nc, DLReal *c);
-    void dstsub(int n, DLReal *a, int nc, DLReal *c);
     int j, nw, nc;
     DLReal xr;
     
@@ -490,11 +501,6 @@ void ddst(int n, int isgn, DLReal *a, int *ip, DLReal *w)
 
 void dfct(int n, DLReal *a, DLReal *t, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void makect(int nc, int *ip, DLReal *c);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void rftfsub(int n, DLReal *a, int nc, DLReal *c);
-    void dctsub(int n, DLReal *a, int nc, DLReal *c);
     int j, k, l, m, mh, nw, nc;
     DLReal xr, xi, yr, yi;
     
@@ -583,11 +589,6 @@ void dfct(int n, DLReal *a, DLReal *t, int *ip, DLReal *w)
 
 void dfst(int n, DLReal *a, DLReal *t, int *ip, DLReal *w)
 {
-    void makewt(int nw, int *ip, DLReal *w);
-    void makect(int nc, int *ip, DLReal *c);
-    void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w);
-    void rftfsub(int n, DLReal *a, int nc, DLReal *c);
-    void dstsub(int n, DLReal *a, int nc, DLReal *c);
     int j, k, l, m, mh, nw, nc;
     DLReal xr, xi, yr, yi;
     
@@ -672,7 +673,6 @@ void dfst(int n, DLReal *a, DLReal *t, int *ip, DLReal *w)
 
 void makewt(int nw, int *ip, DLReal *w)
 {
-    void makeipt(int nw, int *ip);
     int j, nwh, nw0, nw1;
     DLReal delta, wn4r, wk1r, wk1i, wk3r, wk3i;
     
@@ -779,17 +779,6 @@ void makect(int nc, int *ip, DLReal *c)
 
 void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w)
 {
-    void bitrv2(int n, int *ip, DLReal *a);
-    void bitrv216(DLReal *a);
-    void bitrv208(DLReal *a);
-    void cftf1st(int n, DLReal *a, DLReal *w);
-    void cftrec4(int n, DLReal *a, int nw, DLReal *w);
-    void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
-    void cftfx41(int n, DLReal *a, int nw, DLReal *w);
-    void cftf161(DLReal *a, DLReal *w);
-    void cftf081(DLReal *a, DLReal *w);
-    void cftf040(DLReal *a);
-    void cftx020(DLReal *a);
 #ifdef USE_CDFT_THREADS
     void cftrec4_th(int n, DLReal *a, int nw, DLReal *w);
 #endif /* USE_CDFT_THREADS */
@@ -827,17 +816,6 @@ void cftfsub(int n, DLReal *a, int *ip, int nw, DLReal *w)
 
 void cftbsub(int n, DLReal *a, int *ip, int nw, DLReal *w)
 {
-    void bitrv2conj(int n, int *ip, DLReal *a);
-    void bitrv216neg(DLReal *a);
-    void bitrv208neg(DLReal *a);
-    void cftb1st(int n, DLReal *a, DLReal *w);
-    void cftrec4(int n, DLReal *a, int nw, DLReal *w);
-    void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
-    void cftfx41(int n, DLReal *a, int nw, DLReal *w);
-    void cftf161(DLReal *a, DLReal *w);
-    void cftf081(DLReal *a, DLReal *w);
-    void cftb040(DLReal *a);
-    void cftx020(DLReal *a);
 #ifdef USE_CDFT_THREADS
     void cftrec4_th(int n, DLReal *a, int nw, DLReal *w);
 #endif /* USE_CDFT_THREADS */
@@ -2220,9 +2198,6 @@ void cftrec4_th(int n, DLReal *a, int nw, DLReal *w)
 
 void *cftrec1_th(void *p)
 {
-    int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w);
-    void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
-    void cftmdl1(int n, DLReal *a, DLReal *w);
     int isplt, j, k, m, n, n0, nw;
     DLReal *a, *w;
     
@@ -2249,9 +2224,6 @@ void *cftrec1_th(void *p)
 
 void *cftrec2_th(void *p)
 {
-    int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w);
-    void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
-    void cftmdl2(int n, DLReal *a, DLReal *w);
     int isplt, j, k, m, n, n0, nw;
     DLReal *a, *w;
     
@@ -2281,9 +2253,6 @@ void *cftrec2_th(void *p)
 
 void cftrec4(int n, DLReal *a, int nw, DLReal *w)
 {
-    int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w);
-    void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w);
-    void cftmdl1(int n, DLReal *a, DLReal *w);
     int isplt, j, k, m;
     
     m = n;
@@ -2303,8 +2272,6 @@ void cftrec4(int n, DLReal *a, int nw, DLReal *w)
 
 int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w)
 {
-    void cftmdl1(int n, DLReal *a, DLReal *w);
-    void cftmdl2(int n, DLReal *a, DLReal *w);
     int i, isplt, m;
     
     if ((k & 3) != 0) {
@@ -2338,12 +2305,6 @@ int cfttree(int n, int j, int k, DLReal *a, int nw, DLReal *w)
 
 void cftleaf(int n, int isplt, DLReal *a, int nw, DLReal *w)
 {
-    void cftmdl1(int n, DLReal *a, DLReal *w);
-    void cftmdl2(int n, DLReal *a, DLReal *w);
-    void cftf161(DLReal *a, DLReal *w);
-    void cftf162(DLReal *a, DLReal *w);
-    void cftf081(DLReal *a, DLReal *w);
-    void cftf082(DLReal *a, DLReal *w);
     
     if (n == 512) {
         cftmdl1(128, a, &w[nw - 64]);
@@ -2647,10 +2608,6 @@ void cftmdl2(int n, DLReal *a, DLReal *w)
 
 void cftfx41(int n, DLReal *a, int nw, DLReal *w)
 {
-    void cftf161(DLReal *a, DLReal *w);
-    void cftf162(DLReal *a, DLReal *w);
-    void cftf081(DLReal *a, DLReal *w);
-    void cftf082(DLReal *a, DLReal *w);
     
     if (n == 128) {
         cftf161(a, &w[nw - 8]);
