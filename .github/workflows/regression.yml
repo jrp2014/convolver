@@ -81,6 +81,17 @@ jobs:
       - name: Compare FFTW and Accelerate output
         if: runner.os == 'macOS'
         run: python tests/native/backend_equivalence.py build/convolver build-accelerate/convolver
+      - name: Build and test the dependency-free Ooura backend
+        run: |
+          cmake -S . -B build-ooura -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }} \
+            -DCONVOLVER_FFT_BACKEND=OOURA -DCONVOLVER_LEGACY_TESTS=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
+          cmake --build build-ooura --parallel 2
+          ctest --test-dir build-ooura --output-on-failure --parallel 2
+          ./build-ooura/convolver --version
+      - name: Compare FFTW and Ooura output
+        run: python tests/native/backend_equivalence.py build/convolver build-ooura/convolver
   windows:
     runs-on: windows-latest
     steps:
@@ -133,3 +144,13 @@ jobs:
           cmake --build build-core --config Release --parallel 2
 
           ctest --test-dir build-core -C Release --output-on-failure --parallel 2
+      - name: Core-only MSVC build with the Ooura backend
+        run: >-
+          cmake -S . -B build-ooura -A x64 -DCONVOLVER_FFT_BACKEND=OOURA
+          -DCONVOLVER_BUILD_IO=OFF -DCONVOLVER_BUILD_CLI=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
+
+          cmake --build build-ooura --config Release --parallel 2
+
+          ctest --test-dir build-ooura -C Release --output-on-failure --parallel 2

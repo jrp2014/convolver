@@ -102,8 +102,11 @@ std::vector<float> run(Engine& engine, const std::vector<float>& input, std::siz
     }
     return out;
 }
+double worst_error = 0; // Largest |actual - oracle|, reported at the end.
 void close(const std::vector<float>& actual, const std::vector<double>& expected) {
     require(actual.size() == expected.size(), "output size");
+    for (std::size_t i = 0; i < actual.size(); ++i)
+        worst_error = std::max(worst_error, std::abs(actual[i] - expected[i]));
     for (std::size_t i = 0; i < actual.size(); ++i)
         if (!std::isfinite(actual[i]) ||
             std::abs(actual[i] - expected[i]) > 2e-5 * (1 + std::abs(expected[i])))
@@ -398,7 +401,8 @@ int main() {
         shared_input_mixes();
         invalid();
         no_processing_allocation();
-        std::cout << "native engine tests passed\n";
+        std::cout << "native engine tests passed (" << fft_backend_name()
+                  << "; worst absolute error against the double oracle " << worst_error << ")\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

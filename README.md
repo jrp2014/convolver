@@ -69,7 +69,9 @@ ctest --test-dir build-native --output-on-failure
 ```
 
 On Apple platforms, add `-DCONVOLVER_FFT_BACKEND=ACCELERATE` to use the system
-FFT framework without FFTW. See [backend measurements](docs/fft-backends.md).
+FFT framework without FFTW. On any platform, `-DCONVOLVER_FFT_BACKEND=OOURA`
+builds a dependency-free FFT into the library instead. See
+[backend measurements](docs/fft-backends.md).
 
 See [platform instructions and options](docs/portable-core.md) for macOS/Linux
 packages, Windows/vcpkg, sanitizer builds and CLI semantics.

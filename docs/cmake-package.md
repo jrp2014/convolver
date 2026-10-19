@@ -20,7 +20,8 @@ cmake --install build-core --prefix /path/to/convolver-install
 
 This builds the core and its C++/consumer tests without looking for libsndfile or
 Python. FFTW's float library remains required, unless selecting
-`-DCONVOLVER_FFT_BACKEND=ACCELERATE` on Apple. Set `-DBUILD_TESTING=OFF` for a
+`-DCONVOLVER_FFT_BACKEND=ACCELERATE` on Apple or the built-in
+`-DCONVOLVER_FFT_BACKEND=OOURA` anywhere. Set `-DBUILD_TESTING=OFF` for a
 library-only top-level build. Dependency discovery never downloads libraries.
 
 The full default build still includes I/O, CLI, native tests, and documentation

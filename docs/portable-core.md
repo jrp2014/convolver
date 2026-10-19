@@ -38,8 +38,10 @@ cmake --build build-accelerate --parallel
 ctest --test-dir build-accelerate --output-on-failure
 ```
 
-Accelerate builds neither search for nor link FFTW. Backend selection is per
-build, not a runtime switch; `--version` identifies the selected backend.
+Accelerate builds neither search for nor link FFTW. `-DCONVOLVER_FFT_BACKEND=OOURA`
+builds Ooura's FFT into the library instead, on any platform, so the only
+remaining dependency is libsndfile for the CLI and file I/O. Backend selection is
+per build, not a runtime switch; `--version` identifies the selected backend.
 See [FFT contracts, benchmarks and equivalence results](fft-backends.md).
 
 ### FFTW plan tuning
@@ -123,7 +125,7 @@ Build options:
 | `CONVOLVER_BUILD_NATIVE` | ON | Enable portable targets; OFF retains regression-only mode |
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
-| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW or ACCELERATE (Apple only) |
+| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW, ACCELERATE (Apple only) or OOURA (built in) |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
 | `BUILD_TESTING` | ON at top level | Master test switch |
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |

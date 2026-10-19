@@ -63,6 +63,14 @@
       "cacheVariables": {
         "CONVOLVER_FFT_BACKEND": "ACCELERATE"
       }
+    },
+    {
+      "name": "ooura",
+      "inherits": "release",
+      "displayName": "Built-in Ooura FFT Release (no FFT library)",
+      "cacheVariables": {
+        "CONVOLVER_FFT_BACKEND": "OOURA"
+      }
     }
   ],
   "buildPresets": [
@@ -89,6 +97,11 @@
     {
       "name": "accelerate-debug",
       "configurePreset": "accelerate-debug",
+      "jobs": 2
+    },
+    {
+      "name": "ooura",
+      "configurePreset": "ooura",
       "jobs": 2
     }
   ],
@@ -136,6 +149,16 @@
     {
       "name": "accelerate-debug",
       "configurePreset": "accelerate-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "ooura",
+      "configurePreset": "ooura",
       "output": {
         "outputOnFailure": true
       },
