@@ -147,6 +147,16 @@ it, matching the historical Pipe timing convention. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
 exceed unity. Integer output clips to its representable range.
 
+`--gain-db auto` applies the historical engine's "optimum attenuation": the
+filter is run on seeded white noise uniform in [-1, 1) on every input for ten
+filter lengths (at least 65536 frames), and the gain is -20 log10 of the largest
+output sample. That reflects typical programme peaks, so loud material can still
+clip. `--gain-db no-clip` instead applies the gain that no input within full
+scale can clip: -20 log10 of the largest sum of absolute taps of any output's
+combined input-to-output responses. Both report the chosen gain on stderr. The
+library function is `estimate_attenuation`; tests check the bound is exact and
+attainable against the double-precision oracle.
+
 Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
 `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
 

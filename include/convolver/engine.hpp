@@ -45,6 +45,27 @@ void validate_configuration(const Configuration&, std::size_t block_frames = 256
 // Validate and return FIR/routing support, excluding latency, without FFT planning.
 std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
 
+// The historical engine's "optimum attenuation": the gain that keeps output
+// within full scale (|sample| <= 1) for input within full scale.
+struct AttenuationEstimate {
+    // Historical method: the largest |output| over the whole response to seeded
+    // uniform white noise in [-1, 1) on every input, lengths times the longest
+    // impulse long (at least 65536 frames), and -20 log10 of it. Typical
+    // programme peaks, not a bound.
+    double noise_peak = 0;
+    double noise_attenuation_db = 0;
+    // The largest |output| any input within full scale can produce: for each
+    // output, the sum over inputs of the absolute taps of the combined
+    // input-to-output response (route gains included, delays irrelevant).
+    // Applying worst_case_attenuation_db guarantees no clipping.
+    double worst_case_peak = 0;
+    double worst_case_attenuation_db = 0;
+};
+// Validates like the Engine. A zero peak (silent routing) gives 0 dB. Runs the
+// convolution offline with estimate planning: not for the audio thread.
+AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t seed = 0,
+                                         std::size_t lengths = 10);
+
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;
 const char* fft_backend_version() noexcept;

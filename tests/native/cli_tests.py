@@ -88,6 +88,20 @@ def integer_format_tests(d):
     call(base+['--output-format','wav-pcm24','--dither','rectangular','--noise-shaping','none'])
     fmt,bits,valid,mask,_=wave_fields(dst); assert (fmt,bits,valid)==(1,24,24)
 
+def automatic_gain_tests(d):
+    """--gain-db auto/no-clip apply the attenuation estimates and report them."""
+    ir=d/'ag-ir.wav'; src=d/'ag-in.wav'; dst=d/'ag-out.wav'
+    pcm(ir,[8192]); values=[(((i*379)%12001)-6000) for i in range(3000)]; pcm(src,values)
+    for mode in ('no-clip','auto'):
+        p=call(['--filter',ir,'--input',src,'--output',dst,'--gain-db',mode])
+        err=p.stderr.decode()
+        # A 0.25 impulse: the largest possible peak and the noise peak are both ~0.25.
+        db=float(re.search(r'attenuation (-?[0-9.]+) dB',err).group(1))
+        assert abs(db-12.04)<0.02, err
+        _,_,out=floats(dst)
+        near(out,[v/32768*0.25*10**(db/20) for v in values]) if mode=='no-clip' else None
+    call(['--filter',ir,'--input',src,'--output',dst,'--gain-db','loud'],ok=False)
+
 def speaker_map_tests(d):
     """--speaker-map config labels WAV channels with the configuration's mask."""
     ir=d/'sm-ir.wav'; src=d/'sm-in.wav'; out=d/'sm-out.wav'
@@ -214,6 +228,7 @@ def main():
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)
         call(['--filter',ir,'--input',src,'--output',dst,'--dither','none'])
         integer_format_tests(d)
+        automatic_gain_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size','0'], ['--block-size','-1'], ['--gain-db','nan'], ['--unknown']):
             call(['--filter',ir,'--input',src,'--output',dst]+extra,ok=False)

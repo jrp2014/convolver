@@ -10,6 +10,7 @@
 #include <csignal>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -35,7 +36,10 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
   --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
   --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
-  --gain-db DB         Output gain in decibels (default 0)
+  --gain-db DB         Output gain in decibels (default 0), or 'auto' for the
+                      historical optimum attenuation (peak response to white
+                      noise) or 'no-clip' for the gain that can never clip;
+                      the chosen value is reported on stderr
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm8, wav-pcm16, wav-pcm24,
                       wav-pcm32, raw-float (little-endian IEEE float32)
@@ -137,6 +141,7 @@ int run(int argc, char** argv) {
         unsigned valid_bits = 0;
         std::size_t block = 256;
         float gain = 1;
+        std::optional<std::string> automatic_gain;
         bool keep = false, speaker_map = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
@@ -193,6 +198,11 @@ int run(int argc, char** argv) {
             } else if (option == "--gain-db") {
                 audio_options = true;
                 auto text = value();
+                if (text == "auto" || text == "no-clip") {
+                    automatic_gain = text;
+                    continue;
+                }
+                automatic_gain.reset();
                 std::size_t end = 0;
                 const double db = std::stod(text, &end);
                 const double linear = std::pow(10., db / 20.);
@@ -319,6 +329,20 @@ int run(int argc, char** argv) {
             if (same_file(source, output))
                 throw std::invalid_argument(
                     "output must differ from referenced configuration and impulse files");
+        if (automatic_gain) {
+            const auto estimate = convolver::estimate_attenuation(config);
+            const bool safe = *automatic_gain == "no-clip";
+            const auto db =
+                safe ? estimate.worst_case_attenuation_db : estimate.noise_attenuation_db;
+            gain = static_cast<float>(std::pow(10., db / 20.));
+            if (!std::isfinite(gain))
+                throw std::invalid_argument("the estimated gain is not representable");
+            std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
+                      << std::fixed << std::setprecision(2) << db << " dB ("
+                      << (safe ? "largest possible peak " : "white-noise peak ")
+                      << std::setprecision(4)
+                      << (safe ? estimate.worst_case_peak : estimate.noise_peak) << ")\n";
+        }
         convolver::Engine engine(config, block, fft_options);
         // Dither and shaping are opt-in; integer PCM is plainly rounded by default.
         const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),

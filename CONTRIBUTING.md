@@ -30,7 +30,7 @@ Presets export `compile_commands.json`. Run the correctness-oriented checks in
 `.clang-tidy` against the translation units present in that build:
 
 ```sh
-clang-tidy-18 -p build/presets/release portable/engine.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
+clang-tidy-18 -p build/presets/release portable/engine.cpp portable/attenuation.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
 ```
 
 For an Accelerate build replace `fft_fftw.cpp` with `fft_accelerate.cpp`. Match
