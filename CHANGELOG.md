@@ -9,6 +9,8 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
 ### Added
 
 Features that only the historical engine had:
@@ -37,6 +39,10 @@ Features that only the historical engine had:
 
 - PCM24 output is now quantized by Convolver (round to nearest, ties up) instead
   of libsndfile's float conversion; samples can differ by at most 1 LSB.
+- CMake consumers now request `find_package(Convolver 0.4)`; the package keeps
+  its same-minor compatibility policy.
+
+## [0.3.1] - 2026-10-18
 
 ### Fixed
 
@@ -167,6 +173,9 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jrp2014/convolver/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/jrp2014/convolver/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.2.1

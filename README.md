@@ -1,7 +1,7 @@
 # Convolver
 
 Convolver applies impulse-response filters for room correction, crossovers and
-multichannel audio routing. The current **portable 0.3.0** implementation provides
+multichannel audio routing. The current **portable 0.4.0** implementation provides
 a C++20 core, file/RAW-stream CLI and optional VST3 plug-in, using CMake, FFTW or
 Apple Accelerate, and libsndfile at the file boundary.
 
