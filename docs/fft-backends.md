@@ -6,7 +6,8 @@ Measured 18 October 2026 on Apple M5 Max, 128 GiB RAM, macOS 27.0.1 (26A434).
 
 `-DCONVOLVER_FFT_BACKEND=FFTW` is the default and portable choice.
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` selects Apple's system vDSP framework and
-requires an Apple target. Accelerate builds do not discover or link FFTW. Each
+requires an Apple target. `-DCONVOLVER_FFT_BACKEND=OOURA` builds a
+dependency-free FFT into the library (see below). Accelerate builds do not discover or link FFTW. Each
 binary has one backend; there is no automatic or runtime backend switching.
 `convolver --version` reports the backend. The library exposes
 `fft_backend_name()` and `fft_backend_version()`.
@@ -24,6 +25,45 @@ It does not silently fall back to FFTW for awkward sizes. Extra padding consumes
 more spectrum/history storage; validation accounts for that before allocation.
 Planning/allocation remain outside processing. Neither backend changes routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
+
+### Ooura (no FFT library)
+
+`-DCONVOLVER_FFT_BACKEND=OOURA` builds Takuya Ooura's split-radix real FFT
+(`fftsg`, the package the historical engine also shipped) into the core, so the
+library, CLI and VST3 plug-in need no FFT library at all. It works on every
+platform and compiler. The code is vendored in `portable/third_party/ooura/`
+with its permissive licence ("use, copy, modify and distribute this code for any
+purpose ... without fee"), which is compatible with GPL-2.0-or-later; see the
+README there for the source and the small changes made. Like Accelerate it uses
+the next power of two at least 2B (minimum four) and accepts only estimate
+planning, without wisdom or time limits. Its tables are built when the engine is
+prepared, not on the audio thread.
+
+Measured 19 October 2026 on a cloud Linux x86-64 VM (Intel Xeon at 2.80 GHz,
+Release, Clang 18, Ubuntu FFTW 3.3.10 with estimate planning), median of three
+rounds of `benchmark_backends.py`:
+
+| Case | FFTW ns/frame | Ooura ns/frame | FFTW/Ooura |
+| --- | ---: | ---: | ---: |
+| mono_short | 25.7 | 36.6 | 0.70× |
+| mono_room | 34.7 | 45.0 | 0.77× |
+| stereo_low_latency | 286.4 | 296.4 | 0.97× |
+| stereo_long | 594.8 | 620.5 | 0.96× |
+| matrix_short | 173.8 | 191.9 | 0.91× |
+| matrix_long | 1066.9 | 1142.7 | 0.93× |
+| stereo_large_block | 166.8 | 189.3 | 0.88× |
+| stereo_odd_size | 120.1 | 167.7 | 0.72× |
+| matrix6_short | 552.0 | 802.6 | 0.69× |
+| matrix6_long | 2925.9 | 2653.7 | 1.10× |
+
+Ooura takes 0.9–1.45 times FFTW's time per frame here; long filters are
+dominated by the partition multiply-accumulate, which is the same for every
+backend. A shared VM is noisy; treat these as indicative. On that machine the
+16-case CLI comparison against FFTW gave a maximum absolute difference of
+7.2e-7 (RMS 7.9e-8), and the engine's worst error against the double-precision
+oracle was 2.6e-7 (FFTW 3.4e-7). CI builds and tests the Ooura backend on Linux
+(Clang with sanitizers, GCC) and macOS, compares its CLI output with FFTW's, and
+builds and tests the core with MSVC without FFTW.
 
 ## Correctness evidence
 

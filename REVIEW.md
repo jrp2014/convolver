@@ -63,7 +63,7 @@ proof for every possible filter or floating-point input.
 | Three-multiply complex cancellation | Direct complex products restored | Direct real/imaginary MACs, with cancellation and numerical-oracle coverage |
 | PCM24 sign/reduced valid-bit packing | Historical conversion fixes retained | Real libsndfile PCM16/24/32 round trips and endpoint/clipping checks; not a claim about every legacy wrapper |
 | VST2 aliasing, additive/double transfer, disconnected inputs | Extracted adapter fixes tested | Separate planar/in-place float/double HostProcessor and SDK adapter tests; internal DSP remains float |
-| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura is not a portable backend; portable PCM16 dither added after this review |
+| Negative-zero routes, dither constants, list display, Ooura tail scaling | Branch fixes retained and extraction-tested | Legacy format semantics tested; Ooura and dither/noise shaping on all integer formats added to the portable core after this review |
 | Old CMD EOF and old host tail/lifecycle behavior | Original CMD/DMO/VST2 release gaps remain | New CLI explicitly drains; HostProcessor preserves stream history and handles bypass/filter changes; these do not repair the old applications |
 
 The merged historical fixes are exercised through extracted production routines
@@ -85,7 +85,8 @@ prepare/replace/collect/destruction calls must be serialized, and destruction
 requires stopped audio. These contracts and tests do not establish hard realtime
 deadlines or absence of every possible race.
 
-VST3 currently supports equal mono or stereo buses, 32/64-bit host buffers,
+VST3 supports one input and one output bus of 1 to 8 channels each (counts may
+differ), 32/64-bit host buffers,
 256-sample latency, latency-aligned bypass, embedded-filter presets and bounded
 state restoration. Tail reporting works before activation and conservatively
 through replacements. Sample-rate/layout mismatches are rejected; there is no
@@ -158,11 +159,10 @@ recovery records remain available as provenance rather than current instructions
 
 ## Remaining priorities
 
-1. **PCM16 dither:** implemented after this review. PCM16 output now uses a
-   documented, seeded quantizer with opt-in TPDF, the old engine's
-   high-pass triangular and rectangular dither; see
-   [the portable guide](docs/portable-core.md). Noise shaping is not implemented,
-   so equivalence with the old engine holds only for its unshaped dither modes.
+1. **Dither:** implemented after this review. Every integer output format uses a
+   documented, seeded quantizer with opt-in TPDF, the old engine's high-pass
+   triangular and rectangular dither, and its five noise shapers; see
+   [the portable guide](docs/portable-core.md).
 2. **Host compatibility and delivery:** exercise named Windows/macOS DAWs,
    silence/seek/reload/bypass and multiple instances; define minimum OS versions,
    dependency bundling, signing and installers. SDK validation is the starting gate.

@@ -45,14 +45,41 @@ void validate_configuration(const Configuration&, std::size_t block_frames = 256
 // Validate and return FIR/routing support, excluding latency, without FFT planning.
 std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
 
+// The historical engine's "optimum attenuation": the gain that keeps output
+// within full scale (|sample| <= 1) for input within full scale.
+struct AttenuationEstimate {
+    // Historical method: the largest |output| over the whole response to seeded
+    // uniform white noise in [-1, 1) on every input, lengths times the longest
+    // impulse long (at least 65536 frames), and -20 log10 of it. Typical
+    // programme peaks, not a bound.
+    double noise_peak = 0;
+    double noise_attenuation_db = 0;
+    // The largest |output| any input within full scale can produce: for each
+    // output, the sum over inputs of the absolute taps of the combined
+    // input-to-output response (route gains included, delays irrelevant).
+    // Applying worst_case_attenuation_db guarantees no clipping.
+    double worst_case_peak = 0;
+    double worst_case_attenuation_db = 0;
+};
+// Validates like the Engine. A zero peak (silent routing) gives 0 dB. Runs the
+// convolution offline with estimate planning: not for the audio thread.
+AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t seed = 0,
+                                         std::size_t lengths = 10);
+
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;
 const char* fft_backend_version() noexcept;
 
-enum class FftPlanning { estimate, measure, patient };
+// FFTW planner rigour, as the historical engine offered: estimate (no timing),
+// measure, patient and exhaustive try progressively more algorithms.
+enum class FftPlanning { estimate, measure, patient, exhaustive };
 struct FftOptions {
     FftPlanning planning = FftPlanning::estimate;
     bool wisdom_only = false; // Fail if the requested plans are not cached.
+    // Upper bound in seconds on each plan's search (FFTW returns the best plan
+    // found so far); zero means unlimited. The historical "Take 1 minute" choice
+    // was patient with 30 s each for the forward and inverse plans.
+    double time_limit_seconds = 0;
 };
 // FFTW wisdom is process-global. These operations are serialized with planning,
 // and must run outside audio processing. Other backends reject wisdom operations.
@@ -60,8 +87,10 @@ bool fft_supports_wisdom() noexcept;
 void import_fft_wisdom(std::string_view wisdom);
 std::string export_fft_wisdom();
 // Prepare this block size's forward/inverse plans; no audio or filter is needed.
-// Use measure or patient; export_fft_wisdom() then saves accumulated plans.
+// Use measure, patient or exhaustive; export_fft_wisdom() then saves accumulated
+// plans. The FftOptions form also takes a time limit (wisdom_only must be false).
 void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
+void tune_fft(std::size_t block_frames, FftOptions);
 
 // Prepared single-precision uniformly partitioned convolution.
 // Construction/destruction must be outside processing and are serialized for

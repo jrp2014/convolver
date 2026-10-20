@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="convolver-planning-") as directory:
     wisdom = root / "plans-µ.txt"
     fftw = "FFT backend: FFTW" in run("--version").stdout.decode()
     if fftw:
-        for plan in ("measure", "patient"):
+        for plan in ("measure", "patient", "exhaustive"):
             for block in (17, 64):
                 saved = root / f"{plan}-{block}.txt"
                 run("--tune-fft", saved, "--block-size", block, "--fft-plan", plan)
@@ -64,6 +64,17 @@ with tempfile.TemporaryDirectory(prefix="convolver-planning-") as directory:
                     run(*base, "--output", out, "--block-size", block,
                         "--fft-wisdom", saved, "--fft-plan", "patient", ok=False)
                     assert out.read_bytes() == b"preserve me"
+        # Time-limited planning: the historical "Take 1 minute" mode, shortened.
+        limited = root / "limited.txt"
+        run("--tune-fft", limited, "--block-size", 32, "--fft-plan", "exhaustive",
+            "--fft-time-limit", "0.5")
+        run(*base, "--output", root / "limited.raw", "--block-size", 32, "--fft-plan", "patient",
+            "--fft-time-limit", "0.25")
+        for bad in ("0", "-1", "nan", "x", "86401"):
+            run(*base, "--output", root / "bad-limit.raw", "--fft-plan", "measure",
+                "--fft-time-limit", bad, ok=False)
+        run(*base, "--output", root / "bad-limit.raw", "--fft-time-limit", "1", ok=False)
+        assert not (root / "bad-limit.raw").exists()
         # Default tuning is patient; rendering defaults to estimate, which accepts it.
         run("--tune-fft", wisdom, "--block-size", 16)
         run(*base, "--output", root / "default.raw", "--block-size", 16, "--fft-wisdom", wisdom)

@@ -112,15 +112,113 @@ void edge_cases() {
     require(p.setActive(true) != kResultOk, "mismatched IR rate activated");
     p.terminate();
 }
+void multichannel() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "multichannel initialize");
+    SpeakerArrangement nine = (SpeakerArrangement(1) << 9) - 1, stereo = SpeakerArr::kStereo,
+                       surround = SpeakerArr::k51, octo = SpeakerArr::k71Music;
+    require(p.setBusArrangements(&nine, 1, &stereo, 1) != kResultOk &&
+                p.setBusArrangements(&stereo, 1, &nine, 1) != kResultOk,
+            "nine channels accepted");
+    require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 arrangement");
+    require(p.setBusArrangements(&stereo, 1, &surround, 1) == kResultOk, "2x6 arrangement");
+    SpeakerArrangement current = 0;
+    require(p.getBusArrangement(kOutput, 0, current) == kResultOk && current == surround,
+            "output arrangement not stored");
+    // Left feeds front left and the LFE at half gain; right feeds front right and,
+    // one sample later, both surrounds with opposite signs.
+    convolver::HostState saved;
+    saved.configuration = convolver::Configuration{48000, 2, 6, 0, {}, {}, {}};
+    saved.configuration->paths = {{{1}, {{0, 1}}, {{0, 1}, {3, .5f}}},
+                                  {{1}, {{1, 1}}, {{1, 1}}},
+                                  {{0, 1}, {{1, 1}}, {{4, 1}, {5, -1}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode 2x6 state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore 2x6 state");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 300, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "2x6 activate");
+    p.setProcessing(true);
+    std::array<std::array<float, 300>, 2> ins{};
+    std::array<std::array<float, 300>, 6> outs{};
+    ins[0][0] = 1;
+    ins[1][0] = 2;
+    float* in_ptr[] = {ins[0].data(), ins[1].data()};
+    std::array<float*, 6> out_ptr{};
+    for (int c = 0; c < 6; ++c)
+        out_ptr[c] = outs[c].data();
+    AudioBusBuffers input{}, output{};
+    input.numChannels = 2;
+    output.numChannels = 6;
+    input.channelBuffers32 = in_ptr;
+    output.channelBuffers32 = out_ptr.data();
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 300;
+    require(p.process(d) == kResultOk, "2x6 process");
+    const std::array<std::array<float, 2>, 6> expected{
+        {{1, 0}, {2, 0}, {0, 0}, {.5f, 0}, {0, 2}, {0, -2}}};
+    for (int c = 0; c < 6; ++c)
+        for (int i = 0; i < 300; ++i) {
+            float want = i == 256 ? expected[c][0] : i == 257 ? expected[c][1] : 0.f;
+            require(std::abs(outs[c][i] - want) < 1e-5, "2x6 routing");
+        }
+    output.numChannels = 2;
+    require(p.process(d) != kResultOk, "output bus with wrong channel count accepted");
+    p.setProcessing(false);
+    p.setActive(false);
+    require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 2x6");
+    require(p.setActive(true) != kResultOk, "2x6 preset activated on 8x8 buses");
+    convolver::HostState identity;
+    MemoryStream empty;
+    require(write_state(&empty, identity), "encode identity state");
+    empty.seek(0, IBStream::kIBSeekSet, nullptr);
+    setup.symbolicSampleSize = kSample64;
+    require(p.setState(&empty) == kResultOk && p.setupProcessing(setup) == kResultOk &&
+                p.setActive(true) == kResultOk,
+            "8x8 identity activate");
+    p.setProcessing(true);
+    std::array<std::array<double, 300>, 8> wide{};
+    std::array<double*, 8> wide_ptr{};
+    for (int c = 0; c < 8; ++c) {
+        wide[c][0] = c + 1;
+        wide_ptr[c] = wide[c].data();
+    }
+    input.numChannels = output.numChannels = 8;
+    input.channelBuffers64 = output.channelBuffers64 = wide_ptr.data();
+    d.symbolicSampleSize = kSample64;
+    require(p.process(d) == kResultOk, "8x8 in-place double process");
+    for (int c = 0; c < 8; ++c)
+        for (int i = 0; i < 300; ++i)
+            require(std::abs(wide[c][i] - (i == 256 ? c + 1. : 0.)) < 1e-5, "8x8 identity");
+    p.setProcessing(false);
+    p.setActive(false);
+    convolver::HostState too_wide;
+    too_wide.configuration = convolver::Configuration{48000, 9, 9, 0, {}, {}, {}};
+    for (std::size_t c = 0; c < 9; ++c)
+        too_wide.configuration->paths.push_back({{1}, {{c, 1}}, {{c, 1}}});
+    MemoryStream wide_state;
+    require(write_state(&wide_state, too_wide), "encode 9x9 state");
+    wide_state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&wide_state) != kResultOk, "9x9 preset accepted");
+    p.terminate();
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
+        multichannel();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");
         SpeakerArrangement mono = SpeakerArr::kMono, stereo = SpeakerArr::kStereo;
-        require(p.setBusArrangements(&mono, 1, &stereo, 1) != kResultOk,
-                "mismatched buses accepted");
+        require(p.setBusArrangements(&mono, 1, &stereo, 1) == kResultOk, "mono to stereo buses");
         require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "mono buses");
         if (!preset_path.empty()) {
             std::ifstream file(preset_path, std::ios::binary);

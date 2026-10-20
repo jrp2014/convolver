@@ -15,11 +15,15 @@ struct AudioInfo {
 };
 // RAW streaming is little-endian IEEE float32, with explicit metadata.
 using RawSpec = AudioInfo;
-enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float };
+// Integer WAV formats: wav_pcm8 is unsigned 8-bit; the others are signed.
+enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float, wav_pcm8 };
+// Container bits of an integer output format, or zero for float formats.
+unsigned container_bits(OutputFormat) noexcept;
 
-// PCM16 quantization. Samples are scaled by 32768, offset by the dither (in
-// 16-bit LSBs), rounded to nearest with ties toward +infinity, then clipped to
-// [-32768, 32767]. There is no noise shaping.
+// Integer quantization, shared by every integer output format. With B
+// significant (valid) bits, samples are scaled by 2^(B-1), offset by the dither
+// (in LSBs of B bits) and the noise-shaping feedback, rounded to nearest with
+// ties toward +infinity, then clipped to [-2^(B-1), 2^(B-1) - 1].
 // - none: plain rounding.
 // - rectangular: uniform dither in [-0.5, 0.5) LSB.
 // - triangular: independent TPDF dither, sum of two uniforms, in (-1, 1) LSB.
@@ -29,23 +33,59 @@ enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float 
 // output depends only on the seed, channel count and sample sequence, not on how
 // the stream is split into write calls.
 enum class Dither { none, rectangular, triangular, triangular_highpass };
+// The historical engine's error-feedback noise shapers. Each subtracts a fixed
+// FIR combination of the channel's previous quantization errors, H = sum c_k
+// e[n-k], before rounding, so the total error spectrum is E(z)(1 - sum c_k z^-k):
+// - simple: c = {1}, first-order high-pass.
+// - second_order: c = {1.287, -0.651}.
+// - third_order: c = {1.329, -0.735, 0.0646}.
+// - ninth_order: nine coefficients from 2.203 (psychoacoustically weighted).
+// - sony_sbm: twelve coefficients from 1.47933 ("Pseudo Sony SBM").
+// The fed-back error is the rounding error including dither, taken before
+// clipping, so it stays bounded and the shaper cannot run away after overload.
+enum class NoiseShaping { none, simple, second_order, third_order, ninth_order, sony_sbm };
 struct QuantizationOptions {
     Dither dither = Dither::none;
     std::uint64_t seed = 0;
+    NoiseShaping noise_shaping = NoiseShaping::none;
+    // Significant bits in each integer sample, 8 up to the container size; zero
+    // means the whole container. Fewer bits are stored left-justified, with the
+    // low bits zero, in a WAVE_FORMAT_EXTENSIBLE file declaring them as
+    // wValidBitsPerSample (for example 20 valid bits in a 24-bit container).
+    unsigned valid_bits = 0;
 };
+class Quantizer {
+  public:
+    // bits: significant bits, 8 to 32. Throws on invalid channels, bits or options.
+    Quantizer(std::size_t channels, unsigned bits, QuantizationOptions = {});
+    // Sizes must match and hold complete frames. Results lie in the B-bit range.
+    // NaN quantizes to zero; neither NaN nor infinity disturbs the shaper state.
+    void quantize(std::span<const float> interleaved, std::span<std::int32_t> out) noexcept;
+    void reset() noexcept;
+    unsigned bits() const noexcept {
+        return bits_;
+    }
+
+  private:
+    float uniform() noexcept;
+    float dither() noexcept;
+    std::size_t channels_, channel_ = 0;
+    unsigned bits_;
+    double scale_, low_, high_;
+    QuantizationOptions options_;
+    std::uint64_t state_;
+    std::vector<float> previous_;
+    std::vector<double> coefficients_, errors_; // errors_: channels x order, newest first
+};
+// The 16-bit case of Quantizer, kept for existing callers.
 class Pcm16Quantizer {
   public:
     Pcm16Quantizer(std::size_t channels, QuantizationOptions = {});
-    // Sizes must match and hold complete frames. NaN quantizes to zero.
     void quantize(std::span<const float> interleaved, std::span<std::int16_t> out) noexcept;
     void reset() noexcept;
 
   private:
-    float uniform() noexcept;
-    std::size_t channels_, channel_ = 0;
-    QuantizationOptions options_;
-    std::uint64_t state_;
-    std::vector<float> previous_;
+    Quantizer quantizer_;
 };
 // Optional container metadata for WAV output.
 struct OutputMetadata {
@@ -77,8 +117,8 @@ class AudioReader {
 };
 class AudioWriter {
   public:
-    // Dither other than none requires wav_pcm16. PCM16 output always uses
-    // Pcm16Quantizer; PCM24/PCM32 keep libsndfile's conversion and clipping.
+    // Every integer format is quantized by Quantizer with these options; float
+    // and RAW formats reject dither, noise shaping and valid bits.
     AudioWriter(const std::filesystem::path&, AudioInfo, OutputFormat, QuantizationOptions = {},
                 OutputMetadata = {});
     ~AudioWriter();
@@ -91,8 +131,18 @@ class AudioWriter {
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+// Stream properties a configuration must match; zero means unspecified. The
+// historical engine also selected list entries by the output format the
+// playback device accepted, which output_channels reproduces.
+struct ConfigurationSelection {
+    int sample_rate = 0;
+    std::size_t input_channels = 0, output_channels = 0;
+};
 // IR audio file, legacy .cfg, or configuration list. A list selects the first
-// entry matching both expected properties; zero means unspecified.
+// entry matching every specified property. A sound file has as many outputs as
+// inputs.
+Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
+                                 std::vector<std::filesystem::path>* source_paths = nullptr);
 Configuration load_configuration(const std::filesystem::path&, int expected_rate = 0,
                                  std::size_t expected_inputs = 0,
                                  std::vector<std::filesystem::path>* source_paths = nullptr);

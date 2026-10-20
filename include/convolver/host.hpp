@@ -14,6 +14,7 @@ std::vector<std::byte> encode_host_state(const HostState&);
 HostState decode_host_state(std::span<const std::byte>);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
+// Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, collect, destruction; serialize these calls.
 // Audio: process, set_bypass, reset; one audio thread per instance. Control and
 // audio may overlap only for replace/collect. Teardown requires stopped audio.

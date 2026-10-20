@@ -283,11 +283,15 @@ struct Engine::Impl {
     }
 };
 void tune_fft(std::size_t b, FftPlanning planning) {
+    tune_fft(b, FftOptions{planning, false, 0});
+}
+void tune_fft(std::size_t b, FftOptions options) {
     if (b == 0 || b > (1u << 20))
         throw std::invalid_argument("FFT block size must be between 1 and 1048576");
-    if (planning != FftPlanning::measure && planning != FftPlanning::patient)
-        throw std::invalid_argument("FFT tuning requires measure or patient planning");
-    detail::RealFft fft(detail::fft_size(b), {planning, false});
+    if (options.planning == FftPlanning::estimate || options.wisdom_only)
+        throw std::invalid_argument(
+            "FFT tuning requires measure, patient or exhaustive planning, without wisdom-only");
+    detail::RealFft fft(detail::fft_size(b), options);
 }
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options)
     : impl_(std::make_unique<Impl>(c, b, validate(c, b), options)) {}

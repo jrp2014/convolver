@@ -10,6 +10,7 @@
 #include <csignal>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -33,18 +34,31 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
        convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
+                      or exhaustive
+  --fft-time-limit S   Limit each FFTW plan search to S seconds (best plan so
+                      far is used); the historical "Take 1 minute" was
+                      --fft-plan patient --fft-time-limit 30
   --fft-wisdom FILE    Load FFTW plans; fail if the requested plans are missing
   --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
-  --gain-db DB         Output gain in decibels (default 0)
+  --gain-db DB         Output gain in decibels (default 0), or 'auto' for the
+                      historical optimum attenuation (peak response to white
+                      noise) or 'no-clip' for the gain that can never clip;
+                      the chosen value is reported on stderr
   --keep-latency       Keep the leading block of algorithmic latency
-  --output-format F   wav-float (default), wav-pcm16, wav-pcm24, wav-pcm32,
-                      raw-float (little-endian IEEE float32)
+  --output-format F   wav-float (default), wav-pcm8, wav-pcm16, wav-pcm24,
+                      wav-pcm32, raw-float (little-endian IEEE float32)
   --speaker-map config
                       Label WAV output channels with the configuration's channel
                       mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
-  --dither D           PCM16 only: none (default), triangular, triangular-highpass
-                      or rectangular. Other formats reject dither.
+  --dither D           Integer PCM only: none (default), triangular,
+                      triangular-highpass or rectangular
   --dither-seed N      Dither generator seed (default 0); output is reproducible
+  --noise-shaping S    Integer PCM only: none (default), simple, second-order,
+                      third-order, ninth-order or sony-sbm (error feedback)
+  --valid-bits N       Integer PCM only: quantize to N significant bits (8 up to
+                      the container), stored left-justified, e.g. 20 in wav-pcm24
+  --output-channels N  From a configuration list, select the first entry with N
+                      output channels (as well as the input rate and channels)
   --raw-input RATE CHANNELS
                       Read little-endian IEEE float32 with explicit metadata
   --help              Show this help
@@ -129,8 +143,11 @@ int run(int argc, char** argv) {
         convolver::OutputFormat format = convolver::OutputFormat::wav_float;
         std::optional<convolver::Dither> dither;
         std::uint64_t dither_seed = 0;
-        std::size_t block = 256;
+        convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
+        unsigned valid_bits = 0;
+        std::size_t block = 256, output_channels = 0;
         float gain = 1;
+        std::optional<std::string> automatic_gain;
         bool keep = false, speaker_map = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
@@ -169,9 +186,24 @@ int run(int argc, char** argv) {
                     fft_options.planning = convolver::FftPlanning::measure;
                 else if (mode == "patient")
                     fft_options.planning = convolver::FftPlanning::patient;
+                else if (mode == "exhaustive")
+                    fft_options.planning = convolver::FftPlanning::exhaustive;
                 else
                     throw std::invalid_argument(
-                        "FFT planning mode must be estimate, measure or patient");
+                        "FFT planning mode must be estimate, measure, patient or exhaustive");
+            } else if (option == "--fft-time-limit") {
+                const auto text = value();
+                std::size_t end = 0;
+                const double seconds = std::stod(text, &end);
+                if (end != text.size() || !(seconds > 0) || seconds > 86400)
+                    throw std::invalid_argument(
+                        "--fft-time-limit must be a number of seconds, above 0 and at most 86400");
+                fft_options.time_limit_seconds = seconds;
+            } else if (option == "--output-channels") {
+                audio_options = true;
+                output_channels = count(value());
+                if (output_channels > 256)
+                    throw std::invalid_argument("--output-channels must be 1..256");
             } else if (option == "--block-size")
                 block = count(value());
             else if (option == "--keep-latency") {
@@ -187,6 +219,11 @@ int run(int argc, char** argv) {
             } else if (option == "--gain-db") {
                 audio_options = true;
                 auto text = value();
+                if (text == "auto" || text == "no-clip") {
+                    automatic_gain = text;
+                    continue;
+                }
+                automatic_gain.reset();
                 std::size_t end = 0;
                 const double db = std::stod(text, &end);
                 const double linear = std::pow(10., db / 20.);
@@ -204,6 +241,8 @@ int run(int argc, char** argv) {
                 const auto name = value();
                 if (name == "wav-float")
                     format = convolver::OutputFormat::wav_float;
+                else if (name == "wav-pcm8")
+                    format = convolver::OutputFormat::wav_pcm8;
                 else if (name == "wav-pcm16")
                     format = convolver::OutputFormat::wav_pcm16;
                 else if (name == "wav-pcm24")
@@ -227,6 +266,29 @@ int run(int argc, char** argv) {
                     dither = convolver::Dither::triangular_highpass;
                 else
                     throw std::invalid_argument("unsupported dither: " + name);
+            } else if (option == "--noise-shaping") {
+                audio_options = true;
+                const auto name = value();
+                if (name == "none")
+                    shaping = convolver::NoiseShaping::none;
+                else if (name == "simple")
+                    shaping = convolver::NoiseShaping::simple;
+                else if (name == "second-order")
+                    shaping = convolver::NoiseShaping::second_order;
+                else if (name == "third-order")
+                    shaping = convolver::NoiseShaping::third_order;
+                else if (name == "ninth-order")
+                    shaping = convolver::NoiseShaping::ninth_order;
+                else if (name == "sony-sbm")
+                    shaping = convolver::NoiseShaping::sony_sbm;
+                else
+                    throw std::invalid_argument("unsupported noise shaping: " + name);
+            } else if (option == "--valid-bits") {
+                audio_options = true;
+                const auto bits = count(value());
+                if (bits < 8 || bits > 32)
+                    throw std::invalid_argument("--valid-bits must be between 8 and 32");
+                valid_bits = static_cast<unsigned>(bits);
             } else if (option == "--dither-seed") {
                 audio_options = true;
                 const auto text = value();
@@ -239,19 +301,33 @@ int run(int argc, char** argv) {
         }
         if (speaker_map && format == convolver::OutputFormat::raw_float)
             throw std::invalid_argument("--speaker-map needs WAV output; raw-float has no header");
+        const auto bits = convolver::container_bits(format);
+        if (!bits && dither && *dither != convolver::Dither::none)
+            throw std::invalid_argument("--dither applies only to integer PCM output");
+        if (!bits && shaping != convolver::NoiseShaping::none)
+            throw std::invalid_argument("--noise-shaping applies only to integer PCM output");
+        if (valid_bits && valid_bits > bits)
+            throw std::invalid_argument(
+                bits ? "--valid-bits exceeds the output container's " + std::to_string(bits) +
+                           " bits"
+                     : std::string("--valid-bits applies only to integer PCM output"));
         if ((!wisdom.empty() || !tune.empty()) && !convolver::fft_supports_wisdom())
             throw std::invalid_argument("tuning and wisdom require the FFTW backend");
+        if (fft_options.time_limit_seconds > 0 &&
+            fft_options.planning == convolver::FftPlanning::estimate && tune.empty())
+            throw std::invalid_argument(
+                "--fft-time-limit needs --fft-plan measure, patient or exhaustive");
         if (!tune.empty()) {
             if (tune == "-" || !filter.empty() || !input.empty() || !output.empty() ||
                 !wisdom.empty() || audio_options)
                 throw std::invalid_argument("--tune-fft needs a new file path and accepts only "
-                                            "--block-size and --fft-plan");
+                                            "--block-size, --fft-plan and --fft-time-limit");
             // Reject existing targets before the potentially lengthy calibration.
             if (std::filesystem::exists(std::filesystem::symlink_status(tune)))
                 throw std::invalid_argument("FFTW wisdom output must be a new file path");
             if (!explicit_plan)
                 fft_options.planning = convolver::FftPlanning::patient;
-            convolver::tune_fft(block, fft_options.planning);
+            convolver::tune_fft(block, fft_options);
             const auto wisdom_text = convolver::export_fft_wisdom();
             convolver::detail::write_new_file(tune, std::as_bytes(std::span(wisdom_text)));
             std::cout << "Saved FFTW wisdom for block size " << block
@@ -272,19 +348,32 @@ int run(int argc, char** argv) {
         convolver::AudioReader reader(input, raw);
         const auto info = reader.info();
         std::vector<std::filesystem::path> dependencies;
-        const auto config =
-            convolver::load_configuration(filter, info.sample_rate, info.channels, &dependencies);
+        const auto config = convolver::load_configuration(
+            filter,
+            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels},
+            &dependencies);
         for (const auto& source : dependencies)
             if (same_file(source, output))
                 throw std::invalid_argument(
                     "output must differ from referenced configuration and impulse files");
+        if (automatic_gain) {
+            const auto estimate = convolver::estimate_attenuation(config);
+            const bool safe = *automatic_gain == "no-clip";
+            const auto db =
+                safe ? estimate.worst_case_attenuation_db : estimate.noise_attenuation_db;
+            gain = static_cast<float>(std::pow(10., db / 20.));
+            if (!std::isfinite(gain))
+                throw std::invalid_argument("the estimated gain is not representable");
+            std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
+                      << std::fixed << std::setprecision(2) << db << " dB ("
+                      << (safe ? "largest possible peak " : "white-noise peak ")
+                      << std::setprecision(4)
+                      << (safe ? estimate.worst_case_peak : estimate.noise_peak) << ")\n";
+        }
         convolver::Engine engine(config, block, fft_options);
-        if (dither && *dither != convolver::Dither::none &&
-            format != convolver::OutputFormat::wav_pcm16)
-            throw std::invalid_argument("--dither applies only to wav-pcm16 output");
-        // Dither is opt-in; PCM16 is plainly rounded by default.
+        // Dither and shaping are opt-in; integer PCM is plainly rounded by default.
         const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
-                                                          dither_seed};
+                                                          dither_seed, shaping, valid_bits};
         convolver::OutputMetadata metadata;
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;

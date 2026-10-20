@@ -215,6 +215,27 @@ void run(const fs::path& dir) {
                     !failed.configurations[0].valid,
                 "a failed selected entry cannot produce a valid report");
     }
+    {
+        // Output-channel selection and combined mismatch outcomes.
+        InspectionOptions options;
+        options.expected_rate = 48000;
+        options.expected_outputs = 3;
+        const auto report = inspect_configuration(dir / "list.txt", options);
+        require(report.valid && report.selected == dir / "room.cfg" &&
+                    report.traversal.back().output_channels == 3,
+                "select by output channels");
+        options.expected_outputs = 2;
+        options.expected_inputs = 1;
+        const auto none = inspect_configuration(dir / "list.txt", options);
+        std::vector<std::string> outcomes;
+        for (const auto& step : none.traversal)
+            outcomes.push_back(step.outcome);
+        require(!none.valid && has_code(none, "no-match") &&
+                    outcomes == std::vector<std::string>{"list", "rate-and-output-mismatch",
+                                                         "rate-and-output-mismatch",
+                                                         "input-and-output-mismatch"},
+                "output mismatch outcomes");
+    }
     rejects_argument(
         [&] {
             InspectionOptions o;

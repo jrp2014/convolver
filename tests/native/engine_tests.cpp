@@ -102,8 +102,11 @@ std::vector<float> run(Engine& engine, const std::vector<float>& input, std::siz
     }
     return out;
 }
+double worst_error = 0; // Largest |actual - oracle|, reported at the end.
 void close(const std::vector<float>& actual, const std::vector<double>& expected) {
     require(actual.size() == expected.size(), "output size");
+    for (std::size_t i = 0; i < actual.size(); ++i)
+        worst_error = std::max(worst_error, std::abs(actual[i] - expected[i]));
     for (std::size_t i = 0; i < actual.size(); ++i)
         if (!std::isfinite(actual[i]) ||
             std::abs(actual[i] - expected[i]) > 2e-5 * (1 + std::abs(expected[i])))
@@ -169,6 +172,9 @@ void cases() {
             scenario(c, b, in, {FftPlanning::measure, false});
             scenario(c, b, in, {FftPlanning::patient, false});
             scenario(c, b, in, {FftPlanning::patient, true});
+            scenario(c, b, in, {FftPlanning::exhaustive, false});
+            scenario(c, b, in, {FftPlanning::exhaustive, true});
+            scenario(c, b, in, {FftPlanning::patient, false, 0.5});
         }
     }
     // The largest input and output delays are on disconnected channels; they must not inflate tail.
@@ -333,14 +339,70 @@ void invalid() {
     // Rejections must leave the processing state untouched.
     close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3));
 }
+void attenuation() {
+    // Two inputs, two outputs. Output 0 combines a cancelling pair on input 0
+    // (kernel {0, 0.5, 0.25}) and a scaled path from input 1; output 1 mirrors.
+    Configuration c;
+    c.sample_rate = 48000;
+    c.input_channels = c.output_channels = 2;
+    c.paths.push_back({{1, 0.5f}, {{0, 1}}, {{0, 1}}});
+    c.paths.push_back({{-1, 0, 0.25f}, {{0, 1}}, {{0, 1}}});
+    c.paths.push_back({{0.25f, -0.5f}, {{1, -2}}, {{0, 1}, {1, 0.5f}}});
+    const auto e = estimate_attenuation(c, 3);
+    // Output 0: |0|+|0.5|+|0.25| + 2*(0.25+0.5) = 2.25; output 1: 0.5*0.75*2 = 0.75.
+    require(std::abs(e.worst_case_peak - 2.25) < 1e-12, "worst-case peak");
+    require(std::abs(e.worst_case_attenuation_db + 20 * std::log10(2.25)) < 1e-9,
+            "worst-case attenuation");
+    // The bound is reached: inputs equal to the sign of the time-reversed kernels.
+    const std::vector<double> k0{0, 0.5, 0.25}, k1{-0.5, 1, 0};
+    std::vector<float> in;
+    for (std::size_t t = 0; t < 3; ++t)
+        for (const auto* k : {&k0, &k1}) {
+            const double v = (*k)[2 - t];
+            in.push_back(v > 0 ? 1.f : v < 0 ? -1.f : 0.f);
+        }
+    const auto out = oracle(c, in, 1);
+    double reached = 0;
+    for (std::size_t i = 0; i < out.size(); i += 2)
+        reached = std::max(reached, std::abs(out[i]));
+    require(std::abs(reached - e.worst_case_peak) < 1e-12, "worst-case peak is attainable");
+    // The historical noise estimate is a typical peak: below the bound, and
+    // seeded, so repeatable.
+    require(e.noise_peak > 0.5 && e.noise_peak <= e.worst_case_peak, "noise peak range");
+    require(std::abs(e.noise_attenuation_db + 20 * std::log10(e.noise_peak)) < 1e-9,
+            "noise attenuation");
+    const auto again = estimate_attenuation(c, 3);
+    require(again.noise_peak == e.noise_peak, "noise estimate is reproducible");
+    require(estimate_attenuation(c, 4).noise_peak != e.noise_peak, "noise estimate uses seed");
+    // A unit impulse passes noise unchanged: the estimate is just under 0 dB.
+    Configuration dirac;
+    dirac.sample_rate = 48000;
+    dirac.input_channels = dirac.output_channels = 1;
+    dirac.paths.push_back({std::vector<float>(1000, 0.f), {{0, 1}}, {{0, 1}}});
+    dirac.paths[0].impulse[0] = 1;
+    const auto d = estimate_attenuation(dirac);
+    require(d.worst_case_peak == 1 && d.noise_peak > 0.999 && d.noise_peak <= 1,
+            "unit impulse estimate");
+    // Silent routing: no peak, no gain change.
+    auto silent = dirac;
+    silent.paths[0].outputs[0].gain = 0;
+    const auto z = estimate_attenuation(silent);
+    require(z.noise_peak == 0 && z.worst_case_peak == 0 && z.noise_attenuation_db == 0 &&
+                z.worst_case_attenuation_db == 0,
+            "silent estimate");
+    rejects([&] { estimate_attenuation(dirac, 0, 0); });
+    rejects([&] { estimate_attenuation(Configuration{}); });
+}
 } // namespace
 int main() {
     try {
         cases();
+        attenuation();
         shared_input_mixes();
         invalid();
         no_processing_allocation();
-        std::cout << "native engine tests passed\n";
+        std::cout << "native engine tests passed (" << fft_backend_name()
+                  << "; worst absolute error against the double oracle " << worst_error << ")\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

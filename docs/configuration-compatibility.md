@@ -72,7 +72,7 @@ statements; "not tested" means nobody has run these fixtures in that program.
 | UTF-8 names with spaces | yes | `unicode-and-spaces` | not tested | not tested | not tested |
 | Native absolute paths | yes, warned by `portable-paths` | `absolute-native-path` | documented as unsupported | not tested | not tested |
 | Windows drive/UNC paths on macOS/Linux | no, with a diagnostic | `drive-letter-path`, `unc-path` | n/a | n/a | n/a |
-| Lists: first entry matching rate and channels | yes | `list-first-match`, `list-of-sound-files` | not tested | not tested | not tested |
+| Lists: first entry matching rate and channels (optionally output channels) | yes | `list-first-match`, `list-of-sound-files` | not tested | not tested | not tested |
 | Lists naming lists | yes | `nested-list-windows-separators` | documented as unsupported | not tested | not tested |
 | Missing IR in an unselected list entry | yes | `list-missing-unselected-asset` | unknown | unknown | unknown |
 

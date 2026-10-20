@@ -74,8 +74,13 @@ void validate_speakers(std::uint32_t mask, std::size_t channels, OutputFormat fo
                                     " speakers for " + std::to_string(channels) +
                                     " output channels");
 }
-// The dwChannelMask a RIFF/WAVE file declares, or nothing if it has none.
-std::optional<std::uint32_t> declared_speakers(const std::filesystem::path& path) {
+// The WAVE_FORMAT_EXTENSIBLE fields a RIFF/WAVE file declares, if it has them.
+struct Extensible {
+    std::uint16_t valid_bits = 0;
+    std::uint32_t channel_mask = 0;
+    std::streamoff valid_bits_offset = 0; // File offset of wValidBitsPerSample.
+};
+std::optional<Extensible> declared_extensible(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 12> head{};
     file.read(reinterpret_cast<char*>(head.data()), head.size());
@@ -88,16 +93,38 @@ std::optional<std::uint32_t> declared_speakers(const std::filesystem::path& path
             return std::nullopt;
         const auto length = detail::read_le32(std::as_bytes(std::span(header)).subspan(4));
         if (std::string_view(reinterpret_cast<char*>(header.data()), 4) == "fmt ") {
+            const auto start = static_cast<std::streamoff>(file.tellg());
             std::array<unsigned char, 24> fmt{};
             file.read(reinterpret_cast<char*>(fmt.data()), fmt.size());
             const auto bytes = std::as_bytes(std::span(fmt));
             if (!file || length < 40 || detail::read_le16(bytes) != 0xfffe)
                 return std::nullopt;
-            return detail::read_le32(bytes.subspan(20));
+            return Extensible{detail::read_le16(bytes.subspan(18)),
+                              detail::read_le32(bytes.subspan(20)), start + 18};
         }
         file.seekg(static_cast<std::streamoff>(length + (length & 1u)), std::ios::cur);
     }
     return std::nullopt;
+}
+// libsndfile always declares every container bit valid, and labels speakers by
+// channel count when given no map. Record fewer bits and the requested mask.
+void write_extensible(const std::filesystem::path& path, unsigned bits, std::uint32_t mask) {
+    const auto format = declared_extensible(path);
+    if (!format)
+        throw std::runtime_error("audio output " + path.string() +
+                                 " has no WAVE_FORMAT_EXTENSIBLE header for its valid bits");
+    std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
+    file.seekp(format->valid_bits_offset);
+    // wValidBitsPerSample, then dwChannelMask.
+    std::array<char, 6> value{};
+    value[0] = static_cast<char>(bits & 255);
+    value[1] = static_cast<char>(bits >> 8);
+    for (unsigned i = 0; i < 4; ++i)
+        value[2 + i] = static_cast<char>((mask >> (8 * i)) & 255);
+    file.write(value.data(), value.size());
+    file.close();
+    if (!file)
+        throw std::runtime_error("cannot record valid bits in " + path.string());
 }
 void validate_raw_stdin(std::size_t channels) {
     // On a seekable descriptor libsndfile reports a whole-frame count, which
@@ -223,10 +250,48 @@ std::uint64_t splitmix64(std::uint64_t& state) noexcept {
     return z ^ (z >> 31);
 }
 } // namespace
-Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options)
-    : channels_(channels), options_(options), state_(options.seed) {
+unsigned container_bits(OutputFormat format) noexcept {
+    switch (format) {
+    case OutputFormat::wav_pcm8:
+        return 8;
+    case OutputFormat::wav_pcm16:
+        return 16;
+    case OutputFormat::wav_pcm24:
+        return 24;
+    case OutputFormat::wav_pcm32:
+        return 32;
+    default:
+        return 0;
+    }
+}
+namespace {
+// Error-feedback coefficients of the historical noise shapers (dither.h),
+// newest error first.
+std::vector<double> shaping_coefficients(NoiseShaping shaping) {
+    switch (shaping) {
+    case NoiseShaping::none:
+        return {};
+    case NoiseShaping::simple:
+        return {1};
+    case NoiseShaping::second_order:
+        return {1.287, -0.651};
+    case NoiseShaping::third_order:
+        return {1.329, -0.735, 0.0646};
+    case NoiseShaping::ninth_order:
+        return {2.203, -3.210, 3.970, -4.404, 3.668, -2.656, 1.644, -0.767, 0.118};
+    case NoiseShaping::sony_sbm:
+        return {1.47933,   -1.59032,  1.64436,    -1.36613,   0.926704,    -0.557931,
+                -0.267859, -0.106726, -0.0285161, 0.00123066, -0.00616555, 0.003067};
+    }
+    throw std::invalid_argument("unknown noise shaping");
+}
+} // namespace
+Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions options)
+    : channels_(channels), bits_(bits), options_(options), state_(options.seed) {
     if (channels == 0 || channels > 256)
         throw std::invalid_argument("quantizer channels must be 1..256");
+    if (bits < 8 || bits > 32)
+        throw std::invalid_argument("quantizer bits must be 8..32");
     switch (options.dither) {
     case Dither::none:
     case Dither::rectangular:
@@ -236,53 +301,90 @@ Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options
     default:
         throw std::invalid_argument("unknown dither");
     }
+    coefficients_ = shaping_coefficients(options.noise_shaping);
+    scale_ = std::ldexp(1.0, static_cast<int>(bits) - 1);
+    low_ = -scale_;
+    high_ = scale_ - 1;
     reset();
 }
-float Pcm16Quantizer::uniform() noexcept {
+float Quantizer::uniform() noexcept {
     // 24 random bits give exactly representable floats in [0, 1).
     return static_cast<float>(splitmix64(state_) >> 40) * 0x1p-24f;
 }
-void Pcm16Quantizer::reset() noexcept {
+float Quantizer::dither() noexcept {
+    switch (options_.dither) {
+    case Dither::none:
+        break;
+    case Dither::rectangular:
+        return uniform() - 0.5f;
+    case Dither::triangular: {
+        // Sequence RNG draws explicitly: subtraction operands are unordered.
+        const float first = uniform();
+        const float second = uniform();
+        return first - second;
+    }
+    case Dither::triangular_highpass: {
+        const float u = uniform();
+        const float d = u - previous_[channel_];
+        previous_[channel_] = u;
+        return d;
+    }
+    }
+    return 0;
+}
+void Quantizer::reset() noexcept {
     state_ = options_.seed;
     channel_ = 0;
     previous_.assign(options_.dither == Dither::triangular_highpass ? channels_ : 0, 0.f);
     for (auto& v : previous_)
         v = uniform();
+    errors_.assign(channels_ * coefficients_.size(), 0.0);
 }
-void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t> out) noexcept {
+void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out) noexcept {
     const auto count = std::min(in.size(), out.size());
+    const auto order = coefficients_.size();
     for (std::size_t i = 0; i < count; ++i) {
-        float d = 0;
-        switch (options_.dither) {
-        case Dither::none:
-            break;
-        case Dither::rectangular:
-            d = uniform() - 0.5f;
-            break;
-        case Dither::triangular: {
-            // Sequence RNG draws explicitly: subtraction operands are unordered.
-            const float first = uniform();
-            const float second = uniform();
-            d = first - second;
-            break;
-        }
-        case Dither::triangular_highpass: {
-            const float u = uniform();
-            d = u - previous_[channel_];
-            previous_[channel_] = u;
-            break;
-        }
-        }
+        const double d = dither();
+        double* const e = errors_.data() + channel_ * order;
+        double feedback = 0;
+        for (std::size_t k = 0; k < order; ++k)
+            feedback += coefficients_[k] * e[k];
         if (++channel_ == channels_)
             channel_ = 0;
-        // Double keeps the scaled float sample and dither exact before rounding.
-        const double x = std::floor(static_cast<double>(in[i]) * 32768.0 + d + 0.5);
+        // Double keeps the scaled float sample and dither exact before rounding
+        // (for up to 24 significant bits without shaping).
+        const double target = static_cast<double>(in[i]) * scale_ - feedback;
+        const double x = std::floor(target + d + 0.5);
+        if (order) {
+            // Rounding error including dither, before clipping; zero for NaN or
+            // infinity so a bad sample cannot poison later ones.
+            const double error = std::isfinite(x) ? x - target : 0.0;
+            for (std::size_t k = order - 1; k > 0; --k)
+                e[k] = e[k - 1];
+            e[0] = error;
+        }
         if (std::isnan(x))
             out[i] = 0;
         else
-            out[i] = x >= 32767.0    ? std::int16_t{32767}
-                     : x <= -32768.0 ? std::int16_t{-32768}
-                                     : static_cast<std::int16_t>(x);
+            out[i] = x >= high_  ? static_cast<std::int32_t>(high_)
+                     : x <= low_ ? static_cast<std::int32_t>(low_)
+                                 : static_cast<std::int32_t>(x);
+    }
+}
+Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options)
+    : quantizer_(channels, 16, options) {}
+void Pcm16Quantizer::reset() noexcept {
+    quantizer_.reset();
+}
+void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t> out) noexcept {
+    std::array<std::int32_t, 256> scratch{};
+    const auto count = std::min(in.size(), out.size());
+    for (std::size_t offset = 0; offset < count; offset += scratch.size()) {
+        const auto n = std::min(scratch.size(), count - offset);
+        const auto part = std::span(scratch).first(n);
+        quantizer_.quantize(in.subspan(offset, n), part);
+        for (std::size_t i = 0; i < n; ++i)
+            out[offset + i] = static_cast<std::int16_t>(part[i]);
     }
 }
 struct AudioReader::Impl {
@@ -405,10 +507,11 @@ struct AudioWriter::Impl {
     AudioInfo info{};
     std::filesystem::path path;
     std::uint32_t speakers = 0;
+    unsigned valid_bits = 0, container_bits = 0;
     bool raw = false;
     std::size_t frame_bytes = 0;
-    std::optional<Pcm16Quantizer> pcm16;
-    std::vector<std::int16_t> pcm16_buffer;
+    std::optional<Quantizer> quantizer;
+    std::vector<std::int32_t> buffer;
     // Reserve ample room for the WAV headers written by this wrapper.
     std::uint64_t wav_remaining = std::uint64_t(UINT32_MAX) - 4096;
 };
@@ -417,23 +520,15 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     : impl_(std::make_unique<Impl>()) {
     validate(info);
     validate_speakers(metadata.channel_mask, info.channels, format);
-    if (quantization.dither != Dither::none && format != OutputFormat::wav_pcm16)
-        throw std::invalid_argument("dither applies only to PCM16 output");
-    if (format == OutputFormat::wav_pcm16)
-        impl_->pcm16.emplace(info.channels, quantization);
-    impl_->info = info;
-    impl_->path = path;
-    impl_->speakers = metadata.channel_mask;
-    impl_->raw = format == OutputFormat::raw_float;
-    impl_->frame_bytes = info.channels * (format == OutputFormat::wav_pcm16   ? 2
-                                          : format == OutputFormat::wav_pcm24 ? 3
-                                                                              : 4);
     SF_INFO sf{};
     sf.samplerate = info.sample_rate;
     sf.channels = static_cast<int>(info.channels);
     switch (format) {
     case OutputFormat::wav_float:
         sf.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT;
+        break;
+    case OutputFormat::wav_pcm8:
+        sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_U8; // WAV 8-bit PCM is unsigned.
         break;
     case OutputFormat::wav_pcm16:
         sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
@@ -450,7 +545,25 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     default:
         throw std::invalid_argument("unknown audio output format");
     }
-    if (impl_->speakers)
+    const auto bits = container_bits(format);
+    if (!bits && (quantization.dither != Dither::none ||
+                  quantization.noise_shaping != NoiseShaping::none || quantization.valid_bits))
+        throw std::invalid_argument(
+            "dither, noise shaping and valid bits apply only to integer PCM output");
+    if (quantization.valid_bits && (quantization.valid_bits < 8 || quantization.valid_bits > bits))
+        throw std::invalid_argument("valid bits must be between 8 and the container's " +
+                                    std::to_string(bits) + " bits");
+    impl_->container_bits = bits;
+    impl_->valid_bits = quantization.valid_bits ? quantization.valid_bits : bits;
+    if (bits)
+        impl_->quantizer.emplace(info.channels, impl_->valid_bits, quantization);
+    impl_->info = info;
+    impl_->path = path;
+    impl_->speakers = metadata.channel_mask;
+    impl_->raw = format == OutputFormat::raw_float;
+    impl_->frame_bytes = info.channels * (bits ? bits / 8 : 4);
+    // Speaker labels and reduced valid bits both need WAVE_FORMAT_EXTENSIBLE.
+    if (impl_->speakers || impl_->valid_bits != bits)
         sf.format = (sf.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
     if (!sf_format_check(&sf))
         throw std::invalid_argument("unsupported audio output format");
@@ -487,18 +600,23 @@ void AudioWriter::write(std::span<const float> data) {
         throw std::length_error(
             "WAV output exceeds 4 GiB container limit; select raw-float for a larger stream");
     sf_count_t written;
-    if (impl_->pcm16) {
+    if (impl_->quantizer) {
         // Bound scratch memory; the quantizer carries its state across calls.
+        // libsndfile's int samples are left-justified 32-bit values: it keeps
+        // the container's top bits, so B valid bits land left-justified.
         constexpr std::size_t chunk_frames = 4096;
         const auto channels = impl_->info.channels;
-        impl_->pcm16_buffer.resize(std::min(data.size(), chunk_frames * channels));
+        const auto shift = 32 - impl_->valid_bits;
+        impl_->buffer.resize(std::min(data.size(), chunk_frames * channels));
         written = 0;
         for (std::size_t offset = 0; offset < data.size();) {
-            const auto n = std::min(data.size() - offset, impl_->pcm16_buffer.size());
-            const auto part = std::span<std::int16_t>(impl_->pcm16_buffer).first(n);
-            impl_->pcm16->quantize(data.subspan(offset, n), part);
+            const auto n = std::min(data.size() - offset, impl_->buffer.size());
+            const auto part = std::span<std::int32_t>(impl_->buffer).first(n);
+            impl_->quantizer->quantize(data.subspan(offset, n), part);
+            for (auto& v : part)
+                v = static_cast<std::int32_t>(static_cast<std::uint32_t>(v) << shift);
             const auto frames_here = static_cast<sf_count_t>(n / channels);
-            const auto got = sf_writef_short(file, part.data(), frames_here);
+            const auto got = sf_writef_int(file, part.data(), frames_here);
             written += got;
             if (got != frames_here)
                 break;
@@ -516,12 +634,23 @@ void AudioWriter::close() {
     // sf_close. Finalize the WAV header while its error state is inspectable.
     if (impl_->handle.file && !impl_->raw)
         sf_command(impl_->handle.file, SFC_UPDATE_HEADER_NOW, nullptr, 0);
-    const bool check_speakers = impl_->handle.file && impl_->speakers;
+    const bool finishing = impl_->handle.file != nullptr;
     impl_->handle.close();
-    // Confirm the finished header carries the requested labels.
-    if (check_speakers && declared_speakers(impl_->path) != impl_->speakers)
+    if (!finishing)
+        return;
+    const bool reduced = impl_->container_bits && impl_->valid_bits != impl_->container_bits;
+    if (reduced)
+        write_extensible(impl_->path, impl_->valid_bits, impl_->speakers);
+    if (!impl_->speakers && !reduced)
+        return;
+    // Confirm the finished header carries the requested labels and valid bits.
+    const auto declared = declared_extensible(impl_->path);
+    if (!declared || declared->channel_mask != impl_->speakers)
         throw std::runtime_error("audio output " + impl_->path.string() +
                                  " was written without the requested speaker mask");
+    if (impl_->container_bits && declared->valid_bits != impl_->valid_bits)
+        throw std::runtime_error("audio output " + impl_->path.string() +
+                                 " was written without the requested valid bits");
 }
 const char* sndfile_version() noexcept {
     return sf_version_string();

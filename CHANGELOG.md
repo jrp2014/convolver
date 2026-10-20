@@ -9,6 +9,41 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
+### Added
+
+Features that only the historical engine had:
+
+- Dither on every integer output format (PCM8, PCM16, PCM24, PCM32), with the
+  historical engine's five error-feedback noise shapers: `--noise-shaping
+  simple|second-order|third-order|ninth-order|sony-sbm`. Dither stays off by
+  default. `convolver::Quantizer` generalizes `Pcm16Quantizer`, which remains.
+- `wav-pcm8` output and `--valid-bits N`, which writes WAVE_FORMAT_EXTENSIBLE
+  with fewer valid bits than the container (for example 20 bits in 24).
+- `--gain-db auto` (the historical white-noise optimum-attenuation estimate,
+  seeded so it is repeatable) and `--gain-db no-clip` (an exact bound that
+  cannot clip), from `convolver::estimate_attenuation`.
+- `--output-channels N` and `ConfigurationSelection` choose a list entry by
+  output channel count as well as rate and inputs; inspection reports it.
+- `--fft-plan exhaustive`, `--fft-time-limit SECONDS`, `FftPlanning::exhaustive`,
+  `FftOptions::time_limit_seconds` and `tune_fft`.
+- `-DCONVOLVER_FFT_BACKEND=OOURA`: Ooura's FFT built in (permissive licence),
+  for a core, CLI and plug-in with no FFT library dependency. FFTW stays the
+  default.
+- VST3 buses of 1 to 8 channels each, with unequal input and output counts.
+  `HostProcessor` accepts unequal counts. `convolver-vst3-preset` gains
+  `--sample-rate`, `--input-channels` and `--output-channels`.
+
+### Changed
+
+- PCM24 output is now quantized by Convolver (round to nearest, ties up) instead
+  of libsndfile's float conversion; samples can differ by at most 1 LSB.
+- CMake consumers now request `find_package(Convolver 0.4)`; the package keeps
+  its same-minor compatibility policy.
+
+## [0.3.1] - 2026-10-18
+
 ### Fixed
 
 - Inspection reports direct sound-file decoding and filesystem resolution failures
@@ -138,6 +173,9 @@ Until 1.0 the C++ API may change between minor versions.
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jrp2014/convolver/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/jrp2014/convolver/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/jrp2014/convolver/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jrp2014/convolver/compare/v0.2.0...v0.2.1

@@ -8,8 +8,8 @@ import statistics
 import subprocess
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('fftw', type=Path)
-parser.add_argument('accelerate', type=Path)
+parser.add_argument('fftw', type=Path, help='benchmark binary built with FFTW')
+parser.add_argument('other', type=Path, help='benchmark binary built with another backend')
 parser.add_argument('--seconds', type=float, default=.25)
 parser.add_argument('--rounds', type=int, default=5)
 parser.add_argument('--output', type=Path, required=True)
@@ -19,7 +19,7 @@ if args.rounds < 3 or args.seconds <= 0:
 rows = []
 for repeat in range(args.rounds):
     for case in range(10):
-        binaries = [args.fftw.resolve(), args.accelerate.resolve()]
+        binaries = [args.fftw.resolve(), args.other.resolve()]
         if (repeat+case) % 2:
             binaries.reverse()
         for binary in binaries:
@@ -30,10 +30,13 @@ for repeat in range(args.rounds):
 with args.output.open('w', newline='') as f:
     writer = csv.DictWriter(f, fieldnames=list(rows[0]))
     writer.writeheader(); writer.writerows(rows)
-print('| Case | FFTW ns/frame | Accelerate ns/frame | FFTW/Accelerate |')
+first, second = dict.fromkeys(row['backend'] for row in rows)
+if second == 'FFTW':
+    first, second = second, first
+print(f'| Case | {first} ns/frame | {second} ns/frame | {first}/{second} |')
 print('| --- | ---: | ---: | ---: |')
 for case in dict.fromkeys(row['case'] for row in rows):
     values = {backend: statistics.median(float(row['ns_per_frame']) for row in rows
                                         if row['case']==case and row['backend']==backend)
-              for backend in ('FFTW', 'Accelerate')}
-    print(f"| {case} | {values['FFTW']:.1f} | {values['Accelerate']:.1f} | {values['FFTW']/values['Accelerate']:.2f}× |")
+              for backend in (first, second)}
+    print(f"| {case} | {values[first]:.1f} | {values[second]:.1f} | {values[first]/values[second]:.2f}× |")

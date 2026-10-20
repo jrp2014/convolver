@@ -37,8 +37,10 @@ ctest --test-dir build --output-on-failure
 ```
 
 On a Mac you can use Apple's Accelerate framework instead of FFTW by adding
-`-DCONVOLVER_FFT_BACKEND=ACCELERATE` to the first command. Windows builds use
-vcpkg; see the [portable guide](docs/portable-core.md#windows-build).
+`-DCONVOLVER_FFT_BACKEND=ACCELERATE` to the first command. On any platform,
+`-DCONVOLVER_FFT_BACKEND=OOURA` builds a small FFT into the library so FFTW is not
+needed. Windows builds use vcpkg; see the
+[portable guide](docs/portable-core.md#windows-build).
 
 ## Filter a file
 
@@ -55,9 +57,10 @@ With a configuration file:
 ./build/convolver --filter room.cfg --input music.wav --output corrected.wav --output-format wav-pcm24
 ```
 
-Output is 32-bit float WAV unless you choose `wav-pcm16`, `wav-pcm24`,
-`wav-pcm32` or `raw-float`. Use `--gain-db -3` (or any value) to lower the level
-and avoid clipping. The output keeps the whole filter tail, and Convolver's
+Output is 32-bit float WAV unless you choose `wav-pcm8`, `wav-pcm16`,
+`wav-pcm24`, `wav-pcm32` or `raw-float`; integer formats can add `--dither` and
+`--noise-shaping`. Use `--gain-db -3` (or any value) to lower the level, or
+`--gain-db no-clip` to pick the largest gain that cannot clip. The output keeps the whole filter tail, and Convolver's
 processing delay is removed, so the result lines up with the input. The input
 sample rate and channel count must match the filter; Convolver does not resample.
 
@@ -118,6 +121,7 @@ Check a configuration before using it:
 ## VST3 plug-in
 
 The plug-in is optional and needs the Steinberg VST3 SDK, fetched separately.
+It takes up to 8 input and 8 output channels, and the counts may differ.
 Filters are loaded through the host's preset menu: a small tool converts a WAV
 or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 

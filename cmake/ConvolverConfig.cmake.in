@@ -21,10 +21,10 @@ function(_convolver_dependencies)
             set(Convolver_NOT_FOUND_MESSAGE "Convolver needs single-precision FFTW" PARENT_SCOPE)
             return()
         endif()
-    elseif(NOT APPLE)
+    elseif(Convolver_FFT_BACKEND STREQUAL "ACCELERATE" AND NOT APPLE)
         set(Convolver_NOT_FOUND_MESSAGE "This Convolver package requires Apple Accelerate" PARENT_SCOPE)
         return()
-    endif()
+    endif() # OOURA is built in and needs nothing.
     set(Convolver_core_FOUND TRUE PARENT_SCOPE)
     if("io" IN_LIST Convolver_FIND_COMPONENTS AND
        EXISTS "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ConvolverIOTargets.cmake")

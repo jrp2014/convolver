@@ -38,8 +38,10 @@ cmake --build build-accelerate --parallel
 ctest --test-dir build-accelerate --output-on-failure
 ```
 
-Accelerate builds neither search for nor link FFTW. Backend selection is per
-build, not a runtime switch; `--version` identifies the selected backend.
+Accelerate builds neither search for nor link FFTW. `-DCONVOLVER_FFT_BACKEND=OOURA`
+builds Ooura's FFT into the library instead, on any platform, so the only
+remaining dependency is libsndfile for the CLI and file I/O. Backend selection is
+per build, not a runtime switch; `--version` identifies the selected backend.
 See [FFT contracts, benchmarks and equivalence results](fft-backends.md).
 
 ### FFTW plan tuning
@@ -55,16 +57,23 @@ with a Release binary and little competing CPU activity:
 ```
 
 Tuning needs no input audio or IR. It prepares both transforms using `patient`
-planning by default; `--fft-plan measure` searches less extensively. The wisdom
+planning by default; `--fft-plan measure` searches less extensively and
+`--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
+longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
+seconds and keeps the best plan found by then, as the historical engine's "Take 1
+minute" choice did (`--fft-plan patient --fft-time-limit 30`). A search the limit
+cuts short may not be stored as reusable wisdom for that mode; tune without a
+limit when the wisdom is for `--fft-wisdom`. The wisdom
 destination must be a **new file**; existing files and aliases are never replaced.
 Use a different filename when retuning, then replace an older cache deliberately.
 
-Normal rendering defaults to `estimate`, or accepts `--fft-plan measure|patient`
-to time plans during startup. `--fft-wisdom FILE` imports native single-precision
+Normal rendering defaults to `estimate`, or accepts
+`--fft-plan measure|patient|exhaustive` (optionally with `--fft-time-limit`) to
+time plans during startup. `--fft-wisdom FILE` imports native single-precision
 FFTW wisdom and requires matching plans, with no silent measured fallback. A
 missing size or insufficient planning rigor fails before opening the audio
-output. Patient wisdom satisfies estimate/measure requests as well as patient;
-measure wisdom cannot satisfy patient. CLI wisdom input is limited to 1 MiB.
+output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
+patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
 
 Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
 Retune after changing them; loading successfully is **not** proof that old wisdom
@@ -116,7 +125,7 @@ Build options:
 | `CONVOLVER_BUILD_NATIVE` | ON | Enable portable targets; OFF retains regression-only mode |
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
-| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW or ACCELERATE (Apple only) |
+| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW, ACCELERATE (Apple only) or OOURA (built in) |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
 | `BUILD_TESTING` | ON at top level | Master test switch |
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
@@ -136,7 +145,10 @@ The filter may be an IR sound file, a historical configuration, or a configurati
 list. A direct multichannel IR maps each IR channel to the corresponding input
 and output; a mono IR requires mono input. Use a config to apply one mono IR to
 several channels. Lists select the first entry matching input rate and channel
-count. There is no resampling or nearest-rate substitution.
+count. `--output-channels N` also requires N output channels, as the historical
+engine also chose by the output format the playback device accepted (a sound
+file counts as having as many outputs as inputs). There is no resampling or
+nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
 count. FFTW uses FFT length 2B; Accelerate rounds up to a power of two (at least
@@ -145,23 +157,62 @@ has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
 it, matching the historical Pipe timing convention. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
-exceed unity. PCM24/PCM32 output clips to its representable range via libsndfile.
+exceed unity. Integer output clips to its representable range.
 
-Outputs: `wav-float` (default), `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
+`--gain-db auto` applies the historical engine's "optimum attenuation": the
+filter is run on seeded white noise uniform in [-1, 1) on every input for ten
+filter lengths (at least 65536 frames), and the gain is -20 log10 of the largest
+output sample. That reflects typical programme peaks, so loud material can still
+clip. `--gain-db no-clip` instead applies the gain that no input within full
+scale can clip: -20 log10 of the largest sum of absolute taps of any output's
+combined input-to-output responses. Both report the chosen gain on stderr. The
+library function is `estimate_attenuation`; tests check the bound is exact and
+attainable against the double-precision oracle.
 
-PCM16 output is quantized by Convolver's own `Pcm16Quantizer`, not libsndfile:
-each sample is scaled by 32768, offset by the dither (in LSBs), rounded to the
-nearest integer (ties toward +infinity) and clipped to [-32768, 32767]. Dither
-is off by default. `--dither` selects `none` (default), `triangular` (independent
-TPDF, error power 1/4 LSB² at every signal level), `triangular-highpass` (the
-historical engine's "Triangular": per-channel difference of successive uniform
-values, same amplitude, high-pass error spectrum) or `rectangular`.
-`--dither-seed N` (default 0) seeds the generator; the same seed, input and
-channel count give byte-identical output regardless of buffering. Dither is
-rejected for other output formats. There is no noise shaping. The library's
-`AudioWriter` defaults to no dither; pass `QuantizationOptions` to enable it.
-The tests check rounding/clipping endpoints, reproducibility, chunk independence
-and measured error mean, variance and correlation against the theoretical values.
+Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
+`wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
+
+Every integer format is quantized by Convolver's own `Quantizer`, not libsndfile:
+with B significant bits, each sample is scaled by 2^(B-1), offset by the dither
+(in LSBs) and the noise-shaping feedback, rounded to the nearest integer (ties
+toward +infinity) and clipped to [-2^(B-1), 2^(B-1) - 1]. PCM16 output is
+unchanged from 0.3 (`Pcm16Quantizer` is now the 16-bit case). PCM24 and PCM32
+used libsndfile's conversion before 0.4; they now follow the same rule, which
+can differ from it by at most one LSB.
+
+Dither is off by default. `--dither` selects `none` (default), `triangular`
+(independent TPDF, error power 1/4 LSB² at every signal level),
+`triangular-highpass` (the historical engine's "Triangular": per-channel
+difference of successive uniform values, same amplitude, high-pass error
+spectrum) or `rectangular`. `--dither-seed N` (default 0) seeds the generator;
+the same seed, input and channel count give byte-identical output regardless of
+buffering. Float and RAW formats reject dither, noise shaping and valid bits.
+
+`--noise-shaping` selects one of the historical engine's error-feedback shapers:
+`simple` (first order), `second-order`, `third-order`, `ninth-order` or
+`sony-sbm` (the historical "Pseudo Sony SBM"), or `none` (default). Each
+subtracts a fixed combination of the channel's previous quantization errors
+before rounding, so the error spectrum is the rounding error filtered by
+1 - Σ c_k z^-k, moving noise away from the frequencies where hearing is most
+sensitive at the cost of more total noise. The fed-back error is taken before
+clipping, so overload cannot make a shaper run away (the historical code could
+wrap). The coefficients are in `include/convolver/io.hpp`. Shaping works with or
+without dither; use it with dither.
+
+`--valid-bits N` quantizes to N significant bits (8 up to the container size)
+and stores them left-justified with the low bits zero, in a
+WAVE_FORMAT_EXTENSIBLE header that declares N as `wValidBitsPerSample`, for
+example 20 valid bits in `wav-pcm24` or 24 in `wav-pcm32`, as the historical
+engine offered. Dither and shaping then act at that resolution.
+
+The library's `AudioWriter` defaults to plain rounding; pass `QuantizationOptions`
+to enable dither, shaping or valid bits. The tests check rounding/clipping
+endpoints for 8 to 32 bits, reproducibility, chunk independence, measured
+dither error mean, variance and correlation, that each shaper's output error
+equals a bounded rounding residual through the historical coefficients, that its
+measured error spectrum follows 1 - Σ c_k z^-k within 15%, recovery after
+clipping, and exact stored samples and header fields for every container and
+valid-bit combination.
 
 ### Speaker labels
 
@@ -242,9 +293,10 @@ convolver --validate filters.txt --all-configurations --json
 convolver --inspect room.cfg --syntax-only --json
 ```
 
-- Selection matches rendering: the first list entry matching `--sample-rate` and
-  `--input-channels` (or the first entry with neither). The report lists each
-  visited file and why it was skipped. Unselected entries' IR files are not opened.
+- Selection matches rendering: the first list entry matching `--sample-rate`,
+  `--input-channels` and `--output-channels` (or the first entry with none). The
+  report lists each visited file and why it was skipped, for example
+  `rate-and-output-mismatch`. Unselected entries' IR files are not opened.
 - `--all-configurations` validates every leaf of a list, continues after a failed
   entry, and fails if any entry fails. It cannot be combined with selectors.
 - `--syntax-only` reads one configuration file's text, checks grammar, routes and

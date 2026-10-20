@@ -32,10 +32,10 @@ resolution when new features justify it; keep private FFT storage free to evolve
   C++ ABI promise. See [package contracts](cmake-package.md).
 - **Compatibility/tooling:** Windows and mixed relative configuration paths,
   signed-zero routing semantics, real PCM/file tests, `.clang-format`,
-  `.clang-tidy` and CI checks. PCM16 output uses a deterministic, seeded
+  `.clang-tidy` and CI checks. Integer output uses a deterministic, seeded
   quantizer; dither (triangular, historical high-pass triangular or
-  rectangular) is opt-in.
-- **FFT selection and optimization:** FFTW and Accelerate behind one private
+  rectangular) and the historical noise shapers are opt-in.
+- **FFT selection and optimization:** FFTW, Accelerate and Ooura behind one private
   contract; offline FFTW planning/wisdom; split real/imaginary spectra and
   vectorizable MAC loops. The [recorded measurements](fft-backends.md) distinguish
   Apple backend/planning experiments from the later x86 split-spectrum results.
@@ -51,17 +51,16 @@ arbitrary threads; its ownership/thread contract remains part of the API.
 
 ## Next compatibility work
 
-PCM16 dither is implemented with tests of quantization error, clipping and
-reproducibility that are independent of convolution accuracy. Noise shaping and
-PCM24 dither remain separate, explicit choices if they are wanted.
+Dither and noise shaping are implemented for every integer format, with tests of
+quantization error, shaped noise spectra, clipping and reproducibility that are
+independent of convolution accuracy.
 
 Configuration import still combines parsing, selection and asset decoding; no
 inspection/validation command exposes the resolved graph. Add one grammar-backed
 inspection path reporting files, sample rate, routes, delays, latency, tail and
 estimated storage. Build a small redistributable compatibility corpus with
 consumer-specific profiles. Preserve route order and list-selection semantics.
-Speaker masks, RF64, optional resampling and wider VST3 layouts each need their
-own acceptance tests. Parser/state/IR fuzzing should have bounded resource use.
+RF64 and optional resampling each need their own acceptance tests. Parser/state/IR fuzzing should have bounded resource use.
 
 For VST3, prioritize named Windows/macOS DAW tests and repeatable release bundles
 before adding a custom UI or another host API. SDK validation is necessary but
