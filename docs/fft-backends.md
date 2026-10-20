@@ -311,7 +311,77 @@ tolerance. It also needs care with output delays and the per-path output gains.
 It is a reasonable next step for dense matrices, as a separate, separately
 measured change.
 
+## Overlap-add and overlap-save
+
+The historical engine uses uniformly partitioned overlap-save: each block's input
+spectrum is multiplied by every filter partition and accumulated into a ring of
+future output spectra (`convolver/convolution/convolution.cpp`,
+`doPartitionedConvolution`). The portable engine uses overlap-add with a ring of
+past input spectra (`portable/engine.cpp`). The portable engine was written this
+way from its first commit (`fa8ca77`); no reason for the change is recorded. It
+was not made for speed.
+
+Per block and path both schemes do one forward FFT of size 2B, P
+multiply-accumulates and one inverse FFT. The only differences are memory traffic
+and bookkeeping. Overlap-save reads and writes back P output spectra. Overlap-add
+reads P history spectra into a single accumulator, and pads its input with zeros
+and adds the overlap afterwards.
+
+[`src/overlap_schemes.cpp`](benchmarks/src/overlap_schemes.cpp) times both on one
+path with the same FFTW MEASURE plans and the same split-spectrum MAC loop, so
+only the scheme differs. Both agree with a direct double-precision convolution
+to within 1e-5. Measured 19 October 2026 on a 4-vCPU Intel Xeon cloud VM at
+2.8 GHz, Ubuntu 24.04, GCC 13.3 `-O3`, Ubuntu's FFTW 3.3.10. Each case ran seven
+alternating rounds of 0.2 s, and the whole benchmark ran three times. The table
+shows medians across the three runs and each run's ratio
+([raw data](benchmarks/2026-10-19-x86-overlap-schemes.csv)). A ratio below 1
+means overlap-save was faster.
+
+| IR frames | B | Partitions | Overlap-add µs/block | Overlap-save µs/block | Save/add (each run) |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 4096 | 64 | 64 | 3.2 | 3.0 | 0.92, 0.93, 1.00 |
+| 4096 | 256 | 16 | 3.9 | 3.8 | 1.00, 0.96, 0.95 |
+| 4096 | 1024 | 4 | 9.4 | 10.6 | 1.28, 1.20, 1.01 |
+| 4096 | 4096 | 1 | 35.2 | 35.5 | 1.02, 0.97, 1.01 |
+| 65536 | 64 | 1024 | 46.9 | 42.7 | 0.94, 0.89, 0.90 |
+| 65536 | 256 | 256 | 45.2 | 46.7 | 1.03, 1.05, 0.92 |
+| 65536 | 1024 | 64 | 48.5 | 52.2 | 1.04, 1.16, 1.08 |
+| 65536 | 4096 | 16 | 89.5 | 94.8 | 1.10, 1.01, 1.06 |
+| 262144 | 64 | 4096 | 215.0 | 184.7 | 0.85, 0.86, 0.88 |
+| 262144 | 256 | 1024 | 246.2 | 234.1 | 0.95, 0.91, 0.88 |
+| 262144 | 1024 | 256 | 217.1 | 206.3 | 1.03, 0.93, 1.05 |
+| 262144 | 4096 | 64 | 234.8 | 242.3 | 1.02, 1.03, 1.05 |
+| 1048576 | 64 | 16384 | 1213.1 | 833.2 | 0.86, 0.69, 0.86 |
+| 1048576 | 256 | 4096 | 1872.8 | 1045.2 | 0.66, 0.56, 0.70 |
+| 1048576 | 1024 | 1024 | 1407.9 | 1337.8 | 0.95, 1.07, 0.89 |
+| 1048576 | 4096 | 256 | 1250.3 | 1169.3 | 0.85, 1.00, 0.91 |
+
+Overlap-save was consistently faster at B = 64, by 7–15% up to 256k taps. With
+1M taps at B = 64–256 it was 1.2–1.8× faster, where the spectra no longer fit in
+cache. At B = 1024–4096 the two were within shared-VM noise up to 256k taps, with
+overlap-add sometimes ahead. The cause has not been profiled; ARM is unmeasured.
+
+The layout also decides which transform sharing is natural. Input-spectrum
+history lets paths with the same input mix share one forward FFT and history
+ring (implemented above). Output-spectrum accumulation would instead let paths
+with the same output routes share one inverse FFT. Any switch to overlap-save
+must keep the engine's latency, tail, oracle and allocation tests.
+
 ## Reproduce
+
+### Overlap-add and overlap-save
+
+Needs a C++20 compiler and single-precision FFTW (`brew install fftw` on macOS,
+`apt-get install libfftw3-dev` on Ubuntu); no CMake build is required:
+
+```sh
+sh docs/benchmarks/src/run_overlap_schemes.sh > overlap.csv   # about 1 minute
+sh docs/benchmarks/src/run_overlap_schemes.sh --quick         # about 10 s, no 1M-tap cases
+```
+
+The script finds FFTW with `pkg-config` or Homebrew, compiles with `-O3 -DNDEBUG`
+(override with `CXX` and `CXXFLAGS`), prints the accuracy check and compiler to
+stderr and CSV to stdout.
 
 ### Building FFTW for this Apple Silicon Mac
 
