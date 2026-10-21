@@ -317,6 +317,25 @@ libsndfile 1.2.2's Windows reader reports that condition as a system error. File
 and output streams still use libsndfile. Partial-byte reads are accumulated before
 checking complete frames, so fragmented writes do not lose audio.
 
+### With FFmpeg
+
+FFmpeg can decode the audio of any file it reads, pass it through Convolver and
+remux it with the original video. Its `-ar` and `-ac` values must match the
+configuration:
+
+```sh
+ffmpeg -i movie.mkv -map 0:a -f f32le -ar 48000 -ac 2 - \
+  | convolver --filter room.cfg --input - --raw-input 48000 2 \
+      --output - --output-format raw-float \
+  | ffmpeg -i movie.mkv -f f32le -ar 48000 -ac 2 -i - \
+      -map 0:v -map 1:a -c:v copy -c:a flac movie-corrected.mkv
+```
+
+The new audio keeps the filter tail, so it can run past the video; add
+`-shortest` to cut it. It starts at time zero, so check sync for files whose
+audio starts late. A built-in FFmpeg filter is planned, not implemented: see the
+[FFmpeg filter plan](superpowers/plans/2026-10-21-ffmpeg-filter.md).
+
 Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
 validation, because libsndfile can otherwise silently accept truncation. Other
 input containers, including RF64, retain libsndfile's validation semantics; this

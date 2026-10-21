@@ -8,7 +8,7 @@ backlog, not a promise that every idea will be implemented. Checked on 20 Octobe
 
 In short: the main open themes are first-use examples and documentation
 automation (DOC), plug-in release qualification and host testing (REL, HOST),
-unused VST3 SDK features (VST3), checks against other configuration readers
+unused VST3 SDK features (VST3), an FFmpeg filter (FFMPEG), checks against other configuration readers
 (CFG), large files and resampling (IO), precise no-clip headroom (GAIN), longer
 stress testing (ROBUST), and FFT or performance work only where measurements
 justify it (FFT, PERF). The
@@ -43,6 +43,28 @@ speed. Do not change the historical archive to implement a portable feature.
   [CLAP](https://github.com/free-audio/clap), and a filter-loading editor against
   actual user needs. Keep the core and host lifecycle reusable; require host tests
   and distribution work for each adapter.
+
+## FFmpeg integration
+
+Design and evidence: [FFmpeg filter plan](docs/superpowers/plans/2026-10-21-ffmpeg-filter.md)
+(21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter
+means a patched FFmpeg build with `--enable-gpl`.
+
+- [ ] **FFMPEG-1 — Test the pipe workflow.** The
+  [FFmpeg pipe example](docs/portable-core.md#with-ffmpeg) is documented and was
+  run by hand; add a CI test that runs it when `ffmpeg` is installed.
+- [ ] **FFMPEG-2 — C API.** A C99 header over `HostProcessor` and the
+  configuration loader, a `Convolver::c` target and `convolver.pc`, with C-only
+  tests and the same output as `Engine`.
+- [ ] **FFMPEG-3 — Out-of-tree `convolver` filter.** Patch series against a
+  pinned FFmpeg release, build script, CI job comparing filter output with the
+  CLI, and a user guide once it works.
+- [ ] **FFMPEG-4 — Reverb support.** Latency-aligned dry/wet mix in the host
+  layer (shared with VST3-4), filter gain, and a faster long-IR choice (larger
+  offline block or PERF-2).
+- [ ] **FFMPEG-5 — Upstream decision.** Decide whether to submit the filter to
+  FFmpeg after FFMPEG-3 has users; it overlaps `afir`, so the case rests on
+  `.cfg` compatibility and routing.
 
 ## Compatibility and robustness
 
