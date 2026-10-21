@@ -87,6 +87,11 @@ if(CONVOLVER_BUILD_TESTS)
         message(STATUS "VST3 runtime validation and moduleinfo loading disabled: developer build only")
     endif()
     set_tests_properties(vst3.adapter PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
+    # PLUG-1: the plug-in must not share an FFTW planner with its host process.
+    find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME vst3.fft_symbols COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/vst3/fft_symbols.py" "${fft_backend}" "$<TARGET_FILE:convolver_vst3>")
+    set_tests_properties(vst3.fft_symbols PROPERTIES LABELS "vst3;real-libraries" SKIP_RETURN_CODE 77)
     add_dependencies(check convolver_vst3 convolver_vst3_tests validator)
 endif()
 

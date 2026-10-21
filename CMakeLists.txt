@@ -49,9 +49,27 @@ if(CONVOLVER_BUILD_NATIVE)
         message(FATAL_ERROR "CONVOLVER_BUILD_CLI requires CONVOLVER_BUILD_IO; disable CLI for a core-only build.")
     endif()
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-    set(CONVOLVER_FFT_BACKEND "FFTW" CACHE STRING "FFT backend: FFTW, ACCELERATE or OOURA")
-    set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS FFTW ACCELERATE OOURA)
+    # AUTO picks FFTW, except in plug-in builds: a host process may load other
+    # plug-ins that use the same FFTW, and FFTW's planner is not thread-safe, so
+    # plug-in builds use Ooura (Accelerate on Apple). Set FFTW, ACCELERATE or
+    # OOURA explicitly to override. One backend serves every target in a build.
+    set(CONVOLVER_FFT_BACKEND "AUTO" CACHE STRING
+        "FFT backend: AUTO (FFTW; OOURA or ACCELERATE for plug-in builds), FFTW, ACCELERATE or OOURA")
+    set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW ACCELERATE OOURA)
     string(TOUPPER "${CONVOLVER_FFT_BACKEND}" fft_backend)
+    if(fft_backend STREQUAL "AUTO")
+        if(NOT CONVOLVER_BUILD_VST3)
+            set(fft_backend "FFTW")
+        elseif(APPLE)
+            set(fft_backend "ACCELERATE")
+        else()
+            set(fft_backend "OOURA")
+        endif()
+    elseif(fft_backend STREQUAL "FFTW" AND CONVOLVER_BUILD_VST3)
+        message(WARNING "CONVOLVER_FFT_BACKEND=FFTW in a plug-in build: FFTW's planner is not "
+            "thread-safe, and another plug-in or the host may use the same FFTW at the same "
+            "time. Use AUTO (Ooura, or Accelerate on Apple) for plug-ins you distribute.")
+    endif()
     if(fft_backend STREQUAL "FFTW")
         find_package(ConvolverFFTW REQUIRED)
         set(fft_source portable/fft_fftw.cpp)
@@ -71,9 +89,9 @@ if(CONVOLVER_BUILD_NATIVE)
         set_source_files_properties(portable/third_party/ooura/fftsg.cpp PROPERTIES
             COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
     else()
-        message(FATAL_ERROR "CONVOLVER_FFT_BACKEND must be FFTW, ACCELERATE or OOURA.")
+        message(FATAL_ERROR "CONVOLVER_FFT_BACKEND must be AUTO, FFTW, ACCELERATE or OOURA.")
     endif()
-    message(STATUS "Convolver FFT backend: ${fft_backend}")
+    message(STATUS "Convolver FFT backend: ${fft_backend} (CONVOLVER_FFT_BACKEND=${CONVOLVER_FFT_BACKEND})")
     find_package(Threads REQUIRED)
     add_library(convolver_core STATIC portable/engine.cpp portable/attenuation.cpp ${fft_source})
     add_library(Convolver::core ALIAS convolver_core)

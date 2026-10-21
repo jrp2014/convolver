@@ -14,17 +14,19 @@ production release. The plug-in now accepts 1–8 input and 1–8 output channel
 (0.4.0) and is also tested with pluginval; the example presets still cover mono
 and stereo. The shared release pipeline for VST3, LV2 and AU (PLUG-5 in
 [TODO](../../TODO.md)) grows from this work, and the plug-in FFT backend choice
-(PLUG-1) may change the backends in the matrix below. The developer signing
+(PLUG-1) was settled the same day: Ooura on Linux and Windows, Accelerate on
+macOS, as the matrix below now shows. FFTW remains pinned for builds that select
+it, and its notice ships only in those. The developer signing
 scripts were left on the branch until signing is taken up.
 
 ## Candidate matrix
 
 | Candidate | Backend | Automated record | Minimum OS / named host |
 | --- | --- | --- | --- |
-| Windows x86-64 | Static FFTW | CI artifacts bind source/hash/toolchain | Unverified; Windows 11 proposed |
+| Windows x86-64 | Ooura (built in) | CI artifacts bind source/hash/toolchain | Unverified; Windows 11 proposed |
 | macOS arm64 | Accelerate | CI artifacts bind source/hash/toolchain | Unverified; macOS 14 proposed |
 | macOS x86-64 | Accelerate | CI artifacts bind source/hash/toolchain | Unverified; macOS 14 proposed |
-| Linux x86-64 | Static FFTW | CI artifacts bind source/hash/toolchain | Unverified; Ubuntu 22.04 / glibc 2.35 proposed |
+| Linux x86-64 | Ooura (built in) | CI artifacts bind source/hash/toolchain | Unverified; Ubuntu 22.04 / glibc 2.35 proposed |
 
 Native macOS archives are separate. A universal package is deferred until both
 architectures have passed the full release qualification; no slice is assumed
@@ -66,8 +68,9 @@ passing CI run is insufficient to change that policy.
 
 ## Licence and reproducibility notes
 
-Convolver and FFTW use GPL-2.0-or-later; libsndfile uses LGPL-2.1-or-later; the pinned
-VST3 SDK uses MIT. Notices include upstream author/licence files. Preview libraries
+Convolver (and FFTW, when selected) use GPL-2.0-or-later; libsndfile uses
+LGPL-2.1-or-later; the pinned VST3 SDK uses MIT; the built-in Ooura FFT has a
+permissive notice, shipped as `licenses/Ooura.txt`. Notices include upstream author/licence files. Preview libraries
 are static and optional libsndfile codecs are disabled. Complete source and build
 scripts permit rebuilding/relinking with modified libraries; do not add proprietary
 components or omit corresponding materials when redistributing. Production review

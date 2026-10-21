@@ -40,7 +40,8 @@ if __name__ == '__main__':
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--sdk', type=Path)
     parser.add_argument('--prefix', type=Path)
-    parser.add_argument('--backend', choices=['FFTW', 'ACCELERATE'], default='FFTW')
+    parser.add_argument('--backend', choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'], default='AUTO',
+                        help='CONVOLVER_FFT_BACKEND; AUTO is Ooura, or Accelerate on macOS, for plug-in builds')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--exclude-validator', action='store_true')
     args = parser.parse_args()
@@ -56,7 +57,8 @@ if __name__ == '__main__':
                 raise ValueError('source archive file inventory/hash mismatch')
             policy = load_policy(source / 'convolver/packaging/release-policy.json')
             work = root / 'dependencies-build'
-            sdk, prefix = build_dependencies(policy, source / 'dependencies', work, args.cmake, fetch=False)
+            sdk, prefix = build_dependencies(policy, source / 'dependencies', work, args.cmake, fetch=False,
+                                             backend=args.backend)
             run(source / 'convolver', sdk, prefix, args.backend, args.cmake, args.exclude_validator, work / 'licenses')
     else:
         if not args.sdk or not args.prefix:

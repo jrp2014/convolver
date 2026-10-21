@@ -32,8 +32,15 @@ over CPU-specific optimization.
 
 ## Build
 
-The optional SDK build needs CMake 3.25+, a C++20 compiler and the usual FFT
-backend. The core alone retains its CMake 3.20 minimum. Obtain the SDK separately:
+The optional SDK build needs CMake 3.25+ and a C++20 compiler. The core alone
+retains its CMake 3.20 minimum. A plug-in build needs no FFT library: with
+`CONVOLVER_BUILD_VST3=ON` the default backend (`AUTO`) is the built-in Ooura FFT,
+or Apple's Accelerate on macOS. FFTW is avoided because a plug-in shares its
+process with the host and other plug-ins, which may use the same FFTW, and
+FFTW's planner is not thread-safe. Pass `-DCONVOLVER_FFT_BACKEND=FFTW` to
+override (CMake then warns; see [backend selection](fft-backends.md#plug-in-builds)).
+One backend serves every target in a build, so the CLI built alongside the
+plug-in uses it too. Obtain the SDK separately:
 
 ```sh
 git clone --branch v3.8.1_build_84 --depth 1 https://github.com/steinbergmedia/vst3sdk.git /path/to/vst3sdk
@@ -48,22 +55,22 @@ On Windows, use static libraries with the dynamic MSVC runtime so the plug-in
 can load independently of the DAW's DLL search path:
 
 ```powershell
-vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
+vcpkg install 'libsndfile[core]:x64-windows-static-md'
 cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON `
   -DCONVOLVER_VST3_SDK=C:/path/to/vst3sdk `
   "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
 ```
 
-Use a fresh build directory when changing triplets. On Apple,
-`-DCONVOLVER_FFT_BACKEND=ACCELERATE` removes the plug-in's FFTW dependency.
+Use a fresh build directory when changing triplets. An FFTW override on
+Windows needs static FFTW too (`fftw3:x64-windows-static-md`).
 The preset-writing tool still needs libsndfile. Core-only plug-in builds can
 turn I/O and CLI off; the preset writer is then omitted.
 
 The SDK creates `build-vst3/VST3/Release/Convolver.vst3`. No link is created in
 user/system plug-in folders. This is a developer build, not a signed/notarized
-installer or self-contained distribution. Shared FFTW dependencies must be
-available at runtime; compatibility with older OS versions also depends on how
+installer or self-contained distribution. Shared libsndfile (and, with an FFTW
+override, FFTW) dependencies must be available at runtime; compatibility with older OS versions also depends on how
 those libraries were built. Local libraries built for macOS 27 do not establish
 macOS 11 compatibility just because a bundle has an older deployment target.
 macOS may block ad-hoc-signed developer bundles; use an appropriate developer

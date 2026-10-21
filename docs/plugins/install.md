@@ -12,8 +12,8 @@ Copy the bundle to your host's VST3 search location:
 - Linux: `~/.vst3/Convolver.vst3` for your account.
 
 Keep the tools, examples and guide together in a separate directory. Windows
-builds require the Microsoft Visual C++ 2015–2022 x64 runtime. Do not place FFTW
-DLLs in a host directory.
+builds require the Microsoft Visual C++ 2015–2022 x64 runtime. The plug-in
+contains its own FFT code (Ooura, or Accelerate on macOS) and needs no FFTW.
 
 ## Unsigned previews
 
