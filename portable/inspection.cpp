@@ -39,6 +39,9 @@ std::string mismatch(int rate, std::size_t inputs, std::size_t outputs,
     add(o.expected_outputs && o.expected_outputs != outputs, "output");
     return text.empty() ? text : text + "-mismatch";
 }
+ConfigurationSelection selection(const InspectionOptions& o) {
+    return {o.expected_rate, o.expected_inputs, o.expected_outputs};
+}
 std::string selectors(const InspectionOptions& o) {
     std::string text;
     auto add = [&](const std::string& part) { text += (text.empty() ? "" : " and ") + part; };
@@ -178,6 +181,7 @@ class Inspector {
             result = leaf(*l.document, l.chain);
         }
         SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
+        candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs});
         if (!options_.all_configurations) {
             step.outcome = mismatch(rate, inputs, outputs, options_);
             if (!step.outcome.empty()) {
@@ -254,9 +258,12 @@ class Inspector {
         }
         const auto wanted = selectors(options_);
         if (!stopped) {
+            const bool list =
+                !report_.traversal.empty() && report_.traversal.front().outcome == "list";
             add({"no-match",
                  DiagnosticSeverity::error,
-                 "no configuration matches " + (wanted.empty() ? "" : wanted),
+                 detail::explain_no_match(report_.path, list, candidates_, selection(options_),
+                                          "the requested selection"),
                  {report_.path, 0, 0},
                  {}});
             report_.selection_reason = "no entry matches " + wanted;
@@ -315,7 +322,10 @@ class Inspector {
         if (!outcome.empty())
             add({"no-match",
                  DiagnosticSeverity::error,
-                 "configuration does not match " + selectors(options_),
+                 detail::explain_no_match(
+                     path, false,
+                     {{path, false, p.sample_rate, p.input_channels, p.output_channels}},
+                     selection(options_), "the requested selection"),
                  {path, p.header_line, 0},
                  {}});
         else
@@ -420,6 +430,7 @@ class Inspector {
     InspectionReport report_;
     std::size_t errors_ = 0, dropped_ = 0;
     std::size_t budget_ = 0;
+    std::vector<detail::SelectionCandidate> candidates_; // Leaves visited, for no-match help.
 };
 } // namespace
 

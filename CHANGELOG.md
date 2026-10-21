@@ -14,6 +14,14 @@ Until 1.0 the C++ API may change between minor versions.
 - `convolver --help` describes `--gain-db no-clip` as the filter's worst-case
   peak bound rather than a gain that can never clip, matching the CLI reference:
   it assumes input within full scale and leaves no dither or shaping headroom.
+- When no filter matches the input (for example a mono IR given for stereo
+  audio, a configuration for another sample rate, or a list with no matching
+  entry), the CLI, inspection and the VST3 preset tool now say what each
+  candidate offers, what differs and what to change. For a mono IR used with
+  multichannel input the message includes a ready-to-save configuration that
+  applies the IR to every channel. Missing IRs, out-of-range IR or route
+  channels, IR sample-rate mismatches and `-` without RAW options also get
+  fuller explanations.
 
 ## [0.4.0] - 2026-10-19
 

@@ -5,7 +5,7 @@
   "error_patterns": {
     "cycle": "configuration list cycle",
     "missing-asset": "cannot open audio input|cannot read",
-    "no-match": "no configuration matches",
+    "no-match": "cannot be used with|does not match|none of the [0-9]+ filters",
     "invalid": "invalid configuration",
     "nonportable-path": "Windows drive/rooted paths"
   },

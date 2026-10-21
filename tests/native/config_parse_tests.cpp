@@ -100,7 +100,8 @@ int main() {
         require(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").code() == "syntax", "code");
         require(std::string(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").what()) ==
                     "invalid configuration: t.cfg:6:1: route channel out of range: 2 (1 "
-                    "channels declared)",
+                    "channel declared in the header, numbered from 0, so the channel must be 0; "
+                    "a route's integer part is the channel and its fractional part the gain)",
                 "message format");
         for (const auto bad : {std::string_view(""), std::string_view("// only\n\n"),
                                std::string_view("48\0", 3), std::string_view("a\x01")})

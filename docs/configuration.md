@@ -145,7 +145,7 @@ later entries.
 
 | Symptom | Next step |
 | --- | --- |
-| Rate or channel mismatch | Inspect the IR and input properties; choose the matching configuration or generate the right IR |
+| Rate or channel mismatch | Read the error: it lists each candidate filter and what differs. Choose the matching configuration or generate the right IR; for a mono IR it suggests a configuration to save |
 | Cannot find an IR | Check its name relative to the configuration, including case; use `--profile portable-paths` |
 | A Windows drive path fails on Mac/Linux | Copy the IRs beside the configuration and replace the drive path with a relative path |
 | Old configuration rejected for missing delays | Add explicit input and output delay lines using the counts in the header; review the rest before rendering |
