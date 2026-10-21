@@ -150,7 +150,7 @@ Build options:
 | `CONVOLVER_BUILD_NATIVE` | ON | Enable portable targets; OFF retains regression-only mode |
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
-| `CONVOLVER_FFT_BACKEND` | FFTW | FFTW, ACCELERATE (Apple only) or OOURA (built in) |
+| `CONVOLVER_FFT_BACKEND` | AUTO | AUTO (FFTW; OOURA, or ACCELERATE on Apple, when `CONVOLVER_BUILD_VST3` is ON), FFTW, ACCELERATE (Apple only) or OOURA (built in); see [plug-in builds](fft-backends.md#plug-in-builds) |
 | `CONVOLVER_BUILD_VST3` | OFF | SDK adapter and, with I/O, the preset writer; see [VST3](vst3.md) |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
@@ -438,7 +438,8 @@ contract. This is not a hard real-time guarantee or instrumentation of every
 possible library/system allocation. FFTW planning/destruction is serialized between
 these engine instances, outside processing. Accelerate owns an independent setup
 per instance. Other FFTW users in the same process
-must coordinate their planning too.
+must coordinate their planning too, which is why plug-in builds default to Ooura
+or Accelerate ([plug-in builds](fft-backends.md#plug-in-builds)).
 
 ### Resource limits
 

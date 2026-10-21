@@ -55,7 +55,7 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     if platform.system() != candidate['os']:
         raise ValueError('candidate must be built on its target OS')
     deps = work / 'deps'
-    sdk, prefix = build_dependencies(policy, bundle / 'dependencies', deps, cmake, architecture=candidate['architecture'] if platform.system() == 'Darwin' else None)
+    sdk, prefix = build_dependencies(policy, bundle / 'dependencies', deps, cmake, architecture=candidate['architecture'] if platform.system() == 'Darwin' else None, backend=candidate['backend'])
     build_dir = work / 'build'
     configure = [cmake, '-S', source, '-B', build_dir, '-DCMAKE_BUILD_TYPE=Release',
                  '-DCONVOLVER_BUILD_VST3=ON', '-DCONVOLVER_PACKAGE_PLUGINS=ON',

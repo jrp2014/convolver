@@ -33,7 +33,7 @@ the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Now | **PLUG-1:** plug-in FFT backend | Affects the existing VST3 build. Plug-in binaries neither import nor export `fftwf_*` symbols, checked by a test; oracle error reported for the chosen backend. |
+| 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Now | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI. |
 | 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks speaker arrangements against it. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
@@ -103,20 +103,14 @@ work continues under VST3-1 to VST3-6, HOST-1 and REL-1.
 
 Shared groundwork, done once so the three streams stay independent:
 
-- [ ] **PLUG-1 — FFT backend for plug-ins.** Our planner mutex only covers our
-  own calls. Another plug-in, or the host itself, can plan with the same FFTW at
-  the same time, and FFTW's planner is not thread-safe. Today the Linux and macOS
-  VST3 builds link the system FFTW dynamically; Windows links it statically.
-  Static linking alone is not enough on Linux or macOS while the library's
-  symbols stay exported or can bind to an FFTW already loaded in the process.
-  Recommended: Ooura for Linux and Windows plug-ins and Accelerate on macOS
-  (Ooura measured 0.9–1.45 times FFTW's time per frame; see
-  [FFT backends](docs/fft-backends.md#ooura-no-fft-library)), which also removes
-  FFTW from the plug-in release's dependency closure. Alternatives: static FFTW
-  with hidden, locally bound symbols, or `fftwf_make_planner_thread_safe()`.
-  Add a test that inspects the built plug-in's imported and exported symbols.
-  The [distribution plan](docs/superpowers/plans/2026-10-18-plugin-distribution.md)
-  currently assumes FFTW on Windows and Linux and must follow this decision.
+- [x] **PLUG-1 — FFT backend for plug-ins.** Done 21 October 2026 (owner's
+  decision). `CONVOLVER_FFT_BACKEND=AUTO` (the default) selects Ooura on Linux
+  and Windows and Accelerate on macOS when `CONVOLVER_BUILD_VST3` is ON, and FFTW
+  otherwise; FFTW stays available as an explicit override, with a configure
+  warning. `vst3.fft_symbols` checks that the plug-in exports no FFTW symbols and,
+  unless FFTW was chosen, imports none. The release policy uses the same
+  backends and ships FFTW's notice only when FFTW is linked. See
+  [plug-in builds](docs/fft-backends.md#plug-in-builds).
 - [ ] **PLUG-2 — Shared adapter test harness.** Common fixtures (mono, stereo,
   2→6 crossover; with DOC-1) and a comparison against the CLI render, used by
   every adapter's tests.

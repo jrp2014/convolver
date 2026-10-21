@@ -12,6 +12,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
+        # the FFTW job keeps the explicit override working.
+        fft: [AUTO]
+        include:
+          - os: ubuntu-latest
+            fft: FFTW
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +99,7 @@ jobs:
         if: runner.os != 'Windows'
         run: >-
           cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON
+          "-DCONVOLVER_FFT_BACKEND=${{ matrix.fft }}"
           "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk" -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
       - name: Configure Windows

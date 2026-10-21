@@ -160,7 +160,8 @@ def main():
             raise ValueError('actual build, source archive and policy disagree')
         if build['configuration'] != 'Release' or re.search(r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.I):
             raise ValueError('nonportable release build flags or configuration')
-        for required in ('licenses/Convolver.txt', 'licenses/DEPENDENCIES.json', 'licenses/libsndfile.txt', 'licenses/fftw.txt', 'licenses/vst3sdk.txt', 'docs/plugins/quickstart.md', 'presets/examples.json', 'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json', 'VERSION.txt'):
+        notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
+        for required in ('licenses/Convolver.txt', 'licenses/DEPENDENCIES.json', 'licenses/libsndfile.txt', *notices, 'licenses/vst3sdk.txt', 'docs/plugins/quickstart.md', 'presets/examples.json', 'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json', 'VERSION.txt'):
             if not (root / required).is_file():
                 raise ValueError(f'missing release content: {required}')
         manifest = dict(schema=1, version=policy['version'], platform=args.platform, source_commit=build['source_commit'],

@@ -16,7 +16,7 @@
         "CONVOLVER_BUILD_NATIVE": "ON",
         "CONVOLVER_BUILD_IO": "ON",
         "CONVOLVER_BUILD_CLI": "ON",
-        "CONVOLVER_FFT_BACKEND": "FFTW",
+        "CONVOLVER_FFT_BACKEND": "AUTO",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },

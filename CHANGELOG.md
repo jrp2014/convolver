@@ -27,6 +27,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Plug-in builds no longer use FFTW by default. `CONVOLVER_FFT_BACKEND` now
+  defaults to `AUTO`: FFTW for ordinary builds, and the built-in Ooura FFT
+  (Accelerate on macOS) when `CONVOLVER_BUILD_VST3` is ON, because another
+  plug-in or the host may use the same FFTW and its planner is not thread-safe.
+  `-DCONVOLVER_FFT_BACKEND=FFTW` still selects FFTW (CMake warns in a plug-in
+  build). A new `vst3.fft_symbols` test checks the plug-in binary, and the
+  release candidates for Linux and Windows use Ooura. Output differs from FFTW
+  builds only by floating-point rounding (worst error against the double oracle
+  2.6e-7 with Ooura on Linux x86-64).
 - `convolver --help` describes `--gain-db no-clip` as the filter's worst-case
   peak bound rather than a gain that can never clip, matching the CLI reference:
   it assumes input within full scale and leaves no dither or shaping headroom.

@@ -23,15 +23,18 @@ cmake --build --preset release-vst3
 ctest --preset release-vst3
 ```
 
-On macOS add `-DCONVOLVER_FFT_BACKEND=ACCELERATE`; the converter requires libsndfile.
-On Linux provide FFTW single precision and libsndfile development libraries.
+Plug-in builds need no FFT library: the default backend is the built-in Ooura FFT
+on Linux and Windows and Accelerate on macOS, because a plug-in must not share an
+FFTW planner with its host. Override it with `-DCONVOLVER_FFT_BACKEND=FFTW` (or
+`OOURA`, `ACCELERATE`) if you need to; CMake warns for FFTW. The converter
+requires libsndfile, so on Linux provide its development library.
 These development libraries do not establish a portable binary release.
 
 On Windows run in a Visual Studio developer terminal. For the optional vcpkg
 recipe, check out the baseline recorded in the policy before installing:
 
 ```powershell
-vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
+vcpkg install 'libsndfile[core]:x64-windows-static-md'
 cmake --preset release-vst3 -DCONVOLVER_VST3_SDK=C:/src/vst3sdk `
   "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
@@ -53,14 +56,16 @@ cmake -S . -B build-core -DBUILD_TESTING=OFF -DCONVOLVER_BUILD_IO=OFF \
 cmake --build build-core
 ```
 
-This needs neither Python, libsndfile nor the VST3 SDK. Choose Accelerate on
-macOS or provide FFTW. See `docs/cmake-package.md` in that source bundle for
+This needs neither Python, libsndfile nor the VST3 SDK. It uses FFTW by default;
+choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/cmake-package.md` in that source bundle for
 `Convolver::core`, `Convolver::host` and `Convolver::io` consumers.
 
 ## Pinned preview recipe
 
-The release recipe builds static FFTW and libsndfile (built-in formats only;
-optional FLAC/Ogg/MP3 codecs are disabled), and uses Accelerate for macOS plug-ins.
+The release recipe builds static libsndfile (built-in formats only; optional
+FLAC/Ogg/MP3 codecs are disabled) and uses Ooura for Linux and Windows plug-ins
+and Accelerate for macOS. It builds static FFTW only when `--backend FFTW` is
+given, and ships FFTW's notice only then.
 The following commands work in a Unix shell or a Visual Studio developer terminal
 with Python and CMake on `PATH` (use one line per command in PowerShell):
 
@@ -74,17 +79,17 @@ ctest --preset release-vst3
 cmake --install build/presets/release-vst3 --config Release --prefix stage --component PluginDistribution
 ```
 
-On macOS add `-DCONVOLVER_FFT_BACKEND=ACCELERATE -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`.
+On macOS add `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`.
 Use `$PWD` in PowerShell or absolute paths in cmd. `--fetch` explicitly permits
 network acquisition; omitting it requires the already supplied, hash-checked sources.
-No optional CPU instruction set is enabled in release FFTW. Windows uses static
+No optional CPU instruction set is enabled in an FFTW build. Windows uses static
 libraries and the dynamic MSVC runtime consistently.
 
 `build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
 assembles **committed** source and the pinned dependency archives. Then
 `python tests/release/source_build.py --archive build/Convolver-source.tar.gz`
 rebuilds dependencies, core, converter, SDK and external consumers from a fresh
-extraction without fetching. Add `--backend ACCELERATE` on macOS.
+extraction without fetching. Its `--backend` defaults to `AUTO`, as above.
 
 On a Mac that rejects ad-hoc bundles, set `-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF`
 (or `--exclude-validator` for the source smoke). This disables **both** the SDK

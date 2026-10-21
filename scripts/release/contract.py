@@ -59,7 +59,7 @@ def validate_policy(policy, source=None):
             raise ValueError('duplicate artifact or platform')
         names.add(name)
         ids.add(platform.get('id'))
-        if not platform.get('architecture') or platform.get('backend') not in ('FFTW', 'ACCELERATE'):
+        if not platform.get('architecture') or platform.get('backend') not in ('FFTW', 'ACCELERATE', 'OOURA'):
             raise ValueError('missing architecture/backend')
         if platform.get('status') not in ('tested', 'build-only', 'unverified'):
             raise ValueError('invalid support status')

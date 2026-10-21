@@ -48,6 +48,11 @@ install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistrib
 install(FILES "${PROJECT_SOURCE_DIR}/examples/plugin-presets/README.md" DESTINATION presets COMPONENT PluginDistribution)
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/plugins" DESTINATION docs COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/COPYING" DESTINATION licenses RENAME Convolver.txt COMPONENT PluginDistribution)
+if(fft_backend STREQUAL "OOURA")
+    # The vendored Ooura FFT's notice and provenance, which quote its licence.
+    install(FILES "${PROJECT_SOURCE_DIR}/portable/third_party/ooura/README.md" DESTINATION licenses
+        RENAME Ooura.txt COMPONENT PluginDistribution)
+endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT_VERSION}\nDeveloper preview; production qualification incomplete.\n")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)
 # Relocation is mandatory for release archives, tested with actual SDK tools.

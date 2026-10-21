@@ -10,7 +10,8 @@ from contract import load_policy
 from sources import unpack_dependencies
 
 
-def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None):
+def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW'):
+    """FFTW is built and its notice shipped only when the FFT backend is FFTW."""
     work = work.resolve()
     source = work / 'sources'
     source.mkdir(parents=True, exist_ok=True)
@@ -24,21 +25,27 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None):
         common += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0']
         if architecture:
             common += ['-DCMAKE_OSX_ARCHITECTURES=' + architecture]
-    for name, options in (
+    libraries = (
         ('fftw', ['-DENABLE_FLOAT=ON', '-DBUILD_TESTS=OFF', '-DENABLE_SSE=OFF',
                   '-DENABLE_SSE2=OFF', '-DENABLE_AVX=OFF', '-DENABLE_AVX2=OFF',
                   '-DENABLE_OPENMP=OFF', '-DENABLE_THREADS=OFF']),
         ('libsndfile', ['-DBUILD_TESTING=OFF', '-DBUILD_PROGRAMS=OFF', '-DBUILD_EXAMPLES=OFF',
-                       '-DENABLE_EXTERNAL_LIBS=OFF', '-DENABLE_MPEG=OFF', '-DENABLE_CPACK=OFF'])):
+                       '-DENABLE_EXTERNAL_LIBS=OFF', '-DENABLE_MPEG=OFF', '-DENABLE_CPACK=OFF']))
+    used = {name for name in policy['dependencies'] if name != 'fftw' or backend == 'FFTW'}
+    for name, options in libraries:
+        if name not in used:
+            continue
         output = work / ('build-' + name)
         subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
         subprocess.run([cmake, '--build', str(output), '--config', 'Release', '--parallel', '2'], check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
     inventory = {name: {key: value for key, value in dep.items() if key in ('version', 'sha256', 'license', 'revision')}
-                 for name, dep in policy['dependencies'].items()}
+                 for name, dep in policy['dependencies'].items() if name in used}
     licenses = work / 'licenses'
     licenses.mkdir(exist_ok=True)
     for name, dep in policy['dependencies'].items():
+        if name not in used:
+            continue
         dep_root = source / dep['directory']
         notice = dep_root / ('LICENSE.txt' if name.startswith('vst3') else 'COPYING')
         shutil.copyfile(notice, licenses / (name + '.txt'))
@@ -61,5 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing pinned archives')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--architecture', choices=['arm64', 'x86_64'])
+    parser.add_argument('--backend', choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'], default='AUTO',
+                        help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW')
     args = parser.parse_args()
-    build(load_policy(args.policy), args.cache, args.work, args.cmake, args.fetch, args.architecture)
+    build(load_policy(args.policy), args.cache, args.work, args.cmake, args.fetch, args.architecture, args.backend)

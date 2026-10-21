@@ -44,7 +44,8 @@ local Ooura modifications. Its freshness was checked on 21 October 2026 (FFT-1, 
 
 ## Selection and contract
 
-`-DCONVOLVER_FFT_BACKEND=FFTW` is the default and portable choice.
+`-DCONVOLVER_FFT_BACKEND=AUTO`, the default, selects FFTW, except in plug-in
+builds (below). `-DCONVOLVER_FFT_BACKEND=FFTW` selects FFTW explicitly.
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` selects Apple's system vDSP framework and
 requires an Apple target. `-DCONVOLVER_FFT_BACKEND=OOURA` builds a
 dependency-free FFT into the library (see below). Accelerate builds do not discover or link FFTW. Each
@@ -65,6 +66,25 @@ Neither silently falls back to FFTW for awkward sizes. Extra padding consumes
 more spectrum/history storage; validation accounts for that before allocation.
 Planning/allocation remain outside processing. The backend does not change routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
+
+### Plug-in builds
+
+With `CONVOLVER_BUILD_VST3=ON`, `AUTO` selects **Ooura** on Linux and Windows and
+**Accelerate** on macOS (owner's decision, 21 October 2026; TODO PLUG-1). A
+plug-in runs inside a host process that may load other plug-ins, or the host
+itself, using the same FFTW. FFTW's planner is not thread-safe, and Convolver's
+planner lock only covers Convolver's own calls. Static FFTW is not enough on
+Linux or macOS either, because its symbols are exported or can bind to an FFTW
+already loaded in the process. Ooura took 0.9–1.45 times FFTW's time per frame in
+the measurements below, so the cost is small.
+
+The choice stays a build option: pass `-DCONVOLVER_FFT_BACKEND=FFTW` (or `OOURA`,
+`ACCELERATE`) to override it. CMake warns for FFTW in a plug-in build. The
+`vst3.fft_symbols` test checks the built plug-in: it must never export FFTW
+symbols, and unless FFTW was chosen it must not import them. One backend serves a
+whole build, so build the CLI separately with FFTW if you want FFTW wisdom and
+measured plans for offline rendering. The release candidates follow the same
+defaults (`packaging/release-policy.json`).
 
 ### Ooura (no FFT library)
 
