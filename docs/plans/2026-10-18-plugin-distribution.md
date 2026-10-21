@@ -14,7 +14,7 @@ state semantics and tests, not the VST3 SDK interfaces.
 SDK, GitHub Actions; Python standard library for release validation. Platform
 signing/installer tools are release-time dependencies only.
 
-**Spec:** [Plug-in distribution design](../specs/2026-10-18-plugin-distribution-design.md).
+**Spec:** [Plug-in distribution design](2026-10-18-plugin-distribution-design.md).
 
 **Current status (21 October 2026, `4e1bb1b`, 0.4.6).** Tasks 1–3, the
 installer templates and the candidate gates are merged and produce unsigned
@@ -22,18 +22,18 @@ preview artifacts for VST3. The FFT choice is settled (PLUG-1): plug-in builds
 use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
 are superseded. First releases are unsigned previews; signing (Task 4) and
 production acceptance are a later gate. LV2 and AU now share this pipeline
-(PLUG-5). The [plug-in formats plan](2026-10-21-lv2-plugin.md) and
-[TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
+(PLUG-5). The [plug-in formats plan](2026-10-21-plugin-formats.md) and
+[TODO](../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
 dated notes and tasks below are kept as the record.
 
 Status: proposed work, based on `0bf77d0` and portable package 0.2.0. This plan does
 not implement a release or certify any commercial host. The existing
-[configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
+[configuration interoperability plan](../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
 **Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
-see the [plug-in formats plan](2026-10-21-lv2-plugin.md).
+see the [plug-in formats plan](2026-10-21-plugin-formats.md).
 **Signing decided on 21 October 2026:** first releases are unsigned previews on
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the

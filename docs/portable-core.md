@@ -347,7 +347,7 @@ ensure its assumed channel order matches the configuration's routes.
 The new audio keeps the filter tail, so it can run past the video; add
 `-shortest` to cut it. It starts at time zero, so check sync for files whose
 audio starts late. A built-in FFmpeg filter is planned, not implemented: see the
-[FFmpeg filter plan](superpowers/plans/2026-10-21-ffmpeg-filter.md).
+[FFmpeg filter plan](plans/2026-10-21-ffmpeg-filter.md).
 
 Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
 validation, because libsndfile can otherwise silently accept truncation. Other

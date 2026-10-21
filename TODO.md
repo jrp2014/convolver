@@ -30,7 +30,7 @@ so independent tasks do not duplicate changes.
 Direction (owner's decision, 21 October 2026): VST3, LV2 and AU are equal first
 priorities, developed in parallel after shared groundwork. The FFmpeg filter and
 Windows-native adapters are parked; CLAP and an editor wait for a request. See
-the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
+the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
 | 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks named speaker arrangements against it, and version-1 presets keep loading. |
 | 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
-| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
+| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
@@ -75,7 +75,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   PLUG-5 extends it to LV2 and AU. Still open: track minimum OS/CPU versions,
   dependency closure, licences/corresponding source, signing/notarization, clean
   machine installation and immutable release assets. Start with the
-  [distribution plan](docs/superpowers/plans/2026-10-18-plugin-distribution.md).
+  [distribution plan](docs/plans/2026-10-18-plugin-distribution.md).
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -93,13 +93,13 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   Foundation or WinRT. First name the target users. For system-wide room
   correction, an export to Equalizer APO's `Convolution:`/`Copy:` configuration
   is likely cheaper than an MFT or our own APO. See the
-  [MFT plan](docs/superpowers/plans/2026-10-21-media-foundation-transform.md).
+  [MFT plan](docs/plans/2026-10-21-media-foundation-transform.md).
 
 ## Plug-ins: VST3, LV2 and AU
 
 First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
-[plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md). Each
+[plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
 work continues under VST3-1 to VST3-6, HOST-1 and REL-1.
 
@@ -124,7 +124,7 @@ Shared groundwork, done once so the three streams stay independent:
   buffers, mono, stereo and 2→6. Reuse `scripts/release/generate_examples.py`
   and the oracle helpers in `tests/vst3/pluginval_tests.py` rather than adding
   a second fixture system; DOC-1 documents the same fixtures. See the
-  [harness spec](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-test-harness-plug-2).
+  [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
 - [ ] **PLUG-3 — One preset tool.** `convolver-preset`, writing `.vstpreset`,
   `.aupreset` and LV2 presets from the same host state. It must build without
   the VST3 SDK so AU and LV2 builds can ship it; `.vstpreset` output uses the SDK
@@ -139,7 +139,7 @@ Shared groundwork, done once so the three streams stay independent:
   current state records counts and an output mask only, so version-1 presets
   stay "unspecified", load on any arrangement with matching counts, and are
   never rejected by stricter checks. Recording an input layout needs state
-  version 2. See [channel layouts](docs/superpowers/plans/2026-10-21-lv2-plugin.md#channel-layouts-and-old-presets).
+  version 2. See [channel layouts](docs/plans/2026-10-21-plugin-formats.md#channel-layouts-and-old-presets).
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
   merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
   `.github/workflows/release.yml`) rather than writing a new one. Signing
@@ -148,7 +148,7 @@ Shared groundwork, done once so the three streams stay independent:
   unsigned code) and the install guide explains removing the download
   quarantine; Windows installers show a SmartScreen warning. Label these
   releases as unsigned previews. The preview gate and the production gate are
-  separate ([criteria](docs/superpowers/plans/2026-10-21-lv2-plugin.md#unsigned-previews-and-production)):
+  separate ([criteria](docs/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production)):
   signing is not a prerequisite for a preview. The candidate workflow cannot
   publish, so publication is a manual step owned by jrp: pick one green
   candidate run on a tagged commit, upload exactly its `collect` files to a
@@ -161,7 +161,7 @@ Shared groundwork, done once so the three streams stay independent:
   `lv2lint`: shipped code in `packaging/release-policy.json`, test tools in CI.
 
 Shared adapter contract, for every format (detail in the
-[plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract)):
+[plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):
 a failed replacement keeps the running filter, with an explicit error; initial
 restoration installs the filter directly, without a crossfade; an empty
 instance and a failed initial load have one stated, tested behaviour (owner's
@@ -178,7 +178,7 @@ LV2 (Linux first; also PipeWire system audio):
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
-  [worker and state lifecycle](docs/superpowers/plans/2026-10-21-lv2-plugin.md#lv2-adapter-design):
+  [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
   one adapter lock for all `HostProcessor` control calls that `run()` never
   takes; no `state:threadSafeRestore` at first; initial restoration installs
   directly; rapid loads coalesce to the newest; defined handling of scheduling
@@ -201,7 +201,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   silence flags and 2→6. Licence (owner's decision, 21 October 2026): the AU
   component is distributed under GPL-3.0-or-later because AudioUnitSDK is
   Apache-2.0, which is compatible with GPLv3 but not GPLv2; ship its notices
-  (see the [plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#au-licence)).
+  (see the [plan](docs/plans/2026-10-21-plugin-formats.md#au-licence)).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu.
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI.
@@ -219,7 +219,7 @@ prefer the pipe, a filter accepted upstream, or upstream state support in
 FFmpeg's generic `lv2` filter (it cannot pass a file path today), which would let
 the LV2 plug-in serve FFmpeg.
 
-Design and evidence: [FFmpeg filter plan](docs/superpowers/plans/2026-10-21-ffmpeg-filter.md)
+Design and evidence: [FFmpeg filter plan](docs/plans/2026-10-21-ffmpeg-filter.md)
 (21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter
 means a patched FFmpeg build with `--enable-gpl`.
 

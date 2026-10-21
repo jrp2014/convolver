@@ -25,5 +25,5 @@ Convolver needs a VST3 host. Installing it alone does not process every player o
 all system audio. Historical WMP, DirectShow and VST2 binaries belong to the old
 Windows implementation; old plug-in identities and projects do not automatically
 migrate. LV2 and Audio Unit (AUv2) adapters are planned alongside VST3 (see the
-plug-in formats plan in the source repository's `docs/superpowers/plans/`); CLAP,
+plug-in formats plan in the source repository's `docs/plans/`); CLAP,
 a custom editor, AAX and a system-audio application are not part of this preview.

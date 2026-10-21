@@ -64,7 +64,7 @@ class DocumentationLinks(unittest.TestCase):
             'README.md': '# Home\n[Old](docs/archive/old.md#record)\n',
             'docs/archive/old.md': '# Record\n[Past](absent.md)\n',
             'docs/historical/old.md': '[Past](absent.md)\n',
-            'docs/superpowers/plans/old.md': '[Past](absent.md)\n',
+            'docs/review-2026-10/old.md': '[Past](absent.md)\n',
         })
         self.assertEqual(result.returncode, 0, result.stderr)
 
