@@ -118,5 +118,5 @@ Do not change their audible or numerical behavior in a build-system or formattin
 patch; keep optional processing explicit and test exact samples as well as statistics.
 
 For host changes, run the optional SDK build and its validator/adapter/preset
-tests as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests
+tests, and pluginval if you can, as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests
 separately from SDK validation.

@@ -104,11 +104,15 @@ ctest --test-dir build-native -N
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.
 
-The optional [VST3 build](vst3.md) adds three tests: actual SDK-interface lifecycle
+The optional [VST3 build](vst3.md) adds four tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR,
-plus the SDK validator loading the built plug-in (the preset test requires I/O). These cover preactivation tail
+plus the SDK validator loading the built plug-in in its default and extensive
+modes (the preset test requires I/O). These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
-They do not establish compatibility in a particular commercial DAW.
+Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
+[pluginval](vst3.md#independent-host-tests-pluginval), a host that does not share
+the SDK's hosting code. None of these establishes compatibility in a particular
+commercial DAW.
 
 `packaging.consumer` installs and relocates the package, builds and runs an
 external core/host/I/O consumer, and verifies components and source-tree use with and
