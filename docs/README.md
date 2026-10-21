@@ -68,7 +68,9 @@ These pages describe the active CMake implementation. The package version is in
   instructions for the portable code.
 - `review-2026-10/`, `archive/reviews/` and `superpowers/` contain dated reviews,
   evidence and design/implementation plans. Plans describe intent at the time;
-  use the current guides and source to determine what is implemented.
+  use the current guides and source to determine what is implemented. Plans for
+  open work stay in `superpowers/`; [completed plans](archive/plans/README.md)
+  move to `archive/plans/`.
 
 For maintainers and coding agents, [AGENTS.md](../AGENTS.md) supplies repository
 rules. The [implementation map](project-structure.md#change-and-test-map) connects
