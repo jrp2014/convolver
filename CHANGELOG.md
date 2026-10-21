@@ -9,6 +9,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Changed
+
+- `convolver --help` describes `--gain-db no-clip` as the filter's worst-case
+  peak bound rather than a gain that can never clip, matching the CLI reference:
+  it assumes input within full scale and leaves no dither or shaping headroom.
+
 ## [0.4.0] - 2026-10-19
 
 ### Added

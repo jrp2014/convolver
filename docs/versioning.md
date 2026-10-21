@@ -1,5 +1,13 @@
 # Source versions
 
+[Documentation index](README.md) · [Changelog](../CHANGELOG.md)
+
+**In short:** `VERSION` holds the one version number. Each source change merged
+to `main` gets the next patch number and a `vX.Y.Z` tag automatically; edit
+`VERSION` yourself only for a deliberate minor or major step. Changes confined to
+`docs/` and top-level Markdown files do not bump the version. A tag identifies a
+revision; it does not certify a tested release.
+
 The portable library, CLI and VST3 plug-in share the number in [`VERSION`](../VERSION):
 `MAJOR.MINOR.PATCH`. CMake package metadata and numeric bundle versions read that
 file. Historical Windows resource versions and the old `convolver*` tags retain

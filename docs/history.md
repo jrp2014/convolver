@@ -5,6 +5,13 @@
 This page is historical context. New users can build and use the portable
 implementation without reading it.
 
+**In short:** Convolver was a set of Windows audio applications (2005–2006).
+This repository rebuilds their history from SourceForge SVN and source zips,
+plus recovered 4.4 material. That code is kept, unbuilt, in `convolver/` and
+checked by extraction tests. The portable C++20 implementation replaced it. Later
+programs mostly adopted the `.cfg` format rather than the code; see
+[downstream use](#downstream-use).
+
 Convolver began as a set of Windows applications written in 2005 and 2006. Their
 user documentation is still at <https://convolver.sourceforge.net/>, and an
 archived copy of the 4.4 website is in [historical/convolver-4.4](historical/convolver-4.4/README.md).
@@ -19,7 +26,8 @@ The historical Windows applications by jrp are preserved separately: WMP DSP
 They share the old overlap-save engine in
 [`convolver/convolution`](../convolver/convolution); the portable engine uses
 partitioned overlap-add. The [downstream evidence](review-2026-10/downstream-evidence.json)
-documents both derivative implementations and wider adoption of the text format.
+records the derivative code that was found and the wider adoption of the text
+format; see [downstream use](#downstream-use).
 
 ## Where this code came from
 
@@ -86,11 +94,14 @@ FFT backends, libsndfile, CLI and external consumers. See [testing instructions 
 
 ## From historical to portable
 
-Core/CLI, FFTW/Accelerate, offline planning, split-spectrum MACs, package exports,
-Windows config paths, host lifecycle and VST3 are implemented. The
-[structure review](project-structure.md) and
-[modernization plan](modernization.md) identify remaining
-interoperability, DAW/release validation and measured optimization work.
+The portable core and CLI, three FFT backends, offline FFTW planning, package
+exports, configuration inspection, Windows-style relative paths, the
+historical-only output features (dither, noise shaping, PCM8, valid bits,
+automatic attenuation), the host lifecycle and VST3 are implemented. The
+[implementation map](project-structure.md) describes the result;
+[TODO](../TODO.md) holds the remaining interoperability, DAW/release validation
+and measured optimization work, and the [modernization direction](modernization.md)
+explains its priorities.
 Earlier 4.3 assessments are in the [review archive](archive/reviews/README.md).
 
 ## Downstream use

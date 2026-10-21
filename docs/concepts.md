@@ -71,7 +71,7 @@ Convolver does not resample or design a replacement IR automatically.
 Floating-point samples normally use -1 to +1 as full scale, but a float WAV can
 store larger finite values. Filters and summed routes can raise the level.
 Integer output clips values outside its representable range. Use explicit gain
-and inspect the result; dither is not a limiter. The [CLI reference](portable-core.md#file-rendering)
+and inspect the result; dither is not a limiter. The [CLI reference](portable-core.md#gain-and-attenuation)
 explains fixed gain and the two automatic attenuation estimates.
 
 ## How long filters are calculated

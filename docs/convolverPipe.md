@@ -1,5 +1,11 @@
 # convolverPipe
 
+[History](history.md) · [Documentation index](README.md)
+
+This page documents a **historical** Windows tool kept in `convolver/`. For
+streaming with the current portable CLI, see
+[RAW streams](portable-core.md#raw-streams).
+
 `convolverPipe` filters interleaved audio from standard input and writes the
 convolved audio to standard output. It uses the same engine and filter/config
 format as the plug-ins. This is the recovered 4.4 command-line interface with

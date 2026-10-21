@@ -11,9 +11,10 @@ holds two implementations:
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-Start with `CONTRIBUTING.md` (build, presets, formatting, analysis) and
-`REVIEW.md` (current review and priorities). Implementation: `docs/project-structure.md`;
-behaviour: `docs/portable-core.md`, `docs/testing.md`, `docs/vst3.md`.
+Start with `CONTRIBUTING.md` (build, presets, formatting, analysis),
+`REVIEW.md` (current status) and `TODO.md` (open work and priorities).
+Implementation: `docs/project-structure.md`; behaviour: `docs/portable-core.md`,
+`docs/configuration.md`, `docs/testing.md`, `docs/vst3.md`.
 
 ## Build and test
 

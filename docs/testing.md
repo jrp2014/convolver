@@ -2,9 +2,29 @@
 
 [Documentation index](README.md) · [Implementation map](project-structure.md#change-and-test-map)
 
+**In short:**
+
+- `ctest --test-dir BUILD --output-on-failure` runs everything your build
+  configured; `ctest --test-dir BUILD -N` lists it. The total depends on the
+  enabled options, so do not quote a fixed count.
+- The `native.*` tests check the real portable code against independent
+  references (a direct double-precision convolution and a direct DFT), real
+  libsndfile files and real CLI processes.
+- With Clang on macOS or Linux, `regression.*` tests also compile slices of the
+  historical Windows source under ASan/UBSan. They preserve old behaviour; they
+  are not tests of the portable code.
+- Tests and CI workflows describe coverage. Only an actual run on a stated
+  revision shows a pass, and no test here proves compatibility with a named DAW
+  or hard real-time deadlines.
+
 Use the native tests for changes to the active implementation. Historical
 extraction tests are additional preservation checks and are described separately
 below. A test list is coverage information; a pass claim needs an actual run.
+
+Contents: [native tests](#native-production-tests),
+[historical tests](#historical-tests-run-with-cmakectest) and
+[their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
+[documentation checks](#documentation-checks) and [fuzzing](#fuzz-smoke-tests-and-longer-campaigns).
 
 ## Native production tests
 

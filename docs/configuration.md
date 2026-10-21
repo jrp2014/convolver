@@ -8,6 +8,21 @@ the IR samples themselves: it names sound files holding them. Keep the
 configuration and those files together when moving a setup to another computer.
 This page describes the current portable parser, not the old Windows installer.
 
+**In short:**
+
+- For a simple per-channel filter, pass a multichannel IR sound file directly;
+  use a `.cfg` file for routing, mixing, delays or sharing one mono IR.
+- A `.cfg` file is a header line, a line of input delays, a line of output
+  delays, then four lines per path: IR file, IR channel, input routes, output
+  routes. Channels count from zero.
+- A route number's integer part is the channel and its fractional part is the
+  gain, so `1.25` is channel 1 at gain 0.25, and `-0` is channel 0 inverted.
+- Paths are relative to the file that names them. Use relative paths so a setup
+  can be copied to another computer; Windows drive paths fail on macOS/Linux.
+- A list file names several configurations; the first that matches the input's
+  sample rate and channel count is used. Check any file with `--validate` or
+  `--inspect`.
+
 ## The simplest filter: a sound file
 
 Pass an IR sound file directly to `--filter` to filter each input channel with
@@ -139,7 +154,7 @@ later entries.
 
 [Inspection options and JSON output](portable-core.md#inspecting-and-validating-configurations)
 include syntax-only checks and warning policy. Resource limits are recorded in
-[the core reference](portable-core.md#compatibility-and-library-api).
+[the core reference](portable-core.md#resource-limits).
 
 The format is used by other audio programs, but their accepted subsets differ.
 See the [compatibility matrix](configuration-compatibility.md) before assuming a

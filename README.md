@@ -40,6 +40,12 @@ ctest --test-dir build --output-on-failure
 ./build/convolver --version
 ```
 
+If Clang is your default compiler on Linux, the default build also runs the
+historical regression tests, which need Clang's sanitizer runtimes. When the
+first command stops with "Clang with ASan/UBSan runtimes is required for legacy
+tests", install them (on Ubuntu, `libclang-rt-18-dev` for Clang 18) or add
+`-DCONVOLVER_LEGACY_TESTS=OFF`.
+
 On a Mac you can use Apple's Accelerate framework instead of FFTW by adding
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` to the first command. On any platform,
 `-DCONVOLVER_FFT_BACKEND=OOURA` builds a small FFT into the library so FFTW is not
@@ -65,7 +71,7 @@ Output is 32-bit float WAV unless you choose `wav-pcm8`, `wav-pcm16`,
 `wav-pcm24`, `wav-pcm32` or `raw-float`; integer formats can add `--dither` and
 `--noise-shaping`. Use `--gain-db -3` to lower the level by 3 dB; positive
 values raise it. Automatic attenuation options and their assumptions are in
-[the CLI reference](docs/portable-core.md#file-rendering).
+[the CLI reference](docs/portable-core.md#gain-and-attenuation).
 The output keeps the whole filter tail, and Convolver's
 processing delay is removed, so the result lines up with the input. The input
 sample rate and channel count must match the filter; Convolver does not resample.

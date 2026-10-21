@@ -16,8 +16,8 @@ New readers should start with the [README](README.md) or
 | Uniform partitioned overlap-add with shared forward transforms for identical ordered input mixes | [Engine](portable/engine.cpp), [processing flow](docs/project-structure.md#processing-data-flow) | Direct-double oracle, routing/delays, awkward blocks, chunk/reset and heap guards |
 | FFTW, Apple Accelerate and built-in Ooura | [FFT contract](portable/fft.hpp), [backend guide](docs/fft-backends.md) | Independent direct DFT and convolution tests; CLI backend comparisons |
 | Configuration/list loading and inspection, including Windows relative paths | [Current grammar](docs/configuration.md), [compatibility](docs/configuration-compatibility.md) | Parser, inspection, limits, generated corpus and fuzz replay |
-| Float/RAW I/O and PCM8/16/24/32 quantization, optional dither, shaping and valid bits | [I/O implementation](portable/io.cpp), [CLI reference](docs/portable-core.md#file-rendering) | Real files, exact samples/header fields, statistics, stream faults |
-| Fixed and automatic gain estimates | [Attenuation](portable/attenuation.cpp), [CLI behavior](docs/portable-core.md#file-rendering) | Engine oracle cases for the mathematical peak bound |
+| Float/RAW I/O and PCM8/16/24/32 quantization, optional dither, shaping and valid bits | [I/O implementation](portable/io.cpp), [CLI reference](docs/portable-core.md#integer-formats-dither-and-noise-shaping) | Real files, exact samples/header fields, statistics, stream faults |
+| Fixed and automatic gain estimates | [Attenuation](portable/attenuation.cpp), [CLI behavior](docs/portable-core.md#gain-and-attenuation) | Engine oracle cases for the mathematical peak bound |
 | Persistent host lifecycle and VST3 with 1–8 input and 1–8 output channels | [Host API](include/convolver/host.hpp), [VST3 guide](docs/vst3.md) | Host/state tests and real SDK adapter, preset and bundle-validator tests |
 | Independent CMake core/host/io components | [Package guide](docs/cmake-package.md) | Installed/relocated and source-tree consumers |
 

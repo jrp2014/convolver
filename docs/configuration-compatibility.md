@@ -1,5 +1,14 @@
 # Configuration compatibility
 
+[Documentation index](README.md) · [Configuration format](configuration.md) · [Inspection options](portable-core.md#inspecting-and-validating-configurations)
+
+**In short:** the portable reader accepts the 3.0-and-later `.cfg` format plus a
+few extensions (such as unequal IR lengths), and a generated corpus renders each
+feature against an independent reference. Roon, JRiver/Audiolense and others
+read variants of the format, but none has been tested with these fixtures, so
+treat interchange as unverified. Run `--profile portable-paths` before copying a
+setup to another machine.
+
 What the portable Convolver accepts in a configuration, what has been rendered
 and checked, and what is known about other programs that read the same format.
 Each claim points at a corpus case in [tests/compatibility](../tests/compatibility/README.md)
