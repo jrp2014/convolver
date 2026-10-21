@@ -131,6 +131,20 @@ Configuration configuration_graph(const ParsedConfiguration&);
 bool matches(int sample_rate, std::size_t input_channels, std::size_t output_channels,
              const ConfigurationSelection&);
 
+// A filter considered during selection, for explaining why none matched.
+struct SelectionCandidate {
+    std::filesystem::path path;
+    bool sound_file = false;
+    int sample_rate = 0;
+    std::size_t input_channels = 0, output_channels = 0;
+};
+// A self-contained explanation of why no candidate matches `wanted`, naming each
+// difference and what to change. `subject` says where the wanted properties came
+// from, for example "the input audio". `list` is true when `filter` is a list.
+std::string explain_no_match(const std::filesystem::path& filter, bool list,
+                             const std::vector<SelectionCandidate>& candidates,
+                             const ConfigurationSelection& wanted, std::string_view subject);
+
 struct DecodedIr {
     std::filesystem::path resolved;
     AudioInfo info{};

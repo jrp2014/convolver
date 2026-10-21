@@ -7,6 +7,8 @@ Write for a reader who has not seen the development conversations. Define audio
 terms before relying on them, explain what an option does before its internal
 mechanism, and use one working example before describing exceptions. Keep
 headings descriptive, link text meaningful, and tables small enough to scan.
+Longer guides open with a short **In short** summary, and the longest add a
+contents line. When a change alters a summarized fact, update the summary too.
 
 ## One home for each topic
 

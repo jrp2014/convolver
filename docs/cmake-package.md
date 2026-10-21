@@ -2,6 +2,13 @@
 
 [Documentation index](README.md) · [Implementation map](project-structure.md)
 
+**In short:** install Convolver (or add it with `add_subdirectory`), then
+`find_package(Convolver 0.4 REQUIRED COMPONENTS core)` and link
+`Convolver::core`. Add the `host` component for plug-in-style planar processing
+and `io` for sound files and configurations (needs libsndfile). The libraries are
+static development packages for the same toolchain, not a stable binary ABI.
+The core-only build needs only an FFT library (or none, with Ooura).
+
 The portable package reads its version from [VERSION](../VERSION). It provides static C++20 libraries. The API is evolving: package
 version checks accept compatible patch releases within the same minor version,
 but this is not a stable binary ABI promise. Rebuild consumers with the same
@@ -101,8 +108,8 @@ cmake --build --preset release
 ctest --preset release
 ```
 
-Presets are `release`, `debug-sanitizers`, `core-only`, `accelerate`, and
-`accelerate-debug`, and `ooura`. Each has matching configure/build/test presets and a separate
+Presets are `release`, `debug-sanitizers`, `core-only`, `accelerate`,
+`accelerate-debug` and `ooura`. Each has matching configure/build/test presets and a separate
 directory under `build/presets/`. Pass `-DCMAKE_PREFIX_PATH=...` during configure
 for local dependencies. Keep personal paths/toolchain overrides in the ignored
 `CMakeUserPresets.json`, inheriting one of the checked-in presets.

@@ -2,10 +2,32 @@
 
 [Documentation index](README.md) · [Concepts](concepts.md) · [Open FFT work](../TODO.md#fft-libraries-and-performance)
 
+**In short:**
+
+- Choose one FFT library per build with `-DCONVOLVER_FFT_BACKEND`: **FFTW**
+  (default, every platform, supports tuned plans), **ACCELERATE** (Apple's system
+  framework, no extra dependency) or **OOURA** (built in, no FFT library at all).
+- All three give the same results within a small tested tolerance. None is
+  fastest everywhere: in the dated measurements below FFTW was faster in most
+  cases, by up to about 1.8 times at an awkward (non-power-of-two) block size,
+  while Accelerate won some Apple workloads by up to 7%.
+- For long filters most time goes into the per-partition multiply-accumulate,
+  not the FFT, so changing or tuning the FFT library helps them little.
+- An optimized (SIMD) FFTW build matters more than planner settings. Homebrew's
+  FFTW on Apple Silicon and vcpkg's default port are built without SIMD.
+
 Start with the selection table and contract. Later sections contain **dated
 measurements**, not a ranking of current libraries on every machine. The Apple
 results were measured on 18 October 2026 on an M5 Max, 128 GiB RAM,
 macOS 27.0.1 (26A434); later x86/Ooura sections name their own setup.
+
+Contents: [selection and contract](#selection-and-contract),
+[Ooura](#ooura-no-fft-library), [correctness evidence](#correctness-evidence),
+[Apple benchmark](#processing-benchmark),
+[x86-64 FFTW tuning](#fftw-tuning-on-x86-64-and-split-spectra),
+[shared forward transforms](#shared-forward-transforms),
+[overlap-add versus overlap-save](#overlap-add-and-overlap-save) and
+[reproduction steps](#reproduce).
 
 | Backend | Availability | Separate FFT dependency | Planning |
 | --- | --- | --- | --- |
@@ -284,8 +306,10 @@ ESTIMATE plans ([raw data](benchmarks/2026-10-18-x86-split-spectra.csv)):
 On ARM, NEON's `ld2` de-interleaving loads make the old layout cheaper than on
 x86, so the gain there may be smaller; rerun `benchmark_backends.py` on the Mac
 to confirm. Larger gains for long filters need fewer multiply-accumulates rather
-than faster FFTs: sharing one forward FFT per input channel and one inverse per
-output (milestone 3), and non-uniform partitioning.
+than faster FFTs. Sharing forward FFTs between paths with the same input mix is
+now implemented ([below](#shared-forward-transforms)); inverse-transform sharing
+and non-uniform partitioning remain open as **PERF-2** in
+[TODO](../TODO.md#fft-libraries-and-performance).
 
 ### Shared forward transforms
 

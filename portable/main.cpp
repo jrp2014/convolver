@@ -42,8 +42,9 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --tune-fft FILE      Time FFTW plans and save wisdom to a new file, then exit
   --gain-db DB         Output gain in decibels (default 0), or 'auto' for the
                       historical optimum attenuation (peak response to white
-                      noise) or 'no-clip' for the gain that can never clip;
-                      the chosen value is reported on stderr
+                      noise) or 'no-clip' for the filter's worst-case peak
+                      bound (input within full scale, no dither or shaping
+                      headroom); the chosen value is reported on stderr
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   wav-float (default), wav-pcm8, wav-pcm16, wav-pcm24,
                       wav-pcm32, raw-float (little-endian IEEE float32)

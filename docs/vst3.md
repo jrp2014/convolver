@@ -2,8 +2,27 @@
 
 [Documentation index](README.md) · [Audio concepts](concepts.md)
 
+**In short:**
+
+- The plug-in is optional. Build it with `-DCONVOLVER_BUILD_VST3=ON` and a
+  separately downloaded Steinberg VST3 SDK, then copy the whole
+  `Convolver.vst3` bundle into a folder your host scans.
+- There is no editor. Turn a WAV, `.cfg` or configuration list into a
+  `.vstpreset` with `convolver-vst3-preset`, then load it from the host's preset
+  menu. The preset embeds the filter, so the original files are not needed later.
+- One input bus and one output bus of 1 to 8 channels each; the counts may
+  differ. The preset must match the host's sample rate and channel counts.
+- Latency is always 256 samples. Processing is single-precision with 32- or
+  64-bit host buffers; integer dither does not apply.
+- These are developer builds: not signed, notarized or packaged, and not yet
+  tested in named commercial DAWs.
+
 Use this guide to build the plug-in and load a filter through a host's preset
 menu. The later lifecycle section is for contributors and host integrators.
+
+Contents: [build](#build), [install for a host](#make-the-plug-in-discoverable),
+[loading filters](#loading-filters), [processing and lifecycle](#processing-and-lifecycle)
+and [compatibility evidence](#compatibility-evidence).
 
 The optional adapter uses [VST SDK 3.8.1 build 84](https://github.com/steinbergmedia/vst3sdk/releases/tag/v3.8.1_build_84).
 The CI workflow pins SDK commit
@@ -96,8 +115,8 @@ as the CLI does; without them the first entry is used:
 ```
 
 The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
-and the counts may differ (for example stereo in, 5.1 out), independently. Any speaker arrangement with that many channels is
-accepted; channels are numbered in the host's bus order, which is the order the
+and the counts may differ (for example stereo in, 5.1 out). Any speaker
+arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
 the sample rate, or activation fails. Without a preset the plug-in passes input
 *c* to output *c* and leaves outputs without a matching input silent; bypass uses

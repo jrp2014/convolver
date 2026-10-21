@@ -7,11 +7,29 @@ For a first render, use the [quick start](../README.md#build-and-try-it).
 The active implementation is C++20 with FFTW, Apple Accelerate or built-in Ooura;
 file I/O uses libsndfile. It does not depend on the old Windows applications.
 
-- [Build and backend selection](#build)
-- [File rendering, gain and integer output](#file-rendering)
+**In short:**
+
+- `convolver --filter IR_OR_CFG --input IN --output OUT` renders a file. The
+  output lines up with the input (processing latency removed) and keeps the
+  whole filter tail. Rate and channel counts must match; nothing is resampled.
+- Output is 32-bit float WAV by default. Integer WAV (8 to 32 bits) is plainly
+  rounded unless you ask for `--dither`, `--noise-shaping` or `--valid-bits`.
+- `--gain-db` takes a fixed decibel value, `auto` (noise-based estimate) or
+  `no-clip` (worst-case filter bound). Neither estimate is a limiter.
+- `--inspect` and `--validate` explain what a configuration resolves to without
+  rendering; `--json` gives a machine-readable report.
+- The FFT backend is chosen when building. FFTW builds can save tuned plans
+  ("wisdom") with `--tune-fft` and reuse them with `--fft-wisdom`.
+
+Contents:
+
+- [Build and backend selection](#build), [FFTW plan tuning](#fftw-plan-tuning), [Windows](#windows-build)
+- [File rendering](#file-rendering): [gain](#gain-and-attenuation),
+  [integer output and dither](#integer-formats-dither-and-noise-shaping),
+  [speaker labels](#speaker-labels), [output safety](#output-safety)
 - [RAW streams](#raw-streams)
 - [Inspection and validation](#inspecting-and-validating-configurations)
-- [Library API and resource limits](#compatibility-and-library-api)
+- [Library API](#engine-api) and [resource limits](#resource-limits)
 
 ## Build
 
@@ -154,7 +172,9 @@ The filter may be an IR sound file, a [configuration](configuration.md), or a co
 list. A direct multichannel IR maps each IR channel to the corresponding input
 and output; a mono IR requires mono input. Use a config to apply one mono IR to
 several channels. Lists select the first entry matching input rate and channel
-count. `--output-channels N` also requires N output channels, (a sound file has as many outputs as inputs). There is no resampling or
+count. `--output-channels N` adds the requirement of N output channels; a
+single configuration or sound file that has a different count is rejected (a
+sound file has as many outputs as inputs). There is no resampling or
 nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
@@ -268,6 +288,8 @@ channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE heade
 The library equivalent is `AudioWriter(path, info, format, {}, OutputMetadata{mask})`;
 the default `OutputMetadata{}` keeps the plain header.
 
+### Output safety
+
 Output paths must differ from input, configuration/list files and referenced IRs,
 including filesystem aliases. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
@@ -327,8 +349,12 @@ convolver --inspect room.cfg --syntax-only --json
 - `--syntax-only` reads one configuration file's text, checks grammar, routes and
   delays and resolves references lexically, without opening IRs. Coefficient,
   latency, tail and storage fields are null, and the result says so.
+- `--profile portable-paths` adds warnings for references that work here but
+  will not survive copying to another machine; the default profile is
+  `convolver`. See [profiles](configuration-compatibility.md#profiles).
 - `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
   validation fails. Diagnostics are also printed to stderr.
+- `convolver --inspect --help` lists every inspection option.
 - Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
   `--warnings-as-errors` makes warnings fail.
 

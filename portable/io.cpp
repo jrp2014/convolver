@@ -202,7 +202,13 @@ void validate_wave(const std::filesystem::path& path) {
 SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
     if (path == "-") {
         if ((info.format & SF_FORMAT_TYPEMASK) != SF_FORMAT_RAW)
-            throw std::invalid_argument("standard streams require explicit RAW float32 metadata");
+            throw std::invalid_argument(
+                mode == SFM_READ
+                    ? "reading audio from standard input ('-') needs --raw-input RATE CHANNELS: "
+                      "a pipe carries headerless little-endian float32 samples, so the sample "
+                      "rate and channel count must be given on the command line"
+                    : "writing audio to standard output ('-') needs --output-format raw-float: "
+                      "a WAV header cannot be completed on a pipe");
         const int fd = mode == SFM_READ ? 0 : 1;
 #ifdef _WIN32
         if (_setmode(fd, _O_BINARY) == -1)

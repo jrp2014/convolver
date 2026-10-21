@@ -6,6 +6,13 @@ backlog, not a promise that every idea will be implemented. Checked on 20 Octobe
 2026 against `2fe503e`. Keep completed behavior in the guides and
 [CHANGELOG](CHANGELOG.md), and keep this list for outstanding work.
 
+In short: the main open themes are first-use examples and documentation
+automation (DOC), plug-in release qualification and host testing (REL, HOST),
+checks against other configuration readers (CFG), large files and resampling
+(IO), precise no-clip headroom (GAIN), longer stress testing (ROBUST), and FFT or
+performance work only where measurements justify it (FFT, PERF). The
+[limitations table](#documented-limitations) lists current constraints.
+
 Each item has a stable ID. When taking one on, record the owner/issue or branch,
 evidence needed, and outcome here. Confirm the current source first: separate
 work may already have implemented part of it. Compatibility takes priority over
@@ -111,7 +118,7 @@ with compatibility tests; linked IDs point to open work above.
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/configuration-compatibility.md#compatibility-matrix) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/configuration-compatibility.md#profiles) |
 | Output is ordinary WAV or little-endian raw float; codecs depend on libsndfile build | WAV size limits and broader container validation remain IO-1. RAW has no embedded rate/channel metadata. | [RAW I/O](docs/portable-core.md#raw-streams) |
-| Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output protection](docs/portable-core.md#speaker-labels) |
+| Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/portable-core.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/portable-core.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/portable-core.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/cmake-package.md) |

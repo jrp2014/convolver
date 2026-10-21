@@ -821,6 +821,58 @@ void run(const fs::path& dir) {
             "a sound file has as many outputs as inputs");
     rejects([&] { load_configuration(dir / "outputs.txt", ConfigurationSelection{48000, 2, 3}); });
     rejects([&] { load_configuration(dir / "outputs.txt", ConfigurationSelection{0, 0, 257}); });
+    {
+        // Selection failures explain what differs and what to change.
+        const auto failure = [&](const fs::path& filter, ConfigurationSelection wanted) {
+            try {
+                load_configuration(filter, wanted);
+            } catch (const std::runtime_error& e) {
+                return std::string(e.what());
+            }
+            return std::string();
+        };
+        const auto has = [](const std::string& text, std::string_view part) {
+            return text.find(part) != std::string::npos;
+        };
+        wave(dir / "mono.wav", 48000, 1, {1, .5f});
+        const auto mono = failure(dir / "mono.wav", {48000, 2, 0});
+        require(has(mono, "is a sound-file filter (48000 Hz, 1 channel)") &&
+                    has(mono, "it takes 1 input channel, not 2") &&
+                    has(mono, "To apply this mono IR to all 2 channels") &&
+                    has(mono, "    48000 2 2 0\n") &&
+                    has(mono, "    mono.wav\n    0\n    1\n    1\n"),
+                "mono IR with stereo input explains the mismatch and suggests a configuration");
+        // The suggested configuration is valid and applies the IR to both channels.
+        std::string suggestion;
+        for (std::size_t start = 0; start < mono.size();) {
+            const auto end = std::min(mono.find('\n', start), mono.size());
+            if (mono.compare(start, 4, "    ") == 0)
+                suggestion += mono.substr(start + 4, end - start - 4) + '\n';
+            start = end + 1;
+        }
+        text_file(dir / "suggested.cfg", suggestion);
+        const auto applied = load_configuration(dir / "suggested.cfg", 48000, 2);
+        require(applied.paths.size() == 2 && applied.paths[1].inputs[0].channel == 1 &&
+                    applied.paths[1].outputs[0].channel == 1 &&
+                    applied.paths[1].impulse == std::vector<float>({1, .5f}),
+                "suggested mono configuration loads");
+        const auto rate = failure(dir / "good.cfg", {44100, 2, 0});
+        require(has(rate, "is a configuration for 48000 Hz audio with 2 input channels") &&
+                    has(rate, "its sample rate is 48000 Hz, not 44100 Hz") &&
+                    has(rate, "never resamples"),
+                "configuration rate mismatch explains resampling");
+        const auto outputs = failure(dir / "outputs.txt", {48000, 2, 3});
+        require(has(outputs, "none of the 3 filters in the configuration list") &&
+                    has(outputs, "upmix.cfg (configuration, 48000 Hz, 2 in, 6 out): it produces 6 "
+                                 "output channels, not 3") &&
+                    has(outputs, "44100.wav (sound file, 44100 Hz, 1 channel)") &&
+                    has(outputs, "none produces 3 output channels"),
+                "list mismatch lists each entry and the missing property");
+        const auto unrated = failure(dir / "outputs.txt", {96000, 0, 0});
+        require(has(unrated, "No entry is for 96000 Hz") &&
+                    has(unrated, "convert the audio to 44100 Hz or 48000 Hz"),
+                "list rate mismatch names the rates available");
+    }
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
     text_file(dir / "list.txt", "unrelated.cfg\ngood.cfg\n");
     require(load_configuration(dir / "list.txt", 48000, 2).sample_rate == 48000,

@@ -130,7 +130,12 @@ struct Parser {
             if (std::abs(integral) >= static_cast<float>(channels))
                 fail(line.number, field.column,
                      "route channel out of range: " + field.text + " (" + std::to_string(channels) +
-                         " channels declared)");
+                         (channels == 1 ? " channel" : " channels") +
+                         " declared in the header, numbered from 0, so the channel must be " +
+                         (channels == 1 ? std::string("0")
+                                        : "0 to " + std::to_string(channels - 1)) +
+                         "; a route's integer part is the channel and its fractional part the "
+                         "gain)");
             if (gain == 0)
                 gain = std::copysign(1.0f, integral);
             result.push_back(

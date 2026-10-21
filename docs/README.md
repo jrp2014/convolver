@@ -16,6 +16,7 @@ Convolver applies that response continuously to every input sample.
 | Build Convolver and filter a file | [Quick start](../README.md#build-and-try-it) |
 | Understand the audio terms and timing | [Concepts](concepts.md) |
 | Write a filter configuration or move one from Windows | [Configuration format](configuration.md) |
+| Check whether a configuration works in Roon, JRiver or elsewhere | [Configuration compatibility](configuration-compatibility.md) |
 | See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
 | Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md) |
 | Use the C++ libraries in another application | [CMake package guide](cmake-package.md) |
@@ -23,6 +24,32 @@ Convolver applies that response continuously to every input sample.
 | Understand what the tests establish | [Testing](testing.md) |
 | Choose an FFT backend or reproduce measurements | [FFT guide](fft-backends.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
+| Understand version numbers and tags | [Source versioning](versioning.md) |
+| Edit these documents | [Documentation maintenance](documentation.md) |
+| Learn where Convolver came from | [History](history.md) |
+
+## All maintained pages
+
+| Page | What it covers |
+| --- | --- |
+| [Concepts](concepts.md) | Audio terms, latency, tails, files versus streams |
+| [Configuration format](configuration.md) | `.cfg` and list syntax, routes, paths, troubleshooting |
+| [Configuration compatibility](configuration-compatibility.md) | What is tested, path-portability profile, other readers of the format |
+| [Core and CLI reference](portable-core.md) | Build options, every CLI option, output formats, inspection, library API, limits |
+| [VST3 guide](vst3.md) | Building, installing and loading the plug-in; host lifecycle |
+| [CMake package guide](cmake-package.md) | Using the libraries from another CMake project; presets |
+| [FFT guide](fft-backends.md) | Backend choice, numerical contract, dated benchmarks |
+| [Testing](testing.md) | What each test establishes and its limits |
+| [Implementation map](project-structure.md) | Source responsibilities, invariants, change-to-test map |
+| [Modernization direction](modernization.md) | Priorities and dependency choices |
+| [Source versioning](versioning.md) | `VERSION`, automatic tags, recovery |
+| [Documentation maintenance](documentation.md) | Which page owns each topic; link checks |
+| [History](history.md) | Provenance, historical builds, downstream use |
+| [convolverPipe](convolverPipe.md) | The recovered historical streaming tool (Windows only) |
+
+At the top level: [README](../README.md), [TODO](../TODO.md),
+[CHANGELOG](../CHANGELOG.md), [current review](../REVIEW.md),
+[contributing](../CONTRIBUTING.md) and [agent rules](../AGENTS.md).
 
 These pages describe the active CMake implementation. The package version is in
 [`VERSION`](../VERSION); use `convolver --version` to identify a particular binary.
