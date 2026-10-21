@@ -164,11 +164,12 @@ Shared adapter contract, for every format (detail in the
 [plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract)):
 a failed replacement keeps the running filter, with an explicit error; initial
 restoration installs the filter directly, without a crossfade; an empty
-instance and a failed initial load have one stated, tested behaviour (owner to
-confirm the proposal: identity for an empty instance with equal counts, silence
-otherwise and after a failed initial load). VST3 currently lets a rejected
-preset loaded while inactive replace the saved state; fix that under this
-contract.
+instance and a failed initial load have one stated, tested behaviour (owner's
+decision, 21 October 2026: identity for an empty instance with equal counts;
+silence, with an error shown, for unequal counts and after a failed initial
+load). VST3 must change to match: today an empty instance with unequal counts
+passes input *c* to output *c*, and a rejected preset loaded while inactive
+replaces the saved state.
 
 LV2 (Linux first; also PipeWire system audio):
 
