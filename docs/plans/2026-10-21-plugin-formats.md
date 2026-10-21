@@ -206,12 +206,34 @@ behaviour:
 | Situation | Audio | Indication | Today (VST3) |
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | Identity on matching channel numbers, other outputs silent, whatever the counts |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Preset accepted while inactive; activation then fails |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | Kept while active (`setState` returns `kResultFalse`). While inactive the rejected preset replaces the saved state and activation fails; this must change so the last valid state survives |
+| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | A preset restored while inactive is accepted without the configuration check, and activation then fails |
+| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | Kept while active (`setState` returns `kResultFalse`). While inactive, a preset whose rate or counts conflict with an already known configuration still replaces the saved state and activation fails; this must change so the last valid state survives |
 
 A replacement is accepted only after it has been fully validated and prepared,
 so rejection never disturbs the running filter. The rejected request is not
 retried automatically.
+
+**State that arrives before the host is configured.** Hosts can restore state
+before they set the sample rate and channel layout (VST3 `setState` before
+`setupProcessing`/`setBusArrangements`; AU `RestoreState` before
+`Initialize`). Two kinds of check are therefore kept apart:
+
+- **Checks on the state itself** run immediately: decoding, the version, the
+  resource limits and the 1–8 channel bound. Malformed state is rejected at
+  once, and the previously accepted state is unchanged.
+- **Checks against the host's configuration** (sample rate, channel counts,
+  layout) run as soon as that configuration is known. If it is already known
+  when the state arrives, a mismatch is rejected at once, as a failed
+  replacement (or a failed initial load if nothing was accepted before).
+- **When the configuration is not known yet,** well-formed state replaces the
+  previously accepted state straight away: the host is restoring what it saved.
+  The configuration check then happens at activation. If it fails there, that is
+  a failed initial load (silence and an error), but the restored state is kept
+  as the saved state, so opening a project at the wrong sample rate and then
+  correcting the rate brings the filter back, and saving the project does not
+  lose it.
+- LV2 knows the sample rate at instantiation and its ports are fixed, so its
+  configuration is always known and both kinds of check run in `restore()`.
 
 ### Initial restoration and live replacement
 
@@ -288,16 +310,25 @@ Fixed criteria:
 - **Latency alignment:** the host-reported latency (256 frames) must be exactly
   the offset at which output matches the oracle. AU reports it in seconds
   (`256 / sample rate`), so the test converts.
-- **Tails:** the reported tail must equal the exact value: the longest routed
-  IR length minus one plus that route's input and output delays (the formula in
-  `engine_tests.cpp`). AU reports it in seconds too. Output beyond the tail is
-  within tolerance of zero, and silence after a reset is exactly zero.
+- **Tails:** for a freshly constructed processor (first activation, or
+  reactivation), the reported tail must equal the exact value: the longest
+  routed IR length minus one plus that route's input and output delays (the
+  formula in `engine_tests.cpp`). After live replacements, `HostProcessor`
+  deliberately reports a conservative bound: the largest tail of any filter
+  used since construction, which never shrinks during a session
+  (`portable/host.cpp`). The test therefore requires the reported tail to be
+  at least the current filter's exact tail and equal to that maximum, and a
+  long-filter → short-filter replacement followed by reactivation must report
+  the long tail until reactivation and the short tail after it. AU reports it in
+  seconds too. Output beyond the current filter's tail is within tolerance of
+  zero, and silence after a reset is exactly zero.
 - **Channel order:** every route gets a distinct IR, so a swapped or misrouted
   channel fails instead of passing by symmetry.
 
 Cases, run for every adapter:
 
 - initial restoration (no crossfade: matches the oracle from the first block),
+  and a long → short replacement followed by reactivation (tail reporting),
   live replacement (fresh history, 256-frame warm-up, 256-frame crossfade),
   failed initial load and failed replacement (see the
   [contract](#loading-and-failure)), and an empty instance;
@@ -329,8 +360,10 @@ separate:
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:
-choose one green candidate run on a tagged commit, take exactly the files from
-its `collect` artifact, check them against the recorded SHA-256 sums, and
+run the candidate workflow on the chosen tag by hand (the version bot pushes
+tags with the workflow token, which does not trigger other workflows), take
+exactly the files from that run's `complete-preview-candidate` artifact (made
+by its `collect` job), check them against the recorded SHA-256 sums, and
 upload them unchanged to a GitHub pre-release on that tag, with the sums and
 download instructions in the release notes. Assets are never replaced after
 publication; a fix gets a new version.
@@ -409,13 +442,24 @@ contract:
   `HostProcessor` with it directly, with no crossfade, per the
   [contract](#initial-restoration-and-live-replacement). If audio has already
   run, `restore()` uses `replace` instead.
-- **Live loads.** A `patch:Set` arriving in `run()` copies the path into a
-  preallocated, bounded request slot (too long a path sets "load failed"),
-  increments a request number and schedules work. `work()` takes the lock,
-  reads the newest request and skips any that a newer one has superseded, so
-  rapid successive loads coalesce to the latest. It then loads, validates and
-  calls `replace`. The response updates the status port and sends `patch:Set`
-  with the path now in use.
+- **Live loads.** `run()` and `work()` share no request buffer, because
+  `run()` never takes the lock. A `patch:Set` arriving in `run()` builds a
+  bounded request on the stack (a generation number, the path length and the
+  path; too long a path sets "load failed") and passes it to `schedule_work` as
+  its payload, which the host copies
+  ([worker API](https://lv2plug.in/c/html/group__worker.html)). The generation
+  comes from an atomic counter that `run()` and `restore()` increment, so the
+  newest request is always known without a lock.
+- **Stale requests.** `work()` takes the lock and skips a request whose
+  generation is older than the newest one, so rapid loads coalesce. Loading a
+  file takes time and a newer request can arrive meanwhile, so `work()` checks
+  again after loading and validating: it calls `replace` only if the request is
+  still the newest and newer than the generation already installed (kept under
+  the lock, so it only increases). Otherwise it discards the prepared filter.
+  The response carries the generation too, and `work_response()` ignores any
+  response older than the last one it applied, so a stale completion cannot
+  overwrite a newer status, path or filter. The response then updates the
+  status port and sends `patch:Set` with the path now in use.
 - **Scheduling failure.** If `schedule_work` returns
   `LV2_WORKER_ERR_NO_SPACE` or `LV2_WORKER_ERR_UNKNOWN`, the running filter
   stays, the status becomes "load failed", `patch:Get` still reports the old
@@ -431,8 +475,10 @@ contract:
   `run()` is not executing. `collect()` runs in `work()` and `save()`.
 - **Tests** (in the `lilv` host test): a worker with an injectable delay,
   synchronous (free-wheel) work, injected scheduling failure, restore and save
-  while a load is in progress, several loads in quick succession, and cleanup
-  with work outstanding, all under sanitizers.
+  while a load is in progress, several loads in quick succession, a newer
+  request arriving while an older file is still loading (the older completion
+  must not change the filter, status or saved path), and cleanup with work
+  outstanding, all under sanitizers (ThreadSanitizer for the races).
 
 **State.** Save the mapped path (`state:mapPath`, so sessions can move) and the
 encoded host state (the VST3 preset format), so a session still sounds the same
@@ -535,9 +581,12 @@ AUv2 effects.
   it should with N-M effects", bypass included
   ([AUEffectBase.cpp](https://github.com/apple/AudioUnitSDK/blob/main/src/AudioUnitSDK/AUEffectBase.cpp)).
   Derive from `ausdk::AUBase` (or override `Render` and the bypass property
-  completely) so that `kAudioUnitProperty_BypassEffect` calls
-  `HostProcessor::set_bypass` and wet processing keeps running underneath, as
-  in VST3. Set `kAudioUnitRenderAction_OutputIsSilence` only when the output
+  completely). Setting `kAudioUnitProperty_BypassEffect` happens on a host
+  thread, and `HostProcessor::set_bypass` is an audio-thread call that writes a
+  plain flag, so the property setter only stores the requested value in an
+  atomic; `Render` applies it with `set_bypass` before processing each block,
+  as the VST3 adapter does with its bypass parameter. Wet processing keeps
+  running underneath, as in VST3. Set `kAudioUnitRenderAction_OutputIsSilence` only when the output
   really is silent, which is not until the tail has drained.
 - **Filters and state:** the encoded host state is saved in the
   `kAudioUnitProperty_ClassInfo` dictionary, so `.aupreset` files written by the
@@ -548,7 +597,8 @@ AUv2 effects.
   has run. `Render` only calls `process`. A rejected `RestoreState` returns an
   error and keeps the running filter.
 - **Tests (AU-1):** through PLUG-2, with AU-specific checks for latency and tail
-  in seconds, bypass (ramp and delayed dry path, never plain pass-through),
+  in seconds, bypass (ramp and delayed dry path, never plain pass-through;
+  toggled from another thread while rendering, under ThreadSanitizer),
   tails after silent input, silence flags, and 2→6 processing.
 - **Validation:** `auval` and pluginval on the `.component` in macOS CI.
 - **Hosts (AU-4):** Logic, GarageBand, SoundSource, Live, REAPER and FL Studio:

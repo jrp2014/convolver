@@ -119,7 +119,9 @@ Shared groundwork, done once so the three streams stay independent:
   adapter: the independent double-precision convolution oracle (the authority)
   and the CLI render (adapter equivalence; both share the engine, so the CLI
   alone could hide a shared defect). Fixed tolerance (1e-5 against the oracle,
-  identical to the CLI once latency is aligned), exact latency and tail values,
+  identical to the CLI once latency is aligned), exact latency, exact tail for a
+  fresh processor and the documented conservative (never-shrinking) bound after
+  replacements,
   and distinct IRs per route so channel order is checked. Cases: initial
   restoration, live replacement, failed initial load and failed replacement,
   empty instance, bypass, reset, silence flags, variable blocks, in-place
@@ -152,8 +154,9 @@ Shared groundwork, done once so the three streams stay independent:
   releases as unsigned previews. The preview gate and the production gate are
   separate ([criteria](docs/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production)):
   signing is not a prerequisite for a preview. The candidate workflow cannot
-  publish, so publication is a manual step owned by jrp: pick one green
-  candidate run on a tagged commit, upload exactly its `collect` files to a
+  publish, so publication is a manual step owned by jrp: run the candidate
+  workflow by hand on the chosen tag (the version bot's tag push does not start
+  it), upload exactly its `complete-preview-candidate` artifact's files to a
   GitHub pre-release with their SHA-256 sums and download instructions, and
   never replace an asset afterwards. Developer ID signing with notarization
   (shared by VST3 and AU), and Authenticode, come later as the production gate;
@@ -184,8 +187,10 @@ LV2 (Linux first; also PipeWire system audio):
   path, and PipeWire-style restore from a bare path string. Follow the
   [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
   one adapter lock for all `HostProcessor` control calls that `run()` never
-  takes; no `state:threadSafeRestore` at first; initial restoration installs
-  directly; rapid loads coalesce to the newest; defined handling of scheduling
+  takes; requests passed as copied worker payloads with a generation number,
+  rechecked after loading so a stale completion never wins; no
+  `state:threadSafeRestore` at first; initial restoration installs directly;
+  rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown
   with work outstanding, each with a test.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
@@ -199,8 +204,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-1 — Adapter and test.** `plugins/au/` on Apple's AudioUnitSDK:
   PLUG-4 channel configurations, latency and tail reported in **seconds**
-  (`frames / sample rate`), and bypass through `HostProcessor::set_bypass`
-  rather than `AUEffectBase`'s pass-through (which skips the delayed dry path
+  (`frames / sample rate`), and bypass stored atomically by the property
+  setter and applied with `HostProcessor::set_bypass` in `Render`, rather than
+  `AUEffectBase`'s pass-through (which skips the delayed dry path
   and ramp and handles N→M poorly). Tests using PLUG-2, plus bypass, tails,
   silence flags and 2→6. Licence (owner's decision, 21 October 2026): the AU
   component is distributed under GPL-3.0-or-later because AudioUnitSDK is

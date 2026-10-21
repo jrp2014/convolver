@@ -94,9 +94,14 @@ No production release or merge into `main` is part of this work.
 Signing is not a prerequisite for a preview; the production gates above are
 separate. Publication is a manual step owned by jrp:
 
-1. Choose one green candidate run on a tagged commit (`vX.Y.Z`).
-2. Download its `collect` artifact and check every file against the recorded
-   SHA-256 sums. Publish exactly those files, unchanged.
+1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
+   (`vX.Y.Z`): Actions, then "Run workflow", choosing the tag, or
+   `gh workflow run release.yml --ref vX.Y.Z`. The version bot's tag push does
+   not start it, because pushes made with the workflow token do not trigger
+   other workflows. Wait for the whole run to pass.
+2. Download that run's `complete-preview-candidate` artifact (made by its
+   `collect` job) and check every file against the `SHA256SUMS` file it
+   contains. Publish exactly those files, unchanged.
 3. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
    developer preview)". Put the SHA-256 sums, the run link and download and
    installation instructions (pointing to the install guide's unsigned-preview
