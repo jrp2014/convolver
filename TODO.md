@@ -8,7 +8,7 @@ backlog, not a promise that every idea will be implemented. Checked on 20 Octobe
 
 In short: the main open themes are first-use examples and documentation
 automation (DOC), plug-in release qualification and host testing (REL, HOST),
-unused VST3 SDK features (VST3), an FFmpeg filter (FFMPEG), checks against other configuration readers
+unused VST3 SDK features (VST3), an LV2 plug-in (LV2) and a deferred FFmpeg filter (FFMPEG), checks against other configuration readers
 (CFG), large files and resampling (IO), precise no-clip headroom (GAIN), longer
 stress testing (ROBUST), and FFT or performance work only where measurements
 justify it (FFT, PERF). The
@@ -39,10 +39,14 @@ speed. Do not change the historical archive to implement a portable feature.
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
-- [ ] **HOST-2 — Additional formats and UI.** Assess Audio Unit for Apple users,
-  [CLAP](https://github.com/free-audio/clap), and a filter-loading editor against
-  actual user needs. Keep the core and host lifecycle reusable; require host tests
-  and distribution work for each adapter.
+- [ ] **HOST-2 — Additional formats and UI.** Order agreed in the
+  [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md): LV2
+  first (LV2 items below), then Audio Unit (AUv2, for Logic, GarageBand and
+  SoundSource) against Apple's AudioUnitSDK. CLAP only on request: every CLAP host
+  found also loads VST3. A filter-loading editor only for an identified need.
+  Write adapters against the formats' own headers, not a framework. Keep the core
+  and host lifecycle reusable; require host tests and distribution work for each
+  adapter.
 - [ ] **HOST-3 — Windows Media Foundation transform.** Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
   Legacy, DirectShow players and applications that insert effects through Media
@@ -51,7 +55,32 @@ speed. Do not change the historical archive to implement a portable feature.
   is likely cheaper than an MFT or our own APO. See the
   [MFT plan](docs/superpowers/plans/2026-10-21-media-foundation-transform.md).
 
+## LV2 plug-in
+
+Design and evidence: [plug-in formats and LV2 plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md)
+(21 October 2026). LV2 is the native plug-in format on Linux and the only one
+PipeWire's `filter-chain` loads, so it also gives system-wide room correction.
+
+- [ ] **LV2-1 — Adapter and headless test.** `plugins/lv2/` over `HostProcessor`:
+  audio, latency and bypass ports; a `lilv` test comparing output with the CLI.
+- [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
+  chooser), worker-thread preparation, state with the embedded filter and mapped
+  path, and PipeWire-style restore from a bare path string.
+- [ ] **LV2-3 — Layouts and validation.** Generated plug-in URIs for the agreed
+  channel layouts; `lv2lint` and pluginval in CI.
+- [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
+  configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results (HOST-1).
+- [ ] **LV2-5 — FFT backend for plug-ins.** A shared system FFTW planner is not
+  serialized with other plug-ins in the same host process. Use Ooura or
+  Accelerate, static FFTW with hidden symbols, or
+  `fftwf_make_planner_thread_safe()` for LV2 and VST3 builds.
+- [ ] **LV2-6 — Release bundles.** Linux tarball, then distro packages; macOS and
+  Windows bundles under REL-1.
+
 ## FFmpeg integration
+
+Deferred behind the LV2 plug-in (21 October 2026). FFmpeg's `lv2` filter cannot
+pass a file path, so LV2 does not cover FFmpeg; the documented pipe does.
 
 Design and evidence: [FFmpeg filter plan](docs/superpowers/plans/2026-10-21-ffmpeg-filter.md)
 (21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter

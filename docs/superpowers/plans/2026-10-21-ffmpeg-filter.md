@@ -7,6 +7,11 @@ Status: proposed work, written on 21 October 2026 against Convolver `f6ac6c6`
 already works. Open work is tracked as FFMPEG-1 to FFMPEG-5 in
 [TODO](../../../TODO.md#ffmpeg-integration).
 
+**Priority revised later on 21 October 2026:** the built-in filter (FFMPEG-2 to
+FFMPEG-5) is deferred behind an LV2 plug-in; see the
+[plug-in formats and LV2 plan](2026-10-21-lv2-plugin.md). The pipe workflow
+and FFMPEG-1 are unaffected.
+
 **In short:**
 
 - FFmpeg cannot load audio filters at run time. A filter is either compiled into
