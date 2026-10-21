@@ -1,7 +1,21 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Portable developer-preview release record
 
 Author: jrp. Started 18 October 2026. This records implementation and unfulfilled
 qualification gates; it is not a production release announcement.
+
+## Update, 21 October 2026
+
+This work was merged into `main` (it was previously only on the
+`codex/plugin-distribution` branch). The owner decided that the first releases
+are unsigned on macOS (ad-hoc signature, documented quarantine removal) and
+Windows (SmartScreen warning). The signing gates below stay open for a later
+production release. The plug-in now accepts 1–8 input and 1–8 output channels
+(0.4.0) and is also tested with pluginval; the example presets still cover mono
+and stereo. The shared release pipeline for VST3, LV2 and AU (PLUG-5 in
+[TODO](../../TODO.md)) grows from this work, and the plug-in FFT backend choice
+(PLUG-1) may change the backends in the matrix below. The developer signing
+scripts were left on the branch until signing is taken up.
 
 ## Candidate matrix
 

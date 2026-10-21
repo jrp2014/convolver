@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Host qualification
 
 No named DAW is currently qualified for portable Convolver. Automated SDK
@@ -8,7 +9,7 @@ Cubase need available licences/testers; no compatibility claim is inferred.
 ## Procedure for a release tester
 
 Record host version, OS version/build, CPU architecture, package SHA-256, FFT
-backend, sample rate, mono/stereo layout, buffer size and exact steps/results.
+backend, sample rate, input/output channel layout, buffer size and exact steps/results.
 Keep private audio out of reports. Use the supplied synthetic examples.
 
 1. Download through the actual user-facing route, retaining quarantine metadata.

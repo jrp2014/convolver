@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Preview troubleshooting
 
 Use the archive matching your CPU and OS. A deployment-target flag or a successful
@@ -5,10 +6,13 @@ build alone does not establish compatibility with an older OS. No production
 compatibility floor is advertised yet.
 
 If a host cannot scan the plug-in, check its diagnostic log for missing libraries,
-architecture mismatch or signature rejection. Follow the host's documented rescan
-procedure after correcting the cause. Do not disable operating-system security.
+architecture mismatch or signature rejection. On macOS, a quarantined unsigned
+bundle is the usual cause; see [unsigned previews](install.md#unsigned-previews).
+Follow the host's documented rescan procedure after correcting the cause. Do not
+disable operating-system security system-wide.
 
-A preset must match both the host sample rate and mono/stereo layout. Change the
+A preset must match both the host sample rate and the track's input and output
+channel counts. Change the
 host configuration or import the matching preset; Convolver does not resample.
 Malformed or mismatched state is rejected and the last valid state is preserved.
 A converter failure prints the cause to stderr and does not replace an existing

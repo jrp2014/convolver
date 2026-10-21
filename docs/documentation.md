@@ -21,6 +21,7 @@ contents line. When a change alters a summarized fact, update the summary too.
 | Component boundaries and change map | [Implementation map](project-structure.md) | Actual symbols, callers, targets and test names |
 | Package consumption | [CMake package guide](cmake-package.md) | CMake exports, presets, external-consumer tests |
 | Plug-in build and host behavior | [VST3 guide](vst3.md) | Adapter, SDK pin, host/state tests |
+| Plug-in downloads and release gates | [Plug-in distribution](plugins/index.md), [release record](releases/developer-preview.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../TODO.md) | Current source and linked issues/plans |

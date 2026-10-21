@@ -38,6 +38,8 @@ Convolver applies that response continuously to every input sample.
 | [Configuration compatibility](configuration-compatibility.md) | What is tested, path-portability profile, other readers of the format |
 | [Core and CLI reference](portable-core.md) | Build options, every CLI option, output formats, inspection, library API, limits |
 | [VST3 guide](vst3.md) | Building, installing and loading the plug-in; host lifecycle |
+| [Plug-in distribution](plugins/index.md) | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
+| [Preview release record](releases/developer-preview.md) | Candidate matrix, evidence and remaining production gates |
 | [CMake package guide](cmake-package.md) | Using the libraries from another CMake project; presets |
 | [FFT guide](fft-backends.md) | Backend choice, numerical contract, dated benchmarks |
 | [Testing](testing.md) | What each test establishes and its limits |

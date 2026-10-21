@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Build the VST3 plug-in
 
 These are developer builds of portable Convolver. Supported operating-system

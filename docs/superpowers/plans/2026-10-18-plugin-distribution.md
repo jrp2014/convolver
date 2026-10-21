@@ -28,6 +28,9 @@ see the [plug-in formats plan](2026-10-21-lv2-plugin.md).
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the
 later gate; until then, milestone B is not claimed.
+**Merged on 21 October 2026:** the `codex/plugin-distribution` implementation of
+Tasks 1–3, the installer templates and candidate gates is on `main`. The two
+signing scripts listed below stayed on that branch until signing is taken up.
 The FFT choice below ("Windows/Linux use FFTW") is under review as PLUG-1: a
 plug-in must not share an FFTW planner with other code in the host process.
 
