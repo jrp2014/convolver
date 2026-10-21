@@ -2,8 +2,9 @@
 # Convolver TODO
 
 Open improvement ideas for the active portable implementation. This is the shared
-backlog, not a promise that every idea will be implemented. Checked on 20 October
-2026 against `2fe503e`. Keep completed behavior in the guides and
+backlog, not a promise that every idea will be implemented. The baseline inventory
+was checked on 20 October 2026 against `2fe503e`; Ooura and the adapter plans were
+reviewed on 21 October against `75f3924`. Keep completed behavior in the guides and
 [CHANGELOG](CHANGELOG.md), and keep this list for outstanding work.
 
 In short: the main open themes are first-use examples and documentation
@@ -19,6 +20,25 @@ evidence needed, and outcome here. Confirm the current source first: separate
 work may already have implemented part of it. Compatibility takes priority over
 speed. Do not change the historical archive to implement a portable feature.
 
+## Execution priorities
+
+This is the order for new work, not approval to start every item. Correctness
+regressions take priority whenever discovered. Record ownership before starting
+so independent tasks do not duplicate changes.
+
+| Order | Work | Exit criterion / dependency |
+| --- | --- | --- |
+| Continue separately | **REL-1 / HOST-1:** existing VST3 distribution and named-host qualification | Keep its branch/task separate; assess its release evidence before any integration. New adapters are not prerequisites for a VST3 release. |
+| Next in this workstream | **DOC-1 / FFMPEG-1:** redistributable examples and automated file/pipe tests | Documented commands pass in CI, including multiple audio tracks, unequal input/output counts, timestamps and tail handling. DOC-3's plan corrections are complete. |
+| After those examples, if integrated FFmpeg demand is confirmed | **FFMPEG-2**, then **FFMPEG-3:** C API followed by the pinned filter patch | Settle layouts, buffering/timestamps/tails, ownership/threading and FFT-option propagation before freezing the C ABI; require oracle and CLI-equivalence tests. |
+| Separate decision gate | **HOST-3 Phase 0:** identify Windows users and hosts | Evaluate an Equalizer APO export for supported system-effects playback first. Start MFT/DMO implementation only for a named workflow; ASIO/exclusive playback needs another route. |
+| Later, based on users or measurements | **HOST-2 / VST3 features**, **FFMPEG-4/5**, **FFT-2 / PERF** | Define the user need or measured bottleneck and acceptance tests first. Ooura freshness (**FFT-1**, complete) is not a blocker. |
+
+DOC-2 automation and the CFG/IO/GAIN/ROBUST items remain open supporting work;
+prioritize them when a reproducible defect or a selected milestone requires them.
+The [review record](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
+explains the rationale; this table owns the current ordering.
+
 ## User experience and distribution
 
 - [ ] **DOC-1 — Runnable first-use examples.** Provide small redistributable IRs,
@@ -29,6 +49,12 @@ speed. Do not change the historical archive to implement a portable feature.
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
   [check scope](docs/documentation.md#automated-checks).
+- [x] **DOC-3 — Resolve adapter-plan review findings.** Corrected the plans and
+  maintained guide: separate input/output speaker layouts, specify MFT partial
+  buffering and queried latency, require host FFT-option support, and explain
+  the pipe's stream/channel scope and Equalizer APO coverage. Adapter code and
+  planned tests remain future work. See the
+  [21 October review and recommended order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** Reconcile the separate plug-in
   distribution work with main before duplicating it. Track minimum OS/CPU versions,
   dependency closure, licences/corresponding source, signing/notarization, clean
@@ -59,10 +85,15 @@ means a patched FFmpeg build with `--enable-gpl`.
 
 - [ ] **FFMPEG-1 — Test the pipe workflow.** The
   [FFmpeg pipe example](docs/portable-core.md#with-ffmpeg) is documented and was
-  run by hand; add a CI test that runs it when `ffmpeg` is installed.
+  originally run by hand for one stereo audio/video pair. Add a CI test when
+  `ffmpeg` is installed, covering explicit track selection, 2-in/6-out routing,
+  frame counts/tails and timestamp offsets. The revised commands are not new
+  end-to-end validation evidence.
 - [ ] **FFMPEG-2 — C API.** A C99 header over `HostProcessor` and the
   configuration loader, a `Convolver::c` target and `convolver.pc`, with C-only
-  tests and the same output as `Engine`.
+  tests and the same output as `Engine`. First add tested host FFT-option
+  propagation for initial/replacement engines; reject unsupported backend
+  options, keep preparation off the audio path, and query actual latency.
 - [ ] **FFMPEG-3 — Out-of-tree `convolver` filter.** Patch series against a
   pinned FFmpeg release, build script, CI job comparing filter output with the
   CLI, and a user guide once it works.
@@ -150,12 +181,14 @@ so the preset file path is not needed).
 
 ## FFT libraries and performance
 
-- [ ] **FFT-1 — Check that we have the latest Ooura version.** Compare the vendored
-  [Ooura copy](portable/third_party/ooura/README.md) with the
-  [upstream packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html). Record the
-  upstream archive/hash, algorithm family and local modifications. Do not infer
-  freshness from file dates. Review licensing/notices, compare changes, and run
-  FFT, convolution-oracle and backend-equivalence tests before updating it.
+- [x] **FFT-1 — Check that we have the latest Ooura version.** Checked the
+  [official packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html) on
+  21 October 2026: no C algorithm changes are missing. All 36 non-threaded
+  function definitions match after the documented adaptations; the advertised
+  December 2006 correction was to the Fortran version. Keep the current code.
+  [Provenance and hashes](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026)
+  and [review/validation](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md)
+  record the evidence. Recheck upstream if considering a later update.
 - [ ] **FFT-2 — Evaluate alternatives only against a measured need.** These are
   candidates, not supported backends or automatic fallbacks:
 

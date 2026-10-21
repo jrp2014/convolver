@@ -5,6 +5,10 @@ Status: proposal, dated 21 October 2026, written against `f6ac6c6` (package
 0.4.3). Nothing here is implemented. Tracked as HOST-3 in [TODO](../../../TODO.md).
 External facts were checked on the date above; recheck them before implementing.
 
+Revision note, 21 October 2026: the [documentation review](../../review-2026-10/ooura-and-roadmap-2026-10-21.md)
+corrected speaker-mask semantics, buffering/latency requirements and Equalizer
+APO coverage. These are proposed contracts, not implemented adapter behavior.
+
 **In short:**
 
 - A Media Foundation transform (MFT) is a Windows COM component that media
@@ -19,7 +23,9 @@ External facts were checked on the date above; recheck them before implementing.
 - System-wide processing (Spotify, browsers, games) needs an Audio Processing
   Object (APO), not an MFT. Equalizer APO already convolves with WAV impulse
   responses, so exporting our `.cfg` files to Equalizer APO is likely the
-  cheapest way to serve that need. We recommend against writing our own APO for now.
+  cheapest way to serve that need when applications use the system-effects path;
+  ASIO and WASAPI exclusive playback bypass it. We recommend against writing our
+  own APO for now.
 - Recommended design: a synchronous, dual-mode DSP plug-in. One COM object
   implements both `IMFTransform` (Media Foundation) and `IMediaObject` (DirectX
   Media Object, for DirectShow players). It is built on the existing
@@ -71,7 +77,9 @@ Consequences:
 
 1. Before building anything, confirm which of the routes above a real user
    needs (Phase 0). If the need is system-wide room correction, do the Equalizer
-   APO export first. It is smaller and reaches every application.
+   APO export first if its endpoint/system-effects coverage meets that need.
+   It does not cover ASIO or WASAPI exclusive playback; see the
+   [upstream requirements](https://sourceforge.net/projects/equalizerapo/).
 2. If an MFT is wanted, build one dual-mode DSP plug-in (MFT + DMO + WMP
    enable/property page) instead of separate MFT and DMO projects. Microsoft's
    own audio DSPs follow this pattern, and so did our historical WMP plug-in on the DMO side.
@@ -112,8 +120,10 @@ Engine (existing)
 - **`StreamTransform`** (portable): owns a `HostProcessor`. It accepts arbitrary
   input frame counts, processes in chunks of at most `max_frames` (for example
   4096), drops the first `latency_frames()` output frames after a start or flush,
-  and on drain produces `latency_frames() + tail_frames()` frames of the remaining
-  output. Its unit tests run under the sanitizers on Linux and macOS as well as Windows.
+  and on drain feeds `latency_frames() + tail_frames()` zero frames through the
+  processor, discarding any remaining startup latency before emitting the tail.
+  An empty stream emits nothing. Its unit tests run under the sanitizers on Linux
+  and macOS as well as Windows.
 - **Threading:** the shell declares `ThreadingModel=Both`. Media Foundation calls
   `ProcessInput`/`ProcessOutput` from its work-queue threads, and configuration
   arrives from UI or application threads. An `SRWLOCK` guards the shell's bookkeeping. Configuration changes go through
@@ -123,9 +133,21 @@ Engine (existing)
   callback, but playback still stutters if it stalls.
 - **Allocation:** the caller provides output samples. Do not set
   `MFT_OUTPUT_STREAM_PROVIDES_SAMPLES`, so the MFT never allocates `IMFSample`s
-  while streaming. Report `cbSize` in `GetOutputStreamInfo` as the output bytes
-  for one input sample of the negotiated maximum size. Any internal FIFO is
-  allocated when the media types are set.
+  while streaming. Report the output audio frame size (`MF_MT_AUDIO_BLOCK_ALIGNMENT`)
+  as `cbSize`, the minimum output buffer size, following
+  [`MFT_OUTPUT_STREAM_INFO`](https://learn.microsoft.com/en-us/windows/win32/api/mftransform/ns-mftransform-mft_output_stream_info).
+  There is no maximum input sample size negotiated by the listed media types;
+  `HostProcessor::max_frames` is an internal per-call processing bound.
+  Retain at most one caller-owned input sample and a cursor, validate its byte
+  length/frame alignment, and process it in bounded chunks. Allocate any working
+  FIFO at media-type setup with explicit capacity; never copy an arbitrarily
+  sized input sample into a growing queue. Honor output buffers as small as one
+  audio frame and preserve unconsumed input and pending output between calls.
+  Advertise this retention with `MFT_INPUT_STREAM_HOLDS_BUFFERS`, leave
+  `MFT_INPUT_STREAM_DOES_NOT_ADDREF` unset, and report the corresponding input
+  latency/lookahead fields consistently with the
+  [input-stream contract](https://learn.microsoft.com/en-us/windows/win32/api/mftransform/ne-mftransform-_mft_input_stream_info_flags).
+  Release retained samples on consumption, flush, type clear and teardown.
 - **Messages:** `MFT_MESSAGE_NOTIFY_BEGIN_STREAMING` (allocate if not done),
   `NOTIFY_START_OF_STREAM` (arm latency compensation), `COMMAND_FLUSH`
   (`reset()`, discard queued audio, re-arm), `COMMAND_DRAIN` (emit tail, then
@@ -134,9 +156,13 @@ Engine (existing)
 - **Input sample discontinuity** (`MFSampleExtension_Discontinuity`): treat it as a
   flush (fresh history, re-armed compensation), as the historical DMO did. Mixing
   audio across a seek would be wrong.
-- **Process model:** one input sample at a time. `ProcessInput` returns
-  `MF_E_NOTACCEPTING` while output is pending. `ProcessOutput` sets
-  `MFT_OUTPUT_DATA_BUFFER_INCOMPLETE` while drain output remains.
+- **Process model:** one retained input sample at a time. `ProcessInput` returns
+  `MF_E_NOTACCEPTING` while that sample or pending output remains. `ProcessOutput`
+  emits as many whole frames as fit, retaining the remainder, and sets
+  `MFT_OUTPUT_DATA_BUFFER_INCOMPLETE` when more output is available without new
+  input, including during drain. Once an input sample is consumed with no output
+  ready (for example during initial latency), release it and accept the next;
+  do not deadlock by waiting for output before accepting enough input.
 
 ## Media types and negotiation
 
@@ -146,7 +172,7 @@ Engine (existing)
 | `MF_MT_SUBTYPE` | `MFAudioFormat_Float` (32-bit); `MFAudioFormat_PCM` 16/24/32-bit | `MFAudioFormat_Float` (32-bit) |
 | `MF_MT_AUDIO_SAMPLES_PER_SECOND` | Must equal the selected configuration's rate | Same as input |
 | `MF_MT_AUDIO_NUM_CHANNELS` | Configuration's input channels | Configuration's output channels (may differ) |
-| `MF_MT_AUDIO_CHANNEL_MASK` | Checked against the configuration's mask when both are known | Configuration's mask or the standard mask for the count |
+| `MF_MT_AUDIO_CHANNEL_MASK` | Preserve the host's declared layout; routes address input indices, and `.cfg` declares no input mask | Configuration's explicit output mask, validated against the output count; otherwise leave unspecified |
 | `MF_MT_AUDIO_BLOCK_ALIGNMENT`, `MF_MT_AUDIO_AVG_BYTES_PER_SECOND`, `MF_MT_AUDIO_BITS_PER_SAMPLE` | From the format | From the format |
 | `MF_MT_ALL_SAMPLES_INDEPENDENT` | TRUE | TRUE |
 
@@ -169,30 +195,38 @@ Build and parse these through `MFInitMediaTypeFromWaveFormatEx` and
   and `IConvolverMediaEffect::GetStatus` show the stream's format, the candidates,
   and what differs, reusing the explanations of `detail::explain_no_match`. Also
   send it to `OutputDebugString` and an ETW/TraceLogging provider for developers.
-- **Speaker layout:** the same question as VST3-1. Initially reject a mask that
-  conflicts with an explicit configuration mask, and accept any layout when the
-  configuration has none. Channel limits follow the core, not the VST3 1–8 bus limit.
+- **Speaker layout:** the `.cfg` mask labels outputs only. Reject an output type
+  that conflicts with an explicit output mask; never compare that mask with the
+  input layout. Stereo input and 5.1 output are a valid combination. Do not guess
+  an arrangement from a channel count. If a host needs labelled output where the
+  configuration has none, require explicit metadata rather than inventing it.
+  Input routes remain index-based until a separate input-layout contract is
+  defined under VST3-1. Channel limits follow the core, not the VST3 1–8 bus limit.
 - **Format change mid-stream:** a new `SetInputType` while streaming loads the matching
   configuration on the calling thread (control path) and resets. The Legacy player
   sets types before streaming. Other hosts drain or flush first.
 
 ## Latency, tail and timestamps
 
-The core has a fixed latency of B = 256 frames (`HostProcessor::latency_frames()`).
+This adapter initially chooses B = 256 frames. The core and `HostProcessor`
+support other block sizes; obtain L from `HostProcessor::latency_frames()` and
+use that value throughout buffering, trimming and drain logic.
 Unlike a VST3 callback, an MFT may hold input before producing output, so the
 transform can **compensate the latency**:
 
-- After start, flush or a discontinuity, discard the first 256 output frames.
+- After start, flush or a discontinuity, discard the first L output frames.
 - Output sample times equal input sample times. Duration follows from the frame count.
-- On `COMMAND_DRAIN`, flush the 256 latency frames plus `tail_frames()` of filter
-  tail. For room correction the tail is short. For a reverb IR it can be several
-  seconds, and it is audible.
+- On `COMMAND_DRAIN` after nonempty input, feed L plus `tail_frames()` of silence,
+  continue discarding any remaining startup latency, and emit the remaining
+  output. Repeated drain calls must not restart the flush. Empty input emits no
+  frames. For a reverb IR the tail can be several seconds, and it is audible.
 
-This keeps audio aligned with video without any host-side latency reporting
-(we found no Media Foundation equivalent of VST3's latency reporting for effects).
+This keeps the output timestamps aligned with video without requiring VST3-style
+host delay compensation. The MFT must still report its input buffering through
+`GetInputStreamInfo`; those fields do not replace correct sample timestamps.
 It matches the CLI's file behaviour, where latency is trimmed and the whole tail
 written. Streaming capture through `MediaCapture` still incurs the inherent
-256-frame block delay, about 5 ms at 48 kHz. A `KeepLatency` attribute can disable
+L-frame block delay (about 5 ms at 48 kHz with B = 256). A `KeepLatency` attribute can disable
 compensation for hosts that prefer constant throughput.
 
 ## Configuration and IR loading
@@ -262,8 +296,9 @@ ARM64X is a later option for x64 hosts emulated on ARM.
 ## System-wide processing: APOs and Equalizer APO
 
 An **Audio Processing Object (APO)** is a COM component loaded by the Windows
-audio engine (`audiodg.exe`) for an endpoint. It processes everything that plays
-through that device, in roughly 10 ms periods, under real-time rules (no
+audio engine (`audiodg.exe`) for an endpoint. It processes streams using that
+endpoint's system-effects path; ASIO and WASAPI exclusive playback bypass
+Equalizer APO. Processing runs in engine periods under real-time rules (no
 allocation, locks or paging in `APOProcess`), and reports latency through
 `IAudioProcessingObject::GetLatency`. The engine's real-time design would fit.
 
@@ -307,6 +342,13 @@ are checked manually and recorded like HOST-1.
 | Hosts (manual) | Windows Media Player Legacy on a clean Windows 11 VM (enable optional feature, enable plug-in, play 44.1/48 kHz stereo and 5.1, mismatched file shows diagnostic, filter change without restart); MPC-HC with the DMO; a MediaPlayer sample app | Recorded matrix |
 
 Notes for Windows CI:
+
+- Buffering tests must include one-frame output buffers, repeated partial output,
+  input samples larger than `max_frames`, back-pressure, zero/one-frame and
+  shorter-than-latency input, flush/discontinuity, and repeated drain. Repeat
+  portable timing tests with non-default block sizes. Negotiation tests must
+  include stereo-to-5.1, absent output masks and same-count/different-layout
+  cases, without inferring input labels from the output mask.
 
 - Windows Server runner images do not include Media Foundation. Add
   `Install-WindowsFeature Server-Media-Foundation` before the tests

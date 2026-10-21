@@ -319,17 +319,30 @@ checking complete frames, so fragmented writes do not lose audio.
 
 ### With FFmpeg
 
-FFmpeg can decode the audio of any file it reads, pass it through Convolver and
-remux it with the original video. Its `-ar` and `-ac` values must match the
-configuration:
+FFmpeg can decode an audio track, pass it through Convolver and remux it with
+the original video. This example uses a 48 kHz configuration with two inputs
+and two outputs, processing the first audio track and retaining the first
+video track:
 
 ```sh
-ffmpeg -i movie.mkv -map 0:a -f f32le -ar 48000 -ac 2 - \
+ffmpeg -i movie.mkv -map 0:a:0 -f f32le -ar 48000 -ac 2 - \
   | convolver --filter room.cfg --input - --raw-input 48000 2 \
       --output - --output-format raw-float \
   | ffmpeg -i movie.mkv -f f32le -ar 48000 -ac 2 -i - \
-      -map 0:v -map 1:a -c:v copy -c:a flac movie-corrected.mkv
+      -map 0:v:0 -map 1:a:0 -c:v copy -c:a flac movie-corrected.mkv
 ```
+
+The raw pipe carries one audio stream. Change `0:a:0` to `0:a:1` to select the
+second audio track; do not use `0:a`, which selects all audio tracks. Other
+audio/video tracks, subtitles and attachments are omitted by this example.
+See FFmpeg's [stream-selection rules](https://ffmpeg.org/ffmpeg.html#Stream-selection).
+
+Both `-ar` values and the rate in `--raw-input` must match the configuration's
+rate. The first `-ac` and the channel count in `--raw-input` must match its
+**input** count; the receiving FFmpeg's `-ac` must match its **output** count.
+For a 2-in/6-out configuration, keep the first `-ac 2` and `--raw-input 48000 2`,
+but change the receiving command to `-ac 6`. RAW carries no channel labels;
+ensure its assumed channel order matches the configuration's routes.
 
 The new audio keeps the filter tail, so it can run past the video; add
 `-shortest` to cut it. It starts at time zero, so check sync for files whose

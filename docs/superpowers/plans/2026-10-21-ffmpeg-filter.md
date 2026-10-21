@@ -7,6 +7,10 @@ Status: proposed work, written on 21 October 2026 against Convolver `f6ac6c6`
 already works. Open work is tracked as FFMPEG-1 to FFMPEG-5 in
 [TODO](../../../TODO.md#ffmpeg-integration).
 
+Revision note, 21 October 2026: the [documentation review](../../review-2026-10/ooura-and-roadmap-2026-10-21.md)
+corrected the pipe example's stream/channel scope, output-mask semantics and
+host FFT-option prerequisites. The measurements below retain their original scope.
+
 **In short:**
 
 - FFmpeg cannot load audio filters at run time. A filter is either compiled into
@@ -81,21 +85,31 @@ Convolver Release build with Clang and FFTW, one run each, so indicative only):
 
 **A. Pipe.** The CLI already streams little-endian float (see
 [RAW streams](../../portable-core.md#raw-streams)). Tested here with a
-true-stereo `.cfg` and a 5 s video:
+true-stereo `.cfg` and a 5 s video. The command below now selects the first
+audio and video tracks explicitly; the original measurement used a single
+audio/video pair:
 
 ```sh
-ffmpeg -i movie.mkv -map 0:a -f f32le -ar 48000 -ac 2 - \
+ffmpeg -i movie.mkv -map 0:a:0 -f f32le -ar 48000 -ac 2 - \
   | convolver --filter hall.cfg --input - --raw-input 48000 2 \
       --output - --output-format raw-float \
   | ffmpeg -i movie.mkv -f f32le -ar 48000 -ac 2 -i - \
-      -map 0:v -map 1:a -c:v copy -c:a flac movie-hall.mkv
+      -map 0:v:0 -map 1:a:0 -c:v copy -c:a flac movie-hall.mkv
 ```
 
 The audio matched a file render of the same input to 1.2e-7 (the 24-bit FLAC
-step) and kept the 0.8 s tail (add `-shortest` to cut it). `-ar` and `-ac` must
-match the configuration, and the audio restarts at time zero, so check sync for
+step) and kept the 0.8 s tail (add `-shortest` to cut it). This is a 48 kHz,
+2-in/2-out example. The first `-ac` and `--raw-input` channel count describe
+inputs; the receiving `-ac` describes outputs. Use `-ac 6` on the receiving
+command for a 2-in/6-out configuration. Both rates must match the configuration.
+RAW has no channel labels; its assumed order must match the routes.
+
+Select one audio track (`0:a:1` selects the second); `0:a` would select every
+track for a pipe that carries only one stream. The example omits other tracks,
+subtitles and attachments. Audio restarts at time zero, so check sync for
 sources whose audio starts late. It is one process per stream and cannot switch
-filters mid-stream.
+filters mid-stream. [The maintained pipe guide](../../portable-core.md#with-ffmpeg)
+owns the user instructions; FFMPEG-1 must test multiple tracks and unequal counts.
 
 **B. LV2 through `lv2`.** FFmpeg's `lv2` filter (`af_lv2.c`) sets only numeric
 control ports and passes an empty event sequence. It has no way to send a file
@@ -185,6 +199,17 @@ nonfinite-input handling and allocation-free processing. Build it as a new
 exported, and install `convolver.pc` generated from `VERSION`. The header is
 also usable by GStreamer or other C hosts.
 
+**Required host-layer work in FFMPEG-2:** the current `HostProcessor` takes a
+configuration, callback capacity and block size, and constructs engines with
+default FFT options. Before exposing the proposed `fft_planning`/`fft_wisdom`
+options, extend it to accept and retain validated `FftOptions` for both initial
+construction and every replacement. Wisdom file I/O/import and planning stay on
+the serialized control path. Importing wisdom alone does not select a planning
+mode. Reject FFTW-only options on Ooura/Accelerate; never silently ignore them.
+Until this support and its tests exist, the proposed C API/filter options are
+not implemented. Query `latency_frames()` for trimming/drain instead of assuming
+the default block size of 256.
+
 ## Filter design
 
 `libavfilter/af_convolver.c`, an activate-style filter with one input and one
@@ -212,8 +237,12 @@ Behaviour:
   layout comes from the `.cfg` speaker mask when it labels every output: the
   WAVE mask bits are the same as FFmpeg's native `AV_CH_*` bits for the 18
   standard positions. Otherwise the output has an unspecified-order layout with
-  the right count. A mismatch between a labelled input layout and the mask logs
-  a warning; channels are never reordered.
+  the right count. The `.cfg` mask labels outputs only: validate it against the
+  output count/layout, never against the input layout. Inputs are routed by
+  index; the format does not declare an input speaker arrangement. Do not infer
+  one from the channel count or warn about a legitimate stereo-to-5.1 mapping.
+  Channels are never reordered. Any future input-layout metadata needs its own
+  explicit contract and compatibility tests.
 - **Rates.** By default accept any rate, select the list entry in
   `config_props`, and fail with an explanation listing available rates and the
   `aresample=RATE,convolver=...` fix. Never resample the IR. With `match_rate`,
@@ -264,7 +293,10 @@ covers the DSP:
   header with `-std=c99 -pedantic`; open/probe/process/replace/close; error
   text for no-match and missing files; allocation guard on process; output
   identical to `Engine` for the same configuration and block, and within the
-  existing double-precision oracle tolerance (report the worst error).
+  existing double-precision oracle tolerance (report the worst error). Verify
+  FFT planning options reach both initial and replacement engines, wisdom
+  errors surface before processing, and non-FFTW backends reject unsupported
+  options. Exercise non-default block sizes and query their actual latency.
 - **Filter (CI job building FFmpeg):** fetch the pinned FFmpeg release, apply the
   patch, configure `--enable-gpl --enable-libconvolver` with a minimal component
   set, then run `ffmpeg` scripts that check:
@@ -273,7 +305,8 @@ covers the DSP:
   - variable frame sizes (`asetnsamples`), `fltp` and `dblp`, timestamps
     continuous and starting at the input's;
   - list selection by rate and channels, `out_channels`, and each documented
-    error message;
+    error message; stereo-to-5.1 routing, absent output masks, and equal channel
+    counts with differing speaker arrangements (without invented input labels);
   - `filter` command switching and timeline `enable=` (no clicks beyond the
     ramp, compared with the host-layer tests);
   - agreement with `afir` for a single mono IR over the input length, with its
@@ -307,7 +340,9 @@ covers the DSP:
 
 1. **FFMPEG-1:** document the pipe workflow in the CLI guide (done in the PR
    adding this plan) and add a CI test that runs it when `ffmpeg` is installed.
-2. **FFMPEG-2:** C API, `Convolver::c`, `convolver.pc`, C tests.
+2. **FFMPEG-2:** host FFT-option propagation and tests, then C API,
+   `Convolver::c`, `convolver.pc`, C tests. Freeze the ABI only after the
+   layout, timing, ownership/threading and option contracts are covered.
 3. **FFMPEG-3:** out-of-tree filter patch, build script and CI job; filter tests
    above; user guide `docs/ffmpeg.md` when it works.
 4. **FFMPEG-4:** dry/wet mix in the host layer, `gain`/`no-clip`, larger
