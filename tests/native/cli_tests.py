@@ -116,6 +116,27 @@ def output_selection_tests(d):
     p=call(base+['--output-channels','2'],ok=False)
     assert b'output channel count' in p.stderr, p.stderr
 
+def repeatability_tests(d):
+    """Separate runs on the same input must write bit-identical samples.
+
+    Each run is a new process, so its heap layout differs. Output must not depend
+    on where buffers land, or exact comparisons between renders become flaky.
+    """
+    ir=d/'rep-ir.wav'; src=d/'rep-in.wav'; out=d/'rep-out.wav'
+    pcm(ir,[(i*7919)%20001-10000 for i in range(300)])
+    pcm(src,[(i*104729)%30001-15000 for i in range(2*3000)],channels=2)
+    cfg=d/'rep.cfg'
+    cfg.write_text('48000 2 6 3f\n0 0\n0 0 0 0 0 0\n' +
+                   ''.join('rep-ir.wav\n0\n%d\n%d.%d\n' % (o%2, o, o+1) for o in range(6)))
+    first=None
+    for run in range(20):
+        call(['--filter',cfg,'--input',src,'--output',out,'--output-format','wav-float'])
+        samples=floats(out)[2]
+        if first is None: first=samples
+        differing=sum(a!=b for a,b in zip(samples,first))
+        assert samples==first, 'run %d differs from run 0 in %d of %d samples' % (
+            run, differing, len(first))
+
 def speaker_map_tests(d):
     """--speaker-map config labels WAV channels with the configuration's mask."""
     ir=d/'sm-ir.wav'; src=d/'sm-in.wav'; out=d/'sm-out.wav'
@@ -251,6 +272,7 @@ def main():
         call(['--filter',ir,'--input','-','--output',dst],ok=False,data=raw)
         call(['--filter',ir,'--input','-','--raw-input','44100','1','--output',dst],ok=False,data=raw)
         call(args,data=b'')
+        repeatability_tests(d)
         speaker_map_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d/'v-ir.wav',[16384]); pcm(d/'v-in.wav',[1000,-1000])
