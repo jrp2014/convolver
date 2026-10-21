@@ -29,7 +29,7 @@ jobs:
           python-version: '3.12'
       - name: Linux libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev xvfb libasound2t64
       - name: macOS libraries
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
@@ -61,11 +61,40 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
+      - name: Download pluginval
+        shell: bash
+        env:
+          PLUGINVAL_TAG: v2.0.0-beta3
+        run: |
+          case "$RUNNER_OS" in
+            Linux) archive=pluginval_Linux.zip; executable=pluginval
+              sha=2e23d311c8c2664457b11be8f6cf4ed29cfdc08765c71c43934a1ed3360f118f ;;
+            macOS) archive=pluginval_macOS.zip; executable=pluginval.app/Contents/MacOS/pluginval
+              sha=d13c260110e9a1d375e9130e79d20439dcdc9f7d0cfcad74a29197dd78d84ac3 ;;
+            Windows) archive=pluginval_Windows.zip; executable=pluginval.exe
+              sha=da158e918b60430c6a5223cd99cc2e746bda604e583258c400898caf4e95c523 ;;
+          esac
+          directory="$RUNNER_TEMP/pluginval"
+          mkdir -p "$directory"
+          curl -fsSL --retry 3 -o "$directory/$archive" \
+            "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_TAG/$archive"
+          python - "$directory/$archive" "$sha" <<'EOF'
+          import hashlib, sys
+          digest = hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest()
+          sys.exit(digest != sys.argv[2] and f'unexpected pluginval checksum {digest}')
+          EOF
+          (cd "$directory" && unzip -q "$archive")
+          echo "PLUGINVAL=$directory/$executable" >> "$GITHUB_ENV"
+          # rtcheck (macOS only) flags real-time-unsafe calls during processing.
+          if [ "$RUNNER_OS" = macOS ]; then
+            echo "PLUGINVAL_ARGS=--rtcheck;relaxed" >> "$GITHUB_ENV"
+          fi
       - name: Configure Unix
         if: runner.os != 'Windows'
         run: >-
           cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON
           "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk" -DCONVOLVER_LEGACY_TESTS=OFF
+          "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
       - name: Configure Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -74,7 +103,8 @@ jobs:
           "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk"
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
+          "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
         run: cmake --build build-vst3 --config Release --parallel 2
-      - name: Core, host, preset and VST3 compatibility
+      - name: Core, host, preset, VST3 validator and pluginval
         run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2

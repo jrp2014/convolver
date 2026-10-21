@@ -9,6 +9,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
+  [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
+  Linux, macOS (with real-time-safety checks) and Windows, plus acceptance
+  renders that load real filters through the host and match a direct
+  convolution. Optional locally via `-DCONVOLVER_PLUGINVAL`.
+- The SDK validator also runs in extensive mode (`vst3.validator.extensive`).
+
 ### Changed
 
 - `convolver --help` describes `--gain-db no-clip` as the filter's worst-case

@@ -170,6 +170,36 @@ reset, concurrent replacement, C++ allocation/deallocation guards, corrupted
 state, and presets after source-file deletion. The SDK validator loads the actual
 bundle; separate tests call the real processor/controller SDK interfaces.
 
+The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
+pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
+and adds automation patterns. The validator, the adapter tests and the plug-in
+all use Steinberg's SDK code, so CI also loads the bundle in an independent host.
+
+### Independent host tests (pluginval)
+
+[pluginval](https://github.com/Tracktion/pluginval) (Tracktion, GPL-3.0) is a
+JUCE-based host that runs headless. It is downloaded separately, never linked
+into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to add:
+
+- `vst3.pluginval`: `pluginval validate --strictness-level 10 --skip-gui-tests`.
+  Open/close, state save and restore, bus layouts, parameter fuzzing and thread
+  safety, allocations during processing and oversized blocks, at several sample
+  rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS` adds options; CI adds
+  `--rtcheck;relaxed` on macOS, where pluginval can flag real-time-unsafe calls
+  in process callbacks.
+- `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
+  size 300) and a cross-feed `.cfg` (block size 61), loads each through the
+  host's state call, renders noise with `pluginval test`, and compares the
+  output with a direct double-precision convolution delayed by 256 samples
+  (tolerance 1e-5). A second render must match the first exactly.
+
+[`tests/vst3/pluginval_tests.py`](../tests/vst3/pluginval_tests.py) runs both.
+On Linux it uses `xvfb-run` when there is no display (JUCE needs an X server).
+JUCE's host only accepts state in its own wrapper (an XML document holding the
+component state in JUCE's base64 variant), so the script converts the preset's
+component chunk; given raw component state, JUCE leaves the plug-in empty and
+it passes delayed dry audio. CI pins pluginval 2.0.0-beta3 by checksum.
+
 The VST3 CI matrix runs on Linux, Windows and macOS. These automated checks are
 not proof of hard real-time deadlines or compatibility with every DAW. Commercial
 DAW testing, installers, dependency bundling, signing/notarization and a custom

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 set(CONVOLVER_VST3_SDK "" CACHE PATH "VST3 SDK 3.8.1 source directory with submodules")
+set(CONVOLVER_PLUGINVAL "" CACHE FILEPATH "Optional pluginval 2 executable for host-compatibility tests")
+set(CONVOLVER_PLUGINVAL_ARGS "" CACHE STRING "Extra options for pluginval validate (a CMake list)")
 if(NOT EXISTS "${CONVOLVER_VST3_SDK}/public.sdk/source/vst/vstaudioeffect.h")
     message(FATAL_ERROR "Set CONVOLVER_VST3_SDK to SDK 3.8.1 with base/cmake/pluginterfaces/public.sdk submodules")
 endif()
@@ -49,7 +51,10 @@ if(CONVOLVER_BUILD_TESTS)
     add_test(NAME vst3.adapter COMMAND convolver_vst3_tests)
     get_target_property(bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
     add_test(NAME vst3.validator COMMAND validator "${bundle}")
-    set_tests_properties(vst3.adapter vst3.validator PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
+    # Extensive mode adds every pairing of 15 speaker arrangements and more automation patterns.
+    add_test(NAME vst3.validator.extensive COMMAND validator -e "${bundle}")
+    set_tests_properties(vst3.adapter vst3.validator vst3.validator.extensive
+        PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
     add_dependencies(check convolver_vst3 convolver_vst3_tests validator)
 endif()
 
@@ -69,5 +74,16 @@ if(CONVOLVER_BUILD_IO)
             "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>")
         set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 120)
         add_dependencies(check convolver_vst3_preset)
+        # Tracktion pluginval: an independent (JUCE) host, downloaded separately.
+        if(CONVOLVER_PLUGINVAL)
+            add_test(NAME vst3.pluginval COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/vst3/pluginval_tests.py" validate
+                "${CONVOLVER_PLUGINVAL}" "${bundle}" ${CONVOLVER_PLUGINVAL_ARGS})
+            add_test(NAME vst3.pluginval.acceptance COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/vst3/pluginval_tests.py" acceptance
+                "${CONVOLVER_PLUGINVAL}" "${bundle}" "$<TARGET_FILE:convolver_vst3_preset>")
+            set_tests_properties(vst3.pluginval vst3.pluginval.acceptance
+                PROPERTIES LABELS "vst3;real-libraries;pluginval" TIMEOUT 600)
+        endif()
     endif()
 endif()
