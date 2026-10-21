@@ -73,8 +73,9 @@ Shared groundwork, done once so the three streams stay independent:
 - [ ] **PLUG-3 — One preset tool.** Extend `convolver-vst3-preset` into a tool
   writing `.vstpreset`, `.aupreset` and LV2 presets from the same host state.
 - [ ] **PLUG-4 — Layouts and identities.** One list of supported channel layouts
-  and a registry of permanent IDs: VST3 class IDs, AU manufacturer and subtype
-  codes (chosen by us; Apple no longer runs a registration service), LV2 URIs.
+  and a registry of permanent IDs: VST3 class IDs, AU codes (`aufx`/`Conv`/`CONV`,
+  chosen 21 October 2026; Apple no longer runs a registration service), LV2 URIs.
+  Tell forks to change them.
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats, with macOS
   signing and notarization shared by VST3 and AU.
 
