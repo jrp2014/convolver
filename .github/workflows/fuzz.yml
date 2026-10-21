@@ -17,7 +17,7 @@ jobs:
   libfuzzer:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
       - name: Configure Clang libFuzzer with ASan/UBSan
@@ -47,7 +47,7 @@ jobs:
           exit $status
       - name: Keep crash inputs and logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-findings
           path: |

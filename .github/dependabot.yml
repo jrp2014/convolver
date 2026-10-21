@@ -1,0 +1,14 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Keep the GitHub Actions used by the workflows on their latest releases.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
