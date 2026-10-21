@@ -85,9 +85,9 @@ in [TODO](../TODO.md).
   (HOST-3): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
   for system-wide processing.
-- [Plug-in formats and LV2](superpowers/plans/2026-10-21-lv2-plugin.md)
-  (LV2-1 to LV2-6): which hosts load VST3, AU, LV2 and CLAP, the recommended
-  order (LV2 next, then AU), framework choice, and an LV2 plug-in for Linux
-  hosts and PipeWire system audio.
+- [Plug-in formats: VST3, LV2 and AU](superpowers/plans/2026-10-21-lv2-plugin.md)
+  (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
+  choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2
+  for PipeWire system audio.
 - [FFmpeg filter](superpowers/plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
-  FFMPEG-5, deferred behind LV2): a libavfilter filter; the pipe already works.
+  FFMPEG-5, parked): a libavfilter filter; the pipe already works.

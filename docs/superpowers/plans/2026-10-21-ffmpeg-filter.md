@@ -8,9 +8,10 @@ already works. Open work is tracked as FFMPEG-1 to FFMPEG-5 in
 [TODO](../../../TODO.md#ffmpeg-integration).
 
 **Priority revised later on 21 October 2026:** the built-in filter (FFMPEG-2 to
-FFMPEG-5) is deferred behind an LV2 plug-in; see the
-[plug-in formats and LV2 plan](2026-10-21-lv2-plugin.md). The pipe workflow
-and FFMPEG-1 are unaffected.
+FFMPEG-5) is parked while VST3, LV2 and AU are developed in parallel; see the
+[plug-in formats plan](2026-10-21-lv2-plugin.md). The owner does not want to
+maintain a patched FFmpeg source tree (option C below), because of the coupling
+it creates. The pipe workflow and FFMPEG-1 are unaffected.
 
 **In short:**
 
