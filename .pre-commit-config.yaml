@@ -1,7 +1,7 @@
 ---
 # Preserve recovered source/documents and archived review evidence.
 exclude: >-
-  ^(archives/|convolver/|source/|review/|docs/historical/|docs/archive/)
+  ^(archives/|historical/|source/|review/|docs/historical/|docs/archive/)
 
 repos:
   - repo: https://github.com/ryanrhee/shellcheck-py

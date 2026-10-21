@@ -739,7 +739,7 @@
       "id": "pre-3.0-format",
       "label": "spec-derived",
       "evidence": "docs/historical/convolver-4.4/config.html",
-      "description": "The format before version 3.0 had no delay lines (as in the bundled convolver/configs samples). It is rejected with a diagnostic saying which lines to add.",
+      "description": "The format before version 3.0 had no delay lines (as in the bundled historical/configs samples). It is rejected with a diagnostic saying which lines to add.",
       "files": {
         "ir.wav": {"rate": 44100, "format": "float", "channels": [[1.0]]},
         "room.cfg": {"text": "44100 1 1 0\nir.wav\n0\n0.0\n0.0\n"}

@@ -7,7 +7,7 @@ config:
     siblings_only: true
 ignores:
   - 'archives/**'
-  - 'convolver/**'
+  - 'historical/**'
   - 'source/**'
   - 'review/**'
   - 'docs/archive/**'

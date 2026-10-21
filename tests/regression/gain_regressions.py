@@ -96,7 +96,7 @@ def main():
     parser.add_argument(
         "--source", type=Path,
         default=Path(__file__).resolve().parents[2]
-        / "convolver/convolution/channelpaths.cpp",
+        / "historical/convolution/channelpaths.cpp",
         help="channelpaths.cpp to test, including an untouched archived copy",
     )
     args = parser.parse_args()

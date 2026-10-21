@@ -380,7 +380,7 @@ measured change.
 
 The historical engine uses uniformly partitioned overlap-save: each block's input
 spectrum is multiplied by every filter partition and accumulated into a ring of
-future output spectra (`convolver/convolution/convolution.cpp`,
+future output spectra (`historical/convolution/convolution.cpp`,
 `doPartitionedConvolution`). The portable engine uses overlap-add with a ring of
 past input spectra (`portable/engine.cpp`). The portable engine was written this
 way from its first commit (`fa8ca77`); no reason for the change is recorded. It

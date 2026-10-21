@@ -16,10 +16,10 @@ ROOT = HERE.parents[1]
 
 
 def main():
-    source = (ROOT / 'convolver/convolverPipe/convolverPipe.cpp').read_text()
+    source = (ROOT / 'historical/convolverPipe/convolverPipe.cpp').read_text()
     # Remove platform includes only, preserving the complete real entry point.
     source = re.sub(r'^#include.*$', '', source, flags=re.M)
-    helpers = (ROOT / 'convolver/convolverPipe/pipe_helpers.h').read_text()
+    helpers = (ROOT / 'historical/convolverPipe/pipe_helpers.h').read_text()
     helpers = helpers.replace('#pragma once', '')
     harness = (HERE / 'pipe_regressions.cpp').read_text().replace(
         '// INSERT PRODUCTION ENTRY POINT', helpers + '\n' + source)

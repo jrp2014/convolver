@@ -74,7 +74,7 @@ ctest --test-dir build-native -N
   rejected render options, deterministic JSON, escaping of quotes, backslashes,
   tabs and Unicode in names, invalid UTF-8 filenames on Linux, the
   `portable-paths` profile with `--warnings-as-errors`, and diagnosis of every
-  bundled historical sample in `convolver/configs/`.
+  bundled historical sample in `historical/configs/`.
 - `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -175,7 +175,7 @@ Adding a workflow file does not establish that its remote jobs have passed.
 
 ## Historical coverage
 
-The tests below use the canonical `convolver/` source tree. Earlier local
+The tests below use the canonical `historical/` source tree. Earlier local
 `tests/*.py` experiments aimed at a separate source snapshot are not the gate.
 
 | Suite | What it establishes | Boundary |

@@ -62,7 +62,7 @@ These pages describe the active CMake implementation. The package version is in
 ## Current source versus historical records
 
 - `include/convolver/`, `portable/` and `plugins/vst3/` are the active implementation.
-- `convolver/` contains the old Windows applications. You do not need it to learn
+- `historical/` contains the old Windows applications. You do not need it to learn
   the current API or build the CLI.
 - [History](history.md) explains recovery, provenance and downstream reuse.
   [Historical website files](historical/convolver-4.4/README.md) are preserved

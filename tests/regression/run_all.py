@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the portable tests of the canonical convolver/ tree. No extra Python packages."""
+"""Run the portable tests of the canonical historical/ tree. No extra Python packages."""
 from pathlib import Path
 import subprocess
 import sys

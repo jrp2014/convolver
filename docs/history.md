@@ -7,8 +7,10 @@ implementation without reading it.
 
 **In short:** Convolver was a set of Windows audio applications (2005–2006).
 This repository rebuilds their history from SourceForge SVN and source zips,
-plus recovered 4.4 material. That code is kept, unbuilt, in `convolver/` and
-checked by extraction tests. The portable C++20 implementation replaced it. Later
+plus recovered 4.4 material. That code is kept, unbuilt, in `historical/` and
+checked by extraction tests (the folder was called `convolver/` until 21 October
+2026, so older commits and records use that path). The portable C++20
+implementation replaced it. Later
 programs mostly adopted the `.cfg` format rather than the code; see
 [downstream use](#downstream-use).
 
@@ -24,7 +26,7 @@ The historical Windows applications by jrp are preserved separately: WMP DSP
 (`convolverWMP`), DirectShow (`convolverFilter`), VST2 (`convolverVST`), command-line
 (`convolverCMD`) and recovered 4.4 streaming [`convolverPipe`](convolverPipe.md).
 They share the old overlap-save engine in
-[`convolver/convolution`](../convolver/convolution); the portable engine uses
+[`historical/convolution`](../historical/convolution); the portable engine uses
 partitioned overlap-add. The [downstream evidence](review-2026-10/downstream-evidence.json)
 records the derivative code that was found and the wider adoption of the text
 format; see [downstream use](#downstream-use).
@@ -66,7 +68,7 @@ including configuration examples, host guides and release history.
 ## Building the historical Windows applications
 
 The original build used Visual Studio 2005 (some projects also have Intel C++
-`.icproj` files). Open `convolver/convolver.sln`. Beyond Visual Studio with ATL
+`.icproj` files). Open `historical/convolver.sln`. Beyond Visual Studio with ATL
 and the Windows SDK, it expects:
 
 - the DirectShow base classes (`streams.h`) for `convolverFilter`

@@ -2,7 +2,7 @@
 
 [History](history.md) · [Documentation index](README.md)
 
-This page documents a **historical** Windows tool kept in `convolver/`. For
+This page documents a **historical** Windows tool kept in `historical/`. For
 streaming with the current portable CLI, see
 [RAW streams](portable-core.md#raw-streams).
 
@@ -14,7 +14,7 @@ validated from this repository.
 
 ## Build
 
-Open `convolver/convolver.sln` and select the `convolverPipe` project. Its
+Open `historical/convolver.sln` and select the `convolverPipe` project. Its
 historical Visual Studio 2005 project is registered for Debug, Release and
 Release PIII and includes the recovered `convolution/wavefile.cpp` format tables.
 It expects the existing Windows/ATL, Boost, FFTW and libsndfile build environment;

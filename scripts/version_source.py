@@ -13,7 +13,7 @@ VERSION_PATTERN = r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 # Keep the definition here rather than duplicating it in workflow path filters.
 SOURCE_PATHS = (
     "VERSION", "CMakeLists.txt", "CMakePresets.json", "cmake", "include",
-    "portable", "plugins", "convolver", "tests", "scripts", ".github/workflows",
+    "portable", "plugins", "historical", "tests", "scripts", ".github/workflows",
 )
 
 

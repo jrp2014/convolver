@@ -227,7 +227,7 @@ def main():
         # No output, wisdom or other files were created.
         assert sorted(d.rglob('*')) == before, set(d.rglob('*')) ^ set(before)
     # Bundled pre-portable samples are diagnosed (exit 1), never crash or pass.
-    samples = Path(__file__).resolve().parents[2] / 'convolver' / 'configs'
+    samples = Path(__file__).resolve().parents[2] / 'historical' / 'configs'
     for sample in sorted(samples.rglob('*.txt')):
         p = call(['--validate', str(sample), '--all-configurations', '--json'], 1)
         assert json.loads(p.stdout)['diagnostics'], sample

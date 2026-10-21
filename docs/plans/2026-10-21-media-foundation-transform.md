@@ -394,7 +394,7 @@ Phases 1–2 are useful alone, to developers. Phase 3 is what end users would se
 
 ## Comparison with the historical plug-in
 
-The historical ConvolverWMP (`convolver/convolverWMP/`) was an ATL DMO with
+The historical ConvolverWMP (`historical/convolverWMP/`) was an ATL DMO with
 `IWMPPluginEnable`, `ISpecifyPropertyPages`, `IPropertyBag` and a custom
 `IConvolver` interface. It registered through the WMP registrar and `DMORegister`
 for PCM and float, with `ThreadingModel=Apartment`, and kept settings under

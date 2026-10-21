@@ -215,17 +215,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path,
                         default=Path(__file__).resolve().parents[2],
-                        help="repository root containing convolver/")
+                        help="repository root containing historical/")
     parser.add_argument("--revision", help="read production sources from this Git revision")
     args = parser.parse_args()
 
     def read(name):
-        path = "convolver/" + name
         if args.revision:
-            return subprocess.check_output(
-                ["git", "show", args.revision + ":" + path],
-                cwd=args.source_root).decode("latin1").replace("\r\n", "\n")
-        return (args.source_root / path).read_text(encoding="latin1")
+            # The historical tree was called convolver/ before 21 October 2026.
+            for folder in ("historical", "convolver"):
+                shown = subprocess.run(
+                    ["git", "show", args.revision + ":" + folder + "/" + name],
+                    cwd=args.source_root, capture_output=True)
+                if shown.returncode == 0:
+                    return shown.stdout.decode("latin1").replace("\r\n", "\n")
+            raise SystemExit("Neither historical/ nor convolver/ has " + name + " at " + args.revision)
+        return (args.source_root / "historical" / name).read_text(encoding="latin1")
 
     with tempfile.TemporaryDirectory(prefix="convolver-branch-") as directory:
         scratch = Path(directory)

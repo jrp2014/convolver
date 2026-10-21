@@ -19,9 +19,16 @@ def main():
     args = parser.parse_args()
     methods = []
     for index, name in enumerate(('channelpaths.cpp', 'convolution.cpp')):
-        relative = 'convolver/convolution/' + name
-        text = (subprocess.check_output(['git', 'show', args.revision + ':' + relative], cwd=ROOT).decode()
-                if args.revision else (ROOT / relative).read_text())
+        relative = 'historical/convolution/' + name
+        if args.revision:
+            # The historical tree was called convolver/ before 21 October 2026.
+            shown = subprocess.run(['git', 'show', args.revision + ':' + relative], cwd=ROOT, capture_output=True)
+            if shown.returncode != 0:
+                shown = subprocess.run(['git', 'show', args.revision + ':convolver/convolution/' + name],
+                                       cwd=ROOT, capture_output=True, check=True)
+            text = shown.stdout.decode()
+        else:
+            text = (ROOT / relative).read_text()
         pattern = r'else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}\s*else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}'
         clauses = re.search(pattern, text, re.S).group()
         clauses = clauses.replace('config_()', 'stream').replace('config()', 'stream')

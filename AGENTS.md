@@ -7,7 +7,7 @@ holds two implementations:
   CMake. `include/convolver/` (public API), `portable/` (engine, host lifecycle,
   FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/vst3/`,
   `tests/native/`, `tests/consumer/`.
-- **Historical Windows code (preserved):** `convolver/` — the 2005–2006 engine
+- **Historical Windows code (preserved):** `historical/` — the 2005–2006 engine
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
@@ -35,7 +35,7 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed.
 - `tests/regression/` compiles **historical** functions by slicing
-  `convolver/` source on text markers. If you edit those files, update the
+  `historical/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
 - Portable sources must pass `clang-format-18 --dry-run --Werror` and the
   `.clang-tidy` checks (CI enforces both; commands in `CONTRIBUTING.md`).
@@ -86,9 +86,9 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - Keep component boundaries in `docs/project-structure.md`; split files only
   when a responsibility grows.
 - `docs/historical/` files are byte-exact copies with recorded hashes; never edit
-  them. Do not reformat files under `convolver/`; it destroys `git blame`.
+  them. Do not reformat files under `historical/`; it destroys `git blame`.
 - Line endings: LF in the repo; `.sln`, `.vcproj`, `.rc` are CRLF via `.gitattributes`.
-- Vendored third-party code (`convolver/Common/`, `convolver/fftw/`,
-  `convolver/libsndfile/` headers) is not ours to patch.
+- Vendored third-party code (`historical/Common/`, `historical/fftw/`,
+  `historical/libsndfile/` headers) is not ours to patch.
 - New files carry `// SPDX-License-Identifier: GPL-2.0-or-later`.
 - Keep commits focused; state the audible or numerical effect of a DSP change.

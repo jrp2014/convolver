@@ -54,7 +54,7 @@ template<int validBits> struct Pcm{bits}Adapter {{
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, default=ROOT / "convolver/convolution/sample.h")
+    parser.add_argument("--source", type=Path, default=ROOT / "historical/convolution/sample.h")
     args = parser.parse_args()
     text = args.source.read_text(encoding="latin-1")
     dither = args.source.with_name("dither.h").read_text(encoding="latin-1")

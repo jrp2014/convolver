@@ -79,7 +79,7 @@ int main() {
 def main():
     code = core_regressions.generate(None).split('// Independent linear convolution oracle')[0]
     code += '\nusing sf_count_t = int64_t;\n#define TEXT(x) x\nconst DWORD MAX_ATTENUATION_DB=1000;\n'
-    code += (ROOT / 'convolver/convolverPipe/pipe_helpers.h').read_text().replace('#pragma once', '')
+    code += (ROOT / 'historical/convolverPipe/pipe_helpers.h').read_text().replace('#pragma once', '')
     code += HARNESS
     with tempfile.TemporaryDirectory(prefix='convolver-pipe-dsp-') as tmp:
         source = Path(tmp) / 'test.cpp'; executable = Path(tmp) / 'test'
