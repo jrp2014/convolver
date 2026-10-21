@@ -216,9 +216,15 @@ void speaker_tests(const fs::path& dir) {
         w.write(stereo);
         w.close();
     }
+    // libsndfile stamps float WAVs' PEAK chunk with the current time, so two
+    // writes either side of a second boundary differ there; ignore that field.
     const auto bytes = [](const fs::path& p) {
         std::ifstream f(p, std::ios::binary);
-        return std::string((std::istreambuf_iterator<char>(f)), {});
+        std::string data((std::istreambuf_iterator<char>(f)), {});
+        if (const auto peak = data.find("PEAK");
+            peak != std::string::npos && peak + 16 <= data.size())
+            data.replace(peak + 12, 4, 4, '\0'); // ID, size, version, then timestamp.
+        return data;
     };
     require(bytes(plain) == bytes(zero) && wave_format(zero).tag == 3 && !wave_format(zero).mask,
             "a zero mask writes the unchanged plain WAV");

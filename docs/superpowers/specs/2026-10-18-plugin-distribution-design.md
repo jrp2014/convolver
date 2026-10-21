@@ -4,6 +4,14 @@ Status: proposed release scope, 18 October 2026. This describes future work;
 it does not claim that production installers, Audio Units or commercial-host
 certification already exist.
 
+**Current status (21 October 2026, `4e1bb1b`):** unsigned VST3 preview
+artifacts are built by the merged candidate workflow; nothing is published yet.
+Plug-in builds use Ooura on Windows and Linux and Accelerate on macOS (PLUG-1),
+not FFTW as stated below. First releases are unsigned previews, and LV2 and AU
+join the same pipeline. See the
+[plug-in formats plan](../plans/2026-10-21-lv2-plugin.md) for the current plan;
+the rest of this page is the 18 October design record.
+
 ## Outcome and audience
 
 People should be able to download, install and use Convolver without a compiler,

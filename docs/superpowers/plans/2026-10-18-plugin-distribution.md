@@ -16,6 +16,16 @@ signing/installer tools are release-time dependencies only.
 
 **Spec:** [Plug-in distribution design](../specs/2026-10-18-plugin-distribution-design.md).
 
+**Current status (21 October 2026, `4e1bb1b`, 0.4.6).** Tasks 1–3, the
+installer templates and the candidate gates are merged and produce unsigned
+preview artifacts for VST3. The FFT choice is settled (PLUG-1): plug-in builds
+use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
+are superseded. First releases are unsigned previews; signing (Task 4) and
+production acceptance are a later gate. LV2 and AU now share this pipeline
+(PLUG-5). The [plug-in formats plan](2026-10-21-lv2-plugin.md) and
+[TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
+dated notes and tasks below are kept as the record.
+
 Status: proposed work, based on `0bf77d0` and portable package 0.2.0. This plan does
 not implement a release or certify any commercial host. The existing
 [configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
@@ -31,8 +41,10 @@ later gate; until then, milestone B is not claimed.
 **Merged on 21 October 2026:** the `codex/plugin-distribution` implementation of
 Tasks 1–3, the installer templates and candidate gates is on `main`. The two
 signing scripts listed below stayed on that branch until signing is taken up.
-The FFT choice below ("Windows/Linux use FFTW") is under review as PLUG-1: a
-plug-in must not share an FFTW planner with other code in the host process.
+**FFT settled on 21 October 2026 (PLUG-1):** the FFT choice below
+("Windows/Linux use FFTW") was replaced: a plug-in must not share an FFTW
+planner with other code in the host process, so plug-in builds default to
+Ooura on Windows and Linux and Accelerate on macOS. FFTW stays a build option.
 
 ## Global constraints
 
@@ -42,6 +54,7 @@ plug-in must not share an FFTW planner with other code in the host process.
 - Preserve VST3 IDs, version-1 state, 256-sample latency and off-callback preparation.
 - First release: mono/stereo and matching-rate embedded presets, with no implicit resampling.
 - macOS downloads use Accelerate; Windows/Linux use FFTW. Keep both source options.
+  (Superseded 21 October 2026: Windows/Linux plug-ins use Ooura; see PLUG-1 above.)
 - No GUI framework, Python runtime, libsndfile or format SDK requirement in the DSP core.
 - Publish only tested OS/architecture/host claims. Use the proposed matrix in the spec
   as candidates until Task 1 establishes the actual support record.

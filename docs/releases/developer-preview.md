@@ -88,3 +88,21 @@ four native platforms, and uploads unsigned preview artifacts with corresponding
 source. It has read-only repository permissions and cannot publish releases.
 Version numbers come from the same root `VERSION` file as the portable package.
 No production release or merge into `main` is part of this work.
+
+## Publishing an unsigned preview (planned, not yet done)
+
+Signing is not a prerequisite for a preview; the production gates above are
+separate. Publication is a manual step owned by jrp:
+
+1. Choose one green candidate run on a tagged commit (`vX.Y.Z`).
+2. Download its `collect` artifact and check every file against the recorded
+   SHA-256 sums. Publish exactly those files, unchanged.
+3. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
+   developer preview)". Put the SHA-256 sums, the run link and download and
+   installation instructions (pointing to the install guide's unsigned-preview
+   section) in the release notes.
+4. Never replace or edit an asset after publication; a fix gets a new version.
+
+Before publishing, run the smoke test in the
+[host qualification guide](../plugins/hosts.md#smoke-test-for-an-unsigned-preview)
+in at least one host. `production_enabled` stays false.
