@@ -24,6 +24,10 @@ can proceed independently; its future APIs are not prerequisites here.
 **Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
 see the [plug-in formats plan](2026-10-21-lv2-plugin.md).
+**Signing decided on 21 October 2026:** first releases are unsigned previews on
+macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
+warning). Task 4's signing steps and the production acceptance below stay the
+later gate; until then, milestone B is not claimed.
 The FFT choice below ("Windows/Linux use FFTW") is under review as PLUG-1: a
 plug-in must not share an FFTW planner with other code in the host process.
 

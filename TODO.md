@@ -38,7 +38,7 @@ the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
 | 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks speaker arrangements against it. |
 | 2. Before PLUG-5 | **REL-1:** reconcile `codex/plugin-distribution` | That branch (VST3 staging, installers, signing scripts, release gates; last updated 18 October, 69 commits behind `main` at `8508f18`) is rebased into the shared pipeline or explicitly retired. Do not start a second release pipeline beside it. |
 | 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons; **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. |
-| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | Needs the owner's signing decision (Apple Developer ID for macOS VST3 and AU; a Windows code-signing certificate or unsigned Windows downloads). |
+| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned on macOS and Windows (owner's decision, 21 October 2026); see PLUG-5. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
@@ -125,9 +125,13 @@ Shared groundwork, done once so the three streams stay independent:
   Tell forks to change them.
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats, with macOS
   signing and notarization shared by VST3 and AU. Start from the
-  `codex/plugin-distribution` branch rather than a new pipeline. Needs the
-  owner's decision on signing identities (Apple Developer ID; Windows
-  code-signing certificate or unsigned Windows downloads).
+  `codex/plugin-distribution` branch rather than a new pipeline. Signing
+  (owner's decision, 21 October 2026): start unsigned on macOS and Windows.
+  Mac bundles still carry an ad-hoc signature (Apple Silicon will not load
+  unsigned code) and the install guide explains removing the download
+  quarantine; Windows installers show a SmartScreen warning. Label these
+  releases as unsigned previews. Developer ID signing with notarization, and
+  Authenticode, come later as the production gate in the distribution plan.
 
 LV2 (Linux first; also PipeWire system audio):
 
