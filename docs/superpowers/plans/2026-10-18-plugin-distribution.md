@@ -21,6 +21,10 @@ not implement a release or certify any commercial host. The existing
 [configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
+**Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.
+They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
+see the [plug-in formats plan](2026-10-21-lv2-plugin.md).
+
 ## Global constraints
 
 - Keep C++20; core CMake minimum 3.20, VST3 minimum 3.25.
