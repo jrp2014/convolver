@@ -40,7 +40,7 @@ See [build and tuning commands](portable-core.md#build). Primary references:
 [Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp), and
 [Ooura packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html).
 The [vendored-copy record](../portable/third_party/ooura/README.md) describes
-local Ooura modifications. Checking its freshness is tracked as **FFT-1** in TODO.
+local Ooura modifications. Its freshness was checked on 21 October 2026 (FFT-1, complete).
 
 ## Selection and contract
 

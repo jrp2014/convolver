@@ -19,7 +19,7 @@ Convolver applies that response continuously to every input sample.
 | Check whether a configuration works in Roon, JRiver or elsewhere | [Configuration compatibility](configuration-compatibility.md) |
 | See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
 | Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md) |
-| Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter is [planned](superpowers/plans/2026-10-21-ffmpeg-filter.md) |
+| Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter was [planned](superpowers/plans/2026-10-21-ffmpeg-filter.md) and is parked |
 | Use the C++ libraries in another application | [CMake package guide](cmake-package.md) |
 | Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](testing.md) |
@@ -78,16 +78,17 @@ changes to source files, invariants and tests without requiring a history lesson
 
 ## Plans for further adapters
 
-These dated plans propose adapters that do not exist yet; open work is tracked
-in [TODO](../TODO.md).
+These dated plans propose adapters that do not exist yet; open work and the
+current order are tracked in [TODO](../TODO.md#execution-priorities). The
+plug-in formats plan is the current direction; the other two are parked.
 
-- [Media Foundation transform](superpowers/plans/2026-10-21-media-foundation-transform.md)
-  (HOST-3): a Windows audio effect for Media Player Legacy, DirectShow players and
-  Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
-  for system-wide processing.
 - [Plug-in formats: VST3, LV2 and AU](superpowers/plans/2026-10-21-lv2-plugin.md)
   (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
   choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2
   for PipeWire system audio.
+- [Media Foundation transform](superpowers/plans/2026-10-21-media-foundation-transform.md)
+  (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
+  Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
+  for system-wide processing.
 - [FFmpeg filter](superpowers/plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.

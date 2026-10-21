@@ -26,18 +26,28 @@ This is the order for new work, not approval to start every item. Correctness
 regressions take priority whenever discovered. Record ownership before starting
 so independent tasks do not duplicate changes.
 
+Direction (owner's decision, 21 October 2026): VST3, LV2 and AU are equal first
+priorities, developed in parallel after shared groundwork. The FFmpeg filter and
+Windows-native adapters are parked; CLAP and an editor wait for a request. See
+the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
+
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| Continue separately | **REL-1 / HOST-1:** existing VST3 distribution and named-host qualification | Keep its branch/task separate; assess its release evidence before any integration. New adapters are not prerequisites for a VST3 release. |
-| Next in this workstream | **DOC-1 / FFMPEG-1:** redistributable examples and automated file/pipe tests | Documented commands pass in CI, including multiple audio tracks, unequal input/output counts, timestamps and tail handling. DOC-3's plan corrections are complete. |
-| After those examples, if integrated FFmpeg demand is confirmed | **FFMPEG-2**, then **FFMPEG-3:** C API followed by the pinned filter patch | Settle layouts, buffering/timestamps/tails, ownership/threading and FFT-option propagation before freezing the C ABI; require oracle and CLI-equivalence tests. |
-| Separate decision gate | **HOST-3 Phase 0:** identify Windows users and hosts | Evaluate an Equalizer APO export for supported system-effects playback first. Start MFT/DMO implementation only for a named workflow; ASIO/exclusive playback needs another route. |
-| Later, based on users or measurements | **HOST-2 / VST3 features**, **FFMPEG-4/5**, **FFT-2 / PERF** | Define the user need or measured bottleneck and acceptance tests first. Ooura freshness (**FFT-1**, complete) is not a blocker. |
+| 1. Now | **PLUG-1:** plug-in FFT backend | Affects the existing VST3 build. Plug-in binaries neither import nor export `fftwf_*` symbols, checked by a test; oracle error reported for the chosen backend. |
+| 1. Now | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI. |
+| 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks speaker arrangements against it. |
+| 2. Before PLUG-5 | **REL-1:** reconcile `codex/plugin-distribution` | That branch (VST3 staging, installers, signing scripts, release gates; last updated 18 October, 69 commits behind `main` at `8508f18`) is rebased into the shared pipeline or explicitly retired. Do not start a second release pipeline beside it. |
+| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons; **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. |
+| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | Needs the owner's signing decision (Apple Developer ID for macOS VST3 and AU; a Windows code-signing certificate or unsigned Windows downloads). |
+| Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
+| Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
+| On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
 
 DOC-2 automation and the CFG/IO/GAIN/ROBUST items remain open supporting work;
 prioritize them when a reproducible defect or a selected milestone requires them.
-The [review record](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
-explains the rationale; this table owns the current ordering.
+This table owns the current ordering. The earlier
+[21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order),
+which put FFmpeg next, is kept as a dated record and is superseded here.
 
 ## User experience and distribution
 
@@ -56,7 +66,8 @@ explains the rationale; this table owns the current ordering.
   planned tests remain future work. See the
   [21 October review and recommended order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** Reconcile the separate plug-in
-  distribution work with main before duplicating it. Track minimum OS/CPU versions,
+  distribution work (branch `codex/plugin-distribution`, VST3 only, last updated
+  18 October 2026) with main before duplicating it; it becomes PLUG-5. Track minimum OS/CPU versions,
   dependency closure, licences/corresponding source, signing/notarization, clean
   machine installation and immutable release assets. Start with the
   [distribution plan](docs/superpowers/plans/2026-10-18-plugin-distribution.md).
@@ -89,10 +100,20 @@ work continues under VST3-1 to VST3-6, HOST-1 and REL-1.
 
 Shared groundwork, done once so the three streams stay independent:
 
-- [ ] **PLUG-1 — FFT backend for plug-ins.** A shared system FFTW planner is not
-  serialized with other plug-ins in the same host process. Use Ooura or
-  Accelerate, static FFTW with hidden symbols, or
-  `fftwf_make_planner_thread_safe()` for VST3, LV2 and AU builds.
+- [ ] **PLUG-1 — FFT backend for plug-ins.** Our planner mutex only covers our
+  own calls. Another plug-in, or the host itself, can plan with the same FFTW at
+  the same time, and FFTW's planner is not thread-safe. Today the Linux and macOS
+  VST3 builds link the system FFTW dynamically; Windows links it statically.
+  Static linking alone is not enough on Linux or macOS while the library's
+  symbols stay exported or can bind to an FFTW already loaded in the process.
+  Recommended: Ooura for Linux and Windows plug-ins and Accelerate on macOS
+  (Ooura measured 0.9–1.45 times FFTW's time per frame; see
+  [FFT backends](docs/fft-backends.md#ooura-no-fft-library)), which also removes
+  FFTW from the plug-in release's dependency closure. Alternatives: static FFTW
+  with hidden, locally bound symbols, or `fftwf_make_planner_thread_safe()`.
+  Add a test that inspects the built plug-in's imported and exported symbols.
+  The [distribution plan](docs/superpowers/plans/2026-10-18-plugin-distribution.md)
+  currently assumes FFTW on Windows and Linux and must follow this decision.
 - [ ] **PLUG-2 — Shared adapter test harness.** Common fixtures (mono, stereo,
   2→6 crossover; with DOC-1) and a comparison against the CLI render, used by
   every adapter's tests.
@@ -103,7 +124,10 @@ Shared groundwork, done once so the three streams stay independent:
   chosen 21 October 2026; Apple no longer runs a registration service), LV2 URIs.
   Tell forks to change them.
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats, with macOS
-  signing and notarization shared by VST3 and AU.
+  signing and notarization shared by VST3 and AU. Start from the
+  `codex/plugin-distribution` branch rather than a new pipeline. Needs the
+  owner's decision on signing identities (Apple Developer ID; Windows
+  code-signing certificate or unsigned Windows downloads).
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -111,7 +135,10 @@ LV2 (Linux first; also PipeWire system audio):
   bypass ports; a `lilv` test using PLUG-2.
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
-  path, and PipeWire-style restore from a bare path string.
+  path, and PipeWire-style restore from a bare path string. `HostProcessor`
+  control calls must be serialized, but LV2 can call state restore on the main
+  thread while the worker loads a file: route both through the worker or guard
+  them with an adapter lock that the audio thread never takes.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
 - [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
@@ -266,8 +293,17 @@ so the preset file path is not needed).
 - [ ] **PERF-1 — Reproducible current benchmarks.** Rerun workloads on named target
   machines after substantial engine changes; record commit, compiler, dependency
   revisions, plans, block size and numerical error. Keep dated results labelled.
+  For the plug-ins, include 6- and 8-channel room-correction filters at 48 and
+  96 kHz, which have not been measured yet. On the 19 October cloud VM, a
+  65536-tap stereo filter at B = 256 took about 0.6 µs per frame (about 3% of
+  one core at 48 kHz) and B = 1024 was about 3.5 times cheaper; a 6×6 matrix of
+  16384-tap filters (36 paths) took about 2.9 µs per frame (about 14%).
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** Prototype
-  only for a demonstrated long-filter/latency bottleneck. Preserve routing, tail,
+  only for a demonstrated long-filter/latency bottleneck. If PERF-1 shows the
+  plug-ins need less CPU, first consider letting the user choose a larger block
+  (`HostProcessor` already accepts one; it changes reported latency and needs
+  saved state and each format's latency-change call). Nonuniform partitions are
+  the route to low latency and low CPU together. Preserve routing, tail,
   delay and reset behavior; account for changed floating-point accumulation order.
   Shared forward transforms are already implemented.
 
