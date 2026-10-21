@@ -71,6 +71,15 @@
       "cacheVariables": {
         "CONVOLVER_FFT_BACKEND": "OOURA"
       }
+    },
+    {
+      "name": "release-vst3",
+      "inherits": "release",
+      "displayName": "VST3 distribution (explicit SDK/dependencies)",
+      "cacheVariables": {
+        "CONVOLVER_BUILD_VST3": "ON",
+        "CONVOLVER_PACKAGE_PLUGINS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -102,6 +111,12 @@
     {
       "name": "ooura",
       "configurePreset": "ooura",
+      "jobs": 2
+    },
+    {
+      "name": "release-vst3",
+      "configurePreset": "release-vst3",
+      "configuration": "Release",
       "jobs": 2
     }
   ],
@@ -159,6 +174,17 @@
     {
       "name": "ooura",
       "configurePreset": "ooura",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "release-vst3",
+      "configurePreset": "release-vst3",
+      "configuration": "Release",
       "output": {
         "outputOnFailure": true
       },

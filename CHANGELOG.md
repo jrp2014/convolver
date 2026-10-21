@@ -17,6 +17,13 @@ Until 1.0 the C++ API may change between minor versions.
   renders that load real filters through the host and match a direct
   convolution. Optional locally via `-DCONVOLVER_PLUGINVAL`.
 - The SDK validator also runs in extensive mode (`vst3.validator.extensive`).
+- Unsigned VST3 preview distributions: pinned dependencies and corresponding
+  source, relocatable archives with synthetic presets, unsigned installer
+  templates, and a read-only candidate workflow on Windows, Linux and both macOS
+  architectures (`-DCONVOLVER_PACKAGE_PLUGINS=ON`, preset `release-vst3`).
+  Production qualification (signing, clean machines, named hosts) remains open.
+- macOS VST3 bundles are re-sealed with an ad-hoc signature after the SDK adds
+  `moduleinfo.json`, and `vst3.signature` verifies the seal.
 
 ### Changed
 

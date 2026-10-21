@@ -132,3 +132,10 @@ execute test applications, or disable all tests. Tests inherit the selected
 compiler, generator, SDK, dependency prefixes and Windows toolchain/triplet.
 The normal GitHub matrix runs these checks on Linux, Windows and macOS; Apple
 also exercises Accelerate. CI results belong to the specific tested commit.
+
+## Optional plug-in distributions
+
+The `release-vst3` preset enables the separate `PluginDistribution` installation
+component. It stages the SDK bundle, converter, presets, notices and user guide;
+it does not replace the C++ library exports above. See the
+[pinned source recipe](plugins/build.md) and [preview qualification record](releases/developer-preview.md).

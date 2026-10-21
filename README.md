@@ -151,3 +151,9 @@ portable implementation replaced it and
 
 GNU General Public License, version 2 or (at your option) any later version.
 See [COPYING](COPYING).
+
+## Plug-in distributions
+
+See the [plug-in guide](docs/plugins/index.md) for preview installation, preset
+conversion and pinned source builds. [Candidate qualification](docs/releases/developer-preview.md)
+separates automated checks from signing, clean-install and named-host evidence.

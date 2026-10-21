@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<installer-gui-script minSpecVersion="2">
+  <title>Convolver</title>
+  <options customize="always" require-scripts="false"/>
+  <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+  <choices-outline>
+    <line choice="vst3"/>
+    <line choice="tools"/>
+  </choices-outline>
+  <choice id="vst3" title="Convolver VST3" description="Install the plug-in for all users.">
+    <pkg-ref id="org.convolver.pkg.vst3"/>
+  </choice>
+  <choice id="tools" title="Preset converter and examples" description="Install tools and documentation in Application Support.">
+    <pkg-ref id="org.convolver.pkg.tools"/>
+  </choice>
+  <pkg-ref id="org.convolver.pkg.vst3">Convolver-vst3.pkg</pkg-ref>
+  <pkg-ref id="org.convolver.pkg.tools">Convolver-tools.pkg</pkg-ref>
+</installer-gui-script>

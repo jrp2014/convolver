@@ -19,10 +19,29 @@ set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
 set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
+option(CONVOLVER_VST3_RUNTIME_VALIDATION "Run SDK tools that load plug-in bundles (disable when local policy rejects ad-hoc code)" ON)
+set(SMTG_CREATE_MODULE_INFO ${CONVOLVER_VST3_RUNTIME_VALIDATION} CACHE BOOL "" FORCE)
 if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "macOS deployment target" FORCE)
 endif()
+# SDK 3.8.1 assumes non-Xcode Unix generators are single-configuration.
+# A generator expression prevents CMake appending a second config directory and
+# keeps SDK resource/signing paths aligned with the actual bundle for Ninja Multi-Config.
+if(CMAKE_GENERATOR STREQUAL "Ninja Multi-Config")
+    set(CMAKE_BUILD_TYPE "$<CONFIG>")
+endif()
 add_subdirectory("${CONVOLVER_VST3_SDK}" sdk EXCLUDE_FROM_ALL)
+# SDK Windows tools receive UTF-8 arguments but construct narrow filesystem paths.
+# Give those tools a UTF-8 process code page so Unicode bundle paths round-trip.
+# This changes only our test tools, not the plug-in or the user's host process.
+if(WIN32)
+    foreach(sdk_tool IN ITEMS validator moduleinfotool)
+        if(TARGET ${sdk_tool})
+            target_link_options(${sdk_tool} PRIVATE
+                "/MANIFEST:EMBED" "/MANIFESTINPUT:${PROJECT_SOURCE_DIR}/tests/vst3/windows-utf8.manifest")
+        endif()
+    endforeach()
+endif()
 set(SDK_ROOT "${CONVOLVER_VST3_SDK}")
 set(public_sdk_SOURCE_DIR "${SDK_ROOT}/public.sdk")
 set(pluginterfaces_SOURCE_DIR "${SDK_ROOT}/pluginterfaces")
@@ -50,11 +69,24 @@ if(CONVOLVER_BUILD_TESTS)
     add_dependencies(convolver_vst3 validator)
     add_test(NAME vst3.adapter COMMAND convolver_vst3_tests)
     get_target_property(bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
-    add_test(NAME vst3.validator COMMAND validator "${bundle}")
-    # Extensive mode adds every pairing of 15 speaker arrangements and more automation patterns.
-    add_test(NAME vst3.validator.extensive COMMAND validator -e "${bundle}")
-    set_tests_properties(vst3.adapter vst3.validator vst3.validator.extensive
-        PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
+    if(APPLE)
+        set(bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
+        add_test(NAME vst3.signature COMMAND codesign --verify --deep --strict "${bundle}")
+        set_tests_properties(vst3.signature PROPERTIES LABELS "vst3;real-libraries")
+    endif()
+    if(CONVOLVER_VST3_RUNTIME_VALIDATION)
+        find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
+        add_test(NAME vst3.validator COMMAND "${Python3_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tests/vst3/validate_bundle.py" "$<TARGET_FILE:validator>" "${bundle}")
+        # Extensive mode adds every pairing of 15 speaker arrangements and more automation patterns.
+        add_test(NAME vst3.validator.extensive COMMAND "${Python3_EXECUTABLE}"
+            "${PROJECT_SOURCE_DIR}/tests/vst3/validate_bundle.py" "$<TARGET_FILE:validator>" -e "${bundle}")
+        set_tests_properties(vst3.validator vst3.validator.extensive
+            PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
+    else()
+        message(STATUS "VST3 runtime validation and moduleinfo loading disabled: developer build only")
+    endif()
+    set_tests_properties(vst3.adapter PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
     add_dependencies(check convolver_vst3 convolver_vst3_tests validator)
 endif()
 
@@ -86,4 +118,23 @@ if(CONVOLVER_BUILD_IO)
                 PROPERTIES LABELS "vst3;real-libraries;pluginval" TIMEOUT 600)
         endif()
     endif()
+endif()
+
+if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
+    add_executable(convolver_vst3_package_probe "${PROJECT_SOURCE_DIR}/tests/vst3/package_probe.cpp"
+        processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+    target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+    target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting)
+    if(APPLE)
+        target_link_libraries(convolver_vst3_package_probe PRIVATE "-framework Cocoa")
+    endif()
+endif()
+
+if(APPLE)
+    # SDK 3.8.1 seals the bundle before moduleinfotool adds moduleinfo.json.
+    # Seal the complete resources last, and verify without loading the bundle.
+    add_custom_command(TARGET convolver_vst3 POST_BUILD
+        COMMAND codesign --force --sign - --timestamp=none "$<TARGET_BUNDLE_DIR:convolver_vst3>"
+        COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:convolver_vst3>"
+        VERBATIM)
 endif()
