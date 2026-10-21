@@ -8,7 +8,7 @@ the text retain their original repository context. For navigable originals, use
 [the source revision](https://github.com/jrp2014/convolver/tree/2fe503e33800b82f5c4f83c972ee0ecef2b5bc9d).
 
 Use the [current documentation index](../../README.md) for instructions and
-[the review record](../../documentation-review-2026-10-20.md) for the information map.
+[the review record](../reviews/2026-10-20-documentation-review.md) for the information map.
 Hashes and byte counts are recorded in [manifest.json](manifest.json).
 
 | Original | Preserved text |

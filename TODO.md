@@ -155,7 +155,9 @@ Shared groundwork, done once so the three streams stay independent:
   GitHub pre-release with their SHA-256 sums and download instructions, and
   never replace an asset afterwards. Developer ID signing with notarization
   (shared by VST3 and AU), and Authenticode, come later as the production gate;
-  the draft signing scripts remain on the `codex/plugin-distribution` branch.
+  the draft signing scripts are kept in history at `f4519022c` (the last commit of
+  the merged `codex/plugin-distribution` branch): `git show
+  f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
 - [ ] **PLUG-6 — Pin format dependencies.** AudioUnitSDK by commit and
   checksum (like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and
   `lv2lint`: shipped code in `packaging/release-policy.json`, test tools in CI.
@@ -395,7 +397,7 @@ with compatibility tests; linked IDs point to open work above.
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** Separate current guides from
   historical records, add a configuration reference and concepts page, correct
   stale feature claims, and add a source/invariant/test map for contributors and
-  agents. See [documentation review](docs/documentation-review-2026-10-20.md).
+  agents. See [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 
 External links identify starting points, not endorsements or a completed licence
 or performance assessment. Primary project pages were checked during this review;

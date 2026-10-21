@@ -1,7 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Documentation review: 20 October 2026
 
-[Documentation index](README.md) · [Current repository review](../REVIEW.md)
+> **Archived record.** Moved on 21 October 2026 from
+> `docs/documentation-review-2026-10-20.md`; only link locations changed.
+
+[Documentation index](../../README.md) · [Current repository review](../../../REVIEW.md)
 
 This review checks the maintained documentation against source revision
 `2fe503e33800b82f5c4f83c972ee0ecef2b5bc9d` (package 0.4.0), then improves its
@@ -33,23 +36,23 @@ compatibility caveat to retain; these were addressed.
 
 ## Information preservation and navigation
 
-The [pre-review snapshot](archive/documentation-2026-10-20/README.md) retains
+The [pre-review snapshot](../documentation-2026-10-20/README.md) retains
 21 original guides and root documents, including unchanged companion documents.
 Every snapshot has its original byte count and SHA-256 in
-[the manifest](archive/documentation-2026-10-20/manifest.json), tied to the source
+[the manifest](../documentation-2026-10-20/manifest.json), tied to the source
 commit. The `.md.txt` files preserve exact wording without presenting obsolete
 relative links as current navigation; the archive index links to the navigable
 original source revision as well.
 
 | Information previously spread across… | Maintained destination |
 | --- | --- |
-| README, old configuration website and portable guide | [Quick start](../README.md), [concepts](concepts.md), [configuration](configuration.md) |
-| REVIEW, modernization and project-structure prose | [Current status](../REVIEW.md), [principles](modernization.md), [implementation map](project-structure.md) |
-| Feature wish lists and release limitations | [TODO](../TODO.md), with stable IDs and a linked limitations inventory |
-| FFT implementation details and numerical measurements | [FFT guide](fft-backends.md); historical measurements retain their configuration/context |
-| CLI options, formats, resource bounds and API contracts | [Core reference](portable-core.md), linked from the shorter entry pages |
-| Package, host and test detail | [CMake package](cmake-package.md), [VST3](vst3.md), [testing](testing.md) |
-| Import history, downstream reuse and old validation | [History](history.md), dated review records and existing archives |
+| README, old configuration website and portable guide | [Quick start](../../../README.md), [concepts](../../concepts.md), [configuration](../../configuration.md) |
+| REVIEW, modernization and project-structure prose | [Current status](../../../REVIEW.md), [principles](../../modernization.md), [implementation map](../../project-structure.md) |
+| Feature wish lists and release limitations | [TODO](../../../TODO.md), with stable IDs and a linked limitations inventory |
+| FFT implementation details and numerical measurements | [FFT guide](../../fft-backends.md); historical measurements retain their configuration/context |
+| CLI options, formats, resource bounds and API contracts | [Core reference](../../portable-core.md), linked from the shorter entry pages |
+| Package, host and test detail | [CMake package](../../cmake-package.md), [VST3](../../vst3.md), [testing](../../testing.md) |
+| Import history, downstream reuse and old validation | [History](../../history.md), dated review records and existing archives |
 
 The original historical website under `docs/historical/` is unchanged. Previous
 review evidence and dated plans remain available. Current numerical benchmark
@@ -77,7 +80,7 @@ documentation/tooling changes:
 
 Commands used include `cmake --build build/presets/debug-sanitizers --parallel 4`,
 `ctest --test-dir build/presets/debug-sanitizers --output-on-failure --parallel 4`,
-the two Python checks in [CONTRIBUTING](../CONTRIBUTING.md), and
+the two Python checks in [CONTRIBUTING](../../../CONTRIBUTING.md), and
 `pre-commit run --all-files --show-diff-on-failure`. Example audio was generated
 locally with an identity IR; no commercial IR was needed. The checker was also
 independently reviewed and corrected so HTML anchors inside Markdown code
@@ -90,12 +93,12 @@ URLs were checked selectively; there was no exhaustive external-link crawl.
 
 ## Remaining work
 
-[TODO](../TODO.md) includes the explicit reminder to compare the vendored Ooura
+[TODO](../../../TODO.md) includes the explicit reminder to compare the vendored Ooura
 implementation with upstream, alternative FFT candidates with primary references,
 and limitations gathered from the guides. It separates deliberate contracts from
 missing features. Shared runnable example assets and automated CLI/build-option
 documentation checks remain DOC-1/DOC-2. This review does not claim to have tested
 external configuration consumers, commercial DAWs, installers or signing.
 
-Future edits should follow [documentation maintenance](documentation.md), update
+Future edits should follow [documentation maintenance](../../documentation.md), update
 the owning page beside the code change and keep results tied to an actual run.

@@ -160,5 +160,5 @@ format-adoption matrix and its evidence limits.
 
 The [pre-refresh documentation](archive/documentation-2026-10-20/README.md)
 retains the complete text of the guides before the 20 October reorganization.
-Use the [review record](documentation-review-2026-10-20.md) to find their current
+Use the [review record](archive/reviews/2026-10-20-documentation-review.md) to find their current
 successors. Dated validation and benchmark results retain their original scope.

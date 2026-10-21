@@ -40,7 +40,8 @@ warning). Task 4's signing steps and the production acceptance below stay the
 later gate; until then, milestone B is not claimed.
 **Merged on 21 October 2026:** the `codex/plugin-distribution` implementation of
 Tasks 1–3, the installer templates and candidate gates is on `main`. The two
-signing scripts listed below stayed on that branch until signing is taken up.
+signing scripts listed below were left out of `main` until signing is taken up;
+they are in history at `f4519022c`, the branch's last commit.
 **FFT settled on 21 October 2026 (PLUG-1):** the FFT choice below
 ("Windows/Linux use FFTW") was replaced: a plug-in must not share an FFTW
 planner with other code in the host process, so plug-in builds default to
