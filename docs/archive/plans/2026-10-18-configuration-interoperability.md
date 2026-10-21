@@ -1,3 +1,5 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/plans/2026-10-18-configuration-interoperability.md`. Its "proposal" status predates implementation: all six tasks were delivered in PR #5 (`c1304c5`, package 0.3.0) with fixes in 0.3.1. Named Roon/JRiver/Audiolense profiles, which the plan made conditional on evidence, remain open as CFG-1 in [TODO](../../../TODO.md). Current behavior: [configuration compatibility](../../configuration-compatibility.md) and [core and CLI reference](../../portable-core.md). Two links to sections that no longer exist now point to the page. The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # Configuration Interoperability Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -20,8 +22,8 @@ C++20 standard-library parsing, files and report serialization; Python standard-
 fixture/CLI tests; optional Clang libFuzzer targets. POSIX calls are permitted only
 behind narrow platform adapters when standard C++ cannot meet the requirement.
 
-**Spec:** Item 3 of [the current review](../../../REVIEW.md#remaining-priorities),
-[the modernization plan](../../modernization.md#recommended-next-work), and the
+**Spec:** Item 3 of [the current review](../../../REVIEW.md),
+[the modernization plan](../../modernization.md), and the
 [existing compatibility contract](../../portable-core.md#compatibility-and-library-api).
 The detailed proposed behavior below elaborates that scope.
 

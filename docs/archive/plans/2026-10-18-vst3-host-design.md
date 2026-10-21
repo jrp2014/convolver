@@ -1,3 +1,5 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/specs/2026-10-18-vst3-host-design.md`. Design spec for the [host lifecycle plan](2026-10-18-vst3-host-lifecycle.md), implemented in `2f44142` and `5bcbef3`. Current behavior: [VST3 guide](../../vst3.md). The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # Host lifecycle and VST3 compatibility
 
 The user authorizes implementation, tests, commit, merge to local main before

@@ -1,3 +1,5 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/plans/2026-10-17-portable-core.md`. Implemented in `fa8ca77` (portable FFTW core, libsndfile CLI and native tests). Current behavior: [core and CLI reference](../../portable-core.md). The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # Portable core and CLI implementation plan
 
 **Goal:** Implement the portable core/CLI milestone approved by the owner, using

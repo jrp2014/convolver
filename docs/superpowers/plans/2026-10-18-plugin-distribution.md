@@ -18,7 +18,7 @@ signing/installer tools are release-time dependencies only.
 
 Status: proposed work, based on `0bf77d0` and portable package 0.2.0. This plan does
 not implement a release or certify any commercial host. The existing
-[configuration interoperability plan](2026-10-18-configuration-interoperability.md)
+[configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
 ## Global constraints

@@ -1,9 +1,11 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/plans/2026-10-18-vst3-host-lifecycle.md`. Implemented in `2f44142` and `5bcbef3` (host processor, state codec, VST3 adapter). Current behavior: [VST3 guide](../../vst3.md). The spec reference is now a link to the archived design. The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # Host lifecycle and VST3 implementation plan
 
 **Goal:** compatible VST3 integration around the existing portable core.
 **Architecture:** portable prepared host processor and state codec; thin SDK adapter
 and preset writer; real-library numerical, lifecycle and SDK compatibility tests.
-**Spec:** ../specs/2026-10-18-vst3-host-design.md
+**Spec:** [host lifecycle design](2026-10-18-vst3-host-design.md)
 **Execution:** inline, authorized by user; one independent final review. Existing
 checkout branch isolates tracked changes; leave unrelated recovery files alone.
 

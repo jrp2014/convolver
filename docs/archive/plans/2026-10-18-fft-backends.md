@@ -1,3 +1,5 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/plans/2026-10-18-fft-backends.md`. Implemented in `2571990` (Accelerate backend, FFTW wisdom tuning, benchmarks). Current behavior: [FFT guide](../../fft-backends.md). The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # FFT backends implementation plan
 
 **Goal:** Add Apple Accelerate while retaining FFTW, prove equivalent convolution

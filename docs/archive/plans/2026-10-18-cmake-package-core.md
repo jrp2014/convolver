@@ -1,3 +1,5 @@
+> **Archived plan — completed.** Moved on 21 October 2026 from `docs/superpowers/plans/2026-10-18-cmake-package-core.md`. Implemented in `82cf94b` (exported core/I/O package, presets, consumer tests). The one unticked step, green CI before updating main, is superseded: the work is on main and CI runs the core-only preset and package consumers on every push. Current behavior: [CMake package guide](../../cmake-package.md). The text below records intent and evidence at that time; its status lines, checkboxes and test counts were not updated. For current behavior read the guides, not this plan.
+
 # Independent core and CMake package implementation plan
 
 **Goal:** deliver milestone 1 of [the structure review](../../project-structure.md):

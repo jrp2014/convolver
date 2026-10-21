@@ -57,9 +57,11 @@ compiler, dependency versions, planner mode and workload. Avoid words such as
 Keep the historical website under `docs/historical/` byte-identical. Mark dated
 reviews and plans as records rather than updating their results in place. The
 `superpowers/` folder name is a workflow convention: its plans are design records,
-not special authority over current code or user instructions. Put source comments
-near non-obvious invariants; put contributor navigation here, rather than adding
-large instruction blocks to implementation files.
+not special authority over current code or user instructions. When the code on
+`main` implements all of a plan, move it to [`archive/plans/`](archive/plans/README.md)
+with an archive notice and a row in that index, and fix links to it. Put source
+comments near non-obvious invariants; put contributor navigation here, rather
+than adding large instruction blocks to implementation files.
 
 External references should point to primary specifications, project repositories
 or upstream documentation. Record the exact release/hash when adopting code.
