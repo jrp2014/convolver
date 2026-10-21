@@ -19,6 +19,7 @@ Convolver applies that response continuously to every input sample.
 | Check whether a configuration works in Roon, JRiver or elsewhere | [Configuration compatibility](configuration-compatibility.md) |
 | See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
 | Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md) |
+| Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter is [planned](superpowers/plans/2026-10-21-ffmpeg-filter.md) |
 | Use the C++ libraries in another application | [CMake package guide](cmake-package.md) |
 | Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](testing.md) |
