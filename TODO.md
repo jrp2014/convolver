@@ -43,6 +43,13 @@ speed. Do not change the historical archive to implement a portable feature.
   [CLAP](https://github.com/free-audio/clap), and a filter-loading editor against
   actual user needs. Keep the core and host lifecycle reusable; require host tests
   and distribution work for each adapter.
+- [ ] **HOST-3 — Windows Media Foundation transform.** Wrap the engine as a
+  synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
+  Legacy, DirectShow players and applications that insert effects through Media
+  Foundation or WinRT. First name the target users. For system-wide room
+  correction, an export to Equalizer APO's `Convolution:`/`Copy:` configuration
+  is likely cheaper than an MFT or our own APO. See the
+  [MFT plan](docs/superpowers/plans/2026-10-21-media-foundation-transform.md).
 
 ## Compatibility and robustness
 

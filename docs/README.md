@@ -72,3 +72,13 @@ These pages describe the active CMake implementation. The package version is in
 For maintainers and coding agents, [AGENTS.md](../AGENTS.md) supplies repository
 rules. The [implementation map](project-structure.md#change-and-test-map) connects
 changes to source files, invariants and tests without requiring a history lesson.
+
+## Plans for further adapters
+
+These dated plans propose adapters that do not exist yet; open work is tracked
+in [TODO](../TODO.md).
+
+- [Media Foundation transform](superpowers/plans/2026-10-21-media-foundation-transform.md)
+  (HOST-3): a Windows audio effect for Media Player Legacy, DirectShow players and
+  Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
+  for system-wide processing.
