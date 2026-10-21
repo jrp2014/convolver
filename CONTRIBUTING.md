@@ -1,5 +1,9 @@
 # Working on portable Convolver
 
+Start with [the implementation map](docs/project-structure.md) for source entry
+points, invariants and tests. Coding agents must also follow [AGENTS.md](AGENTS.md).
+For prose changes, use [the documentation maintenance guide](docs/documentation.md).
+
 Use CMake 3.20+, C++20 and the real FFT/library dependencies. Start with
 [the portable guide](docs/portable-core.md) and [package/preset instructions](docs/cmake-package.md).
 Keep host APIs and file access outside the DSP core. Preserve the historical
@@ -19,8 +23,8 @@ The portable code uses `.clang-format`; CI checks LLVM clang-format **18**.
 Format only these modern sources:
 
 ```sh
-clang-format-18 -i include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
-clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
+clang-format-18 -i include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/fuzz/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
+clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/fuzz/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
 ```
 
 Historical directories are also excluded by `.clang-format-ignore`. Formatting
@@ -30,10 +34,11 @@ Presets export `compile_commands.json`. Run the correctness-oriented checks in
 `.clang-tidy` against the translation units present in that build:
 
 ```sh
-clang-tidy-18 -p build/presets/release portable/engine.cpp portable/attenuation.cpp portable/config.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
+clang-tidy-18 -p build/presets/release portable/engine.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
 ```
 
-For an Accelerate build replace `fft_fftw.cpp` with `fft_accelerate.cpp`. Match
+Replace `fft_fftw.cpp` with `fft_accelerate.cpp` or `fft_ooura.cpp` for the
+corresponding backend. Match
 the analyzer to the compiler/SDK headers: older analyzers may not parse newer
 Apple SDKs. CI uses the Linux clang-tidy 18 toolchain. Fix real diagnostics rather
 than adding blanket suppressions. These tools are development dependencies;
@@ -66,6 +71,21 @@ These checks are development tools and do not add package runtime dependencies.
 Use `pre-commit run --files <paths>` to include new files before staging them;
 `--all-files` checks files already tracked by Git.
 
+The local hooks also check maintained Markdown links and run the link checker's
+regression tests on every invocation. They use only Python's standard library
+and can be run independently:
+
+```sh
+python3 scripts/check_doc_links.py
+python3 tests/documentation_links_tests.py
+```
+
+The link check scans top-level Markdown and maintained guides under `docs/`,
+including untracked files. Dated records and archives are excluded as source
+pages; links into them must still resolve. It checks local destinations and
+supported heading/HTML anchors, not external websites or agreement with code.
+See [documentation maintenance](docs/documentation.md#automated-checks) for scope.
+
 CI caches pre-commit environments by operating system, architecture, exact Python
 and Node versions, and `.pre-commit-config.yaml`. Windows jobs cache vcpkg binary
 archives separately for dynamic and static triplets. Their keys include the runner
@@ -92,10 +112,10 @@ Installed dependency versions remain externally managed. A future
 binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
-semantics. PCM16 quantization and dither follow the documented policy in
-[the portable guide](docs/portable-core.md); PCM24/PCM32 use libsndfile's
-conversion without dither. Do not silently change either behavior in a
-build-system or formatting patch, and keep noise shaping a separate, explicit option.
+semantics. PCM8/16/24/32 quantization, optional dither, noise shaping and valid bits follow
+[the portable guide](docs/portable-core.md#integer-formats-dither-and-noise-shaping).
+Do not change their audible or numerical behavior in a build-system or formatting
+patch; keep optional processing explicit and test exact samples as well as statistics.
 
 For host changes, run the optional SDK build and its validator/adapter/preset
 tests as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests

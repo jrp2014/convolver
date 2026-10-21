@@ -12,7 +12,7 @@ holds two implementations:
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
 Start with `CONTRIBUTING.md` (build, presets, formatting, analysis) and
-`REVIEW.md` (current review and priorities). Plans: `docs/project-structure.md`;
+`REVIEW.md` (current review and priorities). Implementation: `docs/project-structure.md`;
 behaviour: `docs/portable-core.md`, `docs/testing.md`, `docs/vst3.md`.
 
 ## Build and test
@@ -23,10 +23,13 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure --parallel 4
 ```
 
-Needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and libsndfile. On Ubuntu:
+The default build needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and
+libsndfile. Accelerate (Apple only) or built-in Ooura can replace FFTW; see
+[backend selection](docs/fft-backends.md). On Ubuntu:
 `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev clang-format-18 clang-tidy-18`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
-CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg).
+CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg),
+plus Ooura configurations described in [testing](docs/testing.md).
 
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed.
@@ -65,6 +68,13 @@ CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpk
   and tags even without `--push`, so it is **not a dry run**.
 
 ## Rules
+
+- Documentation: follow [page ownership and maintenance](docs/documentation.md).
+  Use [the implementation map](docs/project-structure.md) to find symbols,
+  invariants and tests. Update the owning guide when behavior changes; keep open
+  work and documented limitations in [TODO.md](TODO.md). Run the documentation
+  checks in `CONTRIBUTING.md` and distinguish actual test results from configured
+  CI coverage. Preserve dated evidence and historical originals.
 
 - Real-time path: `Engine::process` and everything it calls must not allocate,
   lock or do I/O (`engine_tests.cpp` checks allocation). Preparation, FFTW

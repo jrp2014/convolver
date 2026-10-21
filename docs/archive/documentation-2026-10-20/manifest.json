@@ -1,0 +1,131 @@
+{
+  "source_commit": "2fe503e33800b82f5c4f83c972ee0ecef2b5bc9d",
+  "files": [
+    {
+      "source": "AGENTS.md",
+      "snapshot": "AGENTS.md.txt",
+      "sha256": "dc7678b227c4c8d5bbb85aa2406456decf2a944075d0482f80ac8b98205e35b3",
+      "bytes": 4896
+    },
+    {
+      "source": "CHANGELOG.md",
+      "snapshot": "CHANGELOG.md.txt",
+      "sha256": "8e92c9308068f5e92c323befa9171c82ddc99bb8e0cb0c6d2ef0821e8b3e1b63",
+      "bytes": 8915
+    },
+    {
+      "source": "CLAUDE.md",
+      "snapshot": "CLAUDE.md.txt",
+      "sha256": "6eb04f36bbe509d202d566333454c0b55e16132314f1d1c71344bc4e2e94f668",
+      "bytes": 35
+    },
+    {
+      "source": "CONTRIBUTING.md",
+      "snapshot": "CONTRIBUTING.md.txt",
+      "sha256": "98d689460626858f769df06023af6fba868d316994aa0b265b5efd1855a38b6f",
+      "bytes": 5645
+    },
+    {
+      "source": "README.md",
+      "snapshot": "README.md.txt",
+      "sha256": "1a2fe3ae451c65f9614f79063031c47e7671a73fa47de03e8bb4f388b86caa34",
+      "bytes": 5374
+    },
+    {
+      "source": "REVIEW.md",
+      "snapshot": "REVIEW.md.txt",
+      "sha256": "de0d38e6bf27920460629296e05e2431e67823faa15d32ac89d01f5cfadd1879",
+      "bytes": 12026
+    },
+    {
+      "source": "docs/cmake-package.md",
+      "snapshot": "docs/cmake-package.md.txt",
+      "sha256": "4d7f7c1661d756134b8705fe207e616eff29625c7fcf7b384afb7de4d0fb5b43",
+      "bytes": 6114
+    },
+    {
+      "source": "docs/configuration-compatibility.md",
+      "snapshot": "docs/configuration-compatibility.md.txt",
+      "sha256": "0d920fee15b450692a052ab1688986cdc7dab845f376c588fbe0a9ad6c7b530e",
+      "bytes": 7098
+    },
+    {
+      "source": "docs/convolverPipe.md",
+      "snapshot": "docs/convolverPipe.md.txt",
+      "sha256": "6932ea0d97158ad060944a276eabcdbffdd93dddafdb058544114703341482c9",
+      "bytes": 5241
+    },
+    {
+      "source": "docs/fft-backends.md",
+      "snapshot": "docs/fft-backends.md.txt",
+      "sha256": "674d158551cdeb1065573de5f9e7b5611ea13360009d8d0f572268d244c5bc04",
+      "bytes": 25609
+    },
+    {
+      "source": "docs/history.md",
+      "snapshot": "docs/history.md.txt",
+      "sha256": "8d00b8d130ceab27a0caeb3c7d06f8e6b484b7a9944c8e056dda78ed34b0cff9",
+      "bytes": 4663
+    },
+    {
+      "source": "docs/modernization.md",
+      "snapshot": "docs/modernization.md.txt",
+      "sha256": "91389c989ef555e36628853551914199a99e099c49962970d3c2e6ba4a92c057",
+      "bytes": 6495
+    },
+    {
+      "source": "docs/portable-core.md",
+      "snapshot": "docs/portable-core.md.txt",
+      "sha256": "9ffadee876288bfcabce704a96d5afae26ea8c455a6078249b546b51c400c88a",
+      "bytes": 23455
+    },
+    {
+      "source": "docs/project-structure.md",
+      "snapshot": "docs/project-structure.md.txt",
+      "sha256": "81a7808b7edea5609de73eae8361713d67518922cb15687f382cc878797932d6",
+      "bytes": 6684
+    },
+    {
+      "source": "docs/review-2026-10/archive-recovery.md",
+      "snapshot": "docs/review-2026-10/archive-recovery.md.txt",
+      "sha256": "82233c38e59350f3c7c94160f09f7ea2aee95ca459b58ae30f49f83fbbe9968a",
+      "bytes": 8031
+    },
+    {
+      "source": "docs/review-2026-10/convolver-review.md",
+      "snapshot": "docs/review-2026-10/convolver-review.md.txt",
+      "sha256": "8a802433db55beb52db64e98e05f48e723958bba027274f9daa543b417531721",
+      "bytes": 2037
+    },
+    {
+      "source": "docs/review-2026-10/current-validation.md",
+      "snapshot": "docs/review-2026-10/current-validation.md.txt",
+      "sha256": "26237eb31274c5dbe2d3aeefe0303946409a36c35f5893500dd300945b5cc733",
+      "bytes": 3288
+    },
+    {
+      "source": "docs/review-2026-10/reconciliation.md",
+      "snapshot": "docs/review-2026-10/reconciliation.md.txt",
+      "sha256": "1c02d6a8d16e6e4cf4a7d9ad7d96439d6c28bee4215eb42e73776a0ad684d183",
+      "bytes": 10063
+    },
+    {
+      "source": "docs/testing.md",
+      "snapshot": "docs/testing.md.txt",
+      "sha256": "3f6ba414316ad59408ef1d4c6cfa935420872dca52990df3486bfd1123a4a1fc",
+      "bytes": 11397
+    },
+    {
+      "source": "docs/versioning.md",
+      "snapshot": "docs/versioning.md.txt",
+      "sha256": "64e9c23c94c4e499a65a20d5a538b556cbdb868cea58d531262df45193d6a493",
+      "bytes": 4029
+    },
+    {
+      "source": "docs/vst3.md",
+      "snapshot": "docs/vst3.md.txt",
+      "sha256": "052ba8def73d3e5c3e0c886ef8b8d197a2f65a56f44cd9d48d0aa7b9e4cf28d7",
+      "bytes": 7318
+    }
+  ]
+}

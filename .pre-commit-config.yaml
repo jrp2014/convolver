@@ -19,6 +19,18 @@ repos:
         args: [--strict]
   - repo: local
     hooks:
+      - id: documentation-links
+        name: Maintained documentation links and anchors
+        entry: python scripts/check_doc_links.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: documentation-link-tests
+        name: Documentation link checker tests
+        entry: python tests/documentation_links_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: actionlint
         name: GitHub Actions and embedded ShellCheck
         entry: actionlint

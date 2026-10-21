@@ -1,6 +1,24 @@
 # FFT backends and measurements
 
-Measured 18 October 2026 on Apple M5 Max, 128 GiB RAM, macOS 27.0.1 (26A434).
+[Documentation index](README.md) · [Concepts](concepts.md) · [Open FFT work](../TODO.md#fft-libraries-and-performance)
+
+Start with the selection table and contract. Later sections contain **dated
+measurements**, not a ranking of current libraries on every machine. The Apple
+results were measured on 18 October 2026 on an M5 Max, 128 GiB RAM,
+macOS 27.0.1 (26A434); later x86/Ooura sections name their own setup.
+
+| Backend | Availability | Separate FFT dependency | Planning |
+| --- | --- | --- | --- |
+| FFTW (default) | Supported macOS/Linux/Windows builds | Single-precision FFTW | Estimate, measured modes and saved wisdom |
+| Accelerate | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
+| Ooura | Built into portable source | None | Prepared tables; estimate mode only |
+
+See [build and tuning commands](portable-core.md#build). Primary references:
+[FFTW manual](https://fftw.org/fftw3_doc/),
+[Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp), and
+[Ooura packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html).
+The [vendored-copy record](../portable/third_party/ooura/README.md) describes
+local Ooura modifications. Checking its freshness is tracked as **FFT-1** in TODO.
 
 ## Selection and contract
 
@@ -12,26 +30,25 @@ binary has one backend; there is no automatic or runtime backend switching.
 `convolver --version` reports the backend. The library exposes
 `fft_backend_name()` and `fft_backend_version()`.
 
-The internal `portable/fft.hpp` interface owns prepared plans and buffers. Both
+The internal `portable/fft.hpp` interface owns prepared plans and buffers. All three
 implementations expose interleaved complex bins 0..N/2 with separate DC/Nyquist,
 an unscaled forward DFT, and an inverse scaled by N. The convolution engine
 normalizes filter spectra once by 1/N. Accelerate's adapter handles the packed
 DC/Nyquist and factor-of-two forward scaling described in
 [Apple's real FFT guide](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/vDSP_Programming_Guide/UsingFourierTransforms/UsingFourierTransforms.html).
 
-FFTW uses N=2B. Accelerate uses the next power of two at least 2B (minimum four),
+FFTW uses N=2B. Accelerate and Ooura use the next power of two at least 2B (minimum four),
 while keeping the requested B-frame latency, partition payload, delays and tail.
-It does not silently fall back to FFTW for awkward sizes. Extra padding consumes
+Neither silently falls back to FFTW for awkward sizes. Extra padding consumes
 more spectrum/history storage; validation accounts for that before allocation.
-Planning/allocation remain outside processing. Neither backend changes routing,
+Planning/allocation remain outside processing. The backend does not change routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
 
 ### Ooura (no FFT library)
 
 `-DCONVOLVER_FFT_BACKEND=OOURA` builds Takuya Ooura's split-radix real FFT
 (`fftsg`, the package the historical engine also shipped) into the core, so the
-library, CLI and VST3 plug-in need no FFT library at all. It works on every
-platform and compiler. The code is vendored in `portable/third_party/ooura/`
+library, CLI and VST3 plug-in need no FFT library at all. The configured CI exercises it with Clang, GCC and MSVC. The code is vendored in `portable/third_party/ooura/`
 with its permissive licence ("use, copy, modify and distribute this code for any
 purpose ... without fee"), which is compatible with GPL-2.0-or-later; see the
 README there for the source and the small changes made. Like Accelerate it uses
@@ -67,7 +84,8 @@ builds and tests the core with MSVC without FFTW.
 
 ## Correctness evidence
 
-Both implementations passed **14/14 CTest suites** in Debug with ASan/UBSan and
+In the initial 18 October FFTW/Accelerate comparison, both implementations passed
+**14/14 CTest suites** in Debug with ASan/UBSan and
 optimized Release on this Mac. The new `native.fft` suite checks canonical bins
 against a direct double DFT, DC-only/Nyquist-only signals, impulses, and inverse
 normalization. Existing engine tests retain their independent double convolution
@@ -95,11 +113,14 @@ The preceding FFTW implementation passed all platforms at `f78c22b`.
 
 ## Processing benchmark
 
+The following is the 18 October Apple FFTW/Accelerate measurement record.
+Later engine changes and other machines require new measurements.
+
 This measures the full in-memory Engine processing loop, including routing,
 partition accumulation and FFT layout conversion. It excludes file I/O, CLI
 startup and filter preparation. It is not an isolated FFT microbenchmark.
 
-Both Convolver builds use AppleClang 21.0.0, `-O3 -DNDEBUG`, no fast-math or
+Those two Convolver builds used AppleClang 21.0.0, `-O3 -DNDEBUG`, no fast-math or
 sanitizers. FFTW is official 3.3.11, built with `--enable-float --enable-neon
 --enable-shared --disable-fortran`; configure chose `-O3 -fomit-frame-pointer
 -mtune=native -fstrict-aliasing`. It reports `fftw-3.3.11-neon`. Plans use
@@ -434,7 +455,7 @@ libraries. The benchmark's existing installation is temporary, under
 durable installation. Convolver's tests passed against that temporary build;
 `make check` above additionally runs FFTW's own tests when reproducing.
 
-### Comparing both backends
+### Comparing backends
 
 Install CMake, a C++20 compiler, optimized single-precision FFTW and libsndfile.
 Use `CMAKE_PREFIX_PATH` for libraries installed outside standard locations.
@@ -453,3 +474,7 @@ python3 tests/native/benchmark_backends.py build-fftw/convolver_benchmark build-
 Repeat correctness tests in separate Debug build directories with
 `-DCONVOLVER_SANITIZERS=ON`. Never benchmark sanitizer builds. Native baseline
 sources and dependency archive hashes are recorded in [the portable guide](portable-core.md).
+
+For Ooura, configure another directory with `-DCONVOLVER_FFT_BACKEND=OOURA`
+and pass that CLI/benchmark as one side of the same pairwise comparison.
+Compare each backend with an independent oracle as well as with its peers.

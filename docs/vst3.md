@@ -1,7 +1,12 @@
 # VST3 adapter and host lifecycle
 
-The optional Convolver VST3 adapter uses **VST SDK 3.8.1 build 84**, the latest
-published release checked on 18 October 2026. Builds pin SDK commit
+[Documentation index](README.md) · [Audio concepts](concepts.md)
+
+Use this guide to build the plug-in and load a filter through a host's preset
+menu. The later lifecycle section is for contributors and host integrators.
+
+The optional adapter uses [VST SDK 3.8.1 build 84](https://github.com/steinbergmedia/vst3sdk/releases/tag/v3.8.1_build_84).
+The CI workflow pins SDK commit
 `3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96` and its submodules. Ordinary core/CLI
 builds do not need the SDK. Compatibility and numerical correctness take priority
 over CPU-specific optimization.
@@ -45,10 +50,32 @@ macOS 11 compatibility just because a bundle has an older deployment target.
 macOS may block ad-hoc-signed developer bundles; use an appropriate developer
 signing/approval workflow. Do not disable system security checks.
 
+## Make the plug-in discoverable
+
+For a local developer build, close the host and copy the complete
+`Convolver.vst3` bundle into a plug-in folder it scans. Do not copy only the
+executable inside the bundle. Common per-user locations are:
+
+| Platform | Folder |
+| --- | --- |
+| macOS | `~/Library/Audio/Plug-Ins/VST3/` |
+| Windows | `%LOCALAPPDATA%\Programs\Common\VST3\` |
+| Linux | `~/.vst3/` |
+
+See Steinberg's [plug-in locations](https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical%2BDocumentation/Locations%2BFormat/Plugin%2BLocations.html)
+for system-wide alternatives. Reopen the host, enable VST3 scanning if necessary,
+and use its plug-in rescan command. Add Convolver as an audio effect, then use
+the host's preset loader as described below. Exact menu names depend on the host.
+
+If Convolver does not appear, check the host's scan log, matching CPU architecture,
+runtime libraries and the signing requirements above. A successful build or SDK
+validator run alone does not prove that a relocated bundle loads in a particular
+DAW; named-host installation tests remain tracked in [TODO](../TODO.md).
+
 ## Loading filters
 
-The first version uses the DAW's standard preset loader and generic bypass
-control, without a custom editor. Convert an impulse WAV, legacy `.cfg`, or
+The adapter uses the DAW's standard preset loader and generic bypass
+control, without a custom editor. Convert an impulse WAV, [`.cfg`](configuration.md), or
 configuration list into a new preset:
 
 ```sh
@@ -69,8 +96,7 @@ as the CLI does; without them the first entry is used:
 ```
 
 The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
-and the counts may differ (for example stereo in, 5.1 out), as the historical
-VST 2 plug-in allowed. Any speaker arrangement with that many channels is
+and the counts may differ (for example stereo in, 5.1 out), independently. Any speaker arrangement with that many channels is
 accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
 the sample rate, or activation fails. Without a preset the plug-in passes input
@@ -129,4 +155,7 @@ The VST3 CI matrix runs on Linux, Windows and macOS. These automated checks are
 not proof of hard real-time deadlines or compatibility with every DAW. Commercial
 DAW testing, installers, dependency bundling, signing/notarization and a custom
 file-picker editor remain separate release work. VST3 exchanges floating-point
-audio, so the CLI/file writer's PCM16 dither does not apply to it.
+audio, so the CLI/file writer's integer quantization and dither does not apply to it.
+
+Source entry points and the change/test map are in [the implementation guide](project-structure.md).
+Release gaps and intentional constraints are tracked in [TODO](../TODO.md#documented-limitations).

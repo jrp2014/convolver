@@ -1,8 +1,14 @@
 # Tests and their boundaries
 
+[Documentation index](README.md) · [Implementation map](project-structure.md#change-and-test-map)
+
+Use the native tests for changes to the active implementation. Historical
+extraction tests are additional preservation checks and are described separately
+below. A test list is coverage information; a pass claim needs an actual run.
+
 ## Native production tests
 
-The [portable build](portable-core.md) now compiles production C++20 translation
+The [portable build](portable-core.md) compiles production C++20 translation
 units against the selected real FFT library and libsndfile. Build before running CTest:
 
 ```sh
@@ -11,12 +17,14 @@ cmake --build build-native --parallel
 ctest --test-dir build-native --output-on-failure
 ```
 
-With Clang on macOS/Linux this runs **28 suites**: twelve native suites, four
-fuzz-input replays, the configuration compatibility corpus, one package-consumer
-suite, the [source versioning](versioning.md) suite and the nine
-historical/documentation suites below. GCC and MSVC default to twenty
-native/fuzz-replay/compatibility/package/versioning/documentation suites; the old
-extraction adapters require Clang.
+The default Clang build on macOS/Linux also enables historical extraction tests.
+GCC/MSVC builds omit those extraction tests. The core-only configuration omits
+file I/O, CLI, Python and historical tests. Optional components change the total;
+list the tests in your actual build rather than relying on a copied count:
+
+```sh
+ctest --test-dir build-native -N
+```
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
@@ -24,7 +32,8 @@ extraction adapters require Clang.
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
   nonfinite data and a C++ heap-allocation guard during processing/reset.
-- `native.io`: real libsndfile float/PCM16/24/32 round trips and clipping,
+- `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
+  and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation and RAW alignment. POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
@@ -77,7 +86,7 @@ extraction adapters require Clang.
 
 The optional [VST3 build](vst3.md) adds three tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR,
-plus the SDK validator loading the built plug-in. These cover preactivation tail
+plus the SDK validator loading the built plug-in (the preset test requires I/O). These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
 They do not establish compatibility in a particular commercial DAW.
 
@@ -86,16 +95,16 @@ external core/host/I/O consumer, and verifies components and source-tree use wit
 without a parent CTest setup. Core-only configuration runs six C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
-`backend_equivalence.py` separately compares both actual CLIs over 16 matrix/delay
+`backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See
 [measurements and reproduction commands](fft-backends.md). The
-[current validation record](review-2026-10/current-validation.md) pins fresh local
-results and Linux/Windows/macOS CI evidence to source baseline `5df874e`.
+[18 October validation record](review-2026-10/current-validation.md) preserves
+results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../.github/workflows/regression.yml) and
 [VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
 file alone is not evidence that a job passed.
 
-## Run with CMake/CTest
+## Historical tests: run with CMake/CTest
 
 Requirements: CMake 3.20+, Python 3.8+, Clang/AppleClang with AddressSanitizer and
 UndefinedBehaviorSanitizer, and a native macOS or Linux environment. No Python
@@ -137,7 +146,7 @@ with flags). For documentation only, run
 The GitHub Actions workflow runs the CMake/CTest entry point on macOS and Linux.
 Adding a workflow file does not establish that its remote jobs have passed.
 
-## Current coverage
+## Historical coverage
 
 The tests below use the canonical `convolver/` source tree. Earlier local
 `tests/*.py` experiments aimed at a separate source snapshot are not the gate.
@@ -165,21 +174,31 @@ fragment, and escaping manifest/link paths. Original archived bytes remain
 unchanged. The independently enumerated pages and saved manifest detect loss;
 the live-site comparison is a dated provenance record, not a network CI test.
 
-## Gates for a native release
+## Validation limits and release work
 
-The initial native core now supplies normally compiled production tests with
-the selected real FFT backend and libsndfile. Add every future backend to the same contract tests. Retain the
-independent direct-convolution oracle rather than relying only on agreement
-between FFT implementations.
+Every FFT backend must pass the same independent DFT and convolution references.
+Agreement between two implementations is useful but cannot replace an oracle.
+Statistical dither/shaping tests assess quantization separately from convolution.
 
-Outstanding legacy cases include the original full-width PCM32 specialization,
-nonzero noise shaping, old CMD EOF/tail handling, actual host format negotiation and latency/tail reporting,
-long-running configuration/IR fuzzing campaigns (CI runs 60 s per target), multi-instance/filter-switch behaviour, and
-callback deadline measurements. Native PCM32 endpoints and CLI EOF are covered;
-that does not fix the independent historical wrappers. The portable CTest gate does not
-establish native Windows/ATL/DirectShow/VST compatibility or real-time safety.
+Native tests do not establish a full build of the old Windows applications,
+universal host compatibility or hard real-time deadlines. The historical
+extraction tests also leave old full-width PCM32, nonzero noise shaping, CMD
+tail handling and full host negotiation outside their coverage. Preserve these
+limits when quoting a result. [TODO](../TODO.md#documented-limitations) gathers
+open validation gaps and intentional constraints.
 
-The [current review](../REVIEW.md) separates implemented native behavior from
-remaining legacy and release gaps. The [modernization plan](modernization.md)
-prioritizes future compatibility and performance evidence. Only retire extraction
-harnesses once their failure cases have equivalent production coverage.
+## Documentation checks
+
+Run the pinned [pre-commit checks](../CONTRIBUTING.md#shell-markdown-and-yaml-checks)
+for ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
+The `documentation` CTest entry checks the archived website's hashes and links;
+it is not a check of all maintained Markdown. Run changed CLI/build examples
+against the current program as well as checking links.
+
+## Fuzz smoke tests and longer campaigns
+
+[The fuzz guide](../tests/fuzz/README.md) describes the four harnesses and corpus
+replay. Push CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
+resource bounds. A manual workflow run defaults to 600 seconds per target;
+set its `seconds` input to `60` to reproduce the smoke-test budget. Keep crashes
+as committed regression inputs after investigating them.

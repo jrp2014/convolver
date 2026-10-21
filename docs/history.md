@@ -1,5 +1,10 @@
 # Convolver history
 
+[Current documentation](README.md) · [Current implementation](project-structure.md)
+
+This page is historical context. New users can build and use the portable
+implementation without reading it.
+
 Convolver began as a set of Windows applications written in 2005 and 2006. Their
 user documentation is still at <https://convolver.sourceforge.net/>, and an
 archived copy of the 4.4 website is in [historical/convolver-4.4](historical/convolver-4.4/README.md).
@@ -74,10 +79,10 @@ cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCONVOLVER_BUILD_NATIVE=OFF
 ctest --test-dir build --output-on-failure --parallel 2
 ```
 
-These nine suites cover extracted production routines and preservation of the
+These checks cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
-The default native build additionally runs eight suites against the actual core,
-the selected FFT backend, libsndfile and CLI, plus an external package-consumer suite. See [testing instructions and coverage limits](testing.md).
+The default native build separately tests the actual portable implementation,
+FFT backends, libsndfile, CLI and external consumers. See [testing instructions and coverage limits](testing.md).
 
 ## From historical to portable
 
@@ -87,3 +92,32 @@ Windows config paths, host lifecycle and VST3 are implemented. The
 [modernization plan](modernization.md) identify remaining
 interoperability, DAW/release validation and measured optimization work.
 Earlier 4.3 assessments are in the [review archive](archive/reviews/README.md).
+
+## Downstream use
+
+The [17 October investigation](review-2026-10/downstream-evidence.json) records
+URLs, hashes, binary markers and attribution. It distinguishes:
+
+- **Album Player:** evidence of a Windows ConvolverVST adaptation and Linux core
+  lineage. Binaries were inspected, not executed; no source diff or bug-status
+  conclusion was established.
+- **DRC Designer/cPlay:** distribution/integration or external plug-in hosting,
+  not evidence of another embedded engine fork.
+- **Audiolense/JRiver, Roon, Hang Loose Convolver and CamillaGUI/CamillaDSP:**
+  configuration-format adoption or import. This does not establish DSP source reuse.
+- **Equalizer APO:** the investigation identifies a different convolution-library
+  lineage.
+
+These are dated findings, not a survey of every current release. The
+[inspection script](review-2026-10/inspect_downstream.py) can recheck artifacts,
+but upstream downloads change and are not a normal offline CI dependency.
+Compare actual source and tests before importing any downstream fix.
+[Configuration compatibility](configuration-compatibility.md) owns the current
+format-adoption matrix and its evidence limits.
+
+## Documentation snapshots
+
+The [pre-refresh documentation](archive/documentation-2026-10-20/README.md)
+retains the complete text of the guides before the 20 October reorganization.
+Use the [review record](documentation-review-2026-10-20.md) to find their current
+successors. Dated validation and benchmark results retain their original scope.

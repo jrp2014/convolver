@@ -1,7 +1,8 @@
 # Building and consuming the portable library
 
-The portable package is at **0.4.0** (see [CHANGELOG.md](../CHANGELOG.md)), independently of the historical Convolver
-release numbers. It provides static C++20 libraries. The API is evolving: package
+[Documentation index](README.md) · [Implementation map](project-structure.md)
+
+The portable package reads its version from [VERSION](../VERSION). It provides static C++20 libraries. The API is evolving: package
 version checks accept compatible patch releases within the same minor version,
 but this is not a stable binary ABI promise. Rebuild consumers with the same
 toolchain/runtime. `BUILD_SHARED_LIBS` does not change these static targets.
@@ -101,7 +102,7 @@ ctest --preset release
 ```
 
 Presets are `release`, `debug-sanitizers`, `core-only`, `accelerate`, and
-`accelerate-debug`. Each has matching configure/build/test presets and a separate
+`accelerate-debug`, and `ooura`. Each has matching configure/build/test presets and a separate
 directory under `build/presets/`. Pass `-DCMAKE_PREFIX_PATH=...` during configure
 for local dependencies. Keep personal paths/toolchain overrides in the ignored
 `CMakeUserPresets.json`, inheriting one of the checked-in presets.

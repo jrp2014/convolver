@@ -1,20 +1,29 @@
 # Portable core and CLI
 
-The new `portable/` implementation builds normal C++20 translation units against
-real FFTW or Apple Accelerate (single precision), plus libsndfile. It is independent of Windows/ATL and
-the historical plug-in wrappers. The original sources and their regression tests
-remain in place.
+[Documentation index](README.md) · [Concepts](concepts.md) · [Configuration format](configuration.md)
+
+This is the detailed reference for building and using the CLI and C++ core.
+For a first render, use the [quick start](../README.md#build-and-try-it).
+The active implementation is C++20 with FFTW, Apple Accelerate or built-in Ooura;
+file I/O uses libsndfile. It does not depend on the old Windows applications.
+
+- [Build and backend selection](#build)
+- [File rendering, gain and integer output](#file-rendering)
+- [RAW streams](#raw-streams)
+- [Inspection and validation](#inspecting-and-validating-configurations)
+- [Library API and resource limits](#compatibility-and-library-api)
 
 ## Build
 
 Install CMake 3.20+, a C++20 compiler, FFTW's single-precision development library
-and libsndfile's development library. For example:
+and libsndfile's development library. The default tests also need Python 3.8+.
+For example:
 
 ```sh
 # macOS with Homebrew
 brew install cmake fftw libsndfile
 # Debian/Ubuntu
-sudo apt-get install cmake g++ libfftw3-dev libsndfile1-dev
+sudo apt-get install cmake g++ python3 libfftw3-dev libsndfile1-dev
 ```
 
 Then, from the repository root:
@@ -60,8 +69,8 @@ Tuning needs no input audio or IR. It prepares both transforms using `patient`
 planning by default; `--fft-plan measure` searches less extensively and
 `--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
 longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
-seconds and keeps the best plan found by then, as the historical engine's "Take 1
-minute" choice did (`--fft-plan patient --fft-time-limit 30`). A search the limit
+seconds and keeps the best plan found by then. For example,
+`--fft-plan patient --fft-time-limit 30` gives each plan a 30-second budget. A search the limit
 cuts short may not be stored as reusable wisdom for that mode; tune without a
 limit when the wisdom is for `--fft-wisdom`. The wisdom
 destination must be a **new file**; existing files and aliases are never replaced.
@@ -80,7 +89,7 @@ Retune after changing them; loading successfully is **not** proof that old wisdo
 is optimal for a different CPU. The native wisdom format performs FFTW's own
 compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
 and does not guarantee a globally optimal plan. This step does not choose B or
-change B-frame latency. Accelerate rejects measured planning and wisdom options.
+change B-frame latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
 See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
 
 Library callers can pass `FftOptions` to `Engine`, or call `tune_fft`, then
@@ -101,19 +110,17 @@ cmake --build build-native --config Release
 ctest --test-dir build-native -C Release --output-on-failure
 ```
 
-The preceding FFTW baseline passed Linux/MSVC CI. The new backend abstraction
-and Accelerate implementation have been verified locally on macOS Apple Silicon
-with AppleClang; see [GitHub Actions](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
-for platform CI results. The historical
-Windows hosts have not been ported. Dependency package versions in CI follow the
-runner's package manager; `--version` records the linked versions. Pin a package
-baseline before making a reproducible binary release.
+The [native CI workflow](../.github/workflows/regression.yml) defines the platform
+matrix. Check [Actions](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
+for revision-specific results. Package-manager dependency versions can change;
+`--version` records the linked versions. Pin dependencies before producing a
+reproducible binary release.
 
-Targets: `convolver_core`, `convolver_io`, `convolver_cli` (executable name
+Targets: `convolver_core`, `convolver_host`, `convolver_io`, `convolver_cli` (executable name
 `convolver`). `cmake --build build-native --target check` builds native tests and
 runs CTest. `cmake --install build-native --prefix /desired/prefix` installs the
 CLI, libraries and headers. Libraries can also be consumed with `add_subdirectory`
-through `Convolver::core` and `Convolver::io`. Installed CMake package exports,
+through `Convolver::core`, `Convolver::host` and `Convolver::io`. Installed CMake package exports,
 component selection and presets are described in [the package guide](cmake-package.md).
 The libraries are static; shared dependencies must remain installed. This is not
 a self-contained redistributable app bundle.
@@ -126,6 +133,8 @@ Build options:
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
 | `CONVOLVER_FFT_BACKEND` | FFTW | FFTW, ACCELERATE (Apple only) or OOURA (built in) |
+| `CONVOLVER_BUILD_VST3` | OFF | SDK adapter and, with I/O, the preset writer; see [VST3](vst3.md) |
+| `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
 | `BUILD_TESTING` | ON at top level | Master test switch |
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
@@ -141,33 +150,47 @@ Build options:
 ./build-native/convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
-The filter may be an IR sound file, a historical configuration, or a configuration
+The filter may be an IR sound file, a [configuration](configuration.md), or a configuration
 list. A direct multichannel IR maps each IR channel to the corresponding input
 and output; a mono IR requires mono input. Use a config to apply one mono IR to
 several channels. Lists select the first entry matching input rate and channel
-count. `--output-channels N` also requires N output channels, as the historical
-engine also chose by the output format the playback device accepted (a sound
-file counts as having as many outputs as inputs). There is no resampling or
+count. `--output-channels N` also requires N output channels, (a sound file has as many outputs as inputs). There is no resampling or
 nearest-rate substitution.
 
 `--block-size` is the uniform partition payload B, not the historical partition
-count. FFTW uses FFT length 2B; Accelerate rounds up to a power of two (at least
-four). Positive non-power-of-two B values work with either backend. The core
+count. FFTW uses FFT length 2B; Accelerate and Ooura round up to a power of two
+(at least four). Positive non-power-of-two B values work with all three backends. The core
 has B frames of algorithmic latency. The CLI trims that leading latency by
 default and always drains the complete FIR/routing tail. `--keep-latency` retains
-it, matching the historical Pipe timing convention. No input frames means no
+it for callers that need the untrimmed stream. No input frames means no
 output audio frames. Gain is a finite decibel value; finite float output can
 exceed unity. Integer output clips to its representable range.
 
-`--gain-db auto` applies the historical engine's "optimum attenuation": the
-filter is run on seeded white noise uniform in [-1, 1) on every input for ten
-filter lengths (at least 65536 frames), and the gain is -20 log10 of the largest
-output sample. That reflects typical programme peaks, so loud material can still
-clip. `--gain-db no-clip` instead applies the gain that no input within full
-scale can clip: -20 log10 of the largest sum of absolute taps of any output's
-combined input-to-output responses. Both report the chosen gain on stderr. The
-library function is `estimate_attenuation`; tests check the bound is exact and
-attainable against the double-precision oracle.
+### Gain and attenuation
+
+`--gain-db NUMBER` applies a fixed decibel gain. Negative values attenuate;
+positive values amplify. Two offline estimates are also available:
+
+- `--gain-db auto` measures the peak response to seeded uniform noise in [-1, 1)
+  on every input, for ten filter lengths (at least 65,536 frames). It applies
+  `-20 log10(peak)`. This estimates a useful level but does not bound peaks in
+  arbitrary programme material.
+- `--gain-db no-clip` calculates a mathematical filter bound: for each output,
+  combine the paths from each input, sum the absolute values of their taps,
+  then take the largest output sum. The gain is `-20 log10(bound)`, or 0 dB for
+  silent routing. It assumes every input sample has magnitude at most 1.
+
+Both report the chosen gain on stderr and may take time before rendering. The
+bound applies to ideal linear filtering, not input above full scale or additional
+quantizer noise. Floating-point error, dither, noise shaping and the asymmetric
+positive integer endpoint need headroom if clipping must be strictly avoided;
+see **GAIN-1** in [TODO](../TODO.md). Neither option is a limiter.
+The API is `estimate_attenuation` in [engine.hpp](../include/convolver/engine.hpp);
+[attenuation.cpp](../portable/attenuation.cpp) and the engine oracle tests define
+and exercise the calculation. The noise estimate retains the older engine's
+"optimum attenuation" method.
+
+### Integer formats, dither and noise shaping
 
 Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
 `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
@@ -193,10 +216,11 @@ buffering. Float and RAW formats reject dither, noise shaping and valid bits.
 `sony-sbm` (the historical "Pseudo Sony SBM"), or `none` (default). Each
 subtracts a fixed combination of the channel's previous quantization errors
 before rounding, so the error spectrum is the rounding error filtered by
-1 - Σ c_k z^-k, moving noise away from the frequencies where hearing is most
-sensitive at the cost of more total noise. The fed-back error is taken before
+1 - Σ c_k z^-k, redistributing noise across frequency, often at the cost of more total noise.
+The coefficients are fixed; their audible effect depends on sample rate and
+playback conditions. The fed-back error is taken before
 clipping, so overload cannot make a shaper run away (the historical code could
-wrap). The coefficients are in `include/convolver/io.hpp`. Shaping works with or
+wrap). The coefficients are in [io.hpp](../include/convolver/io.hpp). Shaping works with or
 without dither; use it with dither.
 
 `--valid-bits N` quantizes to N significant bits (8 up to the container size)
@@ -216,7 +240,8 @@ valid-bit combination.
 
 ### Speaker labels
 
-By default WAV output has a plain header with no speaker labels, as before.
+WAV output has no speaker labels unless requested. A valid-bit override may
+also require an extensible header, independently of labels.
 `--speaker-map config` labels the output channels with the configuration's hex
 channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
 
@@ -330,29 +355,13 @@ storage and partitions for an in-memory `Configuration`.
 
 ## Compatibility and library API
 
-Configuration syntax follows the [archived specification](historical/convolver-4.4/config.html):
-header, input delays, output delays, then four lines per path (IR filename,
-selected IR channel, input routes, output routes). `//` comments and blank lines
-are accepted. The fractional part of a route is its weight; an integer route has
-unit magnitude, and `-0` means inverted channel zero. Delays use the historical
-float parsing and truncation from milliseconds to integer frames.
+The [configuration reference](configuration.md) owns the text grammar, path rules,
+route encoding and list-selection semantics. The [compatibility matrix](configuration-compatibility.md)
+records tested fixtures and the limits of claims about other programs.
 
-Relative paths resolve beside the configuration/list that contains them, not
-from the process working directory. Text paths use UTF-8. References in configs
-and lists accept both `/` and Windows `\` separators, including mixed paths.
-Windows drive-letter, drive-relative and backslash-rooted/UNC paths require
-conversion to relative paths on macOS/Linux and produce an explicit diagnostic;
-no drive or network-share mapping is guessed. Native absolute paths remain
-platform-specific. Configuration
-errors name the file, physical line and column (a UTF-8 BOM is not counted),
-and for nested lists each enclosing list entry (`; included from filters.txt:2`).
-A rejected Windows path also names any existing file beside the configuration
-that matches its trailing part, as a suggested relative replacement; it is never
-loaded implicitly. Unequal
-IR lengths are a supported extension; each path is independently zero-padded,
-and the longest connected route determines the tail.
+### Engine API
 
-`include/convolver/engine.hpp` exposes Configuration, FilterPath, Route and Engine.
+[engine.hpp](../include/convolver/engine.hpp) exposes Configuration, FilterPath, Route and Engine.
 Construction prepares FFT plans and all processing buffers. `process` takes
 interleaved float spans and any frame count, producing the same number of output
 frames. Empty input means silence for drain. Input/output spans must not overlap;
@@ -361,11 +370,8 @@ feed their sum as silence after the final nonempty input to drain fully.
 `reset()` clears history and delays. Instances have separate state; an individual
 instance must not be processed/reset concurrently.
 
-This implementation uses uniform partitioned overlap-add with an input-spectrum
-history. It preserves the reviewed engine's linear convolution and timing
-semantics while making ownership and lengths explicit. It is new portable
-production code, not an extraction test or an assertion that every historical
-host feature has been ported. Both backends expose the same spectrum layout and
+This implementation uses uniform partitioned overlap-add with input-spectrum
+history, as described in [the implementation map](project-structure.md#processing-data-flow). All three backends expose the same spectrum layout and
 scaling; 1/N normalization is applied once when preparing IR spectra. The first
 backend measurements are recorded in [the FFT guide](fft-backends.md).
 
@@ -376,15 +382,17 @@ these engine instances, outside processing. Accelerate owns an independent setup
 per instance. Other FFTW users in the same process
 must coordinate their planning too.
 
+### Resource limits
+
 Resource limits are deliberate: 1..256 channels, 1..768000 Hz, B up to 1048576,
 4096 paths/routes, and about 1 GiB of prepared float-equivalent storage. Core IRs
 and individual delays are bounded to 67108864 frames. The importer additionally
-limits text to 1 MiB, list nesting to 16, visited entries to 4096, total decoded IR
+limits each text file to 1 MiB and all text read per operation to 16 MiB, list nesting to 16, visited entries to 4096, total decoded IR
 samples to 64 Mi, and each delay to 16 Mi frames. Invalid dimensions, arithmetic
 overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
 the CLI's output check; library callers choose their own output policy.
 
-## Verification record
+## Verification and dated dependency record
 
 The native tests link actual production translation units and actual libraries:
 independent double time-domain convolution, seeded matrices/delays, awkward IR
@@ -394,7 +402,8 @@ Fault tests cover source overwrite protection, truncation, fragmented pipes,
 write failure and WAV-header finalization. Existing historical tests and archived
 website integrity checks remain enabled on supported Clang hosts.
 
-Local dependency sources used for verification:
+The following sources describe the earlier October 2026 local test setup,
+not dependency pins for every current build:
 
 - FFTW 3.3.11, archive SHA256
   `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.
@@ -402,7 +411,9 @@ Local dependency sources used for verification:
   `3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e`;
   optional external codecs disabled for this local test installation.
 
-FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. The final
-local verification uses the official configure/make build of that source archive,
+FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
+local verification used the official configure/make build of that source archive,
 which reports 3.3.11. Convolver itself is built with CMake in both cases.
-See [test coverage](testing.md) for the remaining legacy-host and platform limits.
+See [test coverage](testing.md) and [TODO limitations](../TODO.md#documented-limitations)
+for the boundaries of the current checks. Current LLVM/SDK/library results must
+be tied to the revision actually tested.

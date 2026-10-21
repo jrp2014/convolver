@@ -1,4 +1,8 @@
-# Current review validation
+# Validation record: 18 October 2026
+
+This is a preserved result for the baseline below, not a current CI report.
+Use [testing](../testing.md) to reproduce checks and [REVIEW.md](../../REVIEW.md)
+for the current status map.
 
 Checked 18 October 2026 against source baseline
 `5df874e42ff7c64ca4d8bc0e4f2a1f642ce46699` (portable 0.2.0), with the review/documentation
