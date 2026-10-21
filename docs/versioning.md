@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Source versions
 
 [Documentation index](README.md) · [Changelog](../CHANGELOG.md)

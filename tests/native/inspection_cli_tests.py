@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """--inspect / --validate command-line contracts: modes, exit codes, JSON schema 1,
 escaping and determinism. Standard library only."""
 import json

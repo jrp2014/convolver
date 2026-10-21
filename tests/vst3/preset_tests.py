@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise generated presets through the real SDK adapter, with relocated assets."""
 import pathlib
 import struct

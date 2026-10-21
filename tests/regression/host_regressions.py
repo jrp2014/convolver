@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Compile actual sample.h adapters with portable boundary types.
 
 This tests conversion and frame transfer, not a native Windows/VST plug-in.

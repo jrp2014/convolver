@@ -25,6 +25,7 @@ contents line. When a change alters a summarized fact, update the summary too.
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../TODO.md) | Current source and linked issues/plans |
+| Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` |
 | Past releases and provenance | [History](history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,

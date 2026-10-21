@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.20)
 project(ConvolverConsumer LANGUAGES CXX)
 if(NOT CONVOLVER_CONSUMER_VERSION)

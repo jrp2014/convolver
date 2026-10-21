@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 if(NOT TARGET SndFile::sndfile)
     find_package(SndFile CONFIG QUIET)
 endif()

@@ -16,9 +16,11 @@ stress testing (ROBUST), and FFT or performance work only where measurements
 justify it (FFT, PERF). The
 [limitations table](#documented-limitations) lists current constraints.
 
-Each item has a stable ID. When taking one on, record the owner/issue or branch,
-evidence needed, and outcome here. Confirm the current source first: separate
-work may already have implemented part of it. Compatibility takes priority over
+Each item has a stable ID. To take one on, open a draft pull request titled with
+its ID; that is the claim, and its description holds the handoff note. Record
+progress and the outcome here as the [workflow guide](docs/workflow.md#recording-progress-in-todo)
+describes. Confirm the current source first: separate work may already have
+implemented part of it. Compatibility takes priority over
 speed. Do not change the historical archive to implement a portable feature.
 
 ## Execution priorities

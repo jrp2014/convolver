@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Prefer upstream package targets; preserve support for distribution packages
 # and configure/make installations which only provide headers and libraries.
 if(NOT TARGET FFTW3::fftw3f)

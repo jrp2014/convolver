@@ -1,7 +1,10 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Working on portable Convolver
 
 Start with [the implementation map](docs/project-structure.md) for source entry
 points, invariants and tests. Coding agents must also follow [AGENTS.md](AGENTS.md).
+[Taking on and reviewing work](docs/workflow.md) explains how to claim a TODO
+item, leave a handoff note and get a pull request reviewed and merged.
 For prose changes, use [the documentation maintenance guide](docs/documentation.md).
 
 Use CMake 3.20+, C++20 and the real FFT/library dependencies. Start with
@@ -20,13 +23,16 @@ routing and file-protection behavior unless the change explicitly revises them.
 ## Formatting and analysis
 
 The portable code uses `.clang-format`; CI checks LLVM clang-format **18**.
-Format only these modern sources:
+`scripts/check_format.sh` finds the modern C++ sources by location (`include/`,
+`portable/`, `plugins/`, `tests/`), so new adapters and test folders are covered
+automatically. It skips vendored code and the regression harnesses:
 
 ```sh
-clang-format-18 -i include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/fuzz/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
-clang-format-18 --dry-run --Werror include/convolver/*.hpp portable/*.hpp portable/*.cpp tests/native/*.cpp tests/fuzz/*.cpp tests/consumer/*.cpp plugins/vst3/*.hpp plugins/vst3/*.cpp tests/vst3/*.cpp
+scripts/check_format.sh          # check, as CI does
+scripts/check_format.sh --fix    # reformat in place
 ```
 
+Set `CLANG_FORMAT` to use another binary of the same major version.
 Historical directories are also excluded by `.clang-format-ignore`. Formatting
 changes should be distinguishable from behavior changes in review.
 
@@ -71,14 +77,21 @@ These checks are development tools and do not add package runtime dependencies.
 Use `pre-commit run --files <paths>` to include new files before staging them;
 `--all-files` checks files already tracked by Git.
 
-The local hooks also check maintained Markdown links and run the link checker's
+The local hooks also check maintained Markdown links and the repository rules
+(TODO IDs, the documentation index, plan folders, paths named in agent
+guidance, licence lines and the top-level layout), and run both checkers'
 regression tests on every invocation. They use only Python's standard library
 and can be run independently:
 
 ```sh
 python3 scripts/check_doc_links.py
 python3 tests/documentation_links_tests.py
+python3 scripts/check_repository.py
+python3 tests/repository_checks_tests.py
 ```
+
+[Repository checks](docs/workflow.md#automated-checks) lists each rule and what
+to do when one fails.
 
 The link check scans top-level Markdown and maintained guides under `docs/`,
 including untracked files. Dated records and archives are excluded as source

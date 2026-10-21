@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Compile original DSP bodies on macOS using a small platform/DFT adapter.
 
 No Windows host or FFTW binary is exercised. DFT normalization follows FFTW;

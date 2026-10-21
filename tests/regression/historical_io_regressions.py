@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise recovered descriptor/format helpers with a stub libsndfile boundary.
 
 Compiles actual CWaveFileHandle, exception classes, SndFileFormat and tables.

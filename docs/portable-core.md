@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Portable core and CLI
 
 [Documentation index](README.md) · [Concepts](concepts.md) · [Configuration format](configuration.md)

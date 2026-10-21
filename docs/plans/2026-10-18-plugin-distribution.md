@@ -1,6 +1,11 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Downloadable and buildable Convolver plug-ins implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For contributors and agents:** the open work from this plan is tracked as
+> TODO items (REL-1, PLUG-5). Take them on as described in
+> [the workflow guide](../workflow.md); the task checkboxes below are the
+> 18 October record. (This note replaced a pointer to an agent tool that the
+> repository does not use.)
 
 **Goal:** Deliver tested VST3 downloads and source builds with usable documentation,
 then extend the same release system to a macOS Audio Unit.

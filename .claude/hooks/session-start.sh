@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Cloud sessions: install what the CMake build and tests need (CMake, FFTW,
 # libsndfile, Clang sanitizer runtimes). Local machines are left alone.
 set -euo pipefail

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Modernization direction
 
 [Documentation index](README.md) · [Implementation map](project-structure.md) · [TODO](../TODO.md)

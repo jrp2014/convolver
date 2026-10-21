@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check recovered pipe EOF length against the real extracted convolution engine.
 
 Uses the portable FFTW-compatible DFT adapter from core_regressions; this tests

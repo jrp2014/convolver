@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Independent linear convolution oracle for the extracted production routines.
 static int checks=0;
 static double worst_error=0;

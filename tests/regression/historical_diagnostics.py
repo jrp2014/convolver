@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Test recovered stream-error classification against real iostream states.
 
 Extract only the ordered bad/fail clauses; parsing and Windows I/O are not run.

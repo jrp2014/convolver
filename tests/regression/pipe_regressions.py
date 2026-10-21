@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Compile the actual restored pipe main and helpers with portable I/O adapters.
 
 Exercises argument validation, stream/short-write failures, bounded chunks and

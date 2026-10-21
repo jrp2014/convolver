@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # VST3 adapter and host lifecycle
 
 [Documentation index](README.md) · [Audio concepts](concepts.md)

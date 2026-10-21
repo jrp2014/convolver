@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Tests and their boundaries
 
 [Documentation index](README.md) · [Implementation map](project-structure.md#change-and-test-map)

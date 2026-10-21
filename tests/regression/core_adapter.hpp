@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Test-only substitutes for Windows, file input and FFTW. GPL-2.0-or-later.
 #include <algorithm>
 #include <cassert>

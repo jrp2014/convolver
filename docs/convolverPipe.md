@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # convolverPipe
 
 [History](history.md) · [Documentation index](README.md)

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Changelog
 
 Changes to the portable C++ core, CLI and plug-ins. The portable package is

@@ -99,7 +99,15 @@ callbacks meet deadlines. Report the actual checks and their limits.
 ## Where future work belongs
 
 Keep this page about implemented structure. Put open work in [TODO](../TODO.md)
-and substantial design decisions in a linked, dated plan. Prefer a focused change
-at the existing boundary over reorganizing files merely to shorten them.
+and substantial design decisions in a linked, dated plan in [`plans/`](plans/).
+Prefer a focused change at the existing boundary over reorganizing files merely
+to shorten them.
+
+A new plug-in format follows the VST3 layout: the adapter in
+`plugins/<format>/`, its tests in `tests/<format>/`, and its guide at
+`docs/<format>.md`, listed in the [index](README.md). The
+[repository checks](workflow.md#automated-checks) require all three once the
+adapter folder exists, and `scripts/check_format.sh` covers the new sources
+without a file list to update.
 The old Windows applications and extracted regression harnesses are explained in
 [history](history.md); they are not an alternate implementation of the current API.

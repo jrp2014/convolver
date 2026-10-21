@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver: current repository review
 
 Documentation and source cross-check dated **20 October 2026**, baseline

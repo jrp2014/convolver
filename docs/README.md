@@ -27,6 +27,7 @@ Convolver applies that response continuously to every input sample.
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
 | Understand version numbers and tags | [Source versioning](versioning.md) |
 | Edit these documents | [Documentation maintenance](documentation.md) |
+| Pick up, hand over or review a piece of work | [Taking on and reviewing work](workflow.md) |
 | Learn where Convolver came from | [History](history.md) |
 
 ## All maintained pages
@@ -47,6 +48,7 @@ Convolver applies that response continuously to every input sample.
 | [Modernization direction](modernization.md) | Priorities and dependency choices |
 | [Source versioning](versioning.md) | `VERSION`, automatic tags, recovery |
 | [Documentation maintenance](documentation.md) | Which page owns each topic; link checks |
+| [Taking on and reviewing work](workflow.md) | Claiming a TODO item, handoff notes, definition of done, review and merge, repository checks |
 | [History](history.md) | Provenance, historical builds, downstream use |
 | [convolverPipe](convolverPipe.md) | The recovered historical streaming tool (Windows only) |
 
@@ -78,11 +80,12 @@ For maintainers and coding agents, [AGENTS.md](../AGENTS.md) supplies repository
 rules. The [implementation map](project-structure.md#change-and-test-map) connects
 changes to source files, invariants and tests without requiring a history lesson.
 
-## Plans for further adapters
+## Open plans
 
-These dated plans propose adapters that do not exist yet; open work and the
-current order are tracked in [TODO](../TODO.md#execution-priorities). The
-plug-in formats plan is the current direction; the other two are parked.
+These dated plans in [`plans/`](plans/) describe work that is not finished;
+open work and the current order are tracked in
+[TODO](../TODO.md#execution-priorities). The plug-in formats plan is the
+current direction; the Media Foundation and FFmpeg plans are parked.
 
 - [Plug-in formats: VST3, LV2 and AU](plans/2026-10-21-plugin-formats.md)
   (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
@@ -94,3 +97,7 @@ plug-in formats plan is the current direction; the other two are parked.
   for system-wide processing.
 - [FFmpeg filter](plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
+- [Plug-in distribution](plans/2026-10-18-plugin-distribution.md) and its
+  [design](plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
+  the 18 October release design. The packaging it describes is merged; signing
+  and production qualification are open.

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Configuration compatibility
 
 [Documentation index](README.md) · [Configuration format](configuration.md) · [Inspection options](portable-core.md#inspecting-and-validating-configurations)

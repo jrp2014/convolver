@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Run the production gain loops without the legacy Windows/FFT dependencies.
 
 The source statements are extracted verbatim and compiled with AddressSanitizer.

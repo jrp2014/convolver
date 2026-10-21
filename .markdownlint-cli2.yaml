@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: GPL-2.0-or-later
 config:
   # Markdown is soft-wrapped; commands, URLs and tables can exceed prose width.
   MD013: false

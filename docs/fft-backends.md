@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # FFT backends and measurements
 
 [Documentation index](README.md) · [Concepts](concepts.md) · [Open FFT work](../TODO.md#fft-libraries-and-performance)
