@@ -20,8 +20,8 @@ jobs:
             fft: FFTW
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: steinbergmedia/vst3sdk
           ref: 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96  # SDK 3.8.1 build 84
@@ -30,7 +30,7 @@ jobs:
       - name: SDK dependencies
         working-directory: build-sdk
         run: git submodule update --init --depth 1 base cmake pluginterfaces public.sdk
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Linux libraries
@@ -54,7 +54,7 @@ jobs:
           "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
       - name: Cache vcpkg binary archives
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/vcpkg-binary-cache
           key: >-

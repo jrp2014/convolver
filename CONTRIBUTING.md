@@ -86,6 +86,12 @@ pages; links into them must still resolve. It checks local destinations and
 supported heading/HTML anchors, not external websites or agreement with code.
 See [documentation maintenance](docs/documentation.md#automated-checks) for scope.
 
+Workflows use the latest major release of each action. Dependabot
+(`.github/dependabot.yml`) checks weekly and opens one grouped pull request when
+an action has a new release; review its release notes for changed inputs before
+merging. `ilammy/msvc-dev-cmd` has no Node 24 release yet, so GitHub still runs
+it on Node 24 with a deprecation warning.
+
 CI caches pre-commit environments by operating system, architecture, exact Python
 and Node versions, and `.pre-commit-config.yaml`. Windows jobs cache vcpkg binary
 archives separately for dynamic and static triplets. Their keys include the runner

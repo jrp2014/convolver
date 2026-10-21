@@ -30,8 +30,8 @@ jobs:
             build: Debug
             sanitizers: 'ON'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Linux dependencies
@@ -95,8 +95,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Prepare vcpkg binary cache
@@ -112,7 +112,7 @@ jobs:
           "revision=$revision" >> $env:GITHUB_OUTPUT
           "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
       - name: Cache vcpkg binary archives
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/vcpkg-binary-cache
           key: >-

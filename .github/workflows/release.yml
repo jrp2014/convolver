@@ -14,8 +14,8 @@ jobs:
   sources:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Check release contracts
@@ -30,7 +30,7 @@ jobs:
           python scripts/release/build_sources.py
           --cache build/downloads --fetch
           --output build/Convolver-source.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: corresponding-source
           path: build/Convolver-source.tar.gz
@@ -54,15 +54,15 @@ jobs:
     env:
       CANDIDATE_PLATFORM: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
         with:
           arch: x64
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: corresponding-source
           path: build/source
@@ -96,12 +96,12 @@ jobs:
           tests/release/source_build.py
           --archive build/source/Convolver-source.tar.gz
           --cmake "$(command -v cmake)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: candidate-${{ matrix.platform }}
           path: build/assets/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: diagnostics-${{ matrix.platform }}
@@ -113,11 +113,11 @@ jobs:
     needs: candidates
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: candidate-*
           merge-multiple: true
@@ -126,7 +126,7 @@ jobs:
         run: >-
           python scripts/release/collect_candidate.py
           --root build/assets --output build/assets/candidate.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: complete-preview-candidate
           path: build/assets/*
