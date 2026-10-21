@@ -128,14 +128,24 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 - [Testing](docs/testing.md) and [contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md) and [current review](REVIEW.md)
 
-## History
+## About this project
 
-Convolver started in 2005 as a set of Windows applications: a Windows Media
-Player plug-in, a DirectShow filter, a VST 2 plug-in and command-line tools. Their
-documentation is at <https://convolver.sourceforge.net/>. That code is preserved
-in [`convolver/`](convolver/) but is not built by this project. The
-[history page](docs/history.md) explains where it came from and how the
-portable implementation replaced it.
+> Convolver began in 2005 as a set of Windows applications by JRP: a Windows
+> Media Player plug-in, a DirectShow filter, a VST 2 plug-in and command-line
+> tools, released on SourceForge up to version 4.4. The project's original
+> website and documentation are still at
+> [convolver.sourceforge.net](https://convolver.sourceforge.net/), and its
+> releases at
+> [sourceforge.net/projects/convolver](https://sourceforge.net/projects/convolver/).
+> That documentation describes the historical Windows applications, not the
+> portable version in this repository.
+
+The historical source is preserved in [`convolver/`](convolver/) but is not
+built by this project, and an archived copy of the 4.4 website is in
+[`docs/historical/`](docs/historical/convolver-4.4/README.md). The
+[history page](docs/history.md) explains where the code came from, how the
+portable implementation replaced it and
+[how the two differ](docs/history.md#how-the-portable-version-differs).
 
 ## Licence
 

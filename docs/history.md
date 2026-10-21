@@ -104,6 +104,34 @@ and measured optimization work, and the [modernization direction](modernization.
 explains its priorities.
 Earlier 4.3 assessments are in the [review archive](archive/reviews/README.md).
 
+### How the portable version differs
+
+Both engines use uniformly partitioned FFT convolution in single precision and
+read the same `.cfg` syntax. The main differences, checked against the source
+at 0.4:
+
+| | Historical Windows applications (4.x) | Portable implementation |
+| --- | --- | --- |
+| Platforms and hosts | Windows only: WMP plug-in, DirectShow filter, VST 2, `convolverCMD`, `convolverPipe` | macOS, Linux and Windows: CLI, VST3 plug-in and C++ libraries |
+| Choosing latency | You choose the number of partitions; latency is the partition length, so it grows with filter length | You choose the block size B (default 256); latency is B frames whatever the filter length |
+| Algorithm | Overlap-save, accumulating a ring of output spectra | Overlap-add with a ring of input spectra, shared between paths with the same input mix |
+| Filter lengths | Every path's IR must have the same length | Paths may use IRs of different lengths |
+| Rendering a file | Output has the input's length: the processing delay is kept and the filter tail cut off | Processing delay removed and the whole tail written (`--keep-latency` keeps the delay) |
+| Changing filters in a plug-in | Rebuilt while holding the audio lock, so FFTW planning can interrupt audio | Prepared off the audio thread, then crossfaded in; the audio path does not allocate, lock or read files |
+| Saved plug-in state | The filter's file path | The filter itself, so a project still loads if the files move |
+| FFTW planning | Chosen per instance, with a `wisdom.fftw` file beside the program | Fast estimate by default; plans tuned once with `--tune-fft` and loaded with `--fft-wisdom` |
+| Configuration paths | Windows paths; the bundled samples use absolute drive paths | Relative to the configuration on every platform; `\` separators accepted; drive letters explained, not guessed |
+
+Features once found only in the historical engine were ported in 0.4.0: dither
+and the five noise shapers on every integer format, PCM8 output, valid-bits
+output, the optimum-attenuation estimate, list selection by output channels,
+exhaustive and time-limited FFTW planning, the Ooura FFT and plug-in buses of up
+to 8 channels. What remains only in the historical code is the Windows media
+player integration (WMP and DirectShow), the VST 2 build and double-precision
+output formats. The bundled 2005–2006 sample configurations predate the 3.0
+format or use absolute paths, so they need editing before the portable reader
+accepts them; see [bundled samples](configuration-compatibility.md#bundled-historical-samples).
+
 ## Downstream use
 
 The [17 October investigation](review-2026-10/downstream-evidence.json) records
