@@ -39,7 +39,7 @@ the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
 | 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks named speaker arrangements against it, and version-1 presets keep loading. |
 | 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
-| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU licence is decided before AU-1. |
+| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
@@ -198,9 +198,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (`frames / sample rate`), and bypass through `HostProcessor::set_bypass`
   rather than `AUEffectBase`'s pass-through (which skips the delayed dry path
   and ramp and handles N→M poorly). Tests using PLUG-2, plus bypass, tails,
-  silence flags and 2→6. Decide the component's licence first: AudioUnitSDK is
-  Apache-2.0, which is compatible with GPLv3 but not GPLv2 (see the
-  [plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#au-licence)).
+  silence flags and 2→6. Licence (owner's decision, 21 October 2026): the AU
+  component is distributed under GPL-3.0-or-later because AudioUnitSDK is
+  Apache-2.0, which is compatible with GPLv3 but not GPLv2; ship its notices
+  (see the [plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#au-licence)).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu.
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI.
