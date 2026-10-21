@@ -4,7 +4,8 @@
 Open improvement ideas for the active portable implementation. This is the shared
 backlog, not a promise that every idea will be implemented. The baseline inventory
 was checked on 20 October 2026 against `2fe503e`; Ooura and the adapter plans were
-reviewed on 21 October against `75f3924`. Keep completed behavior in the guides and
+reviewed on 21 October against `75f3924`, and the plug-in plans again against
+`4e1bb1b` after the owner's review. Keep completed behavior in the guides and
 [CHANGELOG](CHANGELOG.md), and keep this list for outstanding work.
 
 In short: the main open themes are first-use examples and documentation
@@ -35,10 +36,11 @@ the [plug-in formats plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md).
 | --- | --- | --- |
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Now | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI. |
-| 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks speaker arrangements against it. |
+| 1. Now | **PLUG-4** with **VST3-1:** layout list and permanent identities | One recorded list of layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; VST3 checks named speaker arrangements against it, and version-1 presets keep loading. |
+| 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
-| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons; **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. |
-| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned on macOS and Windows (owner's decision, 21 October 2026); see PLUG-5. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU licence is decided before AU-1. |
+| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
@@ -111,26 +113,62 @@ Shared groundwork, done once so the three streams stay independent:
   unless FFTW was chosen, imports none. The release policy uses the same
   backends and ships FFTW's notice only when FFTW is linked. See
   [plug-in builds](docs/fft-backends.md#plug-in-builds).
-- [ ] **PLUG-2 — Shared adapter test harness.** Common fixtures (mono, stereo,
-  2→6 crossover; with DOC-1) and a comparison against the CLI render, used by
-  every adapter's tests.
-- [ ] **PLUG-3 — One preset tool.** Extend `convolver-vst3-preset` into a tool
-  writing `.vstpreset`, `.aupreset` and LV2 presets from the same host state.
+- [ ] **PLUG-2 — Shared adapter test harness.** Two references for every
+  adapter: the independent double-precision convolution oracle (the authority)
+  and the CLI render (adapter equivalence; both share the engine, so the CLI
+  alone could hide a shared defect). Fixed tolerance (1e-5 against the oracle,
+  identical to the CLI once latency is aligned), exact latency and tail values,
+  and distinct IRs per route so channel order is checked. Cases: initial
+  restoration, live replacement, failed initial load and failed replacement,
+  empty instance, bypass, reset, silence flags, variable blocks, in-place
+  buffers, mono, stereo and 2→6. Reuse `scripts/release/generate_examples.py`
+  and the oracle helpers in `tests/vst3/pluginval_tests.py` rather than adding
+  a second fixture system; DOC-1 documents the same fixtures. See the
+  [harness spec](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-test-harness-plug-2).
+- [ ] **PLUG-3 — One preset tool.** `convolver-preset`, writing `.vstpreset`,
+  `.aupreset` and LV2 presets from the same host state. It must build without
+  the VST3 SDK so AU and LV2 builds can ship it; `.vstpreset` output uses the SDK
+  when present or a small writer of the documented format tested against the
+  SDK's reader. Keep `convolver-vst3-preset` working with the same arguments and
+  output for existing scripts.
 - [ ] **PLUG-4 — Layouts and identities.** One list of supported channel layouts
   and a registry of permanent IDs: VST3 class IDs, AU codes (`aufx`/`Conv`/`CONV`,
   chosen 21 October 2026; Apple no longer runs a registration service), LV2 URIs.
-  Tell forks to change them.
-- [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats, with macOS
-  signing and notarization shared by VST3 and AU. Extend the merged VST3
-  pipeline (`packaging/release-policy.json`, `scripts/release/`,
+  Tell forks to change them. Each side of a filter is either discrete (numbered
+  channels, any arrangement with that count) or a named speaker layout; the
+  current state records counts and an output mask only, so version-1 presets
+  stay "unspecified", load on any arrangement with matching counts, and are
+  never rejected by stricter checks. Recording an input layout needs state
+  version 2. See [channel layouts](docs/superpowers/plans/2026-10-21-lv2-plugin.md#channel-layouts-and-old-presets).
+- [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
+  merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
   `.github/workflows/release.yml`) rather than writing a new one. Signing
   (owner's decision, 21 October 2026): start unsigned on macOS and Windows.
   Mac bundles still carry an ad-hoc signature (Apple Silicon will not load
   unsigned code) and the install guide explains removing the download
   quarantine; Windows installers show a SmartScreen warning. Label these
-  releases as unsigned previews. Developer ID signing with notarization, and
-  Authenticode, come later as the production gate in the distribution plan;
+  releases as unsigned previews. The preview gate and the production gate are
+  separate ([criteria](docs/superpowers/plans/2026-10-21-lv2-plugin.md#unsigned-previews-and-production)):
+  signing is not a prerequisite for a preview. The candidate workflow cannot
+  publish, so publication is a manual step owned by jrp: pick one green
+  candidate run on a tagged commit, upload exactly its `collect` files to a
+  GitHub pre-release with their SHA-256 sums and download instructions, and
+  never replace an asset afterwards. Developer ID signing with notarization
+  (shared by VST3 and AU), and Authenticode, come later as the production gate;
   the draft signing scripts remain on the `codex/plugin-distribution` branch.
+- [ ] **PLUG-6 — Pin format dependencies.** AudioUnitSDK by commit and
+  checksum (like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and
+  `lv2lint`: shipped code in `packaging/release-policy.json`, test tools in CI.
+
+Shared adapter contract, for every format (detail in the
+[plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#shared-adapter-contract)):
+a failed replacement keeps the running filter, with an explicit error; initial
+restoration installs the filter directly, without a crossfade; an empty
+instance and a failed initial load have one stated, tested behaviour (owner to
+confirm the proposal: identity for an empty instance with equal counts, silence
+otherwise and after a failed initial load). VST3 currently lets a rejected
+preset loaded while inactive replace the saved state; fix that under this
+contract.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -138,10 +176,13 @@ LV2 (Linux first; also PipeWire system audio):
   bypass ports; a `lilv` test using PLUG-2.
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
-  path, and PipeWire-style restore from a bare path string. `HostProcessor`
-  control calls must be serialized, but LV2 can call state restore on the main
-  thread while the worker loads a file: route both through the worker or guard
-  them with an adapter lock that the audio thread never takes.
+  path, and PipeWire-style restore from a bare path string. Follow the
+  [worker and state lifecycle](docs/superpowers/plans/2026-10-21-lv2-plugin.md#lv2-adapter-design):
+  one adapter lock for all `HostProcessor` control calls that `run()` never
+  takes; no `state:threadSafeRestore` at first; initial restoration installs
+  directly; rapid loads coalesce to the newest; defined handling of scheduling
+  failure, saving during a load, synchronous (free-wheel) work and teardown
+  with work outstanding, each with a test.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
 - [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
@@ -152,13 +193,21 @@ LV2 (Linux first; also PipeWire system audio):
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-1 — Adapter and test.** `plugins/au/` on Apple's AudioUnitSDK:
-  PLUG-4 channel configurations, latency, tail and bypass; tests using PLUG-2.
+  PLUG-4 channel configurations, latency and tail reported in **seconds**
+  (`frames / sample rate`), and bypass through `HostProcessor::set_bypass`
+  rather than `AUEffectBase`'s pass-through (which skips the delayed dry path
+  and ramp and handles N→M poorly). Tests using PLUG-2, plus bypass, tails,
+  silence flags and 2→6. Decide the component's licence first: AudioUnitSDK is
+  Apache-2.0, which is compatible with GPLv3 but not GPLv2 (see the
+  [plan](docs/superpowers/plans/2026-10-21-lv2-plugin.md#au-licence)).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu.
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI.
 - [ ] **AU-4 — User guide and host matrix.** `docs/au.md`; Logic, GarageBand,
-  SoundSource, Live and REAPER results.
-- [ ] **AU-5 — Release.** Signed, notarized component under PLUG-5.
+  SoundSource, Live, REAPER and FL Studio results.
+- [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
+  signed, documented quarantine removal). Developer ID signing and
+  notarization follow at the production gate.
 
 ## FFmpeg integration
 
