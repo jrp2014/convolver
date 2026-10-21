@@ -26,6 +26,7 @@ For the audio vocabulary, start with [concepts](concepts.md).
 | VST3 adapter and preset writer | [`processor.cpp`](../plugins/vst3/processor.cpp), [`processor.hpp`](../plugins/vst3/processor.hpp), [`preset.cpp`](../plugins/vst3/preset.cpp) | SDK boundary; stream processing goes through `HostProcessor` |
 | Build, exports and feature switches | [`CMakeLists.txt`](../CMakeLists.txt), [`CMakePresets.json`](../CMakePresets.json), [`cmake/`](../cmake/) | Static core/host/io components; see [package guide](cmake-package.md) |
 | Version generation | [`VERSION`](../VERSION), [`version_source.py`](../scripts/version_source.py), [`ConvolverBuildVersion.cmake`](../cmake/ConvolverBuildVersion.cmake) | One numeric version source; Git identity added to build strings |
+| Plug-in distribution | [`release-policy.json`](../packaging/release-policy.json), [`scripts/release/`](../scripts/release/), [`ConvolverPluginPackaging.cmake`](../cmake/ConvolverPluginPackaging.cmake), [release workflow](../.github/workflows/release.yml) | Optional (`CONVOLVER_PACKAGE_PLUGINS`); pinned dependencies, staging, installers and gates; tests in `tests/release/` |
 
 ## Processing data flow
 

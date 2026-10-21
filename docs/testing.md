@@ -226,3 +226,18 @@ replay. Push CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
 resource bounds. A manual workflow run defaults to 600 seconds per target;
 set its `seconds` input to `60` to reproduce the smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
+
+## Plug-in candidate checks
+
+The read-only candidate workflow builds native preview archives on Windows x64,
+Linux x64 and both macOS architectures. It checks runtime dependency closure,
+source inventories, final ZIP relocation, executable quickstart examples and
+real SDK validation. Windows also compiles a fixture installer and exercises
+changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
+the supplied source with networking disabled. See the
+[qualification record](releases/developer-preview.md) for external gates.
+
+Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
+policy rejects ad-hoc code. These runs retain signature-integrity and standalone
+adapter checks but omit all dynamic SDK bundle loading; they are not release
+qualification. Never bypass system security to turn those checks green.

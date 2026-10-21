@@ -201,10 +201,11 @@ component chunk; given raw component state, JUCE leaves the plug-in empty and
 it passes delayed dry audio. CI pins pluginval 2.0.0-beta3 by checksum.
 
 The VST3 CI matrix runs on Linux, Windows and macOS. These automated checks are
-not proof of hard real-time deadlines or compatibility with every DAW. Commercial
-DAW testing, installers, dependency bundling, signing/notarization and a custom
-file-picker editor remain separate release work. VST3 exchanges floating-point
-audio, so the CLI/file writer's integer quantization and dither does not apply to it.
+not proof of hard real-time deadlines or compatibility with every DAW. The
+[plug-in distribution guide](plugins/index.md) covers pinned, unsigned preview
+archives, installer templates and corresponding source. Commercial DAW testing,
+signing, clean-machine installation and a custom file-picker editor remain
+separate release work. VST3 exchanges floating-point audio, so the CLI/file writer's integer quantization and dither does not apply to it.
 
 Source entry points and the change/test map are in [the implementation guide](project-structure.md).
 Release gaps and intentional constraints are tracked in [TODO](../TODO.md#documented-limitations).
