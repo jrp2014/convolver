@@ -4,6 +4,8 @@
 #include <Accelerate/Accelerate.h>
 #include <algorithm>
 #include <bit>
+#include <cstddef>
+#include <new>
 #include <stdexcept>
 #include <vector>
 
@@ -24,6 +26,27 @@ std::string export_fft_wisdom() {
     throw std::invalid_argument("wisdom requires the FFTW backend");
 }
 namespace detail {
+namespace {
+// vDSP may pick a different code path, and so round differently, depending on
+// how its buffers are aligned. Plain vectors land at varying alignments from one
+// process to the next (macOS 26 randomises heap placement), so separate runs on
+// the same input could differ in the last bit. A fixed alignment avoids that.
+template <class T> struct Aligned {
+    using value_type = T;
+    static constexpr std::align_val_t alignment{64};
+    Aligned() = default;
+    template <class U> Aligned(const Aligned<U>&) noexcept {}
+    T* allocate(std::size_t n) {
+        return static_cast<T*>(::operator new(n * sizeof(T), alignment));
+    }
+    void deallocate(T* p, std::size_t) noexcept {
+        ::operator delete(p, alignment);
+    }
+    template <class U> bool operator==(const Aligned<U>&) const noexcept {
+        return true;
+    }
+};
+} // namespace
 // Use at least four real points; padding leaves audio block/latency unchanged.
 std::size_t fft_size(std::size_t b) noexcept {
     return std::max(std::size_t(4), std::bit_ceil(2 * b));
@@ -34,7 +57,7 @@ std::size_t fft_storage(std::size_t n) noexcept {
 struct RealFft::Impl {
     std::size_t n, half;
     vDSP_Length log2;
-    std::vector<float> time, frequency, sum, real, imag;
+    std::vector<float, Aligned<float>> time, frequency, sum, real, imag;
     FFTSetup setup = nullptr;
     explicit Impl(std::size_t length, FftOptions options)
         : n(length), half(n / 2), log2(std::bit_width(n) - 1), time(n), frequency(n + 2),
