@@ -8,9 +8,10 @@ backlog, not a promise that every idea will be implemented. Checked on 20 Octobe
 
 In short: the main open themes are first-use examples and documentation
 automation (DOC), plug-in release qualification and host testing (REL, HOST),
-checks against other configuration readers (CFG), large files and resampling
-(IO), precise no-clip headroom (GAIN), longer stress testing (ROBUST), and FFT or
-performance work only where measurements justify it (FFT, PERF). The
+unused VST3 SDK features (VST3), checks against other configuration readers
+(CFG), large files and resampling (IO), precise no-clip headroom (GAIN), longer
+stress testing (ROBUST), and FFT or performance work only where measurements
+justify it (FFT, PERF). The
 [limitations table](#documented-limitations) lists current constraints.
 
 Each item has a stable ID. When taking one on, record the owner/issue or branch,
@@ -36,7 +37,8 @@ speed. Do not change the historical archive to implement a portable feature.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
-  validation alone does not complete this item.
+  validation and pluginval alone do not complete this item. Steinberg's free
+  VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
 - [ ] **HOST-2 — Additional formats and UI.** Assess Audio Unit for Apple users,
   [CLAP](https://github.com/free-audio/clap), and a filter-loading editor against
   actual user needs. Keep the core and host lifecycle reusable; require host tests
@@ -65,6 +67,57 @@ speed. Do not change the historical archive to implement a portable feature.
 - [ ] **ROBUST-2 — Bound report output.** Review traversal/report growth after the
   configuration-visit limit and diagnostic truncation, including huge invalid
   lists. Bound reporting work as well as file reads.
+
+## VST3 SDK features not yet used
+
+Checked against VST SDK 3.8.1 (`pluginterfaces/`, the developer portal's 3.8.0
+and 3.8.1 change notes) on 21 October 2026. The adapter already uses one main
+input/output bus, 32/64-bit processing, silence flags, sample-accurate bypass
+(`kIsBypass`), latency/tail reporting, component state, generated
+`moduleinfo.json` and the default (empty) process-context requirements. Items
+below are candidates; adopt each only with adapter, validator and pluginval tests.
+
+- [ ] **VST3-1 — Speaker arrangements, not only channel counts.** The adapter
+  accepts any arrangement with 1–8 channels and routes by index, so a 7.1 filter
+  could run on a different 8-channel layout without warning. Record the intended
+  arrangement (or the WAV channel mask from `--speaker-map`) in the preset, check
+  or map it in `setBusArrangements`, and decide whether to offer layouts above 8
+  channels (`SpeakerArr`, for example 7.1.4).
+- [ ] **VST3-2 — Switch filters from the host without an editor.** Expose a set of
+  filters as a program list (`IUnitInfo`, `IProgramListData`, a `kIsProgramChange`
+  parameter), for example the entries of a configuration list, possibly chosen
+  automatically by host rate and layout. Hosts can then switch filters in generic
+  UIs and automation. Changes reuse the existing crossfading replacement.
+- [ ] **VST3-3 — Editor and controller-processor messaging.** A filter-loading
+  editor (HOST-2) needs `IPlugView` (VSTGUI 4.15 or native), content scaling
+  (`IPlugViewContentScaleSupport`), Linux X11/Wayland (preview in 3.8), and
+  `IConnectionPoint`/`IMessage` to pass a chosen file or prepared filter to the
+  processor off the audio thread. `IDataExchangeHandler` could feed meters.
+  Plug-in snapshots for host browsers (`smtg_target_add_plugin_snapshots`)
+  need an editor first.
+- [ ] **VST3-4 — Mix, gain and low-latency parameters.** Consider dry/wet and
+  output-gain parameters, tagged with `IParameterFunctionName` (`kDryWetMix`) so
+  hosts can find them. A `kLowLatencyMode` switch only makes sense if PERF-2
+  provides a lower-latency mode; changing latency then needs
+  `restartComponent(kLatencyChanged)` and tests in hosts that compensate it.
+- [ ] **VST3-5 — Progress for slow filter preparation.** `setState` prepares the
+  filter synchronously on the host's thread. Measure the worst case for long,
+  multichannel filters (including FFTW planning) and, if hosts stall noticeably,
+  report it with `IProgress` (`AsyncStateRestoration`) or move preparation to a
+  worker.
+- [ ] **VST3-6 — Replacing the old VST2 plug-in.** If a migration requirement is
+  defined (see limitations), declare the VST2 ID `'Conv'` in `moduleinfo.json`'s
+  `Compatibility` section or `IPluginCompatibility`, and map old parameters with
+  `IRemapParamID`. Old VST2 chunk state would still need a converter.
+
+Not relevant to a convolver unless the product changes: MIDI and note
+interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
+articulations), `ITransportControl`, `IPrefetchableSupport`,
+`IAudioPresentationLatency`, `IInfoListener` (track name/colour),
+`IAutomationState`, `IXmlRepresentationController`,
+`IEditControllerHostEditing`, `IParameterFinder`, side-chain or auxiliary buses,
+`IComponent::setIoMode`, and `IStreamAttributes` (presets embed their filters,
+so the preset file path is not needed).
 
 ## FFT libraries and performance
 
@@ -106,8 +159,8 @@ with compatibility tests; linked IDs point to open work above.
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate wider layouts/editor under HOST-1/HOST-2. | [VST3](docs/vst3.md#loading-filters) |
-| No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one. | [VST3](docs/vst3.md#loading-filters) |
+| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate layouts/editor under HOST-1/HOST-2 and VST3-1 to VST3-3. | [VST3](docs/vst3.md#loading-filters) |
+| No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/vst3.md#loading-filters) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/portable-core.md#fftw-plan-tuning) |
