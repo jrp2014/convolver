@@ -80,7 +80,8 @@ Use `pre-commit run --files <paths>` to include new files before staging them;
 The local hooks also check maintained Markdown links and the repository rules
 (TODO IDs, the documentation index, plan folders, paths named in agent
 guidance, licence lines and the top-level layout), and run both checkers'
-regression tests on every invocation. They use only Python's standard library
+regression tests on every invocation. A further hook checks the
+[permanent plug-in identities](docs/plugin-identities.md#changing-the-registry). They use only Python's standard library
 and can be run independently:
 
 ```sh
@@ -88,6 +89,7 @@ python3 scripts/check_doc_links.py
 python3 tests/documentation_links_tests.py
 python3 scripts/check_repository.py
 python3 tests/repository_checks_tests.py
+python3 tests/identities_tests.py
 ```
 
 [Repository checks](docs/workflow.md#automated-checks) lists each rule and what

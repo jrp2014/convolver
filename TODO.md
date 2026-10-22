@@ -38,7 +38,7 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | --- | --- | --- |
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Now | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI. |
-| 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading. Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
+| 1. Now | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading. Awaiting jrp's decision on the LV2 URIs and macOS identifiers. Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
 | 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
@@ -135,7 +135,15 @@ Shared groundwork, done once so the three streams stay independent:
   when present or a small writer of the documented format tested against the
   SDK's reader. Keep `convolver-vst3-preset` working with the same arguments and
   output for existing scripts.
-- [x] **PLUG-4 — Layouts and identities.** Done 22 October 2026 (PR #27).
+- [ ] **PLUG-4 — Layouts and identities.** One list of supported channel layouts
+  and a registry of permanent IDs: VST3 class IDs, AU codes (`aufx`/`Conv`/`CONV`,
+  chosen 21 October 2026; Apple no longer runs a registration service), LV2 URIs.
+  Ask forks to change them. Version-1 presets stay "unspecified", load on any
+  arrangement with matching counts, and are never rejected by stricter checks.
+  Remaining: jrp's decision on the proposed LV2 URI scheme and fixed layouts, and
+  on moving the macOS identifiers from `org.convolver.*` to
+  `io.github.jrp2014.convolver.*`; then tick this item.
+  Progress (22 October 2026, PR #27):
   [`plugins/identities.json`](plugins/identities.json) records the permanent IDs
   (VST3 class IDs, AU `aufx`/`Conv`/`CONV` chosen 21 October 2026, LV2 URIs,
   macOS bundle and installer IDs, Windows installer keys, host-state magic), the
@@ -146,7 +154,7 @@ Shared groundwork, done once so the three streams stay independent:
   copies; also in pre-commit), `vst3.identities` (bundle class IDs and bundle
   identifier, SDK speaker bits), and `vst3.adapter`'s `version1_presets`
   (version-1 presets with any output mask load on every six-channel arrangement
-  and route by bus index). Forks are told to change every value in the
+  and route by bus index). Modified builds are asked to change every value in the
   [identities guide](docs/plugin-identities.md), which owns the layout rules.
   Recording an input layout still needs state version 2 (an owner's decision).
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the

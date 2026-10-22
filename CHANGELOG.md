@@ -18,8 +18,9 @@ Until 1.0 the C++ API may change between minor versions.
   installer keys and the speaker meaning of each WAV channel-mask bit in VST3, AU
   and LV2. The build generates `convolver_identities.hpp` from it, and new tests
   (`identities`, `vst3.identities`) stop identities from changing or being copied
-  elsewhere. See [plug-in identities](docs/plugin-identities.md); forks must
-  change every value.
+  elsewhere. See [plug-in identities](docs/plugin-identities.md); modified
+  builds should change every value. The LV2 URIs and fixed layouts are proposals
+  awaiting jrp's decision.
 - VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
   [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
   Linux, macOS (with real-time-safety checks) and Windows, plus acceptance
@@ -36,10 +37,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
-- The macOS VST3 bundle identifier is `io.github.jrp2014.convolver.vst3` and the
-  installer package identifiers `io.github.jrp2014.convolver.pkg.vst3` and
-  `.pkg.tools` (they were `org.convolver.*`, a domain the project does not
-  control). No release used the old identifiers.
+- Proposed, awaiting jrp's decision in PR #27: the macOS VST3 bundle identifier
+  becomes `io.github.jrp2014.convolver.vst3` and the installer package
+  identifiers `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
+  `org.convolver.*`, a domain the project does not control). No release used
+  the old identifiers.
 - The preserved 2005–2006 Windows source moved from `convolver/` to
   `historical/`, so the top-level folder named after the project is no longer
   the old code. Open plans moved from `docs/superpowers/` to `docs/plans/`.

@@ -10,7 +10,7 @@ and installer identifiers. Hosts save these codes in projects and presets, so
 once a build using them is released they **never change**. They are recorded
 once, in [`plugins/identities.json`](../plugins/identities.json), together with
 the channel layouts the plug-ins support; the build and the release scripts
-read them from there. **If you distribute a modified build, change every
+read them from there. **If you distribute a modified build, please change every
 identity in that file** so hosts do not confuse your plug-in with this one.
 Presets saved today (state version 1) record no channel layout and keep
 loading on any host arrangement with the same channel counts.
@@ -52,11 +52,14 @@ ID.
 
 ## If you distribute a modified build
 
-Change **every** value in `plugins/identities.json` before you distribute
-anything: generate two new VST3 class IDs (any 128-bit random values, written as
+Please change **every** value in `plugins/identities.json` before you
+distribute anything. This is a request to avoid confusing hosts and users, not
+a condition of the licence: generate two new VST3 class IDs (any 128-bit random values, written as
 32 uppercase hex digits), choose your own AU manufacturer code, use an LV2 URI
 base and macOS identifiers under a domain or account you control, and rename the
-Windows registry keys. Then update the frozen copy in
+Windows registry keys. `packaging/macos/Distribution.xml` and
+`packaging/windows/installer.nsi` repeat the installer identifiers, so edit them
+to match; the tests check that they agree. Then update the frozen copy in
 [`tests/identities_tests.py`](../tests/identities_tests.py). Keep the host-state
 magic only if your state format stays identical.
 
@@ -80,8 +83,16 @@ meanings:
 
 The registry's `speakers` list names each mask bit for every format. Bits 0 to 17
 of a WAV mask, a VST3 `SpeakerArrangement` and an AU `AudioChannelBitmap` have
-the same meaning, so no translation table is needed for VST3 or AU: bit 4 is
-WAV `BL`, VST3 `kSpeakerLs` and AU `kAudioChannelBit_LeftSurround`. LV2 names
+the same meaning: bit 4 is WAV `BL`, VST3 `kSpeakerLs` and AU
+`kAudioChannelBit_LeftSurround`. VST3 arrangements also order their channels by
+bit, so VST3 needs no translation. AU hosts usually describe a layout by a
+layout tag or by channel labels instead, and their channel order need not be bit
+order (`kAudioChannelLayoutTag_MPEG_5_1_C` is L C R Ls Rs LFE); some labels have
+no bit at all. The AU adapter must therefore convert a tag or label list to a
+mask and a channel map (for example with `kAudioFormatProperty_BitmapForLayoutTag`)
+before comparing. Note too that 5.1 has two masks: `0x3F` with back speakers
+(VST3 `k51`) and `0x60F` with side speakers; a strict check must decide whether
+to treat them as the same layout. LV2 names
 speakers with [port-group](https://lv2plug.in/ns/ext/port-groups) designations;
 it has none for the height speakers (bits 11 to 17), so a layout using them can
 only be discrete in LV2. The `vst3.identities` test checks the VST3 column
@@ -137,8 +148,11 @@ different six-channel arrangements, and checks every output by bus index.
 
 [`tests/identities_tests.py`](../tests/identities_tests.py) runs in pre-commit,
 lint CI and CTest (`identities`). It checks each format's rules, that the
-registry still equals its frozen copy, that the installer files agree with it,
-and that no source file keeps its own copy of an identity. So:
+registry still equals its frozen copy (every fixed layout included), that the
+installer files agree with it, and that no other text file in the repository
+keeps its own copy of a class ID, bundle identifier or LV2 URI base. AU codes
+such as `Conv` are too common a word to search for, so reviews must catch
+copies of those. So:
 
 - **Adding** a fixed layout, a speaker or a new format's identity: edit the
   registry and the frozen copy in the test.

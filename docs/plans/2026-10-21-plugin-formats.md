@@ -6,8 +6,9 @@ and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
 [plug-in distribution plan](2026-10-18-plugin-distribution.md).
-**Current state:** PLUG-1 (the plug-in FFT backend) and PLUG-4 (the
-[identity and layout registry](../plugin-identities.md)) are implemented. Everything
+**Current state:** PLUG-1 (the plug-in FFT backend) is implemented, and PLUG-4
+(the [identity and layout registry](../plugin-identities.md)) is implemented
+pending the owner's decision on its proposed LV2 and macOS identifiers. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
 and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
@@ -286,7 +287,7 @@ Per format:
   `kAudioUnitProperty_SupportedChannelLayoutTags`; discrete uses
   `kAudioChannelLayoutTag_DiscreteInOrder`.
 - **LV2:** ports are fixed per plug-in URI. Named layouts use port groups and
-  `lv2:designation` (for example `pg:FiveDotOneGroup`); discrete ports have no
+  `lv2:designation` (for example `pg:FivePointOneGroup`); discrete ports have no
   designation.
 
 ## Shared test harness (PLUG-2)
@@ -695,7 +696,13 @@ the LV2 plug-in serve FFmpeg too.
   running filter in every adapter, with an explicit error indication. Adopted
   in the contract above; VST3 needs a fix for presets loaded while inactive.
 - Which channel layouts to publish as LV2 URIs. Recommendation: the eight
-  above, all discrete, added to only on request.
+  above, all discrete, added to only on request, as
+  `https://github.com/jrp2014/convolver/lv2#discrete-2-6` and so on (PLUG-4
+  registry; awaiting the owner).
+- The LV2 URI base and the macOS identifier namespace (PLUG-4). Recommendation:
+  `https://github.com/jrp2014/convolver/lv2#`, and `io.github.jrp2014.convolver.*`
+  in place of `org.convolver.*` (a domain the project does not control) before
+  the first release. Awaiting the owner.
 - Whether restore prefers the embedded filter or the file. Recommendation:
   embedded, as VST3 presets do, with an explicit reload.
 - Whether to publish macOS/Windows LV2 bundles at all. Recommendation: build

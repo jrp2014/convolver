@@ -67,7 +67,7 @@ tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 n
     const auto inputs = SpeakerArr::getChannelCount(in[0]);
     const auto outputs = SpeakerArr::getChannelCount(out[0]);
     if (inputs < min_bus_channels || inputs > max_bus_channels || outputs < min_bus_channels ||
-        outputs > max_bus_channels)
+        outputs > max_bus_channels || (!identity::unequal_counts && inputs != outputs))
         return kResultFalse;
     auto result = AudioEffect::setBusArrangements(in, ni, out, no);
     if (result == kResultOk) {

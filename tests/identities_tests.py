@@ -14,6 +14,7 @@ Run from anywhere: python3 tests/identities_tests.py [--root DIR].
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -74,7 +75,22 @@ def lookup(registry, path):
     return value
 
 
+def strings(value, path=()):
+    if isinstance(value, str):
+        yield path, value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from strings(item, path + (key,))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from strings(item, path + (str(index),))
+
+
 def check_rules(registry, errors):
+    # The build pastes these values into C++ string literals and Info.plist.
+    for path, value in strings(registry):
+        if path != ('about',) and not all(' ' <= c <= '~' and c not in '"<>&' for c in value):
+            errors.append(f"{'.'.join(path)}: printable ASCII without quotes, <, > or &")
     if registry.get('schema') != 1:
         errors.append('schema must be 1; a new schema needs this test updated')
     au = registry['au']
@@ -155,6 +171,8 @@ def check_frozen(registry, errors):
         if layouts.get(lid) != counts:
             errors.append(f'fixed layout {lid} {counts} changed or removed; add new entries '
                           'instead (its id is part of a published LV2 URI)')
+    for lid in sorted(set(layouts) - set(FROZEN_LAYOUTS)):
+        errors.append(f'fixed layout {lid} is new: add it to FROZEN_LAYOUTS in this test too')
     if 1 not in registry['host_state']['versions']:
         errors.append('host_state.versions: version 1 must stay readable')
 
@@ -168,10 +186,15 @@ def check_consumers(root, registry, errors):
                       f'{sorted(installer.values())}, found {sorted(refs)}')
     nsis = (root / 'packaging/windows/installer.nsi').read_text(encoding='utf-8')
     windows = registry['windows_installer']
-    if f'HKLM "{windows["registry_key"]}"' not in nsis:
-        errors.append('packaging/windows/installer.nsi: install registry key differs from the registry')
-    if f'CurrentVersion\\Uninstall\\{windows["uninstall_key"]}"' not in nsis:
-        errors.append('packaging/windows/installer.nsi: uninstall key differs from the registry')
+    own = {key for key in re.findall(r'HKLM "(Software\\[^"]+)"', nsis, re.I)
+           if not key.lower().startswith('software\\microsoft\\')}
+    if own != {windows['registry_key']}:
+        errors.append('packaging/windows/installer.nsi: every HKLM key outside Microsoft\\ must be '
+                      f"{windows['registry_key']!r}, found {sorted(own)}")
+    uninstall = set(re.findall(r'CurrentVersion\\Uninstall\\([^"]+)"', nsis))
+    if uninstall != {windows['uninstall_key']}:
+        errors.append(f"packaging/windows/installer.nsi: uninstall keys {sorted(uninstall)}, "
+                      f"registry {windows['uninstall_key']!r}")
     plist = (root / 'plugins/vst3/Info.plist.in').read_text(encoding='utf-8')
     if '<string>${CONVOLVER_ID_VST3_BUNDLE}</string>' not in plist:
         errors.append('plugins/vst3/Info.plist.in: CFBundleIdentifier must be ${CONVOLVER_ID_VST3_BUNDLE}')
@@ -183,13 +206,27 @@ def check_consumers(root, registry, errors):
 
 
 def tracked_files(root):
+    """Git's file list when root is a work tree's top; otherwise walk the tree.
+
+    A source archive extracted inside another repository (as release candidates
+    are) would get an empty list from Git, so Git is used only for its own top.
+    """
     try:
-        listed = subprocess.run(['git', 'ls-files', '-z'], cwd=root, capture_output=True,
-                                check=True).stdout.decode('utf-8')
-        return [name for name in listed.split('\0') if name and (root / name).is_file()]
+        top = subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root,
+                             capture_output=True, check=True).stdout.decode().strip()
+        if Path(top).resolve() == root.resolve():
+            listed = subprocess.run(['git', 'ls-files', '-z'], cwd=root, capture_output=True,
+                                    check=True).stdout.decode('utf-8')
+            return [name for name in listed.split('\0') if name and (root / name).is_file()]
     except (OSError, subprocess.CalledProcessError):
-        return [str(p.relative_to(root)).replace('\\', '/') for p in root.rglob('*')
-                if p.is_file() and '.git' not in p.parts and not p.parts[0].startswith('build')]
+        pass
+    files = []
+    for directory, folders, names in os.walk(root):
+        # Skip version control and any CMake build tree (generated copies live there).
+        folders[:] = [f for f in folders if f != '.git'
+                      and not (Path(directory) / f / 'CMakeCache.txt').exists()]
+        files += [(Path(directory) / n).relative_to(root).as_posix() for n in names]
+    return files
 
 
 def check_copies(root, registry, errors):
@@ -201,12 +238,15 @@ def check_copies(root, registry, errors):
                    *registry['macos_installer'].values(), 'org.convolver.'):
         patterns.append(re.compile(re.escape(bundle)))
     patterns.append(re.compile(re.escape(registry['lv2']['base_uri'])))
+    # Every text file: sources in any language, Turtle, plists, workflows.
+    # AU codes such as Conv are too common to search for; review catches those.
     for name in tracked_files(root):
-        if name in COPIES_ALLOWED or name.startswith(RECORDS) or not name.endswith(
-                ('.cpp', '.hpp', '.h', '.in', '.cmake', '.txt', '.py', '.json', '.plist',
-                 '.xml', '.nsi', '.sh', '.ps1', '.ttl', '.yml')):
+        if name in COPIES_ALLOWED or name.startswith(RECORDS):
             continue
-        text = (root / name).read_text(encoding='utf-8', errors='replace')
+        data = (root / name).read_bytes()
+        if b'\0' in data[:8192]:
+            continue  # Binary (audio fixtures, archives).
+        text = data.decode('utf-8', errors='replace')
         for pattern in patterns:
             if pattern.search(text):
                 errors.append(f'{name}: contains {pattern.pattern!r}; read it from '
@@ -246,6 +286,17 @@ def self_test():
     check_rules(mutated, errors)
     check_frozen(mutated, errors)
     assert errors, 'changed fixed layout was not caught'
+    mutated = json.loads(json.dumps(registry))
+    mutated['fixed_layouts'].append(dict(mutated['fixed_layouts'][0], id='discrete-4-4',
+                                         inputs=4, outputs=4))
+    errors = []
+    check_frozen(mutated, errors)
+    assert errors, 'unfrozen new layout was not caught'
+    mutated = json.loads(json.dumps(registry))
+    mutated['vendor']['name'] = 'Con"volver'
+    errors = []
+    check_rules(mutated, errors)
+    assert errors, 'quote in a C++ string value was not caught'
     mutated = json.loads(json.dumps(registry))
     mutated['speakers'][4]['lv2'] = 'sideLeft'
     errors = []
