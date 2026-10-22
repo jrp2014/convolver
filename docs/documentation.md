@@ -25,6 +25,7 @@ contents line. When a change alters a summarized fact, update the summary too.
 | Plug-in presets and the preset tool | [Plug-in presets](presets.md) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
 | System-wide filtering on Windows | [Equalizer APO export](equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
 | Plug-in downloads and release gates | [Plug-in distribution](plugins/index.md), [release record](releases/developer-preview.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
+| Release status and evidence levels | [Release readiness](release-readiness.md) | TODO, open pull requests, GitHub releases, host records |
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../TODO.md) | Current source and linked issues/plans |

@@ -8,10 +8,15 @@ reviewed on 21 October against `75f3924`, and the plug-in plans again against
 `4e1bb1b` after the owner's review. Keep completed behavior in the guides and
 [CHANGELOG](CHANGELOG.md), and keep this list for outstanding work.
 
-In short: the main open themes are first-use examples and documentation
-automation (DOC), plug-in release qualification and host testing (REL, HOST),
-unused VST3 SDK features (VST3), VST3, LV2 and AU plug-ins developed in parallel (PLUG, LV2, AU), a parked FFmpeg filter (FFMPEG), checks against other configuration readers
-(CFG), large files and resampling (IO), precise no-clip headroom (GAIN), how
+In short: the next milestone is an independent user running an exact preview
+package ([below](#execution-priorities)); [release readiness](docs/release-readiness.md)
+shows what users can run now and the evidence for it. The main open themes are
+first-use examples and documentation automation (DOC), user journeys, plug-in
+release qualification and host testing (REL, HOST), VST3, LV2 and AU plug-ins
+developed in parallel, with lifecycle sequences and failure reasons shared by
+every adapter (PLUG, LV2, AU), unused VST3 SDK features (VST3), files kept from
+releases (COMPAT), a parked FFmpeg filter (FFMPEG), checks against other
+configuration readers (CFG), large files and resampling (IO), precise no-clip headroom (GAIN), how
 diagnostics reach the user once the plug-ins exist (DIAG), longer
 stress testing (ROBUST), and FFT or performance work only where measurements
 justify it (FFT, PERF). The
@@ -35,6 +40,18 @@ priorities, developed in parallel after shared groundwork. The FFmpeg filter and
 Windows-native adapters are parked; CLAP and an editor wait for a request. See
 the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 
+**Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
+22 October 2026): an independent user successfully installs and uses an exact
+preview package, with the lifecycle regression fixed and the advertised
+workflows demonstrated. "Ready" means the user journeys of REL-2 work, not
+that a set of items is ticked. The blockers and their evidence are listed in
+[release readiness](docs/release-readiness.md#next-milestone-an-independent-user-runs-a-preview).
+Finishing a dependable product now matters more than another substantial
+refactor: move code into shared layers only when two formats need the same
+behaviour (as with `HostFilter`), do not generalise host lifecycle or release
+machinery beyond the requirements in hand, and keep libsndfile at the I/O
+boundary and C++20 in the core.
+
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
@@ -42,10 +59,13 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
 | 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
+| 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 lands before LV2-2 and AU-2 settle their error paths, so no adapter discards a reason. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
-| 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
-| 5. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. |
-| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) needs a check in Equalizer APO itself. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
+| 4. Next milestone | Reset fix (VST3-7 follow-up), **PLUG-7**, **REL-2**, **PLUG-5**, **HOST-1** smoke test, **COMPAT-1**, **REL-3** | An independent user completes the REL-2 journeys from one published unsigned preview (REL-3). Formats and platforms whose journeys are not demonstrated are not advertised in it. |
+| 5. Later releases | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each later preview repeats the REL-2 journeys and the COMPAT-1 upgrade tests. |
+| 6. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. With PLUG-8 done it mostly decides how to show reasons already kept. |
+| Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
+| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) needs a check in Equalizer APO itself. PERF-1 keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
 
@@ -85,6 +105,30 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   dependency closure, licences/corresponding source, signing/notarization, clean
   machine installation and immutable release assets. Start with the
   [distribution plan](docs/plans/2026-10-18-plugin-distribution.md).
+- [ ] **REL-2 — Define the first release by user journeys.** Write three
+  journeys as numbered steps for a reader who has never seen the repository:
+  stereo room correction and a 2→6 crossover in a plug-in host, and offline
+  file rendering with the CLI, using the DOC-1 filters. Each journey covers
+  download and checksum, installation, loading the filter, checking the
+  expected output, saving and reopening, and recovering from a wrong preset
+  (wrong rate or channel count), and states the expected result of every step.
+  Write them once in the plug-in guides that ship in the package
+  (`docs/plugins/`), with per-platform differences marked, and make the
+  package contain what they need: presets made from the stereo and 2→6
+  filters, the CLI and the preset tool. Run the CLI steps from an extracted
+  package in the candidate workflow. A platform or format is advertised in a
+  preview only once its journeys have been demonstrated (REL-3); the others
+  stay labelled unverified. See
+  [release readiness](docs/release-readiness.md#user-journeys-for-the-first-preview).
+- [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
+  did not write the code or the guides follows the REL-2 journeys from the
+  published pre-release (the exact files and SHA-256 sums), on their own
+  machine, using only the documentation. Record who (a name or "independent
+  tester"), the package hash, OS, host and version, and for each step whether
+  it worked, where they hesitated and what they could not do without help.
+  Fix the guides or the product for each finding and repeat the affected
+  steps. This is the exit criterion of the
+  [next milestone](#execution-priorities). jrp chooses the tester.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -123,10 +167,13 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   explanatory messages on standard error (for example, a configuration that
   matches nothing lists each candidate and what to change), and
   `--inspect`/`--validate --json` report diagnostics as JSON. The plug-ins
-  have no editor: today the VST3 adapter discards the exception text
-  (`catch (...)`) and reports a preset with the wrong rate or channel counts,
-  or with corrupt state, to the host only as `kResultFalse` or a failed
-  activation, so the explanation is lost. The
+  have no editor: today the VST3 adapter keeps the newest explanation in
+  `HostFilter` but shows it nowhere, reports a preset with the wrong rate or
+  channel counts, or with corrupt state, to the host only as `kResultFalse` or
+  a failed activation, and drops the text of an activation failure
+  (`catch (...)`). PLUG-8 keeps a structured reason for every failure first,
+  so this review decides presentation rather than recovering lost
+  information. The
   [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#loading-and-failure)
   asks for the message in the host's log and a "load failed" status, but only
   LV2 has a defined route (`log:log` and the status port). VST3 and AU have no
@@ -235,6 +282,37 @@ Shared groundwork, done once so the three streams stay independent:
   C++23, jrp's choice on 22 October 2026) and runs `auval`. The weekly
   [Dependency updates workflow](.github/workflows/updates.yml) reports newer
   upstream releases of every pin (jrp's request, 22 October 2026). See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+- [ ] **PLUG-7 — Lifecycle sequence tests.** The reset defect found in the
+  review of 0.4.19 (a filter loaded after a reset during a transition waited
+  for the interrupted crossfade) passed every single-operation test: reset,
+  replacement and initial loading were each tested, their combination was
+  not. Add deterministic sequences of load, process, reset, bypass on and off,
+  failed replacement, failed initial load, save and restore, and stop and
+  restart (deactivate, reactivate, change of rate or layout). After every
+  operation, compare with a small reference model of the contract: which
+  filter is saved, which filter is audible (after the latency and any
+  crossfade), whether silence is required, and that audio-thread calls
+  neither allocate nor lock. Enumerate every sequence up to a short length
+  (four or five operations) and add a few seeded longer ones; a failing
+  sequence prints its operations so it can become a fixed regression. The
+  model is a plain function over a few fields, not a state-machine framework.
+  Run it against `HostFilter` and `HostProcessor` in `native.host`, then
+  through each adapter in the PLUG-2 harness. LV2-2 extends it with
+  outstanding worker loads (a request arriving during preparation, a stale
+  completion, teardown with work outstanding).
+- [ ] **PLUG-8 — Keep a structured failure reason.** Today `HostFilter` keeps
+  the newest explanation as a string, VST3 returns only `kResultFalse`, and
+  the activation path's `catch (...)` drops the exception text. Record each
+  failure as a value: what failed (unreadable or malformed state, rate,
+  channel counts or layout, preparation, activation), the request it belongs
+  to (where the filter came from, its rate and counts, and a request number),
+  whether the instance plays silence or keeps a working filter, and the
+  explanatory message. Keep it on the control side, never on the audio
+  thread. Every adapter records it on every failure path and clears it on
+  success, and its tests read it, even before anything displays it. DIAG-1
+  then decides only where it appears. The
+  [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#failure-reasons)
+  states the rule.
 
 Shared adapter contract, for every format (detail in the
 [plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):
@@ -352,6 +430,21 @@ means a patched FFmpeg build with `--enable-gpl`.
   Roon/JRiver/Audiolense-related workflows; record versions and exact supported
   subsets before adding a consumer-specific profile. See
   [configuration compatibility](docs/configuration-compatibility.md).
+- [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
+  today's writer and reader can agree with each other while both break
+  yesterday's files. When jrp publishes a preview, keep a small collection
+  made by that exact release under `tests/compatibility/releases/VERSION/`:
+  its example presets in every format it ships, a saved REAPER or Carla
+  project containing Convolver, the input and the expected audio, with the
+  package SHA-256 and how each file was made. Later builds must load every
+  retained file and reproduce the expected audio within the oracle tolerance
+  after the reported latency. Never regenerate a retained file; a deliberate
+  incompatibility is an owner's decision recorded beside it. The literal
+  version-1 and version-2 state bytes in `native.state` stay as the first
+  fixtures. Add the capture step to the
+  [publication steps](docs/releases/developer-preview.md#publishing-an-unsigned-preview-planned-not-yet-done)
+  when this is implemented. The four guarantees it protects are listed in
+  [release readiness](docs/release-readiness.md#compatibility-guarantees).
 - [ ] **IO-1 — Large files.** Specify and test RF64 output, boundary sizes and pipe
   behavior. Current output choices are ordinary WAV and raw float; input decoder
   support is not a promise of strict validation for every container.
@@ -464,6 +557,20 @@ so the preset file path is not needed).
   the route to low latency and low CPU together. Preserve routing, tail,
   delay and reset behavior; account for changed floating-point accumulation order.
   Shared forward transforms are already implemented.
+- [ ] **PERF-3 — Resource budgets and supported workloads.** Measure, on
+  named machines, the distribution of callback durations (median, 99th
+  percentile, 99.9th percentile and maximum, not only the average), memory in
+  use and filter-preparation time (including FFTW planning where used) for
+  representative long filters and 6- and 8-channel routing at 48 and 96 kHz,
+  at the host block sizes users meet. Include the costly moments: a live
+  replacement, while two engines run together, and a reset, whose work grows
+  with stored history. Record the results as dated measurements in the
+  [FFT guide](docs/fft-backends.md) and turn them into stated supported
+  workloads (for example "8 channels of 65536 taps at 96 kHz uses under N% of
+  one core and M MB") in the user guides. Only these results decide whether
+  partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
+  and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
+  benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
 
 ## Documented limitations
 

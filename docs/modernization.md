@@ -10,12 +10,23 @@ The [current review](../REVIEW.md) links each area to its implementation.
 
 ## Priorities
 
-1. Make the existing plug-in straightforward to build, install and use in named
-   hosts, with reproducible packages and documented platform support.
+1. Finish a dependable product: someone unfamiliar with the repository can
+   download, install and use an exact preview package by following the
+   documentation (the next milestone in [release readiness](release-readiness.md)).
+   Make the plug-ins straightforward to build, install and use in named hosts,
+   with reproducible packages and documented platform support.
 2. Preserve configuration and stream behavior. Record consumer-specific
-   differences and test changes against independent references.
+   differences and test changes against independent references, and against
+   files kept from released builds.
 3. Improve speed only for measured workloads, keeping latency, memory and callback
-   behavior visible alongside throughput.
+   behavior visible alongside throughput. Resource budgets come first.
+4. Keep maintenance cost down: move code into shared layers only when two
+   formats need the same behaviour (as `HostFilter` was), and do not generalise
+   host lifecycle or release machinery beyond the requirements in hand. The
+   architecture is sound enough; the next decisions matter more than another
+   substantial refactor (jrp's
+   [guidance](review-2026-10/release-readiness-guidance-2026-10-22.md),
+   22 October 2026).
 
 [TODO.md](../TODO.md) is the single list of outstanding work and candidate
 libraries. This page explains direction; dated implementation plans describe
