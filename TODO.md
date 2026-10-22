@@ -90,6 +90,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
+  Progress (22 October 2026): REAPER and Carla are the suggested first hosts
+  (jrp to try); the SDK sample hosts were evaluated and not added to CI
+  ([host qualification](docs/plugins/hosts.md#steinbergs-sdk-hosts)).
 - [ ] **HOST-2 — Additional formats and UI.** LV2 and AU are now first
   priorities alongside VST3 (see [plug-ins](#plug-ins-vst3-lv2-and-au) below).
   CLAP only on request: every CLAP host found also loads VST3. A filter-loading
