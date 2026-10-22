@@ -139,7 +139,12 @@ cases, including odd block sizes and both latency modes. See
 results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../.github/workflows/regression.yml) and
 [VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
-file alone is not evidence that a job passed.
+file alone is not evidence that a job passed. The [LV2](../.github/workflows/lv2.yml)
+and [Audio Unit](../.github/workflows/au.yml) workflows install the
+[pinned format tools](plugins/build.md#pinned-format-dependencies) and check
+them on LV2's example plug-ins and Apple's AUDelay until the adapters add
+their own bundles. The weekly [Dependency updates](../.github/workflows/updates.yml)
+workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
 

@@ -7,7 +7,7 @@ import platform
 import re
 import subprocess
 import tarfile
-from contract import load_policy, platform_policy, sha256
+from contract import load_policy, platform_policy, sha256, used_dependencies
 
 
 def check_dependencies(system, dependencies, policy):
@@ -166,7 +166,9 @@ def main():
                 raise ValueError(f'missing release content: {required}')
         manifest = dict(schema=1, version=policy['version'], platform=args.platform, source_commit=build['source_commit'],
                         backend=candidate['backend'], channel='developer-preview', source=source, build=build,
-                        build_os=platform.platform(), dependencies=policy['dependencies'], binaries=inspect(root, candidate, policy),
+                        build_os=platform.platform(), dependencies={name: dep for name, dep in policy['dependencies'].items()
+                                                   if name in used_dependencies(policy, ('vst3',), candidate['backend'])},
+                        binaries=inspect(root, candidate, policy),
                         files=inventory(root))
         args.manifest.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     else:
