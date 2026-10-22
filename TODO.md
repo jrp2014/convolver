@@ -152,7 +152,8 @@ Shared groundwork, done once so the three streams stay independent:
   (version-1 presets with any output mask load on every six-channel arrangement
   and route by bus index). Modified builds are asked to change every value in the
   [identities guide](docs/plugin-identities.md), which owns the layout rules.
-  Recording an input layout still needs state version 2 (an owner's decision).
+  Recording an input layout still needs a new state version, 3 (an owner's
+  decision; version 2 is VST3-7's failed-load marker).
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
   merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
   `.github/workflows/release.yml`) rather than writing a new one. Signing
@@ -207,8 +208,11 @@ direct installation in `HostProcessor`, which LV2 and AU reuse.
   suit the host activates as silence and returns when the host is corrected;
   a filter set after activation but before audio is installed directly. The
   decisions live in the host layer (`HostFilter`, `unfiltered_configuration`;
-  tests in `native.host`). VST3 shows no message for a mismatch found at
-  activation, as it has no status display without an editor (VST3-3). See
+  tests in `native.host`). Owner's decisions, 22 October 2026: the "known
+  after activation" rule; no message for a mismatch found at activation until
+  VST3-3, as VST3 has no status display without an editor; and saving after a
+  failed first load records it (host state version 2, flag 4, written only
+  then), so reopening stays silent. See
   [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
 
 LV2 (Linux first; also PipeWire system audio):

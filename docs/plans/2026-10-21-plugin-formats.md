@@ -210,7 +210,7 @@ behaviour:
 | Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence with no message, because VST3 has no status display without an editor (VST3-3) |
+| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence with no message, because VST3 has no status display without an editor; accepted until VST3-3 (owner's decision, 22 October 2026) |
 | **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
 
 The control side of these rules is shared code in the host layer, so every
@@ -218,6 +218,11 @@ adapter gets the same decisions and messages: `HostFilter` (which filter a load
 replaces, which is saved and what plays) and `unfiltered_configuration` in
 [`host.hpp`](../../include/convolver/host.hpp). `HostProcessor` installs a
 filter directly when nothing has been processed since construction or reset.
+
+**Saving after a failed initial load** saves the failure: the host state
+records "load failed" (flag 4, state version 2; owner's decision, 22 October
+2026) and no filter, so reopening the project plays silence again instead of
+an empty instance's identity. Only this state is written as version 2.
 
 A replacement is accepted only after it has been fully validated and prepared,
 so rejection never disturbs the running filter. The rejected request is not
@@ -249,7 +254,7 @@ before they set the sample rate and channel layout (VST3 `setState` before
   is not binding: JUCE-based hosts, pluginval among them, call it with
   placeholder values (44.1 kHz) before restoring state made for another rate,
   which a check at that point would wrongly reject (found by
-  `vst3.pluginval.acceptance` in VST3-7).
+  `vst3.pluginval.acceptance` in VST3-7; owner's decision, 22 October 2026).
 
 ### Initial restoration and live replacement
 
@@ -285,9 +290,10 @@ channel mask only; it records no input layout. Compatibility rules:
   checks must never reject it.
 - A version-1 output mask is advisory: an adapter may warn when it disagrees
   with the host's arrangement, but does not reject the preset.
-- Recording an input layout, or making a layout binding, needs state version 2.
-  Decoders keep reading version 1; encoders write version 1 whenever nothing new
-  is recorded, so older builds still read those presets.
+- Recording an input layout, or making a layout binding, needs a new state
+  version (3; version 2 only adds the failed-load marker below). Decoders keep
+  reading versions 1 and 2; encoders write version 1 whenever nothing new is
+  recorded, so older builds still read those presets.
 - The layout list names entries as counts plus meaning, for example "2→6
   discrete", not "5.1".
 

@@ -148,7 +148,8 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
         // While active, the host's configuration is known and a prepared
         // replacement is published; inactive, the next activation installs it.
         const auto host = host_ ? std::optional(layout()) : known_layout();
-        filter_.load(std::move(next.configuration), host, [&](const Configuration& c) {
+        const bool bypass = next.bypass;
+        filter_.load(std::move(next), host, [&](const Configuration& c) {
             if (host_)
                 host_->replace(c);
         });
@@ -158,7 +159,7 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
             tail_.store(filter_.filter()
                             ? static_cast<uint32>(configuration_tail_frames(*filter_.filter()))
                             : 0);
-        bypass_.store(next.bypass);
+        bypass_.store(bypass);
         return kResultOk;
     } catch (...) {
         // A failed first load plays silence rather than the unfiltered input.
@@ -179,6 +180,7 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
         HostState state;
         state.configuration = filter_.filter();
         state.bypass = bypass_.load();
+        state.failed = filter_.failed(); // Reopening stays silent (state version 2).
         if (host_)
             host_->collect();
         return write_state(stream, state) ? kResultOk : kResultFalse;

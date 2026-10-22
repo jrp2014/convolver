@@ -48,9 +48,12 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     return c;
 }
 
-void HostFilter::load(std::optional<Configuration> next, const std::optional<HostLayout>& host,
+void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                       const std::function<void(const Configuration&)>& install) {
+    auto& next = state.configuration;
     try {
+        if (state.failed && next)
+            throw std::invalid_argument("A failed load cannot hold a filter.");
         if (next && (!next->input_channels || !next->output_channels ||
                      next->input_channels > max_channels_ || next->output_channels > max_channels_))
             throw std::invalid_argument("The filter has " +
@@ -58,7 +61,8 @@ void HostFilter::load(std::optional<Configuration> next, const std::optional<Hos
                                         "; this plug-in supports 1 to " +
                                         std::to_string(max_channels_) + " channels on each side.");
         if (host) {
-            const auto unfiltered = next ? Configuration{} : unfiltered_configuration(*host, false);
+            const auto unfiltered =
+                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
             if (next) {
                 if (auto why = mismatch(*next, *host); !why.empty())
                     throw std::invalid_argument(why);
@@ -74,8 +78,11 @@ void HostFilter::load(std::optional<Configuration> next, const std::optional<Hos
         throw std::invalid_argument(error_);
     }
     filter_ = std::move(next);
-    failed_ = false;
+    failed_ = state.failed;
     error_.clear();
+    if (failed_)
+        error_ = "A filter failed to load before this state was saved, so Convolver plays "
+                 "silence. Load a filter made for the host's sample rate and channels.";
 }
 
 void HostFilter::reject(std::string why) {

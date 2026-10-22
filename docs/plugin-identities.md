@@ -33,7 +33,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
-| All | Host state | magic `CNVS`, version 1 | The encoded filter inside presets and saved projects |
+| All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load (owner's decision, 22 October 2026); everything else is still written as version 1 |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
 **Status (22 October 2026):** no release has used these identities yet. The
@@ -118,10 +118,11 @@ and an *output* channel mask, and no input layout. Hence:
   Stricter layout checks added later must never reject it.
 - Its output mask is advisory: an adapter may warn when it disagrees with the
   host's arrangement, but does not reject the preset.
-- Recording an input layout, or making a layout binding, needs host-state
-  version 2, which is a format decision for jrp. Decoders will keep reading
-  version 1, and encoders keep writing version 1 whenever nothing new is
-  recorded, so older builds still read those presets.
+- Recording an input layout, or making a layout binding, needs a new host-state
+  version (3: version 2 is taken by the failed-load marker of VST3-7), which is
+  a format decision for jrp. Decoders will keep reading versions 1 and 2, and
+  encoders keep writing version 1 whenever nothing new is recorded, so older
+  builds still read those presets.
 
 The VST3 adapter test `version1_presets` loads a 2→6 version-1 preset with
 output masks 0, `0x3F` (5.1) and `0x60F` (5.1 with side speakers) on four

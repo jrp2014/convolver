@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <stdexcept>
 using namespace convolver;
@@ -39,6 +40,36 @@ int main() {
                     restored.configuration->paths[0].inputs[0].gain == 1.f &&
                     restored.configuration->paths[0].outputs[0].gain == 1.f,
                 "version-1 wire decoding compatibility");
+        // Version 2 adds only flag 4, a saved failed load; everything else is
+        // still written as version 1 so older builds read it.
+        HostState failed;
+        failed.failed = true;
+        failed.bypass = true;
+        const auto failed_bytes = encode_host_state(failed);
+        const auto failed_wire =
+            std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 6, 0, 0, 0});
+        require(std::equal(failed_bytes.begin(), failed_bytes.end(),
+                           std::as_bytes(std::span(failed_wire)).begin(),
+                           std::as_bytes(std::span(failed_wire)).end()),
+                "version-2 failed-load wire encoding");
+        const auto failed_back = decode_host_state(failed_bytes);
+        require(failed_back.failed && failed_back.bypass && !failed_back.configuration,
+                "version-2 failed-load decoding");
+        require(std::to_integer<int>(encode_host_state(identity)[4]) == 1 &&
+                    std::to_integer<int>(encode_host_state(HostState{})[4]) == 1,
+                "states without a failed load must stay version 1");
+        auto contradictory = failed;
+        contradictory.configuration = identity.configuration;
+        rejects([&] { (void)encode_host_state(contradictory); });
+        for (auto bad :
+             {std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 1, 0, 0, 0, 4, 0, 0, 0}),
+              std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 8, 0, 0, 0}),
+              std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0})})
+            rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad))); });
+        auto failed_with_filter = encode_host_state(identity);
+        failed_with_filter[4] = std::byte{2};
+        failed_with_filter[8] = std::byte{5};
+        rejects([&] { (void)decode_host_state(failed_with_filter); });
         HostState state;
         state.bypass = true;
         state.configuration =

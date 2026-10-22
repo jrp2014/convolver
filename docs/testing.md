@@ -101,7 +101,8 @@ ctest --test-dir build-native -N
 
 - `native.host`: planar/in-place float and double buffers, invalid samples,
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard.
-- `native.state`: fixed version-1 wire fixture, embedded configuration round trips, truncation, corrupt headers,
+- `native.state`: fixed version-1 wire fixture, the version-2 failed-load
+  marker (and that every other state is still written as version 1), embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.

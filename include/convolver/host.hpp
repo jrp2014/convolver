@@ -10,6 +10,10 @@ namespace convolver {
 struct HostState {
     std::optional<Configuration> configuration; // Absent means identity at host rate/layout.
     bool bypass = false;
+    // A load failed and nothing was accepted, so the instance plays silence;
+    // saved so that reopening a project stays silent. Never with a configuration.
+    // Encoded as version 2; all other states stay version 1.
+    bool failed = false;
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 std::vector<std::byte> encode_host_state(const HostState&);
@@ -48,14 +52,15 @@ class HostFilter {
     const std::string& error() const noexcept {
         return error_;
     }
-    // Load decoded state: a filter, or none to return to an empty instance.
+    // Load decoded state: a filter, none to return to an empty instance, or a
+    // saved failed load (plays silence). Bypass is the adapter's to apply.
     // Checks on the state itself always run. Checks against the host run when
     // `host` is given (its configuration is known); `install` then receives
     // what to play and may throw to reject. Without `host`, well-formed state
     // is accepted and checked at activation. On rejection this records the
     // error, keeps the accepted filter (a failed initial load if there was
     // none) and throws std::invalid_argument with an explanation.
-    void load(std::optional<Configuration>, const std::optional<HostLayout>& host,
+    void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {});
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw.

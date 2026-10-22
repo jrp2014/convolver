@@ -15,7 +15,8 @@ Until 1.0 the C++ API may change between minor versions.
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
   `convolver/host.hpp`: the control side of the shared plug-in adapter
   contract (which filter a load replaces, what is saved and what plays), for
-  every format adapter to reuse. `HostProcessor::replace` now installs a filter
+  every format adapter to reuse. `HostState::failed` marks a saved failed
+  first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
 
@@ -66,8 +67,10 @@ Until 1.0 the C++ API may change between minor versions.
   silence. A project restored at the wrong rate or layout now activates and
   plays silence, keeping its filter, instead of failing to activate. A preset
   loaded after activation but before any audio plays from the first sample
-  without a crossfade. The shared decisions are in the host layer
-  (`HostFilter`), for LV2 and AU to reuse.
+  without a crossfade. Saving after a failed first load records the failure,
+  so reopening stays silent: host state version 2, used only for that state
+  (other states are still written as version 1). The shared decisions are in
+  the host layer (`HostFilter`), for LV2 and AU to reuse.
 - The macOS VST3 bundle identifier is now `io.github.jrp2014.convolver.vst3` and the installer package
   identifiers are `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
   `org.convolver.*`, a domain the project does not control). No release used

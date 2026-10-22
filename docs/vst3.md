@@ -152,9 +152,10 @@ Loading follows the
   explanation is held for a later editor or status display, VST3-3).
 - **A preset loaded after activation but before any audio** is installed
   directly; later loads crossfade as described below.
-- **Saving after a failed first load** saves an empty instance: the rejected
-  preset is not stored, so reopening the project plays identity when the
-  counts are equal. Load a matching preset before saving.
+- **Saving after a failed first load** saves that failure (host state version
+  2) but not the rejected preset, so reopening the project plays silence again
+  rather than the unfiltered input. Load a matching preset to replace it.
+  Builds before VST3-7 cannot read that state and treat it as empty.
 
 This plug-in has a new VST3 identity: old VST2 project state
 is not claimed to migrate automatically. The class IDs and bundle identifier are

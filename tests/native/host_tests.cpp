@@ -266,28 +266,48 @@ void filter_contract() {
     // Failed initial load: nothing accepted, so silence with an explanation.
     HostFilter first(8);
     require(!first.filter() && !first.failed() && first.error().empty(), "fresh filter state");
-    expect_rejection([&] { first.load(other_rate, stereo); }, "wrong rate accepted");
+    expect_rejection([&] { first.load(HostState{other_rate}, stereo); }, "wrong rate accepted");
     require(first.failed() && !first.filter(), "failed initial load not recorded");
     require(first.error().find("44100 Hz") != std::string::npos &&
                 first.error().find("plays silence") != std::string::npos,
             "failed initial load not explained");
     require(first.activate(stereo).paths[0].impulse == std::vector<float>{0},
             "failed initial load does not play silence");
-    expect_rejection([&] { first.load(wide, std::nullopt); }, "channel bound unchecked");
-    first.load(std::nullopt, stereo); // Back to an empty instance.
+    expect_rejection([&] { first.load(HostState{wide}, std::nullopt); }, "channel bound unchecked");
+    first.load(HostState{}, stereo); // Back to an empty instance.
     require(!first.failed() && first.error().empty() && first.activate(stereo).paths.size() == 2,
             "empty state does not restore identity");
+
+    // A saved failed load (state version 2) restores as silence, not identity.
+    HostFilter reopened(8);
+    HostState failed_state;
+    failed_state.failed = true;
+    Configuration installed;
+    reopened.load(failed_state, stereo, [&](const Configuration& c) { installed = c; });
+    require(reopened.failed() && !reopened.filter() && !reopened.error().empty() &&
+                installed.paths.size() == 1 && installed.paths[0].impulse == std::vector<float>{0},
+            "saved failed load does not restore as silence");
+    require(reopened.activate(stereo).paths[0].impulse == std::vector<float>{0},
+            "saved failed load activates as identity");
+    auto contradictory = failed_state;
+    contradictory.configuration = a;
+    expect_rejection([&] { HostFilter(8).load(contradictory, stereo); },
+                     "failed state with a filter accepted");
 
     // Failed replacement: the accepted filter stays, and install is not called.
     HostFilter running(8);
     int installs = 0;
-    running.load(a, stereo, [&](const Configuration&) { ++installs; });
+    running.load(HostState{a}, stereo, [&](const Configuration&) { ++installs; });
     require(installs == 1 && running.filter() && running.filter()->paths[0].impulse.size() == 2,
             "valid filter not installed");
-    expect_rejection([&] { running.load(other_rate, stereo, [&](auto&) { ++installs; }); },
-                     "replacement at the wrong rate accepted");
     expect_rejection(
-        [&] { running.load(a, stereo, [](const Configuration&) { throw std::bad_alloc(); }); },
+        [&] { running.load(HostState{other_rate}, stereo, [&](auto&) { ++installs; }); },
+        "replacement at the wrong rate accepted");
+    expect_rejection(
+        [&] {
+            running.load(HostState{a}, stereo,
+                         [](const Configuration&) { throw std::bad_alloc(); });
+        },
         "failed preparation accepted");
     require(installs == 1 && !running.failed() && running.filter()->sample_rate == 48000,
             "failed replacement lost the working filter");
@@ -296,7 +316,7 @@ void filter_contract() {
 
     // Restored before the host is configured: kept, checked at activation.
     HostFilter early(8);
-    early.load(other_rate, std::nullopt);
+    early.load(HostState{other_rate}, std::nullopt);
     require(early.filter() && early.filter()->sample_rate == 44100, "early restore not kept");
     require(early.activate(stereo).paths[0].impulse == std::vector<float>{0} &&
                 early.error().find("44100 Hz") != std::string::npos,

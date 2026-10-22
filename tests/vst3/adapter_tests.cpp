@@ -425,10 +425,31 @@ void failed_first_loads() {
         MemoryStream saved;
         require(p.getState(&saved) == kResultOk, "state after a failed first load");
         saved.seek(0, IBStream::kIBSeekSet, nullptr);
-        require(!read_state(&saved).configuration, "a rejected first filter was saved");
+        const auto kept = read_state(&saved);
+        require(!kept.configuration && kept.failed,
+                "a failed first load must be saved as failed, without the filter");
         p.setProcessing(false);
         p.setActive(false);
         p.terminate();
+        // Reopening that project in a fresh instance stays silent, not identity.
+        Processor reopened;
+        require(reopened.initialize(&context) == kResultOk, "reopen initialize");
+        require(reopened.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "reopen buses");
+        reopened.activateBus(kAudio, kInput, 0, true);
+        reopened.activateBus(kAudio, kOutput, 0, true);
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.setState(&saved) == kResultOk, "saved failed load rejected on reopen");
+        require(reopened.setupProcessing(setup) == kResultOk &&
+                    reopened.setActive(true) == kResultOk,
+                "reopen activate");
+        reopened.setProcessing(true);
+        for (int k = 0; k < 2; ++k)
+            require(reopened.process(d) == kResultOk, "reopen process");
+        for (int i = 0; i < 512; ++i)
+            require(out_left[i] == 0 && out_right[i] == 0, "reopened failed load plays its input");
+        reopened.setProcessing(false);
+        reopened.setActive(false);
+        reopened.terminate();
     }
 }
 int run(const std::filesystem::path& preset_path) {
