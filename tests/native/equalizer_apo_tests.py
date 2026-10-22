@@ -51,6 +51,13 @@ TOLERANCE = 1e-5  # Float32 IRs and inputs against the double oracle.
 # Benchmark.exe writes 16-bit PCM, scaled by 32767: half a step of rounding,
 # plus the above.
 RUNTIME_TOLERANCE = 0.5 / 32767 + TOLERANCE
+# Benchmark.exe processes in blocks of this many frames: the Windows audio
+# engine's 10 ms period at 48 kHz. Equalizer APO 1.4.2's x64 convolution
+# (hcProcessSingle in libHybridConv) multiplies the spectrum four bins at a
+# time plus the Nyquist bin, so with a block that is not a multiple of 4 up to
+# three bins just below half the sample rate are left out. Benchmark.exe's
+# default block is the whole file, which hit this with the crossover example.
+BLOCK = 480
 
 # Windows' default speaker masks for a channel count (ChannelHelper.cpp).
 DEFAULT_NAMES = {
@@ -276,17 +283,21 @@ class Runtime:
     def process(self, text, rate, inputs):
         """Filter planar inputs at a rate with config.txt holding `text`."""
         self.runs += 1
+        frames = len(inputs[0])
+        # Whole blocks only, as from the audio engine.
+        padding = -frames % BLOCK
+        inputs = [list(c) + [0.0] * padding for c in inputs]
         (self.config / 'config.txt').write_text(f'{self.MARKER}\n{text}\n', encoding='utf-8')
         source = self.scratch / f'input-{self.runs}.wav'
         result = self.scratch / f'output-{self.runs}.wav'
         fixtures.write_float_wav(source, rate, inputs)
-        run = subprocess.run([str(self.benchmark), '--nopause', '--verbose', '-i', str(source),
-                              '-o', str(result)], capture_output=True, text=True,
-                             errors='replace', timeout=120)
+        run = subprocess.run([str(self.benchmark), '--nopause', '--verbose',
+                              '--batchsize', str(BLOCK), '-i', str(source), '-o', str(result)],
+                             capture_output=True, text=True, errors='replace', timeout=120)
         log = run.stdout + run.stderr
         if run.returncode != 0 or not result.exists():
             raise AssertionError(f'Benchmark.exe failed ({run.returncode}):\n{log}')
-        outputs = read_wav(result)
+        outputs = [c[:frames] for c in read_wav(result)]
         source.unlink()
         result.unlink()
         return outputs, log
@@ -300,12 +311,6 @@ class Runtime:
         actual, log = self.process(f'Include: {include}', rate, inputs)
         error = fixtures.worst_error(actual, wanted)
         if error > tolerance:
-            # Temporary: the differences in 16-bit steps, to analyse offline.
-            for c, (a, b) in enumerate(zip(actual, wanted), 1):
-                steps = [round((x - y) * 32767) for x, y in zip(a, b)]
-                if any(abs(v) > 1 for v in steps):
-                    for start in (0, 300, len(steps) - 300):
-                        print(f'EAPODIFF {c} {start} {steps[start:start + 300]}')
             raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n'
                                  f'{differences(actual, wanted)}\n{log}')
         print(f'{label}: Equalizer APO worst error {error:.3g}')
