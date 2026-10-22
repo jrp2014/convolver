@@ -10,8 +10,10 @@ and installer identifiers. Hosts save these codes in projects and presets, so
 once a build using them is released they **never change**. They are recorded
 once, in [`plugins/identities.json`](../plugins/identities.json), together with
 the channel layouts the plug-ins support; the build and the release scripts
-read them from there. **If you distribute a modified build, please change every
-identity in that file** so hosts do not confuse your plug-in with this one.
+read them from there. **If you distribute a modified build, please change its
+[product identities](#if-you-distribute-a-modified-build)** (class IDs, AU
+manufacturer code, bundle and installer names, LV2 URIs) so hosts do not
+confuse your plug-in with this one; format constants and layout definitions stay.
 Presets saved today (state version 1) record no channel layout and keep
 loading on any host arrangement with the same channel counts.
 
@@ -52,16 +54,33 @@ ID.
 
 ## If you distribute a modified build
 
-Please change **every** value in `plugins/identities.json` before you
-distribute anything. This is a request to avoid confusing hosts and users, not
-a condition of the licence: generate two new VST3 class IDs (any 128-bit random values, written as
-32 uppercase hex digits), choose your own AU manufacturer code, use an LV2 URI
-base and macOS identifiers under a domain or account you control, and rename the
-Windows registry keys. `packaging/macos/Distribution.xml` and
-`packaging/windows/installer.nsi` repeat the installer identifiers, so edit them
-to match; the tests check that they agree. Then update the frozen copy in
-[`tests/identities_tests.py`](../tests/identities_tests.py). Keep the host-state
-magic only if your state format stays identical.
+Before you distribute a modified build, please give it its own **product
+identities**. This is a request to avoid confusing hosts and users, not a
+condition of the licence. Only the values that name *this* product change; the
+format constants and the shared definitions stay as they are, because hosts and
+the code rely on their meaning.
+
+| Change (in `plugins/identities.json`) | How |
+| --- | --- |
+| `vendor.name`, `vendor.url` | Your project's name and address |
+| `vst3.processor_class_id`, `vst3.controller_class_id` | Two new random 128-bit values, each written as 32 uppercase hex digits |
+| `au.manufacturer` | Your own four-character code, with at least one uppercase letter, not `DEMO` (`au.subtype` may stay: hosts identify an AU by type, subtype and manufacturer together) |
+| `vst3.macos_bundle_id`, `au.macos_bundle_id`, `macos_installer.*` | Reverse-DNS names under a domain or account you control |
+| `lv2.base_uri`, `lv2.bundle` | A URI you control, and a bundle folder name that will not collide with `convolver.lv2` |
+| `windows_installer.*` | Your own registry key and uninstall key names |
+
+| Keep | Why |
+| --- | --- |
+| `au.type` (`aufx`) | Apple's code for an effect, not a product identity |
+| `schema` | The registry's own format version |
+| `channels`, `fixed_layouts`, `speakers` | Supported channel counts and layout meanings; layout ids only follow your LV2 URI base |
+| `host_state` (`CNVS`, version 1) | The state format; keep it as long as your state stays identical, so presets remain readable |
+| `historical.vst2_unique_id` | A record of the 2005–2006 plug-in, not used by modern builds |
+
+`packaging/macos/Distribution.xml` and `packaging/windows/installer.nsi` repeat
+the installer identifiers, so edit them to match; the tests check that they
+agree. Then update the frozen copy (`FROZEN`) in
+[`tests/identities_tests.py`](../tests/identities_tests.py).
 
 Otherwise a host that has both builds installed sees one plug-in, loads the
 wrong one for a project, or lets one installer remove the other.
