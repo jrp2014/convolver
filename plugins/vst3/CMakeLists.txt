@@ -107,20 +107,35 @@ if(CONVOLVER_BUILD_TESTS)
 endif()
 
 if(CONVOLVER_BUILD_IO)
-    add_executable(convolver_vst3_preset preset.cpp processor.cpp
-        "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+    # The original VST3-only tool, kept for existing scripts: the shared preset
+    # tool (PLUG-3) with the old arguments and messages. It needs no SDK.
+    add_executable(convolver_vst3_preset "${PROJECT_SOURCE_DIR}/portable/preset_main.cpp")
     set_target_properties(convolver_vst3_preset PROPERTIES OUTPUT_NAME convolver-vst3-preset)
-    target_include_directories(convolver_vst3_preset PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
-        "${Convolver_BINARY_DIR}/generated")
-    target_link_libraries(convolver_vst3_preset PRIVATE Convolver::host Convolver::io sdk)
-    if(APPLE)
-        target_link_libraries(convolver_vst3_preset PRIVATE "-framework Cocoa")
+    target_compile_definitions(convolver_vst3_preset PRIVATE CONVOLVER_VST3_PRESET_ALIAS)
+    target_link_libraries(convolver_vst3_preset PRIVATE convolver_presets Convolver::io)
+    if(MINGW)
+        target_link_options(convolver_vst3_preset PRIVATE -municode)
     endif()
     if(CONVOLVER_BUILD_TESTS)
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        # The SDK-free writer against Steinberg's PresetFile, both directions.
+        add_executable(convolver_vst3_preset_format "${PROJECT_SOURCE_DIR}/tests/vst3/preset_format_tests.cpp"
+            processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        target_include_directories(convolver_vst3_preset_format PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}")
+        target_link_libraries(convolver_vst3_preset_format PRIVATE convolver_presets sdk)
+        if(APPLE)
+            target_link_libraries(convolver_vst3_preset_format PRIVATE "-framework Cocoa")
+        endif()
+        add_test(NAME vst3.preset_format COMMAND convolver_vst3_preset_format)
+        set_tests_properties(vst3.preset_format PROPERTIES LABELS "vst3;real-libraries")
+        add_dependencies(check convolver_vst3_preset_format)
+        set(shared_preset_tool "")
+        if(TARGET convolver_preset_tool)
+            set(shared_preset_tool "$<TARGET_FILE:convolver_preset_tool>")
+        endif()
         add_test(NAME vst3.preset COMMAND "${Python3_EXECUTABLE}"
             "${PROJECT_SOURCE_DIR}/tests/vst3/preset_tests.py"
-            "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>")
+            "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>" ${shared_preset_tool})
         set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 120)
         # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
         # that examples.first_use leaves behind.

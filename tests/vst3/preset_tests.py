@@ -58,3 +58,12 @@ with tempfile.TemporaryDirectory() as directory:
                             capture_output=True, text=True)
     assert result.returncode != 0 and '1 to 8' in result.stderr, result.stderr
     print('Preset selection by channel counts and multichannel limits')
+
+    # PLUG-3: convolver-vst3-preset is the shared tool under its old name, so
+    # both write the same bytes for the same filter and selection.
+    if len(sys.argv) > 3:
+        shared = root / 'shared.vstpreset'
+        subprocess.run([sys.argv[3], '--sample-rate', '48000', '--output-channels', '6',
+                        str(root / 'list.txt'), str(shared)], check=True, capture_output=True)
+        assert shared.read_bytes() == upmix.read_bytes()
+        print('convolver-preset writes the same .vstpreset as convolver-vst3-preset')

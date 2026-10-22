@@ -106,9 +106,29 @@ ctest --test-dir build-native -N
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.
+- `native.presets`: the [preset containers](presets.md) without any SDK: base64
+  against RFC 4648's vectors, the `.vstpreset` layout field by field, reading
+  presets as hosts save them (extra chunks, lower-case class IDs, padding),
+  version-1 states with any channel mask, every truncation and damaged chunk
+  list, another plug-in's preset, AU keys and XML escaping, one LV2 plug-in URI
+  per fixed layout, Turtle escaping, and the explained refusals (channel limits,
+  layouts without an LV2 plug-in, unusable preset names).
+- `plugins.presets`: `convolver-preset` writes the 2→6 crossover fixture as all
+  three formats in one run and reads each back without Convolver's code: the
+  `.vstpreset` by its documented layout, the `.aupreset` with Python's
+  `plistlib`, and the LV2 bundle's Turtle (also with `serdi`, a Turtle parser,
+  when installed). All three must hold the same encoded state, which a separate
+  version-1 decoder checks against the fixture's WAV samples, routes, gains and
+  delays. It also converts a `.vstpreset` after its source files are deleted,
+  and checks that refused requests write nothing.
 
 The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
-and audio tests, embedded preset generation/loading after deleting the source IR,
+and audio tests, embedded preset generation/loading after deleting the source IR
+(`vst3.preset`, which also checks that `convolver-preset` and
+`convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our
+`.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
+the SDK reads our presets, and we read the SDK's, including controller and
+metadata chunks),
 plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin`: it must export no FFTW symbols
@@ -130,7 +150,7 @@ commercial DAW.
 
 `packaging.consumer` installs and relocates the package, builds and runs an
 external core/host/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs six C++/package
+without a parent CTest setup. Core-only configuration runs seven C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay

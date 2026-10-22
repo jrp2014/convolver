@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- `convolver-preset` (PLUG-3) makes self-contained presets for VST3
+  (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`
+  bundles) from one IR, `.cfg` or configuration list, several formats in one
+  run, and converts an existing `.vstpreset` to the other formats. All carry the
+  same encoded filter. It needs no plug-in SDK, so AU and LV2 builds can ship
+  it. `convolver-vst3-preset` is now the same tool under its old name, with the
+  same arguments and byte-identical output. See [plug-in presets](docs/presets.md).
+
 - Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
   `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
   test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI

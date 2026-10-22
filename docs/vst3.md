@@ -9,8 +9,9 @@
   separately downloaded Steinberg VST3 SDK, then copy the whole
   `Convolver.vst3` bundle into a folder your host scans.
 - There is no editor. Turn a WAV, `.cfg` or configuration list into a
-  `.vstpreset` with `convolver-vst3-preset`, then load it from the host's preset
-  menu. The preset embeds the filter, so the original files are not needed later.
+  `.vstpreset` with `convolver-preset` (or the older `convolver-vst3-preset`),
+  then load it from the host's preset menu. The preset embeds the filter, so the
+  original files are not needed later.
 - One input bus and one output bus of 1 to 8 channels each; the counts may
   differ. The preset must match the host's sample rate and channel counts.
 - Latency is always 256 samples. Processing is single-precision with 32- or
@@ -103,13 +104,20 @@ DAW; named-host installation tests remain tracked in [TODO](../TODO.md).
 
 The adapter uses the DAW's standard preset loader and generic bypass
 control, without a custom editor. Convert an impulse WAV, [`.cfg`](configuration.md), or
-configuration list into a new preset:
+configuration list into a new preset with `convolver-preset`, which makes
+presets for every plug-in format ([presets guide](presets.md)):
+
+```sh
+./build-vst3/convolver-preset room.cfg room.vstpreset
+```
+
+The original VST3-only tool still works, with the same arguments and output:
 
 ```sh
 ./build-vst3/plugins/vst3/convolver-vst3-preset room.cfg room.vstpreset
 ```
 
-With Visual Studio the executable is in `plugins/vst3/Release/`. The output must
+With Visual Studio the executables are in `Release/` and `plugins/vst3/Release/`. The output must
 not already exist. Presets embed coefficients, gains, routes and delays; the DAW
 project's saved state therefore does not depend on the original filter paths.
 Select a configuration matching the DAW's sample rate and bus layout. For a
