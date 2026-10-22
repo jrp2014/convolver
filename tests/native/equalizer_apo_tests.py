@@ -287,7 +287,6 @@ class Runtime:
         if run.returncode != 0 or not result.exists():
             raise AssertionError(f'Benchmark.exe failed ({run.returncode}):\n{log}')
         outputs = read_wav(result)
-        self.last_output = result.read_bytes()
         source.unlink()
         result.unlink()
         return outputs, log
@@ -301,12 +300,12 @@ class Runtime:
         actual, log = self.process(f'Include: {include}', rate, inputs)
         error = fixtures.worst_error(actual, wanted)
         if error > tolerance:
-            # Temporary: the whole output, to compare offline.
-            import base64  # noqa: PLC0415
-            import zlib  # noqa: PLC0415
-            dump = base64.b64encode(zlib.compress(self.last_output, 9)).decode()
-            for i in range(0, len(dump), 2000):
-                print(f'EAPODUMP {dump[i:i + 2000]}')
+            # Temporary: the differences in 16-bit steps, to analyse offline.
+            for c, (a, b) in enumerate(zip(actual, wanted), 1):
+                steps = [round((x - y) * 32767) for x, y in zip(a, b)]
+                if any(abs(v) > 1 for v in steps):
+                    for start in (0, 300, len(steps) - 300):
+                        print(f'EAPODIFF {c} {start} {steps[start:start + 300]}')
             raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n'
                                  f'{differences(actual, wanted)}\n{log}')
         print(f'{label}: Equalizer APO worst error {error:.3g}')
