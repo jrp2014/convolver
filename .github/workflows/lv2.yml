@@ -140,9 +140,13 @@ jobs:
       - name: Convolver's LV2 bundle (Release)
         run: |
           cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF
+            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake --build build-lv2 --parallel --target convolver_lv2
           ls -l build-lv2/lv2/convolver.lv2
+      - name: clang-tidy on the LV2 adapter
+        run: |
+          sudo apt-get install -y --no-install-recommends clang-tidy-18
+          clang-tidy-18 -p build-lv2 plugins/lv2/plugin.cpp
       - name: lv2lint checks every Convolver plug-in
         run: |
           bundle="$PWD/build-lv2/lv2/convolver.lv2/"

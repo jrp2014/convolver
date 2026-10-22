@@ -2,6 +2,7 @@
 #include "host.hpp"
 #include "convolver_identities.hpp"
 #include "presets.hpp"
+#include <array>
 #include <cstdarg>
 #include <cstdio>
 #include <lv2/atom/atom.h>
@@ -39,15 +40,14 @@ const char* UridMap::unmap(LV2_URID id) const {
 namespace {
 int log_vprintf(LV2_Log_Handle handle, LV2_URID type, const char* format, va_list args) {
     auto& log = *static_cast<Log*>(handle);
-    va_list copy;
-    va_copy(copy, args);
-    const int length = std::vsnprintf(nullptr, 0, format, copy);
-    va_end(copy);
-    std::string text(length > 0 ? static_cast<std::size_t>(length) : 0, '\0');
-    if (length > 0)
-        std::vsnprintf(text.data(), text.size() + 1, format, args);
+    // Convolver's messages are a few hundred bytes; longer ones are cut.
+    std::array<char, 8192> text{};
+    // The analyzer cannot see that the caller started `args` (it is a
+    // parameter, as in vprintf itself): a known false positive.
+    // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
+    const int length = std::vsnprintf(text.data(), text.size(), format, args);
     const char* name = log.urids ? log.urids->unmap(type) : nullptr;
-    log.messages.push_back({name ? name : "", text});
+    log.messages.push_back({name ? name : "", text.data()});
     return length;
 }
 int log_printf(LV2_Log_Handle handle, LV2_URID type, const char* format, ...) {

@@ -56,7 +56,9 @@ clang-tidy-18 -p build/presets/release portable/engine.cpp portable/attenuation.
 ```
 
 Replace `fft_fftw.cpp` with `fft_accelerate.cpp` or `fft_ooura.cpp` for the
-corresponding backend. Match
+corresponding backend. In a build with `-DCONVOLVER_BUILD_LV2=ON`, add
+`plugins/lv2/plugin.cpp` (the [LV2 workflow](.github/workflows/lv2.yml) checks
+it). Match
 the analyzer to the compiler/SDK headers: older analyzers may not parse newer
 Apple SDKs. CI uses the Linux clang-tidy 18 toolchain. Fix real diagnostics rather
 than adding blanket suppressions. These tools are development dependencies;
