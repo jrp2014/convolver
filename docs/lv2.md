@@ -145,8 +145,8 @@ frames, with the same output.
   refusals; the status port, log messages and saved state after good and bad
   loads; presets written by `convolver-preset` and lilv's own state round
   trip; long `run()` calls; and lifecycle sequences, one scripted and several
-  seeded (loads, failed
-  loads, audio, bypass, reset, reopening a saved session). A small model
+  seeded (loads, failed loads, audio, bypass, reset, reopening a saved
+  session). A small model
   checks the saved state, status and latency after every step, and the exact
   output at every reset and at the end; the transitions during audio
   (crossfades, a rejection while playing) are the harness's cases.
