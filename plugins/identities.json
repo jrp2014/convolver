@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "about": "Permanent plug-in identities and channel layouts (TODO PLUG-4). Hosts save these identities in projects, presets and installer receipts, so a released value must never change. Anyone distributing a modified build must change every identity here. See docs/plugin-identities.md.",
+  "vendor": {
+    "name": "Convolver",
+    "url": "https://github.com/jrp2014/convolver"
+  },
+  "vst3": {
+    "processor_class_id": "73A81329E6484ADF9DA7D731A8C94201",
+    "controller_class_id": "622AD87C23664CCFB157473FBCD4A6B9",
+    "macos_bundle_id": "io.github.jrp2014.convolver.vst3"
+  },
+  "au": {
+    "type": "aufx",
+    "subtype": "Conv",
+    "manufacturer": "CONV",
+    "macos_bundle_id": "io.github.jrp2014.convolver.au"
+  },
+  "lv2": {
+    "base_uri": "https://github.com/jrp2014/convolver/lv2#",
+    "bundle": "convolver.lv2"
+  },
+  "macos_installer": {
+    "vst3_package_id": "io.github.jrp2014.convolver.pkg.vst3",
+    "tools_package_id": "io.github.jrp2014.convolver.pkg.tools"
+  },
+  "windows_installer": {
+    "registry_key": "Software\\Convolver",
+    "uninstall_key": "Convolver"
+  },
+  "host_state": {
+    "magic": "CNVS",
+    "versions": [1]
+  },
+  "historical": {
+    "vst2_unique_id": "Conv"
+  },
+  "channels": {
+    "minimum": 1,
+    "maximum": 8,
+    "unequal_counts": true
+  },
+  "fixed_layouts": [
+    {"id": "discrete-1-1", "inputs": 1, "outputs": 1, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-2-2", "inputs": 2, "outputs": 2, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-1-2", "inputs": 1, "outputs": 2, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-2-4", "inputs": 2, "outputs": 4, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-2-6", "inputs": 2, "outputs": 6, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-2-8", "inputs": 2, "outputs": 8, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-6-6", "inputs": 6, "outputs": 6, "input": "discrete", "output": "discrete"},
+    {"id": "discrete-8-8", "inputs": 8, "outputs": 8, "input": "discrete", "output": "discrete"}
+  ],
+  "speakers": [
+    {"bit": 0, "wav": "FL", "vst3": "kSpeakerL", "au": "kAudioChannelBit_Left", "lv2": "left"},
+    {"bit": 1, "wav": "FR", "vst3": "kSpeakerR", "au": "kAudioChannelBit_Right", "lv2": "right"},
+    {"bit": 2, "wav": "FC", "vst3": "kSpeakerC", "au": "kAudioChannelBit_Center", "lv2": "center"},
+    {"bit": 3, "wav": "LFE", "vst3": "kSpeakerLfe", "au": "kAudioChannelBit_LFEScreen", "lv2": "lowFrequencyEffects"},
+    {"bit": 4, "wav": "BL", "vst3": "kSpeakerLs", "au": "kAudioChannelBit_LeftSurround", "lv2": "rearLeft"},
+    {"bit": 5, "wav": "BR", "vst3": "kSpeakerRs", "au": "kAudioChannelBit_RightSurround", "lv2": "rearRight"},
+    {"bit": 6, "wav": "FLC", "vst3": "kSpeakerLc", "au": "kAudioChannelBit_LeftCenter", "lv2": "centerLeft"},
+    {"bit": 7, "wav": "FRC", "vst3": "kSpeakerRc", "au": "kAudioChannelBit_RightCenter", "lv2": "centerRight"},
+    {"bit": 8, "wav": "BC", "vst3": "kSpeakerCs", "au": "kAudioChannelBit_CenterSurround", "lv2": "rearCenter"},
+    {"bit": 9, "wav": "SL", "vst3": "kSpeakerSl", "au": "kAudioChannelBit_LeftSurroundDirect", "lv2": "sideLeft"},
+    {"bit": 10, "wav": "SR", "vst3": "kSpeakerSr", "au": "kAudioChannelBit_RightSurroundDirect", "lv2": "sideRight"},
+    {"bit": 11, "wav": "TC", "vst3": "kSpeakerTc", "au": "kAudioChannelBit_TopCenterSurround", "lv2": ""},
+    {"bit": 12, "wav": "TFL", "vst3": "kSpeakerTfl", "au": "kAudioChannelBit_VerticalHeightLeft", "lv2": ""},
+    {"bit": 13, "wav": "TFC", "vst3": "kSpeakerTfc", "au": "kAudioChannelBit_VerticalHeightCenter", "lv2": ""},
+    {"bit": 14, "wav": "TFR", "vst3": "kSpeakerTfr", "au": "kAudioChannelBit_VerticalHeightRight", "lv2": ""},
+    {"bit": 15, "wav": "TBL", "vst3": "kSpeakerTrl", "au": "kAudioChannelBit_TopBackLeft", "lv2": ""},
+    {"bit": 16, "wav": "TBC", "vst3": "kSpeakerTrc", "au": "kAudioChannelBit_TopBackCenter", "lv2": ""},
+    {"bit": 17, "wav": "TBR", "vst3": "kSpeakerTrr", "au": "kAudioChannelBit_TopBackRight", "lv2": ""}
+  ]
+}
