@@ -64,22 +64,23 @@ choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/cmake-packag
 
 Every plug-in format's SDK is pinned by commit and archive SHA-256 in
 `packaging/release-policy.json`, and every test tool by version and checksum in
-CI (PLUG-6), so a build or a validator result can be repeated exactly:
+CI (PLUG-6), so a build or a validator result can be repeated exactly. The
+workflows are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml` in the source:
 
 | Dependency | Pin | Used by | Where pinned |
 | --- | --- | --- | --- |
-| VST3 SDK (`vst3sdk` and four submodules) | 3.8.1 build 84, commit `3cdf9ca` | VST3 builds | Release policy; the [VST3 workflow](../../.github/workflows/vst3.yml) checks out the same commit |
+| VST3 SDK (`vst3sdk` and four submodules) | 3.8.1 build 84, commit `3cdf9ca` | VST3 builds | Release policy; the VST3 workflow checks out the same commit |
 | `lv2` headers | 1.18.10, commit `0bcde33` | LV2 builds (LV2-1) | Release policy |
 | AudioUnitSDK | 1.4.0, commit `bd98b31` | AU builds (AU-1) | Release policy |
-| `lilv` (test host) | Ubuntu 24.04 `0.24.22-1build1` | LV2 tests | [LV2 workflow](../../.github/workflows/lv2.yml) |
+| `lilv` (test host) | Ubuntu 24.04 `0.24.22-1build1` | LV2 tests | LV2 workflow |
 | `lv2lint` | 0.16.2, archive SHA-256 | LV2 validation (LV2-3) | LV2 workflow |
 | pluginval | v2.0.0-beta3, archive SHA-256 per platform | VST3 validation, later LV2 and AU | VST3 workflow |
-| `auval` | ships with macOS; the image is fixed at `macos-15` | AU validation (AU-3) | [Audio Unit workflow](../../.github/workflows/au.yml) |
+| `auval` | ships with macOS; the image is fixed at `macos-15` | AU validation (AU-3) | Audio Unit workflow |
 
 AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds as
 C++23; the core and the other formats stay C++20. Its licence is Apache-2.0,
-which is why the AU component is distributed under GPL-3.0-or-later (see the
-[plug-in formats plan](../plans/2026-10-21-plugin-formats.md#au-licence)).
+which is why the AU component is distributed under GPL-3.0-or-later (see "AU
+licence" in `docs/plans/2026-10-21-plugin-formats.md`).
 
 Each SDK entry in the policy lists the plug-in `formats` that use it.
 `build_dependencies.py --formats vst3 lv2 au` unpacks those formats' SDKs and
