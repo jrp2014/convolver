@@ -111,6 +111,10 @@ plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin`: it must export no FFTW symbols
 and, unless FFTW was chosen, import none (skipped where no tool is found).
+`vst3.identities` checks that the bundle's `moduleinfo.json` (and, on macOS,
+`Info.plist`) carries the class IDs, vendor and bundle identifier from
+[`plugins/identities.json`](../plugins/identities.json), and that each VST3
+speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in

@@ -156,6 +156,11 @@ portable implementation replaced it and
 GNU General Public License, version 2 or (at your option) any later version.
 See [COPYING](COPYING).
 
+If you distribute a modified plug-in build, give it its own identities first:
+change every value in [`plugins/identities.json`](plugins/identities.json), as
+[plug-in identities](docs/plugin-identities.md#if-you-distribute-a-modified-build)
+explains, so hosts do not mistake it for this one.
+
 ## Plug-in distributions
 
 See the [plug-in guide](docs/plugins/index.md) for preview installation, preset

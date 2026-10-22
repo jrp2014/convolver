@@ -6,7 +6,8 @@ and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
 [plug-in distribution plan](2026-10-18-plugin-distribution.md).
-**Current state:** PLUG-1 (the plug-in FFT backend) is implemented. Everything
+**Current state:** PLUG-1 (the plug-in FFT backend) and PLUG-4 (the
+[identity and layout registry](../plugin-identities.md)) are implemented. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
 and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
