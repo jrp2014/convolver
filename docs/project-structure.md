@@ -25,6 +25,7 @@ For the audio vocabulary, start with [concepts](concepts.md).
 | Inspection API | [`inspection.hpp`](../include/convolver/inspection.hpp): `InspectionReport`; [`inspection.cpp`](../portable/inspection.cpp) | Reports the same grammar and selection behavior; no output audio or FFT plans |
 | CLI rendering and reports | [`main.cpp`](../portable/main.cpp), [`inspection_cli.cpp`](../portable/inspection_cli.cpp) | Options, safe output creation, draining, report serialization and exit status |
 | VST3 adapter | [`processor.cpp`](../plugins/vst3/processor.cpp), [`processor.hpp`](../plugins/vst3/processor.hpp) | SDK boundary; stream processing goes through `HostProcessor` |
+| LV2 adapter | [`plugin.cpp`](../plugins/lv2/plugin.cpp), port numbers in [`plugin.hpp`](../plugins/lv2/plugin.hpp); Turtle written by [`generate_ttl.py`](../plugins/lv2/generate_ttl.py) from the identity registry; lilv test host in [`tests/lv2/host.hpp`](../tests/lv2/host.hpp) | `lv2` headers only; exports only `lv2_descriptor`; one plug-in URI per fixed layout; `HostFilter` and `HostProcessor` behind the LV2 threading rules ([guide](lv2.md)) |
 | Preset files for every format | [`presets.hpp`](../portable/presets.hpp), [`presets.cpp`](../portable/presets.cpp): `.vstpreset`, `.aupreset` and LV2 bundles around one encoded `HostState`; the tool [`preset_main.cpp`](../portable/preset_main.cpp) (`convolver-preset`, and `convolver-vst3-preset` built with `CONVOLVER_VST3_PRESET_ALIAS`) | Private `convolver_presets` library; no plug-in SDK. The AU key and LV2 state URI are permanent ([presets guide](presets.md#what-the-files-contain)) |
 | Equalizer APO export | [`equalizer_apo.hpp`](../portable/equalizer_apo.hpp), [`equalizer_apo.cpp`](../portable/equalizer_apo.cpp): `make_export` turns configurations into Equalizer APO commands and mono IR files; the tool [`equalizer_apo_main.cpp`](../portable/equalizer_apo_main.cpp) (`convolver-equalizer-apo`) | Text only, no audio processing; a device no filter fits is silenced ([guide](equalizer-apo.md)) |
 | Permanent plug-in identities and channel layouts | [`plugins/identities.json`](../plugins/identities.json), read by [`ConvolverIdentities.cmake`](../cmake/ConvolverIdentities.cmake) into `convolver::identity` | One registry for every format; adapters and release scripts never repeat its values ([guide](plugin-identities.md)) |
@@ -65,7 +66,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Selection | First matching list entry; relative paths beside their owner; no implicit resampling or guessed drive mapping | `config.cpp`, `native.inspection`, `compatibility.corpus` |
 | Errors | Expected input errors become located diagnostics; resource exhaustion propagates; all-entry validation can continue | `native.inspection_cli`, `native.limits` |
 | Integer output | Seeded draw order and per-channel shaping state are independent of caller chunking | `native.io`, `native.cli` |
-| State | Bounded transactional decoding; no partial application of invalid state | `native.state`, `vst3.adapter` |
+| State | Bounded transactional decoding; no partial application of invalid state | `native.state`, `vst3.adapter`, `lv2.adapter` |
 | Identities and old presets | Released plug-in identities never change; version-1 state loads on any arrangement with matching counts | `identities`, `vst3.identities`, `vst3.adapter` (`version1_presets`) |
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
 
@@ -92,7 +93,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
-| Host lifecycle or state | Host/state implementation and VST3 adapter | `native.host`, `native.state`, host-state fuzz replay and all VST3 tests, including `vst3.harness` |
+| Host lifecycle or state | Host/state implementation, VST3 and LV2 adapters | `native.host`, `native.state`, host-state fuzz replay, all VST3 tests including `vst3.harness`, and `ctest -L lv2` |
 | Plug-in identities or layouts | [Plug-in identities](plugin-identities.md); never change a released value | `identities` (also pre-commit), `vst3.identities`, `vst3.adapter` |
 | Preset files or the preset tool | [Presets guide](presets.md); version-1 state must keep loading | `native.presets`, `plugins.presets`, and with the SDK `vst3.preset_format` and `vst3.preset` |
 | The Equalizer APO export | [Equalizer APO guide](equalizer-apo.md); the model in the test must follow Equalizer APO's sources | `export.equalizer_apo`; report its worst error |

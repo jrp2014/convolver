@@ -264,8 +264,16 @@ decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
 
 LV2 (Linux first; also PipeWire system audio):
 
-- [ ] **LV2-1 — Adapter and headless test.** `plugins/lv2/`: audio, latency and
-  bypass ports; a `lilv` test using PLUG-2.
+- [x] **LV2-1 — Adapter and headless test.** `plugins/lv2/`: audio, latency and
+  bypass ports; a `lilv` test using PLUG-2. Done 22 October 2026 (PR #43): one
+  bundle with a plug-in URI per PLUG-4 layout, generated from the registry;
+  `enabled`, latency and status ports; filters through state (the
+  `convolver-preset` property), with the control lock and failure rules of the
+  [LV2 design](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  `lv2.harness` passes every PLUG-2 case (restore-before-setup and tail checks
+  skipped: LV2 has neither); `lv2.adapter` covers ports, status, log messages,
+  presets, lilv state and seeded lifecycle sequences; `lv2lint` runs on every
+  plug-in in CI ([LV2 guide](docs/lv2.md)).
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
@@ -282,8 +290,14 @@ LV2 (Linux first; also PipeWire system audio):
   rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown
   with work outstanding, each with a test.
+  Progress (22 October 2026, PR #43): restoring the embedded state (presets and
+  sessions) works, prepared in `restore()`; the path parameter, worker, mapped
+  path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
+  sequences with outstanding worker loads.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
+  Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
+  CI came with LV2-1; pluginval and named layouts remain.
 - [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
   configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and

@@ -1,0 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* The LV2 library exports its entry point and nothing else. */
+{
+    global: lv2_descriptor;
+    local: *;
+};

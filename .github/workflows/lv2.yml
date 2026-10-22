@@ -1,9 +1,13 @@
 ---
 # SPDX-License-Identifier: GPL-2.0-or-later
-# LV2 build and test tools, pinned (PLUG-6). Until the LV2 adapter exists
-# (LV2-1), this job proves the pins: the lv2 headers from the release policy
-# build LV2's example plug-ins, lilv loads and runs one on a shared fixture,
-# and lv2lint checks it. LV2-1 and LV2-3 add Convolver's bundle here.
+# LV2 build and test tools, pinned (PLUG-6), and Convolver's LV2 plug-ins
+# (LV2-1). The job first proves the pins: the lv2 headers from the release
+# policy build LV2's example plug-ins, lilv loads and runs one on a shared
+# fixture, and lv2lint checks it. Then it builds Convolver's bundle against the
+# pinned packages, runs the LV2 tests (lilv-hosted PLUG-2 harness and adapter
+# tests) under ASan and UBSan and lv2lints every plug-in. LV2-3 adds pluginval.
+# (lv2apply cannot host Convolver: it offers no features, and Convolver needs
+# urid:map for its state.)
 name: LV2
 
 'on':
@@ -50,7 +54,7 @@ jobs:
             "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
             "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
             "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
-            meson ninja-build pkg-config libelf-dev
+            meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
           dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
       - name: Pinned lv2 source (release policy)
@@ -123,3 +127,27 @@ jobs:
             echo "Expected lv2lint to fail eg-amp on exactly: $expected (got status $status: $failures)" >&2
             exit 1
           fi
+      # The tests load the plug-in into lilv in the same process, so a
+      # sanitizer build can host a sanitizer build of the plug-in.
+      - name: Convolver's LV2 tests (Debug, ASan and UBSan)
+        run: |
+          cmake -S . -B build-lv2-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_SANITIZERS=ON
+          cmake --build build-lv2-asan --parallel
+          ctest --test-dir build-lv2-asan --output-on-failure --parallel 2 \
+            -R '^(examples\.first_use|lv2\..*)$'
+      # lv2lint is not a sanitizer build, so it needs a plain one.
+      - name: Convolver's LV2 bundle (Release)
+        run: |
+          cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF
+          cmake --build build-lv2 --parallel --target convolver_lv2
+          ls -l build-lv2/lv2/convolver.lv2
+      - name: lv2lint checks every Convolver plug-in
+        run: |
+          bundle="$PWD/build-lv2/lv2/convolver.lv2/"
+          uris=$(sed -n 's/^<\(https:[^>]*\)>$/\1/p' "$bundle/manifest.ttl")
+          test "$(echo "$uris" | wc -l)" -eq 8
+          for uri in $uris; do
+            env -u LV2_PATH lv2lint -I "$bundle" "$uri"
+          done

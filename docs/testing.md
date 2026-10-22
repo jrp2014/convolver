@@ -189,7 +189,8 @@ workflow reports newer releases of those pins; it tests nothing in Convolver.
 Every plug-in adapter is held to the same rules by one harness,
 [`tests/plugins/harness.hpp`](../tests/plugins/harness.hpp). Each format's test
 implements its small `Adapter` interface by driving the format's own host API
-(today only VST3, in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp));
+(VST3 in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp), LV2 hosted
+by lilv in [`tests/lv2/harness_tests.cpp`](../tests/lv2/harness_tests.cpp));
 the harness owns the cases and the criteria.
 
 **Fixtures.** The [first-use examples](../examples/first-use/README.md) are the
@@ -254,8 +255,17 @@ hosts call `setupProcessing` with placeholder values before restoring state).
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 
-`vst3.harness` needs the VST3 build, the CLI and the native targets; CTest runs
-`examples.first_use` first. A new format adds a driver beside its other tests
+LV2 lists none either. Its two restore-before-setup cases are skipped (LV2
+knows its rate and channels from instantiation), and the tail checks are
+skipped because LV2 core cannot report a tail: its driver's
+`Adapter::reports_tail()` returns false, and every other check of those cases,
+the audio included, still runs. LV2 has no separate reset, so the driver's
+reset is deactivate and activate, and it reads the latency port after a
+zero-frame `run()`, as hosts do before audio. The [LV2 guide](lv2.md#tests)
+lists its other tests.
+
+`vst3.harness` and `lv2.harness` need their plug-in builds, the CLI and the
+native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
 and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 [`plugins/vst3/CMakeLists.txt`](../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
