@@ -74,7 +74,7 @@ our vendored copy is current.
 
 ## Automated checks
 
-The pre-commit configuration used by lint CI runs
+The pre-commit configuration used by lint CI (which also checks C++ formatting) runs
 [`check_doc_links.py`](../scripts/check_doc_links.py) and its
 [regression tests](../tests/documentation_links_tests.py). The checker scans
 top-level `.md` files and Markdown under `docs/`, excluding `archive/`,

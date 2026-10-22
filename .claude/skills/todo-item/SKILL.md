@@ -39,9 +39,18 @@ change the guide.
 4. Continue on that branch if you can. If you must use another branch, start it
    from theirs and say in both pull requests which replaces which.
 
+## Before every push
+
+Run `pre-commit run --all-files` (it reformats C++ with clang-format 18 and runs
+the other lint checks); stage any files it changed and run it again until it
+passes. Do this for draft and work-in-progress commits too: jrp sees every red
+CI run. In cloud sessions the Git hook runs it on each commit; never bypass it
+with `--no-verify`.
+
 ## Stopping or handing over
 
-1. Commit and push everything; cloud sessions are discarded.
+1. Run the checks above, then commit and push everything; cloud sessions are
+   discarded.
 2. Replace the handoff note in the pull request description: State, Done (with
    commands), Next (concrete), Open questions, Watch out for.
 3. If you are stopping before the item is finished and a partial merge is

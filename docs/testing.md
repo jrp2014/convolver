@@ -23,6 +23,7 @@ extraction tests are additional preservation checks and are described separately
 below. A test list is coverage information; a pass claim needs an actual run.
 
 Contents: [native tests](#native-production-tests),
+[plug-in comparisons](#plug-in-comparisons-plug-2),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
 [documentation checks](#documentation-checks) and [fuzzing](#fuzz-smoke-tests-and-longer-campaigns).
@@ -120,6 +121,7 @@ copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json
 speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
+`vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 [pluginval](vst3.md#independent-host-tests-pluginval), a host that does not share
 the SDK's hosting code. None of these establishes compatibility in a particular
@@ -138,6 +140,79 @@ results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../.github/workflows/regression.yml) and
 [VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
 file alone is not evidence that a job passed.
+
+## Plug-in comparisons (PLUG-2)
+
+Every plug-in adapter is held to the same rules by one harness,
+[`tests/plugins/harness.hpp`](../tests/plugins/harness.hpp). Each format's test
+implements its small `Adapter` interface by driving the format's own host API
+(today only VST3, in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp));
+the harness owns the cases and the criteria.
+
+**Fixtures.** The [first-use examples](../examples/first-use/README.md) are the
+shared fixtures: a mono IR file, a stereo `.cfg` with cross-feed, a fractional
+route gain and an output delay, and a 2→6 crossover with level trims and
+delays. Every route has a different response, so a swapped channel fails.
+[`tests/plugins/fixtures.py`](../tests/plugins/fixtures.py) writes them from
+integer arithmetic and a seeded generator, and holds the Python WAV, noise and
+oracle helpers that the pluginval acceptance test and the release example
+generator also use.
+
+- `examples.fixtures`: the committed fixtures are byte for byte what the
+  generator writes. After changing the generator, regenerate them with
+  `python3 tests/plugins/fixtures.py write examples/first-use`.
+- `examples.first_use`: runs the commands marked `<!-- first-use-example -->` in
+  the README and the examples README exactly as written, with the CLI just
+  built, and compares every render with the fixture's `expected.wav` (the
+  oracle) within 1e-5. Every fixture must have a documented render. The renders
+  stay in `BUILD/first-use/` as the CLI reference for the adapters.
+
+**Two references.** The independent double-precision oracle
+([`tests/native/oracle.hpp`](../tests/native/oracle.hpp), shared with
+`native.engine`) is the authority: at most 1e-5 absolute. The CLI render shows
+that the adapter is wired to the engine as the CLI is: a fresh instance must
+reproduce it exactly, sample for sample, once the 256-frame latency is allowed
+for. Both run the same engine, so the CLI alone could hide a shared defect.
+
+**Cases**, for each fixture (case names as printed, for example
+`bypass[crossover]`):
+
+| Case | Requirement |
+| --- | --- |
+| `initial` | A filter loaded before activation: latency exactly 256, the exact tail, oracle and CLI agreement from the first frame; blocks of 1, 61, 300 and the host maximum (1024), each with separate and shared (in-place) buffers, and a variable block pattern |
+| `restore-after-activation` | A filter loaded after activation but before audio is installed directly, without a crossfade |
+| `restore-before-setup` | State restored before the host negotiates rate and layout (VST3, AU) is installed directly at activation; skipped for formats that always know their configuration first (LV2) |
+| `restore-before-setup-mismatch` | Well-formed state for another rate, restored before setup, is kept as the saved state; activation plays exact silence; correcting the rate brings the filter back |
+| `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 256-frame linear crossfade; two loads before the next callback coalesce to the newest |
+| `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
+| `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
+| `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
+| `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
+| `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
+| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. For unequal counts this is today's VST3 behaviour, provisional until jrp decides what bypass plays there |
+| `reset` | Exact silence after a reset, then the filter plays as if fresh |
+| `silence-flags` | Input flagged silent does not cut the tail short; outputs flagged silent are silent |
+| `nonfinite-input` | NaN and infinite input samples count as silence; output stays finite |
+
+Every render continues two blocks past the end of the filter tail, where the
+output must be within tolerance of zero.
+
+These follow the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
+A format that does not yet meet part of it lists those cases as **known
+deviations**, each with the text its failure must contain and the TODO item
+that fixes it. The run prints them and still passes, but a listed case that
+fails in any other way, or starts passing, fails the run, so the list can
+neither hide a new defect nor go stale. A listed case stops at its first
+failure, so its later checks run only once it is fixed. VST3 lists 13, all for [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au).
+The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
+Linux on 22 October 2026.
+
+`vst3.harness` needs the VST3 build, the CLI and the native targets; CTest runs
+`examples.first_use` first. A new format adds a driver beside its other tests
+and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
+[`plugins/vst3/CMakeLists.txt`](../plugins/vst3/CMakeLists.txt). Status ports
+and host error messages are format-specific; LV2 and AU check them in their
+own tests.
 
 ## Historical tests: run with CMake/CTest
 
@@ -224,8 +299,8 @@ open validation gaps and intentional constraints.
 
 ## Documentation checks
 
-Run the pinned [pre-commit checks](../CONTRIBUTING.md#shell-markdown-and-yaml-checks)
-for ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
+Run the pinned [pre-commit checks](../CONTRIBUTING.md#lint-checks)
+for C++ formatting, ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
 The `documentation` CTest entry checks the archived website's hashes and links;
 it is not a check of all maintained Markdown. Run changed CLI/build examples
 against the current program as well as checking links.

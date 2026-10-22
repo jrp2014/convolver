@@ -285,6 +285,17 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
             "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(compatibility.corpus PROPERTIES LABELS "compatibility;real-libraries;cli" TIMEOUT 300)
+        # DOC-1 and PLUG-2: the shared fixtures, and the documented first-use commands run
+        # as written. The renders it leaves are the CLI reference for plug-in comparisons.
+        add_test(NAME examples.fixtures COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/fixtures.py" check
+            "${CMAKE_CURRENT_SOURCE_DIR}/examples/first-use")
+        add_test(NAME examples.first_use COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/fixtures.py" run-documented
+            --cli "$<TARGET_FILE:convolver_cli>" --work "${PROJECT_BINARY_DIR}/first-use")
+        set_tests_properties(examples.fixtures examples.first_use PROPERTIES
+            LABELS "examples;real-libraries;cli" TIMEOUT 120)
+        set_tests_properties(examples.first_use PROPERTIES FIXTURES_SETUP first_use_renders)
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)

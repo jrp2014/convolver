@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- First-use examples in `examples/first-use/`: a mono IR, a stereo
+  configuration and a stereo-to-six-channel crossover, each with an input and
+  the expected output. CI runs the documented commands as written and checks
+  the results.
+- A shared test harness for plug-in adapters (PLUG-2): every format is checked
+  against a direct double-precision convolution and the CLI's renders of the
+  same examples, with the lifecycle cases of the shared adapter contract. The
+  VST3 adapter runs it as `vst3.harness`.
 - One registry of permanent plug-in identities and channel layouts,
   `plugins/identities.json` (PLUG-4): VST3 class IDs, AU codes `aufx`/`Conv`/`CONV`,
   LV2 URIs and fixed layouts, macOS bundle and installer identifiers, Windows

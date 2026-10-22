@@ -43,9 +43,11 @@ Report only problems you can point to in the diff, with the file and line.
 - **Documentation and tracking:** owning guide updated, new pages in
   `docs/README.md`, CHANGELOG for user-visible changes, TODO ticked or a
   `Progress` line added, completed plans archived.
-- **Repository checks:** run `python3 scripts/check_repository.py`,
-  `python3 scripts/check_doc_links.py` and `scripts/check_format.sh` (if
-  clang-format-18 is available).
+- **Repository checks:** run `pre-commit run --all-files`, which covers
+  formatting (clang-format 18), the repository rules and the documentation
+  links. Without pre-commit, run `python3 scripts/check_format.py`,
+  `python3 scripts/check_repository.py` and `python3 scripts/check_doc_links.py`.
+  Report any red CI run on the branch, including formatting on an older commit.
 
 If you can build, run the tests yourself (AGENTS.md, "Build and test") and say
 what you ran.

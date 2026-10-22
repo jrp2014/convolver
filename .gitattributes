@@ -14,6 +14,8 @@
 *.WAV   binary
 *.pcm   binary
 *.flac  binary
+# Generated fixtures are checked byte for byte against their generator.
+examples/first-use/*/*.cfg -text
 
 # Historical recovery provenance hashes refer to the exact archive bytes.
 docs/historical/convolver-4.4/** -text

@@ -60,8 +60,12 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - `tests/regression/` compiles **historical** functions by slicing
   `historical/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
-- Portable sources must pass `scripts/check_format.sh` (clang-format 18) and the
-  `.clang-tidy` checks (CI enforces both; commands in `CONTRIBUTING.md`).
+- Run `pre-commit run --all-files` before **every** push, draft commits
+  included. It formats the portable C++ with clang-format 18 (also
+  `python3 scripts/check_format.py --fix`) and runs the other lint checks;
+  lint CI fails on any difference. Cloud sessions install it as a Git hook.
+  Portable sources must also pass the `.clang-tidy` checks (commands in
+  `CONTRIBUTING.md`).
 - `python3 scripts/check_repository.py` must pass: TODO IDs defined, every
   maintained page indexed, plans dated and current, paths in this file real,
   SPDX lines, and the top-level layout. Lint CI runs it through pre-commit.

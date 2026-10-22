@@ -55,8 +55,19 @@ needed. Windows builds use vcpkg; see the
 
 ## Filter a file
 
-With a multichannel impulse response, each IR channel filters the matching
-input channel:
+To try it on files that come with the repository:
+
+<!-- first-use-example -->
+```sh
+./build/convolver --filter examples/first-use/stereo/filter.cfg --input examples/first-use/stereo/input.wav --output stereo.wav
+```
+
+`stereo.wav` should match `examples/first-use/stereo/expected.wav`. The
+[first-use examples](examples/first-use/README.md) also include a mono IR and a
+stereo-to-six-channel crossover, and explain what each one does.
+
+For your own files: with a multichannel impulse response, each IR channel
+filters the matching input channel:
 
 ```sh
 ./build/convolver --filter impulse.wav --input music.wav --output corrected.wav
@@ -120,7 +131,7 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 | [`tests/`](tests/) | Native, host, package, compatibility and historical tests |
 | [`docs/`](docs/README.md) | Current guides, [open plans](docs/plans/) and clearly labelled records ([`archive/`](docs/archive/)) |
 | [`cmake/`](cmake/), [`packaging/`](packaging/), [`scripts/`](scripts/) | Build helpers, release packaging, and release and repository checks |
-| [`examples/`](examples/) | Example plug-in presets |
+| [`examples/`](examples/) | First-use example filters with expected output, and notes on the example plug-in presets |
 | [`historical/`](historical/) | Preserved 2005–2006 Windows implementation; not part of the portable CMake build |
 
 - [Documentation index](docs/README.md): choose a guide by task

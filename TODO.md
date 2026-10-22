@@ -37,11 +37,11 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
-| 1. Now | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI. |
-| 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading. Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
+| 1. Done 22 October | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI (PR #28). |
+| 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
 | 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
-| 3. In parallel | **VST3** (VST3-1, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
+| 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
@@ -55,9 +55,14 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
 
 ## User experience and distribution
 
-- [ ] **DOC-1 — Runnable first-use examples.** Provide small redistributable IRs,
-  inputs and expected output for mono, stereo and a crossover. Run the exact
-  documented commands in CI; record fixture provenance/licences.
+- [x] **DOC-1 — Runnable first-use examples.** Done 22 October 2026 (PR #28).
+  [`examples/first-use/`](examples/first-use/README.md) holds a mono IR, a
+  stereo `.cfg` and a 2→6 crossover, each with an input and the oracle's
+  expected output, all synthetic (GPL-2.0-or-later, provenance in that README).
+  `examples.first_use` runs the commands marked in the README and the examples
+  README exactly as written and compares with the expected output;
+  `examples.fixtures` checks the files against their generator. See
+  [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
 - [ ] **DOC-2 — Maintain documentation automatically.** Extend checks to build
   options and executable CLI examples in CI. Local Markdown links/anchors and
   checker regression tests now run through pre-commit; the separate
@@ -103,7 +108,7 @@ First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
 [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
-work continues under VST3-1 to VST3-6, HOST-1 and REL-1.
+work continues under VST3-1 to VST3-7, HOST-1 and REL-1.
 
 Shared groundwork, done once so the three streams stay independent:
 
@@ -115,20 +120,15 @@ Shared groundwork, done once so the three streams stay independent:
   unless FFTW was chosen, imports none. The release policy uses the same
   backends and ships FFTW's notice only when FFTW is linked. See
   [plug-in builds](docs/fft-backends.md#plug-in-builds).
-- [ ] **PLUG-2 — Shared adapter test harness.** Two references for every
-  adapter: the independent double-precision convolution oracle (the authority)
-  and the CLI render (adapter equivalence; both share the engine, so the CLI
-  alone could hide a shared defect). Fixed tolerance (1e-5 against the oracle,
-  identical to the CLI once latency is aligned), exact latency, exact tail for a
-  fresh processor and the documented conservative (never-shrinking) bound after
-  replacements,
-  and distinct IRs per route so channel order is checked. Cases: initial
-  restoration, live replacement, failed initial load and failed replacement,
-  empty instance, bypass, reset, silence flags, variable blocks, in-place
-  buffers, mono, stereo and 2→6. Reuse `scripts/release/generate_examples.py`
-  and the oracle helpers in `tests/vst3/pluginval_tests.py` rather than adding
-  a second fixture system; DOC-1 documents the same fixtures. See the
-  [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
+- [x] **PLUG-2 — Shared adapter test harness.** Done 22 October 2026 (PR #28).
+  `tests/plugins/harness.hpp` checks every adapter against the double-precision
+  oracle (1e-5) and the CLI render of the DOC-1 fixtures (identical after the
+  256-frame latency), with exact latency and tails and the lifecycle cases of
+  the [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
+  `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
+  and 13 known deviations are left to VST3-7. LV2-1 and AU-1 each add a driver;
+  format-specific status and error reporting stay in their own tests. See
+  [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
 - [ ] **PLUG-3 — One preset tool.** `convolver-preset`, writing `.vstpreset`,
   `.aupreset` and LV2 presets from the same host state. It must build without
   the VST3 SDK so AU and LV2 builds can ship it; `.vstpreset` output uses the SDK
@@ -183,9 +183,20 @@ restoration installs the filter directly, without a crossfade; an empty
 instance and a failed initial load have one stated, tested behaviour (owner's
 decision, 21 October 2026: identity for an empty instance with equal counts;
 silence, with an error shown, for unequal counts and after a failed initial
-load). VST3 must change to match: today an empty instance with unequal counts
-passes input *c* to output *c*, and a rejected preset loaded while inactive
-replaces the saved state.
+load). VST3 must change to match (VST3-7).
+
+- [ ] **VST3-7 — Follow the shared adapter contract.** `vst3.harness` lists
+  13 known deviations, which this item removes: an empty instance with unequal
+  counts passes input *c* to output *c* instead of silence; while inactive,
+  `setState` checks only the channel limit, so a filter at the wrong rate
+  replaces the saved state (a failed replacement loses the working filter, and a
+  failed first load is accepted) and activation then fails with no output
+  written instead of silence; state restored before setup at another rate makes
+  activation fail (no output) instead of playing silence until the rate is
+  corrected; and a filter set while active but before any audio is crossfaded
+  in from the empty instance instead of installed directly.
+  Remove each case from the list in `tests/vst3/harness_tests.cpp` as it is
+  fixed; the harness fails if a listed case passes.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -197,7 +208,12 @@ LV2 (Linux first; also PipeWire system audio):
   [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
   one adapter lock for all `HostProcessor` control calls that `run()` never
   takes; requests passed as copied worker payloads with a generation number,
-  rechecked after loading so a stale completion never wins; no
+  skipped if already stale after loading and checked again after the
+  replacement is prepared, just before publication (needs a
+  prepare-then-publish step in `HostProcessor`), so a stale completion never
+  wins; status follows the newest request and the reported path follows the
+  installed filter, with regression tests for a request that arrives during
+  preparation or just before publication; no
   `state:threadSafeRestore` at first; initial restoration installs directly;
   rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown

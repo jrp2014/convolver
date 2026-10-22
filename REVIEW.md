@@ -35,8 +35,10 @@ program does not establish identical selection, path or routing behavior.
 
 [Testing](docs/testing.md) maps tests to production behavior. The
 [native workflow](.github/workflows/regression.yml),
-[VST3 workflow](.github/workflows/vst3.yml) and
-[fuzz workflow](.github/workflows/fuzz.yml) describe the configured gates.
+[VST3 workflow](.github/workflows/vst3.yml),
+[fuzz workflow](.github/workflows/fuzz.yml) and
+[lint workflow](.github/workflows/lint.yml) (formatting and the other
+pre-commit checks) describe the configured gates.
 Check [Actions](https://github.com/jrp2014/convolver/actions) for a particular
 revision's results; neither a workflow file nor a source tag proves a pass.
 

@@ -50,11 +50,11 @@ jobs:
         run: cmake --build build --parallel 2
       - name: Test
         run: ctest --test-dir build --output-on-failure --parallel 2
-      - name: Portable formatting and static analysis
+      # Formatting is checked by the lint workflow (pre-commit), not here.
+      - name: Portable static analysis
         if: runner.os == 'Linux' && matrix.cxx == 'clang++'
         run: |
-          sudo apt-get install -y clang-format-18 clang-tidy-18
-          scripts/check_format.sh
+          sudo apt-get install -y clang-tidy-18
           clang-tidy-18 -p build portable/engine.cpp portable/attenuation.cpp portable/config.cpp \
             portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp \
             portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
