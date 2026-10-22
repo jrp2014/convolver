@@ -126,7 +126,7 @@ Shared groundwork, done once so the three streams stay independent:
   256-frame latency), with exact latency and tails and the lifecycle cases of
   the [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
   `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
-  and 13 known deviations are left to VST3-7. LV2-1 and AU-1 each add a driver;
+  and 13 known deviations are left to VST3-7 (since removed: all 66 pass). LV2-1 and AU-1 each add a driver;
   format-specific status and error reporting stay in their own tests. See
   [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
 - [ ] **PLUG-3 — One preset tool.** `convolver-preset`, writing `.vstpreset`,
@@ -193,20 +193,21 @@ restoration installs the filter directly, without a crossfade; an empty
 instance and a failed initial load have one stated, tested behaviour (owner's
 decision, 21 October 2026: identity for an empty instance with equal counts;
 silence, with an error shown, for unequal counts and after a failed initial
-load). VST3 must change to match (VST3-7).
+load). VST3 follows it since VST3-7; the shared parts are `HostFilter` and
+direct installation in `HostProcessor`, which LV2 and AU reuse.
 
-- [ ] **VST3-7 — Follow the shared adapter contract.** `vst3.harness` lists
-  13 known deviations, which this item removes: an empty instance with unequal
-  counts passes input *c* to output *c* instead of silence; while inactive,
-  `setState` checks only the channel limit, so a filter at the wrong rate
-  replaces the saved state (a failed replacement loses the working filter, and a
-  failed first load is accepted) and activation then fails with no output
-  written instead of silence; state restored before setup at another rate makes
-  activation fail (no output) instead of playing silence until the rate is
-  corrected; and a filter set while active but before any audio is crossfaded
-  in from the empty instance instead of installed directly.
-  Remove each case from the list in `tests/vst3/harness_tests.cpp` as it is
-  fixed; the harness fails if a listed case passes.
+- [x] **VST3-7 — Follow the shared adapter contract.** Done 22 October 2026
+  (PR #35). The 13 known deviations in `vst3.harness` are gone and all 66
+  cases pass (worst error 1.8e-7): an empty instance with unequal counts plays
+  silence; once `setupProcessing` has given the rate, `setState` rejects a
+  mismatched filter while inactive too and keeps the last accepted one; a
+  failed first load plays silence; state restored before setup that does not
+  suit the host activates as silence and returns when the host is corrected;
+  a filter set after activation but before audio is installed directly. The
+  decisions live in the host layer (`HostFilter`, `unfiltered_configuration`;
+  tests in `native.host`). VST3 shows no message for a mismatch found at
+  activation, as it has no status display without an editor (VST3-3). See
+  [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
 
 LV2 (Linux first; also PipeWire system audio):
 

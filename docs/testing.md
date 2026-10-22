@@ -208,7 +208,8 @@ deviations**, each with the text its failure must contain and the TODO item
 that fixes it. The run prints them and still passes, but a listed case that
 fails in any other way, or starts passing, fails the run, so the list can
 neither hide a new defect nor go stale. A listed case stops at its first
-failure, so its later checks run only once it is fixed. VST3 lists 13, all for [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au).
+failure, so its later checks run only once it is fixed. VST3 lists none: its
+13 were removed by [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au), and all 66 cases pass.
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 

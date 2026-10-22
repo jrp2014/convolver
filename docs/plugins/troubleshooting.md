@@ -15,6 +15,12 @@ A preset must match both the host sample rate and the track's input and output
 channel counts. Change the
 host configuration or import the matching preset; Convolver does not resample.
 Malformed or mismatched state is rejected and the last valid state is preserved.
+If nothing valid was loaded before, Convolver plays silence rather than passing
+the unfiltered input through. A project opened at a different sample rate or
+channel layout from its preset also plays silence; set the host back to the
+preset's rate and layout and the filter returns. With no preset loaded and
+different input and output counts (for example a 2→6 crossover), Convolver plays
+silence too.
 A converter failure prints the cause to stderr and does not replace an existing
 file. Use a new output filename. Keep levels low when trying unfamiliar IRs.
 

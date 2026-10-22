@@ -51,6 +51,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The VST3 plug-in follows the shared adapter contract (VST3-7). With no preset
+  loaded and different input and output counts (for example a 2→6 crossover)
+  it plays silence instead of passing input *c* to output *c*. A preset at the
+  wrong sample rate or channel counts is rejected while the plug-in is
+  inactive too, keeping the last valid one; if none was loaded, it plays
+  silence. A project restored at the wrong rate or layout now activates and
+  plays silence, keeping its filter, instead of failing to activate. A preset
+  loaded after activation but before any audio plays from the first sample
+  without a crossfade. The shared decisions are in the host layer
+  (`HostFilter`), for LV2 and AU to reuse.
 - The macOS VST3 bundle identifier is now `io.github.jrp2014.convolver.vst3` and the installer package
   identifiers are `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
   `org.convolver.*`, a domain the project does not control). No release used

@@ -207,11 +207,17 @@ through the PLUG-2 harness.
 An adapter instance is in one of three situations, and each has one defined
 behaviour:
 
-| Situation | Audio | Indication | Today (VST3) |
+| Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
 | --- | --- | --- | --- |
-| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | Identity on matching channel numbers, other outputs silent, whatever the counts |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | A preset restored while inactive is accepted without the configuration check, and activation then fails |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | Kept while active (`setState` returns `kResultFalse`). While inactive, a preset whose rate or counts conflict with an already known configuration still replaces the saved state and activation fails; this must change so the last valid state survives |
+| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
+| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence with no message, because VST3 has no status display without an editor (VST3-3) |
+| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once `setupProcessing` has given the rate; `setState` returns `kResultFalse` |
+
+The control side of these rules is shared code in the host layer, so every
+adapter gets the same decisions and messages: `HostFilter` (which filter a load
+replaces, which is saved and what plays) and `unfiltered_configuration` in
+[`host.hpp`](../../include/convolver/host.hpp). `HostProcessor` installs a
+filter directly when nothing has been processed since construction or reset.
 
 A replacement is accepted only after it has been fully validated and prepared,
 so rejection never disturbs the running filter. The rejected request is not

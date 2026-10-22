@@ -126,12 +126,30 @@ The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
 and the counts may differ (for example stereo in, 5.1 out). Any speaker
 arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
-the sample rate, or activation fails. Without a preset the plug-in passes input
-*c* to output *c* and leaves outputs without a matching input silent; bypass uses
-the same mapping. More than 8 channels, or more than one bus, is rejected. 32-bit
-and 64-bit host buffers are supported, with **single-precision internal DSP**.
-Sample-rate mismatches are rejected; there is no implicit IR resampling or
-pitch/timing change. This plug-in has a new VST3 identity: old VST2 project state
+the sample rate; there is no implicit IR resampling or pitch/timing change. More
+than 8 channels, or more than one bus, is rejected. 32-bit and 64-bit host
+buffers are supported, with **single-precision internal DSP**.
+
+Loading follows the
+[shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+(VST3-7):
+
+- **No preset loaded:** with equal input and output counts the plug-in passes
+  input *c* to output *c*. With unequal counts it plays silence, so an unloaded
+  2→6 crossover never sends full-range audio to a driver.
+- **A preset that does not match:** once the host has called `setupProcessing`,
+  `setState` checks the preset against the sample rate and bus channel counts,
+  whether or not the plug-in is active. A mismatch returns `kResultFalse` and
+  the last accepted preset keeps playing and stays the saved state. If no preset
+  was accepted before, the plug-in plays silence, never its unfiltered input.
+- **State restored before `setupProcessing`** (a project being opened) is kept
+  as it is. If it does not suit the rate or buses at activation, the plug-in
+  still activates but plays silence; correcting the host's rate or layout brings
+  the filter back, and saving the project keeps it. VST3 has no standard way to
+  show the reason without an editor, so the host shows only silence (the
+  explanation is held for a later editor or status display, VST3-3).
+- **A preset loaded after activation but before any audio** is installed
+  directly; later loads crossfade as described below. This plug-in has a new VST3 identity: old VST2 project state
 is not claimed to migrate automatically. The class IDs and bundle identifier are
 listed, with every other format's, in
 [plug-in identities](plugin-identities.md), which also explains why presets
@@ -151,7 +169,9 @@ Bypass uses a 64-sample ramp and a dry delay matching the reported latency. Wet
 processing continues during bypass so returning to wet does not lose history.
 
 Filters are prepared outside processing and transferred through a bounded
-single-producer/single-consumer pointer handoff. A replacement runs for 256 samples
+single-producer/single-consumer pointer handoff. A filter that arrives before any
+audio has been processed since activation or reset is installed directly. Later,
+a replacement runs for 256 samples
 to fill its latency, then crossfades for 256 samples. It starts with fresh input
 history: it cannot reconstruct audio that preceded loading. Old engines are
 retired on the control thread. Pending changes coalesce to the newest; at most
@@ -186,9 +206,9 @@ bundle; separate tests call the real processor/controller SDK interfaces.
 fixtures (mono, stereo and 2→6) against a direct double-precision convolution
 and, sample for sample, against the CLI's renders, at several block sizes with
 separate and in-place buffers, plus replacement, bypass, reset and failure
-cases. It lists where the adapter does not yet follow the
+cases. Since VST3-7 the adapter follows the
 [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
-as known deviations, fixed under VST3-7 in [TODO](../TODO.md#plug-ins-vst3-lv2-and-au).
+and lists no known deviations.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
