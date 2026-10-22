@@ -11,6 +11,7 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <AudioUnitSDK/AUPlugInDispatch.h>
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -19,7 +20,6 @@
 #include <span>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace convolver::au_test {
 inline void check(OSStatus status, const std::string& what) {
@@ -195,9 +195,11 @@ class Unit {
         inputs_ = in;
         frames_ = frames;
         silent_input_ = silent_input;
-        std::vector<std::byte> storage(offsetof(AudioBufferList, mBuffers) +
-                                       sizeof(AudioBuffer) * std::max<std::size_t>(out.size(), 1));
-        auto* list = reinterpret_cast<AudioBufferList*>(storage.data());
+        // The list's storage is allocated once, so a render allocates nothing
+        // in the host either (the no-allocation test counts the whole process).
+        if (out.size() > au::max_channels)
+            return kAudio_ParamError;
+        auto* list = reinterpret_cast<AudioBufferList*>(list_storage_.data());
         list->mNumberBuffers = static_cast<UInt32>(out.size());
         for (std::size_t c = 0; c < out.size(); ++c)
             list->mBuffers[c] = {1, frames * static_cast<UInt32>(sizeof(float)), out[c]};
@@ -228,6 +230,9 @@ class Unit {
         return noErr;
     }
     AudioUnit unit_ = nullptr;
+    alignas(AudioBufferList)
+        std::array<std::byte, offsetof(AudioBufferList, mBuffers) +
+                                  sizeof(AudioBuffer) * au::max_channels> list_storage_{};
     std::span<const float* const> inputs_;
     UInt32 frames_ = 0;
     bool silent_input_ = false;
