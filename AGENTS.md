@@ -62,9 +62,10 @@ plus Ooura configurations described in [testing](docs/testing.md).
   matching `tests/regression/*.py` in the same change.
 - Run `pre-commit run --all-files` before **every** push, draft commits
   included. It formats the portable C++ with clang-format 18 (also
-  `scripts/check_format.sh --fix`) and runs the other lint checks; lint CI
-  fails on any difference. Cloud sessions install it as a Git hook. Portable
-  sources must also pass the `.clang-tidy` checks (commands in `CONTRIBUTING.md`).
+  `python3 scripts/check_format.py --fix`) and runs the other lint checks;
+  lint CI fails on any difference. Cloud sessions install it as a Git hook.
+  Portable sources must also pass the `.clang-tidy` checks (commands in
+  `CONTRIBUTING.md`).
 - `python3 scripts/check_repository.py` must pass: TODO IDs defined, every
   maintained page indexed, plans dated and current, paths in this file real,
   SPDX lines, and the top-level layout. Lint CI runs it through pre-commit.

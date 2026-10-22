@@ -14,7 +14,7 @@ install_build_tools() {
      ls /usr/lib/llvm-*/lib/clang/*/lib/linux/libclang_rt.asan-x86_64.a >/dev/null 2>&1; then
     return 0
   fi
-  ver=$(clang++ --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1)
+  ver=$(clang++ --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1 || true)
   ver=${ver:-18}
   SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
   pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18)
@@ -43,5 +43,6 @@ install_lint_hook() {
   nohup "${venv}/bin/pre-commit" install-hooks >/dev/null 2>&1 </dev/null &
 }
 
-install_build_tools
-install_lint_hook
+# Neither step may stop the other or fail the session.
+install_build_tools || true
+install_lint_hook || true

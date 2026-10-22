@@ -25,23 +25,26 @@ routing and file-protection behavior unless the change explicitly revises them.
 The portable code uses `.clang-format` with LLVM clang-format **18**. Formatting
 is part of the [lint checks](#lint-checks): `pre-commit run` reformats C++ files
 in place with a pinned clang-format 18, and the lint CI job fails if that
-changes anything. `scripts/check_format.sh` finds the modern C++ sources by
+changes anything. `scripts/check_format.py` finds the modern C++ sources by
 location (`include/`, `portable/`, `plugins/`, `tests/`), so new adapters and
 test folders are covered automatically. It skips vendored code and the
 regression harnesses:
 
 ```sh
 pre-commit run clang-format --all-files   # reformat, with the pinned version
-scripts/check_format.sh                   # check only
-scripts/check_format.sh --fix             # reformat in place
+python3 scripts/check_format.py           # check only
+python3 scripts/check_format.py --fix     # reformat in place
 ```
 
-Run one of these before every push, including early draft commits. The script
-uses `CLANG_FORMAT`, then `clang-format-18`, then `clang-format`, and stops with
-installation advice if that is not version 18 (other major versions lay out the
-same code differently). macOS has no `clang-format-18` by default; use the
-pre-commit command, or `python3 -m pip install clang-format==18.1.8` in the lint
-environment below.
+Run one of these before every push, including early draft commits.
+`scripts/check_format.sh` still works and runs the same script. The checker
+uses `CLANG_FORMAT` if set; otherwise the clang-format installed beside its
+Python (pre-commit's pinned 18.1.8), then `clang-format-18`, then
+`clang-format`, taking the first that reports version 18. It stops with
+installation advice if none does, because other major versions lay out the same
+code differently. macOS has no `clang-format-18` by default; use the pre-commit
+command, or `python3 -m pip install clang-format==18.1.8` in the lint
+environment below. `--fix` exits with status 1 when it changed a file.
 Historical directories are also excluded by `.clang-format-ignore`. Formatting
 changes should be distinguishable from behavior changes in review.
 
@@ -89,7 +92,8 @@ excluded. Markdown allows soft-wrapped prose and repeated subheadings under
 different parent sections; other diagnostics should be fixed at their source.
 These checks are development tools and do not add package runtime dependencies.
 Use `pre-commit run --files <paths>` to include new files before staging them;
-`--all-files` checks files already tracked by Git.
+`--all-files` checks files already tracked by Git. The clang-format hook is the
+exception: it always checks every portable C++ source, untracked ones included.
 
 The local hooks also check maintained Markdown links and the repository rules
 (TODO IDs, the documentation index, plan folders, paths named in agent

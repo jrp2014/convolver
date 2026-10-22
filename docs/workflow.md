@@ -177,7 +177,7 @@ reject a TODO ID that is used but never defined.
 - only known folders and files sit at the top level of the repository, and
   every adapter under `plugins/` has tests under `tests/` and a user guide.
 
-`scripts/check_format.sh` finds the C++ sources to format, so a new adapter
+`scripts/check_format.py` finds the C++ sources to format, so a new adapter
 folder is covered without editing a file list. pre-commit runs it with a pinned
 clang-format 18 and lint CI fails on any formatting difference, so run
 `pre-commit run --all-files` before every push, not only before review. Extend these checks, with a

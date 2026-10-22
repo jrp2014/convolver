@@ -45,7 +45,7 @@ Report only problems you can point to in the diff, with the file and line.
   `Progress` line added, completed plans archived.
 - **Repository checks:** run `pre-commit run --all-files`, which covers
   formatting (clang-format 18), the repository rules and the documentation
-  links. Without pre-commit, run `scripts/check_format.sh`,
+  links. Without pre-commit, run `python3 scripts/check_format.py`,
   `python3 scripts/check_repository.py` and `python3 scripts/check_doc_links.py`.
   Report any red CI run on the branch, including formatting on an older commit.
 
