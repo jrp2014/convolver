@@ -42,6 +42,7 @@ add_custom_command(OUTPUT "${examples_dir}/examples.json"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/release/generate_examples.py"
         --output "${examples_dir}" --converter "$<TARGET_FILE:convolver_vst3_preset>"
     DEPENDS convolver_vst3_preset "${PROJECT_SOURCE_DIR}/scripts/release/generate_examples.py"
+        "${PROJECT_SOURCE_DIR}/tests/plugins/fixtures.py"
     VERBATIM)
 add_custom_target(convolver_plugin_examples ALL DEPENDS "${examples_dir}/examples.json")
 install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistribution)

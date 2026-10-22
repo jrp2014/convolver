@@ -108,7 +108,7 @@ First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
 [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
-work continues under VST3-1 to VST3-6, HOST-1 and REL-1.
+work continues under VST3-1 to VST3-7, HOST-1 and REL-1.
 
 Shared groundwork, done once so the three streams stay independent:
 
@@ -125,8 +125,8 @@ Shared groundwork, done once so the three streams stay independent:
   oracle (1e-5) and the CLI render of the DOC-1 fixtures (identical after the
   256-frame latency), with exact latency and tails and the lifecycle cases of
   the [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
-  `vst3.harness` drives the VST3 adapter: 50 cases pass (worst error 1.8e-7)
-  and ten known deviations are left to VST3-7. LV2-1 and AU-1 each add a driver;
+  `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
+  and 13 known deviations are left to VST3-7. LV2-1 and AU-1 each add a driver;
   format-specific status and error reporting stay in their own tests. See
   [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
 - [ ] **PLUG-3 — One preset tool.** `convolver-preset`, writing `.vstpreset`,
@@ -177,13 +177,15 @@ silence, with an error shown, for unequal counts and after a failed initial
 load). VST3 must change to match (VST3-7).
 
 - [ ] **VST3-7 — Follow the shared adapter contract.** `vst3.harness` lists
-  ten known deviations, which this item removes: an empty instance with unequal
+  13 known deviations, which this item removes: an empty instance with unequal
   counts passes input *c* to output *c* instead of silence; while inactive,
   `setState` checks only the channel limit, so a filter at the wrong rate
   replaces the saved state (a failed replacement loses the working filter, and a
   failed first load is accepted) and activation then fails with no output
-  written instead of silence; and a filter set while active but before any
-  audio is crossfaded in from the empty instance instead of installed directly.
+  written instead of silence; state restored before setup at another rate makes
+  activation fail (no output) instead of playing silence until the rate is
+  corrected; and a filter set while active but before any audio is crossfaded
+  in from the empty instance instead of installed directly.
   Remove each case from the list in `tests/vst3/harness_tests.cpp` as it is
   fixed; the harness fails if a listed case passes.
 

@@ -11,8 +11,8 @@ comparison tests, so a filter sounds the same in the CLI, VST3, LV2 and AU.
 | `stereo/` | `filter.cfg` with the two-channel `room.wav` | A different response per side, left fed into the right output at gain 0.5, and the right output delayed by 1 ms |
 | `crossover/` | `filter.cfg` with the six-channel `crossover.wav` | Stereo in, six outputs out (2→6): low, mid and high bands per side, tweeters 6 dB lower and 0.5 ms later |
 
-Each folder also holds `input.wav` (85 ms of quiet white noise per input
-channel) and `expected.wav`, the result of filtering that input with a direct
+Each folder also holds `input.wav` (85 ms of white noise per input channel,
+peaking at half full scale, so turn the volume down before listening) and `expected.wav`, the result of filtering that input with a direct
 double-precision convolution, the project's reference for correctness.
 
 ## Try them

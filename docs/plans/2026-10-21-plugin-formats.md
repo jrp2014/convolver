@@ -301,8 +301,8 @@ correctly, but both use the same engine and could share a defect. So the
 harness has two references, and every adapter's tests use both:
 
 1. **Independent oracle:** direct double-precision time-domain convolution, as
-   `tests/native/engine_tests.cpp` and the pluginval acceptance test
-   (`direct_convolution` in `tests/vst3/pluginval_tests.py`) already do. This
+   `tests/native/engine_tests.cpp` and the pluginval acceptance test already
+   do (now `tests/native/oracle.hpp` and `tests/plugins/fixtures.py`). This
    stays the authority for correctness.
 2. **CLI equivalence:** the CLI render of the same input and filter, with the
    same backend and block size.
@@ -319,7 +319,7 @@ Fixed criteria:
 - **Tails:** for a freshly constructed processor (first activation, or
   reactivation), the reported tail must equal the exact value: the longest
   routed IR length minus one plus that route's input and output delays (the
-  formula in `engine_tests.cpp`). After live replacements, `HostProcessor`
+  formula in `tests/native/oracle.hpp`). After live replacements, `HostProcessor`
   deliberately reports a conservative bound: the largest tail of any filter
   used since construction, which never shrinks during a session
   (`portable/host.cpp`). The test therefore requires the reported tail to be
@@ -344,12 +344,11 @@ Cases, run for every adapter:
   in-place buffers;
 - mono, stereo and 2→6 routing.
 
-Fixtures: reuse the existing generators instead of adding a second fixture
-system. `scripts/release/generate_examples.py` already writes exact float WAVs,
-`.cfg` files and presets; `tests/vst3/pluginval_tests.py` has the noise,
-sparse-IR and oracle helpers. Move the shared helpers into one test module that
-both use, and add the 2→6 crossover to the same generator (DOC-1 then documents
-those fixtures).
+Fixtures: one generator, not several. As built, `tests/plugins/fixtures.py`
+writes the DOC-1 fixtures, including the 2→6 crossover, and holds the WAV,
+noise and oracle helpers; `scripts/release/generate_examples.py` (the release
+presets) and `tests/vst3/pluginval_tests.py` import them instead of keeping
+their own copies.
 
 ## Unsigned previews and production
 

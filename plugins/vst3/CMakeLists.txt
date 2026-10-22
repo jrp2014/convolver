@@ -124,7 +124,7 @@ if(CONVOLVER_BUILD_IO)
                 target_link_libraries(convolver_vst3_harness PRIVATE "-framework Cocoa")
             endif()
             add_test(NAME vst3.harness COMMAND convolver_vst3_harness
-                "${CMAKE_BINARY_DIR}/first-use/fixtures.txt")
+                "${PROJECT_BINARY_DIR}/first-use/fixtures.txt")
             set_tests_properties(vst3.harness PROPERTIES LABELS "vst3;real-libraries;plug2"
                 TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
             add_dependencies(check convolver_vst3_harness)

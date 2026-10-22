@@ -16,6 +16,9 @@ namespace {
 struct Failure : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
+struct Skipped : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 void require(bool condition, const std::string& message) {
     if (!condition)
         throw Failure(message);
@@ -102,6 +105,12 @@ Configuration shortened(Configuration c) {
 }
 Configuration wrong_rate(Configuration c) {
     c.sample_rate = c.sample_rate == 44100 ? 48000 : 44100;
+    return c;
+}
+Configuration wrong_outputs(Configuration c) {
+    ++c.output_channels;
+    if (!c.output_delays.empty())
+        c.output_delays.push_back(0);
     return c;
 }
 Configuration wrong_inputs(Configuration c) {
@@ -231,9 +240,10 @@ struct Context {
     Setup setup() const {
         return {c().sample_rate, c().input_channels, c().output_channels, max_block};
     }
-    // Frames to cover the input, the filter tail and the latency.
+    // Frames to cover the input, the filter tail and the latency, then two
+    // more blocks, which must be silent (the oracle is zero there).
     std::size_t span(const Configuration& x) const {
-        return f.frames() + test::tail(x) + latency;
+        return f.frames() + test::tail(x) + 3 * latency;
     }
     Stream start(const Configuration* filter, std::vector<std::size_t> pattern = {300},
                  bool in_place = false) const {
@@ -290,16 +300,18 @@ void restore_after_activation(const Context& x) {
 }
 
 // Live replacement: the new filter starts with fresh history, the old one plays
-// on for 256 frames, then a 256-frame linear crossfade.
+// on for 256 frames, then a 256-frame linear crossfade. Two loads before the
+// next callback coalesce: only the newest is heard.
 void live_replacement(const Context& x) {
     const auto& a = x.c();
     const auto b = replacement(a);
     const std::size_t at = 1200, no = a.output_channels;
     auto s = x.start(&a);
     auto out = s.render(x.f.input, 0, at);
+    require(x.adapter.load({"superseded", {}, shortened(a)}), "first replacement rejected");
     require(x.adapter.load({"replacement", {}, b}), "replacement rejected");
     x.tail_is(std::max(test::tail(a), test::tail(b)), "after a replacement");
-    const auto frames = x.span(b) + 512;
+    const auto frames = x.span(b);
     const auto rest = s.render(x.f.input, at, frames - at);
     out.insert(out.end(), rest.begin(), rest.end());
     auto later = x.f.input; // The new filter hears only what arrives after the switch.
@@ -351,6 +363,8 @@ void failed_replacement(const Context& x) {
     auto out = s.render(x.f.input, 0, 900);
     require(!x.adapter.load({"wrong rate", {}, wrong_rate(a)}), "wrong sample rate accepted");
     require(!x.adapter.load({"wrong inputs", {}, wrong_inputs(a)}), "wrong input count accepted");
+    require(!x.adapter.load({"wrong outputs", {}, wrong_outputs(a)}),
+            "wrong output count accepted");
     const auto saved = x.adapter.saved();
     require(saved && same(*saved, a), "saved state no longer describes the running filter");
     const auto rest = s.render(x.f.input, 900, x.span(a) - 900);
@@ -390,6 +404,48 @@ void failed_initial_load(const Context& x) {
     s.in_place = true;
     silent(s.render(x.f.input, 1000, 1000), "after a failed first load, in place");
     require(x.adapter.load(x.f.filter), "a valid filter after the failure was rejected");
+    x.adapter.destroy();
+}
+
+// State restored before the host negotiates rate and layout is checked once it
+// does: a valid filter is installed directly at activation.
+void restore_before_setup(const Context& x) {
+    const auto& a = x.c();
+    if (!x.adapter.create_unconfigured())
+        throw Skipped("the format always knows its configuration first");
+    require(x.adapter.load(x.f.filter), "load before setup rejected");
+    x.adapter.configure(x.setup());
+    require(x.adapter.activate(), "activation failed");
+    x.tail_is(test::tail(a), "of a fresh processor");
+    Stream s{x.adapter, x.setup()};
+    close(s.render(x.f.input, 0, x.span(a)), test::oracle(a, x.f.input, latency), a.output_channels,
+          "against the oracle");
+    x.adapter.destroy();
+}
+
+// Well-formed state for another rate, restored before setup, is kept (the
+// host is restoring its project); activation at the wrong rate is a failed
+// initial load (silence), and correcting the rate brings the filter back.
+void restore_before_setup_mismatch(const Context& x) {
+    const auto& a = x.c();
+    const auto other = wrong_rate(a);
+    if (!x.adapter.create_unconfigured())
+        throw Skipped("the format always knows its configuration first");
+    require(x.adapter.load({"other rate", {}, other}), "well-formed state before setup rejected");
+    x.adapter.configure(x.setup());
+    require(x.adapter.activate(), "activation after a mismatched restore failed");
+    Stream s{x.adapter, x.setup()};
+    silent(s.render(x.f.input, 0, 1000), "at the wrong rate");
+    const auto saved = x.adapter.saved();
+    require(saved && same(*saved, other), "the restored state was not kept");
+    x.adapter.deactivate();
+    auto corrected = x.setup();
+    corrected.sample_rate = other.sample_rate;
+    x.adapter.configure(corrected);
+    require(x.adapter.activate(), "activation at the corrected rate failed");
+    Stream t{x.adapter, corrected};
+    close(t.render(x.f.input, 0, x.span(other)), test::oracle(other, x.f.input, latency),
+          other.output_channels, "at the corrected rate");
     x.adapter.destroy();
 }
 
@@ -493,7 +549,7 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
         std::cerr << "cannot load fixtures: " << e.what() << '\n';
         return 1;
     }
-    std::size_t passed = 0, deviations = 0, failed = 0;
+    std::size_t passed = 0, deviations = 0, failed = 0, skipped = 0;
     std::vector<std::string> seen;
     const auto check = [&](const std::string& name, const std::function<void()>& body) {
         seen.push_back(name);
@@ -503,6 +559,11 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
         std::string problem;
         try {
             body();
+        } catch (const Skipped& e) {
+            ++skipped;
+            std::cout << "skip  " << name << ": " << e.what() << '\n';
+            adapter.destroy();
+            return;
         } catch (const std::exception& e) {
             problem = e.what();
             try {
@@ -517,6 +578,11 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
             ++failed;
             std::cout << "FAIL  " << name << ": listed as a known deviation but now passes; "
                       << "remove it from the list (" << known->reason << ")\n";
+        } else if (known != options.known_deviations.end() &&
+                   problem.find(known->expected_problem) == std::string::npos) {
+            ++failed;
+            std::cout << "FAIL  " << name << ": " << problem << " (listed as a known deviation "
+                      << "failing with \"" << known->expected_problem << "\")\n";
         } else if (known != options.known_deviations.end()) {
             ++deviations;
             std::cout << "known " << name << ": " << problem << " [" << known->reason << "]\n";
@@ -537,6 +603,8 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
         check(at("initial") + "[variable blocks]",
               [&] { initial(x, {1, 61, 300, options.max_block, 17, 256, 255}, false); });
         check(at("restore-after-activation"), [&] { restore_after_activation(x); });
+        check(at("restore-before-setup"), [&] { restore_before_setup(x); });
+        check(at("restore-before-setup-mismatch"), [&] { restore_before_setup_mismatch(x); });
         check(at("live-replacement"), [&] { live_replacement(x); });
         check(at("tail-after-replacement"), [&] { tail_after_replacement(x); });
         check(at("failed-replacement"), [&] { failed_replacement(x); });
@@ -554,7 +622,7 @@ int run(Adapter& adapter, const std::filesystem::path& listing, const Options& o
             std::cout << "FAIL  known deviation names no case: " << d.case_name << '\n';
         }
     std::cout << adapter.format() << " against the PLUG-2 harness: " << passed << " passed, "
-              << deviations << " known deviations, " << failed
+              << deviations << " known deviations, " << skipped << " skipped, " << failed
               << " failed; worst error against the double-precision oracle " << worst << '\n';
     return failed ? 1 : 0;
 }

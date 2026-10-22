@@ -20,10 +20,18 @@ class Vst3 final : public test::Adapter {
         return "VST3";
     }
     void create(const test::Setup& setup) override {
+        create_unconfigured();
+        configure(setup);
+    }
+    bool create_unconfigured() override {
         destroy();
-        setup_ = setup;
         processor_ = std::make_unique<convolver::vst3::Processor>();
         check(processor_->initialize(&context_) == kResultOk, "initialize");
+        bypass_ = false;
+        pending_bypass_ = false;
+        return true;
+    }
+    void configure(const test::Setup& setup) override {
         // Discrete channels: any arrangement with the right count (PLUG-4 adds layouts).
         auto in = arrangement(setup.inputs), out = arrangement(setup.outputs);
         check(processor_->setBusArrangements(&in, 1, &out, 1) == kResultOk, "bus arrangement");
@@ -32,8 +40,6 @@ class Vst3 final : public test::Adapter {
         check(processor_->setupProcessing(process) == kResultOk, "setupProcessing");
         processor_->activateBus(kAudio, kInput, 0, true);
         processor_->activateBus(kAudio, kOutput, 0, true);
-        bypass_ = false;
-        pending_bypass_ = false;
     }
     void destroy() override {
         if (!processor_)
@@ -152,14 +158,22 @@ int main(int argc, char** argv) {
     const std::string inactive = "VST3-7: while inactive, setState checks only the channel "
                                  "limit, so a filter at the wrong rate replaces the saved state "
                                  "and activation then fails, with no output written";
+    const std::string activation = "VST3-7: a configuration mismatch found at activation makes "
+                                   "setActive fail, so process writes nothing instead of silence";
     for (const char* fixture : {"mono", "stereo", "crossover"}) {
         const std::string at = std::string("[") + fixture + "]";
-        options.known_deviations.push_back({"restore-after-activation" + at, direct});
-        options.known_deviations.push_back({"failed-replacement-inactive" + at, inactive});
-        options.known_deviations.push_back({"failed-initial-load" + at, inactive});
+        options.known_deviations.push_back(
+            {"restore-after-activation" + at, "against the oracle: frame 256", direct});
+        options.known_deviations.push_back({"failed-replacement-inactive" + at,
+                                            "wrong sample rate accepted while inactive", inactive});
+        options.known_deviations.push_back(
+            {"failed-initial-load" + at, "wrong sample rate accepted", inactive});
+        options.known_deviations.push_back({"restore-before-setup-mismatch" + at,
+                                            "activation after a mismatched restore failed",
+                                            activation});
     }
     options.known_deviations.push_back(
-        {"empty-instance[crossover]",
+        {"empty-instance[crossover]", "an empty instance with unequal counts",
          "VST3-7: an empty instance with unequal counts passes input c to output c "
          "instead of playing silence"});
     Vst3 adapter;

@@ -174,22 +174,29 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | --- | --- |
 | `initial` | A filter loaded before activation: latency exactly 256, the exact tail, oracle and CLI agreement from the first frame; blocks of 1, 61, 300 and the host maximum (1024), each with separate and shared (in-place) buffers, and a variable block pattern |
 | `restore-after-activation` | A filter loaded after activation but before audio is installed directly, without a crossfade |
-| `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 256-frame linear crossfade |
+| `restore-before-setup` | State restored before the host negotiates rate and layout (VST3, AU) is installed directly at activation; skipped for formats that always know their configuration first (LV2) |
+| `restore-before-setup-mismatch` | Well-formed state for another rate, restored before setup, is kept as the saved state; activation plays exact silence; correcting the rate brings the filter back |
+| `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 256-frame linear crossfade; two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
-| `failed-replacement` | A filter at the wrong rate or input count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
+| `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
 | `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
-| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back |
+| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. For unequal counts this is today's VST3 behaviour, provisional until jrp decides what bypass plays there |
 | `reset` | Exact silence after a reset, then the filter plays as if fresh |
 | `silence-flags` | Input flagged silent does not cut the tail short; outputs flagged silent are silent |
 | `nonfinite-input` | NaN and infinite input samples count as silence; output stays finite |
 
+Every render continues two blocks past the end of the filter tail, where the
+output must be within tolerance of zero.
+
 These follow the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
 A format that does not yet meet part of it lists those cases as **known
-deviations**, each with the TODO item that fixes it; the run prints them and
-still passes, but a listed case that starts passing fails the run, so the list
-cannot go stale. VST3 lists ten, all for [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au).
+deviations**, each with the text its failure must contain and the TODO item
+that fixes it. The run prints them and still passes, but a listed case that
+fails in any other way, or starts passing, fails the run, so the list can
+neither hide a new defect nor go stale. A listed case stops at its first
+failure, so its later checks run only once it is fixed. VST3 lists 13, all for [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au).
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 

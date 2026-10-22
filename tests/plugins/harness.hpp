@@ -80,6 +80,15 @@ class Adapter {
     virtual std::size_t tail_frames() = 0;
     // The filter the instance would save now; nothing for an empty instance.
     virtual std::optional<Configuration> saved() = 0;
+    // Formats whose hosts may restore state before negotiating the rate and
+    // layout (VST3 setState before setupProcessing, AU RestoreState before
+    // Initialize) override these: create an instance with nothing negotiated
+    // and return true, then configure() negotiates. Others keep the defaults
+    // and the restore-before-setup cases are skipped.
+    virtual bool create_unconfigured() {
+        return false;
+    }
+    virtual void configure(const Setup&) {}
     // Outputs marked silent by the last process call, where the format has flags.
     virtual std::optional<std::uint64_t> silent_outputs() {
         return std::nullopt;
@@ -88,7 +97,10 @@ class Adapter {
 
 struct Deviation {
     std::string case_name; // Exact case name, as printed, e.g. "empty-instance[crossover]".
-    std::string reason;    // What differs and the TODO item that fixes it.
+    // Text the failure must contain. Any other failure of the case is a real
+    // failure, so a listed case cannot hide a new defect.
+    std::string expected_problem;
+    std::string reason; // What differs and the TODO item that fixes it.
 };
 
 struct Options {
