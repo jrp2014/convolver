@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "equalizer_apo.hpp"
 #include <algorithm>
-#include <charconv>
+#include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <stdexcept>
 #include <string_view>
@@ -24,13 +26,20 @@
 //   "Preamp: -1000 dB" multiplies by 1e-50, which is 0 as a 32-bit float.
 namespace convolver::equalizer_apo {
 namespace {
+// Shortest fixed-notation text that reads back as the same float. (Not
+// std::to_chars: macOS before 13.3 lacks it for floating point.) The program
+// never changes the C locale, so the decimal mark is '.'.
 std::string number(float value) {
-    char buffer[128];
-    const auto result =
-        std::to_chars(buffer, buffer + sizeof buffer, value, std::chars_format::fixed);
-    if (result.ec != std::errc{})
-        throw std::runtime_error("cannot format a gain for Equalizer APO");
-    return {buffer, result.ptr};
+    std::array<char, 256> buffer{};
+    for (int digits = 1; digits <= 160; ++digits) {
+        const auto length =
+            std::snprintf(buffer.data(), buffer.size(), "%.*f", digits, static_cast<double>(value));
+        if (length <= 0 || static_cast<std::size_t>(length) >= buffer.size())
+            break;
+        if (std::strtof(buffer.data(), nullptr) == value)
+            return {buffer.data(), static_cast<std::size_t>(length)};
+    }
+    throw std::runtime_error("cannot format a gain for Equalizer APO");
 }
 std::string term(float gain, const std::string& channel) {
     return gain == 1.0F ? channel : number(gain) + '*' + channel;
