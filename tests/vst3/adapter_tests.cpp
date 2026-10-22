@@ -398,7 +398,9 @@ void failed_first_loads() {
             p.setProcessing(true);
             for (int k = 0; k < 2; ++k)
                 require(p.process(d) == kResultOk, "empty process");
-            require(out_left[511] == 1 && out_right[511] == 1, "empty 2x2 instance not identity");
+            // Accelerate's FFT is not exact, so compare with a tolerance.
+            require(std::abs(out_left[511] - 1) < 1e-5 && std::abs(out_right[511] - 1) < 1e-5,
+                    "empty 2x2 instance not identity");
             convolver::HostState wrong;
             wrong.configuration =
                 convolver::Configuration{44100, 2, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
