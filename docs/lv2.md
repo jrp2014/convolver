@@ -6,8 +6,8 @@
 **In short:**
 
 - The LV2 plug-in is optional and, for now, a developer build for Linux. Build
-  it with `-DCONVOLVER_BUILD_LV2=ON` (it needs the `lv2` headers; its tests
-  need `lilv`), then point `LV2_PATH` at `BUILD/lv2`, or copy the
+  it with `-DCONVOLVER_BUILD_LV2=ON` (it needs the `lv2` headers, and `lilv`
+  unless tests are off), then point `LV2_PATH` at `BUILD/lv2`, or copy the
   `convolver.lv2` folder into `~/.lv2`.
 - LV2 ports are fixed, so each channel layout is its own plug-in: 1→1, 2→2,
   1→2, 2→4, 2→6, 2→8, 6→6 and 8→8. Choose the one whose counts match your
@@ -36,8 +36,10 @@ cmake --build build --parallel
 ctest --test-dir build -L lv2 --output-on-failure
 ```
 
-The plug-in needs `lv2` 1.18 or later (headers only); `lilv` 0.24 or later is
-needed only for the tests. As for VST3, a plug-in build uses the built-in Ooura
+The plug-in needs `lv2` 1.18 or later (headers only). Its tests need `lilv`
+0.24 or later, which CMake therefore requires while `CONVOLVER_BUILD_TESTS`
+is on (the default for a top-level build); configure with
+`-DCONVOLVER_BUILD_TESTS=OFF` to build the plug-in without it. As for VST3, a plug-in build uses the built-in Ooura
 FFT by default rather than FFTW, whose planner a host process may share with
 other plug-ins ([backend selection](fft-backends.md)). The library exports
 only `lv2_descriptor`, so it cannot clash with the VST3 build or another
@@ -142,9 +144,12 @@ frames, with the same output.
 - `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
   refusals; the status port, log messages and saved state after good and bad
   loads; presets written by `convolver-preset` and lilv's own state round
-  trip; long `run()` calls; and seeded lifecycle sequences (loads, failed
-  loads, audio, bypass, reset, reopening a saved session) checked against a
-  small model after every step.
+  trip; long `run()` calls; and lifecycle sequences, one scripted and several
+  seeded (loads, failed
+  loads, audio, bypass, reset, reopening a saved session). A small model
+  checks the saved state, status and latency after every step, and the exact
+  output at every reset and at the end; the transitions during audio
+  (crossfades, a rejection while playing) are the harness's cases.
 - `lv2.exports` and `lv2.fft_symbols`: the library exports only
   `lv2_descriptor` and does not use a shared FFTW.
 

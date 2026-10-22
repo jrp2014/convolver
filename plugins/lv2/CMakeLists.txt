@@ -81,12 +81,13 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME lv2.adapter COMMAND convolver_lv2_adapter "${lv2_bundle_dir}"
             "${PROJECT_SOURCE_DIR}/examples/first-use" "$<TARGET_FILE:convolver_preset_tool>"
             "${PROJECT_BINARY_DIR}/lv2-test")
-        set_tests_properties(lv2.adapter PROPERTIES LABELS "lv2;real-libraries" TIMEOUT 300)
+        set_tests_properties(lv2.adapter PROPERTIES LABELS "lv2;real-libraries" TIMEOUT 600)
         # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
         # that examples.first_use leaves behind.
         add_test(NAME lv2.harness COMMAND convolver_lv2_harness "${lv2_bundle_dir}"
             "${PROJECT_BINARY_DIR}/first-use/fixtures.txt")
+        # About three minutes under ASan; sanitizer builds need the margin.
         set_tests_properties(lv2.harness PROPERTIES LABELS "lv2;real-libraries;plug2"
-            TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
+            TIMEOUT 600 FIXTURES_REQUIRED first_use_renders)
     endif()
 endif()

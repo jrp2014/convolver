@@ -302,6 +302,13 @@ LV2 (Linux first; also PipeWire system audio):
   configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
+  Before the first release, jrp decides how `VERSION` maps to
+  `lv2:minorVersion` and `lv2:microVersion` (today MINOR and PATCH, set by
+  `plugins/lv2/generate_ttl.py`). LV2 treats an odd minor or micro as a
+  development version and minor 0 as experimental, has no major, and lilv
+  loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
+  lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
+  with minor even and non-zero and micro even for releases.
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 

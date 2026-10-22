@@ -193,6 +193,22 @@ void bundle(host::World& world) {
               uri + ": status is a control output");
         LilvScalePoints* points = lilv_port_get_scale_points(p, port(lv2::status_port));
         check(points && lilv_scale_points_size(points) == 4, uri + ": four status labels");
+        const std::pair<lv2::Status, std::string> labels[] = {
+            {lv2::Status::running, "Running"},
+            {lv2::Status::no_filter, "No filter"},
+            {lv2::Status::load_failed, "Load failed"},
+            {lv2::Status::loading, "Loading"}};
+        for (const auto& [value, label] : labels) {
+            bool found = false;
+            LILV_FOREACH(scale_points, i, points) {
+                const auto* point = lilv_scale_points_get(points, i);
+                found = found || (lilv_node_as_float(lilv_scale_point_get_value(point)) ==
+                                      static_cast<float>(value) &&
+                                  lilv_node_as_string(lilv_scale_point_get_label(point)) == label);
+            }
+            check(found,
+                  uri + ": status " + std::to_string(static_cast<int>(value)) + " is " + label);
+        }
         lilv_scale_points_free(points);
         for (std::uint32_t c = 0; c < ni + no; ++c) {
             const auto i = lv2::first_audio_port + c;
@@ -413,7 +429,11 @@ struct Model {
     }
 };
 
-void lifecycle(host::World& world, const Fixture& f, unsigned seed) {
+// Operation codes: 0 load A, 1 load B, 2 failed load, 3 audio, 4 toggle bypass,
+// 5 reset, 6 save and reopen, 7 restore with nothing of ours. Seed 0 plays
+// `script` instead of random steps.
+void lifecycle(host::World& world, const Fixture& f, unsigned seed,
+               const std::vector<int>& script = {}) {
     const auto& a = f.filter;
     const auto b = other(a);
     const HostLayout layout{a.sample_rate, a.input_channels, a.output_channels};
@@ -446,8 +466,10 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed) {
             return silent(out);
         return matches(out, test::oracle(c, f.input, latency));
     };
-    for (int step = 0; step < 40; ++step) {
-        const int op = std::uniform_int_distribution<int>(0, 7)(random);
+    const auto steps = script.empty() ? std::size_t(40) : script.size();
+    for (std::size_t step = 0; step < steps; ++step) {
+        const int op =
+            script.empty() ? std::uniform_int_distribution<int>(0, 7)(random) : script[step];
         switch (op) {
         case 0:
         case 1: { // A valid load (A or B).
@@ -490,6 +512,8 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed) {
             p->enabled = m.bypass ? 0.f : 1.f; // The host restores its port values.
             check(p->restore(saved.bytes, saved.type) == LV2_STATE_SUCCESS, label() + ": reopened");
             m.error = m.failed; // A saved failure is reported again; a kept filter is not.
+            check(p->log.contains(LV2_LOG__Error, "failed to load before") == m.failed,
+                  label() + ": a reopened failure is explained in the log, and only then");
             p->activate();
             break;
         }
@@ -535,6 +559,9 @@ int main(int argc, char** argv) {
             status_and_log(world, f);
             presets(world, f, tool, work);
             callback_sizes(world, f);
+            // Scripted first: a failed first load saved, reopened and reset;
+            // then a failed replacement across reopen, reset and bypass.
+            lifecycle(world, f, 0, {2, 6, 5, 3, 0, 3, 2, 5, 6, 4, 5, 3, 1, 2, 6, 4, 5, 7, 2, 6});
             for (unsigned seed = 1; seed <= 4; ++seed)
                 lifecycle(world, f, seed);
         }

@@ -161,9 +161,7 @@ void connect_port(LV2_Handle handle, std::uint32_t port, void* data) {
         p.out[port - first_audio_port - ni] = static_cast<float*>(data);
 }
 
-void activate(LV2_Handle handle) {
-    auto& p = *static_cast<Instance*>(handle);
-    std::lock_guard lock(p.control);
+void activate_locked(Instance& p) {
     p.host.reset();
     p.activation_error.clear();
     try {
@@ -190,6 +188,17 @@ void activate(LV2_Handle handle) {
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.update_status();
+}
+
+// No exception may leave a callback into C host code; the catch-all handlers
+// below cover allocation failures while building messages.
+void activate(LV2_Handle handle) {
+    auto& p = *static_cast<Instance*>(handle);
+    try {
+        std::lock_guard lock(p.control);
+        activate_locked(p);
+    } catch (...) {
+    }
 }
 
 void run(LV2_Handle handle, std::uint32_t frames) {
@@ -227,15 +236,19 @@ void run(LV2_Handle handle, std::uint32_t frames) {
 
 void deactivate(LV2_Handle handle) {
     auto& p = *static_cast<Instance*>(handle);
-    std::lock_guard lock(p.control);
-    p.host.reset();
+    try {
+        std::lock_guard lock(p.control);
+        p.host.reset();
+    } catch (...) {
+    }
 }
 
 void cleanup(LV2_Handle handle) {
     auto* p = static_cast<Instance*>(handle);
-    {
-        std::lock_guard lock(p->control);
+    try {
+        std::lock_guard lock(p->control); // Lets a save() in progress finish first.
         p->host.reset();
+    } catch (...) {
     }
     delete p;
 }
@@ -259,10 +272,8 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     }
 }
 
-LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve,
-                         LV2_State_Handle state, std::uint32_t, const LV2_Feature* const*) {
-    auto& p = *static_cast<Instance*>(handle);
-    std::lock_guard lock(p.control);
+LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retrieve,
+                                LV2_State_Handle state) {
     std::size_t size = 0;
     std::uint32_t type = 0, flags = 0;
     const void* value = retrieve(state, p.state_key, &size, &type, &flags);
@@ -287,7 +298,8 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
             p.filter.reject(std::string("The saved state could not be read: ") + e.what());
             throw;
         }
-        next.bypass = false; // The host restores the lv2:enabled port itself.
+        // Bypass is the lv2:enabled port, which the host restores itself;
+        // HostFilter leaves the state's bypass flag to the adapter, which ignores it.
         // LV2 fixes the rate and channels at instantiation, so the host's
         // configuration is always known and checked here. While active, a
         // prepared replacement is published (installed directly if no audio
@@ -299,6 +311,8 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
         p.activation_error.clear();
         p.load_error.clear();
         p.update_status();
+        if (p.filter.failed())
+            p.log_error(p.filter.error()); // A saved failure: silence again, explained.
         return LV2_STATE_SUCCESS;
     } catch (...) {
         // A failed first load plays silence rather than the unfiltered input.
@@ -312,6 +326,17 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
         p.update_status();
         p.log_error(p.load_error);
         return status;
+    }
+}
+
+LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve,
+                         LV2_State_Handle state, std::uint32_t, const LV2_Feature* const*) {
+    auto& p = *static_cast<Instance*>(handle);
+    try {
+        std::lock_guard lock(p.control);
+        return restore_locked(p, retrieve, state);
+    } catch (...) {
+        return LV2_STATE_ERR_UNKNOWN;
     }
 }
 
