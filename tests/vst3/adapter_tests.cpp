@@ -5,6 +5,7 @@
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
 #include <array>
+#include <cstdint>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -210,10 +211,77 @@ void multichannel() {
     require(p.setState(&wide_state) != kResultOk, "9x9 preset accepted");
     p.terminate();
 }
+// PLUG-4: version-1 state records counts and an advisory output mask, no layout.
+// It is "unspecified" (discrete): it must load on every arrangement with matching
+// counts, whatever its mask says, and route by bus index. Stricter layout checks
+// (VST3-1) must keep this test passing.
+void version1_presets() {
+    const std::array<SpeakerArrangement, 4> arrangements{
+        SpeakerArr::k51, SpeakerArr::k60Music,
+        kSpeakerL | kSpeakerR | kSpeakerC | kSpeakerLfe | kSpeakerSl | kSpeakerSr,
+        kSpeakerTfl | kSpeakerTfc | kSpeakerTfr | kSpeakerTrl | kSpeakerTrc | kSpeakerTrr};
+    for (const std::uint32_t mask : {0U, 0x3FU, 0x60FU})
+        for (auto arrangement : arrangements) {
+            HostApplication context;
+            Processor p;
+            require(p.initialize(&context) == kResultOk, "version-1 initialize");
+            SpeakerArrangement stereo = SpeakerArr::kStereo;
+            require(p.setBusArrangements(&stereo, 1, &arrangement, 1) == kResultOk,
+                    "six-channel arrangement refused");
+            // Output c receives input c % 2 with gain c + 1, so order is visible.
+            convolver::HostState saved;
+            saved.configuration = convolver::Configuration{48000, 2, 6, mask, {}, {}, {}};
+            for (std::size_t c = 0; c < 6; ++c)
+                saved.configuration->paths.push_back(
+                    {{1}, {{c % 2, 1}}, {{c, static_cast<float>(c + 1)}}});
+            MemoryStream state;
+            require(write_state(&state, saved), "encode version-1 state");
+            require(state.getData()[8] == 1 && state.getData()[9] == 0,
+                    "state without a layout must still be written as version 1");
+            state.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&state) == kResultOk, "version-1 preset rejected by layout");
+            p.activateBus(kAudio, kInput, 0, true);
+            p.activateBus(kAudio, kOutput, 0, true);
+            ProcessSetup setup{kRealtime, kSample32, 300, 48000};
+            require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                    "version-1 preset failed to activate on a matching count");
+            p.setProcessing(true);
+            std::array<std::array<float, 300>, 2> ins{};
+            std::array<std::array<float, 300>, 6> outs{};
+            ins[0][0] = 1;
+            ins[1][1] = 1;
+            float* in_ptr[] = {ins[0].data(), ins[1].data()};
+            std::array<float*, 6> out_ptr{};
+            for (int c = 0; c < 6; ++c)
+                out_ptr[c] = outs[c].data();
+            AudioBusBuffers input{}, output{};
+            input.numChannels = 2;
+            output.numChannels = 6;
+            input.channelBuffers32 = in_ptr;
+            output.channelBuffers32 = out_ptr.data();
+            ProcessData d{};
+            d.symbolicSampleSize = kSample32;
+            d.numInputs = d.numOutputs = 1;
+            d.inputs = &input;
+            d.outputs = &output;
+            d.numSamples = 300;
+            require(p.process(d) == kResultOk, "version-1 process");
+            for (int c = 0; c < 6; ++c)
+                for (int i = 0; i < 300; ++i) {
+                    const float want = i == 256 + c % 2 ? static_cast<float>(c + 1) : 0.f;
+                    require(std::abs(outs[c][i] - want) < 1e-5,
+                            "version-1 preset not routed by bus index");
+                }
+            p.setProcessing(false);
+            p.setActive(false);
+            p.terminate();
+        }
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
         multichannel();
+        version1_presets();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");
