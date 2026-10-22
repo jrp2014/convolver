@@ -6,7 +6,10 @@ and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
 [plug-in distribution plan](2026-10-18-plugin-distribution.md).
-**Current state:** PLUG-1 (the plug-in FFT backend) is implemented. Everything
+**Current state:** PLUG-1 (the plug-in FFT backend), PLUG-2 (the
+[shared comparison harness](../testing.md#plug-in-comparisons-plug-2), with
+DOC-1's first-use fixtures) and PLUG-4 (the
+[identity and layout registry](../plugin-identities.md)) are implemented. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
 and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
@@ -285,7 +288,7 @@ Per format:
   `kAudioUnitProperty_SupportedChannelLayoutTags`; discrete uses
   `kAudioChannelLayoutTag_DiscreteInOrder`.
 - **LV2:** ports are fixed per plug-in URI. Named layouts use port groups and
-  `lv2:designation` (for example `pg:FiveDotOneGroup`); discrete ports have no
+  `lv2:designation` (for example `pg:FivePointOneGroup`); discrete ports have no
   designation.
 
 ## Shared test harness (PLUG-2)
@@ -384,7 +387,7 @@ never changed after release (like the VST3 class IDs). State keys and the
 parameter URI live under the same base.
 
 **Channels.** LV2 ports are fixed in the `.ttl`, so each channel layout is a
-separate plug-in URI generated from one template: proposed 1→1, 2→2, 1→2, 2→4,
+separate plug-in URI generated from one template (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4,
 2→6, 2→8, 6→6 and 8→8, all discrete, within the VST3 adapter's 1–8 limit.
 Named layouts (port groups and designations) are added per the
 [layout rules](#channel-layouts-and-old-presets). A configuration whose counts
@@ -576,7 +579,7 @@ beyond eight channels.
 
 PipeWire's `filter-chain` passes `config` entries to the plug-in's state on
 load and reads its latency port. A stereo room correction would look like this
-(the URIs are the proposed ones):
+(URIs from the [PLUG-4 registry](../plugin-identities.md)):
 
 ```text
 context.modules = [
@@ -586,7 +589,7 @@ context.modules = [
       filter.graph = {
         nodes = [
           { type = lv2  name = room
-            plugin = "https://github.com/jrp2014/convolver/lv2#stereo"
+            plugin = "https://github.com/jrp2014/convolver/lv2#discrete-2-2"
             config = {
               "https://github.com/jrp2014/convolver/lv2#filter" = "/home/me/room/room.cfg"
             }
@@ -759,7 +762,14 @@ the LV2 plug-in serve FFmpeg too.
   running filter in every adapter, with an explicit error indication. Adopted
   in the contract above; VST3 needs a fix for presets loaded while inactive.
 - Which channel layouts to publish as LV2 URIs. Recommendation: the eight
-  above, all discrete, added to only on request.
+  above, all discrete, added to only on request, as
+  `https://github.com/jrp2014/convolver/lv2#discrete-2-6` and so on.
+  **Decided 22 October 2026 (owner):** as recommended, recorded in the PLUG-4
+  registry.
+- The LV2 URI base and the macOS identifier namespace (PLUG-4). Recommendation:
+  `https://github.com/jrp2014/convolver/lv2#`, and `io.github.jrp2014.convolver.*`
+  in place of `org.convolver.*` (a domain the project does not control) before
+  the first release. **Decided 22 October 2026 (owner):** as recommended.
 - Whether restore prefers the embedded filter or the file. Recommendation:
   embedded, as VST3 presets do, with an explicit reload.
 - Whether to publish macOS/Windows LV2 bundles at all. Recommendation: build

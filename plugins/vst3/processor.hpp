@@ -1,17 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/host.hpp"
+#include "convolver_identities.hpp"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include <atomic>
 #include <mutex>
 
 namespace convolver::vst3 {
-inline const Steinberg::FUID processor_id(0x73A81329, 0xE6484ADF, 0x9DA7D731, 0xA8C94201);
-inline const Steinberg::FUID controller_id(0x622AD87C, 0x23664CCF, 0xB157473F, 0xBCD4A6B9);
+// Permanent class IDs from plugins/identities.json (PLUG-4); never change them.
+inline const Steinberg::FUID processor_id(identity::vst3_processor_class_id[0],
+                                          identity::vst3_processor_class_id[1],
+                                          identity::vst3_processor_class_id[2],
+                                          identity::vst3_processor_class_id[3]);
+inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0],
+                                           identity::vst3_controller_class_id[1],
+                                           identity::vst3_controller_class_id[2],
+                                           identity::vst3_controller_class_id[3]);
 inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
-inline constexpr int max_bus_channels = 8;
+inline constexpr int min_bus_channels = identity::min_channels;
+inline constexpr int max_bus_channels = identity::max_channels;
 HostState read_state(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {

@@ -53,6 +53,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: plugin-identities
+        name: Permanent plug-in identities (PLUG-4 registry)
+        entry: python tests/identities_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: actionlint
         name: GitHub Actions and embedded ShellCheck
         entry: actionlint

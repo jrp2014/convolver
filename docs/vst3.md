@@ -132,7 +132,10 @@ the same mapping. More than 8 channels, or more than one bus, is rejected. 32-bi
 and 64-bit host buffers are supported, with **single-precision internal DSP**.
 Sample-rate mismatches are rejected; there is no implicit IR resampling or
 pitch/timing change. This plug-in has a new VST3 identity: old VST2 project state
-is not claimed to migrate automatically.
+is not claimed to migrate automatically. The class IDs and bundle identifier are
+listed, with every other format's, in
+[plug-in identities](plugin-identities.md), which also explains why presets
+saved today keep loading on any arrangement with the same channel counts.
 
 ## Processing and lifecycle
 

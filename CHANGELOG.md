@@ -20,6 +20,14 @@ Until 1.0 the C++ API may change between minor versions.
   against a direct double-precision convolution and the CLI's renders of the
   same examples, with the lifecycle cases of the shared adapter contract. The
   VST3 adapter runs it as `vst3.harness`.
+- One registry of permanent plug-in identities and channel layouts,
+  `plugins/identities.json` (PLUG-4): VST3 class IDs, AU codes `aufx`/`Conv`/`CONV`,
+  LV2 URIs and fixed layouts, macOS bundle and installer identifiers, Windows
+  installer keys and the speaker meaning of each WAV channel-mask bit in VST3, AU
+  and LV2. The build generates `convolver_identities.hpp` from it, and new tests
+  (`identities`, `vst3.identities`) stop identities from changing or being copied
+  elsewhere. See [plug-in identities](docs/plugin-identities.md); modified
+  builds should change every value.
 - VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
   [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
   Linux, macOS (with real-time-safety checks) and Windows, plus acceptance
@@ -36,6 +44,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The macOS VST3 bundle identifier is now `io.github.jrp2014.convolver.vst3` and the installer package
+  identifiers are `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
+  `org.convolver.*`, a domain the project does not control). No release used
+  the old identifiers.
 - The preserved 2005–2006 Windows source moved from `convolver/` to
   `historical/`, so the top-level folder named after the project is no longer
   the old code. Open plans moved from `docs/superpowers/` to `docs/plans/`.

@@ -112,6 +112,13 @@ plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin`: it must export no FFTW symbols
 and, unless FFTW was chosen, import none (skipped where no tool is found).
+`identities` (in every build with the CLI, and in pre-commit) checks the
+[identity registry](plugin-identities.md#changing-the-registry): each format's
+rules, its frozen values, the installer files, and that no file keeps its own
+copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json` (and, on macOS,
+`Info.plist`) carries the class IDs, vendor and bundle identifier from
+[`plugins/identities.json`](../plugins/identities.json), and that each VST3
+speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).

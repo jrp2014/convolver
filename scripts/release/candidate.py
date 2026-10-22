@@ -109,12 +109,14 @@ def build(archive, identifier, work, output, cmake, nsis=None):
         installer = output / filename.replace('.zip', '-unsigned-setup.exe')
         run([nsis, '/DGENERATED=' + str(generated), '/DOUTPUT=' + str(installer), source / 'packaging/windows/installer.nsi'])
     elif platform.system() == 'Darwin':
+        # Installer receipts are permanent identities (PLUG-4): read them from the registry.
+        identities = json.loads((source / 'plugins/identities.json').read_text())['macos_installer']
         generated = work / 'installer'
         prepare(stage, generated, 'Darwin', policy)
         run(['pkgbuild', '--root', generated / 'plugin-payload', '--component-plist', generated / 'component.plist',
-             '--identifier', 'org.convolver.pkg.vst3', '--version', policy['version'],
+             '--identifier', identities['vst3_package_id'], '--version', policy['version'],
              '--install-location', '/Library/Audio/Plug-Ins/VST3', generated / 'Convolver-vst3.pkg'])
-        run(['pkgbuild', '--root', generated / 'tools-payload', '--identifier', 'org.convolver.pkg.tools',
+        run(['pkgbuild', '--root', generated / 'tools-payload', '--identifier', identities['tools_package_id'],
              '--version', policy['version'], '--install-location', '/Library/Application Support/Convolver', generated / 'Convolver-tools.pkg'])
         installer = output / filename.replace('.zip', '-unsigned.pkg')
         run(['productbuild', '--distribution', source / 'packaging/macos/Distribution.xml', '--package-path', generated, installer])

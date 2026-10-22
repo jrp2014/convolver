@@ -6,6 +6,7 @@ project(Convolver VERSION ${CONVOLVER_VERSION} LANGUAGES CXX)
 set(CONVOLVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(CONVOLVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 include(cmake/ConvolverBuildVersion.cmake)
+include(cmake/ConvolverIdentities.cmake)
 add_custom_target(convolver_build_version
     COMMAND "${CMAKE_COMMAND}" "-DCONVOLVER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DCONVOLVER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
@@ -268,6 +269,9 @@ if(CONVOLVER_BUILD_TESTS)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/versioning_tests.py")
             set_tests_properties(versioning PROPERTIES LABELS "build;versioning" TIMEOUT 120)
         endif()
+        add_test(NAME identities COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/identities_tests.py")
+        set_tests_properties(identities PROPERTIES LABELS "build;identities")
         add_test(NAME native.cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)

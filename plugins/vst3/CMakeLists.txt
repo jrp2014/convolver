@@ -62,7 +62,8 @@ endif()
 if(CONVOLVER_BUILD_TESTS)
     add_executable(convolver_vst3_tests "${PROJECT_SOURCE_DIR}/tests/vst3/adapter_tests.cpp"
         processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
-    target_include_directories(convolver_vst3_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+    target_include_directories(convolver_vst3_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
+        "${Convolver_BINARY_DIR}/generated")
     target_link_libraries(convolver_vst3_tests PRIVATE Convolver::host sdk sdk_hosting)
     if(APPLE)
         target_link_libraries(convolver_vst3_tests PRIVATE "-framework Cocoa")
@@ -93,6 +94,15 @@ if(CONVOLVER_BUILD_TESTS)
     add_test(NAME vst3.fft_symbols COMMAND "${Python3_EXECUTABLE}"
         "${PROJECT_SOURCE_DIR}/tests/vst3/fft_symbols.py" "${fft_backend}" "$<TARGET_FILE:convolver_vst3>")
     set_tests_properties(vst3.fft_symbols PROPERTIES LABELS "vst3;real-libraries" SKIP_RETURN_CODE 77)
+    # PLUG-4: the bundle's class IDs, vendor and bundle identifier come from the registry.
+    set(identity_options "")
+    if(CONVOLVER_VST3_RUNTIME_VALIDATION)
+        set(identity_options --require-moduleinfo)
+    endif()
+    add_test(NAME vst3.identities COMMAND "${Python3_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tests/vst3/identities.py" "${PROJECT_SOURCE_DIR}/plugins/identities.json"
+        "${SDK_ROOT}" "${bundle}" ${identity_options})
+    set_tests_properties(vst3.identities PROPERTIES LABELS "vst3;real-libraries")
     add_dependencies(check convolver_vst3 convolver_vst3_tests validator)
 endif()
 
@@ -100,7 +110,8 @@ if(CONVOLVER_BUILD_IO)
     add_executable(convolver_vst3_preset preset.cpp processor.cpp
         "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
     set_target_properties(convolver_vst3_preset PROPERTIES OUTPUT_NAME convolver-vst3-preset)
-    target_include_directories(convolver_vst3_preset PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+    target_include_directories(convolver_vst3_preset PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
+        "${Convolver_BINARY_DIR}/generated")
     target_link_libraries(convolver_vst3_preset PRIVATE Convolver::host Convolver::io sdk)
     if(APPLE)
         target_link_libraries(convolver_vst3_preset PRIVATE "-framework Cocoa")
@@ -118,7 +129,7 @@ if(CONVOLVER_BUILD_IO)
                 "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp" processor.cpp
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_harness PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
             target_link_libraries(convolver_vst3_harness PRIVATE Convolver::host Convolver::io sdk sdk_hosting)
             if(APPLE)
                 target_link_libraries(convolver_vst3_harness PRIVATE "-framework Cocoa")
@@ -147,7 +158,8 @@ endif()
 if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
     add_executable(convolver_vst3_package_probe "${PROJECT_SOURCE_DIR}/tests/vst3/package_probe.cpp"
         processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
-    target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+    target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
+        "${Convolver_BINARY_DIR}/generated")
     target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting)
     if(APPLE)
         target_link_libraries(convolver_vst3_package_probe PRIVATE "-framework Cocoa")

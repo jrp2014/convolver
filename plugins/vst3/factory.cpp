@@ -4,8 +4,9 @@
 #include "public.sdk/source/main/pluginfactory.h"
 using namespace Steinberg;
 using namespace Steinberg::Vst;
+using namespace convolver;
 using namespace convolver::vst3;
-BEGIN_FACTORY_DEF("Convolver", "https://github.com/jrp2014/convolver", "")
+BEGIN_FACTORY_DEF(identity::vendor.data(), identity::vendor_url.data(), "")
 DEF_CLASS2(INLINE_UID_FROM_FUID(processor_id), PClassInfo::kManyInstances, kVstAudioEffectClass,
            "Convolver", 0, "Fx|Reverb", CONVOLVER_VERSION_STRING, kVstVersionString,
            Processor::create)

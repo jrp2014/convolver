@@ -24,6 +24,7 @@ For the audio vocabulary, start with [concepts](concepts.md).
 | Inspection API | [`inspection.hpp`](../include/convolver/inspection.hpp): `InspectionReport`; [`inspection.cpp`](../portable/inspection.cpp) | Reports the same grammar and selection behavior; no output audio or FFT plans |
 | CLI rendering and reports | [`main.cpp`](../portable/main.cpp), [`inspection_cli.cpp`](../portable/inspection_cli.cpp) | Options, safe output creation, draining, report serialization and exit status |
 | VST3 adapter and preset writer | [`processor.cpp`](../plugins/vst3/processor.cpp), [`processor.hpp`](../plugins/vst3/processor.hpp), [`preset.cpp`](../plugins/vst3/preset.cpp) | SDK boundary; stream processing goes through `HostProcessor` |
+| Permanent plug-in identities and channel layouts | [`plugins/identities.json`](../plugins/identities.json), read by [`ConvolverIdentities.cmake`](../cmake/ConvolverIdentities.cmake) into `convolver::identity` | One registry for every format; adapters and release scripts never repeat its values ([guide](plugin-identities.md)) |
 | Build, exports and feature switches | [`CMakeLists.txt`](../CMakeLists.txt), [`CMakePresets.json`](../CMakePresets.json), [`cmake/`](../cmake/) | Static core/host/io components; see [package guide](cmake-package.md) |
 | Version generation | [`VERSION`](../VERSION), [`version_source.py`](../scripts/version_source.py), [`ConvolverBuildVersion.cmake`](../cmake/ConvolverBuildVersion.cmake) | One numeric version source; Git identity added to build strings |
 | Shared fixtures and plug-in comparisons | [`examples/first-use/`](../examples/first-use/README.md), [`fixtures.py`](../tests/plugins/fixtures.py); [`harness.hpp`](../tests/plugins/harness.hpp), [`oracle.hpp`](../tests/native/oracle.hpp) | Test-only; each adapter's test implements `Adapter` over its own host API ([PLUG-2](testing.md#plug-in-comparisons-plug-2)) |
@@ -62,6 +63,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Errors | Expected input errors become located diagnostics; resource exhaustion propagates; all-entry validation can continue | `native.inspection_cli`, `native.limits` |
 | Integer output | Seeded draw order and per-channel shaping state are independent of caller chunking | `native.io`, `native.cli` |
 | State | Bounded transactional decoding; no partial application of invalid state | `native.state`, `vst3.adapter` |
+| Identities and old presets | Released plug-in identities never change; version-1 state loads on any arrangement with matching counts | `identities`, `vst3.identities`, `vst3.adapter` (`version1_presets`) |
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
 
 The host thread contract is in [`host.hpp`](../include/convolver/host.hpp): one
@@ -88,6 +90,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
 | Host lifecycle or state | Host/state implementation and VST3 adapter | `native.host`, `native.state`, host-state fuzz replay and all VST3 tests, including `vst3.harness` |
+| Plug-in identities or layouts | [Plug-in identities](plugin-identities.md); never change a released value | `identities` (also pre-commit), `vst3.identities`, `vst3.adapter` |
 | A plug-in adapter | Its format folder, the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract) | Its `Adapter` driver for the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), its validator, pluginval where it applies |
 | First-use examples or their generator | `examples/first-use/`, `tests/plugins/fixtures.py`, marked commands in the READMEs | `examples.fixtures`, `examples.first_use`, then every adapter's harness test |
 | Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer` |
