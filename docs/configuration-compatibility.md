@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Configuration compatibility
 
 [Documentation index](README.md) · [Configuration format](configuration.md) · [Inspection options](portable-core.md#inspecting-and-validating-configurations)
@@ -104,7 +105,7 @@ that were.
 
 ## Bundled historical samples
 
-The 40 sample configurations and lists in `convolver/configs/` (including `filters/`) came with the Windows releases. None
+The 40 sample configurations and lists in `historical/configs/` (including `filters/`) came with the Windows releases. None
 loads unchanged with the portable reader: most predate the 3.0 format (no delay
 lines, or an older header) and the rest name absolute `C:\` or `D:\` paths on the original
 developer's machine. `--validate FILE --syntax-only` reports which, and on which

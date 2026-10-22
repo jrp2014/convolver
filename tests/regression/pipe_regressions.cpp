@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Portable adapters for the actual restored convolverPipe entry point.
 // This tests CLI/stream control flow; the DSP kernel is independently covered
 // by core_regressions.py and its direct-convolution oracle.

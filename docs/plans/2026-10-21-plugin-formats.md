@@ -9,7 +9,7 @@ It revises the format order in the
 **Current state:** PLUG-1 (the plug-in FFT backend) is implemented. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
-and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
+and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
 The [shared adapter contract](#shared-adapter-contract) below applies to every
 format and takes precedence over a per-format section that seems to disagree.
 
@@ -135,7 +135,7 @@ No public data counts plug-in installs by format. The available evidence:
 - **Convolver's own users.** Historical downloads with a recorded operating
   system were mostly Windows (about 30,000), and the `.cfg` readers that keep the
   format alive (Roon, JRiver, Audiolense) are Windows and macOS products. See the
-  [downstream-use record](../../history.md#downstream-use).
+  [downstream-use record](../history.md#downstream-use).
 - **CLAP.** About 99% of CLAP plug-ins also ship in another format, per the
   [CLAP review](https://librearts.org/2024/11/clap-api-two-years-later/).
 
@@ -243,7 +243,7 @@ before they set the sample rate and channel layout (VST3 `setState` before
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
   fresh history, warms up for 256 frames and crossfades for 256 frames, as the
-  [VST3 lifecycle](../../vst3.md#processing-and-lifecycle) describes.
+  [VST3 lifecycle](../vst3.md#processing-and-lifecycle) describes.
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
 ### Channel layouts and old presets
@@ -354,7 +354,7 @@ separate:
 | | Unsigned preview | Signed production release |
 | --- | --- | --- |
 | Signing | macOS: ad-hoc signature, documented quarantine removal. Windows: unsigned, SmartScreen warning | Developer ID, notarization, Authenticode with timestamps |
-| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../../plugins/hosts.md) procedure, clean machines, upgrades |
+| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../plugins/hosts.md) procedure, clean machines, upgrades |
 | Label | "unsigned developer preview" in the release title and guide | Ordinary release |
 | `production_enabled` | stays false | true only after every production gate |
 

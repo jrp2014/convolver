@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """End-to-end CLI checks through real FFTW and libsndfile, no Python packages."""
 import math
 import re

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise recovered descriptor/format helpers with a stub libsndfile boundary.
 
 Compiles actual CWaveFileHandle, exception classes, SndFileFormat and tables.
@@ -32,7 +33,7 @@ def fragments(wave, exception, tables):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source-dir', type=Path, default=ROOT / 'convolver/convolution')
+    parser.add_argument('--source-dir', type=Path, default=ROOT / 'historical/convolution')
     parser.add_argument('--archive', type=Path)
     args = parser.parse_args()
     if args.archive:
@@ -70,7 +71,7 @@ def main():
         preamble = harness.split('// INSERT_SOURCE')[0]
         preamble = preamble.replace('#include <cstdint>', '').replace('uint32_t DWORD', 'unsigned long DWORD')
         compatibility.write_text(preamble + production)
-        subprocess.run([compiler, '-std=c++98', '-fsyntax-only', '-I', str(ROOT / 'convolver'), str(compatibility)], check=True)
+        subprocess.run([compiler, '-std=c++98', '-fsyntax-only', '-I', str(ROOT / 'historical'), str(compatibility)], check=True)
         print('PASS production C++98 syntax', flush=True)
         if not args.archive:
             tables_only = '\n'.join(line for line in sources[2].splitlines() if not line.startswith('#include'))
@@ -79,7 +80,7 @@ def main():
             print('PASS format tables disabled without LIBSNDFILE', flush=True)
         for build, options in [('debug', ['-D_DEBUG']), ('release', ['-DNDEBUG'])]:
             executable = Path(temp) / build
-            subprocess.run([compiler, '-std=c++11', '-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I', str(ROOT / 'convolver'), *options, str(source), '-o', str(executable)], check=True)
+            subprocess.run([compiler, '-std=c++11', '-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I', str(ROOT / 'historical'), *options, str(source), '-o', str(executable)], check=True)
             for case in cases:
                 result = subprocess.run([str(executable), case], capture_output=True, text=True)
                 print(f"{'PASS' if result.returncode == 0 else 'FAIL'} {build}: {case}", flush=True)

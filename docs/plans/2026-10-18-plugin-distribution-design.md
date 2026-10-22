@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver plug-in distribution design
 
 Status: proposed release scope, 18 October 2026. This describes future work;
@@ -8,8 +9,8 @@ certification already exist.
 artifacts are built by the merged candidate workflow; nothing is published yet.
 Plug-in builds use Ooura on Windows and Linux and Accelerate on macOS (PLUG-1),
 not FFTW as stated below. First releases are unsigned previews, and LV2 and AU
-join the same pipeline. See the
-[plug-in formats plan](../plans/2026-10-21-lv2-plugin.md) for the current plan;
+join the same pipeline (REL-1, PLUG-5). See the
+[plug-in formats plan](2026-10-21-plugin-formats.md) for the current plan;
 the rest of this page is the 18 October design record.
 
 ## Outcome and audience
@@ -29,7 +30,7 @@ Historical Windows integrations and recovered documentation remain preserved.
 At source commit `0bf77d0`, the repository has independently buildable core, host
 and I/O libraries; FFTW and Accelerate backends; a thin VST3 adapter; embedded
 presets; real-library, numerical, lifecycle and package-consumer tests. The
-[VST3 guide](../../vst3.md) records the current contract and release limitations.
+[VST3 guide](../vst3.md) records the current contract and release limitations.
 
 The adapter handles mono/stereo, float/double host buffers and persistent stream
 history. Internal DSP is float; reported latency is 256 samples. A preset must

@@ -25,6 +25,7 @@ contents line. When a change alters a summarized fact, update the summary too.
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../TODO.md) | Current source and linked issues/plans |
+| Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` |
 | Past releases and provenance | [History](history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
@@ -56,9 +57,10 @@ compiler, dependency versions, planner mode and workload. Avoid words such as
 "latest", "all platforms" and "fully tested" without a defined scope.
 
 Keep the historical website under `docs/historical/` byte-identical. Mark dated
-reviews and plans as records rather than updating their results in place. The
-`superpowers/` folder name is a workflow convention: its plans are design records,
-not special authority over current code or user instructions. When the code on
+reviews and plans as records rather than updating their results in place. Plans
+in [`plans/`](plans/) are design records for open work, not special authority
+over current code or user instructions. (Until 21 October 2026 they lived in
+`docs/superpowers/`, a name taken from an agent tool's convention.) When the code on
 `main` implements all of a plan, move it to [`archive/plans/`](archive/plans/README.md)
 with an archive notice and a row in that index, and fix links to it. Put source
 comments near non-obvious invariants; put contributor navigation here, rather
@@ -75,7 +77,8 @@ The pre-commit configuration used by lint CI runs
 [`check_doc_links.py`](../scripts/check_doc_links.py) and its
 [regression tests](../tests/documentation_links_tests.py). The checker scans
 top-level `.md` files and Markdown under `docs/`, excluding `archive/`,
-`historical/`, `review-2026-10/` and `superpowers/` as source pages. Links to those
+`historical/` and `review-2026-10/` as source pages. Open plans in `plans/` are
+checked like maintained guides. Links to the excluded
 records are still checked. This keeps preserved evidence separate from maintained
 instructions without accepting broken navigation into the evidence.
 

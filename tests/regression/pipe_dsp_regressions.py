@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check recovered pipe EOF length against the real extracted convolution engine.
 
 Uses the portable FFTW-compatible DFT adapter from core_regressions; this tests
@@ -79,7 +80,7 @@ int main() {
 def main():
     code = core_regressions.generate(None).split('// Independent linear convolution oracle')[0]
     code += '\nusing sf_count_t = int64_t;\n#define TEXT(x) x\nconst DWORD MAX_ATTENUATION_DB=1000;\n'
-    code += (ROOT / 'convolver/convolverPipe/pipe_helpers.h').read_text().replace('#pragma once', '')
+    code += (ROOT / 'historical/convolverPipe/pipe_helpers.h').read_text().replace('#pragma once', '')
     code += HARNESS
     with tempfile.TemporaryDirectory(prefix='convolver-pipe-dsp-') as tmp:
         source = Path(tmp) / 'test.cpp'; executable = Path(tmp) / 'test'

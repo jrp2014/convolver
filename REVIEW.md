@@ -1,9 +1,10 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver: current repository review
 
 Documentation and source cross-check dated **20 October 2026**, baseline
 `2fe503e33800b82f5c4f83c972ee0ecef2b5bc9d`. This is a status guide, not a claim of
 an exhaustive new code audit. See [VERSION](VERSION) for the package version and
-[documentation review findings](docs/documentation-review-2026-10-20.md) for this update.
+[documentation review findings](docs/archive/reviews/2026-10-20-documentation-review.md) for this update.
 
 New readers should start with the [README](README.md) or
 [documentation index](docs/README.md). Contributors and agents should use the

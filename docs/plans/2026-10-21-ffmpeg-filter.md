@@ -5,15 +5,15 @@ Status: proposed work, written on 21 October 2026 against Convolver `f6ac6c6`
 (package 0.4.3) and FFmpeg git master `e2798d5` (its `RELEASE` file says
 `8.0.git`). Nothing here is implemented except the pipe workflow in step 1, which
 already works. Open work is tracked as FFMPEG-1 to FFMPEG-5 in
-[TODO](../../../TODO.md#ffmpeg-integration).
+[TODO](../../TODO.md#ffmpeg-integration).
 
-Revision note, 21 October 2026: the [documentation review](../../review-2026-10/ooura-and-roadmap-2026-10-21.md)
+Revision note, 21 October 2026: the [documentation review](../review-2026-10/ooura-and-roadmap-2026-10-21.md)
 corrected the pipe example's stream/channel scope, output-mask semantics and
 host FFT-option prerequisites. The measurements below retain their original scope.
 
 **Priority revised later on 21 October 2026:** the built-in filter (FFMPEG-2 to
 FFMPEG-5) is parked while VST3, LV2 and AU are developed in parallel; see the
-[plug-in formats plan](2026-10-21-lv2-plugin.md). The owner does not want to
+[plug-in formats plan](2026-10-21-plugin-formats.md). The owner does not want to
 maintain a patched FFmpeg source tree (option C below), because of the coupling
 it creates. The pipe workflow and FFMPEG-1 are unaffected.
 
@@ -76,7 +76,7 @@ Convolver Release build with Clang and FFTW, one run each, so indicative only):
   0.81 s (default partitions) and 1.68 s (`minp=256`); Convolver CLI 3.67 s at
   B=256 and 1.03 s at B=1024, including WAV writing. A true-stereo (four-path)
   version took 7.84 s at B=256, 1.90 s at B=1024 and 0.81 s at B=4096. Long
-  reverbs are where non-uniform partitions ([PERF-2](../../../TODO.md#fft-libraries-and-performance))
+  reverbs are where non-uniform partitions ([PERF-2](../../TODO.md#fft-libraries-and-performance))
   would pay off; an offline filter can also simply use a larger block.
 
 ## Integration options
@@ -90,7 +90,7 @@ Convolver Release build with Clang and FFTW, one run each, so indicative only):
 | **E. Native C port inside libavfilter** | Rewrite the engine and `.cfg` parser in C | Every FFmpeg build | Rejected: duplicates `afir`, needs relicensing, loses our tests |
 
 **A. Pipe.** The CLI already streams little-endian float (see
-[RAW streams](../../portable-core.md#raw-streams)). Tested here with a
+[RAW streams](../portable-core.md#raw-streams)). Tested here with a
 true-stereo `.cfg` and a 5 s video. The command below now selects the first
 audio and video tracks explicitly; the original measurement used a single
 audio/video pair:
@@ -114,7 +114,7 @@ Select one audio track (`0:a:1` selects the second); `0:a` would select every
 track for a pipe that carries only one stream. The example omits other tracks,
 subtitles and attachments. Audio restarts at time zero, so check sync for
 sources whose audio starts late. It is one process per stream and cannot switch
-filters mid-stream. [The maintained pipe guide](../../portable-core.md#with-ffmpeg)
+filters mid-stream. [The maintained pipe guide](../portable-core.md#with-ffmpeg)
 owns the user instructions; FFMPEG-1 must test multiple tracks and unequal counts.
 
 **B. LV2 through `lv2`.** FFmpeg's `lv2` filter (`af_lv2.c`) sets only numeric
@@ -271,7 +271,7 @@ Behaviour:
   with other FFTW users in the same process.
 
 An `av_tx` FFT backend inside Convolver would remove FFTW from FFmpeg builds
-entirely. Treat it as an [FFT-2](../../../TODO.md#fft-libraries-and-performance)
+entirely. Treat it as an [FFT-2](../../TODO.md#fft-libraries-and-performance)
 candidate with the usual oracle and benchmark evidence, not a requirement.
 
 ## Reverb use
@@ -288,7 +288,7 @@ covers the DSP:
   end of the input.
 - **Mix:** missing today. Add a latency-aligned dry path and `dry`/`wet` gains in
   the host layer (the bypass already keeps a delayed dry signal), shared with the
-  VST3 [VST3-4](../../../TODO.md#vst3-sdk-features-not-yet-used) parameters.
+  VST3 [VST3-4](../../TODO.md#vst3-sdk-features-not-yet-used) parameters.
   Until then `asplit` and `amix` in the graph work when `keep_latency=0`.
 - **Cost:** multi-second IRs are expensive at B=256 (see measurements); offline
   use should default to a larger block or wait for PERF-2.
@@ -335,7 +335,7 @@ covers the DSP:
   fetches, verifies, patches and configures. FFmpeg minor releases need a check;
   major releases usually need a rebase.
 - **Binaries (optional):** GPL FFmpeg builds for Linux, macOS and Windows are a
-  release-qualification task like [REL-1](../../../TODO.md#user-experience-and-distribution):
+  release-qualification task like [REL-1](../../TODO.md#user-experience-and-distribution):
   source offer for everything linked, dependency closure, signing and clean
   machine tests. A Homebrew tap or vcpkg overlay port is lighter to maintain than
   binaries.

@@ -1,6 +1,11 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Downloadable and buildable Convolver plug-ins implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For contributors and agents:** the open work from this plan is tracked as
+> TODO items (REL-1, PLUG-5). Take them on as described in
+> [the workflow guide](../workflow.md); the task checkboxes below are the
+> 18 October record. (This note replaced a pointer to an agent tool that the
+> repository does not use.)
 
 **Goal:** Deliver tested VST3 downloads and source builds with usable documentation,
 then extend the same release system to a macOS Audio Unit.
@@ -14,7 +19,7 @@ state semantics and tests, not the VST3 SDK interfaces.
 SDK, GitHub Actions; Python standard library for release validation. Platform
 signing/installer tools are release-time dependencies only.
 
-**Spec:** [Plug-in distribution design](../specs/2026-10-18-plugin-distribution-design.md).
+**Spec:** [Plug-in distribution design](2026-10-18-plugin-distribution-design.md).
 
 **Current status (21 October 2026, `4e1bb1b`, 0.4.6).** Tasks 1–3, the
 installer templates and the candidate gates are merged and produce unsigned
@@ -22,25 +27,26 @@ preview artifacts for VST3. The FFT choice is settled (PLUG-1): plug-in builds
 use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
 are superseded. First releases are unsigned previews; signing (Task 4) and
 production acceptance are a later gate. LV2 and AU now share this pipeline
-(PLUG-5). The [plug-in formats plan](2026-10-21-lv2-plugin.md) and
-[TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
+(PLUG-5). The [plug-in formats plan](2026-10-21-plugin-formats.md) and
+[TODO](../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
 dated notes and tasks below are kept as the record.
 
 Status: proposed work, based on `0bf77d0` and portable package 0.2.0. This plan does
 not implement a release or certify any commercial host. The existing
-[configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
+[configuration interoperability plan](../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
 **Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
-see the [plug-in formats plan](2026-10-21-lv2-plugin.md).
+see the [plug-in formats plan](2026-10-21-plugin-formats.md).
 **Signing decided on 21 October 2026:** first releases are unsigned previews on
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the
 later gate; until then, milestone B is not claimed.
 **Merged on 21 October 2026:** the `codex/plugin-distribution` implementation of
 Tasks 1–3, the installer templates and candidate gates is on `main`. The two
-signing scripts listed below stayed on that branch until signing is taken up.
+signing scripts listed below were left out of `main` until signing is taken up;
+they are in history at `f4519022c`, the branch's last commit.
 **FFT settled on 21 October 2026 (PLUG-1):** the FFT choice below
 ("Windows/Linux use FFTW") was replaced: a plug-in must not share an FFTW
 planner with other code in the host process, so plug-in builds default to

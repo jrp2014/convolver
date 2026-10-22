@@ -17,7 +17,7 @@ import sys
 import unicodedata
 from urllib.parse import unquote, urlsplit
 
-EXCLUDED = {'archive', 'historical', 'review-2026-10', 'superpowers'}
+EXCLUDED = {'archive', 'historical', 'review-2026-10'}
 DESTINATION = r'(<[^>\n]+>|(?:[^\s()]|\([^()]*\))+)'  # Includes one level of URL parentheses.
 INLINE = re.compile(r'\[[^\]\n]*\]\(\s*' + DESTINATION + r'(?:\s+["\'][^\n]*["\'])?\s*\)')
 REFERENCE = re.compile(r'^\s{0,3}\[[^\]\n]+\]:\s*' + DESTINATION)

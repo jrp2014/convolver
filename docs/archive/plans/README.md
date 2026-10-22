@@ -2,11 +2,11 @@
 # Archived plans
 
 These design and implementation plans are finished: the work they describe is on
-`main`. They were moved here from `docs/superpowers/` on 21 October 2026 and kept
+`main`. They were moved here from `docs/superpowers/` (now `docs/plans/`) on 21 October 2026 and kept
 as records of what was intended, decided and measured at the time. Use the
 [current documentation](../../README.md) for how Convolver behaves now.
 
-Plans for work that is still open stay in `docs/superpowers/`. Open work is
+Plans for work that is still open stay in [`docs/plans/`](../../plans/). Open work is
 tracked in [TODO](../../../TODO.md).
 
 | Plan | What it delivered | Implemented in | Current guide |
@@ -40,10 +40,10 @@ Each file gained a one-paragraph archive notice. The VST3 plan's plain-text spec
 path became a link, and two links in the configuration plan to sections that no
 longer exist now point to the page instead. Nothing else in the plans was edited.
 Relative links still resolve because `docs/archive/plans/` is at the same depth
-as `docs/superpowers/plans/`.
+as `docs/superpowers/plans/`, where they were written.
 
-The [plug-in distribution plan](../../superpowers/plans/2026-10-18-plugin-distribution.md)
-and its [design](../../superpowers/specs/2026-10-18-plugin-distribution-design.md)
+The [plug-in distribution plan](../../plans/2026-10-18-plugin-distribution.md)
+and its [design](../../plans/2026-10-18-plugin-distribution-design.md)
 were not archived: release packaging, signing, host testing and Audio Unit work
 are open (REL-1, HOST-1, HOST-2). The 21 October 2026 FFmpeg and Media
 Foundation plans are also open.

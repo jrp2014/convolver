@@ -1,7 +1,8 @@
 ---
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Preserve recovered source/documents and archived review evidence.
 exclude: >-
-  ^(archives/|convolver/|source/|review/|docs/historical/|docs/archive/)
+  ^(archives/|historical/|source/|review/|docs/historical/|docs/archive/)
 
 repos:
   - repo: https://github.com/ryanrhee/shellcheck-py
@@ -28,6 +29,18 @@ repos:
       - id: documentation-link-tests
         name: Documentation link checker tests
         entry: python tests/documentation_links_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: repository-rules
+        name: Repository rules (TODO IDs, docs index, plans, paths, SPDX, layout)
+        entry: python scripts/check_repository.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: repository-rule-tests
+        name: Repository rule checker tests
+        entry: python tests/repository_checks_tests.py
         language: python
         pass_filenames: false
         always_run: true

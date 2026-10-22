@@ -2,16 +2,16 @@
 # Media Foundation transform (MFT) plan
 
 Status: proposal, dated 21 October 2026, written against `f6ac6c6` (package
-0.4.3). Nothing here is implemented. Tracked as HOST-3 in [TODO](../../../TODO.md).
+0.4.3). Nothing here is implemented. Tracked as HOST-3 in [TODO](../../TODO.md).
 External facts were checked on the date above; recheck them before implementing.
 
-Revision note, 21 October 2026: the [documentation review](../../review-2026-10/ooura-and-roadmap-2026-10-21.md)
+Revision note, 21 October 2026: the [documentation review](../review-2026-10/ooura-and-roadmap-2026-10-21.md)
 corrected speaker-mask semantics, buffering/latency requirements and Equalizer
 APO coverage. These are proposed contracts, not implemented adapter behavior.
 
 **Parked (owner, 21 October 2026):** a Windows-native adapter needs more thought
 before any work starts. VST3, LV2 and AU come first; see the
-[plug-in formats plan](2026-10-21-lv2-plugin.md).
+[plug-in formats plan](2026-10-21-plugin-formats.md).
 
 **In short:**
 
@@ -394,7 +394,7 @@ Phases 1–2 are useful alone, to developers. Phase 3 is what end users would se
 
 ## Comparison with the historical plug-in
 
-The historical ConvolverWMP (`convolver/convolverWMP/`) was an ATL DMO with
+The historical ConvolverWMP (`historical/convolverWMP/`) was an ATL DMO with
 `IWMPPluginEnable`, `ISpecifyPropertyPages`, `IPropertyBag` and a custom
 `IConvolver` interface. It registered through the WMP registrar and `DMORegister`
 for PCM and float, with `ThreadingModel=Apartment`, and kept settings under

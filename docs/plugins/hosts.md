@@ -9,7 +9,7 @@ Cubase need available licences/testers; no compatibility claim is inferred.
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
 Both gates are set out in the plug-in formats plan in the source repository's
-`docs/superpowers/plans/` ("Unsigned previews and production").
+`docs/plans/` ("Unsigned previews and production").
 
 ## Every report
 

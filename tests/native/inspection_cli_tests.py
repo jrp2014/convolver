@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """--inspect / --validate command-line contracts: modes, exit codes, JSON schema 1,
 escaping and determinism. Standard library only."""
 import json
@@ -227,7 +228,7 @@ def main():
         # No output, wisdom or other files were created.
         assert sorted(d.rglob('*')) == before, set(d.rglob('*')) ^ set(before)
     # Bundled pre-portable samples are diagnosed (exit 1), never crash or pass.
-    samples = Path(__file__).resolve().parents[2] / 'convolver' / 'configs'
+    samples = Path(__file__).resolve().parents[2] / 'historical' / 'configs'
     for sample in sorted(samples.rglob('*.txt')):
         p = call(['--validate', str(sample), '--all-configurations', '--json'], 1)
         assert json.loads(p.stdout)['diagnostics'], sample

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Write the compatibility corpus fixtures described by cases.json.
 
 Fixtures are generated, never copied: impulse responses come from the integer or

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Changelog
 
 Changes to the portable C++ core, CLI and plug-ins. The portable package is
@@ -27,6 +28,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The preserved 2005–2006 Windows source moved from `convolver/` to
+  `historical/`, so the top-level folder named after the project is no longer
+  the old code. Open plans moved from `docs/superpowers/` to `docs/plans/`.
+  Nothing in the portable build, its targets or installed files changed.
 - Plug-in builds no longer use FFTW by default. `CONVOLVER_FFT_BACKEND` now
   defaults to `AUTO`: FFTW for ordinary builds, and the built-in Ooura FFT
   (Accelerate on macOS) when `CONVOLVER_BUILD_VST3` is ON, because another

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Compile original DSP bodies on macOS using a small platform/DFT adapter.
 
 No Windows host or FFTW binary is exercised. DFT normalization follows FFTW;
@@ -21,8 +22,13 @@ ROOT = HERE.parents[1]
 def generate(revision):
     def read(name):
         if revision:
-            return subprocess.check_output(['git', 'show', revision + ':convolver/convolution/' + name], cwd=ROOT).decode('latin1').replace('\r\n','\n')
-        return (ROOT / 'convolver/convolution' / name).read_text(encoding='latin1')
+            # The historical tree was called convolver/ before 21 October 2026.
+            for folder in ('historical', 'convolver'):
+                shown = subprocess.run(['git', 'show', revision + ':' + folder + '/convolution/' + name], cwd=ROOT, capture_output=True)
+                if shown.returncode == 0:
+                    return shown.stdout.decode('latin1').replace('\r\n','\n')
+            raise SystemExit('Neither historical/ nor convolver/ has convolution/' + name + ' at ' + revision)
+        return (ROOT / 'historical/convolution' / name).read_text(encoding='latin1')
 
     buf = read('samplebuffer.h')
     aligned = buf[buf.index('template <class T>'):buf.index('// comparisons')]

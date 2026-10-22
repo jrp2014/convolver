@@ -50,9 +50,9 @@ resolved before treating their technical designs as implementation instructions.
 
 ### P2: input and output speaker layouts are being conflated
 
-The [MFT media-type table](../superpowers/plans/2026-10-21-media-foundation-transform.md#media-types-and-negotiation)
+The [MFT media-type table](../plans/2026-10-21-media-foundation-transform.md#media-types-and-negotiation)
 checks the input mask against the configuration's mask; the
-[FFmpeg design](../superpowers/plans/2026-10-21-ffmpeg-filter.md#filter-design)
+[FFmpeg design](../plans/2026-10-21-ffmpeg-filter.md#filter-design)
 warns about that same mismatch. The `.cfg` fourth header field labels **outputs**,
 as documented in [configuration](../configuration.md#file-layout). It provides
 no input speaker layout. Stereo input routed to 5.1 output legitimately has
@@ -82,7 +82,7 @@ contract and documented command semantics, not a fresh end-to-end pipe run.
 
 ### P2: specify the MFT buffer contract independently of callback capacity
 
-The [allocation section](../superpowers/plans/2026-10-21-media-foundation-transform.md#component-design)
+The [allocation section](../plans/2026-10-21-media-foundation-transform.md#component-design)
 derives `cbSize` from a supposed negotiated maximum input sample. That maximum
 is not established by the listed media-type attributes. Microsoft's
 [`MFT_OUTPUT_STREAM_INFO` contract](https://learn.microsoft.com/en-us/windows/win32/api/mftransform/ns-mftransform-mft_output_stream_info)
@@ -98,7 +98,7 @@ instead of assuming a host-negotiated input maximum.
 
 ### P2: the proposed C API needs explicit host-layer prerequisites
 
-The [C API options](../superpowers/plans/2026-10-21-ffmpeg-filter.md#c-api)
+The [C API options](../plans/2026-10-21-ffmpeg-filter.md#c-api)
 offer FFT planning modes and wisdom, but the current
 [`HostProcessor` constructor](../../include/convolver/host.hpp) accepts only
 configuration, callback capacity and block size; it builds engines with default

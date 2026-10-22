@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
 set(CONVOLVER_VST3_SDK "" CACHE PATH "VST3 SDK 3.8.1 source directory with submodules")
 set(CONVOLVER_PLUGINVAL "" CACHE FILEPATH "Optional pluginval 2 executable for host-compatibility tests")

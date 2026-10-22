@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Real-library planning, fresh-process wisdom reuse and file protection."""
 import math
 from pathlib import Path

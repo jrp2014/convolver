@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 // Portable boundary scaffolding. The production helper bodies are inserted.
 #include <algorithm>
 #include <cstdint>

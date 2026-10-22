@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Building and consuming the portable library
 
 [Documentation index](README.md) · [Implementation map](project-structure.md)

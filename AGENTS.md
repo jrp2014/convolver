@@ -1,20 +1,43 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Guidance for coding agents and contributors
 
 Convolver applies multichannel FIR filters to audio (GPL-2.0-or-later). The repo
 holds two implementations:
 
-- **Portable core (active):** C++20 library, CLI and VST3 adapter built with
-  CMake. `include/convolver/` (public API), `portable/` (engine, host lifecycle,
-  FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/vst3/`,
-  `tests/native/`, `tests/consumer/`.
-- **Historical Windows code (preserved):** `convolver/` — the 2005–2006 engine
+- **Portable core (active):** C++20 library, CLI and plug-in adapters built
+  with CMake. `include/convolver/` (public API), `portable/` (engine, host
+  lifecycle, FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/`
+  (one folder per format: `plugins/vst3/` today; LV2 and AU are planned),
+  `tests/` (one folder per area), `scripts/release/` and `packaging/`
+  (preview release builds).
+- **Historical Windows code (preserved):** `historical/` — the 2005–2006 engine
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
 Start with `CONTRIBUTING.md` (build, presets, formatting, analysis),
 `REVIEW.md` (current status) and `TODO.md` (open work and priorities).
 Implementation: `docs/project-structure.md`; behaviour: `docs/portable-core.md`,
-`docs/configuration.md`, `docs/testing.md`, `docs/vst3.md`.
+`docs/configuration.md`, `docs/testing.md`, `docs/vst3.md`. Open plans are in
+`docs/plans/`; the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`.
+
+## Taking on work
+
+Follow `docs/workflow.md`. In short:
+
+- One TODO item (or a tightly coupled group) per branch. Open a **draft pull
+  request titled with the ID** as soon as you start; that is the claim. Check
+  open pull requests for the ID first.
+- Keep the **handoff note** in the pull request description current, and push
+  at every stopping point: cloud sessions are discarded without warning.
+- Ask jrp before deciding anything permanent or user-facing (identities,
+  state/preset formats, `.cfg` syntax, licences, sound-changing defaults,
+  shipped dependencies, publishing).
+- Before marking ready: the definition of done in the workflow guide, and an
+  **independent review** by someone who did not write the change.
+- jrp merges. Never merge, approve, push to `main` or move tags.
+
+Claude Code sessions have two repository skills: `todo-item` (start, resume or
+hand over an item) and `review-change` (the independent review).
 
 ## Build and test
 
@@ -35,10 +58,13 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed.
 - `tests/regression/` compiles **historical** functions by slicing
-  `convolver/` source on text markers. If you edit those files, update the
+  `historical/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
-- Portable sources must pass `clang-format-18 --dry-run --Werror` and the
+- Portable sources must pass `scripts/check_format.sh` (clang-format 18) and the
   `.clang-tidy` checks (CI enforces both; commands in `CONTRIBUTING.md`).
+- `python3 scripts/check_repository.py` must pass: TODO IDs defined, every
+  maintained page indexed, plans dated and current, paths in this file real,
+  SPDX lines, and the top-level layout. Lint CI runs it through pre-commit.
 - Do not claim something builds or passes unless you ran it.
 
 ## Versioning
@@ -86,9 +112,9 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - Keep component boundaries in `docs/project-structure.md`; split files only
   when a responsibility grows.
 - `docs/historical/` files are byte-exact copies with recorded hashes; never edit
-  them. Do not reformat files under `convolver/`; it destroys `git blame`.
+  them. Do not reformat files under `historical/`; it destroys `git blame`.
 - Line endings: LF in the repo; `.sln`, `.vcproj`, `.rc` are CRLF via `.gitattributes`.
-- Vendored third-party code (`convolver/Common/`, `convolver/fftw/`,
-  `convolver/libsndfile/` headers) is not ours to patch.
+- Vendored third-party code (`historical/Common/`, `historical/fftw/`,
+  `historical/libsndfile/` headers) is not ours to patch.
 - New files carry `// SPDX-License-Identifier: GPL-2.0-or-later`.
 - Keep commits focused; state the audible or numerical effect of a DSP change.

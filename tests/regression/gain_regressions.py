@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Run the production gain loops without the legacy Windows/FFT dependencies.
 
 The source statements are extracted verbatim and compiled with AddressSanitizer.
@@ -96,7 +97,7 @@ def main():
     parser.add_argument(
         "--source", type=Path,
         default=Path(__file__).resolve().parents[2]
-        / "convolver/convolution/channelpaths.cpp",
+        / "historical/convolution/channelpaths.cpp",
         help="channelpaths.cpp to test, including an untouched archived copy",
     )
     args = parser.parse_args()

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
 Convolver applies finite impulse response (FIR) filters to multichannel audio. Typical
@@ -115,17 +116,20 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 | --- | --- |
 | [`include/convolver/`](include/convolver/) | Public C++ APIs |
 | [`portable/`](portable/) | Active engine, FFT backends, file I/O and CLI |
-| [`plugins/vst3/`](plugins/vst3/) | Optional plug-in and preset writer |
+| [`plugins/`](plugins/) | Optional plug-ins, one folder per format ([`vst3/`](plugins/vst3/) today) |
 | [`tests/`](tests/) | Native, host, package, compatibility and historical tests |
-| [`docs/`](docs/README.md) | Current guides and clearly labelled records |
-| [`convolver/`](convolver/) | Preserved Windows implementation; not part of the portable CMake build |
+| [`docs/`](docs/README.md) | Current guides, [open plans](docs/plans/) and clearly labelled records ([`archive/`](docs/archive/)) |
+| [`cmake/`](cmake/), [`packaging/`](packaging/), [`scripts/`](scripts/) | Build helpers, release packaging, and release and repository checks |
+| [`examples/`](examples/) | Example plug-in presets |
+| [`historical/`](historical/) | Preserved 2005–2006 Windows implementation; not part of the portable CMake build |
 
 - [Documentation index](docs/README.md): choose a guide by task
 - [Implementation map](docs/project-structure.md): source responsibilities, invariants and tests
 - [Portable guide](docs/portable-core.md): build options, CLI details, FFTW tuning, dither, speaker labels and the library API
 - [Package guide](docs/cmake-package.md): using Convolver from another CMake project
 - [VST3 guide](docs/vst3.md)
-- [Testing](docs/testing.md) and [contributing](CONTRIBUTING.md)
+- [Testing](docs/testing.md), [contributing](CONTRIBUTING.md) and
+  [taking on and reviewing work](docs/workflow.md)
 - [Changelog](CHANGELOG.md) and [current review](REVIEW.md)
 
 ## About this project
@@ -140,7 +144,7 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 > That documentation describes the historical Windows applications, not the
 > portable version in this repository.
 
-The historical source is preserved in [`convolver/`](convolver/) but is not
+The historical source is preserved in [`historical/`](historical/) but is not
 built by this project, and an archived copy of the 4.4 website is in
 [`docs/historical/`](docs/historical/convolver-4.4/README.md). The
 [history page](docs/history.md) explains where the code came from, how the
