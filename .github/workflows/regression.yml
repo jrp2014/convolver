@@ -143,7 +143,8 @@ jobs:
         run: |
           $directory = Join-Path $env:RUNNER_TEMP 'equalizer-apo'
           $installer = Join-Path $env:RUNNER_TEMP 'EqualizerAPO-x64.exe'
-          $url = "https://sourceforge.net/projects/equalizerapo/files/$env:EQUALIZER_APO_VERSION/EqualizerAPO-x64-$env:EQUALIZER_APO_VERSION.exe/download"
+          $version = $env:EQUALIZER_APO_VERSION
+          $url = "https://sourceforge.net/projects/equalizerapo/files/$version/EqualizerAPO-x64-$version.exe/download"
           curl.exe -fsSL --retry 3 -o $installer $url
           if ($LASTEXITCODE -ne 0) { throw "Cannot download Equalizer APO from $url" }
           $digest = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
