@@ -19,6 +19,13 @@ Until 1.0 the C++ API may change between minor versions.
   first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
+- `convolver-preset` (PLUG-3) makes self-contained presets for VST3
+  (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`
+  bundles) from one IR, `.cfg` or configuration list, several formats in one
+  run, and converts an existing `.vstpreset` to the other formats. All carry the
+  same encoded filter. It needs no plug-in SDK, so AU and LV2 builds can ship
+  it. `convolver-vst3-preset` is now the same tool under its old name, with the
+  same arguments and byte-identical output. See [plug-in presets](docs/presets.md).
 
 - Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
   `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
@@ -42,7 +49,7 @@ Until 1.0 the C++ API may change between minor versions.
   and LV2. The build generates `convolver_identities.hpp` from it, and new tests
   (`identities`, `vst3.identities`) stop identities from changing or being copied
   elsewhere. See [plug-in identities](docs/plugin-identities.md); modified
-  builds should change every value.
+  builds should change the product identities it lists.
 - VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
   [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
   Linux, macOS (with real-time-safety checks) and Windows, plus acceptance
@@ -71,6 +78,10 @@ Until 1.0 the C++ API may change between minor versions.
   so reopening stays silent: host state version 2, used only for that state
   (other states are still written as version 1). The shared decisions are in
   the host layer (`HostFilter`), for LV2 and AU to reuse.
+- Bypass with unequal input and output counts (for example a stereo-to-six
+  crossover) now ramps every output to silence instead of passing input *c* to
+  output *c*, so bypassing a crossover never sends full-range audio to a driver.
+  Filters with equal counts bypass as before.
 - The macOS VST3 bundle identifier is now `io.github.jrp2014.convolver.vst3` and the installer package
   identifiers are `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
   `org.convolver.*`, a domain the project does not control). No release used

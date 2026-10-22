@@ -26,7 +26,8 @@ Contents: [native tests](#native-production-tests),
 [plug-in comparisons](#plug-in-comparisons-plug-2),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
-[documentation checks](#documentation-checks) and [fuzzing](#fuzz-smoke-tests-and-longer-campaigns).
+[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
+and [when CI runs](#ci-triggers).
 
 ## Native production tests
 
@@ -106,9 +107,29 @@ ctest --test-dir build-native -N
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.
+- `native.presets`: the [preset containers](presets.md) without any SDK: base64
+  against RFC 4648's vectors, the `.vstpreset` layout field by field, reading
+  presets as hosts save them (extra chunks, lower-case class IDs, padding),
+  version-1 states with any channel mask, every truncation and damaged chunk
+  list, another plug-in's preset, AU keys and XML escaping, one LV2 plug-in URI
+  per fixed layout, Turtle escaping, and the explained refusals (channel limits,
+  layouts without an LV2 plug-in, unusable preset names).
+- `plugins.presets`: `convolver-preset` writes the 2→6 crossover fixture as all
+  three formats in one run and reads each back without Convolver's code: the
+  `.vstpreset` by its documented layout, the `.aupreset` with Python's
+  `plistlib`, and the LV2 bundle's Turtle (also with `serdi`, a Turtle parser,
+  when installed). All three must hold the same encoded state, which a separate
+  version-1 decoder checks against the fixture's WAV samples, routes, gains and
+  delays. It also converts a `.vstpreset` after its source files are deleted,
+  and checks that refused requests write nothing.
 
 The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
-and audio tests, embedded preset generation/loading after deleting the source IR,
+and audio tests, embedded preset generation/loading after deleting the source IR
+(`vst3.preset`, which also checks that `convolver-preset` and
+`convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our
+`.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
+the SDK reads our presets, and we read the SDK's, including controller and
+metadata chunks),
 plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
 binary with `nm`/`readelf`, `otool` or `dumpbin`: it must export no FFTW symbols
@@ -130,7 +151,7 @@ commercial DAW.
 
 `packaging.consumer` installs and relocates the package, builds and runs an
 external core/host/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs six C++/package
+without a parent CTest setup. Core-only configuration runs seven C++/package
 suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
@@ -195,7 +216,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
 | `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
-| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. For unequal counts this is today's VST3 behaviour, provisional until jrp decides what bypass plays there |
+| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. With unequal counts the ramp goes to silence on every output instead |
 | `reset` | Exact silence after a reset, then the filter plays as if fresh |
 | `silence-flags` | Input flagged silent does not cut the tail short; outputs flagged silent are silent |
 | `nonfinite-input` | NaN and infinite input samples count as silence; output stays finite |
@@ -318,9 +339,10 @@ against the current program as well as checking links.
 ## Fuzz smoke tests and longer campaigns
 
 [The fuzz guide](../tests/fuzz/README.md) describes the four harnesses and corpus
-replay. Push CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
-resource bounds. A manual workflow run defaults to 600 seconds per target;
-set its `seconds` input to `60` to reproduce the smoke-test budget. Keep crashes
+replay. CI runs each libFuzzer target for 60 seconds on pull requests and
+`main`, with ASan/UBSan and resource bounds. A manual workflow run defaults to
+600 seconds per target; set its `seconds` input to `60` to reproduce the
+smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
 
 ## Plug-in candidate checks
@@ -337,3 +359,20 @@ Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
 qualification. Never bypass system security to turn those checks green.
+
+## CI triggers
+
+The test workflows run for every pull request, for every push to `main` and
+when started by hand. A commit pushed to a branch that has a pull request runs
+once, as part of that pull request; a branch without one gets no automatic
+run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
+or use Actions, then "Run workflow" on the branch. A new commit on a pull request
+cancels the runs still going for the commit it replaces. Runs on `main` and
+manual runs are never cancelled this way. Re-run only the latest commit's runs:
+re-running an older commit's run cancels the current one.
+
+This keeps the queue short. On the owner's Free plan GitHub runs at most 20
+jobs at once across the account's repositories, and only 5 on macOS, and one
+commit starts about 18 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
+commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
+a macOS runner (up to an hour) while taking about 3 minutes to run.

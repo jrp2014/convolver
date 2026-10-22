@@ -40,7 +40,8 @@ Contents: [before you start](#before-you-start) ·
    **draft** pull request titled `ID: what it does` (for example
    `PLUG-2: shared adapter test harness`). Fill in the
    [template](../.github/pull_request_template.md), including the handoff note.
-   The open draft pull request is the claim.
+   The open draft pull request is the claim, and CI runs
+   automatically only once it exists ([CI triggers](testing.md#ci-triggers)).
 
 ## While working
 

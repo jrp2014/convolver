@@ -242,11 +242,14 @@ struct HostProcessor::Impl {
             }
             dry_mix = std::clamp(dry_mix + (bypass ? 1.f / 64 : -1.f / 64), 0.f, 1.f);
             for (std::size_t c = 0; c < outputs; ++c) {
-                // Bypass passes input c to output c; outputs without an input are silent.
+                // Bypass passes input c to output c when the counts are equal. With
+                // unequal counts it plays silence on every output (owner's decision,
+                // 22 October 2026): no channel has an unfiltered counterpart, and a
+                // crossover must not send full-range audio to a driver.
                 auto index = t * outputs + c;
                 auto& delayed = dry[dry_position * outputs + c];
                 float dry_value = delayed;
-                delayed = c < inputs ? input[t * inputs + c] : 0.f;
+                delayed = inputs == outputs ? input[t * inputs + c] : 0.f;
                 double value = wet[index];
                 if (previous)
                     value = (1.0 - blend) * old_wet[index] + blend * value;

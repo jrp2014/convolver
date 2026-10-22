@@ -180,7 +180,7 @@ behaviour identical:
 | --- | --- | --- |
 | PLUG-1 | A safe FFT backend for every plug-in build (see [FFT backend](#lv2-adapter-design) below). **Done 21 October 2026.** | Affects the existing VST3 build already |
 | PLUG-2 | One adapter test harness, specified under [shared test harness](#shared-test-harness-plug-2): the independent convolution oracle, CLI equivalence, fixed tolerances and lifecycle cases | Each format's tests then only drive its own host API |
-| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts | Users convert a `.cfg` the same way for every format |
+| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
 | PLUG-4 | One list of supported channel layouts, with [channel meaning](#channel-layouts-and-old-presets) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
 | PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../plugins/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
@@ -268,6 +268,23 @@ before they set the sample rate and channel layout (VST3 `setState` before
   fresh history, warms up for 256 frames and crossfades for 256 frames, as the
   [VST3 lifecycle](../vst3.md#processing-and-lifecycle) describes.
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
+
+### Bypass
+
+Bypass ramps over 64 samples to the dry signal and back, with the dry path
+delayed by the reported latency so wet and dry line up. Wet processing carries
+on during bypass, so switching back does not lose history.
+
+- **Equal input and output counts:** the dry signal is input *c* on output *c*.
+- **Unequal counts:** every output ramps to silence (owner's decision,
+  22 October 2026). No output has an unfiltered counterpart: bypassing a 2→6
+  crossover must not send full-range audio to a tweeter, and a 1→2 filter that
+  forks a mono input to two outputs cannot tell which output the input belongs
+  on. This matches the contract for an empty instance with unequal counts.
+
+`HostProcessor` implements this, so every adapter that drives it through
+`set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
+must not use its format's own pass-through bypass (see the AU design).
 
 ### Channel layouts and old presets
 
@@ -646,7 +663,8 @@ AUv2 effects.
   (all-lowercase codes are Apple's) and must not be `DEMO`. Hosts identify an AU
   by the type, subtype and manufacturer together; no other use of `CONV` was
   found in public sources, which cannot prove it is unused. The subtype repeats
-  the historical VST2 ID `'Conv'`. Forks must change the codes. Record them with
+  the historical VST2 ID `'Conv'`. Forks should change the manufacturer code
+  (see [plug-in identities](../plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
   the other permanent IDs in PLUG-4 and never change them after release.
 - **Channels:** advertise the PLUG-4 channel counts through
   `kAudioUnitProperty_SupportedNumChannels`, including unequal pairs such as
@@ -779,6 +797,10 @@ the LV2 plug-in serve FFmpeg too.
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
   unequal counts.
+- What bypass plays with unequal channel counts ([bypass](#bypass)).
+  **Decided 22 October 2026 (owner):** silence on every output, including a
+  1→2 filter that forks one input; equal counts keep input *c* to output *c*.
+  `HostProcessor` implements it, so VST3 already follows it.
 - Failed replacement (raised in the owner's review, 21 October 2026): keep the
   running filter in every adapter, with an explicit error indication. Adopted
   in the contract above; VST3 needs a fix for presets loaded while inactive.

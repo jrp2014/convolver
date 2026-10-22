@@ -9,8 +9,9 @@
   separately downloaded Steinberg VST3 SDK, then copy the whole
   `Convolver.vst3` bundle into a folder your host scans.
 - There is no editor. Turn a WAV, `.cfg` or configuration list into a
-  `.vstpreset` with `convolver-vst3-preset`, then load it from the host's preset
-  menu. The preset embeds the filter, so the original files are not needed later.
+  `.vstpreset` with `convolver-preset` (or the older `convolver-vst3-preset`),
+  then load it from the host's preset menu. The preset embeds the filter, so the
+  original files are not needed later.
 - One input bus and one output bus of 1 to 8 channels each; the counts may
   differ. The preset must match the host's sample rate and channel counts.
 - Latency is always 256 samples. Processing is single-precision with 32- or
@@ -103,13 +104,20 @@ DAW; named-host installation tests remain tracked in [TODO](../TODO.md).
 
 The adapter uses the DAW's standard preset loader and generic bypass
 control, without a custom editor. Convert an impulse WAV, [`.cfg`](configuration.md), or
-configuration list into a new preset:
+configuration list into a new preset with `convolver-preset`, which makes
+presets for every plug-in format ([presets guide](presets.md)):
+
+```sh
+./build-vst3/convolver-preset room.cfg room.vstpreset
+```
+
+The original VST3-only tool still works, with the same arguments and output:
 
 ```sh
 ./build-vst3/plugins/vst3/convolver-vst3-preset room.cfg room.vstpreset
 ```
 
-With Visual Studio the executable is in `plugins/vst3/Release/`. The output must
+With Visual Studio the executables are in `Release/` and `plugins/vst3/Release/`. The output must
 not already exist. Presets embed coefficients, gains, routes and delays; the DAW
 project's saved state therefore does not depend on the original filter paths.
 Select a configuration matching the DAW's sample rate and bus layout. For a
@@ -126,7 +134,10 @@ The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
 and the counts may differ (for example stereo in, 5.1 out). Any speaker
 arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
-the sample rate; there is no implicit IR resampling or pitch/timing change. More
+the sample rate; there is no implicit IR resampling or pitch/timing change. Bypass
+passes input *c* to output *c* only when the counts are equal; with unequal
+counts it plays silence on every output
+([shared adapter contract](plans/2026-10-21-plugin-formats.md#bypass)). More
 than 8 channels, or more than one bus, is rejected. 32-bit and 64-bit host
 buffers are supported, with **single-precision internal DSP**.
 
@@ -175,8 +186,9 @@ reported below. The plug-in performs no file I/O in this streaming path.
 Latency is always 256 samples, independent of the DAW callback length. The adapter
 handles variable blocks, in-place host buffers, zero-length/parameter-only calls,
 inactive channels and silence flags. Silent input still drains the wet tail.
-Bypass uses a 64-sample ramp and a dry delay matching the reported latency. Wet
-processing continues during bypass so returning to wet does not lose history.
+Bypass uses a 64-sample ramp and a dry delay matching the reported latency. With
+unequal channel counts it ramps to silence instead. Wet processing continues
+during bypass so returning to wet does not lose history.
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before any
