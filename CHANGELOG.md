@@ -15,9 +15,9 @@ Until 1.0 the C++ API may change between minor versions.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
   list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate
-  and channel count choose the list entry; a device that no entry fits, and
-  device channels a filter does not use, are silenced rather than played
-  unfiltered. Checked against a model of Equalizer APO, not yet in Equalizer
+  and channel count choose the list entry (on a device with more channels,
+  the largest entry that fits); a device that no entry fits, and device
+  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO, not yet in Equalizer
   APO itself.
 
 - `convolver-preset` (PLUG-3) makes self-contained presets for VST3

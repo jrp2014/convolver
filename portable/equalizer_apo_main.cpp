@@ -87,6 +87,20 @@ int export_folder(const fs::path& input, const fs::path& folder) {
              "  Include: " + folder_name + '\\' + eapo::text_file_name});
         if (result.filters.empty())
             throw std::runtime_error("nothing to export from " + utf8(input));
+        // Equalizer APO builds each IR path in a MAX_PATH buffer and plays a path
+        // whose IR it cannot open unfiltered, so refuse names that would not fit
+        // in its usual config folder.
+        constexpr std::size_t max_path = 259;
+        const std::string config_folder = "C:\\Program Files\\EqualizerAPO\\config\\";
+        for (const auto& ir : result.impulses)
+            if (config_folder.size() + folder_name.size() + 1 + ir.name.size() > max_path)
+                throw std::invalid_argument(
+                    "the folder name " + folder_name +
+                    " is too long: Equalizer APO cannot open "
+                    "files whose full path is over " +
+                    std::to_string(max_path) + " characters, such as " + config_folder +
+                    folder_name + '\\' + ir.name +
+                    ", and would play that path unfiltered. Choose a shorter name.");
         std::error_code error;
         if (fs::symlink_status(folder, error).type() != fs::file_type::not_found)
             throw std::invalid_argument(utf8(folder) +
@@ -113,11 +127,12 @@ int export_folder(const fs::path& input, const fs::path& folder) {
             const auto& c = sources[f.source].configuration;
             std::cout << "Filter " << n + 1 << " (" << sources[f.source].label
                       << ") applies to a device at " << c.sample_rate << " Hz with "
-                      << f.device_channels << (f.device_channels == 1 ? " channel" : " channels")
-                      << (f.device_channels < eapo::max_device_channels
-                              ? " (or more, up to " + std::to_string(eapo::max_device_channels) +
-                                    ", the extra ones silent)"
-                              : std::string())
+                      << f.device_channels
+                      << (f.largest_device > f.device_channels
+                              ? " to " + std::to_string(f.largest_device) +
+                                    " channels (channels after " +
+                                    std::to_string(f.device_channels) + " silent)"
+                              : std::string(f.device_channels == 1 ? " channel" : " channels"))
                       << ": " << c.input_channels << " in, " << c.output_channels << " out.\n";
         }
         for (const auto& note : result.skipped)
@@ -136,7 +151,8 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                   << "\n"
                      "to config.txt there, and set the device's sample rate in Windows sound\n"
                      "settings to one listed above. A device that no filter fits is silenced\n"
-                     "rather than played unfiltered.\n";
+                     "rather than played unfiltered. Copy the whole folder: Equalizer APO plays\n"
+                     "a path whose impulse response file it cannot read unfiltered.\n";
         return 0;
     } catch (const std::exception& e) {
         if (created) {

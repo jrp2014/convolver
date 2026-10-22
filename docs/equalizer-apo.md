@@ -17,9 +17,12 @@
   `Include: room\convolver.txt` to its `config.txt`. Set the device's sample
   rate in Windows to the filter's.
 - Equalizer APO only knows the device's sample rate and channel count, so those
-  choose the filter. A device that no filter fits is **silenced**, not played
-  unfiltered, and so are device channels the filter does not use. This follows
-  the plug-ins' rule: a crossover must never send full-range audio to a tweeter.
+  choose the filter. A device whose sample rate or channel count no filter
+  fits is **silenced**, not played unfiltered, and so are device channels the
+  filter does not use. This follows the plug-ins' rule: a crossover must never
+  send full-range audio to a tweeter.
+- Copy the whole folder. Equalizer APO plays a path whose IR file it cannot
+  read unfiltered, and the export cannot detect that.
 - ASIO and WASAPI exclusive-mode playback bypass Equalizer APO, so they are not
   filtered.
 
@@ -73,14 +76,19 @@ installation steps.
 
 Equalizer APO tells a configuration only the device's sample rate and channel
 count, so these choose the filter. Every entry of a configuration list is
-exported, in the list's order, and the first that fits wins:
+exported:
 
-1. An entry with the device's sample rate and exactly the device's channel
+1. The entry with the device's sample rate and exactly the device's channel
    count.
-2. Otherwise, an entry with the device's sample rate and fewer channels than
-   the device, if the device has at most 32 channels. The filter uses the first
-   channels and the remaining ones are silenced.
+2. Otherwise, of the entries with the device's sample rate and fewer channels
+   than the device, the one with the most channels, if the device has at most
+   32 channels. The filter uses the first channels and the remaining ones are
+   silenced. For example, with a stereo filter and a six-channel crossover at
+   48 kHz, a four-channel device gets the stereo filter and an eight-channel
+   device the crossover.
 3. Otherwise every channel is silenced.
+
+The tool prints the range of device channel counts each filter covers.
 
 An entry's channel count is the larger of its input and output counts, because
 its inputs and outputs are the same device channels. A list entry with the same
@@ -161,6 +169,12 @@ Windows receives 32-bit samples.
   mode.
 - **Only the left channel plays.** The filter has one channel; see
   [a mono IR on a stereo device](#a-mono-ir-on-a-stereo-device).
+- **A path plays unfiltered.** Equalizer APO could not open that path's IR
+  file: the folder was copied only in part, is outside the `config` folder
+  (Equalizer APO runs as the LocalService account, which must be able to read
+  it), or its full path is over 259 characters. Equalizer APO then leaves the
+  audio unchanged and writes the failure to its log (below). The tool refuses
+  folder names that would be too long in the usual `config` folder.
 - **What Equalizer APO read.** Equalizer APO writes problems to
   `C:\Windows\ServiceProfiles\LocalService\AppData\Local\Temp\EqualizerAPO.log`.
   Setting `EnableTrace` to `true` under `HKEY_LOCAL_MACHINE\SOFTWARE\EqualizerAPO`
@@ -172,12 +186,17 @@ Equalizer APO runs inside the Windows audio engine, so CI cannot run it.
 `export.equalizer_apo` runs the exported commands through a model of Equalizer
 APO written from its 1.4.2 sources (line splitting, channel names, `Copy:`
 computed from the channels as they were before the line, created channels,
-`If:`/`Eval:`, `Preamp:`, `Delay:`, `Convolution:` and the sample-rate check)
+`If:`/`Eval:`, `Preamp:`, `Delay:`, `Convolution:` and `Include:` with its
+channel-selection restore; an IR at the wrong rate fails the model, where
+Equalizer APO would play the path unfiltered)
 and compares the result with the same double-precision oracle the CLI tests
 use. It covers the [first-use examples](../examples/first-use/README.md) on
 devices with their channels and with more, a list with mixed routes, gains,
-inverted routes, delays and shared IRs, the choice between list entries, and
-silence for other rates and devices over 32 channels. See
+inverted routes, delays and shared IRs, the choice between list entries
+(including the larger entry winning on a larger device), the export included
+from a `config.txt` between other commands, silence for other rates and devices
+over 32 channels, file names that try to add commands, and folder names too
+long for Equalizer APO's paths. See
 [testing](testing.md#native-production-tests).
 
 The export has not yet been run in Equalizer APO itself; that check is open as

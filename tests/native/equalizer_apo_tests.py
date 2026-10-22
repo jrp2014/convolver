@@ -3,7 +3,7 @@
 
 Equalizer APO is a Windows audio-engine component, so CI cannot run it. The model
 below executes the commands the export writes (Eval, If/EndIf, Channel, Copy,
-Delay, Convolution, Preamp) the way Equalizer APO 1.4.2's sources do: the same line
+Delay, Convolution, Preamp, Include) the way Equalizer APO 1.4.2's sources do: the same line
 splitting, the same channel-name lookup, Copy computed from the channels as they
 were before the line, created ("virtual") channels, mono IRs applied to each
 selected channel in place without latency, and the device's sample rate and
@@ -17,6 +17,7 @@ with the selection between a list's entries.
 Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO
 """
 import math
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -169,6 +170,12 @@ class EqualizerApo:
             raise ModelError(f'unexpected Delay {value!r}')
         self.filters.append(('delay', (self.selection[:], int(match.group(1)))))
 
+    def command_Include(self, value, path):
+        # Relative to the including file; the channel selection is restored after.
+        saved = self.selection[:]
+        self.load(path.parent / value.strip().replace('\\', '/'))
+        self.selection = saved
+
     def command_Preamp(self, value, path):
         match = re.fullmatch(r'\s*(-?\d+(?:\.\d*)?)\s*dB\s*', value)
         if not match:
@@ -180,6 +187,8 @@ class EqualizerApo:
         file = path.parent / value.strip()
         channels, rate = fixtures.read_float_wav(file, with_rate=True)
         if abs(rate - self.rate) > 1:
+            # Equalizer APO logs this and leaves the channels unfiltered; the
+            # export's If lines must make it impossible, so the model fails.
             raise ModelError(f'{file.name} is {rate} Hz on a {self.rate} Hz device')
         taps = [[(k, v) for k, v in enumerate(c) if v] for c in channels]
         self.filters.append(('convolution', [(name, taps[i % len(taps)])
@@ -347,6 +356,53 @@ def test_list(work):
     silent('list: 96 kHz', out, 96000, 2)
 
 
+def test_choice_and_include(work):
+    """A larger device gets the largest entry that fits; Include keeps the rest of config.txt."""
+    folder = work / 'choice'
+    folder.mkdir()
+    entries = [EXAMPLES / 'stereo/filter.cfg', EXAMPLES / 'crossover/filter.cfg']
+    write_cfg(folder / 'list.txt',
+              ''.join(os.path.relpath(e, folder).replace(os.sep, '/') + '\n' for e in entries))
+    config = work / 'config'
+    config.mkdir()
+    run(folder / 'list.txt', config / 'room')
+    stereo, crossover = (fixtures.read_float_wav(EXAMPLES / n / 'expected.wav')
+                         for n in ('stereo', 'crossover'))
+    inputs = fixtures.read_float_wav(EXAMPLES / 'stereo/input.wav')
+    crossover_inputs = fixtures.read_float_wav(EXAMPLES / 'crossover/input.wav')
+    check('choice: 4 channels get the stereo entry', config / 'room', fixtures.RATE, 4, inputs,
+          stereo, 2)
+    check('choice: 8 channels get the crossover', config / 'room', fixtures.RATE, 8,
+          crossover_inputs, crossover, 6)
+
+    # As installed: the export included from config.txt between other commands.
+    write_cfg(config / 'config.txt', 'Channel: 1\nInclude: room\\convolver.txt\nPreamp: -6 dB\n')
+    model = EqualizerApo(config / 'config.txt', fixtures.RATE, 2)
+    actual = model.process([list(c) for c in inputs])
+    gain = 10 ** (-6 / 20)
+    wanted = [[gain * v for v in stereo[0]], list(stereo[1])]
+    frames = min(len(actual[0]), len(wanted[0]))
+    error = fixtures.worst_error([c[:frames] for c in actual], [c[:frames] for c in wanted])
+    assert error <= TOLERANCE, f'include: worst error {error:.3g}'
+    print(f'include: worst error {error:.3g}')
+
+
+def test_names(work):
+    """File names cannot add commands; folder names must fit Equalizer APO's paths."""
+    if os.name != 'nt':  # Windows file names cannot hold a line break.
+        folder = work / 'names'
+        folder.mkdir()
+        source = folder / 'x\nPreamp: 20 dB\n.cfg'
+        source.write_bytes((EXAMPLES / 'stereo/filter.cfg').read_bytes())
+        (folder / 'room.wav').write_bytes((EXAMPLES / 'stereo/room.wav').read_bytes())
+        run(source, work / 'names-export')
+        text = (work / 'names-export/convolver.txt').read_text(encoding='utf-8')
+        assert not any(line.startswith('Preamp: 20') for line in text.split('\n')), text
+    result = run(EXAMPLES / 'stereo/filter.cfg', work / ('n' * 230), ok=False)
+    assert 'too long' in result.stderr, result.stderr
+    assert not (work / ('n' * 230)).exists()
+
+
 def test_refusals(work):
     """Existing folders are kept; broken inputs leave nothing behind."""
     source = EXAMPLES / 'stereo/filter.cfg'
@@ -373,6 +429,8 @@ def main():
         work = Path(temporary)
         test_first_use(work)
         test_list(work)
+        test_choice_and_include(work)
+        test_names(work)
         test_refusals(work)
     print('Equalizer APO export: all checks passed')
 

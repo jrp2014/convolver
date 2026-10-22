@@ -50,9 +50,17 @@ std::string device_channel(std::size_t index) {
 std::string path_channel(std::size_t index) {
     return "CONVOLVER" + std::to_string(index + 1);
 }
+// Comments end at a line break, so names must not contain one: a file name
+// with a newline would otherwise add commands.
+std::string printable(std::string text) {
+    std::replace_if(
+        text.begin(), text.end(),
+        [](char ch) { return static_cast<unsigned char>(ch) < 0x20 || ch == '\x7f'; }, '?');
+    return text;
+}
 std::string describe(const Source& s) {
     const auto& c = s.configuration;
-    return s.label + ", " + std::to_string(c.sample_rate) + " Hz, " +
+    return printable(s.label) + ", " + std::to_string(c.sample_rate) + " Hz, " +
            std::to_string(c.input_channels) + (c.input_channels == 1 ? " input, " : " inputs, ") +
            std::to_string(c.output_channels) + (c.output_channels == 1 ? " output" : " outputs");
 }
@@ -173,18 +181,30 @@ Export make_export(const std::vector<Source>& sources, const std::vector<std::st
                 describe(sources[earlier->source]) + ". To use this one, export it on its own.");
             continue;
         }
-        result.filters.push_back({i, channels});
+        result.filters.push_back({i, channels, channels});
+    }
+    // On a device with more channels, the largest filter at its rate that fits
+    // wins, so each filter covers the device sizes up to the next larger one.
+    for (auto& f : result.filters) {
+        if (f.device_channels >= max_device_channels)
+            continue;
+        f.largest_device = max_device_channels;
+        for (const auto& g : result.filters)
+            if (sources[g.source].configuration.sample_rate ==
+                    sources[f.source].configuration.sample_rate &&
+                g.device_channels > f.device_channels)
+                f.largest_device = std::min(f.largest_device, g.device_channels - 1);
     }
 
     auto& out = result.text;
     for (const auto& line : header)
-        out += (line.empty() ? "#" : "# " + line) + '\n';
+        out += (line.empty() ? "#" : "# " + printable(line)) + '\n';
     out += "#\n"
-           "# Applies the first filter below whose sample rate is the device's and\n"
-           "# whose channels the device has: an exact channel count first, then a\n"
-           "# device with more channels, up to " +
+           "# Applies the filter below with the device's sample rate and exactly\n"
+           "# its channel count; otherwise the one with the most channels that the\n"
+           "# device has (for a device with up to " +
            std::to_string(max_device_channels) +
-           ", whose extra channels are silenced.\n"
+           " channels), silencing the extra ones.\n"
            "# Without a match every channel is silenced rather than played\n"
            "# unfiltered. Channel 1 here is Convolver's channel 0, in Windows\n"
            "# speaker order.\n\n";
@@ -196,7 +216,7 @@ Export make_export(const std::vector<Source>& sources, const std::vector<std::st
                      : "# A device with more channels than the filter's\n";
         for (std::size_t n = 0; n < result.filters.size(); ++n) {
             const auto& f = result.filters[n];
-            if (!exact && f.device_channels >= max_device_channels)
+            if (!exact && f.largest_device == f.device_channels)
                 continue;
             std::string indent = "  ";
             out +=
@@ -205,8 +225,8 @@ Export make_export(const std::vector<Source>& sources, const std::vector<std::st
             out += "  If: outputChannelCount " + std::string(exact ? "==" : ">") + ' ' +
                    std::to_string(f.device_channels) + '\n';
             if (!exact) {
-                out += "    If: outputChannelCount < " + std::to_string(max_device_channels + 1) +
-                       '\n';
+                out +=
+                    "    If: outputChannelCount < " + std::to_string(f.largest_device + 1) + '\n';
                 indent += "  ";
             }
             out += indent + "  If: convolverFilter == 0\n";

@@ -22,6 +22,9 @@ struct ImpulseFile {
 struct Filter {
     std::size_t source = 0; // Index into the sources.
     std::size_t device_channels = 0;
+    // The largest device it applies to, at its rate: devices with more
+    // channels than it has go to the largest filter that fits.
+    std::size_t largest_device = 0;
 };
 struct Export {
     std::string text; // UTF-8 configuration file for Equalizer APO's Include command.
