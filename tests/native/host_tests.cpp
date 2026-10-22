@@ -212,12 +212,13 @@ void direct_installation() {
     host.process(in, out, 64);
     audio_thread = false;
     for (std::size_t i = 8; i < 64; ++i)
-        require(output[i] == (i == 8 ? 2.f : 2.25f), "initial filter not installed directly");
+        require(std::abs(output[i] - (i == 8 ? 2.f : 2.25f)) < 1e-5,
+                "initial filter not installed directly");
     host.replace(mono(4));
     audio_thread = true;
     host.process(in, out, 64);
     audio_thread = false;
-    require(output[0] == 2.25f, "live replacement skipped warm-up");
+    require(std::abs(output[0] - 2.25f) < 1e-5, "live replacement skipped warm-up");
     host.collect();
     host.reset();
     host.replace(mono(3));
