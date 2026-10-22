@@ -306,7 +306,9 @@ def read_wav(path):
         channels = file.getnchannels()
         frames = file.readframes(file.getnframes())
     samples = struct.unpack(f'<{len(frames) // 2}h', frames)
-    return [[v / 32768.0 for v in samples[c::channels]] for c in range(channels)]
+    # libsndfile, which Benchmark.exe writes with, scales floats by 32767 for
+    # 16-bit PCM, so undo exactly that.
+    return [[v / 32767.0 for v in samples[c::channels]] for c in range(channels)]
 
 
 RUNTIME = None  # Set in main() when --benchmark is given.
