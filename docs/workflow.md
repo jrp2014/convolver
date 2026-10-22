@@ -102,8 +102,8 @@ checklist says so:
   `tests/native/engine_tests.cpp` pass; report the worst error.
 - **Plug-in changes:** the format's validator and the PLUG-2 comparisons pass,
   and pluginval where it applies ([VST3 guide](vst3.md)).
-- **Checks:** formatting (`scripts/check_format.sh`), clang-tidy and
-  `pre-commit run --all-files`, as in [CONTRIBUTING](../CONTRIBUTING.md).
+- **Checks:** `pre-commit run --all-files` (formatting included) and
+  clang-tidy, as in [CONTRIBUTING](../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
   the [index](README.md); user-visible changes are in the
@@ -178,6 +178,8 @@ reject a TODO ID that is used but never defined.
   every adapter under `plugins/` has tests under `tests/` and a user guide.
 
 `scripts/check_format.sh` finds the C++ sources to format, so a new adapter
-folder is covered without editing a file list. Extend these checks, with a
+folder is covered without editing a file list. pre-commit runs it with a pinned
+clang-format 18 and lint CI fails on any formatting difference, so run
+`pre-commit run --all-files` before every push, not only before review. Extend these checks, with a
 regression test in `tests/repository_checks_tests.py`, when a new rule should
 hold everywhere.

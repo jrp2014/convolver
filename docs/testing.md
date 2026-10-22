@@ -217,8 +217,8 @@ open validation gaps and intentional constraints.
 
 ## Documentation checks
 
-Run the pinned [pre-commit checks](../CONTRIBUTING.md#shell-markdown-and-yaml-checks)
-for ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
+Run the pinned [pre-commit checks](../CONTRIBUTING.md#lint-checks)
+for C++ formatting, ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
 The `documentation` CTest entry checks the archived website's hashes and links;
 it is not a check of all maintained Markdown. Run changed CLI/build examples
 against the current program as well as checking links.

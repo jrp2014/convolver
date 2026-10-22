@@ -22,17 +22,26 @@ routing and file-protection behavior unless the change explicitly revises them.
 
 ## Formatting and analysis
 
-The portable code uses `.clang-format`; CI checks LLVM clang-format **18**.
-`scripts/check_format.sh` finds the modern C++ sources by location (`include/`,
-`portable/`, `plugins/`, `tests/`), so new adapters and test folders are covered
-automatically. It skips vendored code and the regression harnesses:
+The portable code uses `.clang-format` with LLVM clang-format **18**. Formatting
+is part of the [lint checks](#lint-checks): `pre-commit run` reformats C++ files
+in place with a pinned clang-format 18, and the lint CI job fails if that
+changes anything. `scripts/check_format.sh` finds the modern C++ sources by
+location (`include/`, `portable/`, `plugins/`, `tests/`), so new adapters and
+test folders are covered automatically. It skips vendored code and the
+regression harnesses:
 
 ```sh
-scripts/check_format.sh          # check, as CI does
-scripts/check_format.sh --fix    # reformat in place
+pre-commit run clang-format --all-files   # reformat, with the pinned version
+scripts/check_format.sh                   # check only
+scripts/check_format.sh --fix             # reformat in place
 ```
 
-Set `CLANG_FORMAT` to use another binary of the same major version.
+Run one of these before every push, including early draft commits. The script
+uses `CLANG_FORMAT`, then `clang-format-18`, then `clang-format`, and stops with
+installation advice if that is not version 18 (other major versions lay out the
+same code differently). macOS has no `clang-format-18` by default; use the
+pre-commit command, or `python3 -m pip install clang-format==18.1.8` in the lint
+environment below.
 Historical directories are also excluded by `.clang-format-ignore`. Formatting
 changes should be distinguishable from behavior changes in review.
 
@@ -50,7 +59,7 @@ Apple SDKs. CI uses the Linux clang-tidy 18 toolchain. Fix real diagnostics rath
 than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
 
-## Shell, Markdown and YAML checks
+## Lint checks
 
 Use Python 3.12 and Node.js 24 for the same environment as the lint CI job.
 Install the pinned runner in an isolated environment:
@@ -64,12 +73,17 @@ pre-commit run --all-files --show-diff-on-failure
 
 On Windows, create the environment with `py -3.12 -m venv .venv-lint` and
 activate it in PowerShell with `.venv-lint\Scripts\Activate.ps1`, then run the
-same pip and pre-commit commands. Optionally run `pre-commit install` to check
-staged files automatically before each commit. The first run downloads the
-pinned tools; subsequent runs reuse their isolated environments.
+same pip and pre-commit commands. Run `pre-commit install` once so the checks,
+formatting included, run on staged files before each commit. The first run
+downloads the pinned tools; subsequent runs reuse their isolated environments.
 
-The configuration runs ShellCheck, markdownlint-cli2, strict yamllint, and
-actionlint with ShellCheck for Bash embedded in GitHub Actions workflows.
+The configuration runs clang-format 18 on the portable C++ sources (see
+[formatting](#formatting-and-analysis)), ShellCheck, markdownlint-cli2, strict
+yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
+workflows. Hooks that fix files, such as clang-format, report "files were
+modified by this hook"; review and stage the changes, then run again. Claude
+Code cloud sessions install the Git hook automatically
+(`.claude/hooks/session-start.sh`), so their commits run these checks.
 Historical source, recovered documentation and archived review evidence are
 excluded. Markdown allows soft-wrapped prose and repeated subheadings under
 different parent sections; other diagnostics should be fixed at their source.

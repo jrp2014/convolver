@@ -30,7 +30,7 @@ Open as a draft when you start; that is the claim. See docs/workflow.md.
 - [ ] Full CTest configuration (state the configuration):
 - [ ] DSP change: oracle tests pass; worst error:
 - [ ] Plug-in change: validator, PLUG-2 comparisons, pluginval where it applies
-- [ ] `scripts/check_format.sh`, clang-tidy, `pre-commit run --all-files`
+- [ ] `pre-commit run --all-files` (includes clang-format) and clang-tidy
 
 ## Documentation and tracking
 

@@ -20,6 +20,14 @@ repos:
         args: [--strict]
   - repo: local
     hooks:
+      - id: clang-format
+        name: C++ formatting (clang-format 18, reformats in place)
+        entry: scripts/check_format.sh --fix
+        language: python
+        additional_dependencies:
+          - clang-format==18.1.8
+        pass_filenames: false
+        files: \.(h|hpp|cpp|mm)$
       - id: documentation-links
         name: Maintained documentation links and anchors
         entry: python scripts/check_doc_links.py
