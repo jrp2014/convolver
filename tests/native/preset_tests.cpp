@@ -175,9 +175,18 @@ int main() {
             require(rejects([&] { presets::check_writable(format, routed(9, 9), "x"); }, "9x9")
                             .find("1 to 8") != std::string::npos,
                     "channel limit explained");
-            for (std::string_view name : {std::string_view(""), std::string_view("a\tb"),
-                                          std::string_view("\xff"), std::string_view("\xc0\xaf")})
-                rejects([&] { presets::check_writable(format, stereo, name); }, "bad name");
+            // Empty, a tab, invalid UTF-8, an overlong '/', U+FFFE, U+FDD0 and
+            // U+10FFFF: none can be stored in XML and Turtle. A .vstpreset stores
+            // no name, so any file name will do for one.
+            for (std::string_view name :
+                 {std::string_view(""), std::string_view("a\tb"), std::string_view("\xff"),
+                  std::string_view("\xc0\xaf"), std::string_view("a\xef\xbf\xbe"),
+                  std::string_view("\xef\xb7\x90"), std::string_view("\xf4\x8f\xbf\xbf")}) {
+                if (format == Format::vst3)
+                    presets::check_writable(format, stereo, name);
+                else
+                    rejects([&] { presets::check_writable(format, stereo, name); }, "bad name");
+            }
             presets::check_writable(format, stereo, "Raum \xc3\xbc \xf0\x9f\x8e\xa7");
         }
         std::cout << "Preset containers: VST3, AU and LV2 from one host state\n";

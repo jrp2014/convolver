@@ -49,7 +49,7 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   Without them the first entry is used. Choose the entry that matches your
   host's sample rate and channel counts.
 - **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
-  the first output's file name is used (`room.preset.lv2` gives `room`). A
+  the file name of the first AU or LV2 output is used (`room.preset.lv2` gives `room`). A
   `.vstpreset` stores no name; hosts show its file name.
 - **New files only:** every output must be a new path. If any output cannot be
   written (it exists, its format is unknown, or the filter does not fit that
@@ -134,7 +134,8 @@ preset loads on any host arrangement with 2 inputs and 6 outputs. See
 | `… presets support 1 to 8 input and output channels` | The plug-ins have at most 8 channels on each side; use the CLI for wider filters |
 | `this VST3 preset belongs to another plug-in` | Only Convolver's own presets can be converted |
 | `a .vstpreset already holds one filter` | Leave out `--sample-rate`, `--input-channels` and `--output-channels` |
-| `the preset name contains control characters` | Use a plain name without tabs or line breaks |
+| `the preset name … contains control characters`, `… is not valid Unicode text` | AU and LV2 presets store a name, by default the first AU or LV2 file name. Give a plain one with `--name` |
+| `NAME: cannot create output file …` | The folder for that output must exist and be writable. Nothing from the run is kept, so fix it and run the same command again |
 
 Problems with the filter itself (a missing IR, a list with no matching entry)
 give the same explanations as the CLI; see

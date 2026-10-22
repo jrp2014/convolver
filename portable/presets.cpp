@@ -72,6 +72,10 @@ bool valid_utf8(std::string_view text) {
         }
         if (code < minimum || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF))
             return false;
+        // Noncharacters (U+FDD0-U+FDEF, and U+FFFE/U+FFFF in every plane) are
+        // not allowed in XML, so a property list holding one would not load.
+        if ((code >= 0xFDD0 && code <= 0xFDEF) || (code & 0xFFFE) == 0xFFFE)
+            return false;
         i += extra + 1;
     }
     return true;
@@ -192,8 +196,16 @@ HostState read_vst3_preset(std::span<const std::byte> bytes) {
     if (bytes.size() < vst3_header_bytes || !equal_text(bytes, "VST3"))
         throw std::invalid_argument("not a VST3 preset file (no 'VST3' header)");
     std::string class_id;
-    for (auto b : bytes.subspan(8, 32))
-        class_id.push_back(upper(static_cast<char>(b)));
+    for (auto b : bytes.subspan(8, 32)) {
+        const auto c = upper(static_cast<char>(b));
+        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F')) {
+            class_id.push_back(c);
+        } else { // Not a class ID: show the byte, never copy it into a message.
+            constexpr std::string_view hex = "0123456789ABCDEF";
+            const auto v = std::to_integer<unsigned>(b);
+            class_id += std::string("\\x") + hex[v >> 4] + hex[v & 15];
+        }
+    }
     if (class_id != vst3_class_id())
         throw std::invalid_argument("this VST3 preset belongs to another plug-in (class ID " +
                                     class_id + "), not Convolver (" + vst3_class_id() + ")");
@@ -342,14 +354,21 @@ Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
 
 void check_writable(Format format, const HostState& state, std::string_view name) {
     const auto label = std::string(format_name(format));
-    if (name.empty())
-        throw std::invalid_argument("the preset name is empty; give one with --name");
-    if (!valid_utf8(name))
-        throw std::invalid_argument("the preset name is not valid UTF-8 text");
-    if (std::any_of(name.begin(), name.end(),
-                    [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7F; }))
-        throw std::invalid_argument("the preset name contains control characters such as tabs "
-                                    "or line breaks; use plain text");
+    // A .vstpreset stores no name (hosts show its file name), so only AU and
+    // LV2 presets need one that XML and Turtle can hold.
+    if (format != Format::vst3) {
+        if (name.empty())
+            throw std::invalid_argument("the preset name is empty; give one with --name");
+        if (!valid_utf8(name))
+            throw std::invalid_argument(
+                "the preset name (by default the file name) is not valid Unicode text, or "
+                "holds characters that AU and LV2 presets cannot store; give one with --name");
+        if (std::any_of(name.begin(), name.end(),
+                        [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7F; }))
+            throw std::invalid_argument(
+                "the preset name (by default the file name) contains control characters such "
+                "as tabs or line breaks; give a plain one with --name");
+    }
     if (!state.configuration) {
         if (format == Format::lv2)
             throw std::invalid_argument(

@@ -237,7 +237,25 @@ def main():
         result = run(root / 'foreign.vstpreset', root / 'd.aupreset', ok=False)
         assert 'another plug-in' in result.stderr, result.stderr
         (root / 'foreign.vstpreset').unlink()
+        result = run('--name', 'a\ufffeb', CROSSOVER / 'filter.cfg', root / 'e.aupreset', ok=False)
+        assert '--name' in result.stderr, result.stderr
+        # A failure part-way (a missing folder) removes what the run wrote,
+        # names the output, and reports nothing as created.
+        result = run(CROSSOVER / 'filter.cfg', root / 'f.vstpreset', root / 'nodir' / 'f.aupreset',
+                     ok=False)
+        assert 'Created' not in result.stdout, result.stdout
+        assert 'f.aupreset' in result.stderr and 'No presets were kept' in result.stderr, result.stderr
         assert sorted(p.name for p in root.iterdir()) == before, 'refusals wrote nothing'
+        # A .vstpreset stores no name, so its file name may be anything the
+        # file system allows; an AU or LV2 name comes from the first of those.
+        if sys.platform.startswith('linux'):
+            target = bytes(root) + b'/R\xe4um\tx.vstpreset'
+            done = subprocess.run([TOOL, str(CROSSOVER / 'filter.cfg').encode(), target,
+                                   bytes(root / 'Named.aupreset')], capture_output=True)
+            assert done.returncode == 0, done.stderr
+            read_aupreset(root / 'Named.aupreset', 'Named')
+            Path(target.decode('utf-8', 'surrogateescape')).unlink()
+            (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
         print('Refusals: LV2 layouts, existing paths, unknown formats, names, other plug-ins')
 
