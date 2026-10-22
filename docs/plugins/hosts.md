@@ -3,8 +3,56 @@
 
 No named DAW is currently qualified for portable Convolver. Automated SDK
 validation, standalone adapter tests and manual DAW tests are different evidence.
-REAPER on Windows/macOS/Linux is the proposed first smoke host. Ableton Live and
+REAPER and Carla are the suggested first hosts (see below). Ableton Live and
 Cubase need available licences/testers; no compatibility claim is inferred.
+
+## Suggested first hosts
+
+jrp will try these two first. Both are free to try and run on Windows, macOS
+and Linux, so one person can cover all three platforms without buying a
+licence.
+
+- **[REAPER](https://www.reaper.fm/download.php)** (Cockos): a full DAW with a
+  free, fully functional evaluation period. It loads VST3 (and later LV2 and
+  AU), saves projects with plug-in state, renders offline, and its
+  performance meter shows per-plug-in CPU time. It is the closest of the free
+  options to how most users will run Convolver.
+- **[Carla](https://kx.studio/Applications:Carla)** (falkTX, free and open
+  source): a plug-in host and rack rather than a DAW. Version 2.5 or later loads
+  VST3, LV2 and AU, so the same session can compare the formats as they arrive.
+  It runs on JACK or the platform's own audio system and saves its rack,
+  including plug-in state, as a project file.
+
+Use the [smoke test](#smoke-test-for-an-unsigned-preview) below in each, and
+record results under the TODO item HOST-1. Passing the smoke test counts for
+unsigned previews only; a production release needs the full procedure.
+
+## Steinberg's SDK hosts
+
+These are tools for developers, not evidence that a DAW works.
+
+- The SDK **validator** loads the built plug-in in every CI run, in default and
+  extensive modes ([VST3 guide](../vst3.md#compatibility-evidence)). pluginval, an
+  independent host, also runs in CI and renders real filters.
+- **VST3PluginTestHost** (Steinberg, free, Windows and macOS) is a convenient
+  manual check without a DAW: it can load presets, change buses and run audio.
+- The SDK's two **sample hosts**, `audiohost` and `editorhost`, were evaluated
+  on 22 October 2026 and are **not** added to CI, because they would catch
+  nothing that the validator and pluginval do not already catch:
+  - `editorhost` only opens a plug-in's own editor window. Convolver has no
+    editor (VST3-3 is deferred), so it stops at once with "EditController does
+    not provide its own editor". It becomes worth a smoke test only if an editor
+    is added; pluginval's GUI tests would then cover the same ground.
+  - `audiohost` (Linux only, needs a running JACK server) loads the plug-in,
+    activates it with the default stereo buses and processes live audio. It
+    cannot load a preset or state, so Convolver runs as an empty instance, and
+    it never checks the output. It also exits with status 0 even when the
+    plug-in fails to load, so a CI step could not tell success from failure.
+
+  Both build and run headless on Linux (`audiohost` against `jackd -d dummy`,
+  `editorhost` under `xvfb-run`). To build them, configure the SDK on its own
+  with `-DSMTG_ENABLE_VST3_HOSTING_EXAMPLES=ON` (`audiohost` needs the JACK
+  development package; `editorhost` on Linux needs GTK 3 and gtkmm 3).
 
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
