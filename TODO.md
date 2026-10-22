@@ -384,8 +384,13 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   channels (`SpeakerArr`, for example 7.1.4). Use the PLUG-4 speaker table (VST3
   speaker bits equal WAV mask bits) and keep `version1_presets` passing:
   [layout rules](docs/plugin-identities.md#channel-layouts).
-  Progress (22 October 2026): in progress in the `VST3-1` draft pull request;
-  enforcing layouts (state version 3) and more than 8 channels await jrp.
+  Progress 22 October 2026: the adapter compares a filter's output mask with
+  the host's arrangement and records a notice, never a rejection
+  (`speaker_notice`; tests `speaker_arrangements`, `version1_presets`,
+  `native.host`). VST3 needs no channel mapping, since arrangements order
+  channels by bit. Still open, awaiting jrp: enforced layouts (host state
+  version 3) and layouts above 8 channels (7.1.4 is `0x2D63F`, within the
+  shared bits). The notice reaches users only with DIAG-1 or VST3-3.
 - [ ] **VST3-2 — Switch filters from the host without an editor.** Expose a set of
   filters as a program list (`IUnitInfo`, `IProgramListData`, a `kIsProgramChange`
   parameter), for example the entries of a configuration list, possibly chosen

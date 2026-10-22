@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
+#include "convolver_identities.hpp"
 #include <algorithm>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -31,7 +33,73 @@ std::string mismatch(const Configuration& c, const HostLayout& host) {
                counts(host.inputs, host.outputs) + ".";
     return {};
 }
+// WAV channel-mask bits 0 to 17, the speakers every format shares.
+constexpr std::uint32_t shared_speakers = (1U << identity::speakers.size()) - 1;
+static_assert(identity::speakers.size() == 18);
+// A mask names speakers when it gives one known speaker per channel. One
+// channel is never compared: a mono filter suits any single speaker.
+bool names_speakers(std::uint32_t mask, std::size_t channels) {
+    return channels > 1 && mask && !(mask & ~shared_speakers) &&
+           static_cast<std::size_t>(std::popcount(mask)) == channels;
+}
+// 5.1 and quadraphonic layouts are written with back (BL BR) or side (SL SR)
+// speakers for the same surround pair; a layout with only side speakers is
+// compared as if they were the back pair.
+std::uint32_t surround_as_back(std::uint32_t mask) {
+    constexpr std::uint32_t back = 0x30, side = 0x600;
+    return (mask & side) == side && !(mask & back) ? (mask & ~side) | back : mask;
+}
+std::string speaker_list(std::uint32_t mask) {
+    std::string names;
+    for (std::size_t bit = 0; bit < identity::speakers.size(); ++bit)
+        if (mask & (1U << bit)) {
+            if (!names.empty())
+                names += ' ';
+            names += identity::speakers[bit].wav;
+        }
+    return names;
+}
+// The speaker of each channel, in bus order.
+std::vector<std::size_t> speaker_bits(std::uint32_t mask) {
+    std::vector<std::size_t> bits;
+    for (std::size_t bit = 0; bit < identity::speakers.size(); ++bit)
+        if (mask & (1U << bit))
+            bits.push_back(bit);
+    return bits;
+}
+std::string hex(std::uint32_t n) {
+    static constexpr char digits[] = "0123456789ABCDEF";
+    std::string text;
+    do {
+        text.insert(text.begin(), digits[n % 16]);
+        n /= 16;
+    } while (n);
+    return "0x" + text;
+}
 } // namespace
+
+std::string speaker_notice(const Configuration& c, const HostLayout& host) {
+    const auto filter = c.channel_mask, bus = host.output_speakers;
+    if (c.output_channels != host.outputs || !names_speakers(filter, c.output_channels) ||
+        !names_speakers(bus, host.outputs) || surround_as_back(filter) == surround_as_back(bus))
+        return {};
+    std::string differences;
+    const auto ours = speaker_bits(filter), theirs = speaker_bits(bus);
+    for (std::size_t i = 0; i < ours.size(); ++i)
+        if (ours[i] != theirs[i])
+            differences += std::string(differences.empty() ? "" : ", ") + "output " +
+                           std::to_string(i + 1) + " is filtered for " +
+                           std::string(identity::speakers[ours[i]].wav) + " but plays on " +
+                           std::string(identity::speakers[theirs[i]].wav);
+    return "The filter's outputs are labelled for the speakers " + speaker_list(filter) +
+           " (channel mask " + hex(filter) + "), but the host's output bus carries " +
+           speaker_list(bus) + ". Convolver sends output channels to the bus in order, so " +
+           differences +
+           ". If the outputs feed speakers, set the host's track or bus to the filter's "
+           "speaker layout. If they are not speakers (crossover bands, for example), set "
+           "the channel mask at the end of the .cfg's first line to 0. The filter plays as "
+           "loaded either way.";
+}
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     Configuration c;
@@ -80,6 +148,8 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     filter_ = std::move(next);
     failed_ = state.failed;
     error_.clear();
+    // Without the host's configuration, activation checks the speakers.
+    notice_ = host && filter_ ? speaker_notice(*filter_, *host) : std::string();
     if (failed_)
         error_ = "A filter failed to load before this state was saved, so Convolver plays "
                  "silence. Load a filter made for the host's sample rate and channels.";
@@ -93,6 +163,7 @@ void HostFilter::reject(std::string why) {
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {
+    notice_.clear();
     if (!filter_) {
         if (!failed_)
             error_.clear();
@@ -101,6 +172,7 @@ Configuration HostFilter::activate(const HostLayout& host) {
     auto why = mismatch(*filter_, host);
     if (why.empty()) {
         error_.clear();
+        notice_ = speaker_notice(*filter_, host);
         return *filter_;
     }
     error_ = "The saved filter does not suit the host, so Convolver plays silence until it "

@@ -280,6 +280,11 @@ void version1_presets() {
             ProcessSetup setup{kRealtime, kSample32, 300, 48000};
             require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
                     "version-1 preset failed to activate on a matching count");
+            // The output mask is advice only (VST3-1): 5.1 with back or side
+            // speakers suits k51 and the side-speaker 5.1; others get a notice.
+            const bool five_one = arrangement == SpeakerArr::k51 || arrangement == arrangements[2];
+            require(p.notice().empty() == (mask == 0 || five_one),
+                    "version-1 output mask compared wrongly with the arrangement");
             p.setProcessing(true);
             std::array<std::array<float, 300>, 2> ins{};
             std::array<std::array<float, 300>, 6> outs{};
@@ -311,6 +316,48 @@ void version1_presets() {
             p.setActive(false);
             p.terminate();
         }
+}
+// VST3-1: arrangements map to WAV speaker bits directly, and a filter whose
+// output mask names other speakers than the bus plays anyway, with a notice.
+void speaker_arrangements() {
+    require(wav_speakers(SpeakerArr::kStereo) == 0x3 && wav_speakers(SpeakerArr::k51) == 0x3F &&
+                wav_speakers(SpeakerArr::k71Music) == 0x63F &&
+                wav_speakers(SpeakerArr::k71Cine) == 0xFF,
+            "arrangement not mapped to WAV speaker bits");
+    require(wav_speakers(SpeakerArr::kMono) == 0 &&
+                wav_speakers(SpeakerArr::k71CineFullRear) == 0 &&
+                wav_speakers(SpeakerArr::kStereoWide) == 0 &&
+                wav_speakers(SpeakerArr::kAmbi1stOrderACN) == 0 &&
+                wav_speakers(SpeakerArr::k71_4) == 0x2D63F,
+            "arrangement mapped wrongly to WAV speaker bits 0-17");
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "speaker initialize");
+    SpeakerArrangement cine = SpeakerArr::k71Cine, music = SpeakerArr::k71Music;
+    require(p.setBusArrangements(&cine, 1, &cine, 1) == kResultOk, "7.1 Cine buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 64, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "speaker activate");
+    convolver::HostState saved;
+    saved.configuration = convolver::Configuration{48000, 8, 8, 0x63F, {}, {}, {}};
+    for (std::size_t c = 0; c < 8; ++c)
+        saved.configuration->paths.push_back({{1}, {{c, 1}}, {{c, 1}}});
+    MemoryStream state;
+    require(write_state(&state, saved), "encode 7.1 state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "7.1 filter refused on 7.1 Cine");
+    const auto notice = p.notice();
+    require(notice.find("output 7 is filtered for SL but plays on FLC") != std::string::npos &&
+                notice.find("output 8 is filtered for SR but plays on FRC") != std::string::npos,
+            "7.1 filter on 7.1 Cine gave no notice");
+    require(p.setActive(false) == kResultOk &&
+                p.setBusArrangements(&music, 1, &music, 1) == kResultOk &&
+                p.setActive(true) == kResultOk && p.notice().empty(),
+            "7.1 Music buses kept the notice");
+    p.setActive(false);
+    p.terminate();
 }
 // JUCE-based hosts (and pluginval) call setupProcessing with placeholder values
 // before restoring a project's state at its real rate. Until the plug-in has
@@ -459,6 +506,7 @@ int run(const std::filesystem::path& preset_path) {
         edge_cases();
         multichannel();
         version1_presets();
+        speaker_arrangements();
         placeholder_setup();
         failed_first_loads();
         HostApplication context;

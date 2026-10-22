@@ -319,7 +319,8 @@ channel mask only; it records no input layout. Compatibility rules:
 Per format:
 
 - **VST3:** discrete accepts any `SpeakerArrangement` with N channels; a named
-  layout must match the arrangement (VST3-1).
+  layout must match the arrangement (VST3-1). Version-1 output masks are
+  compared and give a notice only (implemented 22 October 2026).
 - **AU:** `kAudioUnitProperty_SupportedNumChannels` gives counts only, so it
   cannot carry layout checks on its own. Named layouts need
   `kAudioUnitProperty_AudioChannelLayout` and

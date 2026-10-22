@@ -3,11 +3,13 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -335,6 +337,57 @@ void filter_contract() {
                 early.error().find("2 inputs and 6 outputs") != std::string::npos,
             "channel mismatch at activation not explained");
 }
+// VST3-1: a filter's output channel mask is compared with the host's speakers,
+// only ever as advice; channels stay routed by bus index.
+void speaker_notices() {
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    Configuration c{48000, 2, 6, 0x3F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const HostLayout back{48000, 2, 6, 0x3, 0x3F}, side{48000, 2, 6, 0x3, 0x60F},
+        music{48000, 2, 6, 0x3, 0x633}, unnamed{48000, 2, 6};
+    require(speaker_notice(c, back).empty() && speaker_notice(c, side).empty(),
+            "5.1 with back or side speakers must count as the same layout");
+    const auto notice = speaker_notice(c, music);
+    require(contains(notice, "FL FR FC LFE BL BR (channel mask 0x3F)") &&
+                contains(notice, "carries FL FR BL BR SL SR") &&
+                contains(notice, "output 3 is filtered for FC but plays on BL") &&
+                contains(notice, "output 6 is filtered for BR but plays on SR") &&
+                !contains(notice, "output 1 ") && contains(notice, "plays as loaded"),
+            "speaker mismatch not explained");
+    require(speaker_notice(c, unnamed).empty(), "host without speakers compared");
+    for (const std::uint32_t mask : {0x0U, 0x3U, 0x7FU, 0x4001FU}) {
+        auto loose = c;
+        loose.channel_mask = mask;
+        require(speaker_notice(loose, music).empty(),
+                "a mask that does not name one speaker per output was compared");
+    }
+    // Both pairs present (7.1): back and side are distinct speakers.
+    Configuration seven{48000, 8, 8, 0x63F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    require(speaker_notice(seven, {48000, 8, 8, 0, 0x63F}).empty() &&
+                contains(speaker_notice(seven, {48000, 8, 8, 0, 0xFF}),
+                         "output 7 is filtered for SL but plays on FLC"),
+            "7.1 layouts not compared exactly");
+    Configuration mono{48000, 1, 1, 0x4, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    require(speaker_notice(mono, {48000, 1, 1, 0x1, 0x1}).empty(), "mono speakers compared");
+
+    // HostFilter keeps the notice for the accepted filter and the current host.
+    HostFilter filter(8);
+    filter.load(HostState{c}, music);
+    require(filter.filter() && filter.error().empty() && contains(filter.notice(), "BL BR SL SR"),
+            "notice not recorded on load");
+    require(filter.activate(back).paths.size() == 1 && filter.notice().empty(),
+            "matching speakers left a notice");
+    filter.load(HostState{c}, std::nullopt);
+    require(filter.notice().empty(), "notice without the host's configuration");
+    require(filter.activate(music).paths.size() == 1 && !filter.notice().empty(),
+            "notice not recorded at activation");
+    require(filter.activate({44100, 2, 6, 0, 0x633}).paths[0].impulse == std::vector<float>{0} &&
+                filter.notice().empty(),
+            "notice kept while the filter does not play");
+    filter.load(HostState{}, music);
+    require(filter.notice().empty(), "empty instance kept a notice");
+}
 // Bypass with more inputs than outputs (2->1 downmix) or fewer (a 1->2 fork)
 // fades every output to silence; until then the filter plays as configured.
 void unequal_bypass() {
@@ -378,6 +431,7 @@ int main() {
         unequal_channels();
         direct_installation();
         filter_contract();
+        speaker_notices();
         unequal_bypass();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {

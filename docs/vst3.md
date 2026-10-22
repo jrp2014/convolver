@@ -133,7 +133,22 @@ as the CLI does; without them the first entry is used:
 The plug-in has one input bus and one output bus. Each may have 1 to 8 channels,
 and the counts may differ (for example stereo in, 5.1 out). Any speaker
 arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
-configuration's routes refer to. A preset must match the bus channel counts and
+configuration's routes refer to. VST3 orders a bus's channels by speaker, so
+the order follows from the arrangement: 5.1 (`k51`) is L R C LFE Ls Rs, the same
+order as the WAV mask `0x3F`.
+
+**Speaker check (VST3-1).** If the `.cfg` names its output speakers (the channel
+mask at the end of its first line, which presets keep) and the host's output
+arrangement names different ones, the plug-in still plays the filter, routed by
+channel number, and records a notice that says which outputs land on which
+speakers: for example a 7.1 filter (`0x63F`, side speakers on outputs 7 and 8)
+on a 7.1 Cine bus, whose channels 7 and 8 are the left and right of centre
+speakers. VST3 has no standard way to show that notice without an editor yet
+(DIAG-1, VST3-3). A mask of 0, a mask that does not name one speaker per output,
+one-channel buses and arrangements with speakers outside the shared table
+(`kMono`, ambisonics, Lw/Rw) are not compared; 5.1 and quadraphonic layouts
+with side speakers count as the same as those with back speakers. The check
+never rejects a preset ([layout rules](plugin-identities.md#channel-layouts)). A preset must match the bus channel counts and
 the sample rate; there is no implicit IR resampling or pitch/timing change. Bypass
 passes input *c* to output *c* only when the counts are equal; with unequal
 counts it plays silence on every output
