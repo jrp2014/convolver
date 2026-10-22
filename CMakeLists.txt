@@ -323,7 +323,12 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/equalizer_apo_tests.py"
             "$<TARGET_FILE:convolver_equalizer_apo>")
         set_tests_properties(export.equalizer_apo PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 300)
-        if(CONVOLVER_EQUALIZER_APO_BENCHMARK)
+        if(CONVOLVER_EQUALIZER_APO_BENCHMARK OR CONVOLVER_EQUALIZER_APO_CONFIG)
+            if(NOT WIN32 OR NOT CONVOLVER_EQUALIZER_APO_BENCHMARK OR NOT CONVOLVER_EQUALIZER_APO_CONFIG)
+                message(FATAL_ERROR "export.equalizer_apo.runtime runs on Windows and needs both "
+                    "CONVOLVER_EQUALIZER_APO_BENCHMARK (Benchmark.exe) and CONVOLVER_EQUALIZER_APO_CONFIG "
+                    "(the folder Equalizer APO's ConfigPath registry value names).")
+            endif()
             add_test(NAME export.equalizer_apo.runtime COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
                 "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/equalizer_apo_tests.py"
                 "$<TARGET_FILE:convolver_equalizer_apo>"
