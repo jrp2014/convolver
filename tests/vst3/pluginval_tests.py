@@ -23,8 +23,11 @@ import subprocess
 import sys
 import tempfile
 
-LATENCY = 256  # Reported by the adapter for every filter; see docs/vst3.md.
-TOLERANCE = 1e-5  # Single-precision FFT convolution; observed error is ~1e-7.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'plugins'))
+# The shared PLUG-2 helpers: WAV files, deterministic noise and the direct oracle.
+from fixtures import (LATENCY, TOLERANCE, direct_convolution, noise,  # noqa: E402
+                      read_float_wav, sparse_ir, write_float_wav)
 
 
 def run_pluginval(pluginval, arguments, **kwargs):
@@ -37,52 +40,6 @@ def run_pluginval(pluginval, arguments, **kwargs):
         command = [xvfb, '--auto-servernum', *command]
     print('+', ' '.join(command), flush=True)
     return subprocess.run(command, **kwargs)
-
-
-def write_float_wav(path, rate, channels):
-    frames = len(channels[0])
-    data = b''.join(struct.pack(f'<{len(channels)}f', *(c[i] for c in channels))
-                    for i in range(frames))
-    fmt = struct.pack('<HHIIHH', 3, len(channels), rate, rate * 4 * len(channels),
-                      4 * len(channels), 32)
-    body = b'WAVE' + b'fmt ' + struct.pack('<I', len(fmt)) + fmt
-    body += b'data' + struct.pack('<I', len(data)) + data
-    path.write_bytes(b'RIFF' + struct.pack('<I', len(body)) + body)
-
-
-def read_float_wav(path):
-    data = path.read_bytes()
-    assert data[:4] == b'RIFF' and data[8:12] == b'WAVE', path
-    chunks = {}
-    offset = 12
-    while offset + 8 <= len(data):
-        identifier = data[offset:offset + 4]
-        size = struct.unpack('<I', data[offset + 4:offset + 8])[0]
-        chunks[identifier] = data[offset + 8:offset + 8 + size]
-        offset += 8 + size + (size & 1)
-    tag, channels, _, _, _, bits = struct.unpack('<HHIIHH', chunks[b'fmt '][:16])
-    if tag == 0xFFFE:
-        tag = struct.unpack('<H', chunks[b'fmt '][24:26])[0]
-    assert tag == 3 and bits == 32, f'{path}: expected 32-bit float, got tag {tag}, {bits} bits'
-    samples = struct.unpack(f'<{len(chunks[b"data"]) // 4}f', chunks[b'data'])
-    return [list(samples[c::channels]) for c in range(channels)]
-
-
-def noise(frames, seed):
-    """Deterministic white noise in [-0.5, 0.5) without depending on random's algorithm."""
-    state = seed
-    values = []
-    for _ in range(frames):
-        state = (state * 6364136223846793005 + 1442695040888963407) % 2**64
-        values.append((state >> 40) / 2**24 - 0.5)
-    return values
-
-
-def sparse_ir(length, taps):
-    ir = [0.0] * length
-    for position, gain in taps:
-        ir[position] = gain
-    return ir
 
 
 def component_state(preset):
@@ -113,18 +70,6 @@ def juce_state(component):
     text = (f'<?xml version="1.0" encoding="UTF-8"?> <VST3PluginState><IComponent>{encoded}'
             '</IComponent></VST3PluginState>').encode() + b'\0'
     return struct.pack('<II', 0x21324356, len(text) - 1) + text
-
-
-def direct_convolution(inputs, routes, frames):
-    """Double-precision reference; routes are (input, output, sparse taps)."""
-    outputs = [[0.0] * frames for _ in range(max(r[1] for r in routes) + 1)]
-    for source, target, taps in routes:
-        signal = inputs[source]
-        out = outputs[target]
-        for position, gain in taps:
-            for n in range(max(0, LATENCY + position), min(frames, LATENCY + position + len(signal))):
-                out[n] += gain * signal[n - LATENCY - position]
-    return outputs
 
 
 CASES = [

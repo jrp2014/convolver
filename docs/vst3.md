@@ -178,6 +178,15 @@ reset, concurrent replacement, C++ allocation/deallocation guards, corrupted
 state, and presets after source-file deletion. The SDK validator loads the actual
 bundle; separate tests call the real processor/controller SDK interfaces.
 
+`vst3.harness` drives the processor through the shared
+[PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2): the first-use
+fixtures (mono, stereo and 2→6) against a direct double-precision convolution
+and, sample for sample, against the CLI's renders, at several block sizes with
+separate and in-place buffers, plus replacement, bypass, reset and failure
+cases. It lists where the adapter does not yet follow the
+[shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+as known deviations, fixed under VST3-7 in [TODO](../TODO.md#plug-ins-vst3-lv2-and-au).
+
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
 and adds automation patterns. The validator, the adapter tests and the plug-in

@@ -80,3 +80,8 @@ __pycache__/
 *.user
 .vs/
 __pycache__/
+
+# Output of the documented first-use commands, run from the repository root.
+/mono.wav
+/stereo.wav
+/crossover.wav

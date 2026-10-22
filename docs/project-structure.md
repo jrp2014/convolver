@@ -26,6 +26,7 @@ For the audio vocabulary, start with [concepts](concepts.md).
 | VST3 adapter and preset writer | [`processor.cpp`](../plugins/vst3/processor.cpp), [`processor.hpp`](../plugins/vst3/processor.hpp), [`preset.cpp`](../plugins/vst3/preset.cpp) | SDK boundary; stream processing goes through `HostProcessor` |
 | Build, exports and feature switches | [`CMakeLists.txt`](../CMakeLists.txt), [`CMakePresets.json`](../CMakePresets.json), [`cmake/`](../cmake/) | Static core/host/io components; see [package guide](cmake-package.md) |
 | Version generation | [`VERSION`](../VERSION), [`version_source.py`](../scripts/version_source.py), [`ConvolverBuildVersion.cmake`](../cmake/ConvolverBuildVersion.cmake) | One numeric version source; Git identity added to build strings |
+| Shared fixtures and plug-in comparisons | [`examples/first-use/`](../examples/first-use/README.md), [`fixtures.py`](../tests/plugins/fixtures.py); [`harness.hpp`](../tests/plugins/harness.hpp), [`oracle.hpp`](../tests/native/oracle.hpp) | Test-only; each adapter's test implements `Adapter` over its own host API ([PLUG-2](testing.md#plug-in-comparisons-plug-2)) |
 | Plug-in distribution | [`release-policy.json`](../packaging/release-policy.json), [`scripts/release/`](../scripts/release/), [`ConvolverPluginPackaging.cmake`](../cmake/ConvolverPluginPackaging.cmake), [release workflow](../.github/workflows/release.yml) | Optional (`CONVOLVER_PACKAGE_PLUGINS`); pinned dependencies, staging, installers and gates; tests in `tests/release/` |
 
 ## Processing data flow
@@ -86,7 +87,9 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
-| Host lifecycle or state | Host/state implementation and VST3 adapter | `native.host`, `native.state`, host-state fuzz replay and all VST3 tests |
+| Host lifecycle or state | Host/state implementation and VST3 adapter | `native.host`, `native.state`, host-state fuzz replay and all VST3 tests, including `vst3.harness` |
+| A plug-in adapter | Its format folder, the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract) | Its `Adapter` driver for the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), its validator, pluginval where it applies |
+| First-use examples or their generator | `examples/first-use/`, `tests/plugins/fixtures.py`, marked commands in the READMEs | `examples.fixtures`, `examples.first_use`, then every adapter's harness test |
 | Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer` |
 | Versioning | `SOURCE_PATHS`, build-version CMake and version workflow | `python3 tests/versioning_tests.py`; do not run the mutating helper as a dry run |
 | Documentation | [Page ownership and maintenance](documentation.md) | Markdown/link checks; run changed examples; preserve historical hashes |

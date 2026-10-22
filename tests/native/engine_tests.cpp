@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
+#include "oracle.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -50,37 +51,8 @@ template <class F> void rejects(F f) {
 Configuration mono(std::vector<float> impulse = {1}) {
     return {48000, 1, 1, 0, {0}, {0}, {{std::move(impulse), {{0, 1}}, {{0, 1}}}}};
 }
-std::size_t tail(const Configuration& c) {
-    std::size_t result = 0;
-    for (const auto& p : c.paths)
-        for (const auto& i : p.inputs)
-            for (const auto& o : p.outputs)
-                if (i.gain != 0 && o.gain != 0)
-                    result = std::max(
-                        result, p.impulse.size() - 1 +
-                                    (c.input_delays.empty() ? 0 : c.input_delays[i.channel]) +
-                                    (c.output_delays.empty() ? 0 : c.output_delays[o.channel]));
-    return result;
-}
-std::vector<double> oracle(const Configuration& c, const std::vector<float>& input, std::size_t b) {
-    const auto count = input.size() / c.input_channels;
-    std::vector<double> output((count + tail(c) + b + 2 * b) * c.output_channels);
-    // Deliberately direct double-precision route-by-route convolution, independent of FFT
-    // partitioning.
-    for (const auto& p : c.paths)
-        for (const auto& i : p.inputs)
-            for (const auto& o : p.outputs)
-                for (std::size_t t = 0; t < count; ++t)
-                    for (std::size_t k = 0; k < p.impulse.size(); ++k) {
-                        const auto when =
-                            b + t + k + (c.input_delays.empty() ? 0 : c.input_delays[i.channel]) +
-                            (c.output_delays.empty() ? 0 : c.output_delays[o.channel]);
-                        output[when * c.output_channels + o.channel] +=
-                            static_cast<double>(input[t * c.input_channels + i.channel]) * i.gain *
-                            p.impulse[k] * o.gain;
-                    }
-    return output;
-}
+using test::oracle;
+using test::tail;
 std::vector<float> run(Engine& engine, const std::vector<float>& input, std::size_t output_frames,
                        const std::vector<std::size_t>& chunks) {
     std::vector<float> out(output_frames * engine.output_channels());
