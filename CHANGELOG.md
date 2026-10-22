@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- `convolver-preset` (PLUG-3) makes self-contained presets for VST3
+  (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`
+  bundles) from one IR, `.cfg` or configuration list, several formats in one
+  run, and converts an existing `.vstpreset` to the other formats. All carry the
+  same encoded filter. It needs no plug-in SDK, so AU and LV2 builds can ship
+  it. `convolver-vst3-preset` is now the same tool under its old name, with the
+  same arguments and byte-identical output. See [plug-in presets](docs/presets.md).
 - First-use examples in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
   the expected output. CI runs the documented commands as written and checks
