@@ -129,7 +129,7 @@ if(CONVOLVER_BUILD_IO)
                 "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp" processor.cpp
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_harness PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
             target_link_libraries(convolver_vst3_harness PRIVATE Convolver::host Convolver::io sdk sdk_hosting)
             if(APPLE)
                 target_link_libraries(convolver_vst3_harness PRIVATE "-framework Cocoa")
