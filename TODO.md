@@ -301,9 +301,19 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   component is distributed under GPL-3.0-or-later because AudioUnitSDK is
   Apache-2.0, which is compatible with GPLv3 but not GPLv2; ship its notices
   (see the [plan](docs/plans/2026-10-21-plugin-formats.md#au-licence)).
+  Progress (22 October 2026, PR #44, with AU-2): `plugins/au/` builds
+  `Convolver.component` (`-DCONVOLVER_BUILD_AU=ON`); `au.harness` (PLUG-2),
+  `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
+  with `auval -strict` ([AU guide](docs/au.md)). Still to do: the
+  ThreadSanitizer run of the bypass-toggle test (moved to AU-3).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
-  from PLUG-3 load through the host's preset menu.
-- [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI.
+  from PLUG-3 load through the host's preset menu. Progress (22 October 2026,
+  PR #44): ClassInfo holds the encoded state under `convolver-state`; the
+  tests load `.aupreset` dictionaries from the PLUG-3 writer. Loading one from a
+  named host's preset menu is checked under AU-4.
+- [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
+  runs since PR #44; still to add: pluginval on the component, and a
+  ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
 - [ ] **AU-4 — User guide and host matrix.** `docs/au.md`; Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results.
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc

@@ -12,6 +12,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
+  (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
+  AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
+  host's preset menu. 1 to 8 channels per side (counts may differ), latency and
+  tail reported in seconds, bypass with the same 64-sample ramp and delayed dry
+  signal as VST3, and the shared rules for presets that do not fit. The
+  component is distributed under GPL-3.0-or-later because it includes
+  AudioUnitSDK (Apache-2.0). See the [AU guide](docs/au.md). Not yet tested in
+  named hosts.
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
   `convolver/host.hpp`: the control side of the shared plug-in adapter
   contract (which filter a load replaces, what is saved and what plays), for
