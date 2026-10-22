@@ -51,7 +51,8 @@ inline AudioStreamBasicDescription format(double rate, UInt32 channels) {
     AudioStreamBasicDescription f{};
     f.mSampleRate = rate;
     f.mFormatID = kAudioFormatLinearPCM;
-    f.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved;
+    f.mFormatFlags = static_cast<AudioFormatFlags>(kAudioFormatFlagsNativeFloatPacked) |
+                     static_cast<AudioFormatFlags>(kAudioFormatFlagIsNonInterleaved);
     f.mBytesPerPacket = f.mBytesPerFrame = sizeof(float);
     f.mFramesPerPacket = 1;
     f.mChannelsPerFrame = channels;

@@ -51,14 +51,14 @@ class Effect final : public ausdk::AUBase {
                                 const AudioStreamBasicDescription&,
                                 const AudioStreamBasicDescription&) override;
     UInt32 SupportedNumChannels(const AUChannelInfo**) override;
-    [[nodiscard]] bool CanScheduleParameters() const AUSDK_RTSAFE override {
+    [[nodiscard]] bool CanScheduleParameters() const noexcept AUSDK_RTSAFE override {
         return false;
     }
 
     // In seconds, as Audio Units report them: frames / sample rate.
     Float64 GetLatency() AUSDK_RTSAFE override;
     Float64 GetTailTime() AUSDK_RTSAFE override;
-    bool SupportsTail() AUSDK_RTSAFE override {
+    bool SupportsTail() noexcept AUSDK_RTSAFE override {
         return true;
     }
 

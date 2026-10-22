@@ -5,6 +5,7 @@
 // malformed presets, bypass as a property, the output silence flag, and no
 // allocation while rendering.
 #include "au/au_host.hpp"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -381,6 +382,17 @@ void bypass_property() {
     require(unit.saved().bypass, "bypass is not saved");
     unit.set_bypass(false);
     check(unit.initialize(), "initialization");
+    // Filtered and dry signals are crossfaded with weights that sum to one, so
+    // no output can exceed the larger of the filter's gain bound (the sum of
+    // its absolute taps, times the input's peak of 0.5) and the dry peak.
+    float bound = 0.5f;
+    for (const auto& path : stereo(48000).paths) {
+        double sum = 0;
+        for (auto tap : path.impulse)
+            sum += std::abs(tap);
+        bound = std::max(bound, static_cast<float>(0.5 * sum));
+    }
+    bound *= 1.001f;
     // Hosts switch bypass from their own threads while audio runs.
     std::atomic<bool> done{false};
     std::thread toggler([&] {
@@ -398,7 +410,7 @@ void bypass_property() {
             check(render(unit, b, 256, false, silent), "render while bypass changes");
             for (auto& channel : b.out)
                 for (auto v : channel)
-                    require(std::isfinite(v) && std::abs(v) < 4,
+                    require(std::isfinite(v) && std::abs(v) <= bound,
                             "bypass switching broke the output");
         }
     } catch (...) {
