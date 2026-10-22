@@ -109,6 +109,19 @@ downloading it, from a clone at that commit:
 (for example `--prefix=lv2-0bcde338…/`); the `sources` job of the candidate
 workflow downloads every pinned archive and fails on a mismatch.
 
+The Dependency updates workflow (`.github/workflows/updates.yml`) looks for
+newer releases every Monday. `scripts/release/check_updates.py` reads each pin
+above (and FFTW and libsndfile from the release policy), lists the upstream
+tags and reports which pins have a newer release. It also flags a policy pin
+whose tag no longer points at the pinned commit, and a VST3 workflow checkout
+that differs from the policy. On `main`, one open issue titled "Newer versions
+of pinned dependencies" carries the report; it gets a comment when the
+findings change and is closed when every pin is current. `lilv` is listed for
+information only, because its version follows the `ubuntu-24.04` image.
+The check moves nothing: each update is its own pull request. Run it locally
+with `python3 scripts/release/check_updates.py`. GitHub Actions versions are
+updated by Dependabot instead.
+
 ## Pinned preview recipe
 
 The release recipe builds static libsndfile (built-in formats only; optional

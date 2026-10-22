@@ -182,7 +182,9 @@ Shared groundwork, done once so the three streams stay independent:
   against the pinned headers, runs one through `lilv` and checks lv2lint's
   report on it; the
   [Audio Unit workflow](.github/workflows/au.yml) compiles the pinned SDK (1.4.0,
-  C++23, jrp's choice on 22 October 2026) and runs `auval`. See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+  C++23, jrp's choice on 22 October 2026) and runs `auval`. The weekly
+  [Dependency updates workflow](.github/workflows/updates.yml) reports newer
+  upstream releases of every pin (jrp's request, 22 October 2026). See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
 
 Shared adapter contract, for every format (detail in the
 [plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):

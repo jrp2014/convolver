@@ -25,6 +25,7 @@ jobs:
           python tests/release/artifact_tests.py
           python tests/release/installer_tests.py
           python tests/release/gate_tests.py
+          python tests/release/update_tests.py
       - name: Assemble corresponding source
         run: >-
           python scripts/release/build_sources.py

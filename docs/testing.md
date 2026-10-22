@@ -143,7 +143,8 @@ file alone is not evidence that a job passed. The [LV2](../.github/workflows/lv2
 and [Audio Unit](../.github/workflows/au.yml) workflows install the
 [pinned format tools](plugins/build.md#pinned-format-dependencies) and check
 them on LV2's example plug-ins and Apple's AUDelay until the adapters add
-their own bundles.
+their own bundles. The weekly [Dependency updates](../.github/workflows/updates.yml)
+workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
 
