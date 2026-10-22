@@ -13,12 +13,13 @@ BASE = 'https://github.com/jrp2014/convolver/blob/v1.2.3'
 
 class PackagedDocsTests(unittest.TestCase):
     def rewrite(self, text, page='docs/presets.md'):
-        shipped = {'docs/presets.md', 'docs/equalizer-apo.md', 'docs/plugins/index.md'}
-        return package_docs.rewrite(text, page, shipped, BASE)
+        shipped = {'docs/presets.md', 'docs/equalizer-apo.md'}
+        return package_docs.rewrite(text, page, shipped, BASE, ['docs/plugins'])
 
     def test_links(self):
         self.assertEqual(self.rewrite('[a](equalizer-apo.md#install) [b](plugins/index.md)'),
                          '[a](equalizer-apo.md#install) [b](plugins/index.md)')
+        self.assertEqual(self.rewrite('[a](plugins-old.md)'), f'[a]({BASE}/docs/plugins-old.md)')
         self.assertEqual(self.rewrite('[a](vst3.md#loading-filters) [b](../TODO.md)'),
                          f'[a]({BASE}/docs/vst3.md#loading-filters) [b]({BASE}/TODO.md)')
         self.assertEqual(self.rewrite('[a](#make-a-preset) [b](https://example.org/x.md)'),
@@ -38,6 +39,11 @@ class PackagedDocsTests(unittest.TestCase):
             self.assertIn('# Presets\n\n> The copy of `docs/presets.md` from Convolver 1.2.3.', text)
             self.assertIn('(https://github.com/jrp2014/convolver/tree/v1.2.3)', text)
             self.assertIn(f'See [VST3]({BASE}/docs/vst3.md).', text)
+            # The packaged commit, when known, is more exact than the tag.
+            package_docs.package(source, ['docs/presets.md'], [], output, '1.2.3', 'abc123')
+            text = (output / 'presets.md').read_text()
+            self.assertIn('(https://github.com/jrp2014/convolver/tree/abc123)', text)
+            self.assertIn('See [VST3](https://github.com/jrp2014/convolver/blob/abc123/docs/vst3.md).', text)
 
 
 if __name__ == '__main__':

@@ -36,7 +36,7 @@ limits, test counts or TODOs into several places. Preview packages ship
 `docs/plugins/` and copies of the [presets](presets.md) and
 [Equalizer APO](equalizer-apo.md) guides; `scripts/release/package_docs.py` turns
 the copies' links to unshipped pages into links to the source repository at the
-release tag, so write those guides as usual. `VERSION` is the numeric source
+packaged commit, so write those guides as usual. `VERSION` is the numeric source
 of truth. Version numbers in commands are examples or compatibility requirements,
 not another release metadata source.
 

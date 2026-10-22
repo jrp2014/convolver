@@ -49,6 +49,7 @@ def check(package):
                 assert (root / tokens[2] / 'convolver.txt').is_file(), f'{page}: no convolver.txt'
     print('Packaged guide links and executable examples passed')
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--package', type=Path, required=True)

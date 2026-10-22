@@ -53,9 +53,8 @@ install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistrib
 install(FILES "${PROJECT_SOURCE_DIR}/examples/plugin-presets/README.md" DESTINATION presets COMPONENT PluginDistribution)
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/plugins" DESTINATION docs COMPONENT PluginDistribution)
 # The guides that own the shipped tools, with links to unshipped pages pointing
-# at the source repository's copy at this version's tag.
+# at the source repository's copy at the packaged commit.
 set(packaged_guides docs/presets.md docs/equalizer-apo.md)
-file(GLOB plugin_guides RELATIVE "${PROJECT_SOURCE_DIR}" CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/docs/plugins/*.md")
 set(guides_dir "${CMAKE_CURRENT_BINARY_DIR}/packaged-docs")
 set(guide_sources)
 foreach(guide IN LISTS packaged_guides)
@@ -65,7 +64,8 @@ add_custom_command(OUTPUT "${guides_dir}.stamp"
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${guides_dir}"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
         --source "${PROJECT_SOURCE_DIR}" --output "${guides_dir}" --version "${PROJECT_VERSION}"
-        --stamp "${guides_dir}.stamp" --packaged ${plugin_guides} -- ${packaged_guides}
+        --revision "${source_commit}" --stamp "${guides_dir}.stamp" --packaged-dir docs/plugins
+        ${packaged_guides}
     DEPENDS ${guide_sources} "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
     VERBATIM)
 add_custom_target(convolver_packaged_guides ALL DEPENDS "${guides_dir}.stamp")
