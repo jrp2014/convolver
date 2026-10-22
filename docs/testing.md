@@ -195,7 +195,7 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
 | `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
-| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. For unequal counts this is today's VST3 behaviour, provisional until jrp decides what bypass plays there |
+| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. With unequal counts the ramp goes to silence on every output instead |
 | `reset` | Exact silence after a reset, then the filter plays as if fresh |
 | `silence-flags` | Input flagged silent does not cut the tail short; outputs flagged silent are silent |
 | `nonfinite-input` | NaN and infinite input samples count as silence; output stays finite |

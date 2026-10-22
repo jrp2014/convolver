@@ -186,7 +186,7 @@ void unequal_channels() {
     for (int k = 0; k < 4; ++k)
         host.process(in, out, 32);
     for (int i = 0; i < 32; ++i)
-        require(a[i] == 1 && b[i] == 3 && d[i] == 0, "unequal bypass mapping");
+        require(a[i] == 0 && b[i] == 0 && d[i] == 0, "unequal bypass must play silence");
     auto mismatch = c;
     mismatch.output_channels = 2;
     mismatch.paths.resize(1);
@@ -199,6 +199,40 @@ void unequal_channels() {
     }
     require(rejected, "replacement changed output channels");
 }
+// Bypass with more inputs than outputs (2->1 downmix) or fewer (a 1->2 fork)
+// fades every output to silence; until then the filter plays as configured.
+void unequal_bypass() {
+    for (const std::size_t inputs : {2U, 1U}) {
+        const std::size_t outputs = 3 - inputs;
+        Configuration c{48000, inputs, outputs, 0, {}, {}, {}};
+        if (inputs == 2)
+            c.paths.push_back({{1}, {{0, 1}, {1, 1}}, {{0, 1}}});
+        else
+            c.paths.push_back({{1}, {{0, 1}}, {{0, 1}, {1, 1}}});
+        HostProcessor host(c, 32, 8);
+        std::array<float, 32> left{}, right{}, a{}, b{};
+        left.fill(1);
+        right.fill(2);
+        const float* both[] = {left.data(), right.data()};
+        float* out[] = {a.data(), b.data()};
+        std::span<const float* const> in(both, inputs);
+        std::span<float* const> to(out, outputs);
+        audio_thread = true;
+        host.process(in, to, 32);
+        audio_thread = false;
+        for (std::size_t o = 0; o < outputs; ++o)
+            require(std::abs(out[o][31] - (inputs == 2 ? 3.f : 1.f)) < 1e-5,
+                    "unequal counts play the filter");
+        host.set_bypass(true);
+        audio_thread = true;
+        for (int k = 0; k < 4; ++k)
+            host.process(in, to, 32);
+        audio_thread = false;
+        for (std::size_t o = 0; o < outputs; ++o)
+            for (int i = 0; i < 32; ++i)
+                require(out[o][i] == 0, "unequal bypass must play silence");
+    }
+}
 int main() {
     try {
         numeric<float>();
@@ -206,6 +240,7 @@ int main() {
         lifecycle();
         queued_replacements();
         unequal_channels();
+        unequal_bypass();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

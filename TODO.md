@@ -223,7 +223,8 @@ restoration installs the filter directly, without a crossfade; an empty
 instance and a failed initial load have one stated, tested behaviour (owner's
 decision, 21 October 2026: identity for an empty instance with equal counts;
 silence, with an error shown, for unequal counts and after a failed initial
-load). VST3 must change to match (VST3-7).
+load); bypass with unequal counts fades every output to silence (owner's
+decision, 22 October 2026). VST3 must change to match (VST3-7).
 
 - [ ] **VST3-7 — Follow the shared adapter contract.** `vst3.harness` lists
   13 known deviations, which this item removes: an empty instance with unequal
