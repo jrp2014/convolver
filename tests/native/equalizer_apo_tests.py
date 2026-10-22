@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """convolver-equalizer-apo: exported filters, run through a model of Equalizer APO.
 
-Equalizer APO is a Windows audio-engine component. The model below executes the commands the export writes (Eval, If/EndIf, Channel, Copy,
-Delay, Convolution, Preamp, Include) the way Equalizer APO 1.4.2's sources do: the same line
+Equalizer APO is a Windows audio-engine component. The model below executes the
+commands the export writes (Eval, If/EndIf, Channel, Copy, Delay, Convolution,
+Preamp, Include) the way Equalizer APO 1.4.2's sources do: the same line
 splitting, the same channel-name lookup, Copy computed from the channels as they
 were before the line, created ("virtual") channels, mono IRs applied to each
 selected channel in place without latency, and the device's sample rate and
@@ -52,11 +53,13 @@ TOLERANCE = 1e-5  # Float32 IRs and inputs against the double oracle.
 # plus the above.
 RUNTIME_TOLERANCE = 0.5 / 32767 + TOLERANCE
 # Benchmark.exe processes in blocks of this many frames: the Windows audio
-# engine's 10 ms period at 48 kHz. Equalizer APO 1.4.2's x64 convolution
-# (hcProcessSingle in libHybridConv) multiplies the spectrum four bins at a
-# time plus the Nyquist bin, so with a block that is not a multiple of 4 up to
-# three bins just below half the sample rate are left out. Benchmark.exe's
-# default block is the whole file, which hit this with the crossover example.
+# engine's 10 ms period at 48 kHz. Equalizer APO 1.4.2's x86 and x64
+# convolution (hcProcessSingle in libHybridConv; not ARM64) multiplies the
+# spectrum four bins at a time plus the Nyquist bin, so with a block that is
+# not a multiple of 4 up to three bins just below half the sample rate are left
+# out. Benchmark.exe's default batch is 65536 frames and the convolution takes
+# its block size from the first call, so a shorter file is one block: the
+# crossover example's 4249 frames hit this.
 BLOCK = 480
 
 # Windows' default speaker masks for a channel count (ChannelHelper.cpp).
@@ -312,15 +315,15 @@ class Runtime:
         error = fixtures.worst_error(actual, wanted)
         if error > tolerance:
             raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n'
-                                 f'{differences(actual, wanted)}\n{log}')
+                                 f'{differences(actual, wanted, tolerance)}\n{log}')
         print(f'{label}: Equalizer APO worst error {error:.3g}')
 
 
-def differences(actual, wanted):
+def differences(actual, wanted, tolerance=RUNTIME_TOLERANCE):
     """Where each channel differs by more than the tolerance, to diagnose a failure."""
     lines = []
     for channel, (a, b) in enumerate(zip(actual, wanted), 1):
-        over = [n for n, (x, y) in enumerate(zip(a, b)) if abs(x - y) > RUNTIME_TOLERANCE]
+        over = [n for n, (x, y) in enumerate(zip(a, b)) if abs(x - y) > tolerance]
         if not over:
             lines.append(f'channel {channel}: matches')
             continue
@@ -530,7 +533,8 @@ def test_choice_and_include(work):
         finally:
             shutil.rmtree(installed, ignore_errors=True)
         error = fixtures.worst_error(actual, wanted)
-        assert error <= RUNTIME_TOLERANCE, f'include: Equalizer APO worst error {error:.3g}\n{log}'
+        assert error <= RUNTIME_TOLERANCE, (f'include: Equalizer APO worst error {error:.3g}\n'
+                                            f'{differences(actual, wanted)}\n{log}')
         print(f'include: Equalizer APO worst error {error:.3g}')
 
 

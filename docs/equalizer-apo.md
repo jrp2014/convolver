@@ -26,7 +26,8 @@
 - ASIO and WASAPI exclusive-mode playback bypass Equalizer APO, so they are not
   filtered.
 - CI runs the exports in Equalizer APO 1.4.2's own filter code; a short manual
-  check covers a real device.
+  check on a real device is still to be done
+  ([HOST-4](../TODO.md#user-experience-and-distribution)).
 
 Contents: [make the export](#make-the-export) · [install it on Windows](#install-it-on-windows) ·
 [how a filter is chosen](#how-a-filter-is-chosen) ·
@@ -159,6 +160,9 @@ Windows receives 32-bit samples.
   to trim. The CLI keeps the full tail when a file ends; a device keeps playing.
 - **Sample rate.** The device's rate must be the filter's, within 1 Hz. Export
   a list with one entry per rate to cover several.
+- **Near half the sample rate.** Equalizer APO's own convolution can leave out
+  up to three frequency bins just below half the sample rate (about 22 kHz at
+  44.1 kHz), inaudibly; see [how it is tested](#how-it-is-tested).
 
 ## Troubleshooting
 
@@ -215,11 +219,12 @@ rounding) plus 10⁻⁵, because `Benchmark.exe` writes 16-bit files; silence mu
 be exactly zero. Every case passed in Equalizer APO 1.4.2 on 22 October 2026.
 
 Running the fixtures there found one difference, in Equalizer APO rather than
-in the export: its 64-bit convolution (1.4.2) multiplies the spectrum four
-frequency bins at a time, so when the audio engine's block is not a multiple
-of four frames, up to three bins just below half the sample rate are missing
-from the output. A 10 ms block at 44.1 kHz is 441 frames, which drops the bin
-at about 22 kHz. That is above hearing, so the export does not work around it.
+in the export: the convolution in its x86 and x64 builds (1.4.2; not ARM64)
+multiplies the spectrum four frequency bins at a time, so when a block of
+audio is not a multiple of four frames, up to three bins just below half the
+sample rate are missing from the output. If the audio engine used 10 ms blocks
+at 44.1 kHz (441 frames), it would drop the bin at about 22 kHz. That is above
+hearing, so the export does not work around it.
 
 To run it yourself, use a Windows computer or virtual machine **without**
 Equalizer APO installed on an audio device: the test replaces the
@@ -229,7 +234,8 @@ APO would apply to everything the device plays. Unpack the installer with
 and configure with `-DCONVOLVER_EQUALIZER_APO_BENCHMARK=PATH\Benchmark.exe` and
 `-DCONVOLVER_EQUALIZER_APO_CONFIG=FOLDER`. The test refuses to run when
 `ConfigPath` names another folder or the folder holds a `config.txt` it did
-not write, and it leaves an empty `config.txt` behind.
+not write, and it leaves a `config.txt` holding only its own comment line
+behind.
 
 `Benchmark.exe` bypasses the Windows audio service, so CI does not check that
 Equalizer APO is installed on the device, that Windows passes the device's
@@ -247,8 +253,9 @@ Windows computer with Equalizer APO installed on a stereo device:
    sound should change.
 3. Set the device to 44100 Hz and play again: it should be silent, and the
    log should show `sampleRate == 48000` evaluated to false.
-4. Leave the device at 44100 Hz and play through a player in WASAPI exclusive
-   mode (for example foobar2000 with its WASAPI output): the sound is heard,
-   which shows that exclusive mode bypasses Equalizer APO.
+4. Leave the device at 44100 Hz and play a 44.1 kHz file through a player in
+   WASAPI exclusive mode (for example foobar2000 with its WASAPI output): the
+   sound is heard, although the configuration silences 44.1 kHz, which shows
+   that exclusive mode bypasses Equalizer APO.
 5. Remove the `Include:` line, set `EnableTrace` back to `false` and restore the
    device's rate.
