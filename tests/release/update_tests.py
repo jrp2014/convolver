@@ -32,6 +32,9 @@ class UpdateTests(unittest.TestCase):
         self.assertLess(check_updates.version_key('3.8.1_build_84'),
                         check_updates.version_key('3.8.1_build_90'))
         self.assertIsNone(check_updates.version_key('vstsdk370_31_07_2020_build_116'))
+        fftw = ['3.3.11-rc5', '3.3.11', '3.3.11-pl1', '3.3.12']
+        self.assertEqual(sorted(reversed(fftw), key=check_updates.version_key), fftw)
+        self.assertTrue(check_updates.is_final('3.3.11-pl1'))
 
     def test_annotated_tags_resolve_to_commits(self):
         tags = check_updates.parse_ls_remote(listing({'v1.0': ('a' * 40, 'b' * 40), 'v1.1': 'c' * 40}))
@@ -53,6 +56,9 @@ class UpdateTests(unittest.TestCase):
         pin = check_updates.Pin('sdk', '', 'v', 'policy', '1.0', 'a' * 40)
         self.assertTrue(check_updates.check(pin, {'v1.0': 'b' * 40}).problem)
         self.assertTrue(check_updates.check(pin, {'v1.1': 'a' * 40}).problem)
+        row = check_updates.check(pin, {'v1.0': 'b' * 40, 'v1.2': 'c' * 40})
+        self.assertTrue(row.update and row.problem)
+        self.assertIn('newer release; tag v1.0 now points at', row.status)
 
     def test_information_only_pin_does_not_ask_for_an_update(self):
         pin = check_updates.Pin('lilv', '', 'v', 'ci', '0.24.22', actionable=False)
@@ -76,7 +82,11 @@ class UpdateTests(unittest.TestCase):
         rows = check_updates.run(lister)
         report = check_updates.markdown(rows)
         self.assertIn('lookup failed: unreachable', report)
-        self.assertTrue(all(row.problem for row in rows if row.pin.actionable))
+        self.assertIn('1 could not be checked this time', report)
+        lv2lint = next(row for row in rows if row.pin.name == 'lv2lint')
+        self.assertTrue(lv2lint.unreachable and not lv2lint.problem)
+        others = [row for row in rows if row.pin.actionable and row.pin.name != 'lv2lint']
+        self.assertTrue(all(row.problem for row in others))
 
     def test_workflow_checkout_must_match_policy(self):
         with tempfile.TemporaryDirectory() as temporary:

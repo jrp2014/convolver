@@ -37,7 +37,7 @@ jobs:
         run: >-
           python scripts/release/check_updates.py
           --markdown "$RUNNER_TEMP/report.md" --github-output "$GITHUB_OUTPUT"
-          >> "$GITHUB_STEP_SUMMARY"
+          | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Keep the tracking issue current
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:

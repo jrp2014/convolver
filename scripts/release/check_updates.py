@@ -16,15 +16,19 @@ current by Dependabot, so they are not listed here.
 import argparse
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / 'packaging/release-policy.json'
-PRE_RELEASE = re.compile(r'(?P<number>\d+(?:\.\d+)*)(?:[._-]build[._-](?P<build>\d+))?'
-                         r'(?:[._-]?(?P<pre>alpha|beta|rc|pre)(?P<pre_number>\d*))?$')
+VERSION = re.compile(r'(?P<number>\d+(?:\.\d+)*)(?:[._-]build[._-](?P<build>\d+))?'
+                     r'(?:[._-]?(?P<suffix>alpha|beta|rc|pre|pl)(?P<suffix_number>\d*))?$')
+# Pre-releases sort below the release, patch levels (FFTW's -plN) above it.
+RANK = {'alpha': 0, 'beta': 0, 'rc': 0, 'pre': 0, None: 1, 'pl': 2}
 
 
 @dataclass(frozen=True)
@@ -40,21 +44,20 @@ class Pin:
 
 
 def version_key(text):
-    """Orders versions: numbers, then build, then final above pre-releases."""
-    match = PRE_RELEASE.fullmatch(text)
+    """Orders versions: numbers, then build, then pre-release < release < patch level."""
+    match = VERSION.fullmatch(text)
     if not match:
         return None
     numbers = tuple(int(part) for part in match['number'].split('.'))
     numbers += (0,) * (4 - len(numbers))
     build = int(match['build'] or 0)
-    final = match['pre'] is None
-    pre_number = int(match['pre_number'] or 0)
-    return numbers, build, final, pre_number
+    return numbers, build, RANK[match['suffix']], int(match['suffix_number'] or 0)
 
 
 def is_final(text):
+    """A release or patch level, not a pre-release."""
     key = version_key(text)
-    return key is not None and key[2]
+    return key is not None and key[2] > 0
 
 
 def parse_ls_remote(output):
@@ -74,13 +77,21 @@ def parse_ls_remote(output):
     return tags
 
 
-def ls_remote(remote):
-    result = subprocess.run(['git', 'ls-remote', '--tags', remote], capture_output=True, text=True,
-                            timeout=120, check=False)
-    if result.returncode:
-        raise RuntimeError(result.stderr.strip().splitlines()[-1] if result.stderr.strip() else
-                           f'git ls-remote exited with {result.returncode}')
-    return result.stdout
+def ls_remote(remote, attempts=3):
+    """Lists a remote's tags, retrying a flaky host twice (after 5 s, then 10 s)."""
+    for attempt in range(attempts):
+        try:
+            result = subprocess.run(['git', 'ls-remote', '--tags', remote], capture_output=True,
+                                    text=True, timeout=120, check=False)
+            if not result.returncode:
+                return result.stdout
+            error = RuntimeError(result.stderr.strip().splitlines()[-1] if result.stderr.strip() else
+                                 f'git ls-remote exited with {result.returncode}')
+        except subprocess.TimeoutExpired as timeout:
+            error = RuntimeError(f'no answer within {timeout.timeout} s')
+        if attempt + 1 < attempts:
+            time.sleep(5 * 2**attempt)
+    raise error
 
 
 def tag_versions(tags, prefix):
@@ -108,7 +119,7 @@ def pins(root=ROOT):
     sdk = deps['vst3sdk']
     vst3_version = re.sub(r'-build-', '_build_', sdk['version'])
     result = [
-        Pin('VST3 SDK (with its four submodules)', 'https://github.com/steinbergmedia/vst3sdk', 'v',
+        Pin('VST3 SDK (vst3sdk tag; its submodules move with it)', 'https://github.com/steinbergmedia/vst3sdk', 'v',
             'release policy, VST3 workflow', vst3_version, sdk['revision']),
         Pin('lv2 headers', 'https://github.com/lv2/lv2', 'v', 'release policy',
             deps['lv2']['version'], deps['lv2']['revision']),
@@ -118,7 +129,7 @@ def pins(root=ROOT):
         Pin('libsndfile', 'https://github.com/libsndfile/libsndfile', '', 'release policy',
             deps['libsndfile']['version']),
         Pin('pluginval', 'https://github.com/Tracktion/pluginval', 'v', 'VST3 workflow',
-            _workflow_value(vst3, 'PLUGINVAL_TAG', 'vst3.yml').removeprefix('v')),
+            re.sub(r'^v', '', _workflow_value(vst3, 'PLUGINVAL_TAG', 'vst3.yml'))),
         Pin('lv2lint', 'https://git.open-music-kontrollers.ch/~hp/lv2lint', '', 'LV2 workflow',
             _workflow_value(lv2, 'LV2LINT_VERSION', 'lv2.yml')),
         Pin('lilv', 'https://github.com/lv2/lilv', 'v', 'LV2 workflow (Ubuntu 24.04 package)',
@@ -139,6 +150,7 @@ class Row:
     status: str = ''
     update: bool = False
     problem: bool = False
+    unreachable: bool = False
 
 
 def check(pin, tags):
@@ -163,11 +175,14 @@ def check(pin, tags):
         row.status = 'current'
     if pin.revision:
         tag = pin.tag_prefix + pin.version
+        problem = ''
         if tag not in tags:
-            row.status, row.problem = f'pinned tag {tag} is missing upstream', True
+            problem = f'pinned tag {tag} is missing upstream'
         elif tags[tag] != pin.revision:
-            row.status, row.problem = (f'tag {tag} now points at {tags[tag][:12]}, '
-                                       f'not the pinned {pin.revision[:12]}'), True
+            problem = f'tag {tag} now points at {tags[tag][:12]}, not the pinned {pin.revision[:12]}'
+        if problem:
+            row.status = problem if row.status == 'current' else f'{row.status}; {problem}'
+            row.problem = True
     return row
 
 
@@ -178,7 +193,8 @@ def run(lister=ls_remote, root=ROOT):
         try:
             tags = parse_ls_remote(lister(pin.remote))
         except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-            rows.append(Row(pin, status=f'lookup failed: {error}', problem=True))
+            # Reported, but not a reason to open the issue: hosts have bad days.
+            rows.append(Row(pin, status=f'lookup failed: {error}', unreachable=True))
             continue
         rows.append(check(pin, tags))
     if checkout != pin_list[0].revision:
@@ -191,10 +207,13 @@ def run(lister=ls_remote, root=ROOT):
 def markdown(rows):
     updates = [row for row in rows if row.update]
     problems = [row for row in rows if row.problem]
+    unreachable = [row for row in rows if row.unreachable]
     if updates or problems:
         lines = [f'{len(updates)} pin(s) have a newer release and {len(problems)} need attention.']
     else:
-        lines = ['Every pin is on its newest release.']
+        lines = ['Every pin that could be checked is on its newest release.']
+    if unreachable:
+        lines[0] += f' {len(unreachable)} could not be checked this time.'
     lines += [
         '',
         '| Dependency | Pinned | Newest upstream | Where pinned | Status |',
@@ -202,6 +221,7 @@ def markdown(rows):
     ]
     for row in rows:
         status = f'**{row.status}**' if row.update or row.problem else row.status
+        status = status.replace('|', '\\|')
         lines.append(f'| {row.pin.name} | {row.pin.version or "-"} | {row.newest or "-"} | '
                      f'{row.pin.where} | {status} |')
     notes = [f'- {row.pin.name}: {row.pin.note}' for row in rows if row.pin.note]
@@ -228,6 +248,9 @@ def main(argv=None):
     if args.markdown:
         args.markdown.write_text(report, encoding='utf-8')
     attention = any(row.update or row.problem for row in rows)
+    for row in rows:
+        if row.unreachable and os.environ.get('GITHUB_ACTIONS') == 'true':
+            print(f'::warning::{row.pin.name}: {row.status}', file=sys.stderr)
     if args.github_output:
         with args.github_output.open('a', encoding='utf-8') as output:
             output.write(f'attention={"true" if attention else "false"}\n')
