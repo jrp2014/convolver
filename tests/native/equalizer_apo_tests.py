@@ -290,8 +290,27 @@ class Runtime:
         actual, log = self.process(f'Include: {include}', rate, inputs)
         error = fixtures.worst_error(actual, wanted)
         if error > RUNTIME_TOLERANCE:
-            raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n{log}')
+            raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n'
+                                 f'{differences(actual, wanted)}\n{log}')
         print(f'{label}: Equalizer APO worst error {error:.3g}')
+
+
+def differences(actual, wanted):
+    """Where each channel differs by more than the tolerance, to diagnose a failure."""
+    lines = []
+    for channel, (a, b) in enumerate(zip(actual, wanted), 1):
+        over = [n for n, (x, y) in enumerate(zip(a, b)) if abs(x - y) > RUNTIME_TOLERANCE]
+        if not over:
+            lines.append(f'channel {channel}: matches')
+            continue
+        n = max(over, key=lambda i: abs(a[i] - b[i]))
+        lines.append(f'channel {channel}: {len(over)} of {len(a)} frames differ, '
+                     f'first at {over[0]}, last at {over[-1]}, worst at {n} '
+                     f'(got {a[n]:.6f}, wanted {b[n]:.6f}); '
+                     f'frames {over[0]}..{over[0] + 7} got '
+                     f'{[round(v, 5) for v in a[over[0]:over[0] + 8]]} wanted '
+                     f'{[round(v, 5) for v in b[over[0]:over[0] + 8]]}')
+    return '\n'.join(lines)
 
 
 def read_wav(path):
