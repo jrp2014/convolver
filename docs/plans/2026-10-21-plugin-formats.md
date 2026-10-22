@@ -452,14 +452,38 @@ contract:
   newest request is always known without a lock.
 - **Stale requests.** `work()` takes the lock and skips a request whose
   generation is older than the newest one, so rapid loads coalesce. Loading a
-  file takes time and a newer request can arrive meanwhile, so `work()` checks
-  again after loading and validating: it calls `replace` only if the request is
-  still the newest and newer than the generation already installed (kept under
-  the lock, so it only increases). Otherwise it discards the prepared filter.
-  The response carries the generation too, and `work_response()` ignores any
-  response older than the last one it applied, so a stale completion cannot
-  overwrite a newer status, path or filter. The response then updates the
-  status port and sends `patch:Set` with the path now in use.
+  file and preparing its FFT engine take time, and a newer request can arrive
+  at any point during them. So preparation and publication are separate steps,
+  with the last generation check between them:
+  1. Load and validate the file, then prepare the replacement filter (engine
+     construction and FFT planning). This is everything `replace` does today
+     before it hands the filter to the audio thread.
+  2. Check the generation again, after preparation. Publish only if the
+     request is still the newest and newer than the generation already
+     installed (kept under the lock, so it only increases). Otherwise discard
+     the prepared filter, which off the audio thread is safe.
+  3. Publish: hand the prepared filter to the audio thread, raise the tail
+     bound and record the installed generation and path.
+
+  Checking before a single `replace` call is not enough, because `replace`
+  prepares and publishes in one call. A request that arrives while it prepares
+  would still have the stale filter installed and briefly audible, and if that
+  newer request then failed, the stale filter would keep playing.
+  `HostProcessor` therefore needs a two-step replacement (prepare, then
+  publish), added with LV2-2 and covered by the core host tests. `replace`
+  remains prepare followed by publish. A request that arrives after the check
+  but before publication is not stale: its own `work()` call runs next under
+  the lock and replaces or reports as usual.
+
+  Responses are checked against the newest *request*, not merely the last
+  response applied. Each response carries its generation and the path and
+  status now in use, read from the installed record under the lock.
+  `work_response()` reads the newest requested generation from the atomic
+  counter. A response for an older generation changes nothing, so the status
+  stays "loading" until the newest request answers. The newest response
+  updates the status port and sends `patch:Set` with the path now in use. That
+  is the newly loaded file, or the filter that kept running if the load
+  failed.
 - **Scheduling failure.** If `schedule_work` returns
   `LV2_WORKER_ERR_NO_SPACE` or `LV2_WORKER_ERR_UNKNOWN`, the running filter
   stays, the status becomes "load failed", `patch:Get` still reports the old
@@ -479,6 +503,19 @@ contract:
   request arriving while an older file is still loading (the older completion
   must not change the filter, status or saved path), and cleanup with work
   outstanding, all under sanitizers (ThreadSanitizer for the races).
+  **Regression test for the preparation window:** a test hook pauses `work()`
+  after preparation and before the final generation check. While request A is
+  paused there, request B arrives:
+  - if B names a valid filter, A is never published (the output never shows
+    A's response), and the end state is B;
+  - if B fails validation, the filter that was running before A keeps
+    running, the status is "load failed", and `patch:Get` and `save()` report
+    the old path;
+  - A's response, delivered after B was requested, leaves the status at
+    "loading".
+
+  Distinct gains for the original filter, A and B make each outcome visible
+  in the output.
 
 **State.** Save the mapped path (`state:mapPath`, so sessions can move) and the
 encoded host state (the VST3 preset format), so a session still sounds the same

@@ -188,7 +188,11 @@ LV2 (Linux first; also PipeWire system audio):
   [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
   one adapter lock for all `HostProcessor` control calls that `run()` never
   takes; requests passed as copied worker payloads with a generation number,
-  rechecked after loading so a stale completion never wins; no
+  rechecked after loading and again after the replacement is prepared, just
+  before publication (needs a prepare-then-publish step in `HostProcessor`),
+  so a stale completion never wins; responses checked against the newest
+  request, not the last one applied, with a regression test for a request
+  that arrives during preparation; no
   `state:threadSafeRestore` at first; initial restoration installs directly;
   rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown
