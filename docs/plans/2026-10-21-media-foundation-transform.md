@@ -13,6 +13,10 @@ APO coverage. These are proposed contracts, not implemented adapter behavior.
 before any work starts. VST3, LV2 and AU come first; see the
 [plug-in formats plan](2026-10-21-plugin-formats.md).
 
+**Update, 22 October 2026:** asked to choose this plan's target users, the
+owner chose system-wide filtering through Equalizer APO. That route is now the
+[Equalizer APO export](../equalizer-apo.md) (HOST-4); the MFT stays parked.
+
 **In short:**
 
 - A Media Foundation transform (MFT) is a Windows COM component that media

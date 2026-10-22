@@ -20,6 +20,7 @@ Convolver applies that response continuously to every input sample.
 | See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
 | Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md) |
 | Turn a filter into a preset for a plug-in | [Plug-in presets](presets.md) |
+| Filter everything Windows plays (system-wide) | [Equalizer APO export](equalizer-apo.md) |
 | Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
 | Use the C++ libraries in another application | [CMake package guide](cmake-package.md) |
 | Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
@@ -41,6 +42,7 @@ Convolver applies that response continuously to every input sample.
 | [Core and CLI reference](portable-core.md) | Build options, every CLI option, output formats, inspection, library API, limits |
 | [VST3 guide](vst3.md) | Building, installing and loading the plug-in; host lifecycle |
 | [Plug-in presets](presets.md) | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, what a preset that does not fit plays, file contents |
+| [Equalizer APO export](equalizer-apo.md) | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
 | [Plug-in identities and channel layouts](plugin-identities.md) | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
 | [Plug-in distribution](plugins/index.md) | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
 | [Preview release record](releases/developer-preview.md) | Candidate matrix, evidence and remaining production gates |
@@ -97,7 +99,8 @@ current direction; the Media Foundation and FFmpeg plans are parked.
 - [Media Foundation transform](plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
-  for system-wide processing.
+  for system-wide processing. The Equalizer APO route is now the
+  [Equalizer APO export](equalizer-apo.md) (HOST-4).
 - [FFmpeg filter](plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
 - [Plug-in distribution](plans/2026-10-18-plugin-distribution.md) and its
