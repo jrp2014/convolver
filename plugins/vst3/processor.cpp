@@ -87,22 +87,24 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
         return kInvalidArgument;
     std::lock_guard lock(control_);
-    auto result = AudioEffect::setupProcessing(setup);
-    if (result == kResultOk)
-        configured_ = true;
-    return result;
+    return AudioEffect::setupProcessing(setup);
 }
 HostLayout Processor::layout() const {
     return {static_cast<int>(processSetup.sampleRate), static_cast<std::size_t>(inputs_),
             static_cast<std::size_t>(outputs_)};
 }
-// The host's configuration is known once setupProcessing has given the rate;
-// before that, restored state is kept and checked at activation (the shared
+// The host's configuration is known once the plug-in has been activated with
+// it, and stays known while the rate and buses are unchanged. setupProcessing
+// is not binding on its own: JUCE-based hosts (pluginval among them) call it
+// with placeholder values before restoring a project's state at another rate.
+// Until then, restored state is kept and checked at activation (the shared
 // adapter contract's "state that arrives before the host is configured").
 std::optional<HostLayout> Processor::known_layout() const {
-    if (!configured_)
+    const auto now = layout();
+    if (!activated_ || activated_->sample_rate != now.sample_rate ||
+        activated_->inputs != now.inputs || activated_->outputs != now.outputs)
         return std::nullopt;
-    return layout();
+    return now;
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
     std::lock_guard lock(control_);
@@ -116,6 +118,7 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
             next->set_bypass(bypass_.load());
             next->reset();
             host_ = std::move(next);
+            activated_ = layout();
         } else
             host_.reset();
         active_ = state != 0;

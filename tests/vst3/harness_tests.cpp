@@ -22,6 +22,11 @@ class Vst3 final : public test::Adapter {
     void create(const test::Setup& setup) override {
         create_unconfigured();
         configure(setup);
+        // A VST3 host commits to its rate and buses at activation; setupProcessing
+        // alone may carry placeholder values (JUCE hosts restore state after it).
+        // So a "configured" instance is one that has been activated with the setup.
+        check(activate(), "first activation");
+        deactivate();
     }
     bool create_unconfigured() override {
         destroy();

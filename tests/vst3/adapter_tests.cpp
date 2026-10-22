@@ -312,11 +312,64 @@ void version1_presets() {
             p.terminate();
         }
 }
+// JUCE-based hosts (and pluginval) call setupProcessing with placeholder values
+// before restoring a project's state at its real rate. Until the plug-in has
+// been activated, setupProcessing is not binding: the state must be kept.
+void placeholder_setup() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "placeholder initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "placeholder buses");
+    ProcessSetup setup{kRealtime, kSample32, 512, 44100};
+    require(p.setupProcessing(setup) == kResultOk, "placeholder setup");
+    convolver::HostState saved;
+    saved.configuration =
+        convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode 48 kHz state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "state after a placeholder setup rejected");
+    setup.sampleRate = 48000;
+    require(p.setupProcessing(setup) == kResultOk, "real setup");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    require(p.setActive(true) == kResultOk, "activate at the real rate");
+    p.setProcessing(true);
+    std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+    left[0] = 1;
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    require(p.process(d) == kResultOk, "placeholder process");
+    for (int i = 0; i < 512; ++i)
+        require(out_left[i] == 0 && std::abs(out_right[i] - (i == 256 ? .5f : 0.f)) < 1e-6,
+                "state restored after a placeholder setup does not play");
+    // Now the rate is committed: a mismatch while inactive is rejected at once.
+    p.setProcessing(false);
+    p.setActive(false);
+    saved.configuration->sample_rate = 44100;
+    MemoryStream wrong;
+    require(write_state(&wrong, saved), "encode 44.1 kHz state");
+    wrong.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&wrong) != kResultOk, "mismatch after activation accepted while inactive");
+    p.terminate();
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
         multichannel();
         version1_presets();
+        placeholder_setup();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");

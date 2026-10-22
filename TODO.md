@@ -199,8 +199,10 @@ direct installation in `HostProcessor`, which LV2 and AU reuse.
 - [x] **VST3-7 — Follow the shared adapter contract.** Done 22 October 2026
   (PR #35). The 13 known deviations in `vst3.harness` are gone and all 66
   cases pass (worst error 1.8e-7): an empty instance with unequal counts plays
-  silence; once `setupProcessing` has given the rate, `setState` rejects a
-  mismatched filter while inactive too and keeps the last accepted one; a
+  silence; once the plug-in has been activated at the current rate and buses,
+  `setState` rejects a mismatched filter while inactive too and keeps the last
+  accepted one (`setupProcessing` alone is not binding: JUCE hosts call it with
+  placeholder values before restoring state); a
   failed first load plays silence; state restored before setup that does not
   suit the host activates as silence and returns when the host is corrected;
   a filter set after activation but before audio is installed directly. The

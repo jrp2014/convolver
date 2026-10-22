@@ -209,7 +209,10 @@ that fixes it. The run prints them and still passes, but a listed case that
 fails in any other way, or starts passing, fails the run, so the list can
 neither hide a new defect nor go stale. A listed case stops at its first
 failure, so its later checks run only once it is fixed. VST3 lists none: its
-13 were removed by [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au), and all 66 cases pass.
+13 were removed by [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au), and all 66 cases pass. Its driver
+counts an instance as configured once it has been activated with the setup,
+because a VST3 host commits to its rate and buses at activation (JUCE-based
+hosts call `setupProcessing` with placeholder values before restoring state).
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 

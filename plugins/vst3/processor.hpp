@@ -60,7 +60,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::atomic<Steinberg::uint32> tail_{0};
     int inputs_ = 2, outputs_ = 2;
     bool active_ = false;
-    bool configured_ = false; // setupProcessing has told us the sample rate.
+    // The rate and buses of the last activation. The host's configuration counts
+    // as known only while it still matches: setupProcessing alone is not binding.
+    std::optional<HostLayout> activated_;
 };
 class Controller final : public Steinberg::Vst::EditController {
   public:

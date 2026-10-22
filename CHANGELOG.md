@@ -53,9 +53,9 @@ Until 1.0 the C++ API may change between minor versions.
 
 - The VST3 plug-in follows the shared adapter contract (VST3-7). With no preset
   loaded and different input and output counts (for example a 2→6 crossover)
-  it plays silence instead of passing input *c* to output *c*. A preset at the
-  wrong sample rate or channel counts is rejected while the plug-in is
-  inactive too, keeping the last valid one; if none was loaded, it plays
+  it plays silence instead of passing input *c* to output *c*. Once the plug-in has
+  been activated, a preset at the wrong sample rate or channel counts is
+  rejected while it is inactive too, keeping the last valid one; if none was loaded, it plays
   silence. A project restored at the wrong rate or layout now activates and
   plays silence, keeping its filter, instead of failing to activate. A preset
   loaded after activation but before any audio plays from the first sample

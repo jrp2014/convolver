@@ -137,13 +137,15 @@ Loading follows the
 - **No preset loaded:** with equal input and output counts the plug-in passes
   input *c* to output *c*. With unequal counts it plays silence, so an unloaded
   2→6 crossover never sends full-range audio to a driver.
-- **A preset that does not match:** once the host has called `setupProcessing`,
-  `setState` checks the preset against the sample rate and bus channel counts,
-  whether or not the plug-in is active. A mismatch returns `kResultFalse` and
+- **A preset that does not match:** once the plug-in has been activated, and
+  while the host keeps that sample rate and those buses, `setState` checks the
+  preset against them, whether or not the plug-in is active now. A mismatch returns `kResultFalse` and
   the last accepted preset keeps playing and stays the saved state. If no preset
   was accepted before, the plug-in plays silence, never its unfiltered input.
-- **State restored before `setupProcessing`** (a project being opened) is kept
-  as it is. If it does not suit the rate or buses at activation, the plug-in
+- **State restored before the first activation** (a project being opened) is
+  kept as it is, even if `setupProcessing` has already been called: JUCE-based
+  hosts call it with placeholder values before restoring state at the real
+  rate. If it does not suit the rate or buses at activation, the plug-in
   still activates but plays silence; correcting the host's rate or layout brings
   the filter back, and saving the project keeps it. VST3 has no standard way to
   show the reason without an editor, so the host shows only silence (the
