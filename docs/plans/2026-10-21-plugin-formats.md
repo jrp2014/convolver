@@ -260,7 +260,7 @@ on during bypass, so switching back does not lose history.
   22 October 2026). No output has an unfiltered counterpart: bypassing a 2→6
   crossover must not send full-range audio to a tweeter, and a 1→2 filter that
   forks a mono input to two outputs cannot tell which output the input belongs
-  on. This matches the empty instance with unequal counts.
+  on. This matches the contract for an empty instance with unequal counts.
 
 `HostProcessor` implements this, so every adapter that drives it through
 `set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
@@ -775,6 +775,10 @@ the LV2 plug-in serve FFmpeg too.
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
   unequal counts.
+- What bypass plays with unequal channel counts ([bypass](#bypass)).
+  **Decided 22 October 2026 (owner):** silence on every output, including a
+  1→2 filter that forks one input; equal counts keep input *c* to output *c*.
+  `HostProcessor` implements it, so VST3 already follows it.
 - Failed replacement (raised in the owner's review, 21 October 2026): keep the
   running filter in every adapter, with an explicit error indication. Adopted
   in the contract above; VST3 needs a fix for presets loaded while inactive.

@@ -127,7 +127,10 @@ and the counts may differ (for example stereo in, 5.1 out). Any speaker
 arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
 the sample rate, or activation fails. Without a preset the plug-in passes input
-*c* to output *c* and leaves outputs without a matching input silent. Bypass
+*c* to output *c* and leaves outputs without a matching input silent; with
+unequal counts this will change to silence, as the
+[shared adapter contract](plans/2026-10-21-plugin-formats.md#loading-and-failure)
+requires (VST3-7). Bypass
 passes input *c* to output *c* only when the counts are equal; with unequal
 counts it plays silence on every output
 ([shared adapter contract](plans/2026-10-21-plugin-formats.md#bypass)). More
