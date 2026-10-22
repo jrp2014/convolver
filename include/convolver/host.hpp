@@ -94,7 +94,8 @@ class HostProcessor {
     // before any frame has been processed since construction or reset is
     // installed directly; otherwise the new filter warms up for one block and
     // crossfades over 256 frames. reset() ends a transition in progress (the
-    // newer filter plays at once), so the next published filter is direct too.
+    // newer filter plays at once), so a filter published before audio resumes
+    // is installed directly.
     void replace(const Configuration&);
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;

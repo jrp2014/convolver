@@ -118,7 +118,7 @@ channel counts. The plug-ins check it against the host when they load it
 - **No preset loaded:** with equal input and output counts the plug-in passes
   input *c* to output *c*; with unequal counts it plays silence.
 
-The VST3 plug-in follows these rules since VST3-7, with two limits on
+The VST3 plug-in follows these rules since VST3-7, with three limits on
 reporting until it has an editor or status display (VST3-3; DIAG-1 reviews how
 every message reaches the user):
 
@@ -127,6 +127,8 @@ every message reaches the user):
 - A mismatch found when the host activates the plug-in (for example a project
   restored at another sample rate) is not reported at all, because the load had
   already been accepted: the plug-in plays silence **without** any message.
+- A project saved after a failed first load reopens silent, as decided, again
+  without a message: the saved failure loads successfully.
 
 The [VST3 guide](vst3.md#loading-filters) gives the details.
 

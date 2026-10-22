@@ -161,8 +161,9 @@ Loading follows the
   the filter back, and saving the project keeps it. VST3 has no standard way to
   show the reason without an editor, so the host shows only silence (the
   explanation is held for a later editor or status display, VST3-3).
-- **A preset loaded after activation but before any audio** is installed
-  directly; later loads crossfade as described below.
+- **A preset loaded after activation but before any audio** (or while the host
+  has stopped processing) is installed directly; later loads crossfade as
+  described below.
 - **Saving after a failed first load** saves that failure (host state version
   2) but not the rejected preset, so reopening the project plays silence again
   rather than the unfiltered input. Load a matching preset to replace it.
@@ -194,7 +195,8 @@ Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before any
 audio has been processed since activation or reset is installed directly. A
 reset (the host stopping and restarting processing) also ends a crossfade in
-progress, so the newer filter plays at once and the next one is direct. Later,
+progress, so the newer filter plays at once, and a filter published before audio
+resumes is installed directly. Later,
 a replacement runs for 256 samples
 to fill its latency, then crossfades for 256 samples. It starts with fresh input
 history: it cannot reconstruct audio that preceded loading. Old engines are

@@ -413,7 +413,7 @@ void restart_mid_transition() {
         d.numSamples = 512;
         require(p.process(d) == kResultOk, "restart resumed");
         for (int i = 0; i < 512; ++i)
-            require(std::abs(out_left[i] - (i < 256 ? 0.f : 3.f)) < 1e-5,
+            require(std::abs(out_left[i] - (i < 256 ? 0.f : 3.f)) < 1e-5 && out_right[i] == 0,
                     "preset loaded while stopped mid-transition does not play at once");
     }
     p.setProcessing(false);

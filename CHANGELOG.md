@@ -125,8 +125,9 @@ Until 1.0 the C++ API may change between minor versions.
   crossfade now plays from the first resumed sample. Before, `HostProcessor`
   kept the interrupted transition after `reset()`, so the old filter went on
   playing until that crossfade finished (jrp's review of 0.4.19 measured 1.004
-  where 3 was expected). A reset now ends the transition and the newer filter
-  plays at once.
+  where 3 was expected). Any reset now ends the transition and the newer filter
+  plays at once; that includes the internal recovery reset after non-finite
+  output, which used to bring the old filter back and repeat the crossfade.
 
 ## [0.4.0] - 2026-10-19
 
