@@ -39,43 +39,44 @@ def acquire(dependency, cache, fetch=False):
 
 
 def _link_source(member, regular):
-    """The regular file an in-archive relative symlink names, or None."""
+    """The regular file member an in-archive relative symlink names, or None."""
     link = member.linkname
     if not link or link.startswith('/') or '\\' in link or ':' in link:
         return None
-    target = posixpath.normpath(posixpath.join(posixpath.dirname(member.name), link))
-    return target if target in regular else None
+    return regular.get(posixpath.normpath(posixpath.join(posixpath.dirname(member.name), link)))
 
 
 def extract(archive, destination):
     """Pinned source archives contain regular files and directories, plus
     symlinks to regular files in the same archive (lv2 has one), which are
-    written as copies so nothing can point outside the destination."""
+    written as copies so nothing can point outside the destination. Each
+    path may occur once."""
     destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive) as tar:
         members = tar.getmembers()
-        regular = {posixpath.normpath(m.name) for m in members if m.isfile()}
-        links = {}
+        names = [posixpath.normpath(m.name) for m in members]
+        if len(set(names)) != len(names):
+            raise ValueError('unsafe source archive: a path occurs more than once')
+        regular = {name: m for name, m in zip(names, members) if m.isfile()}
+        sources = {}
         for member in members:
             path = PurePosixPath(member.name)
-            safe_type = member.isfile() or member.isdir()
-            if member.issym():
-                links[member.name] = _link_source(member, regular)
-                safe_type = links[member.name] is not None
+            source = member if member.isfile() else _link_source(member, regular) if member.issym() else None
             if (path.is_absolute() or '..' in path.parts or '\\' in member.name or
-                    ':' in member.name or not safe_type):
+                    ':' in member.name or not (source or member.isdir())):
                 raise ValueError(f'unsafe source archive member: {member.name}')
             target = destination / Path(*path.parts)
             try:
                 target.resolve().relative_to(destination.resolve())
             except ValueError as error:
                 raise ValueError('unsafe source extraction destination') from error
+            sources[member.name] = source
         for member in members:
             target = destination / member.name
             if member.isdir():
                 target.mkdir(parents=True, exist_ok=True)
             else:
-                source_member = tar.getmember(links[member.name]) if member.issym() else member
+                source_member = sources[member.name]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with tar.extractfile(source_member) as source, target.open('wb') as output:
                     shutil.copyfileobj(source, output)

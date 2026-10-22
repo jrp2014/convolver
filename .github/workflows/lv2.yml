@@ -16,12 +16,17 @@ permissions:
 
 jobs:
   lv2:
-    # A fixed image: the apt versions below are Ubuntu 24.04's release pocket,
-    # which never changes.
+    # A fixed image label. The apt versions below are Ubuntu 24.04's release
+    # pocket, which never changes; lilv's libraries (serd, sord, sratom, zix)
+    # are pinned too, so noble-updates cannot move them.
     runs-on: ubuntu-24.04
     env:
       LV2_DEB: 1.18.10-2build1
       LILV_DEB: 0.24.22-1build1
+      SERD_DEB: 0.32.2-1
+      SORD_DEB: 0.16.16-2build1
+      SRATOM_DEB: 0.6.16-1build1
+      ZIX_DEB: 0.4.2-2build1
       LV2LINT_VERSION: 0.16.2
       LV2LINT_SHA256: b23810571f2e18d3d6714c0acc65210a1a5fcd78fff03f1c820553a5c1c45cf4
     steps:
@@ -34,12 +39,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
+            "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
+            "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
             meson ninja-build pkg-config libelf-dev
           lv2info --version
+          dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
       - name: Pinned lv2 source (release policy)
         run: >-
           python scripts/release/sources.py --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" lv2
+      # plugins=auto skips examples whose libraries are missing (eg-sampler
+      # needs libsamplerate); the next step fails if eg-amp was not built.
       - name: Build LV2's example plug-ins against the pinned headers
         run: |
           meson setup "$RUNNER_TEMP/lv2-build" "$RUNNER_TEMP/sources/lv2" \

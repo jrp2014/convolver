@@ -19,12 +19,15 @@ install_build_tools() {
   ver=$(clang++ --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1 || true)
   ver=${ver:-18}
   SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
-  pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18
-        lv2-dev liblilv-dev lilv-utils)
+  pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18)
+  lv2_pkgs=(lv2-dev liblilv-dev lilv-utils)
   $SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1 || {
     $SUDO apt-get update -qq >/dev/null 2>&1
     $SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1
   } || echo "Could not install: ${pkgs[*]}; the CMake build or sanitizer tests may fail." >&2
+  # Separate, so a missing LV2 package cannot stop the core tools installing.
+  $SUDO apt-get install -y "${lv2_pkgs[@]}" >/dev/null 2>&1 ||
+    echo "Could not install: ${lv2_pkgs[*]}; LV2 work needs them." >&2
 }
 
 # The Git hook runs `pre-commit run` on the staged files before each commit,

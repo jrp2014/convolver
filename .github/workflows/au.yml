@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   au:
-    # A fixed image, so the Xcode and auval versions change only by an edit here.
+    # A fixed image label. GitHub still updates its Xcode and macOS point
+    # releases, so the versions are logged for each run.
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -29,6 +30,7 @@ jobs:
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Compile AudioUnitSDK (C++23, universal, macOS 14)
         run: |
+          sw_vers
           xcodebuild -version
           sdk="$RUNNER_TEMP/sources/AudioUnitSDK"
           objects="$RUNNER_TEMP/ausdk-objects"

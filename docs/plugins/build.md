@@ -64,7 +64,7 @@ choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/cmake-packag
 
 Every plug-in format's SDK is pinned by commit and archive SHA-256 in
 `packaging/release-policy.json`, and every test tool by version and checksum in
-CI (PLUG-6), so a build or a validator result can be repeated exactly. The
+CI (PLUG-6), so a build or a validator result can be repeated. The
 workflows are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml` in the source:
 
 | Dependency | Pin | Used by | Where pinned |
@@ -72,19 +72,23 @@ workflows are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml` in the source
 | VST3 SDK (`vst3sdk` and four submodules) | 3.8.1 build 84, commit `3cdf9ca` | VST3 builds | Release policy; the VST3 workflow checks out the same commit |
 | `lv2` headers | 1.18.10, commit `0bcde33` | LV2 builds (LV2-1) | Release policy |
 | AudioUnitSDK | 1.4.0, commit `bd98b31` | AU builds (AU-1) | Release policy |
-| `lilv` (test host) | Ubuntu 24.04 `0.24.22-1build1` | LV2 tests | LV2 workflow |
+| `lilv` (test host) and its libraries | Ubuntu 24.04 packages by exact version (`0.24.22-1build1`; serd, sord, sratom, zix too) | LV2 tests | LV2 workflow |
 | `lv2lint` | 0.16.2, archive SHA-256 | LV2 validation (LV2-3) | LV2 workflow |
 | pluginval | v2.0.0-beta3, archive SHA-256 per platform | VST3 validation, later LV2 and AU | VST3 workflow |
-| `auval` | ships with macOS; the image is fixed at `macos-15` | AU validation (AU-3) | Audio Unit workflow |
+| `auval` | ships with macOS; the image label is `macos-15`, and each run logs the macOS and Xcode versions | AU validation (AU-3) | Audio Unit workflow |
 
-AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds as
-C++23; the core and the other formats stay C++20. Its licence is Apache-2.0,
+AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target would build
+as C++23 while the core and the other formats stay C++20; 1.3.0 is the C++20
+alternative. The version is proposed, awaiting jrp's decision. Its licence is Apache-2.0,
 which is why the AU component is distributed under GPL-3.0-or-later (see "AU
 licence" in `docs/plans/2026-10-21-plugin-formats.md`).
 
 Each SDK entry in the policy lists the plug-in `formats` that use it.
 `build_dependencies.py --formats vst3 lv2 au` unpacks those formats' SDKs and
-ships their notices; the default is `vst3`, today's only adapter. To fetch,
+ships their notices; the default is `vst3`, today's only adapter. An artifact
+manifest lists only the dependencies its build used, while the corresponding
+source bundle carries every pinned archive (about 0.4 MB more for lv2 and
+AudioUnitSDK), so one bundle serves every format. To fetch,
 verify and unpack chosen pins on their own:
 
 ```sh
