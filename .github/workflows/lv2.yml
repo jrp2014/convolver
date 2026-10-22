@@ -88,4 +88,19 @@ jobs:
           ninja -C "$RUNNER_TEMP/lv2lint-build"
           sudo ninja -C "$RUNNER_TEMP/lv2lint-build" install
       - name: lv2lint checks a plug-in
-        run: lv2lint -I "$LV2_PATH/eg-amp.lv2/" http://lv2plug.in/plugins/eg-amp
+        # eg-amp lacks lv2:minorVersion and lv2:microVersion, which lv2lint
+        # 0.16.2 reports as failures. Expect exactly those, so a broken or
+        # changed lv2lint is noticed; Convolver's bundle must pass outright.
+        run: |
+          set +e
+          report=$(env -u LV2_PATH lv2lint -I "$LV2_PATH/eg-amp.lv2/" http://lv2plug.in/plugins/eg-amp 2>&1)
+          status=$?
+          set -e
+          echo "$report"
+          failures=$(echo "$report" | sed -n 's/^ *\[FAIL\] *//p' | sort | paste -sd ';' -)
+          expected='Plugin Version Micro;Plugin Version Minor'
+          if [ "$status" -eq 0 ] || [ "$failures" != "$expected" ] ||
+             ! echo "$report" | grep -qF '<http://lv2plug.in/plugins/eg-amp>'; then
+            echo "Expected lv2lint to fail eg-amp on exactly: $expected (got status $status: $failures)" >&2
+            exit 1
+          fi
