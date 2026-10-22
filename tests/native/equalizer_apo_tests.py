@@ -20,6 +20,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -358,11 +359,12 @@ def test_list(work):
 
 def test_choice_and_include(work):
     """A larger device gets the largest entry that fits; Include keeps the rest of config.txt."""
+    # Copies beside the list: a relative path from the temporary folder to the
+    # repository can cross a symbolic link (macOS /var) or a drive (Windows).
     folder = work / 'choice'
-    folder.mkdir()
-    entries = [EXAMPLES / 'stereo/filter.cfg', EXAMPLES / 'crossover/filter.cfg']
-    write_cfg(folder / 'list.txt',
-              ''.join(os.path.relpath(e, folder).replace(os.sep, '/') + '\n' for e in entries))
+    for name in ('stereo', 'crossover'):
+        shutil.copytree(EXAMPLES / name, folder / name)
+    write_cfg(folder / 'list.txt', 'stereo/filter.cfg\ncrossover/filter.cfg\n')
     config = work / 'config'
     config.mkdir()
     run(folder / 'list.txt', config / 'room')
@@ -398,9 +400,9 @@ def test_names(work):
         run(source, work / 'names-export')
         text = (work / 'names-export/convolver.txt').read_text(encoding='utf-8')
         assert not any(line.startswith('Preamp: 20') for line in text.split('\n')), text
-    result = run(EXAMPLES / 'stereo/filter.cfg', work / ('n' * 230), ok=False)
+    result = run(EXAMPLES / 'stereo/filter.cfg', work / ('n' * 215), ok=False)
     assert 'too long' in result.stderr, result.stderr
-    assert not (work / ('n' * 230)).exists()
+    assert not (work / ('n' * 215)).exists()
 
 
 def test_refusals(work):
