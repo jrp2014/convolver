@@ -14,24 +14,41 @@ Each export is compared with the double-precision oracle of the shared fixtures
 (the CLI's own reference), with the device channels the filter does not use, and
 with the selection between a list's entries.
 
-Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO
+With --benchmark and --config, every case also runs through Equalizer APO
+itself: its Benchmark.exe filters a WAV file with the configuration in the
+folder that the registry value HKLM\\SOFTWARE\\EqualizerAPO\\ConfigPath names. The
+test writes config.txt there, so that folder must be one made for the test; it
+refuses a folder holding a config.txt it did not write. Windows only; CI
+extracts a pinned Equalizer APO release instead of installing it.
+
+Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO [--benchmark BENCHMARK.EXE --config FOLDER]
 """
+import argparse
 import math
 import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import wave
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPOSITORY / 'tests/plugins'))
 import fixtures  # noqa: E402  (shared WAV helpers and oracle)
 
-TOOL = sys.argv[1]
+ARGUMENTS = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+ARGUMENTS.add_argument('tool')
+ARGUMENTS.add_argument('--benchmark', type=Path, help="Equalizer APO's Benchmark.exe")
+ARGUMENTS.add_argument('--config', type=Path, help='the folder ConfigPath names')
+OPTIONS = ARGUMENTS.parse_args()
+TOOL = OPTIONS.tool
 EXAMPLES = REPOSITORY / 'examples/first-use'
 TOLERANCE = 1e-5  # Float32 IRs and inputs against the double oracle.
+# Benchmark.exe writes 16-bit PCM: half a step of rounding, plus the above.
+RUNTIME_TOLERANCE = 2.0 ** -16 + TOLERANCE
 
 # Windows' default speaker masks for a channel count (ChannelHelper.cpp).
 DEFAULT_NAMES = {
@@ -231,6 +248,70 @@ class EqualizerApo:
                 for name in self.names[:self.device_channels]]
 
 
+class Runtime:
+    """Equalizer APO itself, through its Benchmark.exe (Windows only)."""
+
+    MARKER = '# Written by equalizer_apo_tests.py; replaced on every run.'
+
+    def __init__(self, benchmark, config):
+        import winreg  # noqa: PLC0415  (Windows only)
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\EqualizerAPO') as key:
+            registered = Path(winreg.QueryValueEx(key, 'ConfigPath')[0])
+        if registered.resolve() != config.resolve():
+            raise SystemExit(f'ConfigPath is {registered}, not {config}: refusing to replace '
+                             'the configuration of an Equalizer APO installation')
+        existing = config / 'config.txt'
+        if existing.exists() and not existing.read_text(encoding='utf-8',
+                                                        errors='replace').startswith(self.MARKER):
+            raise SystemExit(f'{existing} was not written by this test; use an empty folder')
+        self.benchmark = benchmark
+        self.config = config
+        self.runs = 0
+
+    def process(self, text, rate, inputs):
+        """Filter planar inputs at a rate with config.txt holding `text`."""
+        self.runs += 1
+        (self.config / 'config.txt').write_text(f'{self.MARKER}\n{text}\n', encoding='utf-8')
+        source = self.config / f'input-{self.runs}.wav'
+        result = self.config / f'output-{self.runs}.wav'
+        fixtures.write_float_wav(source, rate, inputs)
+        run = subprocess.run([str(self.benchmark), '--nopause', '--verbose', '-i', str(source),
+                              '-o', str(result)], capture_output=True, text=True,
+                             errors='replace', timeout=120)
+        log = run.stdout + run.stderr
+        if run.returncode != 0 or not result.exists():
+            raise AssertionError(f'Benchmark.exe failed ({run.returncode}):\n{log}')
+        outputs = read_wav(result)
+        source.unlink()
+        result.unlink()
+        return outputs, log
+
+    def check(self, label, include, rate, inputs, wanted):
+        actual, log = self.process(f'Include: {include}', rate, inputs)
+        error = fixtures.worst_error(actual, wanted)
+        if error > RUNTIME_TOLERANCE:
+            raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n{log}')
+        print(f'{label}: Equalizer APO worst error {error:.3g}')
+
+
+def read_wav(path):
+    """Planar samples of a 32-bit float or 16-bit PCM WAV."""
+    data = Path(path).read_bytes()
+    fmt = data.find(b'fmt ')
+    tag, _, _, _, _, bits = struct.unpack('<HHIIHH', data[fmt + 8:fmt + 24])
+    if bits == 32:
+        return fixtures.read_float_wav(path)
+    with wave.open(str(path), 'rb') as file:
+        assert file.getsampwidth() == 2, f'{path}: {file.getsampwidth() * 8}-bit samples'
+        channels = file.getnchannels()
+        frames = file.readframes(file.getnframes())
+    samples = struct.unpack(f'<{len(frames) // 2}h', frames)
+    return [[v / 32768.0 for v in samples[c::channels]] for c in range(channels)]
+
+
+RUNTIME = None  # Set in main() when --benchmark is given.
+
+
 # --- Helpers ---------------------------------------------------------------------
 
 def run(*args, ok=True):
@@ -255,6 +336,8 @@ def check(label, folder, rate, device, inputs, expected, used):
     error = fixtures.worst_error(actual, wanted)
     assert error <= TOLERANCE, f'{label}: worst error {error:.3g}'
     print(f'{label}: worst error {error:.3g}')
+    if RUNTIME:
+        RUNTIME.check(label, folder.resolve() / 'convolver.txt', rate, padded, wanted)
     return error
 
 
@@ -266,6 +349,10 @@ def silent(label, folder, rate, device, frames=200):
     assert loudest == 0.0, f'{label}: not silent ({loudest:.3g})'
     assert not any(kind == 'convolution' for kind, _ in model.filters), label
     print(f'{label}: silent')
+    if RUNTIME:
+        RUNTIME.check(label, folder.resolve() / 'convolver.txt', rate,
+                      [fixtures.noise(frames, 700 + c) for c in range(device)],
+                      [[0.0] * frames for _ in range(device)])
 
 
 def write_cfg(path, text):
@@ -387,6 +474,14 @@ def test_choice_and_include(work):
     error = fixtures.worst_error([c[:frames] for c in actual], [c[:frames] for c in wanted])
     assert error <= TOLERANCE, f'include: worst error {error:.3g}'
     print(f'include: worst error {error:.3g}')
+    if RUNTIME:
+        padded = [c + [0.0] * (len(wanted[0]) - len(c)) for c in inputs]
+        actual, log = RUNTIME.process(
+            f'Channel: 1\nInclude: {(config / "room/convolver.txt").resolve()}\nPreamp: -6 dB',
+            fixtures.RATE, padded)
+        error = fixtures.worst_error(actual, wanted)
+        assert error <= RUNTIME_TOLERANCE, f'include: Equalizer APO worst error {error:.3g}\n{log}'
+        print(f'include: Equalizer APO worst error {error:.3g}')
 
 
 def test_names(work):
@@ -427,6 +522,11 @@ def test_refusals(work):
 
 
 def main():
+    global RUNTIME
+    if OPTIONS.benchmark or OPTIONS.config:
+        if not (OPTIONS.benchmark and OPTIONS.config):
+            ARGUMENTS.error('--benchmark and --config go together')
+        RUNTIME = Runtime(OPTIONS.benchmark, OPTIONS.config)
     with tempfile.TemporaryDirectory() as temporary:
         work = Path(temporary)
         test_first_use(work)
@@ -434,7 +534,8 @@ def main():
         test_choice_and_include(work)
         test_names(work)
         test_refusals(work)
-    print('Equalizer APO export: all checks passed')
+    print('Equalizer APO export: all checks passed' +
+          (f', {RUNTIME.runs} of them also in Equalizer APO' if RUNTIME else ''))
 
 
 if __name__ == '__main__':
