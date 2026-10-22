@@ -11,7 +11,8 @@ reviewed on 21 October against `75f3924`, and the plug-in plans again against
 In short: the main open themes are first-use examples and documentation
 automation (DOC), plug-in release qualification and host testing (REL, HOST),
 unused VST3 SDK features (VST3), VST3, LV2 and AU plug-ins developed in parallel (PLUG, LV2, AU), a parked FFmpeg filter (FFMPEG), checks against other configuration readers
-(CFG), large files and resampling (IO), precise no-clip headroom (GAIN), longer
+(CFG), large files and resampling (IO), precise no-clip headroom (GAIN), how
+diagnostics reach the user once the plug-ins exist (DIAG), longer
 stress testing (ROBUST), and FFT or performance work only where measurements
 justify it (FFT, PERF). The
 [limitations table](#documented-limitations) lists current constraints.
@@ -44,6 +45,7 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1** | FFMPEG-1 reuses DOC-1 fixtures. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
+| 5. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once VST3-7, PLUG-3, LV2-1 to LV2-4 and AU-1 to AU-4 are implemented, so every surface that can report an error exists. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
 
@@ -101,6 +103,28 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   correction, an export to Equalizer APO's `Convolution:`/`Copy:` configuration
   is likely cheaper than an MFT or our own APO. See the
   [MFT plan](docs/plans/2026-10-21-media-foundation-transform.md).
+- [ ] **DIAG-1 — Review how diagnostics reach the user.** Do this once the
+  current plug-in plans are implemented (see the
+  [execution priorities](#execution-priorities)). For every failure a user can
+  meet, check where the explanation is produced and where it actually appears,
+  in the CLI, the preset tool and each plug-in format. The CLI prints
+  explanatory messages on standard error (for example, a configuration that
+  matches nothing lists each candidate and what to change) and `--json` reports
+  diagnostics. The plug-ins have no editor: today a VST3 preset with the wrong
+  rate or channel counts, or with corrupt state, is reported to the host only as `kResultFalse` or a failed activation, and the explanation is
+  lost. The plan sends errors to the host's log and a status where a format has
+  one (LV2 `log:log` and status port); VST3 and AU have no agreed place yet,
+  and an editor is VST3-3/HOST-2. Make a table of failures (missing or
+  unreadable filter, rate mismatch, channel count or layout mismatch, corrupt
+  or newer state, failed preparation, failed activation) against surfaces (CLI
+  standard error, exit status and `--json`; preset tool; VST3 return codes and
+  what named hosts show; LV2 log and status port; AU `OSStatus` and the macOS
+  log). Then propose where each message should appear without an editor (for
+  example a read-only status parameter, the host's log or the system log) for
+  jrp to decide, using the same explanatory text everywhere. jrp prefers
+  diagnostics that explain generously: what failed, why, and what to change,
+  without needing the documentation (owner, 21 October 2026). Add tests that
+  each failure produces its message on each surface.
 
 ## Plug-ins: VST3, LV2 and AU
 
