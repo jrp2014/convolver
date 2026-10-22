@@ -290,6 +290,12 @@ Per format:
 
 ## Shared test harness (PLUG-2)
 
+Implemented 22 October 2026 (PR #28) in `tests/plugins/`; the
+[testing guide](../testing.md#plug-in-comparisons-plug-2) describes the cases
+as built. The fixtures are the DOC-1 first-use examples, written by
+`tests/plugins/fixtures.py`, whose helpers the release example generator and
+the pluginval acceptance test now share.
+
 Comparing an adapter with the CLI render shows that the adapter is wired up
 correctly, but both use the same engine and could share a defect. So the
 harness has two references, and every adapter's tests use both:
