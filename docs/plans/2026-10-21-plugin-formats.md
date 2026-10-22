@@ -626,7 +626,8 @@ AUv2 effects.
   (all-lowercase codes are Apple's) and must not be `DEMO`. Hosts identify an AU
   by the type, subtype and manufacturer together; no other use of `CONV` was
   found in public sources, which cannot prove it is unused. The subtype repeats
-  the historical VST2 ID `'Conv'`. Forks must change the codes. Record them with
+  the historical VST2 ID `'Conv'`. Forks should change the manufacturer code
+  (see [plug-in identities](../plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
   the other permanent IDs in PLUG-4 and never change them after release.
 - **Channels:** advertise the PLUG-4 channel counts through
   `kAudioUnitProperty_SupportedNumChannels`, including unequal pairs such as

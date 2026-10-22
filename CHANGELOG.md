@@ -34,7 +34,7 @@ Until 1.0 the C++ API may change between minor versions.
   and LV2. The build generates `convolver_identities.hpp` from it, and new tests
   (`identities`, `vst3.identities`) stop identities from changing or being copied
   elsewhere. See [plug-in identities](docs/plugin-identities.md); modified
-  builds should change every value.
+  builds should change the product identities it lists.
 - VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
   [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
   Linux, macOS (with real-time-safety checks) and Windows, plus acceptance
