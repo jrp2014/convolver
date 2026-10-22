@@ -3,7 +3,7 @@
 
 Equalizer APO is a Windows audio-engine component, so CI cannot run it. The model
 below executes the commands the export writes (Eval, If/EndIf, Channel, Copy,
-Delay, Convolution) the way Equalizer APO 1.4.2's sources do: the same line
+Delay, Convolution, Preamp) the way Equalizer APO 1.4.2's sources do: the same line
 splitting, the same channel-name lookup, Copy computed from the channels as they
 were before the line, created ("virtual") channels, mono IRs applied to each
 selected channel in place without latency, and the device's sample rate and
@@ -169,6 +169,13 @@ class EqualizerApo:
             raise ModelError(f'unexpected Delay {value!r}')
         self.filters.append(('delay', (self.selection[:], int(match.group(1)))))
 
+    def command_Preamp(self, value, path):
+        match = re.fullmatch(r'\s*(-?\d+(?:\.\d*)?)\s*dB\s*', value)
+        if not match:
+            raise ModelError(f'unexpected Preamp {value!r}')
+        gain = 10.0 ** (float(match.group(1)) / 20.0)
+        self.filters.append(('gain', (self.selection[:], gain)))
+
     def command_Convolution(self, value, path):
         file = path.parent / value.strip()
         channels, rate = fixtures.read_float_wav(file, with_rate=True)
@@ -197,6 +204,10 @@ class EqualizerApo:
                 names, delay = data
                 for name in names:
                     signal[name] = ([0.0] * delay + signal[name])[:frames]
+            elif kind == 'gain':
+                names, gain = data
+                for name in names:
+                    signal[name] = [gain * v for v in signal[name]]
             else:
                 for name, taps in data:
                     x = signal[name]
@@ -205,7 +216,9 @@ class EqualizerApo:
                         for n in range(k, frames):
                             y[n] += tap * x[n - k]
                     signal[name] = y
-        return [signal[name] for name in self.names[:self.device_channels]]
+        # The audio engine receives 32-bit floats.
+        return [[fixtures.to_float32(v) for v in signal[name]]
+                for name in self.names[:self.device_channels]]
 
 
 # --- Helpers ---------------------------------------------------------------------
@@ -220,7 +233,7 @@ def run(*args, ok=True):
 
 
 def check(label, folder, rate, device, inputs, expected, used):
-    """Run the export on a device; channels beyond `used` must pass through."""
+    """Run the export on a device; channels beyond `used` must be silent."""
     frames = len(expected[0]) if expected else len(inputs[0])
     extra = [fixtures.noise(frames, 900 + c) for c in range(device - len(inputs))]
     padded = [c + [0.0] * (frames - len(c)) for c in inputs] + extra
@@ -228,11 +241,21 @@ def check(label, folder, rate, device, inputs, expected, used):
     actual = model.process(padded)
     wanted = [list(c) for c in expected]
     wanted += [[0.0] * frames for _ in range(len(expected), used)]
-    wanted += [padded[c] for c in range(used, device)]
+    wanted += [[0.0] * frames for _ in range(used, device)]
     error = fixtures.worst_error(actual, wanted)
     assert error <= TOLERANCE, f'{label}: worst error {error:.3g}'
     print(f'{label}: worst error {error:.3g}')
     return error
+
+
+def silent(label, folder, rate, device, frames=200):
+    """No filter fits: every channel must be silent, not unfiltered."""
+    model = EqualizerApo(folder / 'convolver.txt', rate, device)
+    actual = model.process([fixtures.noise(frames, 700 + c) for c in range(device)])
+    loudest = max(abs(v) for channel in actual for v in channel)
+    assert loudest == 0.0, f'{label}: not silent ({loudest:.3g})'
+    assert not any(kind == 'convolution' for kind, _ in model.filters), label
+    print(f'{label}: silent')
 
 
 def write_cfg(path, text):
@@ -254,9 +277,10 @@ def test_first_use(work):
         for device in (used, used + 2):
             check(f'{name} on {device} channels', folder, fixtures.RATE, device, inputs,
                   expected, used)
-        # Other sample rates pass through unchanged.
-        model = EqualizerApo(folder / 'convolver.txt', 44100, used)
-        assert model.filters == [], f'{name}: filtered at 44.1 kHz'
+        # Another sample rate, or a device too large to silence channel by
+        # channel, gets silence rather than unfiltered audio.
+        for rate, device in ((44100, used), (fixtures.RATE, 33)):
+            silent(f'{name} at {rate} Hz on {device} channels', folder, rate, device)
 
 
 def test_list(work):
@@ -317,10 +341,10 @@ def test_list(work):
     x1 = signal(1, 500)
     c_paths = [dict(ir=c, inputs=[(0, 1.0)], outputs=[(0, 1.0)])]
     check('list: c.wav at 48 kHz, 1 channel', out, 48000, 1, x1, oracle(x1, c_paths, 1), 1)
-    # Stereo at 48 kHz: c.wav fits (filters channel 1); channel 2 passes through.
+    # Stereo at 48 kHz: c.wav fits (filters channel 1); channel 2 is silent.
     check('list: c.wav at 48 kHz, 2 channels', out, 48000, 2, x1, oracle(x1, c_paths, 1), 1)
-    # No entry at 96 kHz: nothing is loaded.
-    assert EqualizerApo(out / 'convolver.txt', 96000, 2).filters == []
+    # No entry at 96 kHz: silence.
+    silent('list: 96 kHz', out, 96000, 2)
 
 
 def test_refusals(work):

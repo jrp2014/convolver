@@ -19,6 +19,9 @@
 // - "Convolution:" with a mono file filters each selected channel separately
 //   in place, without added latency; "Delay: N samples" rounds N to an integer.
 // - Include restores the including file's channel selection afterwards.
+// - "If:" and "Eval:" run while the file loads, so only the chosen filter's
+//   commands exist. "Channel: all" selects created channels too, and
+//   "Preamp: -1000 dB" multiplies by 1e-50, which is 0 as a 32-bit float.
 namespace convolver::equalizer_apo {
 namespace {
 std::string number(float value) {
@@ -170,26 +173,59 @@ Export make_export(const std::vector<Source>& sources, const std::vector<std::st
     out += "#\n"
            "# Applies the first filter below whose sample rate is the device's and\n"
            "# whose channels the device has: an exact channel count first, then a\n"
-           "# device with more channels (those extra channels pass through unchanged).\n"
-           "# Without a match, audio passes through unchanged. Channel 1 here is\n"
-           "# Convolver's channel 0, in Windows speaker order.\n\n";
+           "# device with more channels, up to " +
+           std::to_string(max_device_channels) +
+           ", whose extra channels are silenced.\n"
+           "# Without a match every channel is silenced rather than played\n"
+           "# unfiltered. Channel 1 here is Convolver's channel 0, in Windows\n"
+           "# speaker order.\n\n";
     if (result.filters.empty())
         return result;
-    out += "Eval: convolverFilter = 0\n";
+    out += "Eval: convolverFilter = 0\nEval: convolverChannels = 0\n";
     for (const bool exact : {true, false}) {
         out += exact ? "# A device with exactly the filter's channels\n"
                      : "# A device with more channels than the filter's\n";
         for (std::size_t n = 0; n < result.filters.size(); ++n) {
             const auto& f = result.filters[n];
+            if (!exact && f.device_channels >= max_device_channels)
+                continue;
+            std::string indent = "  ";
             out +=
                 "If: sampleRate == " + std::to_string(sources[f.source].configuration.sample_rate) +
                 '\n';
             out += "  If: outputChannelCount " + std::string(exact ? "==" : ">") + ' ' +
                    std::to_string(f.device_channels) + '\n';
-            out += "    If: convolverFilter == 0\n      Eval: convolverFilter = " +
-                   std::to_string(n + 1) + "\n    EndIf:\n  EndIf:\nEndIf:\n";
+            if (!exact) {
+                out += "    If: outputChannelCount < " + std::to_string(max_device_channels + 1) +
+                       '\n';
+                indent += "  ";
+            }
+            out += indent + "  If: convolverFilter == 0\n";
+            out += indent + "    Eval: convolverFilter = " + std::to_string(n + 1) + '\n';
+            out += indent + "    Eval: convolverChannels = " + std::to_string(f.device_channels) +
+                   '\n';
+            out += indent + "  EndIf:\n";
+            if (!exact)
+                out += "    EndIf:\n";
+            out += "  EndIf:\nEndIf:\n";
         }
     }
+    out += "# No filter fits this device: silence every channel (-1000 dB is far\n"
+           "# below the smallest sample a 32-bit float can hold)\n"
+           "If: convolverFilter == 0\n  Channel: all\n  Preamp: -1000 dB\nEndIf:\n";
+    // Device channels beyond the filter's carry no filtered audio: silence them
+    // rather than let them play unfiltered.
+    const auto fewest = std::min_element(result.filters.begin(), result.filters.end(),
+                                         [](const Filter& a, const Filter& b) {
+                                             return a.device_channels < b.device_channels;
+                                         })
+                            ->device_channels;
+    if (fewest < max_device_channels)
+        out += "# Silence the device channels the filter does not use\n";
+    for (auto channel = fewest + 1; channel <= max_device_channels; ++channel)
+        out += "If: outputChannelCount > " + std::to_string(channel - 1) +
+               "\n  If: convolverChannels < " + std::to_string(channel) +
+               "\n    Copy: " + std::to_string(channel) + "=0.0\n  EndIf:\nEndIf:\n";
     Impulses impulses(result.impulses);
     for (std::size_t n = 0; n < result.filters.size(); ++n) {
         out += '\n';

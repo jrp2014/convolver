@@ -28,6 +28,8 @@ constexpr const char* usage =
     "              or a configuration list; every entry of a list is exported\n"
     "  NEW_FOLDER  a new folder to create, holding convolver.txt and the\n"
     "              impulse responses as WAV files\n"
+    "A device that no exported filter fits (another sample rate or too few\n"
+    "channels) is silenced, not played unfiltered.\n"
     "Copy the folder into Equalizer APO's config folder and add a line such as\n"
     "  Include: NEW_FOLDER\\convolver.txt\n"
     "to its config.txt. See docs/equalizer-apo.md.\n";
@@ -112,18 +114,29 @@ int export_folder(const fs::path& input, const fs::path& folder) {
             std::cout << "Filter " << n + 1 << " (" << sources[f.source].label
                       << ") applies to a device at " << c.sample_rate << " Hz with "
                       << f.device_channels << (f.device_channels == 1 ? " channel" : " channels")
-                      << " or more: " << c.input_channels << " in, " << c.output_channels
-                      << " out.\n";
+                      << (f.device_channels < eapo::max_device_channels
+                              ? " (or more, up to " + std::to_string(eapo::max_device_channels) +
+                                    ", the extra ones silent)"
+                              : std::string())
+                      << ": " << c.input_channels << " in, " << c.output_channels << " out.\n";
         }
         for (const auto& note : result.skipped)
             std::cout << "Note: " << note << '\n';
+        for (std::size_t n = 0; n < result.filters.size(); ++n)
+            if (result.filters[n].device_channels == 1)
+                std::cout << "Note: filter " << n + 1
+                          << " has one channel, so on a stereo device only the left channel\n"
+                             "plays (filtered) and the right is silent. To filter both, export a "
+                             ".cfg\nthat applies the impulse response to each channel; "
+                             "docs/equalizer-apo.md shows one.\n";
         std::cout << "To use it: copy the folder into Equalizer APO's config folder (usually\n"
                      "C:\\Program Files\\EqualizerAPO\\config), add the line\n"
                      "  Include: "
                   << folder_name << '\\' << eapo::text_file_name
                   << "\n"
                      "to config.txt there, and set the device's sample rate in Windows sound\n"
-                     "settings to one listed above. Other rates play unfiltered.\n";
+                     "settings to one listed above. A device that no filter fits is silenced\n"
+                     "rather than played unfiltered.\n";
         return 0;
     } catch (const std::exception& e) {
         if (created) {

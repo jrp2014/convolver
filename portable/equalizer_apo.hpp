@@ -31,6 +31,10 @@ struct Export {
 };
 // The text file's name inside the exported folder.
 inline constexpr const char* text_file_name = "convolver.txt";
+// Largest device a filter applies to when the device has more channels than
+// the filter. The export silences the extra channels one by one, so it needs
+// a bound; larger devices are silenced entirely.
+inline constexpr std::size_t max_device_channels = 32;
 // Device channels a configuration occupies: its inputs and outputs share them.
 std::size_t device_channels(const Configuration&) noexcept;
 // header: comment lines (without '#') placed at the top of the text.
