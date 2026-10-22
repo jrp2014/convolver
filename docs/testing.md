@@ -314,9 +314,10 @@ against the current program as well as checking links.
 ## Fuzz smoke tests and longer campaigns
 
 [The fuzz guide](../tests/fuzz/README.md) describes the four harnesses and corpus
-replay. Pull request and `main` CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
-resource bounds. A manual workflow run defaults to 600 seconds per target;
-set its `seconds` input to `60` to reproduce the smoke-test budget. Keep crashes
+replay. CI runs each libFuzzer target for 60 seconds on pull requests and
+`main`, with ASan/UBSan and resource bounds. A manual workflow run defaults to
+600 seconds per target; set its `seconds` input to `60` to reproduce the
+smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
 
 ## Plug-in candidate checks
@@ -342,10 +343,11 @@ once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
 cancels the runs still going for the commit it replaces. Runs on `main` and
-manual runs are never cancelled this way.
+manual runs are never cancelled this way. Re-run only the latest commit's runs:
+re-running an older commit's run cancels the current one.
 
-This keeps the queue short. GitHub runs at most 20 of the repository owner's
-jobs at once, and only 5 on macOS, and one commit starts about 18 jobs, 5 of
-them on macOS. When the same commit also ran for the branch push, and older
+This keeps the queue short. On the owner's Free plan GitHub runs at most 20
+jobs at once across the account's repositories, and only 5 on macOS, and one
+commit starts about 18 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
