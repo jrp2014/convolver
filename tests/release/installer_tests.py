@@ -16,8 +16,8 @@ class InstallerTests(unittest.TestCase):
         cls.installers = installers
 
     def test_owned_paths(self):
-        owned = self.installers.destinations(['VST3/Convolver.vst3/Contents/x86_64-win/Convolver.vst3', 'presets/identity/filter.vstpreset', 'bin/convolver-vst3-preset.exe'], 'Windows')
-        self.assertEqual(owned['bin/convolver-vst3-preset.exe'], '$INSTDIR\\bin\\convolver-vst3-preset.exe')
+        owned = self.installers.destinations(['VST3/Convolver.vst3/Contents/x86_64-win/Convolver.vst3', 'presets/identity/filter.vstpreset', 'bin/convolver-preset.exe'], 'Windows')
+        self.assertEqual(owned['bin/convolver-preset.exe'], '$INSTDIR\\bin\\convolver-preset.exe')
         self.assertEqual(owned['VST3/Convolver.vst3/Contents/x86_64-win/Convolver.vst3'], '$COMMONFILES64\\VST3\\Convolver.vst3\\Contents\\x86_64-win\\Convolver.vst3')
         user_files = {'$INSTDIR\\presets\\my-own.vstpreset', '$COMMONFILES64\\VST3\\Other.vst3'}
         self.assertTrue(user_files.isdisjoint(owned.values()))
