@@ -40,8 +40,8 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 AU codes are the owner's decision of 21 October 2026. The LV2 URI scheme, the
 eight fixed layouts and the move of the macOS identifiers from `org.convolver.*`
 (a domain the project does not control) to `io.github.jrp2014.convolver.*` are
-proposed in [PLUG-4](../TODO.md#plug-ins-vst3-lv2-and-au) and await jrp's
-decision. The VST3 class IDs are the ones the adapter has always used.
+the owner's decision of 22 October 2026. The VST3 class IDs are the ones the
+adapter has always used.
 
 About the AU codes: hosts identify an Audio Unit by type, subtype and
 manufacturer together. Apple no longer runs a registration service for the
@@ -101,7 +101,7 @@ against the SDK headers.
 **Channel counts.** VST3 (and AU, when it exists) accepts any input and output
 count from 1 to 8, and the counts may differ (2 in, 6 out for a crossover).
 LV2 plug-ins have fixed ports, so LV2 publishes one plug-in for each **fixed
-layout** in the registry. Proposed (awaiting jrp): 1→1, 2→2, 1→2, 2→4, 2→6, 2→8,
+layout** in the registry (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4, 2→6, 2→8,
 6→6 and 8→8, all discrete, with ids such as `discrete-2-6`, so the 2→6 plug-in
 is `https://github.com/jrp2014/convolver/lv2#discrete-2-6`. More are added only
 on request. Layout names give counts and meaning ("2→6 discrete"), never a
