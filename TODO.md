@@ -220,8 +220,9 @@ Shared groundwork, done once so the three streams stay independent:
   the merged `codex/plugin-distribution` branch): `git show
   f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
   Progress 22 October 2026 (PR #38): preview packages ship `convolver-preset`
-  and `convolver-equalizer-apo` on every platform instead of the older
-  `convolver-vst3-preset`, with the presets and Equalizer APO guides;
+  and `convolver-equalizer-apo` on every platform, and not the older
+  `convolver-vst3-preset` (owner's decisions, 22 October 2026), with the
+  presets and Equalizer APO guides;
   `release.stage`, `package_smoke.py` and `verify_artifact.py` require and run
   both tools.
 - [x] **PLUG-6 — Pin format dependencies.** Done 22 October 2026 (PR #31).
