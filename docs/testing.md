@@ -26,7 +26,8 @@ Contents: [native tests](#native-production-tests),
 [plug-in comparisons](#plug-in-comparisons-plug-2),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
-[documentation checks](#documentation-checks) and [fuzzing](#fuzz-smoke-tests-and-longer-campaigns).
+[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
+and [when CI runs](#ci-triggers).
 
 ## Native production tests
 
@@ -313,7 +314,7 @@ against the current program as well as checking links.
 ## Fuzz smoke tests and longer campaigns
 
 [The fuzz guide](../tests/fuzz/README.md) describes the four harnesses and corpus
-replay. Push CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
+replay. Pull request and `main` CI runs each libFuzzer target for 60 seconds with ASan/UBSan and
 resource bounds. A manual workflow run defaults to 600 seconds per target;
 set its `seconds` input to `60` to reproduce the smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
@@ -332,3 +333,19 @@ Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
 qualification. Never bypass system security to turn those checks green.
+
+## CI triggers
+
+The test workflows run for every pull request, for every push to `main` and
+when started by hand. A commit pushed to a branch that has a pull request runs
+once, as part of that pull request; a branch without one gets no automatic
+run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
+or use Actions, then "Run workflow" on the branch. A new commit on a pull request
+cancels the runs still going for the commit it replaces. Runs on `main` and
+manual runs are never cancelled this way.
+
+This keeps the queue short. GitHub runs at most 20 of the repository owner's
+jobs at once, and only 5 on macOS, and one commit starts about 18 jobs, 5 of
+them on macOS. When the same commit also ran for the branch push, and older
+commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
+a macOS runner (up to an hour) while taking about 3 minutes to run.
