@@ -36,26 +36,6 @@ jobs:
             "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
             meson ninja-build pkg-config libelf-dev
           lv2info --version
-      - name: Pinned lv2lint
-        run: |
-          archive="$RUNNER_TEMP/lv2lint-$LV2LINT_VERSION.tar.xz"
-          # Upstream snapshot first, then the FreeBSD distfile cache; the
-          # checksum (also FreeBSD's) decides either way.
-          for url in \
-            "https://git.open-music-kontrollers.ch/lv2/lv2lint/snapshot/lv2lint-$LV2LINT_VERSION.tar.xz" \
-            "https://distcache.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz"; do
-            if curl -fsSL --retry 3 -o "$archive" "$url" &&
-               echo "$LV2LINT_SHA256  $archive" | sha256sum --check --strict; then
-              break
-            fi
-            rm -f "$archive"
-          done
-          test -f "$archive" || { echo "No lv2lint $LV2LINT_VERSION archive matched the pinned checksum" >&2; exit 1; }
-          mkdir "$RUNNER_TEMP/lv2lint"
-          tar -xJf "$archive" -C "$RUNNER_TEMP/lv2lint" --strip-components=1
-          meson setup "$RUNNER_TEMP/lv2lint-build" "$RUNNER_TEMP/lv2lint" --buildtype=release
-          ninja -C "$RUNNER_TEMP/lv2lint-build"
-          sudo ninja -C "$RUNNER_TEMP/lv2lint-build" install
       - name: Pinned lv2 source (release policy)
         run: >-
           python scripts/release/sources.py --fetch
@@ -81,5 +61,31 @@ jobs:
           print(f'eg-amp at 0 dB, worst difference from its input: {error}')
           sys.exit(error != 0.0)
           EOF
+      - name: Pinned lv2lint
+        run: |
+          archive="$RUNNER_TEMP/lv2lint-$LV2LINT_VERSION.tar.xz"
+          # Upstream first, then FreeBSD's distfile caches (plain HTTP on the
+          # main name, whose certificate does not match); the checksum, which
+          # is FreeBSD's, decides whichever answers.
+          for url in \
+            "https://git.open-music-kontrollers.ch/~hp/lv2lint/snapshot/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "https://distcache.us-east.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "https://distcache.eu.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz"; do
+            if curl -fsSL --retry 3 -o "$archive" "$url"; then
+              if echo "$LV2LINT_SHA256  $archive" | sha256sum --check --strict; then
+                echo "lv2lint $LV2LINT_VERSION from $url"
+                break
+              fi
+              sha256sum "$archive"
+            fi
+            rm -f "$archive"
+          done
+          test -f "$archive" || { echo "No lv2lint $LV2LINT_VERSION archive matched the pinned checksum" >&2; exit 1; }
+          mkdir "$RUNNER_TEMP/lv2lint"
+          tar -xJf "$archive" -C "$RUNNER_TEMP/lv2lint" --strip-components=1
+          meson setup "$RUNNER_TEMP/lv2lint-build" "$RUNNER_TEMP/lv2lint" --buildtype=release
+          ninja -C "$RUNNER_TEMP/lv2lint-build"
+          sudo ninja -C "$RUNNER_TEMP/lv2lint-build" install
       - name: lv2lint checks a plug-in
         run: lv2lint -I "$LV2_PATH/eg-amp.lv2/" http://lv2plug.in/plugins/eg-amp
