@@ -90,7 +90,8 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
     if (format != 1 && format != version)
         throw std::invalid_argument("unsupported host state");
     auto flags = r.word();
-    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5)
+    // Version 2 only ever marks a failed load (flag 4), never with a filter.
+    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == version && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
     HostState state;
     state.bypass = (flags & 2) != 0;

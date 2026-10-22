@@ -51,5 +51,5 @@ duration per target, and failing inputs are kept as the `fuzz-findings` artifact
 
 `make_seeds.py` regenerates the configuration, list and IR seeds from the
 [compatibility corpus](../compatibility/README.md). The host-state seeds
-(`identity`, `bypass`, `matrix`) come from the C++ state encoder and are committed
-as they are.
+(`identity`, `bypass`, `matrix`, and the version-2 `failed` and `failed-bypass`)
+come from the C++ state encoder and are committed as they are.

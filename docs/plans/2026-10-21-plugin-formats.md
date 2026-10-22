@@ -223,6 +223,8 @@ filter directly when nothing has been processed since construction or reset.
 records "load failed" (flag 4, state version 2; owner's decision, 22 October
 2026) and no filter, so reopening the project plays silence again instead of
 an empty instance's identity. Only this state is written as version 2.
+Restoring it is a successful load of what was saved, not a rejected
+replacement, so it replaces a working filter with silence.
 
 A replacement is accepted only after it has been fully validated and prepared,
 so rejection never disturbs the running filter. The rejected request is not

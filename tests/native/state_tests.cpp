@@ -64,11 +64,16 @@ int main() {
         for (auto bad :
              {std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 1, 0, 0, 0, 4, 0, 0, 0}),
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 8, 0, 0, 0}),
+              // Version 2 without the failed flag is never written.
+              std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 0, 0, 0, 0}),
+              std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 2, 0, 0, 0}),
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0})})
             rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad))); });
         auto failed_with_filter = encode_host_state(identity);
         failed_with_filter[4] = std::byte{2};
         failed_with_filter[8] = std::byte{5};
+        rejects([&] { (void)decode_host_state(failed_with_filter); });
+        failed_with_filter[8] = std::byte{1};
         rejects([&] { (void)decode_host_state(failed_with_filter); });
         HostState state;
         state.bypass = true;

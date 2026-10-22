@@ -109,8 +109,9 @@ speaker format such as "5.1", because six crossover outputs are not 5.1 speakers
 
 ## Presets without a layout
 
-The current host state (version 1) stores the input and output channel counts
-and an *output* channel mask, and no input layout. Hence:
+The current host state (version 1, or version 2 for a saved failed load, which
+records no filter) stores the input and output channel counts and an *output*
+channel mask, and no input layout. Hence:
 
 - A version-1 preset, or any filter with no recorded layout, is **unspecified**
   and treated as discrete on both sides. It loads on every host arrangement with

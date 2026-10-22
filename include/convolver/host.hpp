@@ -8,7 +8,9 @@
 namespace convolver {
 // Versioned self-contained host state. All codec calls are control-thread only.
 struct HostState {
-    std::optional<Configuration> configuration; // Absent means identity at host rate/layout.
+    // Absent means an empty instance: identity at the host's rate and layout for
+    // equal counts, otherwise (or when failed is set) silence.
+    std::optional<Configuration> configuration;
     bool bypass = false;
     // A load failed and nothing was accepted, so the instance plays silence;
     // saved so that reopening a project stays silent. Never with a configuration.

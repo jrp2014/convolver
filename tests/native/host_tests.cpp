@@ -289,6 +289,13 @@ void filter_contract() {
             "saved failed load does not restore as silence");
     require(reopened.activate(stereo).paths[0].impulse == std::vector<float>{0},
             "saved failed load activates as identity");
+    // Restoring it over a working filter restores what was saved: silence.
+    HostFilter working(8);
+    working.load(HostState{a}, stereo);
+    working.load(failed_state, stereo, [&](const Configuration& c) { installed = c; });
+    require(working.failed() && !working.filter() &&
+                installed.paths[0].impulse == std::vector<float>{0},
+            "saved failed load over a working filter does not restore as silence");
     auto contradictory = failed_state;
     contradictory.configuration = a;
     expect_rejection([&] { HostFilter(8).load(contradictory, stereo); },
