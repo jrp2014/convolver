@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/engine.hpp"
+#include <functional>
 #include <optional>
+#include <string>
 
 namespace convolver {
 // Versioned self-contained host state. All codec calls are control-thread only.
@@ -12,6 +14,63 @@ struct HostState {
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 std::vector<std::byte> encode_host_state(const HostState&);
 HostState decode_host_state(std::span<const std::byte>);
+
+// The sample rate and channel counts a host has negotiated.
+struct HostLayout {
+    int sample_rate = 0;
+    std::size_t inputs = 0, outputs = 0;
+};
+
+// What an instance plays without a usable filter, under the shared adapter
+// contract: identity (input c to output c) for an empty instance with equal
+// counts; exact silence for unequal counts or when `failed` (a failed initial
+// load or a filter that does not suit the host).
+Configuration unfiltered_configuration(const HostLayout&, bool failed);
+
+// Control side of the shared adapter contract, for every plug-in format
+// (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract): which
+// filter a load replaces, which filter is saved, and what plays. It does no
+// audio work; adapters call it under their control lock.
+class HostFilter {
+  public:
+    // `max_channels` is the format's channel bound, a check on the state itself.
+    explicit HostFilter(std::size_t max_channels = 256) : max_channels_(max_channels) {}
+    // The accepted filter, which a host saves. Absent for an empty instance and
+    // after a failed initial load.
+    const std::optional<Configuration>& filter() const noexcept {
+        return filter_;
+    }
+    // True after a failed initial load: nothing accepted, and a load failed.
+    bool failed() const noexcept {
+        return failed_;
+    }
+    // Why the instance plays silence or rejected its last load; empty if neither.
+    const std::string& error() const noexcept {
+        return error_;
+    }
+    // Load decoded state: a filter, or none to return to an empty instance.
+    // Checks on the state itself always run. Checks against the host run when
+    // `host` is given (its configuration is known); `install` then receives
+    // what to play and may throw to reject. Without `host`, well-formed state
+    // is accepted and checked at activation. On rejection this records the
+    // error, keeps the accepted filter (a failed initial load if there was
+    // none) and throws std::invalid_argument with an explanation.
+    void load(std::optional<Configuration>, const std::optional<HostLayout>& host,
+              const std::function<void(const Configuration&)>& install = {});
+    // A load that failed before decoding (malformed state, unreadable file):
+    // recorded as load() records a rejection. Does not throw.
+    void reject(std::string why);
+    // What to play under `host` at activation: the accepted filter when it
+    // suits the host. Otherwise silence and an error, keeping the filter, so
+    // correcting the host's rate or layout brings it back.
+    Configuration activate(const HostLayout& host);
+
+  private:
+    std::size_t max_channels_;
+    std::optional<Configuration> filter_;
+    bool failed_ = false;
+    std::string error_;
+};
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
@@ -24,8 +83,12 @@ class HostProcessor {
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
-    void replace(const Configuration&); // Prepare off-thread; latest pending state wins.
-    void collect() noexcept;            // Retire old FFT plans off-thread.
+    // Prepare off-thread; latest pending state wins. A filter that is published
+    // before any frame has been processed since construction or reset is
+    // installed directly; otherwise the new filter warms up for one block and
+    // crossfades over 256 frames.
+    void replace(const Configuration&);
+    void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
     void set_bypass(bool) noexcept;
     std::size_t latency_frames() const noexcept;

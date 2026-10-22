@@ -148,34 +148,10 @@ int main(int argc, char** argv) {
         std::cerr << "usage: " << argv[0] << " FIRST_USE_DIRECTORY/fixtures.txt\n";
         return 2;
     }
-    // Where today's adapter does not follow the shared adapter contract
-    // (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract). VST3-7
-    // removes these; the harness fails once one of them starts passing.
-    test::Options options;
-    const std::string direct =
-        "VST3-7: a filter set while active but before any audio is "
-        "crossfaded in from the empty instance instead of installed directly";
-    const std::string inactive = "VST3-7: while inactive, setState checks only the channel "
-                                 "limit, so a filter at the wrong rate replaces the saved state "
-                                 "and activation then fails, with no output written";
-    const std::string activation = "VST3-7: a configuration mismatch found at activation makes "
-                                   "setActive fail, so process writes nothing instead of silence";
-    for (const char* fixture : {"mono", "stereo", "crossover"}) {
-        const std::string at = std::string("[") + fixture + "]";
-        options.known_deviations.push_back(
-            {"restore-after-activation" + at, "against the oracle: frame 256", direct});
-        options.known_deviations.push_back({"failed-replacement-inactive" + at,
-                                            "wrong sample rate accepted while inactive", inactive});
-        options.known_deviations.push_back(
-            {"failed-initial-load" + at, "wrong sample rate accepted", inactive});
-        options.known_deviations.push_back({"restore-before-setup-mismatch" + at,
-                                            "activation after a mismatched restore failed",
-                                            activation});
-    }
-    options.known_deviations.push_back(
-        {"empty-instance[crossover]", "an empty instance with unequal counts",
-         "VST3-7: an empty instance with unequal counts passes input c to output c "
-         "instead of playing silence"});
+    // The adapter follows the shared adapter contract
+    // (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract), so no
+    // case is listed as a known deviation (VST3-7 removed the last ones).
+    const test::Options options;
     Vst3 adapter;
     return test::run(adapter, argv[1], options);
 }

@@ -199,6 +199,114 @@ void unequal_channels() {
     }
     require(rejected, "replacement changed output channels");
 }
+// Initial restoration: a filter published before any audio since construction
+// or reset is installed directly; afterwards a replacement warms up and fades.
+void direct_installation() {
+    HostProcessor host(mono(), 64, 8);
+    std::array<float, 64> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    host.replace(mono(2));
+    audio_thread = true;
+    host.process(in, out, 64);
+    audio_thread = false;
+    for (std::size_t i = 8; i < 64; ++i)
+        require(output[i] == (i == 8 ? 2.f : 2.25f), "initial filter not installed directly");
+    host.replace(mono(4));
+    audio_thread = true;
+    host.process(in, out, 64);
+    audio_thread = false;
+    require(output[0] == 2.25f, "live replacement skipped warm-up");
+    host.collect();
+    host.reset();
+    host.replace(mono(3));
+    audio_thread = true;
+    for (int k = 0; k < 16; ++k) // Let both transitions finish.
+        host.process(in, out, 64);
+    host.reset();
+    audio_thread = false;
+    host.replace(mono(5));
+    audio_thread = true;
+    host.process(in, out, 64);
+    audio_thread = false;
+    for (std::size_t i = 8; i < 64; ++i)
+        require(std::abs(output[i] - (i == 8 ? 5.f : 5.25f)) < 1e-5,
+                "filter after reset not installed directly");
+    host.collect();
+}
+// The control side of the shared adapter contract, which every format uses.
+void filter_contract() {
+    const HostLayout stereo{48000, 2, 2}, crossover{48000, 2, 6};
+    auto identity = unfiltered_configuration(stereo, false);
+    require(identity.paths.size() == 2 && identity.paths[1].impulse == std::vector<float>{1} &&
+                identity.paths[1].inputs[0].channel == 1 &&
+                identity.paths[1].outputs[0].channel == 1,
+            "empty instance with equal counts is not identity");
+    for (const auto& silent :
+         {unfiltered_configuration(crossover, false), unfiltered_configuration(stereo, true)})
+        require(silent.paths.size() == 1 && silent.paths[0].impulse == std::vector<float>{0} &&
+                    configuration_tail_frames(silent) == 0,
+                "unequal counts or a failed load are not silent");
+    const auto expect_rejection = [](auto&& load, const char* what) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return;
+        }
+        throw std::runtime_error(what);
+    };
+    Configuration a{48000, 2, 2, 0, {}, {}, {{{1, .5f}, {{0, 1}}, {{1, 1}}}}};
+    auto other_rate = a;
+    other_rate.sample_rate = 44100;
+    auto wide = a;
+    wide.input_channels = wide.output_channels = 9;
+
+    // Failed initial load: nothing accepted, so silence with an explanation.
+    HostFilter first(8);
+    require(!first.filter() && !first.failed() && first.error().empty(), "fresh filter state");
+    expect_rejection([&] { first.load(other_rate, stereo); }, "wrong rate accepted");
+    require(first.failed() && !first.filter(), "failed initial load not recorded");
+    require(first.error().find("44100 Hz") != std::string::npos &&
+                first.error().find("plays silence") != std::string::npos,
+            "failed initial load not explained");
+    require(first.activate(stereo).paths[0].impulse == std::vector<float>{0},
+            "failed initial load does not play silence");
+    expect_rejection([&] { first.load(wide, std::nullopt); }, "channel bound unchecked");
+    first.load(std::nullopt, stereo); // Back to an empty instance.
+    require(!first.failed() && first.error().empty() && first.activate(stereo).paths.size() == 2,
+            "empty state does not restore identity");
+
+    // Failed replacement: the accepted filter stays, and install is not called.
+    HostFilter running(8);
+    int installs = 0;
+    running.load(a, stereo, [&](const Configuration&) { ++installs; });
+    require(installs == 1 && running.filter() && running.filter()->paths[0].impulse.size() == 2,
+            "valid filter not installed");
+    expect_rejection([&] { running.load(other_rate, stereo, [&](auto&) { ++installs; }); },
+                     "replacement at the wrong rate accepted");
+    expect_rejection(
+        [&] { running.load(a, stereo, [](const Configuration&) { throw std::bad_alloc(); }); },
+        "failed preparation accepted");
+    require(installs == 1 && !running.failed() && running.filter()->sample_rate == 48000,
+            "failed replacement lost the working filter");
+    require(running.error().find("previous filter keeps playing") != std::string::npos,
+            "failed replacement not explained");
+
+    // Restored before the host is configured: kept, checked at activation.
+    HostFilter early(8);
+    early.load(other_rate, std::nullopt);
+    require(early.filter() && early.filter()->sample_rate == 44100, "early restore not kept");
+    require(early.activate(stereo).paths[0].impulse == std::vector<float>{0} &&
+                early.error().find("44100 Hz") != std::string::npos,
+            "mismatch at activation does not play silence with an error");
+    require(early.filter() && early.activate({44100, 2, 2}).sample_rate == 44100 &&
+                early.error().empty(),
+            "correcting the rate does not bring the filter back");
+    require(early.activate({44100, 2, 6}).paths[0].impulse == std::vector<float>{0} &&
+                early.error().find("2 inputs and 6 outputs") != std::string::npos,
+            "channel mismatch at activation not explained");
+}
 int main() {
     try {
         numeric<float>();
@@ -206,6 +314,8 @@ int main() {
         lifecycle();
         queued_replacements();
         unequal_channels();
+        direct_installation();
+        filter_contract();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

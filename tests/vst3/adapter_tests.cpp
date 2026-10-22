@@ -110,7 +110,35 @@ void edge_cases() {
             "inactive replacement tail including routing delays");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk, "rate change setup");
-    require(p.setActive(true) != kResultOk, "mismatched IR rate activated");
+    // Shared adapter contract: a kept filter that does not suit the host plays
+    // silence (not the unfiltered input), and returns once the rate is corrected.
+    require(p.setActive(true) == kResultOk, "a mismatched IR rate must activate, silent");
+    require(p.getTailSamples() == 0, "silent instance reports a tail");
+    p.setProcessing(true);
+    ParameterChanges wet;
+    index = 0;
+    wet.addParameterData(bypass_id, index)->addPoint(0, 0, index);
+    d.inputParameterChanges = &wet;
+    left.fill(1);
+    right.fill(1);
+    for (int k = 0; k < 3; ++k) {
+        require(p.process(d) == kResultOk, "silent process");
+        d.inputParameterChanges = nullptr;
+    }
+    for (int i = 0; i < 512; ++i)
+        require(out_left[i] == 0 && out_right[i] == 0, "mismatched rate not silent");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "state snapshot at the wrong rate");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->sample_rate == 48000,
+            "mismatched filter not kept as the saved state");
+    p.setProcessing(false);
+    p.setActive(false);
+    setup.sampleRate = 48000;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.getTailSamples() == 1010,
+            "corrected rate does not bring the filter back");
+    p.setActive(false);
     p.terminate();
 }
 void multichannel() {
@@ -176,7 +204,14 @@ void multichannel() {
     p.setProcessing(false);
     p.setActive(false);
     require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 2x6");
-    require(p.setActive(true) != kResultOk, "2x6 preset activated on 8x8 buses");
+    // The 2x6 preset does not suit 8x8 buses: silence, and the preset is kept.
+    require(p.setActive(true) == kResultOk && p.getTailSamples() == 0,
+            "2x6 preset on 8x8 buses must activate, silent");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "state snapshot on 8x8 buses");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->output_channels == 6, "2x6 preset not kept");
+    p.setActive(false);
     convolver::HostState identity;
     MemoryStream empty;
     require(write_state(&empty, identity), "encode identity state");
