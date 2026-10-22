@@ -20,6 +20,7 @@ New readers should start with the [README](README.md) or
 | Float/RAW I/O and PCM8/16/24/32 quantization, optional dither, shaping and valid bits | [I/O implementation](portable/io.cpp), [CLI reference](docs/portable-core.md#integer-formats-dither-and-noise-shaping) | Real files, exact samples/header fields, statistics, stream faults |
 | Fixed and automatic gain estimates | [Attenuation](portable/attenuation.cpp), [CLI behavior](docs/portable-core.md#gain-and-attenuation) | Engine oracle cases for the mathematical peak bound |
 | Persistent host lifecycle and VST3 with 1–8 input and 1–8 output channels | [Host API](include/convolver/host.hpp), [VST3 guide](docs/vst3.md) | Host/state tests and real SDK adapter, preset and bundle-validator tests |
+| Audio Unit (AUv2) effect with 1–8 input and 1–8 output channels, built from source | [AU guide](docs/au.md) | In-process AU host tests (PLUG-2 comparisons, ClassInfo, bypass, silence flag, allocations), bundle checks and `auval -strict` on macOS CI |
 | Independent CMake core/host/io components | [Package guide](docs/cmake-package.md) | Installed/relocated and source-tree consumers |
 
 Tests support the exercised behavior, not every possible input or platform.

@@ -11,14 +11,6 @@
 #include <stdexcept>
 #include <vector>
 
-// HostProcessor::process allocates nothing, locks nothing and does no I/O
-// (tests/native/host_tests.cpp checks the allocations), but it is not
-// annotated [[clang::nonblocking]], so Clang's effect analysis would warn about
-// every call from Render.
-#pragma clang diagnostic ignored "-Wunknown-warning-option"
-#pragma clang diagnostic ignored "-Wfunction-effects"
-#pragma clang diagnostic ignored "-Wperf-constraint-implies-noexcept"
-
 namespace convolver::au {
 namespace {
 void log_error(const std::string& message) {
@@ -71,6 +63,9 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
                CFNumberGetValue(static_cast<CFNumberRef>(value), kCFNumberSInt32Type, &out);
     };
     SInt32 version = -1, subtype = 0, manufacturer = 0;
+    if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
+        return "The preset holds the state of one part of a multi-part instrument, not of a "
+               "whole effect. Make a Convolver preset with convolver-preset.";
     if (!number(kAUPresetVersionKey, version) || version != 0)
         return "The preset is not an Audio Unit preset this plug-in can read (its version "
                "entry is missing or not 0).";
@@ -91,12 +86,13 @@ HostLayout Effect::layout() {
 }
 
 // Initialized, the host's configuration is the current formats. Uninitialized,
-// it is known only while the formats still match the last initialization:
+// it is known only while the formats still match the last initialization that
+// rendered audio (see Cleanup):
 // hosts may restore a project's state before setting its formats, and the
 // default format (44.1 kHz stereo) is not a choice the host has made.
 std::optional<HostLayout> Effect::known_layout() {
     const auto now = layout();
-    if (host_ || (initialized_ && same(*initialized_, now)))
+    if (host_ || (committed_ && same(*committed_, now)))
         return now;
     return std::nullopt;
 }
@@ -125,6 +121,7 @@ OSStatus Effect::Initialize() {
             tail_.store(next->tail_frames());
             host_ = std::move(next);
             initialized_ = host;
+            rendered_.store(false);
             reset_requested_.store(false);
             message = filter_.error();
         } catch (const std::exception& e) {
@@ -139,8 +136,14 @@ OSStatus Effect::Initialize() {
     return noErr;
 }
 
+// An initialization binds the formats only once audio has rendered with it.
+// JUCE hosts initialize and uninitialize at AUBase's default 44.1 kHz just to
+// try a channel layout, then restore the project before preparing to play;
+// counting that probe would turn a 48 kHz project's filter into a failed load.
 void Effect::Cleanup() {
     std::lock_guard lock(control_);
+    if (rendered_.load())
+        committed_ = initialized_;
     host_.reset();
 }
 
@@ -218,12 +221,12 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
     return static_cast<UInt32>(infos.size());
 }
 
-Float64 Effect::GetLatency() AUSDK_RTSAFE {
+Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
     const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
     return rate > 0 ? static_cast<Float64>(latency_frames) / rate : 0;
 }
 
-Float64 Effect::GetTailTime() AUSDK_RTSAFE {
+Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
     const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
@@ -371,7 +374,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
 }
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
-                        UInt32 frames) AUSDK_RTSAFE {
+                        UInt32 frames) noexcept AUSDK_RTSAFE {
     auto* host = host_.get();
     if (!host)
         return kAudioUnitErr_Uninitialized;
@@ -396,11 +399,20 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
         in[c] = silent_input ? nullptr : static_cast<const float*>(in_list->mBuffers[c].mData);
     for (UInt32 c = 0; c < outputs; ++c)
         out[c] = static_cast<float*>(out_list->mBuffers[c].mData);
+    // HostProcessor's audio functions allocate nothing, lock nothing and do no
+    // I/O (tests/native/host_tests.cpp and au.adapter count allocations), but
+    // they are not annotated [[clang::nonblocking]], so Clang's effect analysis
+    // is told about these three calls only; the rest of Render stays checked.
+    bool processed = false;
+    AUSDK_RT_UNSAFE_BEGIN("HostProcessor's audio functions are real-time safe, unannotated")
     if (reset_requested_.exchange(false))
         host->reset();
     host->set_bypass(bypass_.load(std::memory_order_relaxed));
-    if (!host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames))
+    processed = host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames);
+    AUSDK_RT_UNSAFE_END
+    if (!processed)
         return kAudio_ParamError;
+    rendered_.store(true, std::memory_order_relaxed);
     // Silent only once the output is: a filter's tail outlasts silent input.
     bool silent = silent_input;
     for (UInt32 c = 0; silent && c < outputs; ++c)

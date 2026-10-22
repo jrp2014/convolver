@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 namespace test = convolver::plugin_test;
 namespace host = convolver::au_test;
@@ -21,12 +22,22 @@ class AudioUnitAdapter final : public test::Adapter {
     void create(const test::Setup& setup) override {
         create_unconfigured();
         configure(setup);
-        // Like the VST3 driver: a host commits to its formats when it
-        // initializes the unit, so a configured instance has been initialized
-        // with them once. Before that, restored state is checked at
-        // initialization (the restore-before-setup cases).
+        // Like the VST3 driver: a host commits to its formats once it has
+        // rendered with them (an initialization alone may be a layout probe),
+        // so a configured instance has rendered one block. Before that,
+        // restored state is checked at initialization (the
+        // restore-before-setup cases).
         if (!activate())
             throw std::runtime_error("AU first initialization failed");
+        std::vector<float> in(setup.inputs), out(setup.outputs);
+        std::vector<const float*> ins;
+        std::vector<float*> outs;
+        for (auto& v : in)
+            ins.push_back(&v);
+        for (auto& v : out)
+            outs.push_back(&v);
+        bool silent = false;
+        host::check(unit_->render(ins, outs, 1, false, silent), "first render");
         deactivate();
     }
     bool create_unconfigured() override {

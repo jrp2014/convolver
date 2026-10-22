@@ -304,8 +304,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   Progress (22 October 2026, PR #44, with AU-2): `plugins/au/` builds
   `Convolver.component` (`-DCONVOLVER_BUILD_AU=ON`); `au.harness` (PLUG-2),
   `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
-  with `auval -strict` ([AU guide](docs/au.md)). Still to do: the
-  ThreadSanitizer run of the bypass-toggle test (moved to AU-3).
+  with `auval -strict` ([AU guide](docs/au.md)). Nothing else remains in
+  AU-1 once PR #44 is reviewed and merged; the ThreadSanitizer run belongs to AU-3.
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu. Progress (22 October 2026,
   PR #44): ClassInfo holds the encoded state under `convolver-state`; the

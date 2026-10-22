@@ -56,8 +56,8 @@ class Effect final : public ausdk::AUBase {
     }
 
     // In seconds, as Audio Units report them: frames / sample rate.
-    Float64 GetLatency() AUSDK_RTSAFE override;
-    Float64 GetTailTime() AUSDK_RTSAFE override;
+    Float64 GetLatency() noexcept AUSDK_RTSAFE override;
+    Float64 GetTailTime() noexcept AUSDK_RTSAFE override;
     bool SupportsTail() noexcept AUSDK_RTSAFE override {
         return true;
     }
@@ -68,7 +68,7 @@ class Effect final : public ausdk::AUBase {
     OSStatus RestoreState(CFPropertyListRef) override;
 
     OSStatus Render(AudioUnitRenderActionFlags&, const AudioTimeStamp&,
-                    UInt32) AUSDK_RTSAFE override;
+                    UInt32) noexcept AUSDK_RTSAFE override;
 
     // Why the unit plays silence or rejected its last filter; empty if neither.
     // The same text goes to the system log when it happens.
@@ -88,9 +88,13 @@ class Effect final : public ausdk::AUBase {
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
-    // The rate and channels of the last initialization. Uninitialized, the
-    // host's configuration counts as known only while it still matches, as in
-    // the VST3 adapter: hosts may restore state before they set the formats.
+    // The rate and channels of the current or last initialization, whether
+    // it has rendered, and the last initialization that did. Uninitialized,
+    // the host's configuration counts as known only while it still matches
+    // `committed_`: hosts may restore state before they set the formats, and
+    // may initialize briefly at a placeholder rate (see Cleanup).
     std::optional<HostLayout> initialized_;
+    std::atomic<bool> rendered_{false};
+    std::optional<HostLayout> committed_;
 };
 } // namespace convolver::au

@@ -19,8 +19,8 @@
 - The component is distributed under **GPL-3.0-or-later**, because it includes
   Apple's AudioUnitSDK (Apache-2.0); Convolver's sources and other builds stay
   GPL-2.0-or-later.
-- These are developer builds: not signed or notarized, and not yet tested in
-  named hosts (TODO AU-4).
+- These are developer builds: ad-hoc signed only (not Developer ID signed or
+  notarized), and not yet tested in named hosts (TODO AU-4).
 
 Contents: [build](#build) · [install](#install) · [loading filters](#loading-filters) ·
 [behaviour](#behaviour) · [licence](#licence) · [testing](#testing)
@@ -93,7 +93,10 @@ A preset that does not fit the host is handled as for every Convolver plug-in
   unchanged.
 - A project restored before the host has set its sample rate keeps its filter:
   if the rate turns out to be wrong the unit plays silence, and correcting the
-  rate brings the filter back.
+  rate brings the filter back. The rate and channels count as set once the
+  unit has processed audio with them; some hosts (those built on JUCE)
+  initialize the unit briefly at a default 44.1 kHz just to try a channel
+  layout, and that alone does not count.
 
 ## Behaviour
 

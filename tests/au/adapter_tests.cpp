@@ -317,6 +317,11 @@ void rejected_presets() {
             }) != noErr,
             "another plug-in's preset accepted");
     still_kept("another plug-in's preset");
+    // The state of one part of a multi-part instrument, not of the whole unit.
+    require(modified([&](CFMutableDictionaryRef d) { set_number(d, kAUPresetPartKey, 0); }) !=
+                noErr,
+            "a part preset accepted");
+    still_kept("a part preset");
     require(modified([&](CFMutableDictionaryRef d) { set_number(d, kAUPresetVersionKey, 1); }) !=
                 noErr,
             "a preset of an unknown version accepted");
@@ -476,6 +481,35 @@ void no_allocation_while_rendering() {
             std::to_string(allocations.load()) + " C++ allocations while rendering");
 }
 
+// JUCE hosts initialize and uninitialize at the default 44.1 kHz to try a
+// channel layout, then restore the project, then prepare at its real rate.
+// The probe must not make a 48 kHz project's filter a failed first load.
+void layout_probe_before_restore() {
+    const auto filter = crossover(48000);
+    Unit unit;
+    check(unit.configure(44100, 2, 6, 512), "probe formats");
+    check(unit.initialize(), "probe initialization");
+    unit.uninitialize();
+    check(unit.load(state_of(filter)), "restoring a 48 kHz project after a 44.1 kHz probe");
+    check(unit.configure(48000, 2, 6, 512), "formats");
+    check(unit.initialize(), "initialization");
+    Buffers b(2, 6, 512);
+    std::uint32_t seed = 13;
+    b.noise(seed);
+    bool silent = false;
+    check(render(unit, b, 512, false, silent), "render");
+    require(!b.output_silent(), "a layout probe turned the project's filter into a failed load");
+    require(unit.saved().configuration.has_value(), "the project's filter was not kept");
+
+    // Once audio has rendered, the formats are the host's: a later restore
+    // that does not fit them is rejected at once and the filter is kept.
+    unit.uninitialize();
+    require(unit.load(state_of(crossover(44100))) != noErr,
+            "a 44.1 kHz filter accepted after rendering at 48 kHz");
+    require(encode_host_state(unit.saved()) == encode_host_state(state_of(filter)),
+            "a rejected restore replaced the filter");
+}
+
 void render_requires_initialization() {
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "formats");
@@ -495,6 +529,7 @@ int main() {
         bypass_property();
         silence_flag();
         no_allocation_while_rendering();
+        layout_probe_before_restore();
         render_requires_initialization();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
