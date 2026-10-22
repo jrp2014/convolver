@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- `HostFilter`, `HostLayout` and `unfiltered_configuration` in
+  `convolver/host.hpp`: the control side of the shared plug-in adapter
+  contract (which filter a load replaces, what is saved and what plays), for
+  every format adapter to reuse. `HostProcessor::replace` now installs a filter
+  directly, without warm-up or crossfade, when no audio has been processed
+  since construction or `reset()`.
+
 - Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
   `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
   test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI

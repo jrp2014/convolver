@@ -81,12 +81,12 @@ tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
     return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
 }
 tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
+    std::lock_guard lock(control_);
     if (active_ || !std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
         setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate ||
         setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20) ||
         canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
         return kInvalidArgument;
-    std::lock_guard lock(control_);
     return AudioEffect::setupProcessing(setup);
 }
 HostLayout Processor::layout() const {

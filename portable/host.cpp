@@ -80,7 +80,7 @@ void HostFilter::load(std::optional<Configuration> next, const std::optional<Hos
 
 void HostFilter::reject(std::string why) {
     failed_ = !filter_;
-    error_ = (filter_ ? "Filter not loaded; the previous filter keeps playing. "
+    error_ = (filter_ ? "Filter not loaded; the previous filter is kept. "
                       : "Filter not loaded, so Convolver plays silence. ") +
              why;
 }

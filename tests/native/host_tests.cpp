@@ -291,7 +291,7 @@ void filter_contract() {
         "failed preparation accepted");
     require(installs == 1 && !running.failed() && running.filter()->sample_rate == 48000,
             "failed replacement lost the working filter");
-    require(running.error().find("previous filter keeps playing") != std::string::npos,
+    require(running.error().find("previous filter is kept") != std::string::npos,
             "failed replacement not explained");
 
     // Restored before the host is configured: kept, checked at activation.

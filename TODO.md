@@ -108,7 +108,7 @@ First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
 [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
-work continues under VST3-1 to VST3-7, HOST-1 and REL-1.
+work continues under VST3-1 to VST3-6, HOST-1 and REL-1 (VST3-7 is done).
 
 Shared groundwork, done once so the three streams stay independent:
 

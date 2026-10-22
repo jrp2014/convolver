@@ -364,12 +364,80 @@ void placeholder_setup() {
     require(p.setState(&wrong) != kResultOk, "mismatch after activation accepted while inactive");
     p.terminate();
 }
+// A failed first load plays silence, never the unfiltered input: a wrong-rate
+// preset sent to an active empty instance, and malformed state before activation.
+void failed_first_loads() {
+    for (const bool while_active : {true, false}) {
+        HostApplication context;
+        Processor p;
+        require(p.initialize(&context) == kResultOk, "failed-load initialize");
+        SpeakerArrangement stereo = SpeakerArr::kStereo;
+        require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "failed-load buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        require(p.setupProcessing(setup) == kResultOk, "failed-load setup");
+        std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {out_left.data(), out_right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 512;
+        left.fill(1);
+        right.fill(1);
+        if (while_active) {
+            // An empty 2x2 instance plays identity until a load fails.
+            require(p.setActive(true) == kResultOk, "empty activate");
+            p.setProcessing(true);
+            for (int k = 0; k < 2; ++k)
+                require(p.process(d) == kResultOk, "empty process");
+            require(out_left[511] == 1 && out_right[511] == 1, "empty 2x2 instance not identity");
+            convolver::HostState wrong;
+            wrong.configuration =
+                convolver::Configuration{44100, 2, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+            MemoryStream state;
+            require(write_state(&state, wrong), "encode wrong-rate state");
+            state.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&state) != kResultOk, "wrong-rate first load accepted while active");
+        } else {
+            MemoryStream damaged;
+            const std::array<unsigned char, 16> junk{16, 0, 0, 0, 1, 2,  3,  4,
+                                                     5,  6, 7, 8, 9, 10, 11, 12};
+            damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
+            damaged.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&damaged) != kResultOk, "malformed first state accepted");
+            require(p.setActive(true) == kResultOk, "activate after a malformed first state");
+            p.setProcessing(true);
+        }
+        for (int k = 0; k < 3; ++k) // Past any 512-frame transition.
+            require(p.process(d) == kResultOk, "process after a failed first load");
+        for (int i = 0; i < 512; ++i)
+            require(out_left[i] == 0 && out_right[i] == 0,
+                    while_active ? "failed first load while active not silent"
+                                 : "malformed first state not silent");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk, "state after a failed first load");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(!read_state(&saved).configuration, "a rejected first filter was saved");
+        p.setProcessing(false);
+        p.setActive(false);
+        p.terminate();
+    }
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
         multichannel();
         version1_presets();
         placeholder_setup();
+        failed_first_loads();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");

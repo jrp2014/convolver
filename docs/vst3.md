@@ -151,7 +151,12 @@ Loading follows the
   show the reason without an editor, so the host shows only silence (the
   explanation is held for a later editor or status display, VST3-3).
 - **A preset loaded after activation but before any audio** is installed
-  directly; later loads crossfade as described below. This plug-in has a new VST3 identity: old VST2 project state
+  directly; later loads crossfade as described below.
+- **Saving after a failed first load** saves an empty instance: the rejected
+  preset is not stored, so reopening the project plays identity when the
+  counts are equal. Load a matching preset before saving.
+
+This plug-in has a new VST3 identity: old VST2 project state
 is not claimed to migrate automatically. The class IDs and bundle identifier are
 listed, with every other format's, in
 [plug-in identities](plugin-identities.md), which also explains why presets
