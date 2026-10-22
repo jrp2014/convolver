@@ -39,7 +39,7 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Done 22 October | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI (PR #28). |
 | 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
-| 1. Now | **PLUG-6:** pin format dependencies | AudioUnitSDK, `lv2`, `lilv` and `lv2lint` pinned before LV2-1 and AU-1 depend on them. |
+| 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow, which LV2-1 and AU-1 extend ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool) is needed before LV2-2 and AU-2 are complete. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
@@ -172,9 +172,16 @@ Shared groundwork, done once so the three streams stay independent:
   the draft signing scripts are kept in history at `f4519022c` (the last commit of
   the merged `codex/plugin-distribution` branch): `git show
   f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
-- [ ] **PLUG-6 — Pin format dependencies.** AudioUnitSDK by commit and
-  checksum (like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and
-  `lv2lint`: shipped code in `packaging/release-policy.json`, test tools in CI.
+- [x] **PLUG-6 — Pin format dependencies.** Done 22 October 2026 (PR #31).
+  AudioUnitSDK 1.4.0 (`bd98b31`) and the `lv2` 1.18.10 headers (`0bcde33`) are
+  pinned by commit and archive SHA-256 in `packaging/release-policy.json`, each
+  marked with the formats that use it; the candidate workflow's `sources` job
+  downloads and checks them. The test-only `lilv` (Ubuntu 24.04 package
+  `0.24.22-1build1`) and `lv2lint` 0.16.2 (archive SHA-256) are pinned in the
+  [LV2 workflow](.github/workflows/lv2.yml), which builds LV2's example plug-ins
+  against the pinned headers, runs one through `lilv` and lints it; the
+  [Audio Unit workflow](.github/workflows/au.yml) compiles the pinned SDK (C++23)
+  and runs `auval`. See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
 
 Shared adapter contract, for every format (detail in the
 [plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):

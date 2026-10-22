@@ -60,6 +60,50 @@ This needs neither Python, libsndfile nor the VST3 SDK. It uses FFTW by default;
 choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/cmake-package.md` in that source bundle for
 `Convolver::core`, `Convolver::host` and `Convolver::io` consumers.
 
+## Pinned format dependencies
+
+Every plug-in format's SDK is pinned by commit and archive SHA-256 in
+`packaging/release-policy.json`, and every test tool by version and checksum in
+CI (PLUG-6), so a build or a validator result can be repeated exactly:
+
+| Dependency | Pin | Used by | Where pinned |
+| --- | --- | --- | --- |
+| VST3 SDK (`vst3sdk` and four submodules) | 3.8.1 build 84, commit `3cdf9ca` | VST3 builds | Release policy; the [VST3 workflow](../../.github/workflows/vst3.yml) checks out the same commit |
+| `lv2` headers | 1.18.10, commit `0bcde33` | LV2 builds (LV2-1) | Release policy |
+| AudioUnitSDK | 1.4.0, commit `bd98b31` | AU builds (AU-1) | Release policy |
+| `lilv` (test host) | Ubuntu 24.04 `0.24.22-1build1` | LV2 tests | [LV2 workflow](../../.github/workflows/lv2.yml) |
+| `lv2lint` | 0.16.2, archive SHA-256 | LV2 validation (LV2-3) | LV2 workflow |
+| pluginval | v2.0.0-beta3, archive SHA-256 per platform | VST3 validation, later LV2 and AU | VST3 workflow |
+| `auval` | ships with macOS; the image is fixed at `macos-15` | AU validation (AU-3) | [Audio Unit workflow](../../.github/workflows/au.yml) |
+
+AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds as
+C++23; the core and the other formats stay C++20. Its licence is Apache-2.0,
+which is why the AU component is distributed under GPL-3.0-or-later (see the
+[plug-in formats plan](../plans/2026-10-21-plugin-formats.md#au-licence)).
+
+Each SDK entry in the policy lists the plug-in `formats` that use it.
+`build_dependencies.py --formats vst3 lv2 au` unpacks those formats' SDKs and
+ships their notices; the default is `vst3`, today's only adapter. To fetch,
+verify and unpack chosen pins on their own:
+
+```sh
+python scripts/release/sources.py --fetch --cache build/downloads \
+  --destination build/sources lv2 audiounitsdk
+```
+
+The LV2 workflow builds LV2's example plug-ins against the pinned headers, runs
+one through `lilv` on the shared mono fixture and checks it with `lv2lint`; the
+Audio Unit workflow compiles the pinned AudioUnitSDK as the AU target will and
+runs `auval` on Apple's AUDelay. The adapters add their own bundles to these
+workflows.
+
+To move a pin, change the policy entry (or the workflow) in its own pull
+request and say why. A GitHub archive's checksum can be computed without
+downloading it, from a clone at that commit:
+`git archive --format=tar --prefix=REPO-COMMIT/ COMMIT | gzip -n | sha256sum`
+(for example `--prefix=lv2-0bcde338…/`); the `sources` job of the candidate
+workflow downloads every pinned archive and fails on a mismatch.
+
 ## Pinned preview recipe
 
 The release recipe builds static libsndfile (built-in formats only; optional

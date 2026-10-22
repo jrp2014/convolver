@@ -1,0 +1,44 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Audio Unit SDK and validator (PLUG-6). Until the AU adapter exists (AU-1),
+# this job proves the pin: AudioUnitSDK from the release policy compiles as
+# the AU target will build it, and auval runs on the image. AU-1 and AU-3 add
+# Convolver's component here.
+name: Audio Unit
+
+'on':
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  au:
+    # A fixed image, so the Xcode and auval versions change only by an edit here.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Pinned AudioUnitSDK (release policy)
+        run: >-
+          python scripts/release/sources.py --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
+      - name: Compile AudioUnitSDK (C++23, universal, macOS 14)
+        run: |
+          xcodebuild -version
+          sdk="$RUNNER_TEMP/sources/AudioUnitSDK"
+          objects="$RUNNER_TEMP/ausdk-objects"
+          mkdir -p "$objects"
+          for source in "$sdk"/src/AudioUnitSDK/*.cpp; do
+            clang++ -std=c++23 -O2 -fvisibility=hidden -Wall -Wextra \
+              -arch arm64 -arch x86_64 -mmacosx-version-min=14.0 \
+              -I "$sdk/include" -c "$source" -o "$objects/$(basename "$source" .cpp).o"
+          done
+          libtool -static -o "$RUNNER_TEMP/libAudioUnitSDK.a" "$objects"/*.o
+          lipo -info "$RUNNER_TEMP/libAudioUnitSDK.a"
+      - name: auval runs (Apple's AUDelay)
+        run: auval -v aufx dely appl
