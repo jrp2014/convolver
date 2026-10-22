@@ -465,7 +465,8 @@ void empty_instance(const Context& x) {
 }
 
 // Bypass ramps over 64 samples to the input delayed by the reported latency
-// (input c to output c; outputs without an input are silent), and back.
+// (input c to output c), and back. With unequal counts bypass ramps every
+// output to silence instead (owner's decision, 22 October 2026).
 void bypass(const Context& x) {
     const auto& a = x.c();
     const auto ni = a.input_channels, no = a.output_channels;
@@ -486,7 +487,7 @@ void bypass(const Context& x) {
         if (t >= on)
             mix = std::clamp(mix + (t < off ? 1. / 64 : -1. / 64), 0., 1.);
         for (std::size_t c = 0; c < no; ++c) {
-            const double dry = c < ni && t >= latency && t - latency < x.f.frames()
+            const double dry = ni == no && t >= latency && t - latency < x.f.frames()
                                    ? x.f.input[(t - latency) * ni + c]
                                    : 0;
             expected[t * no + c] = (1 - mix) * wet[t * no + c] + mix * dry;

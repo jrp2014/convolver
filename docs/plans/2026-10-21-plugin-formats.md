@@ -249,6 +249,23 @@ before they set the sample rate and channel layout (VST3 `setState` before
   [VST3 lifecycle](../vst3.md#processing-and-lifecycle) describes.
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
+### Bypass
+
+Bypass ramps over 64 samples to the dry signal and back, with the dry path
+delayed by the reported latency so wet and dry line up. Wet processing carries
+on during bypass, so switching back does not lose history.
+
+- **Equal input and output counts:** the dry signal is input *c* on output *c*.
+- **Unequal counts:** every output ramps to silence (owner's decision,
+  22 October 2026). No output has an unfiltered counterpart: bypassing a 2→6
+  crossover must not send full-range audio to a tweeter, and a 1→2 filter that
+  forks a mono input to two outputs cannot tell which output the input belongs
+  on. This matches the empty instance with unequal counts.
+
+`HostProcessor` implements this, so every adapter that drives it through
+`set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
+must not use its format's own pass-through bypass (see the AU design).
+
 ### Channel layouts and old presets
 
 PLUG-4's list currently names channel *counts*. A count does not say what the

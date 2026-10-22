@@ -127,9 +127,12 @@ and the counts may differ (for example stereo in, 5.1 out). Any speaker
 arrangement with that many channels is accepted; channels are numbered in the host's bus order, which is the order the
 configuration's routes refer to. A preset must match the bus channel counts and
 the sample rate, or activation fails. Without a preset the plug-in passes input
-*c* to output *c* and leaves outputs without a matching input silent; bypass uses
-the same mapping. More than 8 channels, or more than one bus, is rejected. 32-bit
-and 64-bit host buffers are supported, with **single-precision internal DSP**.
+*c* to output *c* and leaves outputs without a matching input silent. Bypass
+passes input *c* to output *c* only when the counts are equal; with unequal
+counts it plays silence on every output
+([shared adapter contract](plans/2026-10-21-plugin-formats.md#bypass)). More
+than 8 channels, or more than one bus, is rejected. 32-bit and 64-bit host
+buffers are supported, with **single-precision internal DSP**.
 Sample-rate mismatches are rejected; there is no implicit IR resampling or
 pitch/timing change. This plug-in has a new VST3 identity: old VST2 project state
 is not claimed to migrate automatically. The class IDs and bundle identifier are
@@ -147,8 +150,9 @@ reported below. The plug-in performs no file I/O in this streaming path.
 Latency is always 256 samples, independent of the DAW callback length. The adapter
 handles variable blocks, in-place host buffers, zero-length/parameter-only calls,
 inactive channels and silence flags. Silent input still drains the wet tail.
-Bypass uses a 64-sample ramp and a dry delay matching the reported latency. Wet
-processing continues during bypass so returning to wet does not lose history.
+Bypass uses a 64-sample ramp and a dry delay matching the reported latency. With
+unequal channel counts it ramps to silence instead. Wet processing continues
+during bypass so returning to wet does not lose history.
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A replacement runs for 256 samples

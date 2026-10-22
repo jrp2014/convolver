@@ -186,7 +186,7 @@ void unequal_channels() {
     for (int k = 0; k < 4; ++k)
         host.process(in, out, 32);
     for (int i = 0; i < 32; ++i)
-        require(a[i] == 1 && b[i] == 3 && d[i] == 0, "unequal bypass mapping");
+        require(a[i] == 0 && b[i] == 0 && d[i] == 0, "unequal bypass must play silence");
     auto mismatch = c;
     mismatch.output_channels = 2;
     mismatch.paths.resize(1);

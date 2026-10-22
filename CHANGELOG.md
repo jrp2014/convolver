@@ -44,6 +44,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Bypass with unequal input and output counts (for example a stereo-to-six
+  crossover) now ramps every output to silence instead of passing input *c* to
+  output *c*, so bypassing a crossover never sends full-range audio to a driver.
+  Filters with equal counts bypass as before.
 - The macOS VST3 bundle identifier is now `io.github.jrp2014.convolver.vst3` and the installer package
   identifiers are `io.github.jrp2014.convolver.pkg.vst3` and `.pkg.tools` (they were
   `org.convolver.*`, a domain the project does not control). No release used
