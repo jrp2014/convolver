@@ -144,7 +144,16 @@ if(CONVOLVER_BUILD_NATIVE)
             target_link_options(convolver_preset_tool PRIVATE -municode)
         endif()
         target_link_libraries(convolver_preset_tool PRIVATE convolver_presets Convolver::io)
-        list(APPEND native_targets convolver_cli convolver_preset_tool)
+        # Equalizer APO export: a filter for system-wide playback on Windows.
+        add_executable(convolver_equalizer_apo portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp)
+        add_dependencies(convolver_equalizer_apo convolver_build_version)
+        target_include_directories(convolver_equalizer_apo PRIVATE portable "${CMAKE_CURRENT_BINARY_DIR}/generated")
+        set_target_properties(convolver_equalizer_apo PROPERTIES OUTPUT_NAME convolver-equalizer-apo)
+        if(MINGW)
+            target_link_options(convolver_equalizer_apo PRIVATE -municode)
+        endif()
+        target_link_libraries(convolver_equalizer_apo PRIVATE Convolver::io)
+        list(APPEND native_targets convolver_cli convolver_preset_tool convolver_equalizer_apo)
     endif()
     if(CONVOLVER_BUILD_BENCHMARKS)
         add_executable(convolver_benchmark tests/native/benchmark.cpp)
@@ -263,7 +272,8 @@ if(CONVOLVER_BUILD_NATIVE)
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
     endif()
     if(CONVOLVER_BUILD_CLI)
-        install(TARGETS convolver_cli convolver_preset_tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(TARGETS convolver_cli convolver_preset_tool convolver_equalizer_apo
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
     configure_package_config_file(cmake/ConvolverConfig.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/ConvolverConfig.cmake" INSTALL_DESTINATION ${package_dir})
@@ -303,6 +313,11 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/preset_tests.py"
             "$<TARGET_FILE:convolver_preset_tool>")
         set_tests_properties(plugins.presets PROPERTIES LABELS "plugins;real-libraries;cli" TIMEOUT 120)
+        # Equalizer APO export, run through a model of Equalizer APO's commands.
+        add_test(NAME export.equalizer_apo COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+            "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/equalizer_apo_tests.py"
+            "$<TARGET_FILE:convolver_equalizer_apo>")
+        set_tests_properties(export.equalizer_apo PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 300)
         add_test(NAME compatibility.corpus COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
             "$<TARGET_FILE:convolver_cli>")

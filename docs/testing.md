@@ -122,6 +122,22 @@ ctest --test-dir build-native -N
   delays. It also converts a `.vstpreset` after its source files are deleted,
   and checks that refused requests write nothing.
 
+- `export.equalizer_apo`: `convolver-equalizer-apo` exports the first-use
+  examples and a configuration list, and a model of Equalizer APO 1.4.2 (written
+  from its sources: line splitting, channel names, `Copy:` from the channels as
+  they were before the line, created channels, `If:`/`Eval:`, `Preamp:`,
+  `Delay:`, `Convolution:` and `Include:`; an IR at the wrong rate fails the
+  model) runs the commands. The
+  output must match the double-precision oracle within 1e-5 on devices with the
+  filter's channels and with more (the extra ones silent); routes with gains and
+  inversions, input and output delays, shared IRs, the choice between list
+  entries (the largest that fits a larger device) and the export included from
+  a `config.txt` are covered, and other sample rates and devices over 32
+  channels must be silent. It also checks that existing folders and folder
+  names too long for Equalizer APO are refused, that file names cannot add
+  commands, and that failed exports leave nothing. The model is not Equalizer APO itself; running the export there
+  is open as HOST-4. See the [guide](equalizer-apo.md#how-it-is-tested).
+
 The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
