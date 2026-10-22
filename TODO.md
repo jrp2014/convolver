@@ -181,8 +181,8 @@ Shared groundwork, done once so the three streams stay independent:
   [LV2 workflow](.github/workflows/lv2.yml), which builds LV2's example plug-ins
   against the pinned headers, runs one through `lilv` and checks lv2lint's
   report on it; the
-  [Audio Unit workflow](.github/workflows/au.yml) compiles the pinned SDK (C++23;
-  1.4.0 versus the C++20 1.3.0 awaits jrp's decision) and runs `auval`. See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+  [Audio Unit workflow](.github/workflows/au.yml) compiles the pinned SDK (1.4.0,
+  C++23, jrp's choice on 22 October 2026) and runs `auval`. See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
 
 Shared adapter contract, for every format (detail in the
 [plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):

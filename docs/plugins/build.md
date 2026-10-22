@@ -77,9 +77,9 @@ workflows are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml` in the source
 | pluginval | v2.0.0-beta3, archive SHA-256 per platform | VST3 validation, later LV2 and AU | VST3 workflow |
 | `auval` | ships with macOS; the image label is `macos-15`, and each run logs the macOS and Xcode versions | AU validation (AU-3) | Audio Unit workflow |
 
-AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target would build
-as C++23 while the core and the other formats stay C++20; 1.3.0 is the C++20
-alternative. The version is proposed, awaiting jrp's decision. Its licence is Apache-2.0,
+AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds
+as C++23 while the core and the other formats stay C++20. jrp chose 1.4.0 over
+the C++20 1.3.0 on 22 October 2026. Its licence is Apache-2.0,
 which is why the AU component is distributed under GPL-3.0-or-later (see "AU
 licence" in `docs/plans/2026-10-21-plugin-formats.md`).
 
