@@ -257,6 +257,8 @@ struct Context {
         return Stream{adapter, setup(), std::move(pattern), in_place};
     }
     void tail_is(std::size_t expected, const std::string& when) const {
+        if (!adapter.reports_tail())
+            return;
         const auto reported = adapter.tail_frames();
         require(reported == expected, "tail " + when + " is " + std::to_string(reported) +
                                           ", expected " + std::to_string(expected));

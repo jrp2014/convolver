@@ -78,6 +78,11 @@ class Adapter {
     // In frames: an AU adapter converts its seconds.
     virtual std::size_t latency_frames() = 0;
     virtual std::size_t tail_frames() = 0;
+    // Formats with no way to report a tail (LV2 core has none) return false,
+    // and the tail checks are skipped; the audio is still compared in full.
+    virtual bool reports_tail() const {
+        return true;
+    }
     // The filter the instance would save now; nothing for an empty instance.
     virtual std::optional<Configuration> saved() = 0;
     // Formats whose hosts may restore state before negotiating the rate and
