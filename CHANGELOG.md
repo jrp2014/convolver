@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- `HostFilter`, `HostLayout` and `unfiltered_configuration` in
+  `convolver/host.hpp`: the control side of the shared plug-in adapter
+  contract (which filter a load replaces, what is saved and what plays), for
+  every format adapter to reuse. `HostState::failed` marks a saved failed
+  first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
+  directly, without warm-up or crossfade, when no audio has been processed
+  since construction or `reset()`.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
   list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate
@@ -67,6 +74,18 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The VST3 plug-in follows the shared adapter contract (VST3-7). With no preset
+  loaded and different input and output counts (for example a 2→6 crossover)
+  it plays silence instead of passing input *c* to output *c*. Once the plug-in has
+  been activated, a preset at the wrong sample rate or channel counts is
+  rejected while it is inactive too, keeping the last valid one; if none was loaded, it plays
+  silence. A project restored at the wrong rate or layout now activates and
+  plays silence, keeping its filter, instead of failing to activate. A preset
+  loaded after activation but before any audio plays from the first sample
+  without a crossfade. Saving after a failed first load records the failure,
+  so reopening stays silent: host state version 2, used only for that state
+  (other states are still written as version 1). The shared decisions are in
+  the host layer (`HostFilter`), for LV2 and AU to reuse.
 - Bypass with unequal input and output counts (for example a stereo-to-six
   crossover) now ramps every output to silence instead of passing input *c* to
   output *c*, so bypassing a crossover never sends full-range audio to a driver.

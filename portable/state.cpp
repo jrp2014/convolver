@@ -7,7 +7,10 @@
 
 namespace convolver {
 namespace {
-constexpr std::uint32_t magic = 0x53564e43, version = 1;
+// Version 2 adds flag 4, a failed initial load (owner's decision, 22 October
+// 2026). Encoders write version 1 whenever that flag is clear, so builds that
+// read only version 1 keep reading every other state.
+constexpr std::uint32_t magic = 0x53564e43, version = 2;
 struct Writer {
     std::vector<std::byte> data;
     void word(std::size_t n) {
@@ -44,10 +47,12 @@ struct Reader {
 std::vector<std::byte> encode_host_state(const HostState& state) {
     if (state.configuration)
         validate_configuration(*state.configuration);
+    if (state.failed && state.configuration)
+        throw std::invalid_argument("a failed load holds no filter");
     Writer w;
     w.word(magic);
-    w.word(version);
-    w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0));
+    w.word(state.failed ? version : 1);
+    w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0));
     if (state.configuration) {
         const auto& c = *state.configuration;
         w.word(c.sample_rate);
@@ -79,13 +84,18 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
     if (bytes.size() > max_host_state_bytes)
         throw std::length_error("host state exceeds limit");
     Reader r{bytes};
-    if (r.word() != magic || r.word() != version)
+    if (r.word() != magic)
+        throw std::invalid_argument("unsupported host state");
+    const auto format = r.word();
+    if (format != 1 && format != version)
         throw std::invalid_argument("unsupported host state");
     auto flags = r.word();
-    if (flags > 3)
+    // Version 2 only ever marks a failed load (flag 4), never with a filter.
+    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == version && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
     HostState state;
     state.bypass = (flags & 2) != 0;
+    state.failed = (flags & 4) != 0;
     if (flags & 1) {
         Configuration c;
         auto rate = r.word();

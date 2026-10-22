@@ -369,6 +369,11 @@ void check_writable(Format format, const HostState& state, std::string_view name
                 "the preset name (by default the file name) contains control characters such "
                 "as tabs or line breaks; give a plain one with --name");
     }
+    if (state.failed)
+        throw std::invalid_argument(
+            "this preset was saved after a filter failed to load, so it holds no filter to "
+            "convert (a plug-in loading it plays silence); make the preset from the IR, .cfg or "
+            "configuration list instead");
     if (!state.configuration) {
         if (format == Format::lv2)
             throw std::invalid_argument(

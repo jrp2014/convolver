@@ -110,7 +110,35 @@ void edge_cases() {
             "inactive replacement tail including routing delays");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk, "rate change setup");
-    require(p.setActive(true) != kResultOk, "mismatched IR rate activated");
+    // Shared adapter contract: a kept filter that does not suit the host plays
+    // silence (not the unfiltered input), and returns once the rate is corrected.
+    require(p.setActive(true) == kResultOk, "a mismatched IR rate must activate, silent");
+    require(p.getTailSamples() == 0, "silent instance reports a tail");
+    p.setProcessing(true);
+    ParameterChanges wet;
+    index = 0;
+    wet.addParameterData(bypass_id, index)->addPoint(0, 0, index);
+    d.inputParameterChanges = &wet;
+    left.fill(1);
+    right.fill(1);
+    for (int k = 0; k < 3; ++k) {
+        require(p.process(d) == kResultOk, "silent process");
+        d.inputParameterChanges = nullptr;
+    }
+    for (int i = 0; i < 512; ++i)
+        require(out_left[i] == 0 && out_right[i] == 0, "mismatched rate not silent");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "state snapshot at the wrong rate");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->sample_rate == 48000,
+            "mismatched filter not kept as the saved state");
+    p.setProcessing(false);
+    p.setActive(false);
+    setup.sampleRate = 48000;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.getTailSamples() == 1010,
+            "corrected rate does not bring the filter back");
+    p.setActive(false);
     p.terminate();
 }
 void multichannel() {
@@ -176,7 +204,14 @@ void multichannel() {
     p.setProcessing(false);
     p.setActive(false);
     require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 2x6");
-    require(p.setActive(true) != kResultOk, "2x6 preset activated on 8x8 buses");
+    // The 2x6 preset does not suit 8x8 buses: silence, and the preset is kept.
+    require(p.setActive(true) == kResultOk && p.getTailSamples() == 0,
+            "2x6 preset on 8x8 buses must activate, silent");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "state snapshot on 8x8 buses");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->output_channels == 6, "2x6 preset not kept");
+    p.setActive(false);
     convolver::HostState identity;
     MemoryStream empty;
     require(write_state(&empty, identity), "encode identity state");
@@ -277,11 +312,155 @@ void version1_presets() {
             p.terminate();
         }
 }
+// JUCE-based hosts (and pluginval) call setupProcessing with placeholder values
+// before restoring a project's state at its real rate. Until the plug-in has
+// been activated, setupProcessing is not binding: the state must be kept.
+void placeholder_setup() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "placeholder initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "placeholder buses");
+    ProcessSetup setup{kRealtime, kSample32, 512, 44100};
+    require(p.setupProcessing(setup) == kResultOk, "placeholder setup");
+    convolver::HostState saved;
+    saved.configuration =
+        convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode 48 kHz state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "state after a placeholder setup rejected");
+    setup.sampleRate = 48000;
+    require(p.setupProcessing(setup) == kResultOk, "real setup");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    require(p.setActive(true) == kResultOk, "activate at the real rate");
+    p.setProcessing(true);
+    std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+    left[0] = 1;
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    require(p.process(d) == kResultOk, "placeholder process");
+    for (int i = 0; i < 512; ++i)
+        require(out_left[i] == 0 && std::abs(out_right[i] - (i == 256 ? .5f : 0.f)) < 1e-6,
+                "state restored after a placeholder setup does not play");
+    // Now the rate is committed: a mismatch while inactive is rejected at once.
+    p.setProcessing(false);
+    p.setActive(false);
+    saved.configuration->sample_rate = 44100;
+    MemoryStream wrong;
+    require(write_state(&wrong, saved), "encode 44.1 kHz state");
+    wrong.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&wrong) != kResultOk, "mismatch after activation accepted while inactive");
+    p.terminate();
+}
+// A failed first load plays silence, never the unfiltered input: a wrong-rate
+// preset sent to an active empty instance, and malformed state before activation.
+void failed_first_loads() {
+    for (const bool while_active : {true, false}) {
+        HostApplication context;
+        Processor p;
+        require(p.initialize(&context) == kResultOk, "failed-load initialize");
+        SpeakerArrangement stereo = SpeakerArr::kStereo;
+        require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "failed-load buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        require(p.setupProcessing(setup) == kResultOk, "failed-load setup");
+        std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {out_left.data(), out_right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 512;
+        left.fill(1);
+        right.fill(1);
+        if (while_active) {
+            // An empty 2x2 instance plays identity until a load fails.
+            require(p.setActive(true) == kResultOk, "empty activate");
+            p.setProcessing(true);
+            for (int k = 0; k < 2; ++k)
+                require(p.process(d) == kResultOk, "empty process");
+            // Accelerate's FFT is not exact, so compare with a tolerance.
+            require(std::abs(out_left[511] - 1) < 1e-5 && std::abs(out_right[511] - 1) < 1e-5,
+                    "empty 2x2 instance not identity");
+            convolver::HostState wrong;
+            wrong.configuration =
+                convolver::Configuration{44100, 2, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+            MemoryStream state;
+            require(write_state(&state, wrong), "encode wrong-rate state");
+            state.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&state) != kResultOk, "wrong-rate first load accepted while active");
+        } else {
+            MemoryStream damaged;
+            const std::array<unsigned char, 16> junk{16, 0, 0, 0, 1, 2,  3,  4,
+                                                     5,  6, 7, 8, 9, 10, 11, 12};
+            damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
+            damaged.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&damaged) != kResultOk, "malformed first state accepted");
+            require(p.setActive(true) == kResultOk, "activate after a malformed first state");
+            p.setProcessing(true);
+        }
+        for (int k = 0; k < 3; ++k) // Past any 512-frame transition.
+            require(p.process(d) == kResultOk, "process after a failed first load");
+        for (int i = 0; i < 512; ++i)
+            require(out_left[i] == 0 && out_right[i] == 0,
+                    while_active ? "failed first load while active not silent"
+                                 : "malformed first state not silent");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk, "state after a failed first load");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto kept = read_state(&saved);
+        require(!kept.configuration && kept.failed,
+                "a failed first load must be saved as failed, without the filter");
+        p.setProcessing(false);
+        p.setActive(false);
+        p.terminate();
+        // Reopening that project in a fresh instance stays silent, not identity.
+        Processor reopened;
+        require(reopened.initialize(&context) == kResultOk, "reopen initialize");
+        require(reopened.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "reopen buses");
+        reopened.activateBus(kAudio, kInput, 0, true);
+        reopened.activateBus(kAudio, kOutput, 0, true);
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.setState(&saved) == kResultOk, "saved failed load rejected on reopen");
+        require(reopened.setupProcessing(setup) == kResultOk &&
+                    reopened.setActive(true) == kResultOk,
+                "reopen activate");
+        reopened.setProcessing(true);
+        for (int k = 0; k < 2; ++k)
+            require(reopened.process(d) == kResultOk, "reopen process");
+        for (int i = 0; i < 512; ++i)
+            require(out_left[i] == 0 && out_right[i] == 0, "reopened failed load plays its input");
+        reopened.setProcessing(false);
+        reopened.setActive(false);
+        reopened.terminate();
+    }
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
         multichannel();
         version1_presets();
+        placeholder_setup();
+        failed_first_loads();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");

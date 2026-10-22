@@ -49,16 +49,20 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
 
   private:
-    Configuration configuration(const HostState&) const;
+    HostLayout layout() const;
+    std::optional<HostLayout> known_layout() const;
     template <class T>
     bool segment(Steinberg::Vst::ProcessData&, Steinberg::int32, Steinberg::int32) noexcept;
     std::mutex control_;
-    HostState state_;
+    HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
     std::unique_ptr<HostProcessor> host_;
     std::atomic<bool> bypass_{false};
     std::atomic<Steinberg::uint32> tail_{0};
     int inputs_ = 2, outputs_ = 2;
     bool active_ = false;
+    // The rate and buses of the last activation. The host's configuration counts
+    // as known only while it still matches: setupProcessing alone is not binding.
+    std::optional<HostLayout> activated_;
 };
 class Controller final : public Steinberg::Vst::EditController {
   public:

@@ -30,7 +30,7 @@
   },
   "host_state": {
     "magic": "CNVS",
-    "versions": [1]
+    "versions": [1, 2]
   },
   "historical": {
     "vst2_unique_id": "Conv"

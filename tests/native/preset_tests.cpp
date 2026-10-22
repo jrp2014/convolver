@@ -171,6 +171,12 @@ int main() {
                 "LV2 layouts explained");
         rejects([&] { presets::check_writable(Format::lv2, empty, "x"); }, "LV2 empty");
         presets::check_writable(Format::au, empty, "x");
+        HostState failed;
+        failed.failed = true;
+        for (auto format : {Format::vst3, Format::au, Format::lv2})
+            require(rejects([&] { presets::check_writable(format, failed, "x"); }, "failed load")
+                            .find("failed to load") != std::string::npos,
+                    "a saved failed load is converted");
         for (auto format : {Format::vst3, Format::au, Format::lv2}) {
             require(rejects([&] { presets::check_writable(format, routed(9, 9), "x"); }, "9x9")
                             .find("1 to 8") != std::string::npos,

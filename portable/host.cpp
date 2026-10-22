@@ -5,8 +5,110 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace convolver {
+namespace {
+std::string count(std::size_t n, const char* noun) {
+    return std::to_string(n) + " " + noun + (n == 1 ? "" : "s");
+}
+std::string counts(std::size_t inputs, std::size_t outputs) {
+    return count(inputs, "input") + " and " + count(outputs, "output");
+}
+// Why a filter does not suit the host, or empty if it does.
+std::string mismatch(const Configuration& c, const HostLayout& host) {
+    if (c.sample_rate != host.sample_rate)
+        return "The filter was made for " + std::to_string(c.sample_rate) +
+               " Hz, but the host runs at " + std::to_string(host.sample_rate) +
+               " Hz. Convolver does not resample: load a filter made for " +
+               std::to_string(host.sample_rate) + " Hz, or set the host to " +
+               std::to_string(c.sample_rate) + " Hz.";
+    if (c.input_channels != host.inputs || c.output_channels != host.outputs)
+        return "The filter has " + counts(c.input_channels, c.output_channels) +
+               ", but the plug-in is set up with " + counts(host.inputs, host.outputs) +
+               ". Give the plug-in " + counts(c.input_channels, c.output_channels) +
+               " in the host's track or routing settings, or load a filter made for " +
+               counts(host.inputs, host.outputs) + ".";
+    return {};
+}
+} // namespace
+
+Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
+    Configuration c;
+    c.sample_rate = host.sample_rate;
+    c.input_channels = host.inputs;
+    c.output_channels = host.outputs;
+    if (failed || host.inputs != host.outputs) {
+        // One all-zero response: exact silence on every output, and no tail.
+        c.paths.push_back({{0.f}, {{0, 1}}, {{0, 1}}});
+        return c;
+    }
+    for (std::size_t i = 0; i < host.inputs; ++i)
+        c.paths.push_back({{1.f}, {{i, 1}}, {{i, 1}}});
+    return c;
+}
+
+void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
+                      const std::function<void(const Configuration&)>& install) {
+    auto& next = state.configuration;
+    try {
+        if (state.failed && next)
+            throw std::invalid_argument("A failed load cannot hold a filter.");
+        if (next && (!next->input_channels || !next->output_channels ||
+                     next->input_channels > max_channels_ || next->output_channels > max_channels_))
+            throw std::invalid_argument("The filter has " +
+                                        counts(next->input_channels, next->output_channels) +
+                                        "; this plug-in supports 1 to " +
+                                        std::to_string(max_channels_) + " channels on each side.");
+        if (host) {
+            const auto unfiltered =
+                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
+            if (next) {
+                if (auto why = mismatch(*next, *host); !why.empty())
+                    throw std::invalid_argument(why);
+            }
+            if (install)
+                install(next ? *next : unfiltered);
+        }
+    } catch (const std::exception& e) {
+        reject(e.what());
+        throw std::invalid_argument(error_);
+    } catch (...) {
+        reject("The filter could not be prepared.");
+        throw std::invalid_argument(error_);
+    }
+    filter_ = std::move(next);
+    failed_ = state.failed;
+    error_.clear();
+    if (failed_)
+        error_ = "A filter failed to load before this state was saved, so Convolver plays "
+                 "silence. Load a filter made for the host's sample rate and channels.";
+}
+
+void HostFilter::reject(std::string why) {
+    failed_ = !filter_;
+    error_ = (filter_ ? "Filter not loaded; the previous filter is kept. "
+                      : "Filter not loaded, so Convolver plays silence. ") +
+             why;
+}
+
+Configuration HostFilter::activate(const HostLayout& host) {
+    if (!filter_) {
+        if (!failed_)
+            error_.clear();
+        return unfiltered_configuration(host, failed_);
+    }
+    auto why = mismatch(*filter_, host);
+    if (why.empty()) {
+        error_.clear();
+        return *filter_;
+    }
+    error_ = "The saved filter does not suit the host, so Convolver plays silence until it "
+             "does. " +
+             why;
+    return unfiltered_configuration(host, true);
+}
+
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
@@ -25,6 +127,7 @@ struct HostProcessor::Impl {
     std::size_t dry_position = 0, warm = 0, fade = 0;
     float dry_mix = 0;
     bool bypass = false;
+    bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
         : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
           maximum(maximum_), block(block_) {
@@ -62,7 +165,17 @@ struct HostProcessor::Impl {
         tail.store(std::max(tail.load(), prepared->engine.tail_frames()));
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
+    // The audio producer only links; the control consumer owns deletion.
+    // Collection must never hold up adoption of another pending filter.
+    void retire(Prepared* item) noexcept {
+        auto* head = retired.load(std::memory_order_relaxed);
+        do {
+            item->next_retired = head;
+        } while (!retired.compare_exchange_strong(head, item, std::memory_order_release,
+                                                  std::memory_order_relaxed));
+    }
     void reset() noexcept {
+        started = false;
         current->engine.reset();
         if (previous)
             previous->engine.reset();
@@ -81,12 +194,19 @@ struct HostProcessor::Impl {
             return true;
         if (!previous) {
             if (auto next = pending.exchange(nullptr, std::memory_order_acq_rel)) {
-                previous = current;
+                if (started) {
+                    previous = current;
+                    warm = block;
+                    fade = 0;
+                } else {
+                    // Nothing has been heard yet (initial restoration): install
+                    // directly, so output follows the filter from the first frame.
+                    retire(current);
+                }
                 current = next;
-                warm = block;
-                fade = 0;
             }
         }
+        started = true;
         for (std::size_t t = 0; t < frames; ++t)
             for (std::size_t c = 0; c < inputs; ++c) {
                 double v = c < in.size() && in[c] ? in[c][t] : 0;
@@ -147,13 +267,7 @@ struct HostProcessor::Impl {
         if (invalid_output)
             reset();
         if (previous && !warm && fade == 256) {
-            // The audio producer only links; the control consumer owns deletion.
-            // Collection must never hold up adoption of another pending filter.
-            auto* head = retired.load(std::memory_order_relaxed);
-            do {
-                previous->next_retired = head;
-            } while (!retired.compare_exchange_strong(head, previous, std::memory_order_release,
-                                                      std::memory_order_relaxed));
+            retire(previous);
             previous = nullptr;
         }
         return true;

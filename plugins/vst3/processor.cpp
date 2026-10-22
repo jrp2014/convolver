@@ -62,6 +62,7 @@ tresult PLUGIN_API Processor::initialize(FUnknown* context) {
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
                                                  SpeakerArrangement* out, int32 no) {
+    std::lock_guard lock(control_);
     if (active_ || ni != 1 || no != 1 || !in || !out)
         return kResultFalse;
     const auto inputs = SpeakerArr::getChannelCount(in[0]);
@@ -80,6 +81,7 @@ tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
     return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
 }
 tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
+    std::lock_guard lock(control_);
     if (active_ || !std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
         setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate ||
         setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20) ||
@@ -87,35 +89,36 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         return kInvalidArgument;
     return AudioEffect::setupProcessing(setup);
 }
-Configuration Processor::configuration(const HostState& state) const {
-    if (state.configuration) {
-        const auto& c = *state.configuration;
-        if (c.sample_rate != processSetup.sampleRate ||
-            c.input_channels != static_cast<std::size_t>(inputs_) ||
-            c.output_channels != static_cast<std::size_t>(outputs_))
-            throw std::invalid_argument("preset rate/layout does not match the host");
-        return c;
-    }
-    // Without a preset, input c passes to output c; outputs without an input are silent.
-    Configuration c;
-    c.sample_rate = static_cast<int>(processSetup.sampleRate);
-    c.input_channels = inputs_;
-    c.output_channels = outputs_;
-    for (int i = 0; i < std::min(inputs_, outputs_); ++i)
-        c.paths.push_back(
-            {{1}, {{static_cast<std::size_t>(i), 1}}, {{static_cast<std::size_t>(i), 1}}});
-    return c;
+HostLayout Processor::layout() const {
+    return {static_cast<int>(processSetup.sampleRate), static_cast<std::size_t>(inputs_),
+            static_cast<std::size_t>(outputs_)};
+}
+// The host's configuration is known once the plug-in has been activated with
+// it, and stays known while the rate and buses are unchanged. setupProcessing
+// is not binding on its own: JUCE-based hosts (pluginval among them) call it
+// with placeholder values before restoring a project's state at another rate.
+// Until then, restored state is kept and checked at activation (the shared
+// adapter contract's "state that arrives before the host is configured").
+std::optional<HostLayout> Processor::known_layout() const {
+    const auto now = layout();
+    if (!activated_ || activated_->sample_rate != now.sample_rate ||
+        activated_->inputs != now.inputs || activated_->outputs != now.outputs)
+        return std::nullopt;
+    return now;
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
     std::lock_guard lock(control_);
     try {
         if (state) {
-            auto next = std::make_unique<HostProcessor>(configuration(state_),
+            // A filter that does not suit the host plays silence, and is kept so
+            // that correcting the rate or layout brings it back.
+            auto next = std::make_unique<HostProcessor>(filter_.activate(layout()),
                                                         processSetup.maxSamplesPerBlock);
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
             host_ = std::move(next);
+            activated_ = layout();
         } else
             host_.reset();
         active_ = state != 0;
@@ -133,32 +136,54 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
     std::lock_guard lock(control_);
+    const bool was_failed = filter_.failed();
     try {
-        auto next = read_state(stream);
-        if (host_) {
-            host_->replace(configuration(next));
+        HostState next;
+        try {
+            next = read_state(stream);
+        } catch (const std::exception& e) {
+            filter_.reject(std::string("The saved state could not be read: ") + e.what());
+            throw;
+        }
+        // While active, the host's configuration is known and a prepared
+        // replacement is published; inactive, the next activation installs it.
+        const auto host = host_ ? std::optional(layout()) : known_layout();
+        const bool bypass = next.bypass;
+        filter_.load(std::move(next), host, [&](const Configuration& c) {
+            if (host_)
+                host_->replace(c);
+        });
+        if (host_)
             tail_.store(static_cast<uint32>(host_->tail_frames()));
-        } else if (next.configuration && (next.configuration->input_channels > max_bus_channels ||
-                                          next.configuration->output_channels > max_bus_channels))
-            return kResultFalse;
-        if (!host_)
-            tail_.store(next.configuration
-                            ? static_cast<uint32>(configuration_tail_frames(*next.configuration))
+        else
+            tail_.store(filter_.filter()
+                            ? static_cast<uint32>(configuration_tail_frames(*filter_.filter()))
                             : 0);
-        bypass_.store(next.bypass);
-        state_ = std::move(next);
+        bypass_.store(bypass);
         return kResultOk;
     } catch (...) {
+        // A failed first load plays silence rather than the unfiltered input.
+        if (host_ && filter_.failed() && !was_failed) {
+            try {
+                host_->replace(filter_.activate(layout()));
+            } catch (...) {
+            }
+        }
+        if (!host_ && filter_.failed())
+            tail_.store(0);
         return kResultFalse;
     }
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     std::lock_guard lock(control_);
     try {
-        state_.bypass = bypass_.load();
+        HostState state;
+        state.configuration = filter_.filter();
+        state.bypass = bypass_.load();
+        state.failed = filter_.failed(); // Reopening stays silent (state version 2).
         if (host_)
             host_->collect();
-        return write_state(stream, state_) ? kResultOk : kResultFalse;
+        return write_state(stream, state) ? kResultOk : kResultFalse;
     } catch (...) {
         return kResultFalse;
     }

@@ -146,7 +146,7 @@ First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
 [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
-work continues under VST3-1 to VST3-7, HOST-1 and REL-1.
+work continues under VST3-1 to VST3-6, HOST-1 and REL-1 (VST3-7 is done).
 
 Shared groundwork, done once so the three streams stay independent:
 
@@ -164,7 +164,7 @@ Shared groundwork, done once so the three streams stay independent:
   256-frame latency), with exact latency and tails and the lifecycle cases of
   the [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
   `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
-  and 13 known deviations are left to VST3-7. LV2-1 and AU-1 each add a driver;
+  and 13 known deviations are left to VST3-7 (since removed: all 66 pass). LV2-1 and AU-1 each add a driver;
   format-specific status and error reporting stay in their own tests. See
   [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
 - [x] **PLUG-3 — One preset tool.** Done 22 October 2026 (PR #32).
@@ -198,7 +198,8 @@ Shared groundwork, done once so the three streams stay independent:
   and route by bus index). Modified builds are asked to change the product
   identities listed in the [identities guide](docs/plugin-identities.md), which
   owns the layout rules.
-  Recording an input layout still needs state version 2 (an owner's decision).
+  Recording an input layout still needs a new state version, 3 (an owner's
+  decision; version 2 is VST3-7's failed-load marker).
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
   merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
   `.github/workflows/release.yml`) rather than writing a new one. Signing
@@ -240,20 +241,26 @@ instance and a failed initial load have one stated, tested behaviour (owner's
 decision, 21 October 2026: identity for an empty instance with equal counts;
 silence, with an error shown, for unequal counts and after a failed initial
 load); bypass with unequal counts fades every output to silence (owner's
-decision, 22 October 2026). VST3 must change to match (VST3-7).
+decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
+`HostFilter` and direct installation in `HostProcessor`, which LV2 and AU reuse.
 
-- [ ] **VST3-7 — Follow the shared adapter contract.** `vst3.harness` lists
-  13 known deviations, which this item removes: an empty instance with unequal
-  counts passes input *c* to output *c* instead of silence; while inactive,
-  `setState` checks only the channel limit, so a filter at the wrong rate
-  replaces the saved state (a failed replacement loses the working filter, and a
-  failed first load is accepted) and activation then fails with no output
-  written instead of silence; state restored before setup at another rate makes
-  activation fail (no output) instead of playing silence until the rate is
-  corrected; and a filter set while active but before any audio is crossfaded
-  in from the empty instance instead of installed directly.
-  Remove each case from the list in `tests/vst3/harness_tests.cpp` as it is
-  fixed; the harness fails if a listed case passes.
+- [x] **VST3-7 — Follow the shared adapter contract.** Done 22 October 2026
+  (PR #35). The 13 known deviations in `vst3.harness` are gone and all 66
+  cases pass (worst error 1.8e-7): an empty instance with unequal counts plays
+  silence; once the plug-in has been activated at the current rate and buses,
+  `setState` rejects a mismatched filter while inactive too and keeps the last
+  accepted one (`setupProcessing` alone is not binding: JUCE hosts call it with
+  placeholder values before restoring state); a
+  failed first load plays silence; state restored before setup that does not
+  suit the host activates as silence and returns when the host is corrected;
+  a filter set after activation but before audio is installed directly. The
+  decisions live in the host layer (`HostFilter`, `unfiltered_configuration`;
+  tests in `native.host`). Owner's decisions, 22 October 2026: the "known
+  after activation" rule; no message for a mismatch found at activation until
+  VST3-3, as VST3 has no status display without an editor; and saving after a
+  failed first load records it (host state version 2, flag 4, written only
+  then), so reopening stays silent. See
+  [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
 
 LV2 (Linux first; also PipeWire system audio):
 

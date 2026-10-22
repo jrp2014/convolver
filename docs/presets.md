@@ -117,8 +117,8 @@ channel counts. The plug-ins check it against the host when they load it
 - **No preset loaded:** with equal input and output counts the plug-in passes
   input *c* to output *c*; with unequal counts it plays silence.
 
-The VST3 plug-in does not follow all of these rules yet (TODO VST3-7); the
-[VST3 guide](vst3.md#loading-filters) describes what it does today.
+The [VST3 guide](vst3.md#loading-filters) gives the details for VST3, which
+follows these rules since VST3-7.
 
 Presets record channel *counts*, not speaker positions, so a 2-input, 6-output
 preset loads on any host arrangement with 2 inputs and 6 outputs. See
@@ -177,6 +177,9 @@ VST3 length prefix) are the owner's decision of 22 October 2026.
   advisory output channel mask but no layout. Plug-ins must load every
   version-1 preset whose rate and counts fit; a stricter layout check never
   rejects one ([old presets](plugin-identities.md#presets-without-a-layout)).
+- Host state version 2 only marks a plug-in saved after its first filter failed
+  to load; it holds no filter. The tool never writes it and refuses to convert a
+  `.vstpreset` that holds it.
 - If a later version records more (for example an input layout), the tool will
   keep writing version 1 for filters that do not need it, so older plug-in
   builds can still read those presets.
