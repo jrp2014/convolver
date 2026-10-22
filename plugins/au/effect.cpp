@@ -1,0 +1,415 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#include "effect.hpp"
+#include "presets.hpp"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstring>
+#include <exception>
+#include <os/log.h>
+#include <span>
+#include <stdexcept>
+#include <vector>
+
+// HostProcessor::process allocates nothing, locks nothing and does no I/O
+// (tests/native/host_tests.cpp checks the allocations), but it is not
+// annotated [[clang::nonblocking]], so Clang's effect analysis would warn about
+// every call from Render.
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wfunction-effects"
+#pragma clang diagnostic ignored "-Wperf-constraint-implies-noexcept"
+
+namespace convolver::au {
+namespace {
+void log_error(const std::string& message) {
+    if (!message.empty())
+        os_log_error(OS_LOG_DEFAULT, "Convolver: %{public}s", message.c_str());
+}
+
+// Every pairing of 1 to 8 input and output channels (equal counts first), or
+// equal counts only if the registry forbids unequal ones.
+const std::vector<AUChannelInfo>& channel_infos() {
+    static const auto infos = [] {
+        std::vector<AUChannelInfo> v;
+        const auto lo = static_cast<SInt16>(identity::min_channels);
+        const auto hi = static_cast<SInt16>(identity::max_channels);
+        for (SInt16 n = lo; n <= hi; ++n)
+            v.push_back({n, n});
+        if (identity::unequal_counts)
+            for (SInt16 i = lo; i <= hi; ++i)
+                for (SInt16 o = lo; o <= hi; ++o)
+                    if (i != o)
+                        v.push_back({i, o});
+        return v;
+    }();
+    return infos;
+}
+
+CFStringRef state_key() {
+    static const CFStringRef key = CFStringCreateWithBytes(
+        nullptr, reinterpret_cast<const UInt8*>(presets::au_state_key.data()),
+        static_cast<CFIndex>(presets::au_state_key.size()), kCFStringEncodingUTF8, false);
+    return key;
+}
+
+std::string hz(double rate) {
+    return std::to_string(static_cast<long long>(rate));
+}
+
+bool same(const HostLayout& a, const HostLayout& b) {
+    return a.sample_rate == b.sample_rate && a.inputs == b.inputs && a.outputs == b.outputs;
+}
+
+// The checks AUBase::RestoreState makes, before anything changes: Apple's
+// preset version and this component's subtype and manufacturer.
+std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc) {
+    const auto number = [&](const char* key, SInt32& out) {
+        const auto name = CFStringCreateWithCString(nullptr, key, kCFStringEncodingUTF8);
+        const auto value = CFDictionaryGetValue(dict, name);
+        CFRelease(name);
+        return value && CFGetTypeID(value) == CFNumberGetTypeID() &&
+               CFNumberGetValue(static_cast<CFNumberRef>(value), kCFNumberSInt32Type, &out);
+    };
+    SInt32 version = -1, subtype = 0, manufacturer = 0;
+    if (!number(kAUPresetVersionKey, version) || version != 0)
+        return "The preset is not an Audio Unit preset this plug-in can read (its version "
+               "entry is missing or not 0).";
+    if (!number(kAUPresetSubtypeKey, subtype) || !number(kAUPresetManufacturerKey, manufacturer) ||
+        static_cast<UInt32>(subtype) != desc.componentSubType ||
+        static_cast<UInt32>(manufacturer) != desc.componentManufacturer)
+        return "The preset belongs to another plug-in. Make a Convolver preset with "
+               "convolver-preset.";
+    return {};
+}
+} // namespace
+
+Effect::Effect(AudioComponentInstance instance) : AUBase(instance, 1, 1) {}
+
+HostLayout Effect::layout() {
+    const auto in = Input(0).GetStreamFormat(), out = Output(0).GetStreamFormat();
+    return {static_cast<int>(out.mSampleRate), in.mChannelsPerFrame, out.mChannelsPerFrame};
+}
+
+// Initialized, the host's configuration is the current formats. Uninitialized,
+// it is known only while the formats still match the last initialization:
+// hosts may restore a project's state before setting its formats, and the
+// default format (44.1 kHz stereo) is not a choice the host has made.
+std::optional<HostLayout> Effect::known_layout() {
+    const auto now = layout();
+    if (host_ || (initialized_ && same(*initialized_, now)))
+        return now;
+    return std::nullopt;
+}
+
+OSStatus Effect::Initialize() {
+    const auto in = Input(0).GetStreamFormat(), out = Output(0).GetStreamFormat();
+    if (in.mSampleRate != out.mSampleRate) {
+        log_error("The host set different input and output sample rates (" + hz(in.mSampleRate) +
+                  " and " + hz(out.mSampleRate) +
+                  " Hz). Convolver does not resample, so both must be the same.");
+        return kAudioUnitErr_FormatNotSupported;
+    }
+    if (!identity::unequal_counts && in.mChannelsPerFrame != out.mChannelsPerFrame)
+        return kAudioUnitErr_FormatNotSupported;
+    std::string message;
+    {
+        std::lock_guard lock(control_);
+        try {
+            const auto host = layout();
+            // A filter that does not suit the host plays silence, and is kept so
+            // that correcting the rate or channels brings it back.
+            auto next = std::make_unique<HostProcessor>(filter_.activate(host),
+                                                        GetMaxFramesPerSlice(), latency_frames);
+            next->set_bypass(bypass_.load());
+            next->reset();
+            tail_.store(next->tail_frames());
+            host_ = std::move(next);
+            initialized_ = host;
+            reset_requested_.store(false);
+            message = filter_.error();
+        } catch (const std::exception& e) {
+            log_error(std::string("Initialization failed: ") + e.what());
+            return kAudioUnitErr_FailedInitialization;
+        } catch (...) {
+            return kAudioUnitErr_FailedInitialization;
+        }
+    }
+    log_error(message);
+    timing_changed();
+    return noErr;
+}
+
+void Effect::Cleanup() {
+    std::lock_guard lock(control_);
+    host_.reset();
+}
+
+// The host may call Reset from any thread, so the audio thread performs it at
+// the start of the next render, as it applies bypass.
+OSStatus Effect::Reset(AudioUnitScope, AudioUnitElement) {
+    reset_requested_.store(true);
+    return noErr;
+}
+
+OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
+                                 AudioUnitElement element, UInt32& size, bool& writable) {
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+        size = sizeof(UInt32);
+        writable = true;
+        return noErr;
+    }
+    return AUBase::GetPropertyInfo(id, scope, element, size, writable);
+}
+
+OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, AudioUnitElement element,
+                             void* data) {
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+        const UInt32 value = bypass_.load() ? 1 : 0;
+        std::memcpy(data, &value, sizeof value);
+        return noErr;
+    }
+    return AUBase::GetProperty(id, scope, element, data);
+}
+
+// Bypass is stored for Render to apply with HostProcessor::set_bypass: a 64-
+// sample ramp to the input delayed by the latency (equal counts) or to silence
+// (unequal counts), with the filter running on underneath. Never a reset.
+OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, AudioUnitElement element,
+                             const void* data, UInt32 size) {
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+        if (!data || size < sizeof(UInt32))
+            return kAudioUnitErr_InvalidPropertyValue;
+        UInt32 value = 0;
+        std::memcpy(&value, data, sizeof value);
+        bypass_.store(value != 0);
+        return noErr;
+    }
+    return AUBase::SetProperty(id, scope, element, data, size);
+}
+
+bool Effect::StreamFormatWritable(AudioUnitScope, AudioUnitElement) {
+    return !IsInitialized();
+}
+
+// Planar 32-bit float (AUBase's check), 1 to 8 channels, and a whole-number
+// sample rate the engine accepts.
+bool Effect::ValidFormat(AudioUnitScope scope, AudioUnitElement element,
+                         const AudioStreamBasicDescription& format) {
+    const auto rate = format.mSampleRate;
+    return AUBase::ValidFormat(scope, element, format) &&
+           format.mChannelsPerFrame >= static_cast<UInt32>(identity::min_channels) &&
+           format.mChannelsPerFrame <= max_channels && std::isfinite(rate) && rate >= 1 &&
+           rate <= 768000 && std::floor(rate) == rate;
+}
+
+OSStatus Effect::ChangeStreamFormat(AudioUnitScope scope, AudioUnitElement element,
+                                    const AudioStreamBasicDescription& previous,
+                                    const AudioStreamBasicDescription& next) {
+    const auto result = AUBase::ChangeStreamFormat(scope, element, previous, next);
+    if (result == noErr && previous.mSampleRate != next.mSampleRate)
+        timing_changed(); // Seconds depend on the rate.
+    return result;
+}
+
+UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
+    const auto& infos = channel_infos();
+    if (out)
+        *out = infos.data();
+    return static_cast<UInt32>(infos.size());
+}
+
+Float64 Effect::GetLatency() AUSDK_RTSAFE {
+    const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
+    return rate > 0 ? static_cast<Float64>(latency_frames) / rate : 0;
+}
+
+Float64 Effect::GetTailTime() AUSDK_RTSAFE {
+    const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
+    return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
+}
+
+void Effect::timing_changed() {
+    PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
+    PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+}
+
+std::string Effect::error() {
+    std::lock_guard lock(control_);
+    return filter_.error();
+}
+
+OSStatus Effect::SaveState(CFPropertyListRef* out) {
+    if (!out)
+        return kAudioUnitErr_InvalidPropertyValue;
+    std::vector<std::byte> bytes;
+    try {
+        HostState state;
+        {
+            std::lock_guard lock(control_);
+            state.configuration = filter_.filter();
+            state.failed = filter_.failed(); // Reopening stays silent (state version 2).
+            if (host_)
+                host_->collect();
+        }
+        state.bypass = bypass_.load();
+        bytes = encode_host_state(state);
+    } catch (...) {
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+    if (const auto result = AUBase::SaveState(out); result != noErr)
+        return result;
+    // AUBase::SaveState creates a mutable dictionary.
+    auto* dict = static_cast<CFMutableDictionaryRef>(const_cast<void*>(*out));
+    const auto data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(bytes.data()),
+                                   static_cast<CFIndex>(bytes.size()));
+    if (!data) {
+        CFRelease(*out);
+        *out = nullptr;
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+    CFDictionarySetValue(dict, state_key(), data);
+    CFRelease(data);
+    return noErr;
+}
+
+void Effect::reject(const std::string& why) {
+    std::lock_guard lock(control_);
+    const bool was_failed = filter_.failed();
+    filter_.reject(why);
+    // An empty instance that fails its first load plays silence, not identity.
+    if (host_ && filter_.failed() && !was_failed) {
+        try {
+            host_->replace(filter_.activate(layout()));
+        } catch (...) {
+        }
+    }
+    if (!host_ && filter_.failed())
+        tail_.store(0);
+}
+
+OSStatus Effect::RestoreState(CFPropertyListRef plist) {
+    if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
+        reject("The saved state is not an Audio Unit preset dictionary.");
+        log_error(error());
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+    const auto dict = static_cast<CFDictionaryRef>(plist);
+    HostState next;
+    try {
+        if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
+            throw std::invalid_argument(why);
+        const auto value = CFDictionaryGetValue(dict, state_key());
+        if (!value || CFGetTypeID(value) != CFDataGetTypeID())
+            throw std::invalid_argument(
+                "The preset holds no Convolver filter (it has no convolver-state entry). Make "
+                "the preset with convolver-preset, or save it from Convolver in the host.");
+        const auto data = static_cast<CFDataRef>(value);
+        const auto size = static_cast<std::size_t>(CFDataGetLength(data));
+        if (size > max_host_state_bytes)
+            throw std::invalid_argument("The saved filter is larger than the 64 MB limit.");
+        next = decode_host_state(
+            std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
+    } catch (const std::exception& e) {
+        reject(std::string("The saved state could not be read: ") + e.what());
+        log_error(error());
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+
+    bool accepted = false;
+    const bool was_bypassed = bypass_.load();
+    std::string message;
+    {
+        std::lock_guard lock(control_);
+        const bool was_failed = filter_.failed();
+        // Initialized, a prepared replacement is published to the audio thread;
+        // uninitialized, the next initialization installs the filter.
+        const auto host = known_layout();
+        const bool bypass = next.bypass;
+        try {
+            filter_.load(std::move(next), host, [&](const Configuration& c) {
+                if (host_)
+                    host_->replace(c);
+            });
+            if (host_)
+                tail_.store(host_->tail_frames());
+            else
+                tail_.store(filter_.filter() ? configuration_tail_frames(*filter_.filter()) : 0);
+            bypass_.store(bypass);
+            accepted = true;
+        } catch (...) {
+            // A failed first load plays silence rather than the unfiltered input.
+            if (host_ && filter_.failed() && !was_failed) {
+                try {
+                    host_->replace(filter_.activate(layout()));
+                } catch (...) {
+                }
+            }
+            if (!host_ && filter_.failed())
+                tail_.store(0);
+        }
+        message = filter_.error();
+    }
+    // Listeners may call back into the unit, so notify outside the lock.
+    PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+    if (!accepted) {
+        log_error(message);
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+    if (bypass_.load() != was_bypassed)
+        PropertyChanged(kAudioUnitProperty_BypassEffect, kAudioUnitScope_Global, 0);
+    log_error(message); // A restored failed load says why it plays silence.
+    // The preset name and element names, as AUBase restores them. Its "data"
+    // (parameter values) is left out: this unit has no parameters, and AUBase
+    // reads that blob without bounds checks.
+    const auto copy = CFDictionaryCreateMutableCopy(nullptr, 0, dict);
+    if (!copy)
+        return noErr;
+    CFDictionaryRemoveValue(copy, CFSTR(kAUPresetDataKey));
+    static_cast<void>(AUBase::RestoreState(copy));
+    CFRelease(copy);
+    return noErr;
+}
+
+OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
+                        UInt32 frames) AUSDK_RTSAFE {
+    auto* host = host_.get();
+    if (!host)
+        return kAudioUnitErr_Uninitialized;
+    auto& input = GetInput0();
+    auto& output = GetOutput0();
+    if (!input.IsActive())
+        return kAudioUnitErr_NoConnection;
+    if (const auto result = input.PullInput(flags, time, 0, frames); result != noErr)
+        return result;
+    // The source may mark its buffers silent instead of zeroing them.
+    const bool silent_input = (flags & kAudioUnitRenderAction_OutputIsSilence) != 0;
+    const auto in_list = input.GetBufferListOrError();
+    const auto out_list = output.GetBufferListOrError();
+    if (!in_list || !out_list)
+        return kAudio_ParamError;
+    const auto inputs = in_list->mNumberBuffers, outputs = out_list->mNumberBuffers;
+    if (inputs > max_channels || outputs > max_channels)
+        return kAudio_ParamError;
+    std::array<const float*, max_channels> in{};
+    std::array<float*, max_channels> out{};
+    for (UInt32 c = 0; c < inputs; ++c)
+        in[c] = silent_input ? nullptr : static_cast<const float*>(in_list->mBuffers[c].mData);
+    for (UInt32 c = 0; c < outputs; ++c)
+        out[c] = static_cast<float*>(out_list->mBuffers[c].mData);
+    if (reset_requested_.exchange(false))
+        host->reset();
+    host->set_bypass(bypass_.load(std::memory_order_relaxed));
+    if (!host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames))
+        return kAudio_ParamError;
+    // Silent only once the output is: a filter's tail outlasts silent input.
+    bool silent = silent_input;
+    for (UInt32 c = 0; silent && c < outputs; ++c)
+        if (out[c])
+            silent = std::all_of(out[c], out[c] + frames, [](float v) { return v == 0.f; });
+    if (silent)
+        flags |= kAudioUnitRenderAction_OutputIsSilence;
+    else
+        flags &= ~kAudioUnitRenderAction_OutputIsSilence;
+    return noErr;
+}
+} // namespace convolver::au

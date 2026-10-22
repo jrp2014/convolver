@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// The Audio Unit (AUv2 effect) adapter. This source is GPL-2.0-or-later like
+// the rest of Convolver; the built component, which includes Apple's
+// Apache-2.0 AudioUnitSDK, is distributed under GPL-3.0-or-later (NOTICE.txt).
+#pragma once
+#include "convolver/host.hpp"
+#include "convolver_identities.hpp"
+#include <AudioUnitSDK/AUBase.h>
+#include <atomic>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+
+namespace convolver::au {
+// HostProcessor's fixed latency; AU reports it in seconds.
+inline constexpr std::size_t latency_frames = 256;
+inline constexpr UInt32 max_channels = identity::max_channels;
+
+// One input bus and one output bus, 1 to 8 channels each (counts may differ),
+// following the shared adapter contract
+// (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
+//
+// Derived from AUBase rather than AUEffectBase on purpose: AUEffectBase's
+// bypass copies input to output, skipping Convolver's latency-aligned dry
+// path and 64-sample ramp, and does not handle unequal channel counts. Here
+// the bypass property only stores a flag; Render applies it through
+// HostProcessor::set_bypass.
+//
+// Threads: properties, state and initialization on the host's control
+// threads, serialized by `control_`; Render on one audio thread. The host
+// does not render while it initializes or uninitializes the unit.
+class Effect final : public ausdk::AUBase {
+  public:
+    explicit Effect(AudioComponentInstance);
+
+    OSStatus Initialize() override;
+    void Cleanup() override;
+    OSStatus Reset(AudioUnitScope, AudioUnitElement) override;
+
+    OSStatus GetPropertyInfo(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, UInt32&,
+                             bool&) override;
+    OSStatus GetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, void*) override;
+    OSStatus SetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void*,
+                         UInt32) override;
+
+    bool StreamFormatWritable(AudioUnitScope, AudioUnitElement) override;
+    bool ValidFormat(AudioUnitScope, AudioUnitElement, const AudioStreamBasicDescription&) override;
+    OSStatus ChangeStreamFormat(AudioUnitScope, AudioUnitElement,
+                                const AudioStreamBasicDescription&,
+                                const AudioStreamBasicDescription&) override;
+    UInt32 SupportedNumChannels(const AUChannelInfo**) override;
+    [[nodiscard]] bool CanScheduleParameters() const AUSDK_RTSAFE override {
+        return false;
+    }
+
+    // In seconds, as Audio Units report them: frames / sample rate.
+    Float64 GetLatency() AUSDK_RTSAFE override;
+    Float64 GetTailTime() AUSDK_RTSAFE override;
+    bool SupportsTail() AUSDK_RTSAFE override {
+        return true;
+    }
+
+    // ClassInfo: Apple's standard keys plus the encoded host state under
+    // presets::au_state_key, as the .aupreset files from convolver-preset hold.
+    OSStatus SaveState(CFPropertyListRef*) override;
+    OSStatus RestoreState(CFPropertyListRef) override;
+
+    OSStatus Render(AudioUnitRenderActionFlags&, const AudioTimeStamp&,
+                    UInt32) AUSDK_RTSAFE override;
+
+    // Why the unit plays silence or rejected its last filter; empty if neither.
+    // The same text goes to the system log when it happens.
+    std::string error();
+
+  private:
+    HostLayout layout();
+    std::optional<HostLayout> known_layout();
+    // Records a load that failed before it reached HostFilter (unreadable or
+    // foreign state), as HostFilter::load records its own rejections.
+    void reject(const std::string& why);
+    void timing_changed();
+
+    std::mutex control_;
+    HostFilter filter_{max_channels}; // The shared adapter contract's control side.
+    std::unique_ptr<HostProcessor> host_;
+    std::atomic<bool> bypass_{false};
+    std::atomic<bool> reset_requested_{false};
+    std::atomic<std::size_t> tail_{0};
+    // The rate and channels of the last initialization. Uninitialized, the
+    // host's configuration counts as known only while it still matches, as in
+    // the VST3 adapter: hosts may restore state before they set the formats.
+    std::optional<HostLayout> initialized_;
+};
+} // namespace convolver::au
