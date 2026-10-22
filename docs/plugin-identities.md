@@ -158,9 +158,11 @@ channel mask, and no input layout. Hence:
   [`host.hpp`](../include/convolver/host.hpp) makes that comparison for every
   format, and `HostFilter::notice()` keeps the result for the accepted filter
   and the current host (VST3-1, 22 October 2026). It compares only masks that
-  give one speaker per channel on more than one channel, and treats a layout
-  whose only surround pair is SL SR as the same as one with BL BR, because
-  5.1 is written both ways (`0x60F`, `0x3F`). The VST3 adapter converts its
+  give one speaker per channel on more than one channel, channel by channel in
+  bus order. In a layout with SL SR and no BL BR, SL and SR count as BL and
+  BR, because 5.1 is written both ways (`0x60F`, `0x3F`); 6.1 with side
+  speakers (`0x70F`) still differs from 6.1 with back speakers (`0x13F`),
+  whose back centre comes later in bus order. The VST3 adapter converts its
   arrangement directly (bits 0 to 17); an arrangement using any other VST3
   speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state

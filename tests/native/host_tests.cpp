@@ -349,10 +349,12 @@ void speaker_notices() {
     require(speaker_notice(c, back).empty() && speaker_notice(c, side).empty(),
             "5.1 with back or side speakers must count as the same layout");
     const auto notice = speaker_notice(c, music);
-    require(contains(notice, "FL FR FC LFE BL BR (channel mask 0x3F)") &&
+    require(contains(notice, "FL FR FC LFE BL BR (channel mask 0x3F in its .cfg)") &&
                 contains(notice, "carries FL FR BL BR SL SR") &&
-                contains(notice, "output 3 is filtered for FC but plays on BL") &&
-                contains(notice, "output 6 is filtered for BR but plays on SR") &&
+                contains(notice, "output 3 is filtered for the front centre (FC) speaker but plays "
+                                 "on the back left (BL)") &&
+                contains(notice, "output 6 is filtered for the back right (BR) speaker but plays "
+                                 "on the side right (SR)") &&
                 !contains(notice, "output 1 ") && contains(notice, "plays as loaded"),
             "speaker mismatch not explained");
     require(speaker_notice(c, unnamed).empty(), "host without speakers compared");
@@ -366,8 +368,33 @@ void speaker_notices() {
     Configuration seven{48000, 8, 8, 0x63F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
     require(speaker_notice(seven, {48000, 8, 8, 0, 0x63F}).empty() &&
                 contains(speaker_notice(seven, {48000, 8, 8, 0, 0xFF}),
-                         "output 7 is filtered for SL but plays on FLC"),
+                         "output 7 is filtered for the side left (SL) speaker but plays on the "
+                         "front left-centre (FLC)"),
             "7.1 layouts not compared exactly");
+    // Bus order counts: 6.1 with side speakers is not 6.1 with back speakers,
+    // because BC comes before SL SR but after BL BR.
+    Configuration six{48000, 7, 7, 0x70F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const auto six_notice = speaker_notice(six, {48000, 7, 7, 0, 0x13F});
+    require(contains(six_notice, "output 5 is filtered for the back centre (BC) speaker") &&
+                contains(six_notice, "output 7 is filtered for the side right (SR) speaker but "
+                                     "plays on the back centre (BC)"),
+            "6.1 side layout matched 6.1 back layout");
+    six.channel_mask = 0x13F;
+    require(!speaker_notice(six, {48000, 7, 7, 0, 0x70F}).empty(),
+            "6.1 back layout matched 6.1 side layout");
+    Configuration wide{48000, 8, 8, 0x6CF, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    require(contains(speaker_notice(wide, {48000, 8, 8, 0, 0xFF}),
+                     "output 5 is filtered for the front left-centre (FLC) speaker"),
+            "7.1 with side speakers matched 7.1 Cine");
+    // A notice for another channel does not list side-for-back channels.
+    Configuration five{48000, 5, 5, 0x60B, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const auto five_notice = speaker_notice(five, {48000, 5, 5, 0, 0x37});
+    require(contains(five_notice, "output 3 is filtered for the subwoofer (LFE) speaker") &&
+                !contains(five_notice, "output 4") && !contains(five_notice, "output 5"),
+            "side speakers listed as different from back speakers");
+    require(contains(five_notice, "set the host's track or bus to FL FR LFE SL SR") &&
+                contains(five_notice, "load the .cfg again"),
+            "notice does not say what to change");
     Configuration mono{48000, 1, 1, 0x4, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
     require(speaker_notice(mono, {48000, 1, 1, 0x1, 0x1}).empty(), "mono speakers compared");
 

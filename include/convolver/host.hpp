@@ -35,10 +35,11 @@ struct HostLayout {
 // Advisory check of the speakers a filter's outputs are labelled for (its
 // channel mask) against the host's output speakers. Empty when they agree, or
 // when either side names no speakers: a mask of 0, one that does not give one
-// speaker per channel, and one-channel buses are never compared. Back and side
-// pairs count as the same when a layout has only one of them (5.1 is written
-// as 0x3F or 0x60F). Never a reason to reject a filter: channels are routed by
-// bus index whatever the labels say (docs/plugin-identities.md#channel-layouts).
+// speaker per channel, and one-channel buses are never compared. Channels are
+// compared in bus order; in a layout with side (SL SR) and no back (BL BR)
+// speakers, SL and SR count as BL and BR (5.1 is written as 0x3F or 0x60F).
+// Never a reason to reject a filter: channels are routed by bus index whatever
+// the labels say (docs/plugin-identities.md#channel-layouts).
 std::string speaker_notice(const Configuration&, const HostLayout&);
 
 // What an instance plays without a usable filter, under the shared adapter
@@ -69,7 +70,9 @@ class HostFilter {
         return error_;
     }
     // A possible problem that does not stop the accepted filter playing, from
-    // the last check against the host (speaker_notice); empty if none.
+    // the last check against the host (speaker_notice); empty if none. It
+    // describes the host as of the last load() with a host or activate(); an
+    // adapter that shows it must recheck after the host changes its buses.
     const std::string& notice() const noexcept {
         return notice_;
     }

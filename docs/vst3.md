@@ -146,8 +146,10 @@ on a 7.1 Cine bus, whose channels 7 and 8 are the left and right of centre
 speakers. VST3 has no standard way to show that notice without an editor yet
 (DIAG-1, VST3-3). A mask of 0, a mask that does not name one speaker per output,
 one-channel buses and arrangements with speakers outside the shared table
-(`kMono`, ambisonics, Lw/Rw) are not compared; 5.1 and quadraphonic layouts
-with side speakers count as the same as those with back speakers. The check
+(`kMono`, ambisonics, Lw/Rw) are not compared. Channels are compared in bus
+order; in a layout with side speakers and no back ones (5.1 written as `0x60F`,
+for example), the side speakers count as the back pair, so `0x60F` suits `k51`.
+The check
 never rejects a preset ([layout rules](plugin-identities.md#channel-layouts)). A preset must match the bus channel counts and
 the sample rate; there is no implicit IR resampling or pitch/timing change. Bypass
 passes input *c* to output *c* only when the counts are equal; with unequal

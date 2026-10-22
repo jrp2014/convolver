@@ -349,14 +349,30 @@ void speaker_arrangements() {
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&state) == kResultOk, "7.1 filter refused on 7.1 Cine");
     const auto notice = p.notice();
-    require(notice.find("output 7 is filtered for SL but plays on FLC") != std::string::npos &&
-                notice.find("output 8 is filtered for SR but plays on FRC") != std::string::npos,
+    require(notice.find("output 7 is filtered for the side left (SL) speaker but plays on the "
+                        "front left-centre (FLC)") != std::string::npos &&
+                notice.find("output 8 is filtered for the side right (SR)") != std::string::npos,
             "7.1 filter on 7.1 Cine gave no notice");
     require(p.setActive(false) == kResultOk &&
                 p.setBusArrangements(&music, 1, &music, 1) == kResultOk &&
                 p.setActive(true) == kResultOk && p.notice().empty(),
             "7.1 Music buses kept the notice");
-    p.setActive(false);
+    // Changing only the arrangement keeps the host's configuration known: a
+    // preset at the wrong rate is still refused and the working filter kept.
+    require(p.setActive(false) == kResultOk &&
+                p.setBusArrangements(&cine, 1, &cine, 1) == kResultOk,
+            "back to 7.1 Cine buses");
+    saved.configuration->sample_rate = 44100;
+    MemoryStream wrong_rate;
+    require(write_state(&wrong_rate, saved), "encode 44.1 kHz state");
+    wrong_rate.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&wrong_rate) == kResultFalse,
+            "wrong-rate preset accepted after an arrangement change");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "save after refused preset");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->sample_rate == 48000,
+            "refused preset replaced the working filter");
     p.terminate();
 }
 // JUCE-based hosts (and pluginval) call setupProcessing with placeholder values

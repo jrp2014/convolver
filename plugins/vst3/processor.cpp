@@ -109,9 +109,7 @@ HostLayout Processor::layout() const {
 std::optional<HostLayout> Processor::known_layout() const {
     const auto now = layout();
     if (!activated_ || activated_->sample_rate != now.sample_rate ||
-        activated_->inputs != now.inputs || activated_->outputs != now.outputs ||
-        activated_->input_speakers != now.input_speakers ||
-        activated_->output_speakers != now.output_speakers)
+        activated_->inputs != now.inputs || activated_->outputs != now.outputs)
         return std::nullopt;
     return now;
 }

@@ -2,6 +2,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cmath>
@@ -42,12 +43,17 @@ bool names_speakers(std::uint32_t mask, std::size_t channels) {
     return channels > 1 && mask && !(mask & ~shared_speakers) &&
            static_cast<std::size_t>(std::popcount(mask)) == channels;
 }
-// 5.1 and quadraphonic layouts are written with back (BL BR) or side (SL SR)
-// speakers for the same surround pair; a layout with only side speakers is
-// compared as if they were the back pair.
-std::uint32_t surround_as_back(std::uint32_t mask) {
-    constexpr std::uint32_t back = 0x30, side = 0x600;
-    return (mask & side) == side && !(mask & back) ? (mask & ~side) | back : mask;
+// What each WAV mask bit means, for explanations (abbreviations in the PLUG-4
+// table: FL, FR, FC, ...).
+constexpr std::array<const char*, 18> speaker_words{
+    "front left",      "front right",      "front centre",      "subwoofer",
+    "back left",       "back right",       "front left-centre", "front right-centre",
+    "back centre",     "side left",        "side right",        "top centre",
+    "top front left",  "top front centre", "top front right",   "top back left",
+    "top back centre", "top back right"};
+static_assert(speaker_words.size() == identity::speakers.size());
+std::string speaker_name(std::size_t bit) {
+    return std::string(speaker_words[bit]) + " (" + std::string(identity::speakers[bit].wav) + ")";
 }
 std::string speaker_list(std::uint32_t mask) {
     std::string names;
@@ -59,13 +65,23 @@ std::string speaker_list(std::uint32_t mask) {
         }
     return names;
 }
-// The speaker of each channel, in bus order.
+// The speaker of each channel, in bus order (bit order).
 std::vector<std::size_t> speaker_bits(std::uint32_t mask) {
     std::vector<std::size_t> bits;
     for (std::size_t bit = 0; bit < identity::speakers.size(); ++bit)
         if (mask & (1U << bit))
             bits.push_back(bit);
     return bits;
+}
+// Layouts such as 5.1 and quadraphonic are written with back (BL BR) or side
+// (SL SR) speakers for the same surround pair. In a layout with side speakers
+// and no back ones, SL and SR are compared as BL and BR, channel by channel, so
+// bus order still counts (6.1 FL FR FC LFE BC SL SR is not FL FR FC LFE BL BR BC).
+std::size_t compared_as(std::size_t bit, std::uint32_t mask) {
+    constexpr std::uint32_t back = 0x30;
+    if (!(mask & back) && (bit == 9 || bit == 10))
+        return bit - 5;
+    return bit;
 }
 std::string hex(std::uint32_t n) {
     static constexpr char digits[] = "0123456789ABCDEF";
@@ -81,24 +97,30 @@ std::string hex(std::uint32_t n) {
 std::string speaker_notice(const Configuration& c, const HostLayout& host) {
     const auto filter = c.channel_mask, bus = host.output_speakers;
     if (c.output_channels != host.outputs || !names_speakers(filter, c.output_channels) ||
-        !names_speakers(bus, host.outputs) || surround_as_back(filter) == surround_as_back(bus))
+        !names_speakers(bus, host.outputs))
         return {};
     std::string differences;
     const auto ours = speaker_bits(filter), theirs = speaker_bits(bus);
     for (std::size_t i = 0; i < ours.size(); ++i)
-        if (ours[i] != theirs[i])
-            differences += std::string(differences.empty() ? "" : ", ") + "output " +
-                           std::to_string(i + 1) + " is filtered for " +
-                           std::string(identity::speakers[ours[i]].wav) + " but plays on " +
-                           std::string(identity::speakers[theirs[i]].wav);
+        if (compared_as(ours[i], filter) != compared_as(theirs[i], bus))
+            differences += std::string(differences.empty() ? "" : "; ") + "output " +
+                           std::to_string(i + 1) + " is filtered for the " + speaker_name(ours[i]) +
+                           " speaker but plays on the " + speaker_name(theirs[i]);
+    if (differences.empty())
+        return {};
     return "The filter's outputs are labelled for the speakers " + speaker_list(filter) +
-           " (channel mask " + hex(filter) + "), but the host's output bus carries " +
-           speaker_list(bus) + ". Convolver sends output channels to the bus in order, so " +
-           differences +
-           ". If the outputs feed speakers, set the host's track or bus to the filter's "
-           "speaker layout. If they are not speakers (crossover bands, for example), set "
-           "the channel mask at the end of the .cfg's first line to 0. The filter plays as "
-           "loaded either way.";
+           " (channel mask " + hex(filter) +
+           " in its .cfg), but the host's output bus "
+           "carries " +
+           speaker_list(bus) +
+           ". Convolver sends output channels to the bus in "
+           "order, so " +
+           differences + ". If the outputs feed speakers, set the host's track or bus to " +
+           speaker_list(filter) +
+           ". If they are not speakers (crossover bands, for example), set the channel mask "
+           "at the end of the .cfg's first line to 0, then load the .cfg again (or make the "
+           "preset again from it) and save the project. The filter plays as loaded either "
+           "way.";
 }
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
