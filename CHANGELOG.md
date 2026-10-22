@@ -24,8 +24,8 @@ Until 1.0 the C++ API may change between minor versions.
   can apply the filter to everything a device plays. The device's sample rate
   and channel count choose the list entry (on a device with more channels,
   the largest entry that fits); a device that no entry fits, and device
-  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO, not yet in Equalizer
-  APO itself.
+  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO and, on Windows CI, in
+  Equalizer APO 1.4.2's own filter code through its `Benchmark.exe`.
 
 - `convolver-preset` (PLUG-3) makes self-contained presets for VST3
   (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`

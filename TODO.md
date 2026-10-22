@@ -45,7 +45,7 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5** | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | 5. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. |
-| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) needs a check in Equalizer APO itself. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
+| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and decides whether PERF-2 is needed for plug-ins. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
 
@@ -108,10 +108,12 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   an Equalizer APO configuration ([guide](docs/equalizer-apo.md)), chosen by
   the device's sample rate and channel count, silent when nothing fits.
   `export.equalizer_apo` checks it against a model of Equalizer APO 1.4.2 and
-  the double-precision oracle. Still open: run the first-use exports and a list
-  in Equalizer APO itself on Windows (its `Benchmark.exe` processes a WAV file
-  with the installed configuration, which might also allow a Windows CI job),
-  and record the version and results in the guide.
+  the double-precision oracle. On Windows CI, `export.equalizer_apo.runtime`
+  runs the same cases in Equalizer APO 1.4.2's `Benchmark.exe` (its own filter
+  code, without the audio service). Still open: the manual check on a real
+  Windows device in the [guide](docs/equalizer-apo.md#how-it-is-tested)
+  (device rate and channel count reach the configuration; exclusive mode
+  bypasses it), done by anyone with a Windows computer, with the result recorded there.
 - [ ] **DIAG-1 — Review how diagnostics reach the user.** Do this once the
   current plug-in plans are implemented (see the
   [execution priorities](#execution-priorities)). For every failure a user can
