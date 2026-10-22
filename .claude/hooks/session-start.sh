@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Cloud sessions: install what the CMake build and tests need (CMake, FFTW,
-# libsndfile, Clang sanitizer runtimes, clang-format/clang-tidy 18), and install
+# libsndfile, Clang sanitizer runtimes, clang-format/clang-tidy 18, serdi), and install
 # the pre-commit Git hook so every commit runs the lint checks, formatting
 # included. Local machines are left alone (CONTRIBUTING.md, "Lint checks").
 set -euo pipefail
@@ -10,14 +10,15 @@ set -euo pipefail
 
 install_build_tools() {
   command -v apt-get >/dev/null || return 0
-  if command -v cmake >/dev/null && command -v clang-format-18 >/dev/null && command -v clang-tidy-18 >/dev/null && [ -f /usr/include/fftw3.h ] && [ -f /usr/include/sndfile.h ] &&
+  if command -v cmake >/dev/null && command -v clang-format-18 >/dev/null && command -v clang-tidy-18 >/dev/null && [ -f /usr/include/fftw3.h ] && [ -f /usr/include/sndfile.h ] && command -v serdi >/dev/null &&
      ls /usr/lib/llvm-*/lib/clang/*/lib/linux/libclang_rt.asan-x86_64.a >/dev/null 2>&1; then
     return 0
   fi
   ver=$(clang++ --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1 || true)
   ver=${ver:-18}
   SUDO=""; [ "$(id -u)" = 0 ] || SUDO="sudo"
-  pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18)
+  # serdi (a Turtle parser) lets plugins.presets check LV2 preset syntax.
+  pkgs=(cmake libfftw3-dev libsndfile1-dev "libclang-rt-${ver}-dev" clang-format-18 clang-tidy-18 serdi)
   $SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1 || {
     $SUDO apt-get update -qq >/dev/null 2>&1
     $SUDO apt-get install -y "${pkgs[@]}" >/dev/null 2>&1

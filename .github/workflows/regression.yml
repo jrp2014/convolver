@@ -37,7 +37,7 @@ jobs:
           python-version: '3.12'
       - name: Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev serdi
       - name: macOS dependencies
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
@@ -57,7 +57,8 @@ jobs:
           sudo apt-get install -y clang-tidy-18
           clang-tidy-18 -p build portable/engine.cpp portable/attenuation.cpp portable/config.cpp \
             portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp \
-            portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp
+            portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp \
+            portable/presets.cpp portable/preset_main.cpp
       - name: Linked versions
         run: ./build/convolver --version
       - name: Core-only preset without file or Python dependencies
