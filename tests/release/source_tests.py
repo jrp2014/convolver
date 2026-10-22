@@ -57,6 +57,40 @@ class SourceTests(unittest.TestCase):
             self.sources.extract(archive, root / 'out')
             self.assertEqual((root / 'out/root/LICENSE').read_bytes(), b'legal')
 
+    def _archive_with_link(self, root, name, link):
+        archive = root / 'linked.tar'
+        with tarfile.open(archive, 'w') as tar:
+            info = tarfile.TarInfo('root/COPYING')
+            info.size = 5
+            tar.addfile(info, io.BytesIO(b'legal'))
+            directory = tarfile.TarInfo('root/LICENSES')
+            directory.type = tarfile.DIRTYPE
+            tar.addfile(directory)
+            symlink = tarfile.TarInfo(name)
+            symlink.type = tarfile.SYMTYPE
+            symlink.linkname = link
+            tar.addfile(symlink)
+        return archive
+
+    def test_internal_file_link_becomes_copy(self):
+        # lv2 1.18.10 has LICENSES/ISC.txt -> ../COPYING.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.sources.extract(self._archive_with_link(root, 'root/LICENSES/ISC.txt', '../COPYING'), root / 'out')
+            copy = root / 'out/root/LICENSES/ISC.txt'
+            self.assertFalse(copy.is_symlink())
+            self.assertEqual(copy.read_bytes(), b'legal')
+
+    def test_unsafe_links(self):
+        cases = (('root/escape', '../../outside'), ('root/absolute', '/etc/passwd'),
+                 ('root/directory', 'LICENSES'), ('root/missing', 'absent'), ('root/drive', 'C:/x'))
+        for name, link in cases:
+            with self.subTest(link=link), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                with self.assertRaisesRegex(ValueError, 'unsafe'):
+                    self.sources.extract(self._archive_with_link(root, name, link), root / 'out')
+                self.assertFalse((root / 'out').exists() and any((root / 'out').iterdir()))
+
 
 if __name__ == '__main__':
     unittest.main()

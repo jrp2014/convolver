@@ -14,6 +14,25 @@ def sha256(path):
     return digest.hexdigest()
 
 
+# Every pinned dependency. Entries with 'formats' are used only by builds of
+# those plug-in formats; the others (FFTW, libsndfile) by every build.
+REQUIRED_DEPENDENCIES = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk',
+                         'lv2', 'audiounitsdk', 'fftw', 'libsndfile'}
+PLUGIN_FORMATS = {'vst3', 'lv2', 'au'}
+
+
+def used_dependencies(policy, formats=('vst3',), backend='AUTO'):
+    """Names of the pinned dependencies a build of these formats compiles.
+
+    FFTW is used only when the FFT backend is FFTW."""
+    unknown = set(formats) - PLUGIN_FORMATS
+    if unknown:
+        raise ValueError(f'unknown plug-in formats: {sorted(unknown)}')
+    return {name for name, dep in policy['dependencies'].items()
+            if (name != 'fftw' or backend == 'FFTW') and
+            (dep.get('formats') is None or set(dep['formats']) & set(formats))}
+
+
 def load_policy(path):
     path = Path(path)
     policy = json.loads(path.read_text(encoding='utf-8'))
@@ -34,15 +53,18 @@ def validate_policy(policy, source=None):
             raise ValueError('policy version conflicts with VERSION')
     if not re.fullmatch(r'[0-9a-f]{40}', policy.get('base_commit', '')):
         raise ValueError('base_commit must be an immutable revision')
-    required = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk', 'fftw', 'libsndfile'}
-    if set(policy.get('dependencies', {})) != required:
+    if set(policy.get('dependencies', {})) != REQUIRED_DEPENDENCIES:
         raise ValueError('missing or unexpected dependencies')
     for name, dep in policy['dependencies'].items():
         if not re.fullmatch(r'[0-9a-f]{64}', dep.get('sha256', '')):
             raise ValueError(f'{name}: missing/invalid sha256')
         if not dep.get('url', '').startswith('https://') or not dep.get('license') or not dep.get('version'):
             raise ValueError(f'{name}: missing URL, version or license')
-        if name.startswith('vst3') and not re.fullmatch(r'[0-9a-f]{40}', dep.get('revision', '')):
+        formats = dep.get('formats')
+        if formats is not None and (not formats or not set(formats) <= PLUGIN_FORMATS):
+            raise ValueError(f'{name}: formats must name plug-in formats from {sorted(PLUGIN_FORMATS)}')
+        # A format SDK is pinned by commit as well as by archive checksum.
+        if (formats or name.startswith('vst3')) and not re.fullmatch(r'[0-9a-f]{40}', dep.get('revision', '')):
             raise ValueError(f'{name}: missing immutable revision')
     if not re.fullmatch(r'[0-9a-f]{40}', policy.get('vcpkg', {}).get('baseline', '')):
         raise ValueError('missing vcpkg baseline')
