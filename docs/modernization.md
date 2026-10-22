@@ -20,19 +20,22 @@ The [current review](../REVIEW.md) links each area to its implementation.
 [TODO.md](../TODO.md) is the single list of outstanding work and candidate
 libraries. This page explains direction; dated implementation plans describe
 particular projects. Check the source and open pull requests before resuming a
-plan. The separate plug-in distribution branch is merged into `main`; its
-VST3 release pipeline is the one that PLUG-5 extends to LV2 and AU, as the
-[plug-in formats plan](plans/2026-10-21-plugin-formats.md) describes.
+plan. The separate plug-in distribution branch is merged into `main`, except
+its signing scripts; its VST3 release pipeline is the one that PLUG-5 extends
+to LV2 and AU, as the [plug-in formats plan](plans/2026-10-21-plugin-formats.md)
+describes.
 
 ## Dependency choices
 
-FFTW remains the default FFT backend for the core library and CLI. Plug-in builds
-are the exception: they use the built-in Ooura FFT on Linux and Windows and
-Accelerate on macOS, because a host process may load another copy of FFTW whose
-planner is not thread-safe ([plug-in builds](fft-backends.md#plug-in-builds)).
-Accelerate uses an Apple system framework; Ooura is built in and avoids a
-separate FFT dependency. Backend selection is per build. Use [the FFT guide](fft-backends.md) for contract details
-and dated measurements; none is asserted to be fastest for every workload.
+FFTW remains the default FFT backend unless the build includes a plug-in
+(`CONVOLVER_BUILD_VST3=ON`). Then `AUTO` picks the built-in Ooura FFT on Linux
+and Windows and Accelerate on macOS for the whole build, CLI included, because
+other code in the host process may call the same FFTW, whose planner Convolver
+cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)). Build the CLI
+separately to keep FFTW for offline rendering. Accelerate uses an Apple system
+framework; Ooura is built in and avoids a separate FFT dependency. Use
+[the FFT guide](fft-backends.md) for contract details and dated measurements;
+none is asserted to be fastest for every workload.
 
 [libsndfile](https://libsndfile.github.io/libsndfile/) remains the file-decoding and
 encoding boundary. The core and host libraries can omit it. It is neither an

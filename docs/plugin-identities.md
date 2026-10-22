@@ -11,9 +11,10 @@ once a build using them is released they **never change**. They are recorded
 once, in [`plugins/identities.json`](../plugins/identities.json), together with
 the channel layouts the plug-ins support; the build and the release scripts
 read them from there. **If you distribute a modified build, please change its
-[product identities](#if-you-distribute-a-modified-build)** (class IDs, AU
-manufacturer code, bundle and installer names, LV2 URIs) so hosts do not
-confuse your plug-in with this one; format constants and layout definitions stay.
+[product identities](#if-you-distribute-a-modified-build)** (vendor, class IDs,
+AU manufacturer code, bundle and installer names, LV2 URIs, install folders) so
+hosts do not confuse your plug-in with this one; format constants and layout
+definitions stay.
 Presets saved today (state version 1) record no channel layout and keep
 loading on any host arrangement with the same channel counts.
 
@@ -75,12 +76,26 @@ the code rely on their meaning.
 | `schema` | The registry's own format version |
 | `channels`, `fixed_layouts`, `speakers` | Supported channel counts and layout meanings; layout ids only follow your LV2 URI base |
 | `host_state` (`CNVS`, version 1) | The state format; keep it as long as your state stays identical, so presets remain readable |
-| `historical.vst2_unique_id` | A record of the 2005–2006 plug-in, not used by modern builds |
+| `historical.vst2_unique_id` | A record of the 2005–2006 plug-in. If your build declares VST2 compatibility (VST3-6), declare your own ID or none instead of reusing it |
 
 `packaging/macos/Distribution.xml` and `packaging/windows/installer.nsi` repeat
 the installer identifiers, so edit them to match; the tests check that they
 agree. Then update the frozen copy (`FROZEN`) in
 [`tests/identities_tests.py`](../tests/identities_tests.py).
+
+Some names that hosts and installers see are not in the registry yet. Change
+them too, because plug-ins install into shared system folders and the
+uninstaller removes every path it owns:
+
+- the VST3 bundle name `Convolver.vst3` (`PACKAGE_NAME` in
+  `plugins/vst3/CMakeLists.txt`, repeated in `scripts/release/installers.py`
+  and `scripts/release/verify_artifact.py`), and later `Convolver.component`;
+- the plug-in names hosts list (`plugins/vst3/factory.cpp`);
+- the install folders `$PROGRAMFILES64\Convolver`
+  (`packaging/windows/installer.nsi`) and
+  `/Library/Application Support/Convolver`, and the package names
+  `Convolver-vst3.pkg` and `Convolver-tools.pkg`
+  (`scripts/release/candidate.py`, `scripts/release/installers.py`).
 
 Otherwise a host that has both builds installed sees one plug-in, loads the
 wrong one for a project, or lets one installer remove the other.

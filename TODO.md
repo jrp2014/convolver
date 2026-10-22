@@ -150,8 +150,9 @@ Shared groundwork, done once so the three streams stay independent:
   copies; also in pre-commit), `vst3.identities` (bundle class IDs and bundle
   identifier, SDK speaker bits), and `vst3.adapter`'s `version1_presets`
   (version-1 presets with any output mask load on every six-channel arrangement
-  and route by bus index). Modified builds are asked to change the product identities listed in the
-  [identities guide](docs/plugin-identities.md), which owns the layout rules.
+  and route by bus index). Modified builds are asked to change the product
+  identities listed in the [identities guide](docs/plugin-identities.md), which
+  owns the layout rules.
   Recording an input layout still needs state version 2 (an owner's decision).
 - [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
   merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
