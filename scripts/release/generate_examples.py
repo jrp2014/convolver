@@ -3,8 +3,12 @@
 import argparse
 import json
 from pathlib import Path
-import struct
 import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tests' / 'plugins'))
+from fixtures import float_wav_bytes  # noqa: E402  The shared PLUG-2/DOC-1 WAV writer.
 
 
 def generate(output, converter):
@@ -19,10 +23,7 @@ def generate(output, converter):
                 # Exactly representable coefficients: identity; or -6 dB direct
                 # plus a quarter-amplitude delayed tap, with headroom.
                 impulse = [1.0] if kind == 'identity' else [0.5] + [0.0] * 256 + [0.25]
-                payload = b''.join(struct.pack('<f', value) * channels for value in impulse)
-                fmt = struct.pack('<HHIIHH', 3, channels, rate, rate * channels * 4, channels * 4, 32)
-                wav = b'RIFF' + struct.pack('<I', 36 + len(payload)) + b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(payload)) + payload
-                (folder / 'impulse.wav').write_bytes(wav)
+                (folder / 'impulse.wav').write_bytes(float_wav_bytes(rate, [impulse] * channels))
                 zeroes = ' '.join(['0'] * channels)
                 config = f'{rate} {channels} {channels} 0\n{zeroes}\n{zeroes}\n'
                 for channel in range(channels):

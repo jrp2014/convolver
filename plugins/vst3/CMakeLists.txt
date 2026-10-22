@@ -111,6 +111,24 @@ if(CONVOLVER_BUILD_IO)
             "${PROJECT_SOURCE_DIR}/tests/vst3/preset_tests.py"
             "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>")
         set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 120)
+        # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
+        # that examples.first_use leaves behind.
+        if(TARGET convolver_cli AND CONVOLVER_BUILD_NATIVE)
+            add_executable(convolver_vst3_harness "${PROJECT_SOURCE_DIR}/tests/vst3/harness_tests.cpp"
+                "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp" processor.cpp
+                "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+            target_include_directories(convolver_vst3_harness PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
+            target_link_libraries(convolver_vst3_harness PRIVATE Convolver::host Convolver::io sdk sdk_hosting)
+            if(APPLE)
+                target_link_libraries(convolver_vst3_harness PRIVATE "-framework Cocoa")
+            endif()
+            add_test(NAME vst3.harness COMMAND convolver_vst3_harness
+                "${CMAKE_BINARY_DIR}/first-use/fixtures.txt")
+            set_tests_properties(vst3.harness PROPERTIES LABELS "vst3;real-libraries;plug2"
+                TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
+            add_dependencies(check convolver_vst3_harness)
+        endif()
         add_dependencies(check convolver_vst3_preset)
         # Tracktion pluginval: an independent (JUCE) host, downloaded separately.
         if(CONVOLVER_PLUGINVAL)
