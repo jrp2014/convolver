@@ -1,11 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Explicit hash-verified source acquisition and safe archive extraction."""
+"""Explicit hash-verified source acquisition and safe archive extraction.
+
+Run directly to fetch, verify and unpack chosen pins, for example the LV2
+headers or AudioUnitSDK in CI:
+python3 scripts/release/sources.py --fetch --cache DIR --destination DIR lv2
+"""
+import argparse
 from pathlib import Path, PurePosixPath
+import posixpath
 import shutil
 import tarfile
 import tempfile
 import urllib.request
-from contract import sha256
+from contract import load_policy, sha256
 
 
 def verify(path, dependency):
@@ -31,35 +38,58 @@ def acquire(dependency, cache, fetch=False):
     return path
 
 
+def _link_source(member, regular):
+    """The regular file member an in-archive relative symlink names, or None."""
+    link = member.linkname
+    if not link or link.startswith('/') or '\\' in link or ':' in link:
+        return None
+    return regular.get(posixpath.normpath(posixpath.join(posixpath.dirname(member.name), link)))
+
+
 def extract(archive, destination):
-    """Pinned source archives contain regular files/directories only."""
+    """Pinned source archives contain regular files and directories, plus
+    symlinks to regular files in the same archive (lv2 has one), which are
+    written as copies so nothing can point outside the destination. Each
+    path may occur once."""
     destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive) as tar:
         members = tar.getmembers()
+        names = [posixpath.normpath(m.name) for m in members]
+        if len(set(names)) != len(names):
+            raise ValueError('unsafe source archive: a path occurs more than once')
+        regular = {name: m for name, m in zip(names, members) if m.isfile()}
+        sources = {}
         for member in members:
             path = PurePosixPath(member.name)
+            source = member if member.isfile() else _link_source(member, regular) if member.issym() else None
             if (path.is_absolute() or '..' in path.parts or '\\' in member.name or
-                    ':' in member.name or not (member.isfile() or member.isdir())):
+                    ':' in member.name or not (source or member.isdir())):
                 raise ValueError(f'unsafe source archive member: {member.name}')
             target = destination / Path(*path.parts)
             try:
                 target.resolve().relative_to(destination.resolve())
             except ValueError as error:
                 raise ValueError('unsafe source extraction destination') from error
+            sources[member.name] = source
         for member in members:
             target = destination / member.name
             if member.isdir():
                 target.mkdir(parents=True, exist_ok=True)
             else:
+                source_member = sources[member.name]
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with tar.extractfile(member) as source, target.open('wb') as output:
+                with tar.extractfile(source_member) as source, target.open('wb') as output:
                     shutil.copyfileobj(source, output)
-                target.chmod(member.mode & 0o777)
+                target.chmod(source_member.mode & 0o777)
 
 
-def unpack_dependencies(policy, cache, destination, fetch=False):
+def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
+    """Unpack every pinned dependency, or only those in names."""
+    if names is not None and not set(names) <= set(policy['dependencies']):
+        raise ValueError(f'unknown dependencies: {sorted(set(names) - set(policy["dependencies"]))}')
     # Parent SDK before its submodules; never trust an old extracted tree.
-    ordered = sorted(policy['dependencies'].items(), key=lambda item: item[1]['directory'].count('/'))
+    ordered = sorted(((name, dep) for name, dep in policy['dependencies'].items() if names is None or name in names),
+                     key=lambda item: item[1]['directory'].count('/'))
     for name, dependency in ordered:
         archive = acquire(dependency, cache, fetch)
         target = destination / dependency['directory']
@@ -78,3 +108,18 @@ def unpack_dependencies(policy, cache, destination, fetch=False):
                 raise ValueError(f'{name}: archive must have one top-level directory')
             shutil.copytree(roots[0], target, dirs_exist_ok=True)
         stamp.write_text(dependency['sha256'] + '\n')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
+    parser.add_argument('--cache', type=Path, required=True, help='Directory of downloaded archives')
+    parser.add_argument('--destination', type=Path, required=True, help='Directory to unpack into')
+    parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing pinned archives')
+    parser.add_argument('names', nargs='+', help='Dependency names from the policy, such as lv2 or audiounitsdk')
+    args = parser.parse_args()
+    policy = load_policy(args.policy)
+    args.destination.mkdir(parents=True, exist_ok=True)
+    unpack_dependencies(policy, args.cache.resolve(), args.destination.resolve(), args.fetch, set(args.names))
+    for name in args.names:
+        print(f"{name} {policy['dependencies'][name]['version']}: {args.destination / policy['dependencies'][name]['directory']}")

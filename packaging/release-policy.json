@@ -10,7 +10,10 @@
       "sha256": "fbc6e6f713cd3644ab9440496a75ce714e2ad435dbdd38825fe8834f31456fb6",
       "archive": "vst3sdk.tar.gz",
       "directory": "vst3sdk",
-      "license": "MIT"
+      "license": "MIT",
+      "formats": [
+        "vst3"
+      ]
     },
     "vst3-base": {
       "version": "3.8.1-build-84",
@@ -19,7 +22,10 @@
       "sha256": "3753d45a79b5e324c2843d74a18c8f1117fe0b1118fa9312658aecf6360ec603",
       "archive": "vst3-base.tar.gz",
       "directory": "vst3sdk/base",
-      "license": "MIT"
+      "license": "MIT",
+      "formats": [
+        "vst3"
+      ]
     },
     "vst3-cmake": {
       "version": "3.8.1-build-84",
@@ -28,7 +34,10 @@
       "sha256": "d8bddb3d87d66b5078e803d271ef82ba51bc74f941e0ca8256e7145950db409e",
       "archive": "vst3-cmake.tar.gz",
       "directory": "vst3sdk/cmake",
-      "license": "MIT"
+      "license": "MIT",
+      "formats": [
+        "vst3"
+      ]
     },
     "vst3-pluginterfaces": {
       "version": "3.8.1-build-84",
@@ -37,7 +46,10 @@
       "sha256": "ee70777eebb8450fc04fae2a6dd452f723d12bfb8222af443b8c1f8a9259089a",
       "archive": "vst3-pluginterfaces.tar.gz",
       "directory": "vst3sdk/pluginterfaces",
-      "license": "MIT"
+      "license": "MIT",
+      "formats": [
+        "vst3"
+      ]
     },
     "vst3-public-sdk": {
       "version": "3.8.1-build-84",
@@ -46,7 +58,36 @@
       "sha256": "71319491b771068b8e2c5374c22830a339677e9d54c4cd33af4a0aa210e4c838",
       "archive": "vst3-public-sdk.tar.gz",
       "directory": "vst3sdk/public.sdk",
-      "license": "MIT"
+      "license": "MIT",
+      "formats": [
+        "vst3"
+      ]
+    },
+    "lv2": {
+      "version": "1.18.10",
+      "revision": "0bcde338db1c63bbc503b4d1f6d7b55ed43154af",
+      "url": "https://codeload.github.com/lv2/lv2/tar.gz/0bcde338db1c63bbc503b4d1f6d7b55ed43154af",
+      "sha256": "38d515cf1cb95d6f7d0191b8e383cbd95975a1ccec082d4e729eece7ec6a0c3e",
+      "archive": "lv2.tar.gz",
+      "directory": "lv2",
+      "license": "ISC",
+      "notice": "COPYING",
+      "formats": [
+        "lv2"
+      ]
+    },
+    "audiounitsdk": {
+      "version": "1.4.0",
+      "revision": "bd98b31feff57a15989fcfab4cd86dc63382b1ac",
+      "url": "https://codeload.github.com/apple/AudioUnitSDK/tar.gz/bd98b31feff57a15989fcfab4cd86dc63382b1ac",
+      "sha256": "163dc32422c4df153062fb93be1dbc5394af20488c973b81fef61fbd5db22f1c",
+      "archive": "audiounitsdk.tar.gz",
+      "directory": "AudioUnitSDK",
+      "license": "Apache-2.0",
+      "notice": "LICENSE.txt",
+      "formats": [
+        "au"
+      ]
     },
     "fftw": {
       "version": "3.3.11",

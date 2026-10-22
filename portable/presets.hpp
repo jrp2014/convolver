@@ -19,7 +19,8 @@ std::string_view format_name(Format); // "VST3", "AU" or "LV2"
 // By file name: .vstpreset, .aupreset, or a .lv2 bundle folder (NAME.preset.lv2).
 std::optional<Format> format_for(const std::filesystem::path&);
 
-// Permanent names: AU-2 and LV2-2 read the encoded host state from these.
+// Permanent names (owner's decision, 22 October 2026): AU-2 and LV2-2 read
+// the encoded host state (bare, without VST3's length prefix) from these.
 // The AU ClassInfo dictionary keeps Apple's standard keys (an empty "data",
 // since the AU has no parameters, so AUBase::RestoreState still works) and adds:
 inline constexpr std::string_view au_state_key = "convolver-state";

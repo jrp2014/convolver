@@ -168,8 +168,8 @@ keep loading. These names are permanent, like the
   Turtle). No file path is stored, so the preset does not depend on where the
   filter files were.
 
-Recording these key names as permanent is an owner's decision pending in the
-PLUG-3 pull request.
+The AU key, the LV2 state property and the bare state inside them (without the
+VST3 length prefix) are the owner's decision of 22 October 2026.
 
 ## Compatibility
 

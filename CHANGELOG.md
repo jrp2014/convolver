@@ -19,6 +19,14 @@ Until 1.0 the C++ API may change between minor versions.
   same encoded filter. It needs no plug-in SDK, so AU and LV2 builds can ship
   it. `convolver-vst3-preset` is now the same tool under its old name, with the
   same arguments and byte-identical output. See [plug-in presets](docs/presets.md).
+
+- Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
+  `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
+  test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI
+  workflows. A weekly Dependency updates workflow reports newer upstream
+  releases of every pin and keeps one tracking issue current. See
+  [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+
 - First-use examples in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
   the expected output. CI runs the documented commands as written and checks

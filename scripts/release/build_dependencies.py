@@ -6,16 +6,18 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
-from contract import load_policy
+from contract import PLUGIN_FORMATS, load_policy, used_dependencies
 from sources import unpack_dependencies
 
 
-def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW'):
-    """FFTW is built and its notice shipped only when the FFT backend is FFTW."""
+def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',)):
+    """Only the dependencies of the given plug-in formats are unpacked and their
+    notices shipped; FFTW only when the FFT backend is FFTW."""
     work = work.resolve()
     source = work / 'sources'
     source.mkdir(parents=True, exist_ok=True)
-    unpack_dependencies(policy, cache.resolve(), source, fetch)
+    used = used_dependencies(policy, formats, backend)
+    unpack_dependencies(policy, cache.resolve(), source, fetch, names=used)
     prefix = work / 'prefix'
     common = ['-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF',
               '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DCMAKE_INSTALL_LIBDIR=lib',
@@ -31,7 +33,6 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
                   '-DENABLE_OPENMP=OFF', '-DENABLE_THREADS=OFF']),
         ('libsndfile', ['-DBUILD_TESTING=OFF', '-DBUILD_PROGRAMS=OFF', '-DBUILD_EXAMPLES=OFF',
                        '-DENABLE_EXTERNAL_LIBS=OFF', '-DENABLE_MPEG=OFF', '-DENABLE_CPACK=OFF']))
-    used = {name for name in policy['dependencies'] if name != 'fftw' or backend == 'FFTW'}
     for name, options in libraries:
         if name not in used:
             continue
@@ -47,7 +48,7 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
         if name not in used:
             continue
         dep_root = source / dep['directory']
-        notice = dep_root / ('LICENSE.txt' if name.startswith('vst3') else 'COPYING')
+        notice = dep_root / dep.get('notice', 'LICENSE.txt' if name.startswith('vst3') else 'COPYING')
         shutil.copyfile(notice, licenses / (name + '.txt'))
         # Preserve additional upstream notices alongside the main licence.
         for path in dep_root.rglob('*'):
@@ -70,5 +71,8 @@ if __name__ == '__main__':
     parser.add_argument('--architecture', choices=['arm64', 'x86_64'])
     parser.add_argument('--backend', choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'], default='AUTO',
                         help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW')
+    parser.add_argument('--formats', nargs='+', choices=sorted(PLUGIN_FORMATS), default=['vst3'],
+                        help='Plug-in formats of the build that follows; only their SDKs are unpacked')
     args = parser.parse_args()
-    build(load_policy(args.policy), args.cache, args.work, args.cmake, args.fetch, args.architecture, args.backend)
+    build(load_policy(args.policy), args.cache, args.work, args.cmake, args.fetch, args.architecture, args.backend,
+          args.formats)

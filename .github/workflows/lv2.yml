@@ -1,0 +1,125 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+# LV2 build and test tools, pinned (PLUG-6). Until the LV2 adapter exists
+# (LV2-1), this job proves the pins: the lv2 headers from the release policy
+# build LV2's example plug-ins, lilv loads and runs one on a shared fixture,
+# and lv2lint checks it. LV2-1 and LV2-3 add Convolver's bundle here.
+name: LV2
+
+'on':
+  # Pull requests run on their own event; a branch push without a pull
+  # request can be tested with "Run workflow" (docs/testing.md#ci-triggers).
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new commit on a pull request cancels the run for the commit it replaces.
+# Pushes to main and manual runs each get a group of their own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lv2:
+    # A fixed image label. The apt versions below are Ubuntu 24.04's release
+    # pocket, which never changes; lilv's libraries (serd, sord, sratom, zix)
+    # are pinned too, so noble-updates cannot move them.
+    runs-on: ubuntu-24.04
+    env:
+      LV2_DEB: 1.18.10-2build1
+      LILV_DEB: 0.24.22-1build1
+      SERD_DEB: 0.32.2-1
+      SORD_DEB: 0.16.16-2build1
+      SRATOM_DEB: 0.6.16-1build1
+      ZIX_DEB: 0.4.2-2build1
+      LV2LINT_VERSION: 0.16.2
+      LV2LINT_SHA256: b23810571f2e18d3d6714c0acc65210a1a5fcd78fff03f1c820553a5c1c45cf4
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Pinned lilv and lv2 packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
+            "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
+            "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
+            meson ninja-build pkg-config libelf-dev
+          lv2info --version
+          dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
+      - name: Pinned lv2 source (release policy)
+        run: >-
+          python scripts/release/sources.py --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" lv2
+      # plugins=auto skips examples whose libraries are missing (eg-sampler
+      # needs libsamplerate); the next step fails if eg-amp was not built.
+      - name: Build LV2's example plug-ins against the pinned headers
+        run: |
+          meson setup "$RUNNER_TEMP/lv2-build" "$RUNNER_TEMP/sources/lv2" \
+            -Dplugins=auto -Ddocs=disabled -Dtests=disabled \
+            "-Dlv2dir=$RUNNER_TEMP/lv2-bundles" "--prefix=$RUNNER_TEMP/lv2-prefix"
+          ninja -C "$RUNNER_TEMP/lv2-build" install
+          echo "LV2_PATH=$RUNNER_TEMP/lv2-bundles" >> "$GITHUB_ENV"
+      - name: lilv hosts a plug-in on a shared fixture
+        run: |
+          lv2ls
+          output="$RUNNER_TEMP/eg-amp.wav"
+          lv2apply -c gain 0 -i examples/first-use/mono/input.wav -o "$output" http://lv2plug.in/plugins/eg-amp
+          python - "$output" <<'EOF'
+          import sys
+          sys.path.insert(0, 'tests/plugins')
+          import fixtures
+          error = fixtures.worst_error(fixtures.read_float_wav(sys.argv[1]),
+                                       fixtures.read_float_wav('examples/first-use/mono/input.wav'))
+          print(f'eg-amp at 0 dB, worst difference from its input: {error}')
+          sys.exit(error != 0.0)
+          EOF
+      - name: Pinned lv2lint
+        run: |
+          archive="$RUNNER_TEMP/lv2lint-$LV2LINT_VERSION.tar.xz"
+          # Upstream first, then FreeBSD's distfile caches (plain HTTP on the
+          # main name, whose certificate does not match); the checksum, which
+          # is FreeBSD's, decides whichever answers.
+          for url in \
+            "https://git.open-music-kontrollers.ch/~hp/lv2lint/snapshot/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "https://distcache.us-east.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "https://distcache.eu.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
+            "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz"; do
+            if curl -fsSL --retry 3 -o "$archive" "$url"; then
+              if echo "$LV2LINT_SHA256  $archive" | sha256sum --check --strict; then
+                echo "lv2lint $LV2LINT_VERSION from $url"
+                break
+              fi
+              sha256sum "$archive"
+            fi
+            rm -f "$archive"
+          done
+          test -f "$archive" || { echo "No lv2lint $LV2LINT_VERSION archive matched the pinned checksum" >&2; exit 1; }
+          mkdir "$RUNNER_TEMP/lv2lint"
+          tar -xJf "$archive" -C "$RUNNER_TEMP/lv2lint" --strip-components=1
+          meson setup "$RUNNER_TEMP/lv2lint-build" "$RUNNER_TEMP/lv2lint" --buildtype=release
+          ninja -C "$RUNNER_TEMP/lv2lint-build"
+          sudo ninja -C "$RUNNER_TEMP/lv2lint-build" install
+      - name: lv2lint checks a plug-in
+        # eg-amp lacks lv2:minorVersion and lv2:microVersion, which lv2lint
+        # 0.16.2 reports as failures. Expect exactly those, so a broken or
+        # changed lv2lint is noticed; Convolver's bundle must pass outright.
+        run: |
+          set +e
+          report=$(env -u LV2_PATH lv2lint -I "$LV2_PATH/eg-amp.lv2/" http://lv2plug.in/plugins/eg-amp 2>&1)
+          status=$?
+          set -e
+          echo "$report"
+          failures=$(echo "$report" | sed -n 's/^ *\[FAIL\] *//p' | sort | paste -sd ';' -)
+          expected='Plugin Version Micro;Plugin Version Minor'
+          if [ "$status" -eq 0 ] || [ "$failures" != "$expected" ] ||
+             ! echo "$report" | grep -qF '<http://lv2plug.in/plugins/eg-amp>'; then
+            echo "Expected lv2lint to fail eg-amp on exactly: $expected (got status $status: $failures)" >&2
+            exit 1
+          fi

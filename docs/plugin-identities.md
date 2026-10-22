@@ -34,8 +34,8 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
 | All | Host state | magic `CNVS`, version 1 | The encoded filter inside presets and saved projects |
-| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](presets.md#what-the-files-contain)) |
-| LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp` |
+| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](presets.md#what-the-files-contain)). Owner's decision, 22 October 2026 |
+| LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. Owner's decision, 22 October 2026 |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
 **Status (22 October 2026):** no release has used these identities yet. The

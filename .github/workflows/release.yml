@@ -3,12 +3,21 @@
 name: Plug-in distribution candidates
 
 'on':
+  # Pull requests run on their own event; a branch push without a pull
+  # request can be tested with "Run workflow" (docs/testing.md#ci-triggers).
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# A new commit on a pull request cancels the run for the commit it replaces.
+# Pushes to main and manual runs each get a group of their own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   sources:
@@ -25,6 +34,7 @@ jobs:
           python tests/release/artifact_tests.py
           python tests/release/installer_tests.py
           python tests/release/gate_tests.py
+          python tests/release/update_tests.py
       - name: Assemble corresponding source
         run: >-
           python scripts/release/build_sources.py
