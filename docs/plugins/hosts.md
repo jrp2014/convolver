@@ -32,8 +32,9 @@ unsigned previews only; a production release needs the full procedure.
 These are tools for developers, not evidence that a DAW works.
 
 - The SDK **validator** loads the built plug-in in every CI run, in default and
-  extensive modes ([VST3 guide](../vst3.md#compatibility-evidence)). pluginval, an
-  independent host, also runs in CI and renders real filters.
+  extensive modes (source repository: `docs/vst3.md`, "Compatibility
+  evidence"). pluginval, an independent host, also runs in CI and renders real
+  filters.
 - **VST3PluginTestHost** (Steinberg, free, Windows and macOS) is a convenient
   manual check without a DAW: it can load presets, change buses and run audio.
 - The SDK's two **sample hosts**, `audiohost` and `editorhost`, were evaluated
