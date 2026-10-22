@@ -455,8 +455,9 @@ contract:
   file and preparing its FFT engine take time, and a newer request can arrive
   at any point during them. So preparation and publication are separate steps,
   with the last generation check between them:
-  1. Load and validate the file, then prepare the replacement filter (engine
-     construction and FFT planning). This is everything `replace` does today
+  1. Load and validate the file. If the request is already stale, stop here;
+     this saves FFT planning. Otherwise prepare the replacement filter (engine
+     construction and FFT planning), which is everything `replace` does today
      before it hands the filter to the audio thread.
   2. Check the generation again, after preparation. Publish only if the
      request is still the newest and newer than the generation already
@@ -471,23 +472,40 @@ contract:
   newer request then failed, the stale filter would keep playing.
   `HostProcessor` therefore needs a two-step replacement (prepare, then
   publish), added with LV2-2 and covered by the core host tests. `replace`
-  remains prepare followed by publish. A request that arrives after the check
-  but before publication is not stale: its own `work()` call runs next under
-  the lock and replaces or reports as usual.
+  remains prepare followed by publish, so VST3 and AU are unchanged.
 
-  Responses are checked against the newest *request*, not merely the last
-  response applied. Each response carries its generation and the path and
-  status now in use, read from the installed record under the lock.
-  `work_response()` reads the newest requested generation from the atomic
-  counter. A response for an older generation changes nothing, so the status
-  stays "loading" until the newest request answers. The newest response
-  updates the status port and sends `patch:Set` with the path now in use. That
-  is the newly loaded file, or the filter that kept running if the load
-  failed.
+  A request B that arrives between the final check and publication of A is
+  treated as arriving after A was installed. The remaining gap is the atomic
+  hand-over, which a `run()` that never takes the lock cannot close. A really
+  was the newest when it was committed, and B's own `work()` call runs next
+  under the lock and replaces A or reports as usual.
+- **Responses.** Every `work()` call sends a response, including skipped and
+  discarded ones. It carries the request's generation, its outcome
+  (installed, superseded, or load failed), and the installed generation and
+  path, read under the lock. `work_response()` handles the two parts
+  separately:
+  - **Status follows the newest request.** `work_response()` reads the newest
+    requested generation from the atomic counter, which is exact because it
+    runs in the `run()` context that increments it. It applies a response's
+    outcome only if the response is for that generation. Otherwise the status
+    stays "loading" until the newest request answers. Checking against the
+    last response applied is not enough.
+  - **The path follows the installed generation.** If a response reports a
+    newer installed generation than the last one reported, `work_response()`
+    sends `patch:Set` with that path. So `patch:Get` always names the filter
+    that is playing, even when the response that installed it is for an older
+    request.
+  - **Requests that never reach `work()` still get an answer.** If
+    `schedule_work` fails, `run()` answers that generation itself with
+    "load failed" (see below). `restore()` updates the installed record under
+    the lock and leaves its generation, outcome and path for the next `run()`
+    to apply as that generation's response. Without
+    `state:threadSafeRestore`, `restore()` never overlaps `run()`, so the
+    host's own ordering makes that hand-over safe.
 - **Scheduling failure.** If `schedule_work` returns
   `LV2_WORKER_ERR_NO_SPACE` or `LV2_WORKER_ERR_UNKNOWN`, the running filter
-  stays, the status becomes "load failed", `patch:Get` still reports the old
-  path, and the message is logged from the next non-real-time call. The request
+  stays, `run()` answers the request at once with "load failed",
+  `patch:Get` still reports the filter that is playing, and the message is logged from the next non-real-time call. The request
   is dropped, not silently retried.
 - **Saving during a load.** `save()` takes the lock, so it records the state
   either before or after a load, never half of one. It saves the last accepted
@@ -503,19 +521,24 @@ contract:
   request arriving while an older file is still loading (the older completion
   must not change the filter, status or saved path), and cleanup with work
   outstanding, all under sanitizers (ThreadSanitizer for the races).
-  **Regression test for the preparation window:** a test hook pauses `work()`
-  after preparation and before the final generation check. While request A is
-  paused there, request B arrives:
-  - if B names a valid filter, A is never published (the output never shows
-    A's response), and the end state is B;
-  - if B fails validation, the filter that was running before A keeps
-    running, the status is "load failed", and `patch:Get` and `save()` report
-    the old path;
-  - A's response, delivered after B was requested, leaves the status at
-    "loading".
-
-  Distinct gains for the original filter, A and B make each outcome visible
-  in the output.
+  **Regression tests for the preparation window.** Test hooks pause `work()`
+  at two points, and request B arrives while request A is paused. Distinct
+  gains for the original filter, A and B make each outcome visible in the
+  output.
+  - *After preparation, before the final check:* if B names a valid filter,
+    the output never carries A's gain, and the end state is B. If B fails
+    validation, the original filter keeps running, the status is "load
+    failed", and `patch:Get` and `save()` report the original path. A's
+    response (superseded) leaves the status at "loading" until B answers.
+  - *After the final check, before publication:* A is published. A's
+    response, delivered after B was requested, leaves the status at "loading"
+    but sends `patch:Set` with A's path. If B is valid, the end state is B.
+    If B fails, A keeps playing, and the status, `patch:Get` and `save()`
+    report "load failed" and A's path.
+  - *Scheduling failure for B* in the second case: the status becomes "load
+    failed" at once, and the path follows A when A's response arrives.
+  - *`restore()` with a response outstanding:* the older response does not
+    overwrite the status or path that `restore()` installed.
 
 **State.** Save the mapped path (`state:mapPath`, so sessions can move) and the
 encoded host state (the VST3 preset format), so a session still sounds the same
