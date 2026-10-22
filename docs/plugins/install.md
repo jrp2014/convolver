@@ -30,8 +30,9 @@ before going further.
   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Convolver.vst3
   ```
 
-  Do the same for `bin/convolver-vst3-preset` if you use the converter. This
-  changes nothing outside those files; do not turn off Gatekeeper system-wide.
+  Do the same for `bin/convolver-preset` and `bin/convolver-equalizer-apo` if
+  you use them (`xattr -dr com.apple.quarantine bin`). This changes nothing
+  outside those files; do not turn off Gatekeeper system-wide.
 - **Windows:** an unsigned installer shows a SmartScreen warning ("Windows
   protected your PC"). Choose **More info**, check that the publisher is
   "Unknown publisher" and the file name matches, then **Run anyway**. Copying the

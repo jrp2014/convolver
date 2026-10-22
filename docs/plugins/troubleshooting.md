@@ -21,8 +21,9 @@ channel layout from its preset also plays silence; set the host back to the
 preset's rate and layout and the filter returns. With no preset loaded and
 different input and output counts (for example a 2→6 crossover), Convolver plays
 silence too.
-A converter failure prints the cause to stderr and does not replace an existing
-file. Use a new output filename. Keep levels low when trying unfamiliar IRs.
+A tool failure (`convolver-preset` or `convolver-equalizer-apo`) prints the
+cause to stderr and does not replace an existing file or folder. Use a new
+output name. Keep levels low when trying unfamiliar IRs.
 
 Report the package hash, OS/build, CPU, host version, sample rate, channel layout,
 buffer size, error log and a synthetic minimal reproduction. Do not include private

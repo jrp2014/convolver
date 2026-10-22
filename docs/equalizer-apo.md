@@ -36,9 +36,10 @@ Contents: [make the export](#make-the-export) · [install it on Windows](#instal
 ## Make the export
 
 `convolver-equalizer-apo` is built with the [CLI](portable-core.md)
-(`build/convolver-equalizer-apo`, or `build/Release/` with Visual Studio). It
-runs on any platform, so you can make the export on a Mac or Linux machine and
-copy it to the Windows computer.
+(`build/convolver-equalizer-apo`, or `build/Release/` with Visual Studio);
+preview packages for every platform have it in `bin/`. It runs on any
+platform, so you can make the export on a Mac or Linux machine and copy it to
+the Windows computer.
 
 ```sh
 convolver-equalizer-apo room.cfg room

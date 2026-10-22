@@ -74,6 +74,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Preview packages (PLUG-5) ship `convolver-preset` and
+  `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
+  guides in `docs/`, instead of `convolver-vst3-preset` (still built from
+  source, for existing scripts). The example presets are made with
+  `convolver-preset` (byte-identical). Release checks run both tools from a
+  relocated package.
 - The VST3 plug-in follows the shared adapter contract (VST3-7). With no preset
   loaded and different input and output counts (for example a 2→6 crossover)
   it plays silence instead of passing input *c* to output *c*. Once the plug-in has
