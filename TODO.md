@@ -261,6 +261,10 @@ decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
   failed first load records it (host state version 2, flag 4, written only
   then), so reopening stays silent. See
   [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
+  Follow-up from jrp's review of 0.4.19: a reset during a crossfade now ends
+  it, so a filter loaded before audio resumes is installed directly (tests:
+  `native.host` reset during warm-up and crossfade, `vst3.adapter`
+  stop/restart mid-transition); the preset guide states VST3's reporting limits.
 
 LV2 (Linux first; also PipeWire system audio):
 

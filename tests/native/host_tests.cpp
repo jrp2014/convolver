@@ -236,6 +236,50 @@ void direct_installation() {
                 "filter after reset not installed directly");
     host.collect();
 }
+// A reset ends any transition in progress: the newer filter plays at once, and
+// a filter published after the reset is installed directly. Checked for a reset
+// during the warm-up and during the crossfade, with and without a new filter.
+void reset_during_transition() {
+    std::array<float, 64> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    const auto run = [&](HostProcessor& host, std::size_t frames) {
+        audio_thread = true;
+        const bool ok = host.process(in, out, frames);
+        audio_thread = false;
+        require(ok, "process rejected");
+    };
+    const auto resumed = [&](float gain, const char* what) {
+        for (std::size_t i = 0; i < 64; ++i)
+            require(std::abs(output[i] - (i < 8 ? 0.f : i == 8 ? gain : gain + .25f)) < 1e-5, what);
+    };
+    for (const std::size_t into : {std::size_t{4}, std::size_t{64}}) { // warm-up, crossfade
+        for (const bool reload : {true, false}) {
+            HostProcessor host(mono(1), 64, 8);
+            run(host, 64);
+            host.replace(mono(2));
+            run(host, into);
+            audio_thread = true;
+            host.reset();
+            audio_thread = false;
+            if (reload)
+                host.replace(mono(3));
+            run(host, 64);
+            resumed(reload ? 3.f : 2.f, into == 4 ? "filter after reset in warm-up not direct"
+                                                  : "filter after reset in crossfade not direct");
+            // Once audio has resumed, a replacement warms up and fades again.
+            host.replace(mono(4));
+            run(host, 64);
+            require(std::abs(output[0] - (reload ? 3.25f : 2.25f)) < 1e-5,
+                    "replacement after a reset transition skipped warm-up");
+            for (int k = 0; k < 8; ++k)
+                run(host, 64);
+            require(std::abs(output[63] - 4.25f) < 1e-5, "replacement after reset never finished");
+            host.collect();
+        }
+    }
+}
 // The control side of the shared adapter contract, which every format uses.
 void filter_contract() {
     const HostLayout stereo{48000, 2, 2}, crossover{48000, 2, 6};
@@ -377,6 +421,7 @@ int main() {
         queued_replacements();
         unequal_channels();
         direct_installation();
+        reset_during_transition();
         filter_contract();
         unequal_bypass();
         std::cout << "host lifecycle passed\n";

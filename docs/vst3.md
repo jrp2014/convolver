@@ -192,7 +192,9 @@ during bypass so returning to wet does not lose history.
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before any
-audio has been processed since activation or reset is installed directly. Later,
+audio has been processed since activation or reset is installed directly. A
+reset (the host stopping and restarting processing) also ends a crossfade in
+progress, so the newer filter plays at once and the next one is direct. Later,
 a replacement runs for 256 samples
 to fill its latency, then crossfades for 256 samples. It starts with fresh input
 history: it cannot reconstruct audio that preceded loading. Old engines are

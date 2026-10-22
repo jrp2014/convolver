@@ -364,6 +364,62 @@ void placeholder_setup() {
     require(p.setState(&wrong) != kResultOk, "mismatch after activation accepted while inactive");
     p.terminate();
 }
+// A host that stops and restarts processing during a crossfade resets the
+// plug-in: a preset loaded in between plays from the first resumed sample.
+void restart_mid_transition() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "restart initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "restart buses");
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk, "restart setup");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    const auto load = [&](float gain) {
+        convolver::HostState saved;
+        saved.configuration =
+            convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{gain}, {{0, 1}}, {{0, 1}}}}};
+        MemoryStream state;
+        require(write_state(&state, saved), "encode restart state");
+        state.seek(0, IBStream::kIBSeekSet, nullptr);
+        return p.setState(&state);
+    };
+    require(load(1) == kResultOk, "restart first state");
+    require(p.setActive(true) == kResultOk, "restart activate");
+    p.setProcessing(true);
+    std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+    left.fill(1);
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    for (const int into : {64, 400}) { // Stop during the warm-up, then the crossfade.
+        d.numSamples = 512;
+        require(p.process(d) == kResultOk, "restart process");
+        require(load(2) == kResultOk, "restart replacement");
+        d.numSamples = into;
+        require(p.process(d) == kResultOk, "restart transition");
+        p.setProcessing(false);
+        require(load(3) == kResultOk, "restart reload");
+        p.setProcessing(true);
+        d.numSamples = 512;
+        require(p.process(d) == kResultOk, "restart resumed");
+        for (int i = 0; i < 512; ++i)
+            require(std::abs(out_left[i] - (i < 256 ? 0.f : 3.f)) < 1e-5,
+                    "preset loaded while stopped mid-transition does not play at once");
+    }
+    p.setProcessing(false);
+    p.setActive(false);
+    p.terminate();
+}
 // A failed first load plays silence, never the unfiltered input: a wrong-rate
 // preset sent to an active empty instance, and malformed state before activation.
 void failed_first_loads() {
@@ -460,6 +516,7 @@ int run(const std::filesystem::path& preset_path) {
         multichannel();
         version1_presets();
         placeholder_setup();
+        restart_mid_transition();
         failed_first_loads();
         HostApplication context;
         Processor p;
