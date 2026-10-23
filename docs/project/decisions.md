@@ -41,6 +41,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 21 October 2026 | Publishing is a manual step owned by jrp, from one candidate run | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 21 October 2026 | Plug-in builds use Ooura on Linux and Windows and Accelerate on macOS (PLUG-1) | [FFT guide](../develop/fft-backends.md#plug-in-builds) |
 | 22 October 2026 | Preview packages ship `convolver-preset` and `convolver-equalizer-apo`, not the older `convolver-vst3-preset` | [TODO](../../TODO.md) PLUG-5 |
+| 23 October 2026 | The independent walkthrough (REL-3) uses the chosen candidate run's exact files before they are uploaded, so the pre-release can say what was demonstrated | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 23 October 2026 | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated | [Status](status.md#user-journeys-for-the-first-preview) |
 
 ## Plug-in behaviour
