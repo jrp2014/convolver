@@ -127,7 +127,7 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 | --- | --- |
 | [`include/convolver/`](include/convolver/) | Public C++ APIs |
 | [`portable/`](portable/) | Active engine, FFT backends, file I/O and CLI |
-| [`plugins/`](plugins/) | Optional plug-ins, one folder per format ([`vst3/`](plugins/vst3/) and [`au/`](plugins/au/) today) |
+| [`plugins/`](plugins/) | Optional plug-ins, one folder per format ([`vst3/`](plugins/vst3/), [`lv2/`](plugins/lv2/) and [`au/`](plugins/au/)) |
 | [`tests/`](tests/) | Native, host, package, compatibility and historical tests |
 | [`docs/`](docs/README.md) | Current guides, [open plans](docs/plans/) and clearly labelled records ([`archive/`](docs/archive/)) |
 | [`cmake/`](cmake/), [`packaging/`](packaging/), [`scripts/`](scripts/) | Build helpers, release packaging, and release and repository checks |
