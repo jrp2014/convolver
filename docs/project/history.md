@@ -103,7 +103,7 @@ historical-only output features (dither, noise shaping, PCM8, valid bits,
 automatic attenuation), the host lifecycle and VST3 are implemented. The
 [implementation map](../develop/architecture.md) describes the result;
 [TODO](../../TODO.md) holds the remaining interoperability, DAW/release validation
-and measured optimization work, and the [modernization direction](status.md#direction)
+and measured optimization work, and the [direction](status.md#direction)
 explains its priorities.
 Earlier 4.3 assessments are in the [review archive](../archive/reviews/README.md).
 

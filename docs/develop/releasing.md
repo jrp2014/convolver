@@ -61,9 +61,9 @@ jrp, and has not been done yet:
    other workflows. Wait for the whole run to pass.
 2. Download that run's `complete-preview-candidate` artifact (made by its
    `collect` job) and check every file against the `SHA256SUMS` file it
-   contains. Publish exactly those files, unchanged. For the first preview,
-   the independent walkthrough (REL-3 in [TODO](../../TODO.md)) uses these same
-   files before they are uploaded (owner's decision, 23 October 2026).
+   contains. These are the files you will attach, unchanged. For the first
+   preview, the independent walkthrough (REL-3 in [TODO](../../TODO.md)) uses
+   these same files before they are uploaded (owner's decision, 23 October 2026).
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
    at least one host.
 4. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
@@ -71,7 +71,9 @@ jrp, and has not been done yet:
    installation instructions (pointing to
    [unsigned previews](../use/install.md#unsigned-previews)) in the release
    notes.
-5. Never replace or edit an asset after publication; a fix gets a new version.
+5. Check it worked: download each asset from the published pre-release and
+   compare it with `SHA256SUMS`, and read the release page as a user would.
+   Never replace or edit an asset after publication; a fix gets a new version.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
@@ -98,8 +100,9 @@ final file hashes:
 
 Promotion also needs every platform's files, matching sources and notices, and
 unchanged final hashes. Signing comes before the final hashes. A passing CI run
-is not enough to change the policy. Developer signing scripts exist only on the
-old `codex/plugin-distribution` branch until signing is taken up (REL-1).
+is not enough to change the policy. Draft signing scripts are kept in history
+until signing is taken up (REL-1): `git show f4519022c:scripts/release/sign-macos.sh`
+and `sign-windows.ps1`.
 
 ## Licences and corresponding source
 
