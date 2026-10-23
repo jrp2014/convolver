@@ -19,6 +19,12 @@ Until 1.0 the C++ API may change between minor versions.
   first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
+- `speaker_notice` and `HostFilter::notice()` (VST3-1) compare the speakers a
+  filter's outputs are labelled for (the `.cfg` channel mask) with the host's
+  output speakers, now carried in `HostLayout`, and explain which outputs
+  land on which speakers. Advice only: nothing is rejected, and channels stay
+  routed by bus index. The VST3 adapter passes its speaker arrangements to it;
+  it has no way to show the notice yet.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
   list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate

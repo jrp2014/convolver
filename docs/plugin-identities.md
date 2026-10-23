@@ -154,16 +154,31 @@ channel mask, and no input layout. Hence:
   matching counts, exactly as before, and channels are routed by bus index.
   Stricter layout checks added later must never reject it.
 - Its output mask is advisory: an adapter may warn when it disagrees with the
-  host's arrangement, but does not reject the preset.
+  host's arrangement, but does not reject the preset. `speaker_notice` in
+  [`host.hpp`](../include/convolver/host.hpp) makes that comparison for every
+  format, and `HostFilter::notice()` keeps the result for the accepted filter
+  and the current host (VST3-1, 22 October 2026). It compares only masks that
+  give one speaker per channel on more than one channel, channel by channel in
+  bus order. In a layout with SL SR and no BL BR, SL and SR count as BL and
+  BR, because 5.1 is written both ways (`0x60F`, `0x3F`); 6.1 with side
+  speakers (`0x70F`) still differs from 6.1 with back speakers (`0x13F`),
+  whose back centre comes later in bus order. The VST3 adapter converts its
+  arrangement directly (bits 0 to 17); an arrangement using any other VST3
+  speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state
-  version (3: version 2 is taken by the failed-load marker of VST3-7), which is
-  a format decision for jrp. Decoders will keep reading versions 1 and 2, and
+  version (3: version 2 is taken by the failed-load marker of VST3-7). jrp
+  decided against both for now (owner's decision, 23 October 2026): layouts
+  are checked with a notice only, and VST3 buses stay at 1 to 8 channels;
+  either can be revisited on request. Decoders will keep reading versions 1 and 2, and
   encoders keep writing version 1 whenever nothing new is recorded, so older
   builds still read those presets.
 
 The VST3 adapter test `version1_presets` loads a 2→6 version-1 preset with
 output masks 0, `0x3F` (5.1) and `0x60F` (5.1 with side speakers) on four
-different six-channel arrangements, and checks every output by bus index.
+different six-channel arrangements, and checks every output by bus index and
+which of them get a speaker notice; `speaker_arrangements` checks the
+conversion of arrangements to masks and a 7.1 filter on 7.1 Cine and 7.1 Music
+buses.
 
 ## How the build uses the registry
 

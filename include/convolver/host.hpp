@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/engine.hpp"
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -21,11 +22,25 @@ inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 std::vector<std::byte> encode_host_state(const HostState&);
 HostState decode_host_state(std::span<const std::byte>);
 
-// The sample rate and channel counts a host has negotiated.
+// The sample rate and channel counts a host has negotiated, and the speakers
+// its buses carry where the format says: WAV channel-mask bits 0 to 17 (the
+// speaker table in plugins/identities.json), one bit per channel in bus order,
+// or 0 when the host names no positions a WAV mask can express.
 struct HostLayout {
     int sample_rate = 0;
     std::size_t inputs = 0, outputs = 0;
+    std::uint32_t input_speakers = 0, output_speakers = 0;
 };
+
+// Advisory check of the speakers a filter's outputs are labelled for (its
+// channel mask) against the host's output speakers. Empty when they agree, or
+// when either side names no speakers: a mask of 0, one that does not give one
+// speaker per channel, and one-channel buses are never compared. Channels are
+// compared in bus order; in a layout with side (SL SR) and no back (BL BR)
+// speakers, SL and SR count as BL and BR (5.1 is written as 0x3F or 0x60F).
+// Never a reason to reject a filter: channels are routed by bus index whatever
+// the labels say (docs/plugin-identities.md#channel-layouts).
+std::string speaker_notice(const Configuration&, const HostLayout&);
 
 // What an instance plays without a usable filter, under the shared adapter
 // contract: identity (input c to output c) for an empty instance with equal
@@ -54,6 +69,13 @@ class HostFilter {
     const std::string& error() const noexcept {
         return error_;
     }
+    // A possible problem that does not stop the accepted filter playing, from
+    // the last check against the host (speaker_notice); empty if none. It
+    // describes the host as of the last load() with a host or activate(); an
+    // adapter that shows it must recheck after the host changes its buses.
+    const std::string& notice() const noexcept {
+        return notice_;
+    }
     // Load decoded state: a filter, none to return to an empty instance, or a
     // saved failed load (plays silence). Bypass is the adapter's to apply.
     // Checks on the state itself always run. Checks against the host run when
@@ -77,6 +99,7 @@ class HostFilter {
     std::optional<Configuration> filter_;
     bool failed_ = false;
     std::string error_;
+    std::string notice_;
 };
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.

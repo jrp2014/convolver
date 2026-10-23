@@ -39,7 +39,7 @@ the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
 | --- | --- | --- |
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Done 22 October | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI (PR #28). |
-| 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). Checking named VST3 speaker arrangements against it is VST3-1, in the VST3 stream. |
+| 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). VST3-1 checks VST3 speaker arrangements against it (done 23 October, PR #42: a notice only). |
 | 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
@@ -389,14 +389,17 @@ input/output bus, 32/64-bit processing, silence flags, sample-accurate bypass
 `moduleinfo.json` and the default (empty) process-context requirements. Items
 below are candidates; adopt each only with adapter, validator and pluginval tests.
 
-- [ ] **VST3-1 — Speaker arrangements, not only channel counts.** The adapter
-  accepts any arrangement with 1–8 channels and routes by index, so a 7.1 filter
-  could run on a different 8-channel layout without warning. Record the intended
-  arrangement (or the WAV channel mask from `--speaker-map`) in the preset, check
-  or map it in `setBusArrangements`, and decide whether to offer layouts above 8
-  channels (`SpeakerArr`, for example 7.1.4). Use the PLUG-4 speaker table (VST3
-  speaker bits equal WAV mask bits) and keep `version1_presets` passing:
-  [layout rules](docs/plugin-identities.md#channel-layouts).
+- [x] **VST3-1 — Speaker arrangements, not only channel counts.** Done 23
+  October 2026 (PR #42). The adapter accepts any arrangement with 1–8 channels
+  and routes by index; it now compares a filter's output channel mask (the
+  `.cfg`'s first line, kept in version-1 presets) with the host's arrangement,
+  channel by channel, and records an explanatory notice, never a rejection
+  (`speaker_notice`; tests `native.host`, `vst3.adapter` `speaker_arrangements`
+  and `version1_presets`). VST3 needs no channel mapping, since arrangements
+  order channels by bit. Owner's decision, 23 October 2026: warn only, with no
+  enforced layouts (no host state version 3) and no buses above 8 channels;
+  revisit either on request. The notice reaches users only with DIAG-1 or
+  VST3-3. [Layout rules](docs/plugin-identities.md#channel-layouts).
 - [ ] **VST3-2 — Switch filters from the host without an editor.** Expose a set of
   filters as a program list (`IUnitInfo`, `IProgramListData`, a `kIsProgramChange`
   parameter), for example the entries of a configuration list, possibly chosen

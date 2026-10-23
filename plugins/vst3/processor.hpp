@@ -5,7 +5,9 @@
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include <atomic>
+#include <cstdint>
 #include <mutex>
+#include <string>
 
 namespace convolver::vst3 {
 // Permanent class IDs from plugins/identities.json (PLUG-4); never change them.
@@ -21,6 +23,10 @@ inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
 inline constexpr int min_bus_channels = identity::min_channels;
 inline constexpr int max_bus_channels = identity::max_channels;
+// The WAV channel-mask bits of a VST3 arrangement: bits 0 to 17 have the same
+// meaning in both, and VST3 orders channels by bit. 0 (no named speakers) for
+// any arrangement using other speakers, kMono (kSpeakerM) included.
+std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 HostState read_state(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
 class Processor final : public Steinberg::Vst::AudioEffect {
@@ -47,6 +53,10 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     }
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
+    // The filter's advisory notice (HostFilter::notice), for example output
+    // speakers that differ from the host's arrangement. VST3 has no route to
+    // show it yet (DIAG-1, VST3-3); tests read it.
+    std::string notice();
 
   private:
     HostLayout layout() const;
@@ -59,6 +69,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::atomic<bool> bypass_{false};
     std::atomic<Steinberg::uint32> tail_{0};
     int inputs_ = 2, outputs_ = 2;
+    Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
+                                       output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;
     bool active_ = false;
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
