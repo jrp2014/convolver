@@ -166,8 +166,10 @@ channel mask, and no input layout. Hence:
   arrangement directly (bits 0 to 17); an arrangement using any other VST3
   speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state
-  version (3: version 2 is taken by the failed-load marker of VST3-7), which is
-  a format decision for jrp. Decoders will keep reading versions 1 and 2, and
+  version (3: version 2 is taken by the failed-load marker of VST3-7). jrp
+  decided against both for now (owner's decision, 23 October 2026): layouts
+  are checked with a notice only, and VST3 buses stay at 1 to 8 channels;
+  either can be revisited on request. Decoders will keep reading versions 1 and 2, and
   encoders keep writing version 1 whenever nothing new is recorded, so older
   builds still read those presets.
 
