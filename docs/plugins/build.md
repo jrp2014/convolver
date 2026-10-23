@@ -98,9 +98,9 @@ python scripts/release/sources.py --fetch --cache build/downloads \
 
 The LV2 workflow builds LV2's example plug-ins against the pinned headers, runs
 one through `lilv` on the shared mono fixture and checks it with `lv2lint`; the
-Audio Unit workflow compiles the pinned AudioUnitSDK as the AU target will and
-runs `auval` on Apple's AUDelay. The adapters add their own bundles to these
-workflows.
+Audio Unit workflow builds the AU component against the pinned AudioUnitSDK,
+runs its tests and `auval -strict` on it (`docs/au.md` in the source tree). The LV2
+adapter adds its bundle to its workflow.
 
 To move a pin, change the policy entry (or the workflow) in its own pull
 request and say why. A GitHub archive's checksum can be computed without

@@ -18,7 +18,7 @@ Convolver applies that response continuously to every input sample.
 | Write a filter configuration or move one from Windows | [Configuration format](configuration.md) |
 | Check whether a configuration works in Roon, JRiver or elsewhere | [Configuration compatibility](configuration-compatibility.md) |
 | See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
-| Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md); on Linux also the [LV2 guide](lv2.md) (developer build) |
+| Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md); on macOS also the [Audio Unit guide](au.md); on Linux also the [LV2 guide](lv2.md) (developer build) |
 | Turn a filter into a preset for a plug-in | [Plug-in presets](presets.md) |
 | Filter everything Windows plays (system-wide) | [Equalizer APO export](equalizer-apo.md) |
 | Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
@@ -26,6 +26,7 @@ Convolver applies that response continuously to every input sample.
 | Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](testing.md) |
 | Choose an FFT backend or reproduce measurements | [FFT guide](fft-backends.md) |
+| See what is ready to use, what is still unproven and what blocks the next release | [Release readiness](release-readiness.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
 | Understand version numbers and tags | [Source versioning](versioning.md) |
 | Edit these documents | [Documentation maintenance](documentation.md) |
@@ -41,11 +42,13 @@ Convolver applies that response continuously to every input sample.
 | [Configuration compatibility](configuration-compatibility.md) | What is tested, path-portability profile, other readers of the format |
 | [Core and CLI reference](portable-core.md) | Build options, every CLI option, output formats, inspection, library API, limits |
 | [VST3 guide](vst3.md) | Building, installing and loading the plug-in; host lifecycle |
+| [Audio Unit guide](au.md) | Building, installing and loading the macOS Audio Unit; its behaviour, licence and tests |
 | [LV2 guide](lv2.md) | Building the LV2 plug-ins, loading a filter as a preset, ports, behaviour and tests |
 | [Plug-in presets](presets.md) | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, what a preset that does not fit plays, file contents |
 | [Equalizer APO export](equalizer-apo.md) | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
 | [Plug-in identities and channel layouts](plugin-identities.md) | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
 | [Plug-in distribution](plugins/index.md) | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
+| [Release readiness](release-readiness.md) | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees |
 | [Preview release record](releases/developer-preview.md) | Candidate matrix, evidence and remaining production gates |
 | [CMake package guide](cmake-package.md) | Using the libraries from another CMake project; presets |
 | [FFT guide](fft-backends.md) | Backend choice, numerical contract, dated benchmarks |
@@ -69,7 +72,7 @@ These pages describe the active CMake implementation. The package version is in
 
 ## Current source versus historical records
 
-- `include/convolver/`, `portable/`, `plugins/vst3/` and `plugins/lv2/` are the active implementation.
+- `include/convolver/`, `portable/`, `plugins/vst3/`, `plugins/au/` and `plugins/lv2/` are the active implementation.
 - `historical/` contains the old Windows applications. You do not need it to learn
   the current API or build the CLI.
 - [History](history.md) explains recovery, provenance and downstream reuse.

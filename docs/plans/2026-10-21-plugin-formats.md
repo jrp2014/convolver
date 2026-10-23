@@ -258,6 +258,31 @@ before they set the sample rate and channel layout (VST3 `setState` before
   which a check at that point would wrongly reject (found by
   `vst3.pluginval.acceptance` in VST3-7; owner's decision, 22 October 2026).
 
+### Failure reasons
+
+Added 22 October 2026 from jrp's
+[release-readiness guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md);
+PLUG-8 implements it. Silence can be correct processing and still confuse the
+user, so every failure in the table above keeps a structured reason, even while
+the place it is shown is undecided (DIAG-1):
+
+- **What failed:** a missing or unreadable filter file, unreadable or
+  malformed state, a newer state version, the sample rate, the channel counts
+  or layout, preparation, or activation (the same list as DIAG-1's table).
+- **The request it belongs to:** where the filter came from (preset, saved
+  state, file path), its rate and channel counts, and a request number, so a
+  later request's success or failure is never confused with it.
+- **The outcome:** a working filter kept, or silence.
+- **The explanatory message,** written as the CLI writes its diagnostics: what
+  failed, why, and what to change.
+
+The reason lives on the control side (in `HostFilter` or beside it) and never
+on the audio thread: the audio callback only plays what it was given. Every
+adapter records a reason on every failure path, including activation and
+worker completions, and clears it when a later request succeeds. Tests read it
+through the adapter even where the format cannot display it yet. Notices that
+are not failures use the same record unless PLUG-8 records why not.
+
 ### Initial restoration and live replacement
 
 - **Initial restoration** installs the filter directly: when no audio has been
@@ -386,6 +411,11 @@ Cases, run for every adapter:
   in-place buffers;
 - mono, stereo and 2→6 routing.
 
+These cases test one operation at a time. Their combinations (for example a
+load after a reset during a transition, the defect found in the review of
+0.4.19) are PLUG-7: deterministic sequences checked after every operation
+against a small reference model of this contract.
+
 Fixtures: one generator, not several. As built, `tests/plugins/fixtures.py`
 writes the DOC-1 fixtures, including the 2→6 crossover, and holds the WAV,
 noise and oracle helpers; `scripts/release/generate_examples.py` (the release
@@ -401,9 +431,14 @@ separate:
 | | Unsigned preview | Signed production release |
 | --- | --- | --- |
 | Signing | macOS: ad-hoc signature, documented quarantine removal. Windows: unsigned, SmartScreen warning | Developer ID, notarization, Authenticode with timestamps |
-| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../plugins/hosts.md) procedure, clean machines, upgrades |
+| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../plugins/hosts.md) procedure, clean machines, upgrades, and upgrade tests against files kept from earlier releases (COMPAT-1) |
 | Label | "unsigned developer preview" in the release title and guide | Ordinary release |
 | `production_enabled` | stays false | true only after every production gate |
+
+The next milestone (TODO, "Execution priorities") adds an independent user
+following the REL-2 journeys from the first preview's exact files (REL-3).
+Whether that happens before upload or after publication is a proposal for jrp
+(see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:
@@ -760,8 +795,9 @@ the AUv2 entry points against Apple's system headers without AudioUnitSDK.
 ## Milestones
 
 Shared groundwork PLUG-1 to PLUG-5 is described under
-[parallel development](#parallel-development). The streams then run side by
-side:
+[parallel development](#parallel-development). PLUG-7 (lifecycle sequences)
+and PLUG-8 (failure reasons), added on 22 October 2026, are shared too and
+are described in TODO. The streams then run side by side:
 
 | Step | VST3 | LV2 | AU |
 | --- | --- | --- | --- |

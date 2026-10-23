@@ -1,0 +1,24 @@
+Convolver Audio Unit
+
+Copyright (C) 2005-2026 jrp and the Convolver contributors
+https://github.com/jrp2014/convolver
+
+This component combines Convolver, which is licensed under the GNU General
+Public License version 2 or (at your option) any later version, with Apple's
+AudioUnitSDK, which is licensed under the Apache License 2.0. The Apache
+License 2.0 is compatible with version 3 of the GPL but not with version 2,
+so this component as a whole is distributed under the GNU General Public
+License version 3 or (at your option) any later version (GPL-3.0-or-later).
+
+- GPL-3.0.txt: the GNU General Public License, version 3.
+- AudioUnitSDK-LICENSE.txt: AudioUnitSDK's licence (Apache-2.0).
+  AudioUnitSDK is Copyright (C) 2000-2025 Apple Inc.
+
+Convolver's other builds (the command-line tools, the VST3 plug-in and the
+library) remain under GPL-2.0-or-later. The corresponding source is at the
+address above, including the exact AudioUnitSDK version this component was
+built with (packaging/release-policy.json).
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.

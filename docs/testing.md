@@ -187,10 +187,12 @@ results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../.github/workflows/regression.yml) and
 [VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
 file alone is not evidence that a job passed. The [LV2](../.github/workflows/lv2.yml)
-and [Audio Unit](../.github/workflows/au.yml) workflows install the
-[pinned format tools](plugins/build.md#pinned-format-dependencies) and check
-them on LV2's example plug-ins and Apple's AUDelay until the adapters add
-their own bundles. The weekly [Dependency updates](../.github/workflows/updates.yml)
+workflow installs the
+[pinned format tools](plugins/build.md#pinned-format-dependencies) and checks
+them on LV2's example plug-ins until the LV2 adapter adds its bundle. The
+[Audio Unit](../.github/workflows/au.yml) workflow builds the AU component
+against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
+it ([AU guide](au.md#testing)). The weekly [Dependency updates](../.github/workflows/updates.yml)
 workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
@@ -273,8 +275,13 @@ reset is deactivate and activate, and it reads the latency port after a
 zero-frame `run()`, as hosts do before audio. The [LV2 guide](lv2.md#tests)
 lists its other tests.
 
-`vst3.harness` and `lv2.harness` need their plug-in builds, the CLI and the
-native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
+`au.harness` (macOS, `CONVOLVER_BUILD_AU=ON`) drives the Audio Unit through the
+Audio Unit API with the unit registered in the test process; it loads filters
+as `.aupreset` dictionaries, converts latency and tail from seconds, and lists
+no known deviations either.
+
+`vst3.harness`, `lv2.harness` and `au.harness` need their plug-in builds, the
+CLI and the native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
 and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 [`plugins/vst3/CMakeLists.txt`](../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
