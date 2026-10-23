@@ -18,7 +18,7 @@ Until 1.0 the C++ API may change between minor versions.
   `convolver-preset` and from saved sessions; bypass, 256-frame latency
   reporting and a status port; rejected loads are explained in the host's log.
   A filter file parameter and worker-thread loading follow in LV2-2. See the
-  [LV2 guide](docs/lv2.md).
+  [LV2 guide](docs/use/plugins.md).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
@@ -27,7 +27,7 @@ Until 1.0 the C++ API may change between minor versions.
   signal as VST3 (left to the host to save, as is usual for Audio Units), and
   the shared rules for presets that do not fit. The component is distributed
   under GPL-3.0-or-later because it includes
-  AudioUnitSDK (Apache-2.0). See the [AU guide](docs/au.md). Not yet tested in
+  AudioUnitSDK (Apache-2.0). See the [AU guide](docs/use/plugins.md). Not yet tested in
   named hosts.
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
   `convolver/host.hpp`: the control side of the shared plug-in adapter
@@ -51,7 +51,7 @@ Until 1.0 the C++ API may change between minor versions.
   routed by bus index. The VST3 adapter passes its speaker arrangements to it;
   it has no way to show the notice yet.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
-  list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
+  list as an [Equalizer APO](docs/use/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate
   and channel count choose the list entry (on a device with more channels,
   the largest entry that fits); a device that no entry fits, and device
@@ -64,14 +64,14 @@ Until 1.0 the C++ API may change between minor versions.
   run, and converts an existing `.vstpreset` to the other formats. All carry the
   same encoded filter. It needs no plug-in SDK, so AU and LV2 builds can ship
   it. `convolver-vst3-preset` is now the same tool under its old name, with the
-  same arguments and byte-identical output. See [plug-in presets](docs/presets.md).
+  same arguments and byte-identical output. See [plug-in presets](docs/use/presets.md).
 
 - Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
   `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
   test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI
   workflows. A weekly Dependency updates workflow reports newer upstream
   releases of every pin and keeps one tracking issue current. See
-  [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+  [pinned format dependencies](docs/develop/build.md#pinned-format-dependencies).
 
 - First-use examples in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
@@ -112,6 +112,19 @@ Until 1.0 the C++ API may change between minor versions.
   The `todo-item` and `review-change` skills now only point to the workflow
   guide, which holds the full procedures. The
   [index](docs/README.md#moved-pages) lists the old and new paths.
+- User documentation moved into `docs/use/` (DOC-4, second step), written for
+  people applying filters: a [start page](docs/use/README.md), two tutorials
+  ([first filter](docs/use/first-filter.md), whose commands the
+  `examples.first_use` test now runs, and
+  [first sound in a host](docs/use/first-sound-in-a-host.md)), one
+  [install page](docs/use/install.md) and one
+  [plug-in page](docs/use/plugins.md) for VST3, AU and LV2,
+  [troubleshooting](docs/use/troubleshooting.md) and [limits](docs/use/limits.md).
+  The CLI guide is now the [command-line reference](docs/use/command-line.md);
+  its engine API and limits moved to the [library guide](docs/develop/library.md),
+  and test evidence from every user page to [testing](docs/develop/testing.md).
+  Preview packages ship all of `docs/use/` instead of `docs/plugins/` and two
+  copied guides. The tools' messages point at the new paths.
 - Preview packages (PLUG-5) ship `convolver-preset` and
   `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
   guides in `docs/`, instead of `convolver-vst3-preset` (still built from

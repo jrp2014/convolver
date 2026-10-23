@@ -10,7 +10,7 @@ checks out the same SDK commit as the policy.
 python3 scripts/release/check_updates.py [--markdown FILE] [--github-output FILE]
 
 It changes nothing: moving a pin is a reviewed pull request (see "Pinned format
-dependencies" in docs/plugins/build.md). GitHub Actions versions are kept
+dependencies" in docs/develop/build.md). GitHub Actions versions are kept
 current by Dependabot, so they are not listed here.
 """
 import argparse
@@ -230,7 +230,7 @@ def markdown(rows):
     lines += [
         '',
         'Move a pin in its own pull request, with the reason and the new checksum; see '
-        '"Pinned format dependencies" in `docs/plugins/build.md`. GitHub Actions versions '
+        '"Pinned format dependencies" in `docs/develop/build.md`. GitHub Actions versions '
         'are updated by Dependabot.',
     ]
     return '\n'.join(lines) + '\n'

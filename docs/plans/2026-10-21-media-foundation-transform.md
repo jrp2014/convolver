@@ -15,7 +15,7 @@ before any work starts. VST3, LV2 and AU come first; see the
 
 **Update, 22 October 2026:** asked to choose this plan's target users, the
 owner chose system-wide filtering through Equalizer APO. That route is now the
-[Equalizer APO export](../equalizer-apo.md) (HOST-4); the MFT stays parked.
+[Equalizer APO export](../use/equalizer-apo.md) (HOST-4); the MFT stays parked.
 
 **In short:**
 

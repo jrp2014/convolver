@@ -18,9 +18,8 @@ For anyone, person or coding agent, who writes or changes documentation.
   `AGENTS.md` point at them instead of repeating them.
 
 The move into reader folders is under way (DOC-4, [plan](../plans/2026-10-23-documentation-by-reader.md)):
-`docs/develop/` exists, and the remaining guides at the top of `docs/` move
-into `use/` and `project/` in the following steps. Until then they keep their
-current paths.
+`docs/use/` and `docs/develop/` exist, and the status, history and plan pages
+at the top of `docs/` move into `project/` in the next step.
 
 Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 [writing rules](#writing-rules) · [pages agents follow](#pages-agents-follow) ·
@@ -64,7 +63,7 @@ pages help only if each sentence can be understood on its own.
    contents line. When a change alters a summarized fact, update the summary too.
 2. Cover one reader and one kind. If a section is for someone else, move it and
    leave a one-line link.
-3. Define a term the first time it is used, or link to [concepts](../concepts.md).
+3. Define a term the first time it is used, or link to [concepts](../use/concepts.md).
    Explain what an option does before its internal mechanism, and use one
    working example before describing exceptions.
 4. Say each fact in one place; other pages link to it, so they cannot drift
@@ -73,8 +72,7 @@ pages help only if each sentence can be understood on its own.
    filter in your host"), nouns on reference pages ("Output formats"). Keep link
    text meaningful and tables small enough to scan.
 
-On pages in `docs/use/` (the user guides still at the top of `docs/` are
-brought into line as they move there, in DOC-4's second step):
+On pages in `docs/use/`:
 
 - No TODO IDs, pull request numbers, commit hashes or decision dates in the
   body. Where something is unfinished, one **Status** note near the top says so
@@ -116,18 +114,23 @@ can act on it without a separate copy of the rules:
 | Topic | Authoritative page | Check against |
 | --- | --- | --- |
 | Purpose and first command | [README](../../README.md) | Build and run the example |
-| Navigation and vocabulary | [Index](../README.md), [concepts](../concepts.md) | Current entry points; avoid unexplained abbreviations |
-| Configuration grammar | [Configuration](../configuration.md) | `config_parse.cpp`, `config.cpp`, corpus |
-| CLI, formats and core API behavior | [Core/CLI reference](../portable-core.md) | `main.cpp`, `inspection_cli.cpp`, public headers and tests |
+| Navigation and vocabulary | [Index](../README.md), [using Convolver](../use/README.md), [concepts](../use/concepts.md) | Current entry points; avoid unexplained abbreviations |
+| First successes | [Your first filter](../use/first-filter.md), [your first sound in a host](../use/first-sound-in-a-host.md) | `examples.first_use` runs the first; the release examples check the second |
+| Configuration grammar | [Configuration](../use/configuration.md) | `config_parse.cpp`, `config.cpp`, corpus |
+| CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp` and tests |
+| What Convolver does not do | [Limits](../use/limits.md) | TODO's documented limitations |
+| Symptoms and fixes | [Troubleshooting](../use/troubleshooting.md) | Diagnostics in `config.cpp`, the tools and the adapters |
+| Other readers of the format, path portability | [Other programs](../use/other-programs.md) | `tests/compatibility/`, `downstream-evidence.json` |
 | Component boundaries and change map | [Implementation map](architecture.md) | Actual symbols, callers, targets and test names |
-| Package consumption | [Library guide](library.md) | CMake exports, external-consumer tests |
+| Package consumption, engine API and resource limits | [Library guide](library.md) | CMake exports, public headers, external-consumer tests, `native.limits` |
 | Building from source, every target and format, CMake presets | [Build from source](build.md) | `CMakeLists.txt`, `CMakePresets.json`, the CI workflows |
-| Plug-in use in a host | [VST3](../vst3.md), [Audio Unit](../au.md), [LV2](../lv2.md) guides | Adapter, host and state tests |
+| Installing the plug-ins | [Install](../use/install.md) | Packaging, installers, each format's bundle layout |
+| How the plug-ins behave for users | [How the plug-ins behave](../use/plugins.md) | The adapter contract, adapter and harness tests |
 | What every plug-in adapter must do | [Plug-in adapter contract](plugin-contract.md) | `host.hpp`, the PLUG-2 harness, each adapter's tests |
 | Plug-in identities and channel layouts | [Plug-in identities](plugin-identities.md) | `plugins/identities.json`, `tests/identities_tests.py`, `vst3.identities` |
-| Plug-in presets and the preset tool | [Plug-in presets](../presets.md) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
-| System-wide filtering on Windows | [Equalizer APO export](../equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
-| Plug-in downloads and release gates | [Plug-in distribution](../plugins/index.md), [release record](../releases/developer-preview.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
+| Plug-in presets and the preset tool | [Plug-in presets](../use/presets.md); file formats in the [contract](plugin-contract.md#preset-files) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
+| System-wide filtering on Windows | [Equalizer APO export](../use/equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
+| Plug-in downloads and release gates | [Install](../use/install.md), [build from source](build.md#pinned-preview-recipe), [host testing](host-testing.md), [release record](../releases/developer-preview.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
 | Release status and evidence levels | [Release readiness](../release-readiness.md) | TODO, open pull requests, GitHub releases, host records |
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
@@ -137,12 +140,13 @@ can act on it without a separate copy of the rules:
 | Past releases and provenance | [History](../history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
-limits, test counts or TODOs into several places. Preview packages ship
-`docs/plugins/` and copies of the [presets](../presets.md) and
-[Equalizer APO](../equalizer-apo.md) guides; `scripts/release/package_docs.py` turns
-the copies' links to unshipped pages into links to the source repository at the
-packaged commit, so write those guides as usual. `VERSION` is the numeric source
-of truth. Version numbers in commands are examples or compatibility requirements,
+limits, test counts or TODOs into several places. Preview packages ship every
+page in `docs/use/`; `scripts/release/package_docs.py` turns their links to
+other pages into links to the source repository at the packaged commit, so
+write those pages as usual. Commands marked `<!-- executable-example -->` in
+`docs/use/` must run a bundled tool as `./bin/TOOL INPUT OUTPUT...` from the
+package folder; the release tests run them. `VERSION` is the numeric source of
+truth. Version numbers in commands are examples or compatibility requirements,
 not another release metadata source.
 
 ## Updating a behavior

@@ -13,59 +13,60 @@ Convolver applies that response continuously to every input sample.
 
 | I want to… | Start here |
 | --- | --- |
-| Build Convolver and filter a file | [Quick start](../README.md#build-and-try-it) |
-| Understand the audio terms and timing | [Concepts](concepts.md) |
-| Write a filter configuration or move one from Windows | [Configuration format](configuration.md) |
-| Check whether a configuration works in Roon, JRiver or elsewhere | [Configuration compatibility](configuration-compatibility.md) |
-| See every CLI option and its behavior | [Core and CLI reference](portable-core.md) |
-| Use Convolver inside a DAW or other plug-in host | [VST3 guide](vst3.md); on macOS also the [Audio Unit guide](au.md); on Linux also the [LV2 guide](lv2.md) (developer build) |
-| Turn a filter into a preset for a plug-in | [Plug-in presets](presets.md) |
-| Filter everything Windows plays (system-wide) | [Equalizer APO export](equalizer-apo.md) |
-| Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
+| Use Convolver: filter files, use the plug-ins, or filter everything Windows plays | [Using Convolver](use/README.md) |
+| Filter my first file | [Your first filter](use/first-filter.md) |
+| Hear the plug-in in a host | [Install](use/install.md), then [your first sound in a host](use/first-sound-in-a-host.md) |
+| Write a filter configuration | [Configuration files](use/configuration.md) |
+| Use a configuration from Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](use/other-programs.md) |
+| Fix a filter that does not load or play | [Troubleshooting](use/troubleshooting.md) |
+| Filter the audio of a video with FFmpeg | [FFmpeg pipe example](use/command-line.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
 | Build Convolver from source, or a plug-in | [Build from source](develop/build.md) |
 | Use the C++ libraries in another application | [Library guide](develop/library.md) |
 | Find the implementation or change it safely | [Implementation map](develop/architecture.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](develop/testing.md) |
-| Choose an FFT backend or reproduce measurements | [FFT guide](develop/fft-backends.md) |
 | See what is ready to use, what is still unproven and what blocks the next release | [Release readiness](release-readiness.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
-| Understand version numbers and tags | [Source versioning](develop/versioning.md) |
-| Edit these documents | [Documentation guide](develop/documentation.md) |
 | Pick up, hand over or review a piece of work | [Taking on and reviewing work](develop/workflow.md) |
+| Edit these documents | [Documentation guide](develop/documentation.md) |
 | Learn where Convolver came from | [History](history.md) |
 
 ## All maintained pages
 
 Pages are grouped by who they are for. The [documentation guide](develop/documentation.md#kinds-of-page)
-explains the kinds. The user guides still sit at the top of `docs/`; they move
-into `docs/use/` in a later step (DOC-4).
+explains the kinds.
 
 ### For people using Convolver
 
+These pages are in `docs/use/` and are shipped in preview packages.
+
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Concepts](concepts.md) | Background | Audio terms, latency, tails, files versus streams |
-| [Configuration format](configuration.md) | Reference | `.cfg` and list syntax, routes, paths, troubleshooting |
-| [Configuration compatibility](configuration-compatibility.md) | Reference | What is tested, path-portability profile, other readers of the format |
-| [Core and CLI reference](portable-core.md) | Reference | Every CLI option, output formats, inspection, library API, limits |
-| [VST3 guide](vst3.md) | How-to | Installing the plug-in and loading filters; how it behaves |
-| [Audio Unit guide](au.md) | How-to | Installing the macOS Audio Unit and loading filters; its behaviour, licence and tests |
-| [LV2 guide](lv2.md) | How-to | Installing the LV2 plug-ins, loading a filter as a preset, ports, behaviour and tests |
-| [Plug-in presets](presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, what a preset that does not fit plays, file contents |
-| [Equalizer APO export](equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
-| [Plug-in distribution](plugins/index.md) | How-to | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
+| [Using Convolver](use/README.md) | How-to | Choosing how to run it; the tools in a preview package |
+| [Concepts](use/concepts.md) | Background | Audio terms, latency, tails, files versus streams |
+| [Your first filter](use/first-filter.md) | Tutorial | The bundled examples with the command-line tool |
+| [Your first sound in a host](use/first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
+| [Install](use/install.md) | How-to | Preview packages and source builds, for every plug-in format and system; unsigned previews |
+| [Plug-in presets](use/presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, messages |
+| [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
+| [Other programs](use/other-programs.md) | How-to | Path portability, what other programs read, configurations from the old Windows Convolver |
+| [Troubleshooting](use/troubleshooting.md) | How-to | Symptoms, causes and fixes for plug-ins, configurations and tools |
+| [Command-line reference](use/command-line.md) | Reference | Every `convolver` option, output formats, streams, inspection, FFTW tuning |
+| [Configuration files](use/configuration.md) | Reference | `.cfg` and list syntax, routes, paths |
+| [How the plug-ins behave](use/plugins.md) | Reference | VST3, AU and LV2: channels, loading, failures, latency, bypass, LV2 ports, licence |
+| [Limits](use/limits.md) | Reference | What Convolver does not do, and what to do instead |
 
 ### For people building, embedding or changing Convolver (people and agents)
 
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs |
-| [Library guide](develop/library.md) | How-to | Using the libraries from another CMake project; presets |
+| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs, pinned dependencies and the preview recipe |
+| [Library guide](develop/library.md) | How-to | Using the libraries from another CMake project; the engine API and resource limits |
 | [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
-| [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state |
+| [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state, preset files |
 | [Plug-in identities and channel layouts](develop/plugin-identities.md) | Reference | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
 | [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, dated benchmarks |
-| [Testing](develop/testing.md) | Reference | What each test establishes and its limits |
+| [Testing](develop/testing.md) | Reference | What each test establishes and its limits, including each plug-in format and the Equalizer APO export |
+| [Host testing](develop/host-testing.md) | How-to | Testing in real hosts: the preview smoke test, production qualification, Equalizer APO on a device |
 | [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
 | [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |
 | [Source versioning](develop/versioning.md) | Reference | `VERSION`, automatic tags, recovery |
@@ -82,8 +83,8 @@ into `docs/use/` in a later step (DOC-4).
 
 ### Moved pages
 
-These pages moved on 23 October 2026 (DOC-4). Dated records
-still link to the old paths.
+These pages moved on 23 October 2026. Dated records still link to the old
+paths.
 
 | Old path | New path |
 | --- | --- |
@@ -96,6 +97,12 @@ still link to the old paths.
 | `docs/documentation.md` | [`docs/develop/documentation.md`](develop/documentation.md) |
 | `docs/versioning.md` | [`docs/develop/versioning.md`](develop/versioning.md) |
 | Shared adapter contract in the plug-in formats plan | [`docs/develop/plugin-contract.md`](develop/plugin-contract.md) |
+| `docs/concepts.md`, `configuration.md`, `equalizer-apo.md`, `presets.md` | The same names in [`docs/use/`](use/README.md) |
+| `docs/portable-core.md` | [`docs/use/command-line.md`](use/command-line.md); the engine API and limits are in the [library guide](develop/library.md#using-the-engine) |
+| `docs/configuration-compatibility.md` | [`docs/use/other-programs.md`](use/other-programs.md) |
+| `docs/vst3.md`, `docs/au.md`, `docs/lv2.md` | [`docs/use/plugins.md`](use/plugins.md) and [`docs/use/install.md`](use/install.md); their tests are in [testing](develop/testing.md#plug-in-format-tests) |
+| `docs/plugins/index.md`, `install.md`, `quickstart.md`, `troubleshooting.md` | [`docs/use/README.md`](use/README.md), [`install.md`](use/install.md), [`first-sound-in-a-host.md`](use/first-sound-in-a-host.md), [`troubleshooting.md`](use/troubleshooting.md) |
+| `docs/plugins/build.md`, `docs/plugins/hosts.md` | [`docs/develop/build.md`](develop/build.md#pinned-preview-recipe), [`docs/develop/host-testing.md`](develop/host-testing.md) |
 
 At the top level: [README](../README.md), [TODO](../TODO.md),
 [CHANGELOG](../CHANGELOG.md), [current review](../REVIEW.md),
@@ -140,7 +147,7 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
   for system-wide processing. The Equalizer APO route is now the
-  [Equalizer APO export](equalizer-apo.md) (HOST-4).
+  [Equalizer APO export](use/equalizer-apo.md) (HOST-4).
 - [FFmpeg filter](plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
 - [Documentation by reader](plans/2026-10-23-documentation-by-reader.md)

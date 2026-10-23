@@ -154,10 +154,10 @@ binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
 semantics. PCM8/16/24/32 quantization, optional dither, noise shaping and valid bits follow
-[the portable guide](docs/portable-core.md#integer-formats-dither-and-noise-shaping).
+[the portable guide](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
 Do not change their audible or numerical behavior in a build-system or formatting
 patch; keep optional processing explicit and test exact samples as well as statistics.
 
 For host changes, run the optional SDK build and its validator/adapter/preset
-tests, and pluginval if you can, as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests
+tests, and pluginval if you can, as described in [testing](docs/develop/testing.md#pluginval). Report actual DAW tests
 separately from SDK validation.

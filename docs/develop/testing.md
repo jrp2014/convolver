@@ -56,7 +56,13 @@ ctest --test-dir build -N
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
   truncation and RAW alignment. POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
-  header-finalization errors.
+  header-finalization errors. For integer output they check rounding and
+  clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
+  the measured dither error's mean, variance and correlation, that each noise
+  shaper's output error equals a bounded rounding residual through the
+  historical coefficients and that its measured error spectrum follows
+  1 - Σ c_k z^-k within 15%, recovery after clipping, and the exact stored
+  samples and header fields for every container and valid-bit combination.
 - `native.config_parse`: the private configuration parser on its own: physical
   line/column locations after BOM, comments, blank lines and CRLF, original
   tokens with effective signed-zero/fractional routes and truncated delays, list
@@ -107,7 +113,7 @@ ctest --test-dir build -N
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.
-- `native.presets`: the [preset containers](../presets.md) without any SDK: base64
+- `native.presets`: the [preset containers](plugin-contract.md#preset-files) without any SDK: base64
   against RFC 4648's vectors, the `.vstpreset` layout field by field, reading
   presets as hosts save them (extra chunks, lower-case class IDs, padding),
   version-1 states with any channel mask, every truncation and damaged chunk
@@ -137,7 +143,7 @@ ctest --test-dir build -N
   channels must be silent. It also checks that existing folders and folder
   names too long for Equalizer APO are refused, that file names cannot add
   commands, and that failed exports leave nothing. See the
-  [guide](../equalizer-apo.md#how-it-is-tested).
+  [Equalizer APO export tests](#equalizer-apo-export-tests).
 
 - `export.equalizer_apo.runtime` (Windows CI, or a Windows build configured
   with `CONVOLVER_EQUALIZER_APO_BENCHMARK` and `CONVOLVER_EQUALIZER_APO_CONFIG`
@@ -146,7 +152,8 @@ ctest --test-dir build -N
   applies a `config.txt` to a WAV file with Equalizer APO's own filter code.
   The output must match the oracle within half a 16-bit step (its rounding) plus 1e-5, because
   `Benchmark.exe` writes 16-bit files, and silence must be exactly zero. A real audio device and exclusive-mode
-  bypass are checked by hand (steps in the guide).
+  bypass are checked by hand
+  ([steps](host-testing.md#equalizer-apo-on-a-real-device)).
 
 The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
@@ -170,7 +177,7 @@ On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactiv
 queries, silent-input tails, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
-[pluginval](../vst3.md#independent-host-tests-pluginval), a host that does not share
+[pluginval](#pluginval), a host that does not share
 the SDK's hosting code. None of these establishes compatibility in a particular
 commercial DAW.
 
@@ -188,11 +195,11 @@ Consult the [native workflow](../../.github/workflows/regression.yml) and
 [VST3 workflow](../../.github/workflows/vst3.yml) for the configured matrix; a workflow
 file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
 workflow installs the
-[pinned format tools](../plugins/build.md#pinned-format-dependencies) and checks
+[pinned format tools](build.md#pinned-format-dependencies) and checks
 them on LV2's example plug-ins until the LV2 adapter adds its bundle. The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it ([AU guide](../au.md#testing)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
+it ([Audio Unit tests](#audio-unit-tests)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
 workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
@@ -217,7 +224,8 @@ generator also use.
   generator writes. After changing the generator, regenerate them with
   `python3 tests/plugins/fixtures.py write examples/first-use`.
 - `examples.first_use`: runs the commands marked `<!-- first-use-example -->` in
-  the README and the examples README exactly as written, with the CLI just
+  the README, the examples README and
+  [your first filter](../use/first-filter.md) exactly as written, with the CLI just
   built, and compares every render with the fixture's `expected.wav` (the
   oracle) within 1e-5. Every fixture must have a documented render. The renders
   stay in `BUILD/first-use/` as the CLI reference for the adapters.
@@ -272,7 +280,7 @@ skipped because LV2 core cannot report a tail: its driver's
 `Adapter::reports_tail()` returns false, and every other check of those cases,
 the audio included, still runs. LV2 has no separate reset, so the driver's
 reset is deactivate and activate, and it reads the latency port after a
-zero-frame `run()`, as hosts do before audio. The [LV2 guide](../lv2.md#tests)
+zero-frame `run()`, as hosts do before audio. [LV2 tests](#lv2-tests)
 lists its other tests.
 
 `au.harness` (macOS, `CONVOLVER_BUILD_AU=ON`) drives the Audio Unit through the
@@ -286,6 +294,182 @@ and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 [`plugins/vst3/CMakeLists.txt`](../../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
 own tests.
+
+## Plug-in format tests
+
+What each plug-in format's own tests cover, beyond the shared
+[comparisons](#plug-in-comparisons-plug-2). How the plug-ins behave for users
+is in [how the plug-ins behave](../use/plugins.md).
+
+### VST3 tests
+
+Tests cover direct numerical results, planar and in-place float and double
+buffers, callback sizes crossing partition boundaries, silence and tails,
+bypass automation, reset, concurrent replacement, C++ allocation and
+deallocation guards, corrupted state, and presets after their source files are
+deleted. The SDK validator loads the actual bundle; separate tests call the
+real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
+comparisons; since VST3-7 the adapter lists no known deviations.
+
+The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
+pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
+and adds automation patterns. The validator, the adapter tests and the plug-in
+all use Steinberg's SDK code, so CI also loads the bundle in an independent
+host, pluginval.
+
+### pluginval
+
+[pluginval](https://github.com/Tracktion/pluginval) (Tracktion, GPL-3.0) is a
+JUCE-based host that runs headless. It is downloaded separately, never linked
+into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to
+add:
+
+- `vst3.pluginval`: `pluginval validate --strictness-level 10 --skip-gui-tests`.
+  Open and close, state save and restore, bus layouts, parameter fuzzing and
+  thread safety, allocations during processing and oversized blocks, at several
+  sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS` adds options; CI adds
+  `--rtcheck;relaxed` on macOS, where pluginval can flag real-time-unsafe calls
+  in process callbacks.
+- `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
+  size 300) and a cross-feed `.cfg` (block size 61), loads each through the
+  host's state call, renders noise with `pluginval test`, and compares the
+  output with a direct double-precision convolution delayed by 256 samples
+  (tolerance 1e-5). A second render must match the first exactly.
+
+[`tests/vst3/pluginval_tests.py`](../../tests/vst3/pluginval_tests.py) runs
+both. On Linux it uses `xvfb-run` when there is no display (JUCE needs an X
+server). JUCE's host only accepts state in its own wrapper (an XML document
+holding the component state in JUCE's base64 variant), so the script converts
+the preset's component chunk; given raw component state, JUCE leaves the
+plug-in empty and it passes delayed dry audio, which the acceptance comparison
+would catch. CI pins pluginval 2.0.0-beta3 by checksum. The VST3 CI matrix runs
+on Linux, Windows and macOS. None of this proves hard real-time deadlines or
+compatibility with every DAW; see [host testing](host-testing.md).
+
+### Audio Unit tests
+
+Three CTest tests run when the adapter is built (label `au`):
+
+- `au.harness`: the PLUG-2 comparisons through the Audio Unit API, with
+  filters loaded as `.aupreset` dictionaries and latency and tail converted
+  from seconds.
+- `au.adapter`: what is specific to Audio Units: the channel pairs offered,
+  rejected formats, latency and tail in seconds with change notifications, the
+  `ClassInfo` keys, foreign, damaged, newer and failed presets with the failure
+  record each leaves (read through a custom property, 64800, that exists for
+  the tests only), an initialization that cannot build its processor, bypass
+  switched from another thread while rendering, the output silence flag, and no
+  C++ allocation while rendering.
+- `au.bundle`: the bundle's codes and version against the
+  [identity registry](plugin-identities.md), a single exported symbol
+  (`ConvolverAUFactory`), the licence files and the signature.
+
+The tests register the unit inside the test process with
+`AudioComponentRegister`, so they need no installation. The
+[Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
+installs the component for the runner's user and runs `auval -strict`. Named
+host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
+AU-4.
+
+### LV2 tests
+
+`ctest -L lv2` runs:
+
+- `lv2.harness`: the PLUG-2 comparisons with the plug-in hosted by lilv. All
+  cases pass; the restore-before-setup cases and the tail checks are skipped,
+  as described above.
+- `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
+  refusals; the status port, log messages, saved state and failure record after
+  good and bad loads (the record through an unadvertised extension that exists
+  for the tests only); presets written by `convolver-preset` and lilv's own
+  state round trip; long `run()` calls; and lifecycle sequences, one scripted
+  and several seeded (loads, failed loads, audio, bypass, reset, reopening a
+  saved session). A small model checks the saved state, status, latency and
+  failure record after every step, and the exact output at every reset and at
+  the end; the transitions during audio (crossfades, a rejection while
+  playing) are the harness's cases.
+- `lv2.exports` and `lv2.fft_symbols`: the library exports only
+  `lv2_descriptor` and does not use a shared FFTW.
+
+The [LV2 workflow](../../.github/workflows/lv2.yml) also runs `lv2lint` on every
+plug-in in the bundle, with the [pinned packages](build.md#pinned-format-dependencies).
+lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
+Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
+than reporting the refusal).
+
+## Equalizer APO export tests
+
+`export.equalizer_apo` runs the exported commands through a model of Equalizer
+APO written from its 1.4.2 sources (see [native tests](#native-production-tests)
+for what it covers). On Windows CI the same cases also run in Equalizer APO
+itself, as `export.equalizer_apo.runtime`. Equalizer APO's installer contains
+`Benchmark.exe`, which applies the configuration named in the registry
+(`ConfigPath` under `HKEY_LOCAL_MACHINE\SOFTWARE\EqualizerAPO`) to a WAV file
+with Equalizer APO's own filter code, using the file's channel count as the
+device's. The test has it process 480-frame blocks, the audio engine's 10 ms
+period at 48 kHz. CI downloads Equalizer APO 1.4.2 (pinned by its SHA-256),
+unpacks it without installing, points `ConfigPath` at an empty folder, and the
+test writes `config.txt` there with an `Include:` of each export (one case
+copies the export into that folder and uses the relative `Include:` line, as
+installed). Every case passed in Equalizer APO 1.4.2 on 22 October 2026.
+
+Running the fixtures there found one difference, in Equalizer APO rather than
+in the export: the convolution in its x86 and x64 builds (1.4.2; not ARM64)
+multiplies the spectrum four frequency bins at a time, so when a block of audio
+is not a multiple of four frames, up to three bins just below half the sample
+rate are missing from the output. With 10 ms blocks at 44.1 kHz (441 frames)
+it would drop the bin at about 22 kHz. That is above hearing, so the export
+does not work around it; the user guide mentions it under
+[differences from the CLI](../use/equalizer-apo.md#differences-from-the-cli).
+
+To run the runtime test yourself, use a Windows computer or virtual machine
+**without** Equalizer APO installed on an audio device: the test replaces the
+configuration in the folder `ConfigPath` names, which an installed Equalizer APO
+would apply to everything the device plays. Unpack the installer with 7-Zip,
+set `ConfigPath` to an empty folder (this needs administrator rights), and
+configure with `-DCONVOLVER_EQUALIZER_APO_BENCHMARK=PATH\Benchmark.exe` and
+`-DCONVOLVER_EQUALIZER_APO_CONFIG=FOLDER`. The test refuses to run when
+`ConfigPath` names another folder or the folder holds a `config.txt` it did not
+write, and it leaves a `config.txt` holding only its own comment line behind.
+
+`Benchmark.exe` bypasses the Windows audio service, so CI does not check that
+Equalizer APO is installed on the device, that Windows passes the device's rate
+and channel count, or that exclusive mode bypasses it. Those are checked by
+hand: see [host testing](host-testing.md#equalizer-apo-on-a-real-device).
+
+## Configuration corpus cases
+
+`compatibility.corpus` renders each case in
+[`tests/compatibility/cases.json`](../../tests/compatibility/cases.json). The
+[other programs](../use/other-programs.md#what-convolver-accepts) page lists the
+features for users; these are the cases behind each row:
+
+| Feature | Corpus cases |
+| --- | --- |
+| Sound file as the filter, diagonal channels | `wav-identity`, `wav-stereo-diagonal` |
+| Header, delay lines, four-line paths (3.0 and later) | `cfg-identity` |
+| Format before 3.0 (no delay lines), rejected | `pre-3.0-format` |
+| `-0` inversion, fractional weights, repeated routes | `signed-zero-inversion`, `fractional-repeated-routes` |
+| Cross-channel matrices, summed outputs | `cross-channel-mixing` |
+| Selected IR channel | `ir-channel-select` |
+| Delays, truncated to frames | `integer-frame-delays`, `truncated-delays`, `delay-float-precision` |
+| Unequal IR lengths | `unequal-ir-lengths` |
+| Hex channel mask | `hex-channel-mask` |
+| `//` comments and blank lines | `comments-blank-lines` |
+| UTF-8 BOM, CRLF line endings | `bom-crlf` |
+| Relative paths beside the configuration | `relative-posix-parent`, `cwd-relative-filter` |
+| `\` and mixed separators in relative paths | `relative-windows-separators`, `relative-mixed-separators` |
+| UTF-8 names with spaces | `unicode-and-spaces` |
+| Native absolute paths | `absolute-native-path` |
+| Windows drive and UNC paths on macOS and Linux, rejected | `drive-letter-path`, `unc-path` |
+| Lists: first entry matching rate and channels | `list-first-match`, `list-of-sound-files` |
+| Lists naming lists | `nested-list-windows-separators` |
+| Missing IR in an unselected list entry | `list-missing-unselected-asset` |
+
+Use the `consumer-verified` corpus label only for cases that were run in the
+named program. Before adding a named profile for another program, record its
+specification or version, add fixtures for its documented differences, and
+test them in that program.
 
 ## Historical tests: run with CMake/CTest
 
@@ -369,6 +553,25 @@ extraction tests also leave old full-width PCM32, nonzero noise shaping, CMD
 tail handling and full host negotiation outside their coverage. Preserve these
 limits when quoting a result. [TODO](../../TODO.md#documented-limitations) gathers
 open validation gaps and intentional constraints.
+
+### Record: local dependency versions, October 2026
+
+The native tests link actual production translation units and actual
+libraries. The earlier October 2026 local test setup used these sources; they
+are not dependency pins for current builds (those are in
+[build from source](build.md#pinned-format-dependencies)):
+
+- FFTW 3.3.11, archive SHA256
+  `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.
+- libsndfile 1.2.2, archive SHA256
+  `3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e`;
+  optional external codecs disabled for that local installation.
+
+FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
+local verification used the official configure/make build of that source
+archive, which reports 3.3.11. Convolver itself is built with CMake in both
+cases. Current LLVM, SDK and library results must be tied to the revision
+actually tested.
 
 ## Documentation checks
 

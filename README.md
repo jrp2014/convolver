@@ -15,10 +15,10 @@ It runs on macOS, Linux and Windows and comes in three forms:
 Supply a multichannel impulse-response (IR) sound file or a Convolver **`.cfg`**
 file describing filters and routes. Convolver applies filters; it does not
 measure your room or design them. Other programs use variants of the configuration
-format, so [compatibility is not universal](docs/configuration-compatibility.md).
+format, so [compatibility is not universal](docs/use/other-programs.md).
 
-New to the project? Use the [documentation index](docs/README.md), or start with
-[the audio concepts](docs/concepts.md). Open work is tracked in [TODO.md](TODO.md).
+New to it? Start with [using Convolver](docs/use/README.md), or see the
+[documentation index](docs/README.md) for every page. Open work is tracked in [TODO.md](TODO.md).
 
 ## Build and try it
 
@@ -83,7 +83,7 @@ Output is 32-bit float WAV unless you choose `wav-pcm8`, `wav-pcm16`,
 `wav-pcm24`, `wav-pcm32` or `raw-float`; integer formats can add `--dither` and
 `--noise-shaping`. Use `--gain-db -3` to lower the level by 3 dB; positive
 values raise it. Automatic attenuation options and their assumptions are in
-[the CLI reference](docs/portable-core.md#gain-and-attenuation).
+[the command-line reference](docs/use/command-line.md#gain-and-attenuation).
 The output keeps the whole filter tail, and Convolver's
 processing delay is removed, so the result lines up with the input. The input
 sample rate and channel count must match the filter; Convolver does not resample.
@@ -101,7 +101,7 @@ Run `./build/convolver --help` for every option.
 
 A `.cfg` file names the sample rate and channel counts, per-channel delays,
 and one or more paths from input channels through IRs to output channels.
-The [current configuration reference](docs/configuration.md) includes a complete
+The [current configuration reference](docs/use/configuration.md) includes a complete
 stereo example, route-number explanations and troubleshooting.
 
 ```sh
@@ -114,12 +114,14 @@ add `--json` for machine-readable output. Paths are relative to the configuratio
 that contains them. A list of configurations can select a filter matching the
 input rate and channel count.
 
-## VST3 plug-in
+## Plug-ins
 
-The plug-in is optional and needs the Steinberg VST3 SDK, fetched separately.
-It takes up to 8 input and 8 output channels, and the counts may differ.
-Filters are loaded through the host's preset menu: a small tool converts a WAV
-or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
+Convolver is also a VST3 plug-in (Windows, macOS, Linux), an Audio Unit (macOS)
+and an LV2 plug-in (Linux), each taking up to 8 input and 8 output channels.
+Filters are loaded through the host's preset menu: `convolver-preset` converts
+a WAV or `.cfg` file into a preset. See [install](docs/use/install.md) and
+[how the plug-ins behave](docs/use/plugins.md); building them needs each
+format's SDK ([build from source](docs/develop/build.md#plug-ins)).
 
 ## Find your way around the repository
 
@@ -137,9 +139,10 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 - [Documentation index](docs/README.md): choose a guide by task
 - [Implementation map](docs/develop/architecture.md): source responsibilities, invariants and tests
 - [Build from source](docs/develop/build.md): every build, its options and the plug-in SDKs
-- [Portable guide](docs/portable-core.md): CLI details, FFTW tuning, dither, speaker labels and the library API
-- [Library guide](docs/develop/library.md): using Convolver from another CMake project
-- [VST3 guide](docs/vst3.md)
+- [Using Convolver](docs/use/README.md): every user page, from the first filter to troubleshooting
+- [Command-line reference](docs/use/command-line.md): every option, FFTW tuning, dither and speaker labels
+- [Library guide](docs/develop/library.md): using Convolver from another CMake project, and the engine API
+- [How the plug-ins behave](docs/use/plugins.md)
 - [Testing](docs/develop/testing.md), [contributing](CONTRIBUTING.md) and
   [taking on and reviewing work](docs/develop/workflow.md)
 - [Changelog](CHANGELOG.md) and [current review](REVIEW.md)
@@ -175,6 +178,7 @@ explains, so hosts do not mistake it for this one.
 
 ## Plug-in distributions
 
-See the [plug-in guide](docs/plugins/index.md) for preview installation, preset
-conversion and pinned source builds. [Candidate qualification](docs/releases/developer-preview.md)
+See [install](docs/use/install.md) for preview packages and
+[build from source](docs/develop/build.md#pinned-preview-recipe) for the
+pinned recipe that makes them. [Candidate qualification](docs/releases/developer-preview.md)
 separates automated checks from signing, clean-install and named-host evidence.

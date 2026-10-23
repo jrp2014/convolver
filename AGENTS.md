@@ -20,9 +20,9 @@ for contributors and agents are in `docs/develop/`: build commands in
 `docs/develop/build.md`, the implementation map in
 `docs/develop/architecture.md`, tests in `docs/develop/testing.md`, the
 plug-in rules in `docs/develop/plugin-contract.md` and the procedures in
-`docs/develop/workflow.md`. User behaviour is described in
-`docs/portable-core.md`, `docs/configuration.md` and the plug-in guides
-(`docs/vst3.md`, `docs/au.md`, `docs/lv2.md`). Open plans are in `docs/plans/`;
+`docs/develop/workflow.md`. User behaviour is described in `docs/use/`: the
+command line in `docs/use/command-line.md`, configurations in
+`docs/use/configuration.md` and the plug-ins in `docs/use/plugins.md`. Open plans are in `docs/plans/`;
 the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`. How the
 documentation is organised and written, for agents too, is in
 `docs/develop/documentation.md`.

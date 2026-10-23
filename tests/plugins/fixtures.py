@@ -39,7 +39,8 @@ INPUT_FRAMES = 4096
 EXPECTED = 'expected.wav'
 FIXTURE_NAMES = ('mono', 'stereo', 'crossover')
 REPOSITORY = Path(__file__).resolve().parents[2]
-DOCUMENTED = (REPOSITORY / 'README.md', REPOSITORY / 'examples/first-use/README.md')
+DOCUMENTED = (REPOSITORY / 'README.md', REPOSITORY / 'examples/first-use/README.md',
+              REPOSITORY / 'docs/use/first-filter.md')
 MARKER = '<!-- first-use-example -->'
 
 

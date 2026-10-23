@@ -6,8 +6,8 @@
 
 For anyone writing, changing or reviewing a plug-in adapter (VST3, Audio Unit,
 LV2), and for host integrators. This page is the reference for what every
-adapter must do; each format's user guide ([VST3](../vst3.md), [AU](../au.md),
-[LV2](../lv2.md)) says how that looks to a user. The rules were designed in the
+adapter must do; [how the plug-ins behave](../use/plugins.md) says how that
+looks to a user. The rules were designed in the
 [plug-in formats plan](../plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
 and are maintained here.
 
@@ -38,7 +38,8 @@ Contents: [loading and failure](#loading-and-failure) ·
 [failure reasons](#failure-reasons) ·
 [initial restoration and live replacement](#initial-restoration-and-live-replacement) ·
 [bypass](#bypass) · [channel layouts](#channel-layouts) ·
-[replacement and threads](#replacement-and-threads) · [host state](#host-state)
+[replacement and threads](#replacement-and-threads) · [host state](#host-state) ·
+[preset files](#preset-files) · [format notes](#format-notes)
 
 ## Loading and failure
 
@@ -231,4 +232,83 @@ initial load, with no filter.
 Decoders read both; encoders write version 1 whenever nothing new is recorded,
 so older builds still read those presets. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
-[what the files contain](../presets.md#what-the-files-contain).
+[preset files](#preset-files).
+
+## Preset files
+
+`convolver-preset` ([user guide](../use/presets.md)) writes the same **encoded
+host state** into every format: the magic `CNVS`, state version 1, then the
+sample rate, channel counts, output channel mask, delays, and every filter
+path's coefficients, routes and gains, as the plug-ins save it in a host's
+project. The containers around it are fixed, so presets made today keep
+loading. These names are permanent, like the
+[plug-in identities](plugin-identities.md):
+
+- **VST3 (`.vstpreset`):** Steinberg's documented preset file: the header
+  `VST3`, format version 1, the processor class ID, then one component-state
+  chunk (`Comp`) holding a 32-bit little-endian length and the encoded state.
+  The tool's writer needs no SDK; `vst3.preset_format` checks that its output is
+  byte-identical to the SDK's `PresetFile::savePreset`.
+- **AU (`.aupreset`):** an XML property list, the dictionary that Audio Units
+  save as `ClassInfo`. It has Apple's standard keys (`version` 0, `type`,
+  `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,
+  `name`) and an empty `data`, since the AU has no parameters, so the
+  AudioUnitSDK's own checks accept it. The encoded state is under the key
+  `convolver-state`.
+- **LV2 (`NAME.preset.lv2/`):** a preset bundle with `manifest.ttl` and
+  `preset.ttl`. The preset is a `pset:Preset` that applies to the plug-in URI
+  for the filter's channel counts, with one state property, the LV2 base URI
+  followed by `state`, holding the encoded state as an `atom:Chunk` (base64 in
+  Turtle). No file path is stored, so the preset does not depend on where the
+  filter files were.
+
+The AU key, the LV2 state property and the bare state inside them (without the
+VST3 length prefix) are the owner's decision of 22 October 2026.
+
+Compatibility rules for presets:
+
+- Presets hold host state version 1, which records channel counts and an
+  advisory output channel mask but no layout. Plug-ins must load every
+  version-1 preset whose rate and counts fit; a stricter layout check never
+  rejects one ([old presets](plugin-identities.md#presets-without-a-layout)).
+- Host state version 2 only marks a plug-in saved after its first filter failed
+  to load; it holds no filter. The tool never writes it and refuses to convert a
+  `.vstpreset` that holds it. VST3 builds before VST3-7 reject version 2, so a
+  fresh instance there plays as an empty instance.
+- If a later version records more (for example an input layout), the tool must
+  keep writing version 1 for filters that do not need it, so older plug-in
+  builds can still read those presets.
+- `convolver-vst3-preset` is the same tool under its old name, limited to its
+  old behaviour: the same arguments, messages and output bytes, and only
+  `.vstpreset` output.
+
+## Format notes
+
+How each adapter meets the contract where its format differs:
+
+- **VST3:** reports a rejected `setState` as `kResultFalse`; there is no status
+  display without an editor (VST3-3), so a mismatch found at activation is
+  silent without a message, and the [speaker check](../use/plugins.md#channels)
+  notice (`HostFilter::notice()`) is recorded but not shown. The adapter handles
+  variable block sizes, in-place host buffers, calls with no audio, inactive
+  channels and silence flags; 32- and 64-bit host buffers both use the float
+  engine.
+- **Audio Unit:** latency and tail are reported in seconds, with a property
+  change notification when either changes; the tail stays at the longest
+  filter used until the host reinitializes the unit. Bypass is
+  `kAudioUnitProperty_BypassEffect` driving `HostProcessor::set_bypass`, not
+  `AUEffectBase`'s pass-through, and is saved in `ClassInfo`. The output is
+  marked silent only once the tail has decayed. Rejections are returned to the
+  host as errors and logged to the unified log.
+- **LV2:** ports are fixed, so each channel layout is its own plug-in
+  ([identities](plugin-identities.md#channel-layouts)). Bypass is the `enabled`
+  port, which the host saves, so the adapter's state does not record bypass and
+  ignores a bypass flag in another format's preset. Activation is LV2's reset:
+  it starts a fresh processor with the current filter, no history and its exact
+  tail. `run()` does not allocate, lock or do I/O; state restore, save,
+  activation and cleanup share a lock that `run()` never takes, and the plug-in
+  does not declare `state:threadSafeRestore`. It needs `urid:map`, logs through
+  `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
+  `options` when given; without it, or for longer `run()` calls, it processes in
+  pieces of at most 4096 frames with the same output. The `status` port's value
+  3 (Loading) is reserved for LV2-2's file parameter.

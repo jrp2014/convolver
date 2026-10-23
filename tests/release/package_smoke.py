@@ -20,8 +20,9 @@ def staged_tool(root, name):
 
 def check(root, validator=None, probe=None):
     root = Path(root).resolve()
-    for name in ('VST3/Convolver.vst3', 'presets/examples.json', 'docs/plugins/quickstart.md', 'docs/presets.md',
-                 'docs/equalizer-apo.md', 'licenses/Convolver.txt', 'VERSION.txt'):
+    for name in ('VST3/Convolver.vst3', 'presets/examples.json', 'docs/use/README.md',
+                 'docs/use/first-sound-in-a-host.md', 'docs/use/presets.md', 'docs/use/equalizer-apo.md',
+                 'licenses/Convolver.txt', 'VERSION.txt'):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)

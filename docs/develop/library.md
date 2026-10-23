@@ -95,6 +95,74 @@ default to off when included as a subproject, even if the parent uses CTest.
 The parent can explicitly enable `CONVOLVER_BUILD_TESTS` if desired. Dependencies
 must be provided by installed packages or suitable pre-existing imported targets.
 
+## Using the engine
+
+How to call the libraries once they are linked. The command-line tool's
+behaviour is in the [command-line reference](../use/command-line.md).
+
+### Engine API
+
+[engine.hpp](../../include/convolver/engine.hpp) exposes Configuration, FilterPath, Route and Engine.
+Construction prepares FFT plans and all processing buffers. `process` takes
+interleaved float spans and any frame count, producing the same number of output
+frames. Empty input means silence for drain. Input/output spans must not overlap;
+there is no in-place mode. `latency_frames()` and `tail_frames()` are separate;
+feed their sum as silence after the final nonempty input to drain fully.
+`reset()` clears history and delays. Instances have separate state; an individual
+instance must not be processed/reset concurrently.
+
+This implementation uses uniform partitioned overlap-add with input-spectrum
+history, as described in [the implementation map](architecture.md#processing-data-flow). All three backends expose the same spectrum layout and
+scaling; 1/N normalization is applied once when preparing IR spectra. The first
+backend measurements are recorded in [the FFT guide](fft-backends.md).
+
+Prepared processing/reset performs no C++ heap allocation; a test guards that
+contract. This is not a hard real-time guarantee or instrumentation of every
+possible library/system allocation. FFTW planning/destruction is serialized between
+these engine instances, outside processing. Accelerate owns an independent setup
+per instance. Other FFTW users in the same process
+must coordinate their planning too, which is why plug-in builds default to Ooura
+or Accelerate ([plug-in builds](fft-backends.md#plug-in-builds)).
+
+### Resource limits
+
+Resource limits are deliberate: 1..256 channels, 1..768000 Hz, B up to 1048576,
+4096 paths/routes, and about 1 GiB of prepared float-equivalent storage. Core IRs
+and individual delays are bounded to 67108864 frames. The importer additionally
+limits each text file to 1 MiB and all text read per operation to 16 MiB, list nesting to 16, visited entries to 4096, total decoded IR
+samples to 64 Mi, and each delay to 16 Mi frames. Invalid dimensions, arithmetic
+overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
+the CLI's output check; library callers choose their own output policy.
+
+### FFT plans and wisdom
+
+Library callers can pass `FftOptions` to `Engine`, or call `tune_fft`, then
+`export_fft_wisdom`/`import_fft_wisdom`. Core APIs use strings, with file handling
+kept in the CLI. Wisdom is global to the FFTW library in the process. Convolver
+serializes its own planning, destruction and wisdom access; applications making
+other FFTW planner calls must coordinate those too. All preparation belongs
+outside the audio callback.
+
+### Inspecting configurations
+
+`convolver::inspect_configuration` in `convolver/inspection.hpp`
+(`Convolver::io`) returns the same report as `convolver --inspect`
+([inspection](../use/command-line.md#inspecting-and-validating-configurations)),
+and the core's `convolver::analyze_configuration` returns latency, tail, FFT
+length, accounted storage and partitions for an in-memory `Configuration`.
+
+### Writing files
+
+`AudioWriter` defaults to plain rounding for integer formats; pass
+`QuantizationOptions` to enable dither, noise shaping or valid bits, as the
+command line's [integer output](../use/command-line.md#integer-formats-dither-and-noise-shaping)
+describes. The noise-shaping coefficients are in
+[io.hpp](../../include/convolver/io.hpp). `AudioWriter(path, info, format, {}, OutputMetadata{mask})`
+writes [speaker labels](../use/command-line.md#speaker-labels); the default
+`OutputMetadata{}` keeps the plain header. `estimate_attenuation` in
+[engine.hpp](../../include/convolver/engine.hpp) is the calculation behind
+`--gain-db auto` and `no-clip` ([attenuation.cpp](../../portable/attenuation.cpp)).
+
 ## Presets
 
 `CMakePresets.json` names the common configurations, including `core-only`.
@@ -125,4 +193,4 @@ The `release-vst3` preset enables the separate `PluginDistribution` installation
 component. It stages the SDK bundle, `convolver-preset`, `convolver-equalizer-apo`, presets,
 notices and user guide (with the presets and Equalizer APO guides);
 it does not replace the C++ library exports above. See the
-[pinned source recipe](../plugins/build.md) and [preview qualification record](../releases/developer-preview.md).
+[pinned source recipe](build.md) and [preview qualification record](../releases/developer-preview.md).

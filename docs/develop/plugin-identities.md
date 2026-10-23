@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Plug-in identities and channel layouts
 
-[Documentation index](../README.md) · [VST3 guide](../vst3.md) ·
+[Documentation index](../README.md) · [plug-in guide](../use/plugins.md) ·
 [Plug-in formats plan](../plans/2026-10-21-plugin-formats.md)
 
 **In short:** every plug-in format identifies Convolver by fixed codes: VST3
@@ -37,7 +37,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
 | All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load (owner's decision, 22 October 2026); everything else is still written as version 1 |
-| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](../presets.md#what-the-files-contain)). Owner's decision, 22 October 2026 |
+| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). Owner's decision, 22 October 2026 |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. Owner's decision, 22 October 2026 |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 

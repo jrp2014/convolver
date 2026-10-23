@@ -16,8 +16,8 @@ instructions, so that separate skills are not needed.
 `docs/develop/` and `docs/project/`; each page is one kind (tutorial, how-to,
 reference or background) and follows the
 [writing rules](../develop/documentation.md#writing-rules). Four pull requests,
-one per step. Step 1 (`docs/develop/`) is done in the pull request that adds
-this plan. Dated records do not move.
+one per step. Step 1 (`docs/develop/`) was done in the pull request that added
+this plan, and step 2 (`docs/use/`) in the next. Dated records do not move.
 
 ## What was wrong
 
@@ -89,7 +89,7 @@ paths, and records are never edited.
 1. **Done (this plan's pull request):** `docs/develop/`, `build.md`,
    `plugin-contract.md`, the writing rules and rules for pages agents follow,
    the full review procedure in `workflow.md` with thin skills.
-2. **`docs/use/`:** split the CLI and format guides, merge `docs/plugins/`, and
+2. **Done: `docs/use/`:** split the CLI and format guides, merge `docs/plugins/`, and
    ship `docs/use/` in preview packages (`cmake/ConvolverPluginPackaging.cmake`,
    `scripts/release/package_docs.py`, `tests/release/docs_tests.py`,
    `tests/release/package_smoke.py`, `scripts/release/verify_artifact.py`).

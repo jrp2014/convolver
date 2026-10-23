@@ -113,7 +113,7 @@ checklist says so:
 - **DSP changes:** the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp` pass; report the worst error.
 - **Plug-in changes:** the format's validator and the PLUG-2 comparisons pass,
-  and pluginval where it applies ([VST3 guide](../vst3.md)).
+  and pluginval where it applies ([pluginval](testing.md#pluginval)).
 - **Checks:** `pre-commit run --all-files` (formatting included) and
   clang-tidy, as in [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
@@ -236,7 +236,8 @@ reject a TODO ID that is used but never defined.
 - new source, script and maintained documentation files carry an SPDX licence
   line;
 - only known folders and files sit at the top level of the repository, and
-  every adapter under `plugins/` has tests under `tests/` and a user guide.
+  every adapter under `plugins/` has tests under `tests/` and is named in
+  [how the plug-ins behave](../use/plugins.md).
 
 `scripts/check_format.py` finds the C++ sources to format, so a new adapter
 folder is covered without editing a file list. pre-commit runs it with a pinned

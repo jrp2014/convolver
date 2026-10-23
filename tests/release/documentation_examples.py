@@ -22,7 +22,7 @@ def check(package):
             if not target.exists():
                 raise ValueError(f'broken packaged guide link in {page.relative_to(docs)}: {link}')
     examples = []
-    for page in sorted((docs / 'plugins').glob('*.md')):
+    for page in sorted((docs / 'use').glob('*.md')):
         text = page.read_text(encoding='utf-8')
         examples += [(page.name, command) for command in
                      re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.S)]

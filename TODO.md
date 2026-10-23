@@ -57,7 +57,7 @@ boundary and C++20 in the core.
 | 1. Done 21 October | **PLUG-1:** plug-in FFT backend | Plug-in builds default to Ooura (Linux, Windows) or Accelerate (macOS); `vst3.fft_symbols` checks the binary. |
 | 1. Done 22 October | **DOC-1 + PLUG-2:** shared fixtures and the adapter comparison harness | One set of redistributable fixtures (mono, stereo, 2→6) drives the documented CLI commands and the VST3 comparison against the CLI render in CI (PR #28). |
 | 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). VST3-1 checks VST3 speaker arrangements against it (done 23 October, PR #42: a notice only). |
-| 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
+| 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/develop/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 (done 23 October, PR #46) landed before LV2-2 settles its error paths, so no adapter discards a reason. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
@@ -111,14 +111,14 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   merging `REVIEW.md`, release readiness and modernization into one status
   page and starting a decisions log; (4) shorter `README.md`, `AGENTS.md` and
   `TODO.md`, and checks that every maintained page sits in a reader folder.
-  Dated records stay where they are. The page-by-page mapping and the open
-  questions for steps 2 to 4 are in the
+  Dated records stay where they are. The page-by-page mapping and jrp's
+  decisions for steps 2 to 4 are in the
   [plan](docs/plans/2026-10-23-documentation-by-reader.md).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
   `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
   and corresponding source, staging, unsigned installers, artifact verification,
   promotion gates and the candidate workflow
-  ([record](docs/releases/developer-preview.md), [guide](docs/plugins/index.md)).
+  ([record](docs/releases/developer-preview.md), [guide](docs/use/README.md)).
   PLUG-5 extends it to LV2 and AU. Still open: track minimum OS/CPU versions,
   dependency closure, licences/corresponding source, signing/notarization, clean
   machine installation and immutable release assets. Start with the
@@ -136,8 +136,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   Each journey must say how a user checks the output, for example the host's
   offline render of `input.wav` compared with `expected.wav` by a stated
   command, with a listening check only where no comparison is possible.
-  Write them once in the plug-in guides that ship in the package
-  (`docs/plugins/`), with per-platform differences marked, and make the
+  Write them once in the user guides that ship in the package
+  (`docs/use/`, starting from its two first-use tutorials), with per-platform
+  differences marked, and make the
   package contain what they need: presets made from the stereo and 2→6
   filters, the preset tool and the `convolver` CLI, which the first preview
   ships (owner's decision, 23 October 2026); the package has no CLI yet (PLUG-5). See
@@ -161,7 +162,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
   Progress (22 October 2026): REAPER and Carla are the suggested first hosts
   (jrp to try); the SDK sample hosts were evaluated and not added to CI
-  ([host qualification](docs/plugins/hosts.md#steinbergs-sdk-hosts)).
+  ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
 - [ ] **HOST-2 — Additional formats and UI.** LV2 and AU are now first
   priorities alongside VST3 (see [plug-ins](#plug-ins-vst3-lv2-and-au) below).
   CLAP only on request: every CLAP host found also loads VST3. A filter-loading
@@ -177,13 +178,13 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   [MFT plan](docs/plans/2026-10-21-media-foundation-transform.md).
 - [ ] **HOST-4 — System-wide filtering through Equalizer APO.** Progress
   22 October 2026: `convolver-equalizer-apo` exports an IR, `.cfg` or list as
-  an Equalizer APO configuration ([guide](docs/equalizer-apo.md)), chosen by
+  an Equalizer APO configuration ([guide](docs/use/equalizer-apo.md)), chosen by
   the device's sample rate and channel count, silent when nothing fits.
   `export.equalizer_apo` checks it against a model of Equalizer APO 1.4.2 and
   the double-precision oracle. On Windows CI, `export.equalizer_apo.runtime`
   runs the same cases in Equalizer APO 1.4.2's `Benchmark.exe` (its own filter
   code, without the audio service). Still open: the manual check on a real
-  Windows device in the [guide](docs/equalizer-apo.md#how-it-is-tested)
+  Windows device in the [guide](docs/develop/testing.md#equalizer-apo-export-tests)
   (device rate and channel count reach the configuration; exclusive mode
   bypasses it), done by anyone with a Windows computer, with the result recorded there.
 - [ ] **DIAG-1 — Review how diagnostics reach the user.** Do this once the
@@ -255,7 +256,7 @@ Shared groundwork, done once so the three streams stay independent:
   empty `data` and the state under `convolver-state`; LV2 presets hold it as an
   `atom:Chunk` under the base URI plus `state`, with no file path. AU-2 and
   LV2-2 read these. Shipping the tool in release archives belongs to PLUG-5.
-  See [plug-in presets](docs/presets.md).
+  See [plug-in presets](docs/use/presets.md).
 - [x] **PLUG-4 — Layouts and identities.** Done 22 October 2026 (PR #27).
   Identities are owner's decisions: AU codes 21 October 2026; LV2 URI scheme
   (`https://github.com/jrp2014/convolver/lv2#discrete-N-M`), the eight fixed
@@ -315,7 +316,7 @@ Shared groundwork, done once so the three streams stay independent:
   [Audio Unit workflow](.github/workflows/au.yml) compiles the pinned SDK (1.4.0,
   C++23, jrp's choice on 22 October 2026) and runs `auval`. The weekly
   [Dependency updates workflow](.github/workflows/updates.yml) reports newer
-  upstream releases of every pin (jrp's request, 22 October 2026). See [pinned format dependencies](docs/plugins/build.md#pinned-format-dependencies).
+  upstream releases of every pin (jrp's request, 22 October 2026). See [pinned format dependencies](docs/develop/build.md#pinned-format-dependencies).
 - [ ] **PLUG-7 — Lifecycle sequence tests.** The reset defect found in the
   review of 0.4.19 (a filter loaded after a reset during a transition waited
   for the interrupted crossfade) passed every single-operation test: reset,
@@ -388,7 +389,7 @@ decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
   VST3-3, as VST3 has no status display without an editor; and saving after a
   failed first load records it (host state version 2, flag 4, written only
   then), so reopening stays silent. See
-  [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
+  [loading a filter](docs/use/plugins.md#loading-a-filter).
   Follow-up from jrp's review of 0.4.19: a reset during a crossfade now ends
   it, so a filter loaded before audio resumes is installed directly (tests:
   `native.host` reset during warm-up and crossfade, `vst3.adapter`
@@ -405,7 +406,7 @@ LV2 (Linux first; also PipeWire system audio):
   `lv2.harness` passes every PLUG-2 case (restore-before-setup and tail checks
   skipped: LV2 has neither); `lv2.adapter` covers ports, status, log messages,
   presets, lilv state and seeded lifecycle sequences; `lv2lint` runs on every
-  plug-in in CI ([LV2 guide](docs/lv2.md)).
+  plug-in in CI ([plug-in guide](docs/use/plugins.md)).
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
@@ -432,8 +433,8 @@ LV2 (Linux first; also PipeWire system audio):
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
   CI came with LV2-1; pluginval and named layouts remain.
-- [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
-  configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
+- [ ] **LV2-4 — User guide and host matrix.** LV2 in `docs/use/plugins.md` and
+  `docs/use/install.md` (written in DOC-4), plus a PipeWire configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
   Before the first release, jrp decides how `VERSION` maps to
@@ -459,7 +460,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   Progress (22 October 2026, PR #44, with AU-2): `plugins/au/` builds
   `Convolver.component` (`-DCONVOLVER_BUILD_AU=ON`); `au.harness` (PLUG-2),
   `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
-  with `auval -strict` ([AU guide](docs/au.md)). Nothing else remains in
+  with `auval -strict` ([plug-in guide](docs/use/plugins.md)). Nothing else remains in
   AU-1 once PR #44 is reviewed and merged; the ThreadSanitizer run belongs to AU-3.
   PR #49: bypass is left to the host and not saved in `ClassInfo` (owner's
   decision, 23 October 2026: follow each format's convention).
@@ -471,7 +472,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
-- [ ] **AU-4 — User guide and host matrix.** `docs/au.md`; Logic, GarageBand,
+- [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
+  `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results.
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
@@ -490,7 +492,7 @@ Design and evidence: [FFmpeg filter plan](docs/plans/2026-10-21-ffmpeg-filter.md
 means a patched FFmpeg build with `--enable-gpl`.
 
 - [ ] **FFMPEG-1 — Test the pipe workflow.** The
-  [FFmpeg pipe example](docs/portable-core.md#with-ffmpeg) is documented and was
+  [FFmpeg pipe example](docs/use/command-line.md#with-ffmpeg) is documented and was
   originally run by hand for one stereo audio/video pair. Add a CI test when
   `ffmpeg` is installed, covering explicit track selection, 2-in/6-out routing,
   frame counts/tails and timestamp offsets. The revised commands are not new
@@ -515,7 +517,7 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **CFG-1 — Verify other readers.** Run redistributable fixtures in named
   Roon/JRiver/Audiolense-related workflows; record versions and exact supported
   subsets before adding a consumer-specific profile. See
-  [configuration compatibility](docs/configuration-compatibility.md).
+  [configuration compatibility](docs/use/other-programs.md).
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files. When jrp publishes a preview, keep a small collection
@@ -674,26 +676,26 @@ with compatibility tests; linked IDs point to open work above.
 
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
-| No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate layouts/editor under HOST-1/HOST-2 and VST3-1 to VST3-3. | [VST3](docs/vst3.md#loading-filters) |
-| No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/vst3.md#loading-filters) |
-| No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/concepts.md#files-and-continuous-streams) |
+| No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
+| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate layouts/editor under HOST-1/HOST-2 and VST3-1 to VST3-3. | [VST3](docs/use/plugins.md#loading-a-filter) |
+| No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#loading-a-filter) |
+| No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
-| FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/portable-core.md#fftw-plan-tuning) |
-| Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/portable-core.md#engine-api) |
+| FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
+| Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
 | Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with storage. | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
-| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/portable-core.md#resource-limits), [tests](docs/develop/testing.md) |
-| The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/configuration-compatibility.md#compatibility-matrix) |
-| Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/configuration-compatibility.md#profiles) |
-| Output is ordinary WAV or little-endian raw float; codecs depend on libsndfile build | WAV size limits and broader container validation remain IO-1. RAW has no embedded rate/channel metadata. | [RAW I/O](docs/portable-core.md#raw-streams) |
-| Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/portable-core.md#output-safety) |
-| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/portable-core.md#gain-and-attenuation) |
-| Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/portable-core.md#integer-formats-dither-and-noise-shaping) |
+| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
+| The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
+| Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
+| Output is ordinary WAV or little-endian raw float; codecs depend on libsndfile build | WAV size limits and broader container validation remain IO-1. RAW has no embedded rate/channel metadata. | [RAW I/O](docs/use/command-line.md#raw-streams) |
+| Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
+| Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
+| Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
 | Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/develop/testing.md#validation-limits-and-release-work) |
-| Equalizer APO 1.4.2 (x86/x64) convolution drops up to three bins just below half the sample rate when a block is not a multiple of four frames | Upstream behaviour, inaudible (about 22 kHz at 44.1 kHz); the export does not work around it. The runtime test uses 480-frame blocks. | [Equalizer APO guide](docs/equalizer-apo.md#how-it-is-tested) |
+| Equalizer APO 1.4.2 (x86/x64) convolution drops up to three bins just below half the sample rate when a block is not a multiple of four frames | Upstream behaviour, inaudible (about 22 kHz at 44.1 kHz); the export does not work around it. The runtime test uses 480-frame blocks. | [Equalizer APO guide](docs/develop/testing.md#equalizer-apo-export-tests) |
 | Historical Windows applications are not built or host-tested by portable CI | Old PCM32, shaping, CMD tail and host-negotiation gaps remain historical; fix only proven defects, without implying modern host support. | [Historical coverage](docs/develop/testing.md#historical-coverage) |
 
 ## Documentation maintenance
