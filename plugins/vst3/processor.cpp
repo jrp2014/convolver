@@ -130,8 +130,18 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
             host_.reset();
         active_ = state != 0;
         return AudioEffect::setActive(state);
-    } catch (...) {
+    } catch (const std::exception& e) {
+        record_activation_failure(e.what());
         return kResultFalse;
+    } catch (...) {
+        record_activation_failure("the processor could not be built.");
+        return kResultFalse;
+    }
+}
+void Processor::record_activation_failure(const char* why) noexcept {
+    try {
+        filter_.fail_activation(why);
+    } catch (...) { // Out of memory for the message: nothing more to keep.
     }
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
@@ -148,8 +158,13 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
         HostState next;
         try {
             next = read_state(stream);
+        } catch (const NewerHostState& e) {
+            filter_.reject(HostFailureKind::state_newer,
+                           std::string("The saved state could not be read: ") + e.what());
+            throw;
         } catch (const std::exception& e) {
-            filter_.reject(std::string("The saved state could not be read: ") + e.what());
+            filter_.reject(HostFailureKind::state_unreadable,
+                           std::string("The saved state could not be read: ") + e.what());
             throw;
         }
         // While active, the host's configuration is known and a prepared
@@ -184,6 +199,10 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
 std::string Processor::notice() {
     std::lock_guard lock(control_);
     return filter_.notice();
+}
+std::optional<HostFailure> Processor::failure() {
+    std::lock_guard lock(control_);
+    return filter_.failure();
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     std::lock_guard lock(control_);

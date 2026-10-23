@@ -4,6 +4,7 @@
 #include <bit>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace convolver {
 namespace {
@@ -85,10 +86,16 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::length_error("host state exceeds limit");
     Reader r{bytes};
     if (r.word() != magic)
-        throw std::invalid_argument("unsupported host state");
+        throw std::invalid_argument("it is not Convolver plug-in state");
     const auto format = r.word();
+    if (format > version)
+        throw NewerHostState("it was saved by a newer version of Convolver (state version " +
+                             std::to_string(format) + "; this version reads versions 1 to " +
+                             std::to_string(version) +
+                             "). Update Convolver to load it, or make the preset again "
+                             "from its .cfg with this version's convolver-preset.");
     if (format != 1 && format != version)
-        throw std::invalid_argument("unsupported host state");
+        throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();
     // Version 2 only ever marks a failed load (flag 4), never with a filter.
     if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == version && !(flags & 4)))

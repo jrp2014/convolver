@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 namespace convolver {
@@ -20,7 +21,14 @@ struct HostState {
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 std::vector<std::byte> encode_host_state(const HostState&);
+// Throws NewerHostState for state from a newer Convolver, std::length_error
+// above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
+// Host state with a version this build does not read; what() explains.
+class NewerHostState : public std::invalid_argument {
+  public:
+    using std::invalid_argument::invalid_argument;
+};
 
 // The sample rate and channel counts a host has negotiated, and the speakers
 // its buses carry where the format says: WAV channel-mask bits 0 to 17 (the
@@ -48,6 +56,45 @@ std::string speaker_notice(const Configuration&, const HostLayout&);
 // load or a filter that does not suit the host).
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
 
+// PLUG-8: why a request to load a filter failed, or why an instance plays
+// silence, kept as a value on the control side and never touched by the audio
+// thread (docs/plans/2026-10-21-plugin-formats.md#failure-reasons). Adapters
+// read it from HostFilter::failure(); where it is shown is DIAG-1's decision.
+enum class HostFailureKind {
+    filter_file,      // The filter file is missing or cannot be read.
+    state_unreadable, // The saved state or preset is malformed or the wrong type.
+    state_newer,      // The saved state comes from a newer Convolver.
+    sample_rate,      // The filter was made for another sample rate.
+    channels,         // The filter's channel counts or layout do not suit the plug-in.
+    preparation,      // The filter could not be prepared for playing.
+    activation,       // The processor could not be built when the host activated.
+    saved_failure,    // The restored state records an earlier failed load.
+};
+// Where a filter came from. Plug-ins cannot tell a preset from a saved
+// session: both arrive as state.
+enum class HostFilterSource { state, file };
+struct HostRequest {
+    HostFilterSource source = HostFilterSource::state;
+    std::string path; // The filter file, for HostFilterSource::file.
+    // Numbers requests in order, so a later request's outcome is never
+    // mistaken for this one's. 0 asks HostFilter to number it; an adapter
+    // that numbers its own (an LV2 worker generation) passes a larger number.
+    // A failure at activation carries the accepted filter's request, which is
+    // 0 for an instance that never loaded one.
+    std::uint64_t number = 0;
+};
+struct HostFailure {
+    HostFailureKind kind = HostFailureKind::state_unreadable;
+    HostRequest request;
+    // The filter the request carried, when it could be read: rate and counts.
+    int sample_rate = 0;
+    std::size_t inputs = 0, outputs = 0;
+    // True: the instance plays silence. False: a working filter keeps playing.
+    bool silent = false;
+    // What failed, why and what to change, as the CLI explains its errors.
+    std::string message;
+};
+
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract): which
 // filter a load replaces, which filter is saved, and what plays. It does no
@@ -65,10 +112,15 @@ class HostFilter {
     bool failed() const noexcept {
         return failed_;
     }
-    // Why the instance plays silence or rejected its last load; empty if neither.
-    const std::string& error() const noexcept {
-        return error_;
+    // Why the instance plays silence or rejected its last load (PLUG-8).
+    // A failure found at activation comes first; it clears at the next
+    // activation that suits the filter. A rejected request's failure stays
+    // until a later request succeeds, also across activations.
+    const std::optional<HostFailure>& failure() const noexcept {
+        return activation_failure_ ? activation_failure_ : load_failure_;
     }
+    // failure()'s message, or empty.
+    const std::string& error() const noexcept;
     // A possible problem that does not stop the accepted filter playing, from
     // the last check against the host (speaker_notice); empty if none. It
     // describes the host as of the last load() with a host or activate(); an
@@ -84,21 +136,36 @@ class HostFilter {
     // is accepted and checked at activation. On rejection this records the
     // error, keeps the accepted filter (a failed initial load if there was
     // none) and throws std::invalid_argument with an explanation.
+    // `request` says where the state came from (numbered if 0).
     void load(HostState, const std::optional<HostLayout>& host,
-              const std::function<void(const Configuration&)>& install = {});
+              const std::function<void(const Configuration&)>& install = {},
+              HostRequest request = {});
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw.
-    void reject(std::string why);
+    void reject(HostFailureKind, std::string why, HostRequest request = {});
+    // The same, as unreadable state.
+    void reject(std::string why) {
+        reject(HostFailureKind::state_unreadable, std::move(why));
+    }
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back.
     Configuration activate(const HostLayout& host);
+    // The adapter could not build a processor for what activate() returned,
+    // so it plays silence; recorded until the next activate().
+    void fail_activation(std::string why);
 
   private:
+    HostRequest numbered(HostRequest);
+    [[noreturn]] void refuse(HostFailureKind, std::string why, const HostRequest&,
+                             const Configuration*);
+    void record(HostFailureKind, std::string why, const HostRequest&, const Configuration*);
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
+    HostRequest accepted_; // The request that supplied filter_ (or the saved failure).
+    std::uint64_t requests_ = 0;
     bool failed_ = false;
-    std::string error_;
+    std::optional<HostFailure> load_failure_, activation_failure_;
     std::string notice_;
 };
 

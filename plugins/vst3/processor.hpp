@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 
 namespace convolver::vst3 {
@@ -57,8 +58,12 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // speakers that differ from the host's arrangement. VST3 has no route to
     // show it yet (DIAG-1, VST3-3); tests read it.
     std::string notice();
+    // Why the last load failed or the instance plays silence (PLUG-8), as
+    // HostFilter::failure() keeps it; VST3 has no route to show it yet (DIAG-1).
+    std::optional<HostFailure> failure();
 
   private:
+    void record_activation_failure(const char* why) noexcept;
     HostLayout layout() const;
     std::optional<HostLayout> known_layout() const;
     template <class T>
