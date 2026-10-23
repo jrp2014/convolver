@@ -43,7 +43,6 @@ class AudioUnitAdapter final : public test::Adapter {
     bool create_unconfigured() override {
         destroy();
         unit_ = std::make_unique<host::Unit>();
-        bypass_ = false;
         rate_ = 44100; // AUBase's default format until the host sets one.
         return true;
     }
@@ -60,7 +59,7 @@ class AudioUnitAdapter final : public test::Adapter {
     bool load(const test::Filter& filter) override {
         convolver::HostState state;
         state.configuration = filter.configuration;
-        state.bypass = bypass_;
+        // Bypass off, as convolver-preset writes it: the host owns bypass.
         return unit_->load(state, filter.name) == noErr;
     }
     bool activate() override {
@@ -82,7 +81,6 @@ class AudioUnitAdapter final : public test::Adapter {
         return status == noErr;
     }
     void set_bypass(bool on) override {
-        bypass_ = on;
         unit_->set_bypass(on);
     }
     void reset() override {
@@ -106,7 +104,6 @@ class AudioUnitAdapter final : public test::Adapter {
         return static_cast<std::size_t>(std::llround(seconds * rate_));
     }
     std::unique_ptr<host::Unit> unit_;
-    bool bypass_ = false;
     int rate_ = 44100;
     std::uint64_t silent_outputs_ = 0;
 };

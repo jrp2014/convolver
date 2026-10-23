@@ -461,6 +461,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
   with `auval -strict` ([AU guide](docs/au.md)). Nothing else remains in
   AU-1 once PR #44 is reviewed and merged; the ThreadSanitizer run belongs to AU-3.
+  PR #49: bypass is left to the host and not saved in `ClassInfo` (owner's
+  decision, 23 October 2026: follow each format's convention).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu. Progress (22 October 2026,
   PR #44): ClassInfo holds the encoded state under `convolver-state`; the

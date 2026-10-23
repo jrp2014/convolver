@@ -95,7 +95,9 @@ A preset that does not fit the host is handled as for every Convolver plug-in
 - **Bypass.** The host's bypass switch (`kAudioUnitProperty_BypassEffect`) ramps
   over 64 samples to the input delayed by 256 samples, and back; the filter
   keeps running underneath. It is not Apple's `AUEffectBase` pass-through, which
-  would skip the delay and the ramp. Bypass is saved with the filter.
+  would skip the delay and the ramp. As usual for Audio Units, the host saves
+  and restores bypass itself: the unit's `ClassInfo` does not record it, and
+  loading a preset leaves the switch as it is.
 - **Replacing a filter.** Loading a preset while audio plays prepares the new
   filter off the audio thread, then crossfades to it over 256 samples, as in
   the [VST3 lifecycle](vst3.md#processing-and-lifecycle).

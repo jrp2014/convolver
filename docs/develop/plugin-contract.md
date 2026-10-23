@@ -170,6 +170,13 @@ on during bypass, so switching back does not lose history.
 must not use its format's own pass-through bypass (see the AU design in the
 [plug-in formats plan](../plans/2026-10-21-plugin-formats.md#au-adapter-design)).
 
+Whether saved state records bypass follows each format's convention (owner's
+decision, 23 October 2026). VST3 saves its bypass parameter with the
+component state, as the SDK's examples do. In LV2 (the `enabled` port) and
+Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
+bypass itself, so those adapters do not record it and ignore the flag in a
+state from another format.
+
 ## Channel layouts
 
 What a channel means (discrete or a named speaker layout), how presets with no
@@ -219,7 +226,7 @@ limit), validated transactionally: state that fails decoding or its own checks
 leaves the previous state untouched. Checks against the host's configuration
 follow [loading and failure](#loading-and-failure), including state restored
 before the host is configured. Version 1 records the filter (or an empty
-instance) and the bypass setting; version 2 is written only for a saved failed
+instance) and the bypass setting (used by VST3 only; see [bypass](#bypass)); version 2 is written only for a saved failed
 initial load, with no filter.
 Decoders read both; encoders write version 1 whenever nothing new is recorded,
 so older builds still read those presets. How each format stores it (the
