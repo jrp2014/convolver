@@ -78,9 +78,8 @@ struct HostRequest {
     std::string path; // The filter file, for HostFilterSource::file.
     // Numbers requests in order, so a later request's outcome is never
     // mistaken for this one's. 0 asks HostFilter to number it. An adapter
-    // that needs the number before it calls load() (an LV2 worker
-    // generation) takes it from HostFilter::next_request(), so numbers never
-    // repeat; any other number must be larger than every earlier one.
+    // that numbers requests itself (LV2's generations, counted on the audio
+    // thread) numbers all of them, each larger than every earlier one.
     // A failure at activation carries the accepted filter's request, which is
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
@@ -95,6 +94,15 @@ struct HostFailure {
     bool silent = false;
     // What failed, why and what to change, as the CLI explains its errors.
     std::string message;
+};
+
+// Thrown by a HostFilter::load install callback to abandon a request that a
+// newer one has overtaken: load() rethrows it and changes nothing.
+class SupersededRequest : public std::exception {
+  public:
+    const char* what() const noexcept override {
+        return "superseded by a newer request";
+    }
 };
 
 // Control side of the shared adapter contract, for every plug-in format
@@ -129,8 +137,6 @@ class HostFilter {
     const std::optional<HostFailure>& rejection() const noexcept {
         return load_failure_;
     }
-    // Reserves the next request number, for a request numbered before load().
-    std::uint64_t next_request() noexcept;
     // A possible problem that does not stop the accepted filter playing, from
     // the last check against the host (speaker_notice); empty if none. It
     // describes the host as of the last load() with a host or activate(); an
@@ -142,7 +148,9 @@ class HostFilter {
     // saved failed load (plays silence). Bypass is the adapter's to apply.
     // Checks on the state itself always run. Checks against the host run when
     // `host` is given (its configuration is known); `install` then receives
-    // what to play and may throw to reject. Without `host`, well-formed state
+    // what to play and may throw to reject, or throw SupersededRequest to
+    // abandon the request with nothing recorded or changed (a newer request
+    // has arrived). Without `host`, well-formed state
     // is accepted and checked at activation. On rejection this records the
     // error, keeps the accepted filter (a failed initial load if there was
     // none) and throws std::invalid_argument with an explanation.
@@ -197,6 +205,27 @@ class HostProcessor {
     // newer filter plays at once), so a filter published before audio resumes
     // is installed directly.
     void replace(const Configuration&);
+    // replace() in two steps, so an adapter can check between them that the
+    // request is still the newest (LV2-2). prepare() builds and plans the
+    // filter off the audio thread and may throw; publish() hands it to the
+    // audio thread exactly as replace() does and cannot fail. A Replacement
+    // that is never published is simply discarded. Control calls, serialized
+    // with replace() and collect(); publish only to the processor that
+    // prepared it.
+    class Replacement {
+      public:
+        Replacement(Replacement&&) noexcept;
+        Replacement& operator=(Replacement&&) noexcept;
+        ~Replacement();
+
+      private:
+        friend class HostProcessor;
+        struct Data;
+        explicit Replacement(std::unique_ptr<Data>) noexcept;
+        std::unique_ptr<Data> data_;
+    };
+    Replacement prepare(const Configuration&) const;
+    void publish(Replacement&&) noexcept;
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
     void set_bypass(bool) noexcept;

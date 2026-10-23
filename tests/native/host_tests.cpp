@@ -238,6 +238,37 @@ void direct_installation() {
                 "filter after reset not installed directly");
     host.collect();
 }
+// prepare() then publish() behaves as replace(); an unpublished replacement
+// changes nothing, and one from another processor is ignored.
+void prepared_replacements() {
+    HostProcessor host(mono(), 64, 8), other(mono(), 64, 8);
+    std::array<float, 64> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    { auto discarded = host.prepare(mono(7)); }
+    auto foreign = other.prepare(mono(6));
+    host.publish(std::move(foreign));
+    auto r = host.prepare(mono(2));
+    auto moved = std::move(r);
+    host.publish(std::move(moved));
+    audio_thread = true;
+    host.process(in, out, 64);
+    audio_thread = false;
+    for (std::size_t i = 8; i < 64; ++i)
+        require(std::abs(output[i] - (i == 8 ? 2.f : 2.25f)) < 1e-5,
+                "published filter not installed directly");
+    bool refused = false;
+    try {
+        auto wrong = mono();
+        wrong.sample_rate = 44100;
+        (void)host.prepare(wrong);
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused, "prepare accepted another sample rate");
+    host.collect();
+}
 // A reset ends any transition in progress: the newer filter plays at once, and
 // a filter published after the reset is installed directly. Checked for a reset
 // during the warm-up and during the crossfade, with and without a new filter.
@@ -485,13 +516,28 @@ void failure_reasons() {
     early.activate({44100, 2, 2});
     require(early.failure()->kind != Kind::activation && early.failure()->request.number == 4,
             "activation failure outlived activation");
-    // A number reserved before load() (an LV2 worker generation) is never reused.
-    const auto reserved = early.next_request();
-    require(reserved == 5, "next_request does not continue the numbering");
-    early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", reserved});
+    // A number the adapter supplies (an LV2 generation) is kept, and later
+    // numbering continues after it.
+    early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", 9});
     require(!early.failure() && !early.rejection(), "empty state did not clear the failure");
+    early.reject(Kind::filter_file, "missing", {HostFilterSource::file, "/y.cfg", 12});
+    require(early.failure()->request.number == 12 && early.failure()->request.path == "/y.cfg",
+            "a supplied request number was not kept");
     early.reject("damaged");
-    require(early.failure()->request.number == 6, "a reserved number was reused");
+    require(early.failure()->request.number == 13, "numbering does not continue after 12");
+    // A request abandoned by its install callback leaves no trace.
+    const auto before = *early.failure();
+    bool abandoned = false;
+    try {
+        early.load(HostState{crossover}, {{48000, 2, 6}},
+                   [](const Configuration&) { throw SupersededRequest(); },
+                   {HostFilterSource::file, "/z.cfg", 20});
+    } catch (const SupersededRequest&) {
+        abandoned = true;
+    }
+    require(abandoned && early.failure()->request.number == 13 &&
+                early.failure()->message == before.message && !early.filter(),
+            "a superseded request changed the filter or its failure");
     early.load(HostState{}, std::nullopt); // An empty instance succeeds.
     require(!early.failure(), "empty state did not clear the failure");
     HostFilter empty(8);
@@ -634,6 +680,7 @@ int main() {
         queued_replacements();
         unequal_channels();
         direct_installation();
+        prepared_replacements();
         reset_during_transition();
         filter_contract();
         failure_reasons();
