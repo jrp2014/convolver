@@ -31,14 +31,10 @@ and [when CI runs](#ci-triggers).
 
 ## Native production tests
 
-The [portable build](../portable-core.md) compiles production C++20 translation
-units against the selected real FFT library and libsndfile. Build before running CTest:
-
-```sh
-cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
-cmake --build build-native --parallel
-ctest --test-dir build-native --output-on-failure
-```
+The native build compiles production C++20 translation units against the
+selected real FFT library and libsndfile. Build with the
+[sanitizer build](build.md#sanitizer-build-for-changes), then run CTest in its
+build folder.
 
 The default Clang build on macOS/Linux also enables historical extraction tests.
 GCC/MSVC builds omit those extraction tests. The core-only configuration omits
@@ -46,7 +42,7 @@ file I/O, CLI, Python and historical tests. Optional components change the total
 list the tests in your actual build rather than relying on a copied count:
 
 ```sh
-ctest --test-dir build-native -N
+ctest --test-dir build -N
 ```
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
@@ -152,7 +148,7 @@ ctest --test-dir build-native -N
   `Benchmark.exe` writes 16-bit files, and silence must be exactly zero. A real audio device and exclusive-mode
   bypass are checked by hand (steps in the guide).
 
-The optional [VST3 build](../vst3.md) adds these tests: actual SDK-interface lifecycle
+The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
 `convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our

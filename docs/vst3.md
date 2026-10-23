@@ -31,8 +31,8 @@ and [compatibility evidence](#compatibility-evidence).
 
 Build the plug-in with `-DCONVOLVER_BUILD_VST3=ON` and the pinned Steinberg
 VST3 SDK, as [build from source](develop/build.md#vst3) describes (Windows
-included). The bundle is `build-vst3/VST3/Release/Convolver.vst3`, and the
-preset tools are built beside it. This is a developer build: not signed,
+included). The bundle is `build-vst3/VST3/Release/Convolver.vst3`; the preset
+tools are in the build folder. This is a developer build: not signed,
 notarized or packaged. Prepared preview packages are described in the
 [plug-in guide](plugins/index.md).
 

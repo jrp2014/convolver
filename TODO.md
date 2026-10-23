@@ -111,9 +111,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   merging `REVIEW.md`, release readiness and modernization into one status
   page and starting a decisions log; (4) shorter `README.md`, `AGENTS.md` and
   `TODO.md`, and checks that every maintained page sits in a reader folder.
-  Dated records stay where they are. The proposal, with the page-by-page
-  mapping and the open questions for steps 2 to 4, is the
-  "Convolver documentation: proposed reorganisation" document of 23 October 2026.
+  Dated records stay where they are. The page-by-page mapping and the open
+  questions for steps 2 to 4 are in the
+  [plan](docs/plans/2026-10-23-documentation-by-reader.md).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
   `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
   and corresponding source, staging, unsigned installers, artifact verification,

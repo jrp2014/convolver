@@ -17,9 +17,10 @@ For anyone, person or coding agent, who writes or changes documentation.
 - Developer pages double as agent instructions, so repository skills and
   `AGENTS.md` point at them instead of repeating them.
 
-The move into reader folders is under way (DOC-4): `docs/develop/` exists, and
-the remaining guides at the top of `docs/` move into `use/` and `project/` in
-the following steps. Until then they keep their current paths.
+The move into reader folders is under way (DOC-4, [plan](../plans/2026-10-23-documentation-by-reader.md)):
+`docs/develop/` exists, and the remaining guides at the top of `docs/` move
+into `use/` and `project/` in the following steps. Until then they keep their
+current paths.
 
 Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 [writing rules](#writing-rules) · [pages agents follow](#pages-agents-follow) ·
@@ -35,7 +36,7 @@ Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 | `docs/use/` | Someone applying filters with the command-line tool, in a plug-in host, or system-wide on Windows. Shipped in preview packages. | Install, load a filter, hear it, fix a problem | Build recipes, SDK pins, internals, TODO IDs, test evidence |
 | `docs/develop/` | Someone building from source, embedding the library, packaging a fork or changing Convolver, including coding agents | Build, find the code, know the rules and contracts, prove a change | User hand-holding, history |
 | `docs/project/` | jrp, and anyone asking where Convolver is going and why | Status, direction, open plans, decisions, history | Instructions |
-| `docs/archive/` | Anyone checking what was true or decided at a date | Dated reviews, completed plans, release records | Anything current; never edited |
+| `docs/archive/` | Anyone checking what was true or decided at a date | Dated reviews, completed plans, release records | Anything current; records are never edited, but the index pages in it (such as `archive/plans/README.md`) are maintained |
 
 The root keeps the files people and GitHub expect: `README.md`,
 `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md`, `TODO.md` and `CHANGELOG.md`.
@@ -49,7 +50,9 @@ The root keeps the files people and GitHub expect: `README.md`,
 | **Reference** | Look something up | Complete; tables; one topic per heading; no story and no history |
 | **Background** | Understand why or how | Prose and diagrams, no steps; links to the how-to and reference pages |
 
-The [index](../README.md) shows each page's kind next to its title.
+The [index](../README.md) shows each page's kind next to its title. Dated
+records (reviews, release records, completed plans) are not one of the four
+kinds; the index labels them **Record**.
 
 ## Writing rules
 
@@ -70,8 +73,8 @@ pages help only if each sentence can be understood on its own.
    filter in your host"), nouns on reference pages ("Output formats"). Keep link
    text meaningful and tables small enough to scan.
 
-On pages for users (`docs/use/` and, until they move, the user guides at the
-top of `docs/`):
+On pages in `docs/use/` (the user guides still at the top of `docs/` are
+brought into line as they move there, in DOC-4's second step):
 
 - No TODO IDs, pull request numbers, commit hashes or decision dates in the
   body. Where something is unfinished, one **Status** note near the top says so
@@ -117,8 +120,8 @@ can act on it without a separate copy of the rules:
 | Configuration grammar | [Configuration](../configuration.md) | `config_parse.cpp`, `config.cpp`, corpus |
 | CLI, formats and core API behavior | [Core/CLI reference](../portable-core.md) | `main.cpp`, `inspection_cli.cpp`, public headers and tests |
 | Component boundaries and change map | [Implementation map](architecture.md) | Actual symbols, callers, targets and test names |
-| Package consumption | [Library guide](library.md) | CMake exports, presets, external-consumer tests |
-| Building from source, every target and format | [Build from source](build.md) | `CMakeLists.txt`, `CMakePresets.json`, the CI workflows |
+| Package consumption | [Library guide](library.md) | CMake exports, external-consumer tests |
+| Building from source, every target and format, CMake presets | [Build from source](build.md) | `CMakeLists.txt`, `CMakePresets.json`, the CI workflows |
 | Plug-in use in a host | [VST3](../vst3.md), [Audio Unit](../au.md), [LV2](../lv2.md) guides | Adapter, host and state tests |
 | What every plug-in adapter must do | [Plug-in adapter contract](plugin-contract.md) | `host.hpp`, the PLUG-2 harness, each adapter's tests |
 | Plug-in identities and channel layouts | [Plug-in identities](plugin-identities.md) | `plugins/identities.json`, `tests/identities_tests.py`, `vst3.identities` |

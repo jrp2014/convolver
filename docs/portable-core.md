@@ -34,8 +34,8 @@ Contents:
 
 ## Build
 
-Every build recipe, including Windows, the FFT backend choice and the full
-list of CMake options, is in [build from source](develop/build.md). The short
+Every build recipe, including Windows, the FFT backend choice and the CMake
+options, is in [build from source](develop/build.md). The short
 version, from the repository root:
 
 ```sh

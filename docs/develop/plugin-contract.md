@@ -21,7 +21,7 @@ and are maintained here.
 - State is checked in two stages: the state itself at once, and the host's
   sample rate and channels as soon as the host has settled them.
 - Every failure keeps a structured reason on the control side, for the host's
-  log now and a status display later.
+  log, LV2's status port and, later, a status display in the other formats.
 - Bypass ramps over 64 samples to the input delayed by the latency, or to
   silence when the counts differ.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
@@ -31,6 +31,8 @@ These rules hold for VST3, LV2 and AU alike. Each adapter's tests check them
 through the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), and a
 review of plug-in work checks them ([independent review](workflow.md#independent-review)).
 Changing a rule is an owner's decision and goes in its own pull request.
+Compatibility and numerical correctness take priority over CPU-specific
+optimization in every adapter.
 
 Contents: [loading and failure](#loading-and-failure) ·
 [failure reasons](#failure-reasons) ·
@@ -146,8 +148,8 @@ does not start, and no filter request failed.
   the restored configuration. There is no warm-up or crossfade, so output
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for 256 frames and crossfades for 256 frames, as the
-  [replacement and threads](#replacement-and-threads) describes.
+  fresh history, warms up for 256 frames and crossfades for 256 frames, as described under
+  [replacement and threads](#replacement-and-threads).
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
 ## Bypass
@@ -194,8 +196,9 @@ input history: it cannot reconstruct audio that preceded loading. Old engines
 are retired on the control thread. Pending changes coalesce to the newest; at
 most one transition and one pending replacement are retained, with up to two
 old engines awaiting control-thread collection after the last publication.
-Collection does not hold up pending changes. The tail includes routed delays;
-it can grow conservatively during a session, and reactivation recomputes it.
+Collection does not hold up pending changes. The tail is available before
+activation and includes routed delays; it can grow conservatively during a
+session, and reactivation recomputes it.
 
 `Convolver::host` exports `HostProcessor`, `HostFilter` and the state codec
 without SDK or file I/O dependencies ([`host.hpp`](../../include/convolver/host.hpp)).
@@ -212,9 +215,12 @@ not throw; invalid dimensions return failure without advancing audio.
 ## Host state
 
 Host state uses a bounded, versioned little-endian format (64 MiB encoded
-limit), validated transactionally: a state that fails any check leaves the
-previous state untouched. Version 1 records the filter; version 2 is written
-only for a saved failed initial load ([loading and failure](#loading-and-failure)).
+limit), validated transactionally: state that fails decoding or its own checks
+leaves the previous state untouched. Checks against the host's configuration
+follow [loading and failure](#loading-and-failure), including state restored
+before the host is configured. Version 1 records the filter (or an empty
+instance) and the bypass setting; version 2 is written only for a saved failed
+initial load, with no filter.
 Decoders read both; encoders write version 1 whenever nothing new is recorded,
 so older builds still read those presets. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in

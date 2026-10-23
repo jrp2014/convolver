@@ -4,8 +4,10 @@
 [Documentation index](../README.md) · [Implementation map](architecture.md) · [Testing](testing.md)
 
 For anyone, person or coding agent, who builds Convolver from source: the
-command-line tool, the libraries, the tests or a plug-in. Every build recipe
-lives on this page; other pages link here instead of repeating it.
+command-line tool, the libraries, the tests or a plug-in. Build recipes live on
+this page; other pages link here instead of repeating them. The exception is
+the pinned recipe for preview packages, which ships inside them
+([pinned preview recipe](../plugins/build.md#pinned-preview-recipe)).
 
 **In short:**
 
@@ -100,8 +102,11 @@ What the tests establish, and which ones a change needs, is in
 
 ## CMake presets
 
-`CMakePresets.json` names the common configurations. Each preset builds into
-`build/presets/NAME`:
+`CMakePresets.json` names the common configurations. Presets use the Ninja
+generator, so install Ninja first; on Windows run them from a Visual Studio
+developer shell. The ordinary `cmake -S . -B build` commands also work with
+Makefiles and Visual Studio. Each preset has matching configure, build and test
+presets and builds into `build/presets/NAME`:
 
 | Preset | What it builds |
 | --- | --- |
@@ -113,10 +118,16 @@ What the tests establish, and which ones a change needs, is in
 | `release-vst3` | The VST3 distribution; needs the SDK path ([VST3](#vst3)) |
 
 ```sh
+cmake --list-presets
 cmake --preset debug-sanitizers
 cmake --build --preset debug-sanitizers
 ctest --preset debug-sanitizers
 ```
+
+The sanitizer presets need GCC or Clang; the Accelerate presets need macOS. Pass
+`-DCMAKE_PREFIX_PATH=...` at configure time for local dependencies. Keep personal
+paths and toolchain overrides in `CMakeUserPresets.json` (ignored by Git),
+inheriting one of the checked-in presets.
 
 ## FFT backend
 
@@ -163,10 +174,15 @@ does, before producing a reproducible binary.
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Command-line renderer; requires I/O |
 | `CONVOLVER_FFT_BACKEND` | AUTO | See [FFT backend](#fft-backend) |
-| `CONVOLVER_BUILD_VST3` | OFF | VST3 adapter and, with I/O, the preset tools; see [VST3](#vst3) |
+| `CONVOLVER_BUILD_VST3` | OFF | VST3 adapter and, with I/O, the older `convolver-vst3-preset` tool; see [VST3](#vst3) |
+| `CONVOLVER_VST3_SDK` | empty | VST3 SDK source folder, with its submodules |
+| `CONVOLVER_VST3_RUNTIME_VALIDATION` | ON | Run the SDK tools that load the bundle; turn off where local policy rejects ad-hoc-signed code |
+| `CONVOLVER_PLUGINVAL`, `CONVOLVER_PLUGINVAL_ARGS` | empty | Optional pluginval executable and extra options for the host-compatibility tests |
 | `CONVOLVER_BUILD_AU` | OFF | Audio Unit adapter (macOS); see [Audio Unit](#audio-unit) |
+| `CONVOLVER_AU_SDK` | empty | AudioUnitSDK 1.4.0 source folder |
 | `CONVOLVER_BUILD_LV2` | OFF | LV2 adapter; see [LV2](#lv2) |
 | `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution |
+| `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
 | `BUILD_TESTING` | ON at top level | Master test switch |
@@ -175,6 +191,7 @@ does, before producing a reproducible binary.
 | `CONVOLVER_DOCUMENTATION_TESTS` | Same as I/O on first configure | Historical documentation checks; requires Python |
 | `CONVOLVER_SANITIZERS` | OFF | ASan and UBSan for native targets with GCC or Clang |
 | `CONVOLVER_LEGACY_TESTS` | ON with I/O and native Clang on macOS/Linux; OFF elsewhere | Historical extraction harnesses |
+| `CONVOLVER_EQUALIZER_APO_BENCHMARK`, `CONVOLVER_EQUALIZER_APO_CONFIG` | empty | Optional Equalizer APO `Benchmark.exe` and its config folder, for `export.equalizer_apo.runtime` on Windows |
 
 Cached options stay set in an existing build folder. When turning a full build
 folder into a Python-free core build, turn the legacy and documentation tests
@@ -186,10 +203,11 @@ off too, or use the `core-only` preset.
 | --- | --- |
 | `convolver_core`, `convolver_host`, `convolver_io` | The static libraries |
 | `convolver_cli` | The `convolver` executable |
+| `convolver_preset_tool`, `convolver_equalizer_apo` | The `convolver-preset` and `convolver-equalizer-apo` tools; built with the CLI |
 | `check` | The native tests, then runs CTest |
 
-`cmake --install build --prefix /desired/prefix` installs the CLI, libraries,
-headers and CMake package. The libraries are static and their shared
+`cmake --install build --prefix /desired/prefix` installs the three tools,
+the libraries, headers and CMake package. The libraries are static and their shared
 dependencies must stay installed: this is a development install, not a
 self-contained application. Using the libraries from another project is in the
 [library guide](library.md).
@@ -201,8 +219,9 @@ alone never needs one. In every plug-in build:
 
 - the default FFT backend is Ooura, or Accelerate on macOS, so the plug-in links
   no FFTW ([FFT backend](#fft-backend));
-- the preset tools (`convolver-preset` and the older `convolver-vst3-preset`)
-  are built when I/O is on, and need libsndfile;
+- `convolver-preset`, which makes presets for every format, is built with the
+  CLI as usual; a VST3 build with I/O also builds the older
+  `convolver-vst3-preset`. Both need libsndfile;
 - do not use `CONVOLVER_SANITIZERS=ON` for a bundle you will load in a host;
 - the result is a developer build: not signed, notarized or packaged. Installing
   it for a host is in each format's guide ([VST3](../vst3.md#make-the-plug-in-discoverable),
@@ -273,11 +292,11 @@ core and other formats stay C++20.
 
 ### LV2
 
-Needs the `lv2` headers 1.18 or later; the tests also need `lilv` 0.24 or
-later. On Debian or Ubuntu:
+Needs `pkg-config` and the `lv2` headers 1.18 or later; the tests also need
+`lilv` 0.24 or later. On Debian or Ubuntu:
 
 ```sh
-sudo apt-get install lv2-dev liblilv-dev lilv-utils
+sudo apt-get install pkg-config lv2-dev liblilv-dev lilv-utils
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_LV2=ON
 cmake --build build --parallel
 ctest --test-dir build -L lv2 --output-on-failure

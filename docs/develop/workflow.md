@@ -57,7 +57,7 @@ Contents: [before you start](#before-you-start) ·
   is permanent or changes what users get: plug-in identities (IDs, URIs, AU
   codes), state or preset formats, `.cfg` syntax, licences, defaults that
   change the sound, dependencies shipped in releases, and anything published.
-  Record the answer where the work is described, as "(owner's decision,
+  Continue only on work that does not depend on the answer. Record the answer where the work is described, as "(owner's decision,
   21 October 2026)", and in the pull request.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
@@ -95,7 +95,8 @@ rather than appending, so it always describes the branch as it is now:
 
 1. Read the pull request description, its review comments and its CI results.
 2. Read `git log main..BRANCH` and the diff.
-3. Rebuild and rerun the tests before relying on the earlier results.
+3. Rebuild and rerun the tests ([build from source](build.md#sanitizer-build-for-changes))
+   before relying on the earlier results.
 4. Continue on the same branch where you can. If your tooling requires its own
    branch, start it from theirs, and say in both pull requests which one
    replaces the other, then ask jrp to close the old one.
@@ -137,8 +138,15 @@ checked it.
 
 1. Identify the pull request or branch and its TODO IDs. Read the description,
    the handoff note and any earlier review comments.
-2. Get the full diff against `main` and read every changed file, not only the
-   hunks, where behaviour depends on context.
+2. Get the full diff against `main`, following renames, and read every changed
+   file, not only the hunks, where behaviour depends on context:
+
+   ```sh
+   git fetch origin main
+   git diff -M --stat origin/main...HEAD
+   git diff -M origin/main...HEAD
+   ```
+
 3. Read the TODO items, and the plan or contract sections the change claims to
    implement.
 
@@ -161,6 +169,10 @@ Report only problems you can point to in the diff, with file and line.
   (failed loads, initial restore, replacement, bypass) and
   [channel layouts](plugin-identities.md#channel-layouts), checked by the PLUG-2
   comparisons against the independent oracle, not only the CLI.
+- [ ] **Moves and deletions:** text removed from one page exists on another,
+  and old paths and anchors are gone from code comments, scripts, workflows,
+  skills and maintained index pages under `docs/archive/`, which the link
+  checker does not read (`git grep -n 'old/path'`).
 - [ ] **Tests:** a test would fail if the change were wrong; tolerances are
   fixed and justified; new tests are registered in CTest and run by CI.
 - [ ] **Claims:** commands and results in the description match what was run;
@@ -168,11 +180,11 @@ Report only problems you can point to in the diff, with file and line.
 - [ ] **Documentation and tracking:** as in the [definition of done](#definition-of-done),
   and the pages follow the [documentation rules](documentation.md#writing-rules)
   for their reader.
-- [ ] **Repository checks:** `pre-commit run --all-files` passes (formatting,
-  repository rules, documentation links). Without pre-commit, run
+- [ ] **Repository checks:** run the checks without changing files:
   `python3 scripts/check_format.py`, `python3 scripts/check_repository.py` and
-  `python3 scripts/check_doc_links.py`. Report any red CI run on the branch,
-  including formatting on an older commit.
+  `python3 scripts/check_doc_links.py` (or `pre-commit run --all-files` on a
+  clean tree, then report any diff it leaves, since its formatter edits files).
+  Report any red CI run on the branch, including formatting on an older commit.
 
 If you can build, run the tests yourself ([sanitizer build](build.md#sanitizer-build-for-changes))
 and say what you ran.
@@ -219,8 +231,8 @@ reject a TODO ID that is used but never defined.
 - every maintained page under `docs/` is listed in the [index](../README.md);
 - every open plan in [`plans/`](../plans/) has a dated file name, and every
   archived plan is listed in the [archive index](../archive/plans/README.md);
-- repository paths named in `AGENTS.md`, `CONTRIBUTING.md` and the
-  [implementation map](architecture.md) exist;
+- repository paths named in `AGENTS.md`, `CONTRIBUTING.md`, the
+  [implementation map](architecture.md) and this page exist;
 - new source, script and maintained documentation files carry an SPDX licence
   line;
 - only known folders and files sit at the top level of the repository, and

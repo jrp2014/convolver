@@ -65,7 +65,7 @@ target_link_libraries(my_app PRIVATE Convolver::core Convolver::io)
 
 `Convolver::host` adds the prepared planar host lifecycle and embedded-state codec.
 Request `COMPONENTS host` to use it; it depends only on core and has no SDK/file I/O
-dependency. See [VST3 and host lifecycle](../vst3.md).
+dependency. Its threading rules are in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads).
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
@@ -97,23 +97,8 @@ must be provided by installed packages or suitable pre-existing imported targets
 
 ## Presets
 
-`CMakePresets.json` uses schema 2, supported by CMake 3.20. Presets require Ninja;
-the ordinary `cmake -S/-B` commands also work with Makefiles and Visual Studio.
-On Windows, run Ninja presets from a Visual Studio developer shell. The sanitizer
-presets require Clang/GCC; the Accelerate presets require Apple platforms.
-
-```sh
-cmake --list-presets
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
-```
-
-Presets are `release`, `debug-sanitizers`, `core-only`, `accelerate`,
-`accelerate-debug` and `ooura`. Each has matching configure/build/test presets and a separate
-directory under `build/presets/`. Pass `-DCMAKE_PREFIX_PATH=...` during configure
-for local dependencies. Keep personal paths/toolchain overrides in the ignored
-`CMakeUserPresets.json`, inheriting one of the checked-in presets.
+`CMakePresets.json` names the common configurations, including `core-only`.
+Their prerequisites and commands are in [build from source](build.md#cmake-presets).
 
 ## What verifies the package
 

@@ -12,8 +12,8 @@ tracked in [TODO](../../../TODO.md).
 | Plan | What it delivered | Implemented in | Current guide |
 | --- | --- | --- | --- |
 | [Portable core and CLI](2026-10-17-portable-core.md) | C++20 engine with uniform partitioned FFT convolution, libsndfile I/O, `.cfg` loader and the `convolver` CLI | `fa8ca77` | [Core and CLI reference](../../portable-core.md) |
-| [FFT backends](2026-10-18-fft-backends.md) | Accelerate backend beside FFTW, FFTW planning modes and wisdom, benchmarks | `2571990` | [FFT guide](../../fft-backends.md) |
-| [Independent core and CMake package](2026-10-18-cmake-package-core.md) | Exported `Convolver::core` and `Convolver::io`, presets, relocatable package consumer tests | `82cf94b` | [CMake package guide](../../cmake-package.md) |
+| [FFT backends](2026-10-18-fft-backends.md) | Accelerate backend beside FFTW, FFTW planning modes and wisdom, benchmarks | `2571990` | [FFT guide](../../develop/fft-backends.md) |
+| [Independent core and CMake package](2026-10-18-cmake-package-core.md) | Exported `Convolver::core` and `Convolver::io`, presets, relocatable package consumer tests | `82cf94b` | [Library guide](../../develop/library.md) |
 | [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [VST3 guide](../../vst3.md) |
 | [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Configuration compatibility](../../configuration-compatibility.md) |
 

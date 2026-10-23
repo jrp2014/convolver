@@ -134,6 +134,20 @@ it has none for the height speakers (bits 11 to 17), so a layout using them can
 only be discrete in LV2. The `vst3.identities` test checks the VST3 column
 against the SDK headers.
 
+**Per format:**
+
+- **VST3:** a discrete side accepts any `SpeakerArrangement` with N channels; a
+  named layout is compared with the arrangement (VST3-1: a notice only, never a
+  rejection, as described under [presets without a layout](#presets-without-a-layout)).
+- **AU:** `kAudioUnitProperty_SupportedNumChannels` gives counts only, so it
+  cannot carry layout checks on its own. Named layouts need
+  `kAudioUnitProperty_AudioChannelLayout` and
+  `kAudioUnitProperty_SupportedChannelLayoutTags`; discrete uses
+  `kAudioChannelLayoutTag_DiscreteInOrder`.
+- **LV2:** ports are fixed per plug-in URI. Named layouts use port groups and
+  `lv2:designation` (for example `pg:FivePointOneGroup`); discrete ports have no
+  designation.
+
 **Channel counts.** VST3 (and AU, when it exists) accepts any input and output
 count from 1 to 8, and the counts may differ (2 in, 6 out for a crossover).
 LV2 plug-ins have fixed ports, so LV2 publishes one plug-in for each **fixed
