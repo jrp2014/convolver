@@ -55,19 +55,57 @@ Convolver; an Intel Mac uses `macos-x86_64`. The `macos-arm64` preview needs
 macOS 14 or later. Checked on 23 October 2026:
 
 - **REAPER:** use the **macOS Universal** download (`reaper782_universal.dmg`
-  for version 7.82). Its download page says REAPER supports macOS up to
-  macOS 26; if your copy says it supports only up to macOS 15, download the
-  current version. The universal app runs natively on Apple silicon. Do not
-  tick *Open using Rosetta* in its Finder *Get Info* window: under Rosetta
-  REAPER runs as x86_64 and cannot load the arm64 plug-in.
+  for version 7.82): one app with arm64 and x86_64 code, which runs natively on
+  Apple silicon. The sources disagree about macOS 26: the download page says
+  REAPER supports macOS 10.5 to macOS 26, but the 7.82 disk image's own text
+  says "macOS 10.15 to macOS 15". Treat REAPER on macOS 26 as unconfirmed by
+  Cockos: if a step fails, repeat it with another VST3 plug-in before blaming
+  Convolver. Do not tick *Open using Rosetta* in the app's Finder *Get Info*
+  window: under Rosetta REAPER runs as x86_64 and cannot load the arm64
+  plug-in.
+
+  This download is notarized and uses the hardened runtime; Cockos also
+  offers a non-notarized build, saying some plug-ins work better with it. The
+  hardened runtime refuses plug-ins signed by another developer unless the app
+  has the `com.apple.security.cs.disable-library-validation` entitlement, and
+  Convolver's previews carry only an ad-hoc signature. A DAW that loads other
+  vendors' plug-ins needs that entitlement, so REAPER should have it, but this
+  could not be checked from here. Check it before the first test:
+
+  ```sh
+  codesign -d --entitlements - /Applications/REAPER.app
+  ```
+
+  If the output lists `com.apple.security.cs.disable-library-validation` as
+  true, use the notarized build. If not, or if REAPER lists Convolver but will
+  not load it, use the non-notarized build from the same page, and record which
+  build you used.
 - **Audacity:** use the **Universal DMG** (4.0.1). It runs natively on Apple
   silicon. The download page shows "No plugin support" under the ARM64 DMG,
-  but that note belongs to Windows on ARM: the website adds it to every card
-  whose title contains "ARM64", and its "More info" link points to the Windows
-  page's section. Audacity's macOS builds enable VST3 and Audio Units for every
-  architecture. Audacity says it is tested on macOS 14 and 15, so record any
-  macOS 26 problem as Audacity's, not Convolver's, only after the same steps
-  fail with another VST3 plug-in.
+  but that note was written for Windows on ARM:
+  - The website's
+    [`DownloadCard.jsx`](https://github.com/audacity/audacity.github.io/blob/191c2e8461a9ee7ec71f32a00a21a98c4924bb92/src/components/card/DownloadCard.jsx#L64-L74)
+    adds it to every download whose title contains "ARM64", whichever page
+    it is on. It came in one commit,
+    ["add ARM warnings"](https://github.com/audacity/audacity.github.io/commit/e55509f19168b758328f1a2bf228a394f0404824)
+    (1 September 2025), which also added the `#arm` section to the Windows
+    page only.
+  - The note's "More info" link points to `#arm`. Only the
+    [Windows page](https://github.com/audacity/audacity.github.io/blob/191c2e8461a9ee7ec71f32a00a21a98c4924bb92/src/pages/download/windows.astro#L34-L45)
+    has that section, "Windows on ARM notes": "Plugins (VST, OpenVINO, etc.)
+    are not supported." The
+    [macOS page](https://github.com/audacity/audacity.github.io/blob/191c2e8461a9ee7ec71f32a00a21a98c4924bb92/src/pages/download/mac.astro)
+    has no such section, so the link goes nowhere there.
+  - Audacity 4.0.1's own build turns plug-ins on for every Mac architecture.
+    [`CMakeLists.txt`](https://github.com/audacity/audacity/blob/Audacity-4.0.1/CMakeLists.txt#L95-L104)
+    sets the VST module on for all builds and the Audio Unit module on for
+    macOS. The
+    [macOS build workflow](https://github.com/audacity/audacity/blob/Audacity-4.0.1/.github/workflows/au4_build_macos.yml#L65-L67)
+    builds universal, arm64 and x86_64 with the same options.
+
+  Audacity says it is tested on macOS 14 and 15. If something fails on
+  macOS 26, repeat the step with another VST3 plug-in before blaming
+  Convolver.
 - **GarageBand:** the version from the App Store for your macOS is native on
   both architectures. Build the Audio Unit on the Mac that runs GarageBand, so
   it matches.
