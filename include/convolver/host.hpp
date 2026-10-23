@@ -47,7 +47,7 @@ struct HostLayout {
 // compared in bus order; in a layout with side (SL SR) and no back (BL BR)
 // speakers, SL and SR count as BL and BR (5.1 is written as 0x3F or 0x60F).
 // Never a reason to reject a filter: channels are routed by bus index whatever
-// the labels say (docs/plugin-identities.md#channel-layouts).
+// the labels say (docs/develop/plugin-identities.md#channel-layouts).
 std::string speaker_notice(const Configuration&, const HostLayout&);
 
 // What an instance plays without a usable filter, under the shared adapter
@@ -58,7 +58,7 @@ Configuration unfiltered_configuration(const HostLayout&, bool failed);
 
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
-// thread (docs/plans/2026-10-21-plugin-formats.md#failure-reasons). Adapters
+// thread (docs/develop/plugin-contract.md#failure-reasons). Adapters
 // read it from HostFilter::failure(); where it is shown is DIAG-1's decision.
 enum class HostFailureKind {
     filter_file,      // The filter file is missing or cannot be read.
@@ -98,7 +98,7 @@ struct HostFailure {
 };
 
 // Control side of the shared adapter contract, for every plug-in format
-// (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract): which
+// (docs/develop/plugin-contract.md): which
 // filter a load replaces, which filter is saved, and what plays. It does no
 // audio work; adapters call it under their control lock.
 class HostFilter {

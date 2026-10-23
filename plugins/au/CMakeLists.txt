@@ -41,7 +41,7 @@ set(au_patch ${Convolver_VERSION_PATCH})
 if(au_minor GREATER 255 OR au_patch GREATER 255)
     message(WARNING "VERSION ${Convolver_VERSION}: an Audio Unit version holds at most 255 in its "
         "minor and patch numbers, so the component reports 255. Start a new minor version "
-        "(docs/versioning.md) so that hosts notice the update.")
+        "(docs/develop/versioning.md) so that hosts notice the update.")
     if(au_minor GREATER 255)
         set(au_minor 255)
     endif()

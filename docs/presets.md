@@ -2,7 +2,7 @@
 # Plug-in presets
 
 [Documentation index](README.md) · [VST3 guide](vst3.md) ·
-[Plug-in identities](plugin-identities.md) · [Configuration format](configuration.md)
+[Plug-in identities](develop/plugin-identities.md) · [Configuration format](configuration.md)
 
 **In short:**
 
@@ -107,7 +107,7 @@ already holds one filter.
 
 A preset holds one filter at one sample rate, with fixed input and output
 channel counts. The plug-ins check it against the host when they load it
-([shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):
+([shared adapter contract](develop/plugin-contract.md)):
 
 - **The first filter cannot be used** (wrong sample rate or channel counts, or a
   damaged file): the plug-in plays **silence** and reports an error, except as
@@ -136,7 +136,7 @@ The [VST3 guide](vst3.md#loading-filters) gives the details.
 
 Presets record channel *counts*, not speaker positions, so a 2-input, 6-output
 preset loads on any host arrangement with 2 inputs and 6 outputs. See
-[presets without a layout](plugin-identities.md#presets-without-a-layout).
+[presets without a layout](develop/plugin-identities.md#presets-without-a-layout).
 
 ## Messages
 
@@ -144,7 +144,7 @@ preset loads on any host arrangement with 2 inputs and 6 outputs. See
 | --- | --- |
 | `choose the preset format by the name's ending` | End the output name in `.vstpreset`, `.aupreset` or `.preset.lv2` |
 | `… already exists` | Choose a new name, or remove the old preset |
-| `the LV2 plug-in comes in fixed channel layouts …` | LV2 publishes only the listed input→output counts. Use the VST3 or AU plug-in, or ask for the layout to be added ([identities](plugin-identities.md#channel-layouts)) |
+| `the LV2 plug-in comes in fixed channel layouts …` | LV2 publishes only the listed input→output counts. Use the VST3 or AU plug-in, or ask for the layout to be added ([identities](develop/plugin-identities.md#channel-layouts)) |
 | `… presets support 1 to 8 input and output channels` | The plug-ins have at most 8 channels on each side; use the CLI for wider filters |
 | `this VST3 preset belongs to another plug-in` | Only Convolver's own presets can be converted |
 | `a .vstpreset already holds one filter` | Leave out `--sample-rate`, `--input-channels` and `--output-channels` |
@@ -162,7 +162,7 @@ version 1, then the sample rate, channel counts, output channel mask, delays,
 and every filter path's coefficients, routes and gains, as the plug-ins save it
 in a host's project. The containers around it are fixed, so presets made today
 keep loading. These names are permanent, like the
-[plug-in identities](plugin-identities.md):
+[plug-in identities](develop/plugin-identities.md):
 
 - **VST3 (`.vstpreset`):** Steinberg's documented preset file: the header
   `VST3`, format version 1, the processor class ID, then one component-state
@@ -190,7 +190,7 @@ VST3 length prefix) are the owner's decision of 22 October 2026.
 - Presets hold host state version 1, which records channel counts and an
   advisory output channel mask but no layout. Plug-ins must load every
   version-1 preset whose rate and counts fit; a stricter layout check never
-  rejects one ([old presets](plugin-identities.md#presets-without-a-layout)).
+  rejects one ([old presets](develop/plugin-identities.md#presets-without-a-layout)).
 - Host state version 2 only marks a plug-in saved after its first filter failed
   to load; it holds no filter. The tool never writes it and refuses to convert a
   `.vstpreset` that holds it.

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Check repository-wide rules that keep the project navigable.
 
-Each rule is described in docs/workflow.md#automated-checks. The checks use
+Each rule is described in docs/develop/workflow.md#automated-checks. The checks use
 only the standard library and read files; they never change anything. Run
 from anywhere: python3 scripts/check_repository.py [--root DIR].
 """
@@ -150,7 +150,7 @@ def path_like(token):
 
 def check_agent_paths(root, files, errors):
     tracked_top = {name.split('/', 1)[0] for name in files}
-    for source in ('AGENTS.md', 'CONTRIBUTING.md', 'docs/project-structure.md', 'docs/workflow.md'):
+    for source in ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md', 'docs/develop/workflow.md'):
         if not (root / source).exists():
             continue
         for number, line in enumerate(read(root, source).splitlines(), 1):
@@ -217,7 +217,7 @@ def main():
     for error in errors:
         print(error, file=sys.stderr)
     if errors:
-        print(f'{len(errors)} repository rule(s) broken; see docs/workflow.md#automated-checks',
+        print(f'{len(errors)} repository rule(s) broken; see docs/develop/workflow.md#automated-checks',
               file=sys.stderr)
         return 1
     print(f'Repository rules hold for {count} files')

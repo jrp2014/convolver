@@ -24,7 +24,7 @@ file I/O uses libsndfile. It does not depend on the old Windows applications.
 
 Contents:
 
-- [Build and backend selection](#build), [FFTW plan tuning](#fftw-plan-tuning), [Windows](#windows-build)
+- [Build](#build) and [FFTW plan tuning](#fftw-plan-tuning)
 - [File rendering](#file-rendering): [gain](#gain-and-attenuation),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
   [speaker labels](#speaker-labels), [output safety](#output-safety)
@@ -34,43 +34,18 @@ Contents:
 
 ## Build
 
-Install CMake 3.20+, a C++20 compiler, FFTW's single-precision development library
-and libsndfile's development library. The default tests also need Python 3.8+.
-For example:
+Every build recipe, including Windows, the FFT backend choice and the full
+list of CMake options, is in [build from source](develop/build.md). The short
+version, from the repository root:
 
 ```sh
-# macOS with Homebrew
-brew install cmake fftw libsndfile
-# Debian/Ubuntu
-sudo apt-get install cmake g++ python3 libfftw3-dev libsndfile1-dev
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
 ```
 
-Then, from the repository root:
-
-```sh
-cmake -S . -B build-native -DCMAKE_BUILD_TYPE=Release
-cmake --build build-native --parallel
-ctest --test-dir build-native --output-on-failure
-./build-native/convolver --version
-```
-
-Use `-DCMAKE_PREFIX_PATH=/path/to/dependencies` for a separate installation.
-Configuration never downloads dependencies. CMake finds FFTW3f/SndFile package
-configs, with library/header discovery fallbacks (and pkg-config for libsndfile).
-For the default FFTW backend, its single-precision library is required even if
-double FFTW is installed. On Apple platforms select the system framework instead:
-
-```sh
-cmake -S . -B build-accelerate -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_FFT_BACKEND=ACCELERATE
-cmake --build build-accelerate --parallel
-ctest --test-dir build-accelerate --output-on-failure
-```
-
-Accelerate builds neither search for nor link FFTW. `-DCONVOLVER_FFT_BACKEND=OOURA`
-builds Ooura's FFT into the library instead, on any platform, so the only
-remaining dependency is libsndfile for the CLI and file I/O. Backend selection is
-per build, not a runtime switch; `--version` identifies the selected backend.
-See [FFT contracts, benchmarks and equivalence results](fft-backends.md).
+The examples below assume the `convolver` executable is in `build/`.
+`./build/convolver --version` names the FFT backend it was built with.
 
 ### FFTW plan tuning
 
@@ -79,8 +54,8 @@ them for the transform size actually used. Run this once on the target machine
 with a Release binary and little competing CPU activity:
 
 ```sh
-./build-native/convolver --tune-fft machine-b256.fftw --block-size 256
-./build-native/convolver --filter room.cfg --input music.wav --output corrected.wav \
+./build/convolver --tune-fft machine-b256.fftw --block-size 256
+./build/convolver --filter room.cfg --input music.wav --output corrected.wav \
   --block-size 256 --fft-wisdom machine-b256.fftw
 ```
 
@@ -118,55 +93,11 @@ serializes its own planning, destruction and wisdom access; applications making
 other FFTW planner calls must coordinate those too. All preparation belongs
 outside the audio callback.
 
-### Windows build
-
-Windows/MSVC configuration, using an existing vcpkg installation:
-
-```powershell
-vcpkg install fftw3:x64-windows 'libsndfile[core]:x64-windows'
-cmake -S . -B build-native -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
-cmake --build build-native --config Release
-ctest --test-dir build-native -C Release --output-on-failure
-```
-
-The [native CI workflow](../.github/workflows/regression.yml) defines the platform
-matrix. Check [Actions](https://github.com/jrp2014/convolver/actions/workflows/regression.yml)
-for revision-specific results. Package-manager dependency versions can change;
-`--version` records the linked versions. Pin dependencies before producing a
-reproducible binary release.
-
-Targets: `convolver_core`, `convolver_host`, `convolver_io`, `convolver_cli` (executable name
-`convolver`). `cmake --build build-native --target check` builds native tests and
-runs CTest. `cmake --install build-native --prefix /desired/prefix` installs the
-CLI, libraries and headers. Libraries can also be consumed with `add_subdirectory`
-through `Convolver::core`, `Convolver::host` and `Convolver::io`. Installed CMake package exports,
-component selection and presets are described in [the package guide](cmake-package.md).
-The libraries are static; shared dependencies must remain installed. This is not
-a self-contained redistributable app bundle.
-
-Build options:
-
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `CONVOLVER_BUILD_NATIVE` | ON | Enable portable targets; OFF retains regression-only mode |
-| `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
-| `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Renderer; requires I/O |
-| `CONVOLVER_FFT_BACKEND` | AUTO | AUTO (FFTW; OOURA, or ACCELERATE on Apple, when `CONVOLVER_BUILD_VST3` is ON), FFTW, ACCELERATE (Apple only) or OOURA (built in); see [plug-in builds](fft-backends.md#plug-in-builds) |
-| `CONVOLVER_BUILD_VST3` | OFF | SDK adapter and, with I/O, the preset writer; see [VST3](vst3.md) |
-| `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
-| `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
-| `BUILD_TESTING` | ON at top level | Master test switch |
-| `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
-| `CONVOLVER_PACKAGE_TESTS` | ON | Installed/relocated and source-tree C++ consumer tests |
-| `CONVOLVER_DOCUMENTATION_TESTS` | Same as I/O on first configure | Historical documentation checks; requires Python |
-| `CONVOLVER_SANITIZERS` | OFF | ASan/UBSan instrumentation of native targets with GCC/Clang |
-| `CONVOLVER_LEGACY_TESTS` | ON with I/O and native Clang on macOS/Linux; OFF elsewhere | Existing sanitized extraction harnesses |
-
 ## File rendering
 
 ```sh
-./build-native/convolver --filter room.cfg --input music.wav --output corrected.wav
-./build-native/convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
+./build/convolver --filter room.cfg --input music.wav --output corrected.wav
+./build/convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
 The filter may be an IR sound file, a [configuration](configuration.md), or a configuration
@@ -267,7 +198,7 @@ also require an extensible header, independently of labels.
 channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
 
 ```sh
-./build-native/convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
+./build/convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
 ```
 
 - The mask uses the WAVE speaker bits (`0x1` front left, `0x2` front right,
@@ -304,7 +235,7 @@ Standard streams use explicitly described little-endian IEEE float32, interleave
 by frame. No WAV header needs rewriting on a non-seekable pipe:
 
 ```sh
-producer | ./build-native/convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
+producer | ./build/convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
 ```
 
 `--raw-input RATE CHANNELS` also works on a RAW file. The output rate and channel
@@ -430,9 +361,9 @@ feed their sum as silence after the final nonempty input to drain fully.
 instance must not be processed/reset concurrently.
 
 This implementation uses uniform partitioned overlap-add with input-spectrum
-history, as described in [the implementation map](project-structure.md#processing-data-flow). All three backends expose the same spectrum layout and
+history, as described in [the implementation map](develop/architecture.md#processing-data-flow). All three backends expose the same spectrum layout and
 scaling; 1/N normalization is applied once when preparing IR spectra. The first
-backend measurements are recorded in [the FFT guide](fft-backends.md).
+backend measurements are recorded in [the FFT guide](develop/fft-backends.md).
 
 Prepared processing/reset performs no C++ heap allocation; a test guards that
 contract. This is not a hard real-time guarantee or instrumentation of every
@@ -440,7 +371,7 @@ possible library/system allocation. FFTW planning/destruction is serialized betw
 these engine instances, outside processing. Accelerate owns an independent setup
 per instance. Other FFTW users in the same process
 must coordinate their planning too, which is why plug-in builds default to Ooura
-or Accelerate ([plug-in builds](fft-backends.md#plug-in-builds)).
+or Accelerate ([plug-in builds](develop/fft-backends.md#plug-in-builds)).
 
 ### Resource limits
 
@@ -474,6 +405,6 @@ not dependency pins for every current build:
 FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
 local verification used the official configure/make build of that source archive,
 which reports 3.3.11. Convolver itself is built with CMake in both cases.
-See [test coverage](testing.md) and [TODO limitations](../TODO.md#documented-limitations)
+See [test coverage](develop/testing.md) and [TODO limitations](../TODO.md#documented-limitations)
 for the boundaries of the current checks. Current LLVM/SDK/library results must
 be tied to the revision actually tested.

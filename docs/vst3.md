@@ -19,64 +19,22 @@
 - These are developer builds: not signed, notarized or packaged, and not yet
   tested in named commercial DAWs.
 
-Use this guide to build the plug-in and load a filter through a host's preset
-menu. The later lifecycle section is for contributors and host integrators.
+Use this guide to install the plug-in and load a filter through a host's preset
+menu. Building it is in [build from source](develop/build.md#vst3); the rules
+every adapter follows are in the [plug-in adapter contract](develop/plugin-contract.md).
 
 Contents: [build](#build), [install for a host](#make-the-plug-in-discoverable),
 [loading filters](#loading-filters), [processing and lifecycle](#processing-and-lifecycle)
 and [compatibility evidence](#compatibility-evidence).
 
-The optional adapter uses [VST SDK 3.8.1 build 84](https://github.com/steinbergmedia/vst3sdk/releases/tag/v3.8.1_build_84).
-The CI workflow pins SDK commit
-`3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96` and its submodules. Ordinary core/CLI
-builds do not need the SDK. Compatibility and numerical correctness take priority
-over CPU-specific optimization.
-
 ## Build
 
-The optional SDK build needs CMake 3.25+ and a C++20 compiler. The core alone
-retains its CMake 3.20 minimum. A plug-in build needs no FFT library: with
-`CONVOLVER_BUILD_VST3=ON` the default backend (`AUTO`) is the built-in Ooura FFT,
-or Apple's Accelerate on macOS. FFTW is avoided because a plug-in shares its
-process with the host and other plug-ins, which may use the same FFTW, and
-FFTW's planner is not thread-safe. Pass `-DCONVOLVER_FFT_BACKEND=FFTW` to
-override (CMake then warns; see [backend selection](fft-backends.md#plug-in-builds)).
-One backend serves every target in a build, so the CLI built alongside the
-plug-in uses it too. Obtain the SDK separately:
-
-```sh
-git clone --branch v3.8.1_build_84 --depth 1 https://github.com/steinbergmedia/vst3sdk.git /path/to/vst3sdk
-git -C /path/to/vst3sdk submodule update --init --depth 1 base cmake pluginterfaces public.sdk
-cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release \
-  -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK=/path/to/vst3sdk
-cmake --build build-vst3 --config Release --parallel 2
-ctest --test-dir build-vst3 -C Release --output-on-failure
-```
-
-On Windows, use static libraries with the dynamic MSVC runtime so the plug-in
-can load independently of the DAW's DLL search path:
-
-```powershell
-vcpkg install 'libsndfile[core]:x64-windows-static-md'
-cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON `
-  -DCONVOLVER_VST3_SDK=C:/path/to/vst3sdk `
-  "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-  -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
-```
-
-Use a fresh build directory when changing triplets. An FFTW override on
-Windows needs static FFTW too (`fftw3:x64-windows-static-md`).
-The preset-writing tool still needs libsndfile. Core-only plug-in builds can
-turn I/O and CLI off; the preset writer is then omitted.
-
-The SDK creates `build-vst3/VST3/Release/Convolver.vst3`. No link is created in
-user/system plug-in folders. This is a developer build, not a signed/notarized
-installer or self-contained distribution. Shared libsndfile (and, with an FFTW
-override, FFTW) dependencies must be available at runtime; compatibility with older OS versions also depends on how
-those libraries were built. Local libraries built for macOS 27 do not establish
-macOS 11 compatibility just because a bundle has an older deployment target.
-macOS may block ad-hoc-signed developer bundles; use an appropriate developer
-signing/approval workflow. Do not disable system security checks.
+Build the plug-in with `-DCONVOLVER_BUILD_VST3=ON` and the pinned Steinberg
+VST3 SDK, as [build from source](develop/build.md#vst3) describes (Windows
+included). The bundle is `build-vst3/VST3/Release/Convolver.vst3`, and the
+preset tools are built beside it. This is a developer build: not signed,
+notarized or packaged. Prepared preview packages are described in the
+[plug-in guide](plugins/index.md).
 
 ## Make the plug-in discoverable
 
@@ -150,16 +108,16 @@ one-channel buses and arrangements with speakers outside the shared table
 order; in a layout with side speakers and no back ones (5.1 written as `0x60F`,
 for example), the side speakers count as the back pair, so `0x60F` suits `k51`.
 The check
-never rejects a preset ([layout rules](plugin-identities.md#channel-layouts)). A preset must match the bus channel counts and
+never rejects a preset ([layout rules](develop/plugin-identities.md#channel-layouts)). A preset must match the bus channel counts and
 the sample rate; there is no implicit IR resampling or pitch/timing change. Bypass
 passes input *c* to output *c* only when the counts are equal; with unequal
 counts it plays silence on every output
-([shared adapter contract](plans/2026-10-21-plugin-formats.md#bypass)). More
+([shared adapter contract](develop/plugin-contract.md#bypass)). More
 than 8 channels, or more than one bus, is rejected. 32-bit and 64-bit host
 buffers are supported, with **single-precision internal DSP**.
 
 Loading follows the
-[shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+[shared adapter contract](develop/plugin-contract.md)
 (VST3-7):
 
 - **No preset loaded:** with equal input and output counts the plug-in passes
@@ -191,50 +149,27 @@ Loading follows the
 This plug-in has a new VST3 identity: old VST2 project state
 is not claimed to migrate automatically. The class IDs and bundle identifier are
 listed, with every other format's, in
-[plug-in identities](plugin-identities.md), which also explains why presets
+[plug-in identities](develop/plugin-identities.md), which also explains why presets
 saved today keep loading on any arrangement with the same channel counts.
 
 ## Processing and lifecycle
 
-The host owns the audio device, clock and scheduling. Each callback supplies the
-next section of one continuous stream; convolution history persists between
-callbacks. Processing produces one output frame per input frame, with the delay
-reported below. The plug-in performs no file I/O in this streaming path.
+Latency is always 256 samples, independent of the DAW's buffer size, and the
+host compensates for it. Silent input still lets the filter's tail ring out.
+Bypass fades over 64 samples to the input delayed by the same 256 samples, so
+nothing jumps in time; with unequal channel counts it fades to silence instead.
+The filter keeps running underneath, so switching bypass off loses nothing.
 
-Latency is always 256 samples, independent of the DAW callback length. The adapter
-handles variable blocks, in-place host buffers, zero-length/parameter-only calls,
-inactive channels and silence flags. Silent input still drains the wet tail.
-Bypass uses a 64-sample ramp and a dry delay matching the reported latency. With
-unequal channel counts it ramps to silence instead. Wet processing continues
-during bypass so returning to wet does not lose history.
+Loading a preset while audio plays prepares the new filter away from the audio
+thread, then crossfades to it over 256 samples after a 256-sample warm-up. The
+new filter starts with fresh history, so it cannot process audio that played
+before it was loaded. Input that is not a finite number becomes silence.
 
-Filters are prepared outside processing and transferred through a bounded
-single-producer/single-consumer pointer handoff. A filter that arrives before any
-audio has been processed since activation or reset is installed directly. A
-reset (the host stopping and restarting processing) also ends a crossfade in
-progress, so the newer filter plays at once, and a filter published before audio
-resumes is installed directly. Later,
-a replacement runs for 256 samples
-to fill its latency, then crossfades for 256 samples. It starts with fresh input
-history: it cannot reconstruct audio that preceded loading. Old engines are
-retired on the control thread. Pending changes coalesce to the newest; at most
-one transition and one pending replacement are retained, with up to two old
-engines awaiting control-thread collection after the last publication. Collection
-does not hold up pending changes. The tail is available before activation and
-includes routed delays; it can grow conservatively during a session, and
-reactivation recomputes it.
-
-`Convolver::host` exports `HostProcessor` and the state codec without SDK or file
-I/O dependencies. Prepare/replace/collect/destruct calls must be serialized on the
-control side. One audio thread calls process/reset/set_bypass. Destruction and
-reconfiguration require audio to have stopped. Reset clears history without
-allocation, but its work scales with prepared storage. Filter preparation can be
-expensive; neither measured FFT planning nor file access belongs in a callback.
-
-Finite input outside float range and nonfinite input become silence. Nonfinite
-output is contained and history reset. The processing boundary is nonthrowing;
-invalid dimensions return failure without advancing audio. State uses a bounded,
-versioned little-endian format (64 MiB encoded limit), validated transactionally.
+How the adapter hands filters to the audio thread, which threads may call what,
+and the host-state format are in the
+[plug-in adapter contract](develop/plugin-contract.md#replacement-and-threads).
+The adapter handles variable block sizes, in-place host buffers, calls with no
+audio, inactive channels and silence flags.
 
 ## Compatibility evidence
 
@@ -245,12 +180,12 @@ state, and presets after source-file deletion. The SDK validator loads the actua
 bundle; separate tests call the real processor/controller SDK interfaces.
 
 `vst3.harness` drives the processor through the shared
-[PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2): the first-use
+[PLUG-2 comparisons](develop/testing.md#plug-in-comparisons-plug-2): the first-use
 fixtures (mono, stereo and 2→6) against a direct double-precision convolution
 and, sample for sample, against the CLI's renders, at several block sizes with
 separate and in-place buffers, plus replacement, bypass, reset and failure
 cases. Since VST3-7 the adapter follows the
-[shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+[shared adapter contract](develop/plugin-contract.md)
 and lists no known deviations.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
@@ -290,5 +225,5 @@ archives, installer templates and corresponding source. Commercial DAW testing,
 signing, clean-machine installation and a custom file-picker editor remain
 separate release work. VST3 exchanges floating-point audio, so the CLI/file writer's integer quantization and dither does not apply to it.
 
-Source entry points and the change/test map are in [the implementation guide](project-structure.md).
+Source entry points and the change/test map are in [the implementation guide](develop/architecture.md).
 Release gaps and intentional constraints are tracked in [TODO](../TODO.md#documented-limitations).

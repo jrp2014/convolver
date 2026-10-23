@@ -14,15 +14,22 @@ holds two implementations:
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-Start with `CONTRIBUTING.md` (build, presets, formatting, analysis),
-`REVIEW.md` (current status) and `TODO.md` (open work and priorities).
-Implementation: `docs/project-structure.md`; behaviour: `docs/portable-core.md`,
-`docs/configuration.md`, `docs/testing.md`, `docs/vst3.md`. Open plans are in
-`docs/plans/`; the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`.
+Start with `CONTRIBUTING.md` (formatting, analysis, lint), `REVIEW.md`
+(current status) and `TODO.md` (open work and priorities). The pages written
+for contributors and agents are in `docs/develop/`: build commands in
+`docs/develop/build.md`, the implementation map in
+`docs/develop/architecture.md`, tests in `docs/develop/testing.md`, the
+plug-in rules in `docs/develop/plugin-contract.md` and the procedures in
+`docs/develop/workflow.md`. User behaviour is described in
+`docs/portable-core.md`, `docs/configuration.md` and the plug-in guides
+(`docs/vst3.md`, `docs/au.md`, `docs/lv2.md`). Open plans are in `docs/plans/`;
+the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`. How the
+documentation is organised and written, for agents too, is in
+`docs/develop/documentation.md`.
 
 ## Taking on work
 
-Follow `docs/workflow.md`. In short:
+Follow `docs/develop/workflow.md`. In short:
 
 - One TODO item (or a tightly coupled group) per branch. Open a **draft pull
   request titled with the ID** as soon as you start; that is the claim. Check
@@ -36,10 +43,14 @@ Follow `docs/workflow.md`. In short:
   **independent review** by someone who did not write the change.
 - jrp merges. Never merge, approve, push to `main` or move tags.
 
-Claude Code sessions have two repository skills: `todo-item` (start, resume or
-hand over an item) and `review-change` (the independent review).
+Claude Code sessions have two repository skills, `todo-item` (start, resume or
+hand over an item) and `review-change` (the independent review). Both only
+point to sections of `docs/develop/workflow.md`, which holds the procedures.
 
 ## Build and test
+
+Use the sanitizer build for every change (all builds, presets and plug-in SDKs
+are in `docs/develop/build.md`):
 
 ```sh
 cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
@@ -49,11 +60,11 @@ ctest --test-dir build --output-on-failure --parallel 4
 
 The default build needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and
 libsndfile. Accelerate (Apple only) or built-in Ooura can replace FFTW; see
-[backend selection](docs/fft-backends.md). On Ubuntu:
+[backend selection](docs/develop/fft-backends.md). On Ubuntu:
 `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev clang-format-18 clang-tidy-18`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
 CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg),
-plus Ooura configurations described in [testing](docs/testing.md).
+plus Ooura configurations described in [testing](docs/develop/testing.md).
 
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed.
@@ -95,13 +106,13 @@ plus Ooura configurations described in [testing](docs/testing.md).
   numeric package/bundle versions remain `MAJOR.MINOR.PATCH`.
 - Source tags identify revisions, not passing CI or production binary releases.
   Test versioning with `python3 tests/versioning_tests.py`. For workflow recovery,
-  follow [the versioning guide](docs/versioning.md): the helper creates commits
+  follow [the versioning guide](docs/develop/versioning.md): the helper creates commits
   and tags even without `--push`, so it is **not a dry run**.
 
 ## Rules
 
-- Documentation: follow [page ownership and maintenance](docs/documentation.md).
-  Use [the implementation map](docs/project-structure.md) to find symbols,
+- Documentation: follow [page ownership and maintenance](docs/develop/documentation.md).
+  Use [the implementation map](docs/develop/architecture.md) to find symbols,
   invariants and tests. Update the owning guide when behavior changes; keep open
   work and documented limitations in [TODO.md](TODO.md). Run the documentation
   checks in `CONTRIBUTING.md` and distinguish actual test results from configured
@@ -113,7 +124,7 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - `.cfg` compatibility is a product feature (Roon, JRiver and Audiolense use it).
   Preserve relative paths, signed-zero routes, fractional route gains, delay
   truncation and list selection. Syntax changes need a recorded decision.
-- Keep component boundaries in `docs/project-structure.md`; split files only
+- Keep component boundaries in `docs/develop/architecture.md`; split files only
   when a responsibility grows.
 - `docs/historical/` files are byte-exact copies with recorded hashes; never edit
   them. Do not reformat files under `historical/`; it destroys `git blame`.

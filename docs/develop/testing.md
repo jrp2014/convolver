@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Tests and their boundaries
 
-[Documentation index](README.md) · [Implementation map](project-structure.md#change-and-test-map)
+[Documentation index](../README.md) · [Implementation map](architecture.md#change-and-test-map)
 
 **In short:**
 
@@ -31,7 +31,7 @@ and [when CI runs](#ci-triggers).
 
 ## Native production tests
 
-The [portable build](portable-core.md) compiles production C++20 translation
+The [portable build](../portable-core.md) compiles production C++20 translation
 units against the selected real FFT library and libsndfile. Build before running CTest:
 
 ```sh
@@ -78,7 +78,7 @@ ctest --test-dir build-native -N
   tabs and Unicode in names, invalid UTF-8 filenames on Linux, the
   `portable-paths` profile with `--warnings-as-errors`, and diagnosis of every
   bundled historical sample in `historical/configs/`.
-- `compatibility.corpus`: [generated configuration fixtures](../tests/compatibility/README.md)
+- `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
   selection, routes, delays and tail, and the `portable-paths` warnings, against
@@ -92,7 +92,7 @@ ctest --test-dir build-native -N
   without decoding), 256 diagnostics plus a truncation marker, and 64 MiB of host
   state.
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
-  `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../tests/fuzz/README.md)
+  `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
 - `native.fft_planning`: measured/patient planning, saved wisdom reused in fresh
   CLI processes against direct convolution, missing-plan failure before output
@@ -111,7 +111,7 @@ ctest --test-dir build-native -N
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.
-- `native.presets`: the [preset containers](presets.md) without any SDK: base64
+- `native.presets`: the [preset containers](../presets.md) without any SDK: base64
   against RFC 4648's vectors, the `.vstpreset` layout field by field, reading
   presets as hosts save them (extra chunks, lower-case class IDs, padding),
   version-1 states with any channel mask, every truncation and damaged chunk
@@ -141,7 +141,7 @@ ctest --test-dir build-native -N
   channels must be silent. It also checks that existing folders and folder
   names too long for Equalizer APO are refused, that file names cannot add
   commands, and that failed exports leave nothing. See the
-  [guide](equalizer-apo.md#how-it-is-tested).
+  [guide](../equalizer-apo.md#how-it-is-tested).
 
 - `export.equalizer_apo.runtime` (Windows CI, or a Windows build configured
   with `CONVOLVER_EQUALIZER_APO_BENCHMARK` and `CONVOLVER_EQUALIZER_APO_CONFIG`
@@ -152,7 +152,7 @@ ctest --test-dir build-native -N
   `Benchmark.exe` writes 16-bit files, and silence must be exactly zero. A real audio device and exclusive-mode
   bypass are checked by hand (steps in the guide).
 
-The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
+The optional [VST3 build](../vst3.md) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
 `convolver-vst3-preset` write the same bytes), `vst3.preset_format` (our
@@ -168,51 +168,51 @@ and, unless FFTW was chosen, import none (skipped where no tool is found).
 rules, its frozen values, the installer files, and that no file keeps its own
 copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json` (and, on macOS,
 `Info.plist`) carries the class IDs, vendor and bundle identifier from
-[`plugins/identities.json`](../plugins/identities.json), and that each VST3
+[`plugins/identities.json`](../../plugins/identities.json), and that each VST3
 speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
 queries, silent-input tails, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
-[pluginval](vst3.md#independent-host-tests-pluginval), a host that does not share
+[pluginval](../vst3.md#independent-host-tests-pluginval), a host that does not share
 the SDK's hosting code. None of these establishes compatibility in a particular
 commercial DAW.
 
 `packaging.consumer` installs and relocates the package, builds and runs an
 external core/host/I/O consumer, and verifies components and source-tree use with and
 without a parent CTest setup. Core-only configuration runs seven C++/package
-suites without Python or libsndfile. See [package tests](cmake-package.md#what-verifies-the-package).
+suites without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See
 [measurements and reproduction commands](fft-backends.md). The
-[18 October validation record](review-2026-10/current-validation.md) preserves
+[18 October validation record](../review-2026-10/current-validation.md) preserves
 results for its older baseline `5df874e`; it is not current validation evidence.
-Consult the [native workflow](../.github/workflows/regression.yml) and
-[VST3 workflow](../.github/workflows/vst3.yml) for the configured matrix; a workflow
-file alone is not evidence that a job passed. The [LV2](../.github/workflows/lv2.yml)
+Consult the [native workflow](../../.github/workflows/regression.yml) and
+[VST3 workflow](../../.github/workflows/vst3.yml) for the configured matrix; a workflow
+file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
 workflow installs the
-[pinned format tools](plugins/build.md#pinned-format-dependencies) and checks
+[pinned format tools](../plugins/build.md#pinned-format-dependencies) and checks
 them on LV2's example plug-ins until the LV2 adapter adds its bundle. The
-[Audio Unit](../.github/workflows/au.yml) workflow builds the AU component
+[Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it ([AU guide](au.md#testing)). The weekly [Dependency updates](../.github/workflows/updates.yml)
+it ([AU guide](../au.md#testing)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
 workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
 
 Every plug-in adapter is held to the same rules by one harness,
-[`tests/plugins/harness.hpp`](../tests/plugins/harness.hpp). Each format's test
+[`tests/plugins/harness.hpp`](../../tests/plugins/harness.hpp). Each format's test
 implements its small `Adapter` interface by driving the format's own host API
-(VST3 in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp), LV2 hosted
-by lilv in [`tests/lv2/harness_tests.cpp`](../tests/lv2/harness_tests.cpp));
+(VST3 in [`tests/vst3/harness_tests.cpp`](../../tests/vst3/harness_tests.cpp), LV2 hosted
+by lilv in [`tests/lv2/harness_tests.cpp`](../../tests/lv2/harness_tests.cpp));
 the harness owns the cases and the criteria.
 
-**Fixtures.** The [first-use examples](../examples/first-use/README.md) are the
+**Fixtures.** The [first-use examples](../../examples/first-use/README.md) are the
 shared fixtures: a mono IR file, a stereo `.cfg` with cross-feed, a fractional
 route gain and an output delay, and a 2→6 crossover with level trims and
 delays. Every route has a different response, so a swapped channel fails.
-[`tests/plugins/fixtures.py`](../tests/plugins/fixtures.py) writes them from
+[`tests/plugins/fixtures.py`](../../tests/plugins/fixtures.py) writes them from
 integer arithmetic and a seeded generator, and holds the Python WAV, noise and
 oracle helpers that the pluginval acceptance test and the release example
 generator also use.
@@ -227,7 +227,7 @@ generator also use.
   stay in `BUILD/first-use/` as the CLI reference for the adapters.
 
 **Two references.** The independent double-precision oracle
-([`tests/native/oracle.hpp`](../tests/native/oracle.hpp), shared with
+([`tests/native/oracle.hpp`](../../tests/native/oracle.hpp), shared with
 `native.engine`) is the authority: at most 1e-5 absolute. The CLI render shows
 that the adapter is wired to the engine as the CLI is: a fresh instance must
 reproduce it exactly, sample for sample, once the 256-frame latency is allowed
@@ -256,14 +256,14 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 Every render continues two blocks past the end of the filter tail, where the
 output must be within tolerance of zero.
 
-These follow the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
+These follow the [shared adapter contract](plugin-contract.md).
 A format that does not yet meet part of it lists those cases as **known
 deviations**, each with the text its failure must contain and the TODO item
 that fixes it. The run prints them and still passes, but a listed case that
 fails in any other way, or starts passing, fails the run, so the list can
 neither hide a new defect nor go stale. A listed case stops at its first
 failure, so its later checks run only once it is fixed. VST3 lists none: its
-13 were removed by [VST3-7](../TODO.md#plug-ins-vst3-lv2-and-au), and all 66 cases pass. Its driver
+13 were removed by [VST3-7](../../TODO.md#plug-ins-vst3-lv2-and-au), and all 66 cases pass. Its driver
 counts an instance as configured once it has been activated with the setup,
 because a VST3 host commits to its rate and buses at activation (JUCE-based
 hosts call `setupProcessing` with placeholder values before restoring state).
@@ -276,7 +276,7 @@ skipped because LV2 core cannot report a tail: its driver's
 `Adapter::reports_tail()` returns false, and every other check of those cases,
 the audio included, still runs. LV2 has no separate reset, so the driver's
 reset is deactivate and activate, and it reads the latency port after a
-zero-frame `run()`, as hosts do before audio. The [LV2 guide](lv2.md#tests)
+zero-frame `run()`, as hosts do before audio. The [LV2 guide](../lv2.md#tests)
 lists its other tests.
 
 `au.harness` (macOS, `CONVOLVER_BUILD_AU=ON`) drives the Audio Unit through the
@@ -287,7 +287,7 @@ no known deviations either.
 `vst3.harness`, `lv2.harness` and `au.harness` need their plug-in builds, the
 CLI and the native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
 and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
-[`plugins/vst3/CMakeLists.txt`](../plugins/vst3/CMakeLists.txt). Status ports
+[`plugins/vst3/CMakeLists.txt`](../../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
 own tests.
 
@@ -371,12 +371,12 @@ Native tests do not establish a full build of the old Windows applications,
 universal host compatibility or hard real-time deadlines. The historical
 extraction tests also leave old full-width PCM32, nonzero noise shaping, CMD
 tail handling and full host negotiation outside their coverage. Preserve these
-limits when quoting a result. [TODO](../TODO.md#documented-limitations) gathers
+limits when quoting a result. [TODO](../../TODO.md#documented-limitations) gathers
 open validation gaps and intentional constraints.
 
 ## Documentation checks
 
-Run the pinned [pre-commit checks](../CONTRIBUTING.md#lint-checks)
+Run the pinned [pre-commit checks](../../CONTRIBUTING.md#lint-checks)
 for C++ formatting, ShellCheck, Markdown, YAML, workflow and maintained local-link validation.
 The `documentation` CTest entry checks the archived website's hashes and links;
 it is not a check of all maintained Markdown. Run changed CLI/build examples
@@ -384,7 +384,7 @@ against the current program as well as checking links.
 
 ## Fuzz smoke tests and longer campaigns
 
-[The fuzz guide](../tests/fuzz/README.md) describes the four harnesses and corpus
+[The fuzz guide](../../tests/fuzz/README.md) describes the four harnesses and corpus
 replay. CI runs each libFuzzer target for 60 seconds on pull requests and
 `main`, with ASan/UBSan and resource bounds. A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
@@ -400,7 +400,7 @@ examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
 copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
 the supplied source with networking disabled. See the
-[qualification record](releases/developer-preview.md) for external gates.
+[qualification record](../releases/developer-preview.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone

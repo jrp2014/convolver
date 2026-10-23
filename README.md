@@ -51,7 +51,7 @@ On a Mac you can use Apple's Accelerate framework instead of FFTW by adding
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` to the first command. On any platform,
 `-DCONVOLVER_FFT_BACKEND=OOURA` builds a small FFT into the library so FFTW is not
 needed. Windows builds use vcpkg; see the
-[portable guide](docs/portable-core.md#windows-build).
+[build guide](docs/develop/build.md#windows).
 
 ## Filter a file
 
@@ -135,12 +135,13 @@ or `.cfg` file into a `.vstpreset`. See the [VST3 guide](docs/vst3.md).
 | [`historical/`](historical/) | Preserved 2005–2006 Windows implementation; not part of the portable CMake build |
 
 - [Documentation index](docs/README.md): choose a guide by task
-- [Implementation map](docs/project-structure.md): source responsibilities, invariants and tests
-- [Portable guide](docs/portable-core.md): build options, CLI details, FFTW tuning, dither, speaker labels and the library API
-- [Package guide](docs/cmake-package.md): using Convolver from another CMake project
+- [Implementation map](docs/develop/architecture.md): source responsibilities, invariants and tests
+- [Build from source](docs/develop/build.md): every build, its options and the plug-in SDKs
+- [Portable guide](docs/portable-core.md): CLI details, FFTW tuning, dither, speaker labels and the library API
+- [Library guide](docs/develop/library.md): using Convolver from another CMake project
 - [VST3 guide](docs/vst3.md)
-- [Testing](docs/testing.md), [contributing](CONTRIBUTING.md) and
-  [taking on and reviewing work](docs/workflow.md)
+- [Testing](docs/develop/testing.md), [contributing](CONTRIBUTING.md) and
+  [taking on and reviewing work](docs/develop/workflow.md)
 - [Changelog](CHANGELOG.md) and [current review](REVIEW.md)
 
 ## About this project
@@ -169,7 +170,7 @@ See [COPYING](COPYING).
 
 If you distribute a modified plug-in build, give it its own identities first:
 change the product identities in [`plugins/identities.json`](plugins/identities.json), as
-[plug-in identities](docs/plugin-identities.md#if-you-distribute-a-modified-build)
+[plug-in identities](docs/develop/plugin-identities.md#if-you-distribute-a-modified-build)
 explains, so hosts do not mistake it for this one.
 
 ## Plug-in distributions

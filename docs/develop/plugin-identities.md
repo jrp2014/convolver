@@ -1,14 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Plug-in identities and channel layouts
 
-[Documentation index](README.md) · [VST3 guide](vst3.md) ·
-[Plug-in formats plan](plans/2026-10-21-plugin-formats.md)
+[Documentation index](../README.md) · [VST3 guide](../vst3.md) ·
+[Plug-in formats plan](../plans/2026-10-21-plugin-formats.md)
 
 **In short:** every plug-in format identifies Convolver by fixed codes: VST3
 class IDs, AU type, subtype and manufacturer codes, LV2 URIs, and macOS bundle
 and installer identifiers. Hosts save these codes in projects and presets, so
 once a build using them is released they **never change**. They are recorded
-once, in [`plugins/identities.json`](../plugins/identities.json), together with
+once, in [`plugins/identities.json`](../../plugins/identities.json), together with
 the channel layouts the plug-ins support; the build and the release scripts
 read them from there. **If you distribute a modified build, please change its
 [product identities](#if-you-distribute-a-modified-build)** (vendor, class IDs,
@@ -37,7 +37,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
 | All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load (owner's decision, 22 October 2026); everything else is still written as version 1 |
-| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](presets.md#what-the-files-contain)). Owner's decision, 22 October 2026 |
+| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](../presets.md#what-the-files-contain)). Owner's decision, 22 October 2026 |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. Owner's decision, 22 October 2026 |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
@@ -83,7 +83,7 @@ the code rely on their meaning.
 `packaging/macos/Distribution.xml` and `packaging/windows/installer.nsi` repeat
 the installer identifiers, so edit them to match; the tests check that they
 agree. Then update the frozen copy (`FROZEN`) in
-[`tests/identities_tests.py`](../tests/identities_tests.py).
+[`tests/identities_tests.py`](../../tests/identities_tests.py).
 
 Some names that hosts and installers see are not in the registry yet. Change
 them too, because plug-ins install into shared system folders and the
@@ -155,7 +155,7 @@ channel mask, and no input layout. Hence:
   Stricter layout checks added later must never reject it.
 - Its output mask is advisory: an adapter may warn when it disagrees with the
   host's arrangement, but does not reject the preset. `speaker_notice` in
-  [`host.hpp`](../include/convolver/host.hpp) makes that comparison for every
+  [`host.hpp`](../../include/convolver/host.hpp) makes that comparison for every
   format, and `HostFilter::notice()` keeps the result for the accepted filter
   and the current host (VST3-1, 22 October 2026). It compares only masks that
   give one speaker per channel on more than one channel, channel by channel in
@@ -185,7 +185,7 @@ buses.
 - `cmake/ConvolverIdentities.cmake` reads the registry at configure time (a
   change re-runs CMake), rejects malformed codes, and writes
   `generated/convolver_identities.hpp` (namespace `convolver::identity`) from
-  [`cmake/convolver_identities.hpp.in`](../cmake/convolver_identities.hpp.in).
+  [`cmake/convolver_identities.hpp.in`](../../cmake/convolver_identities.hpp.in).
   It also sets `CONVOLVER_ID_*` CMake variables such as
   `CONVOLVER_ID_VST3_BUNDLE`.
 - The VST3 adapter takes its class IDs, vendor and channel bounds from the
@@ -199,7 +199,7 @@ buses.
 
 ## Changing the registry
 
-[`tests/identities_tests.py`](../tests/identities_tests.py) runs in pre-commit,
+[`tests/identities_tests.py`](../../tests/identities_tests.py) runs in pre-commit,
 lint CI and CTest (`identities`). It checks each format's rules, that the
 registry still equals its frozen copy (every fixed layout included), that the
 installer files agree with it, and that no other text file in the repository
