@@ -172,11 +172,25 @@ def container_tests(d):
     ir=d/'ct-ir.wav'; pcm(ir,[16384]); raw=struct.pack('<4f',.5,-.25,.125,-1.)
     base=['--filter',ir,'--raw-input','48000','1','--input','-']
     magic={'wav':b'RIFF','rf64':b'RF64','w64':b'riff','aiff':b'FORM','caf':b'caff','flac':b'fLaC'}
+    # Preview packages build libsndfile without FLAC; --version says which.
+    flac=b'(FLAC output available)' in call(['--version']).stdout
     for name in ('wav-double','rf64-pcm24','w64-pcm8','aiff-pcm16','aiff-float','caf-pcm32',
                  'caf-double','flac-pcm8','flac-pcm16','flac-pcm24'):
-        out=d/('ct.'+name.split('-')[0])
+        out=d/('ct.'+name.split('-')[0]); out.unlink(missing_ok=True)
+        if name.startswith('flac') and not flac:
+            p=call(base+['--output',out,'--output-format',name],ok=False,data=raw)
+            assert b'without FLAC support' in p.stderr and not out.exists(), p.stderr
+            continue
         call(base+['--output',out,'--output-format',name],data=raw)
         assert out.read_bytes()[:4]==magic[name.split('-')[0]], name
+    # The original format names still write the same files as before.
+    for name, subtype, size in (('wav-pcm8',1,1),('wav-pcm16',1,2),('wav-pcm24',1,3),
+                                ('wav-pcm32',1,4),('wav-float',3,4)):
+        out=d/'legacy.wav'
+        call(base+['--output',out,'--output-format',name],data=raw)
+        b=out.read_bytes()
+        assert b[:4]==b'RIFF' and b[8:16]==b'WAVEfmt ', name
+        assert struct.unpack('<HHIIHH',b[20:36])==(subtype,1,48000,48000*size,size,8*size), name
     # Integer and double raw output, read back with the matching --raw-format.
     for name, fmt, size in (('raw-pcm16','s16le',2),('raw-pcm24','s24le',3),
                             ('raw-pcm32','s32le',4),('raw-double','f64le',8)):
@@ -186,6 +200,18 @@ def container_tests(d):
                    '--output','-','--output-format','raw-float'],data=p.stdout)
         near(struct.unpack('<4f',back.stdout),[.125,-.0625,.03125,-.25])  # filtered twice
     assert call(base+['--output','-','--output-format','raw-pcm16'],data=raw).stdout[:2]==b'\0\x20'
+    # s16 and s24 files whose size is not a multiple of 4 bytes keep every frame,
+    # across a read-chunk boundary, from a file and from redirected stdin.
+    for fmt, width in (('s16le',2),('s24le',3)):
+        n=4097; f=d/('odd.'+fmt); f.write_bytes(b''.join(
+            ((i%7-3)<<(8*width-4)).to_bytes(width,'little',signed=True) for i in range(n)))
+        args=['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--output','-',
+              '--output-format','raw-float']
+        p=call(args+['--input',f]); assert len(p.stdout)==4*n, (fmt, len(p.stdout))
+        with open(f,'rb') as seekable:  # stdin redirected from a file
+            p=subprocess.run([EXE,*map(str,args),'--input','-'],stdin=seekable,capture_output=True)
+        assert p.returncode==0 and len(p.stdout)==4*n, (fmt, p.returncode, len(p.stdout))
+        call(args+['--input','-'],data=f.read_bytes()+b'\0',ok=False)  # incomplete frame
     # Big-endian input in each type.
     for fmt, packed in (('s16be',struct.pack('>4h',16384,-8192,4096,-32768)),
                         ('s32be',struct.pack('>4i',1<<30,-(1<<29),1<<28,-(1<<31))),
@@ -206,13 +232,17 @@ def container_tests(d):
         call(base+['--output',out,*bad],ok=False,data=raw); assert not out.exists(), bad
     call(['--filter',ir,'--input',d/'ct.aiff','--raw-format','s16le','--output',out],ok=False)
     # A non-raw stream on stdout names the raw formats.
-    p=call(base+['--output','-','--output-format','flac-pcm16'],ok=False,data=raw)
+    p=call(base+['--output','-','--output-format','aiff-pcm16'],ok=False,data=raw)
     assert b'raw output format' in p.stderr, p.stderr
     # A DRC-style .pcm filter in a configuration.
     (d/'ct.pcm').write_bytes(struct.pack('<2f',.5,.25))
     cfg=d/'ct-raw.cfg'; cfg.write_text('48000 1 1 0\n0\n0\nct.pcm\n0\n0\n0\n')
     p=call(['--filter',cfg,'--raw-input','48000','1','--input','-','--output','-',
             '--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    # A WAV that happens to be named .pcm is still read through its header.
+    pcm(d/'ct.pcm',[16384,8192]); p=call(['--filter',cfg,'--raw-input','48000','1','--input','-',
+                                          '--output','-','--output-format','raw-float'],data=raw)
     near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
 
 def main():

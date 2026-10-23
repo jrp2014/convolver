@@ -297,6 +297,14 @@ void run(const fs::path& dir) {
         const auto flagged = inspect_configuration(dir / "raw.cfg", portable);
         require(flagged.valid && has_code(flagged, "raw-filter"),
                 "portable-paths warns that other readers expect sound files");
+        // A WAV named .pcm keeps reading through its header, without the warning.
+        wave(dir / "wav.pcm", 44100, 2, {.5f, 1, .25f, 1});
+        text_file(dir / "wavpcm.cfg", "44100 1 1 0\n0\n0\nwav.pcm\n0\n0\n0\n");
+        const auto named = inspect_configuration(dir / "wavpcm.cfg", portable);
+        require(named.valid && !has_code(named, "raw-filter") &&
+                    named.configurations.at(0).paths.at(0).ir_frames == 2 &&
+                    named.configurations.at(0).paths.at(0).ir_file_channels == 2,
+                "a WAV named .pcm is read as WAV");
     }
     // Profiles: portable-paths adds warnings only; it never changes validity of errors.
     {
@@ -367,9 +375,10 @@ void run(const fs::path& dir) {
     for (const auto& p : before)
         after.erase(p);
     for (const auto* name :
-         {"absent.cfg", "two.txt", "bad.cfg", "unrelated.cfg", "list.txt", "cyclic.txt",
-          "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg", "drive.txt", "outer.txt", "sub.txt",
-          "dash.cfg", "drc.pcm", "cut.RAW", "raw.cfg", "cut.cfg", "rawch.cfg"})
+         {"absent.cfg", "two.txt",   "bad.cfg",     "unrelated.cfg", "list.txt",  "cyclic.txt",
+          "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",       "drive.txt", "outer.txt",
+          "sub.txt",    "dash.cfg",  "drc.pcm",     "cut.RAW",       "raw.cfg",   "cut.cfg",
+          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

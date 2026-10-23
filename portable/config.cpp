@@ -10,6 +10,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace convolver::detail {
 namespace {
@@ -351,11 +352,31 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
     return cfg;
 }
 
-bool raw_filter_name(const std::filesystem::path& path) {
+namespace {
+bool raw_filter_extension(const std::filesystem::path& path) {
     auto extension = path.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension == ".pcm" || extension == ".raw";
+}
+
+// Whether a file starts like a container libsndfile reads. A .pcm or .raw
+// filter with such a header was always read through its header, so it still is.
+bool has_audio_header(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    char magic[4]{};
+    if (!file.read(magic, sizeof magic))
+        return false;
+    const std::string_view head(magic, sizeof magic);
+    for (const std::string_view known :
+         {"RIFF", "RIFX", "RF64", "BW64", "riff", "FORM", "caff", "fLaC", "OggS"})
+        if (head == known)
+            return true;
+    return false;
+}
+} // namespace
+bool raw_filter(const std::filesystem::path& resolved) {
+    return raw_filter_extension(resolved) && !has_audio_header(resolved);
 }
 
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
@@ -366,7 +387,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         const auto& path = parsed.paths[i];
         const auto resolved = resolve_reference(doc.source, path.ir);
         std::optional<AudioReader> ir;
-        const bool raw = raw_filter_name(resolved);
+        const bool raw = raw_filter(resolved);
         try {
             if (raw)
                 ir.emplace(resolved, RawSpec{cfg.sample_rate, 1});

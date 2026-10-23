@@ -287,6 +287,22 @@ bool supported(OutputEncoding e) noexcept {
         return true;
     }
 }
+bool available(Container container) noexcept {
+    // libsndfile lists only the containers it was built with; a build without
+    // its external libraries has no FLAC, although sf_format_check accepts it.
+    if (container != Container::flac)
+        return true;
+    int count = 0;
+    sf_command(nullptr, SFC_GET_FORMAT_MAJOR_COUNT, &count, sizeof count);
+    for (int i = 0; i < count; ++i) {
+        SF_FORMAT_INFO info{};
+        info.format = i;
+        if (sf_command(nullptr, SFC_GET_FORMAT_MAJOR, &info, sizeof info) == 0 &&
+            (info.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_FLAC)
+            return true;
+    }
+    return false;
+}
 OutputEncoding output_encoding(OutputFormat format) noexcept {
     switch (format) {
     case OutputFormat::wav_pcm8:
@@ -513,10 +529,13 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         impl_->encoding = encoding;
         impl_->sample_bytes = raw_sample_bytes(encoding.sample);
         const auto frame_bytes = impl_->sample_bytes * raw->channels;
-        sf.samplerate = raw->sample_rate;
-        sf.channels = static_cast<int>(raw->channels);
         // libsndfile only opens the stream; read() decodes the bytes itself.
-        sf.format = SF_FORMAT_RAW | SF_FORMAT_FLOAT | SF_ENDIAN_LITTLE;
+        // Open it as one channel of bytes: with a wider declared sample,
+        // libsndfile counts frames in that width and stops reading early when
+        // the byte size is not a multiple of it (for example s16 mono).
+        sf.samplerate = raw->sample_rate;
+        sf.channels = 1;
+        sf.format = SF_FORMAT_RAW | SF_FORMAT_PCM_S8;
         if (path == "-")
             validate_raw_stdin(frame_bytes);
         if (path != "-" && std::filesystem::is_regular_file(path) &&
@@ -537,6 +556,13 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     }
 #endif
     impl_->handle.file = open_or_throw(path, SFM_READ, sf, "cannot open audio input");
+    if (raw) {
+        impl_->info = *raw;
+        if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
+            impl_->frames =
+                static_cast<std::size_t>(sf.frames) / (impl_->sample_bytes * raw->channels);
+        return;
+    }
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
     try {
         validate(impl_->info);
@@ -697,6 +723,10 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
                          QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
     validate(info);
+    if (supported(encoding) && !available(encoding.container))
+        throw std::runtime_error("this build of Convolver cannot write FLAC: its libsndfile was "
+                                 "built without FLAC support. Choose another container, such "
+                                 "as wav or rf64, or use a build whose libsndfile includes FLAC");
     validate_speakers(metadata.channel_mask, info.channels, encoding.container);
     SF_INFO sf{};
     sf.samplerate = info.sample_rate;

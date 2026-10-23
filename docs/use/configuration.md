@@ -103,8 +103,9 @@ match them. See [speaker labels](command-line.md#speaker-labels).
 An IR file can be any sound file libsndfile reads, such as WAV, RF64, W64,
 AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's.
 
-A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter: a
-headerless file of mono little-endian 32-bit float samples, as
+A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
+unless the file starts with a sound-file header (a WAV named `.pcm` is still
+read as WAV). A raw filter is a headerless file of mono little-endian 32-bit float samples, as
 [DRC](https://drc-fir.sourceforge.net/) and BruteFIR setups usually write them.
 Raw filters have no header to state a sample rate, so they take the
 configuration's rate; their IR channel must be `0`. A raw file whose size is

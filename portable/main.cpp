@@ -49,7 +49,8 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   CONTAINER-TYPE, default wav-float. Containers: wav, rf64,
                       w64, aiff, caf (rf64, w64 and caf have no 4 GiB limit),
-                      flac (lossless; pcm8, pcm16, pcm24 only) and raw
+                      flac (lossless; pcm8, pcm16, pcm24 only; needs a
+                      libsndfile with FLAC) and raw
                       (headerless little-endian; no pcm8). Types: pcm8,
                       pcm16, pcm24, pcm32, float, double. Example: flac-pcm24
   --speaker-map config
@@ -219,7 +220,10 @@ int run(int argc, char** argv) {
                 std::cout << "Convolver portable " << CONVOLVER_VERSION_STRING
                           << "\nFFT backend: " << convolver::fft_backend_name() << " / "
                           << convolver::fft_backend_version() << '\n'
-                          << convolver::sndfile_version() << '\n';
+                          << convolver::sndfile_version()
+                          << (convolver::available(convolver::Container::flac)
+                                  ? " (FLAC output available)\n"
+                                  : " (no FLAC output: built without FLAC)\n");
                 return 0;
             }
             if (option == "--filter")
@@ -311,6 +315,10 @@ int run(int argc, char** argv) {
                         " (use CONTAINER-TYPE: wav, rf64, w64, aiff, caf or raw with pcm16, "
                         "pcm24, pcm32, float or double, wav/rf64/w64/aiff/caf also pcm8; "
                         "flac with pcm8, pcm16 or pcm24)");
+                if (!convolver::available(parsed->container))
+                    throw std::invalid_argument(
+                        "this build of Convolver cannot write FLAC: its libsndfile was built "
+                        "without FLAC support. Choose another container, such as wav or rf64");
                 format = *parsed;
             } else if (option == "--dither") {
                 audio_options = true;

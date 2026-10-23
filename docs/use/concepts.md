@@ -59,7 +59,7 @@ input frame. They keep history between calls, even when the host's buffer
 length changes. To let the tail play out at the end of a stream, keep feeding
 silence for the latency plus the tail.
 
-The CLI can also read and write raw float audio through pipes. The producer and
+The CLI can also read and write raw (headerless) audio through pipes. The producer and
 consumer must agree on rate, channel count and sample representation, and own any
 audio devices or timing. The CLI itself is not an audio-device application.
 

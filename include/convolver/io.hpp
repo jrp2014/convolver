@@ -29,6 +29,9 @@ struct OutputEncoding {
 };
 // Whether a container can hold a sample type (for example, flac has no float).
 bool supported(OutputEncoding) noexcept;
+// Whether the libsndfile this build uses can write a container. Only flac can
+// be missing: libsndfile builds without its external libraries leave it out.
+bool available(Container) noexcept;
 // The original WAV and RAW formats; each is shorthand for an OutputEncoding.
 // Integer WAV formats: wav_pcm8 is unsigned 8-bit; the others are signed.
 enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float, wav_pcm8 };

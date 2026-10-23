@@ -359,6 +359,20 @@ means a patched FFmpeg build with `--enable-gpl`.
   Progress (23 October 2026, PR #60): RF64, W64, CAF, FLAC and raw output have
   no 4 GiB limit; WAV and AIFF stop with an error at it. Tests at the boundary
   sizes remain.
+- [ ] **IO-4 — Raw filters and raw sample types.** Read DRC/BruteFIR `.pcm`
+  and `.raw` filters in `.cfg` files, and raw input in integer and double
+  sample types.
+  Progress (23 October 2026, PR #60): implemented; a `.pcm` or `.raw` filter
+  without a sound-file header is read as mono little-endian float32 at the
+  configuration's rate. That `.cfg` rule waits for jrp's decision, to be
+  recorded in [decisions](docs/project/decisions.md).
+  [Filter files](docs/use/configuration.md#filter-files),
+  [RAW streams](docs/use/command-line.md#raw-streams).
+- [ ] **IO-6 — FLAC in the preview packages.** The packages build libsndfile
+  without its external libraries, so they cannot write (or read) FLAC or Ogg.
+  Shipping libFLAC, libogg and libvorbis adds pinned, licence-noted
+  dependencies, which jrp decides; until then `--version` reports it and
+  `flac-` formats are refused.
 - [ ] **IO-5 — Speaker labels beyond WAV.** Carry `--speaker-map` labels into
   the channel layouts of the other containers (WAVE_FORMAT_EXTENSIBLE in RF64
   and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
@@ -492,7 +506,7 @@ with compatibility tests; linked IDs point to open work above.
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
-| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs depend on the libsndfile build. Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
+| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC (IO-6). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
@@ -523,9 +537,6 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **IO-3 — More output containers.** 23 October 2026, PR #60;
   [output formats](docs/use/command-line.md#output-formats).
-- [x] **IO-4 — Raw filters and raw sample types.** 23 October 2026, PR #60;
-  [filter files](docs/use/configuration.md#filter-files),
-  [RAW streams](docs/use/command-line.md#raw-streams).
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;

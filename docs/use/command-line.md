@@ -106,6 +106,11 @@ rejected before any file is created. Speaker labels (`--speaker-map`) and
 WAVE_FORMAT_EXTENSIBLE carries them here. Standard output (`--output -`)
 needs a `raw-` format, since no file header can be completed on a pipe.
 
+FLAC output needs a libsndfile built with FLAC. Linux distributions and
+Homebrew ship one; the [preview packages](install.md#unsigned-previews) do not
+yet (TODO IO-6). `convolver --version` says which you have, and without FLAC a
+`flac-` format is refused before any file is created.
+
 ### Integer formats, dither and noise shaping
 
 Every integer sample type is quantized by Convolver in the same way, whatever
@@ -193,7 +198,8 @@ given with `--raw-input`; its sample type is little-endian 32-bit float unless
 producer | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
 ```
 
-`--raw-format` takes the names FFmpeg and SoX use: `f32le` (default), `f64le`,
+`--raw-format` needs `--raw-input`, since a file with a header states its own
+sample type. It takes the names FFmpeg and SoX use: `f32le` (default), `f64le`,
 `s16le`, `s24le` and `s32le`, or the same ending in `be` for big-endian.
 Integers are scaled by 2^-(bits-1), so `s16le` 16384 is 0.5. On output, the
 `raw-` formats write little-endian `pcm16`, `pcm24`, `pcm32`, `float` or
@@ -204,7 +210,7 @@ samples from SoX:
 ```sh
 sox in.flac -t raw -e signed -b 16 -L - \
   | convolver --filter room.cfg --input - --raw-input 48000 2 --raw-format s16le \
-      --output out.flac --output-format flac-pcm24
+      --output out.wav --output-format wav-pcm24
 ```
 
 `--raw-input RATE CHANNELS` also works on a RAW file. The output rate and channel

@@ -18,12 +18,15 @@ Until 1.0 the C++ API may change between minor versions.
   bits; raw has no 8-bit type). RF64, W64, CAF, FLAC and raw have no 4 GiB
   limit. The existing names, such as `wav-pcm24` and `raw-float`, are
   unchanged. In the library, `AudioWriter` also takes an `OutputEncoding`.
+  FLAC needs a libsndfile built with FLAC (the preview packages are not, IO-6):
+  `--version` says whether it is available, `available(Container)` tells the
+  library, and without it a `flac-` format is refused before any file exists.
 - Raw sample types (IO-4): `--raw-format` reads `--raw-input` streams as
   `s16`, `s24`, `s32`, `f32` or `f64`, little- or big-endian (`AudioReader`'s
   new `RawEncoding` argument), and `raw-pcm16`, `raw-pcm24`, `raw-pcm32` and
   `raw-double` write them.
-- Raw filters (IO-4): a configuration's filter ending in `.pcm` or `.raw` is
-  read as mono little-endian float32 at the configuration's sample rate, as
+- Raw filters (IO-4): a configuration's filter ending in `.pcm` or `.raw`, and
+  not starting with a sound-file header, is read as mono little-endian float32 at the configuration's sample rate, as
   DRC and BruteFIR write them; `--profile portable-paths` warns that other
   `.cfg` readers expect sound files (`raw-filter`).
 - An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one

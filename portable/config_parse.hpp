@@ -152,8 +152,9 @@ struct DecodedIr {
 };
 // A filter whose name ends in .pcm or .raw (any case) is a headerless mono
 // little-endian float32 file at the configuration's sample rate, as DRC and
-// BruteFIR write them.
-bool raw_filter_name(const std::filesystem::path&);
+// BruteFIR write them, unless it starts with a sound-file header (a WAV named
+// .pcm still reads as WAV). A missing file counts as raw.
+bool raw_filter(const std::filesystem::path& resolved);
 // Decode every path's selected IR channel into cfg (from configuration_graph).
 // budget counts decoded samples across one resolution operation.
 std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg,
