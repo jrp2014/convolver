@@ -110,7 +110,8 @@ channel counts. The plug-ins check it against the host when they load it
 ([shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):
 
 - **The first filter cannot be used** (wrong sample rate or channel counts, or a
-  damaged file): the plug-in plays **silence** and reports an error. It never
+  damaged file): the plug-in plays **silence** and reports an error, except as
+  noted below for VST3. It never
   falls back to passing input through unfiltered, because a room correction or
   crossover that quietly plays unfiltered audio can be worse than an obvious
   failure: a tweeter could receive full-range audio.
@@ -119,8 +120,19 @@ channel counts. The plug-ins check it against the host when they load it
 - **No preset loaded:** with equal input and output counts the plug-in passes
   input *c* to output *c*; with unequal counts it plays silence.
 
-The [VST3 guide](vst3.md#loading-filters) gives the details for VST3, which
-follows these rules since VST3-7.
+The VST3 plug-in follows these rules since VST3-7, with three limits on
+reporting until it has an editor or status display (VST3-3; DIAG-1 reviews how
+every message reaches the user):
+
+- It reports a failed load only by refusing it, which hosts show in their own
+  way or not at all.
+- A mismatch found when the host activates the plug-in (for example a project
+  restored at another sample rate) is not reported at all, because the load had
+  already been accepted: the plug-in plays silence **without** any message.
+- A project saved after a failed first load reopens silent, as decided, again
+  without a message: the saved failure loads successfully.
+
+The [VST3 guide](vst3.md#loading-filters) gives the details.
 
 Presets record channel *counts*, not speaker positions, so a 2-input, 6-output
 preset loads on any host arrangement with 2 inputs and 6 outputs. See
