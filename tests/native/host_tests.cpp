@@ -381,6 +381,139 @@ void filter_contract() {
                 early.error().find("2 inputs and 6 outputs") != std::string::npos,
             "channel mismatch at activation not explained");
 }
+// PLUG-8: every failure is kept as a value naming what failed, the request it
+// belongs to and whether the instance plays silence, until a later request
+// succeeds (or, for a failure found at activation, the next activation).
+void failure_reasons() {
+    using Kind = HostFailureKind;
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    const auto refused = [](auto&& load) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return;
+        }
+        throw std::runtime_error("load not refused");
+    };
+    const HostLayout stereo{48000, 2, 2};
+    Configuration a{48000, 2, 2, 0, {}, {}, {{{1, .5f}, {{0, 1}}, {{1, 1}}}}};
+    auto other_rate = a;
+    other_rate.sample_rate = 44100;
+    Configuration crossover{48000, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    Configuration wide{48000, 9, 9, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+
+    HostFilter f(8);
+    require(!f.failure() && f.error().empty(), "fresh instance has a failure");
+    // Request 1: a failed first load, so silence.
+    refused([&] { f.load(HostState{other_rate}, stereo); });
+    {
+        const auto& r = *f.failure();
+        require(r.kind == Kind::sample_rate && r.request.number == 1 &&
+                    r.request.source == HostFilterSource::state && r.sample_rate == 44100 &&
+                    r.inputs == 2 && r.outputs == 2 && r.silent &&
+                    contains(r.message, "44100 Hz") && contains(r.message, "plays silence") &&
+                    f.error() == r.message,
+                "failed first load not recorded");
+    }
+    // Request 2 succeeds and clears it.
+    f.load(HostState{a}, stereo);
+    require(!f.failure() && f.error().empty(), "success did not clear the failure");
+    // Request 3: a failed replacement keeps the working filter, not silent,
+    // and stays recorded across activations until a later request succeeds.
+    refused([&] { f.load(HostState{crossover}, stereo); });
+    require(f.failure()->kind == Kind::channels && f.failure()->request.number == 3 &&
+                !f.failure()->silent && f.failure()->outputs == 6 &&
+                contains(f.error(), "previous filter is kept"),
+            "failed replacement not recorded");
+    require(f.activate(stereo).paths.size() == 1 && f.failure() && f.failure()->request.number == 3,
+            "activation cleared a rejected request's failure");
+    // Request 4: preparation fails.
+    refused([&] {
+        f.load(HostState{a}, stereo, [](const Configuration&) { throw std::bad_alloc(); });
+    });
+    require(f.failure()->kind == Kind::preparation && f.failure()->request.number == 4 &&
+                !f.failure()->silent && contains(f.error(), "could not be prepared"),
+            "failed preparation not recorded");
+    // Request 5: beyond the format's channel bound.
+    refused([&] { f.load(HostState{wide}, std::nullopt); });
+    require(f.failure()->kind == Kind::channels && f.failure()->request.number == 5 &&
+                f.failure()->inputs == 9,
+            "channel bound not recorded");
+    // Requests that fail before decoding, numbered by the adapter or not.
+    f.reject(Kind::state_newer, "it was saved by a newer version of Convolver.");
+    require(f.failure()->kind == Kind::state_newer && f.failure()->request.number == 6 &&
+                f.failure()->sample_rate == 0 && !f.failure()->silent,
+            "newer state not recorded");
+    f.reject(Kind::filter_file, "room.cfg is missing.",
+             {HostFilterSource::file, "/music/room.cfg", 10});
+    require(f.failure()->kind == Kind::filter_file && f.failure()->request.number == 10 &&
+                f.failure()->request.source == HostFilterSource::file &&
+                f.failure()->request.path == "/music/room.cfg",
+            "adapter-numbered file request not recorded");
+    f.reject("damaged");
+    require(f.failure()->kind == Kind::state_unreadable && f.failure()->request.number == 11,
+            "numbering does not continue after an adapter's number");
+
+    // A failure found at activation belongs to the accepted filter's request,
+    // comes before a rejected request's failure and clears when the host suits
+    // the filter again; the rejected request's failure then shows again.
+    HostFilter early(8);
+    early.load(HostState{other_rate}, std::nullopt); // Request 1, accepted unchecked.
+    refused([&] { early.load(HostState{crossover}, {{44100, 2, 2}}); }); // Request 2.
+    require(early.activate(stereo).paths[0].impulse == std::vector<float>{0}, "mismatch played");
+    require(early.failure()->kind == Kind::sample_rate && early.failure()->request.number == 1 &&
+                early.failure()->silent && early.failure()->sample_rate == 44100 &&
+                contains(early.error(), "does not suit the host"),
+            "mismatch at activation not recorded");
+    // A request rejected while the activation failure lasts: failure() still
+    // explains the silence, rejection() explains the new request (to log it).
+    refused([&] { early.load(HostState{crossover}, stereo); }); // Request 3.
+    require(early.failure()->request.number == 1 && early.rejection() &&
+                early.rejection()->request.number == 3 &&
+                contains(early.rejection()->message, "6 outputs"),
+            "a request rejected during an activation failure is not its own rejection");
+    refused([&] { early.load(HostState{crossover}, {{44100, 2, 2}}); }); // Request 4.
+    require(early.activate({44100, 2, 2}).sample_rate == 44100 && early.failure() &&
+                early.failure()->request.number == 4 && !early.failure()->silent,
+            "rejected request's failure lost behind an activation failure");
+    early.fail_activation("out of memory");
+    require(early.failure()->kind == Kind::activation && early.failure()->request.number == 1 &&
+                early.failure()->silent && contains(early.error(), "out of memory"),
+            "activation failure not recorded");
+    early.activate({44100, 2, 2});
+    require(early.failure()->kind != Kind::activation && early.failure()->request.number == 4,
+            "activation failure outlived activation");
+    // A number reserved before load() (an LV2 worker generation) is never reused.
+    const auto reserved = early.next_request();
+    require(reserved == 5, "next_request does not continue the numbering");
+    early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", reserved});
+    require(!early.failure() && !early.rejection(), "empty state did not clear the failure");
+    early.reject("damaged");
+    require(early.failure()->request.number == 6, "a reserved number was reused");
+    early.load(HostState{}, std::nullopt); // An empty instance succeeds.
+    require(!early.failure(), "empty state did not clear the failure");
+    HostFilter empty(8);
+    empty.activate(stereo);
+    empty.fail_activation("out of memory");
+    require(empty.failure()->request.number == 0 && empty.failure()->inputs == 0,
+            "an instance that never loaded a filter has a request");
+
+    // Restoring a saved failure is a successful request whose instance plays
+    // silence, and the reason says so.
+    HostFilter reopened(8);
+    HostState failed_state;
+    failed_state.failed = true;
+    reopened.load(failed_state, stereo);
+    require(reopened.failure()->kind == Kind::saved_failure &&
+                reopened.failure()->request.number == 1 && reopened.failure()->silent &&
+                contains(reopened.error(), "failed to load before this state was saved"),
+            "saved failure not recorded");
+    require(reopened.activate(stereo).paths[0].impulse == std::vector<float>{0} &&
+                reopened.failure()->kind == Kind::saved_failure,
+            "activation cleared a saved failure");
+}
 // VST3-1: a filter's output channel mask is compared with the host's speakers,
 // only ever as advice; channels stay routed by bus index.
 void speaker_notices() {
@@ -503,6 +636,7 @@ int main() {
         direct_installation();
         reset_during_transition();
         filter_contract();
+        failure_reasons();
         speaker_notices();
         unequal_bypass();
         std::cout << "host lifecycle passed\n";

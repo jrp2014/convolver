@@ -60,22 +60,24 @@ struct Instance {
     std::mutex control;
     HostFilter filter{max_channels};
     std::unique_ptr<HostProcessor> host; // Exists while active.
-    // Why the last load was rejected, until a load succeeds. HostFilter keeps
-    // the same text but clears it at activation once the kept filter plays;
-    // the status port keeps showing the failure until the user loads again.
-    std::string load_error;
-    std::string activation_error; // The processor for the filter could not be built.
     // Shared with run().
     std::atomic<int> shown{static_cast<int>(Status::no_filter)};
     std::atomic<bool> bypass{false}; // Last seen on the enabled port; applied at activation.
 
     void update_status() {
         auto s = Status::no_filter;
-        if (!activation_error.empty() || !load_error.empty() || filter.failed())
+        // A failure stays recorded until a later load succeeds (PLUG-8).
+        // failed() also covers a record that could not be built.
+        if (filter.failure() || filter.failed())
             s = Status::load_failed;
         else if (filter.filter())
             s = Status::running;
         shown.store(static_cast<int>(s), std::memory_order_relaxed);
+    }
+    // Why the newest request failed, or the saved failure it restored.
+    void log_rejection() {
+        if (const auto& r = filter.rejection())
+            log_error(r->message);
     }
     void log_error(const std::string& message) {
         // Without the host's log feature this prints to stderr, which is
@@ -161,19 +163,23 @@ void connect_port(LV2_Handle handle, std::uint32_t port, void* data) {
         p.out[port - first_audio_port - ni] = static_cast<float*>(data);
 }
 
+void record_activation_failure(Instance& p, const char* why) noexcept {
+    try {
+        p.filter.fail_activation(why);
+    } catch (...) { // Out of memory for the message: nothing more to keep.
+    }
+}
+
 void activate_locked(Instance& p) {
     p.host.reset();
-    p.activation_error.clear();
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
         p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block);
     } catch (const std::exception& e) {
-        p.activation_error = std::string("The filter could not be prepared, so Convolver plays "
-                                         "silence: ") +
-                             e.what();
+        record_activation_failure(p, e.what());
     } catch (...) {
-        p.activation_error = "The filter could not be prepared, so Convolver plays silence.";
+        record_activation_failure(p, "the processor could not be built.");
     }
     if (!p.host) {
         try {
@@ -181,7 +187,7 @@ void activate_locked(Instance& p) {
                                                      p.max_block);
         } catch (...) {
         }
-        p.log_error(p.activation_error);
+        p.log_error(p.filter.error());
     }
     if (p.host) {
         p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
@@ -285,17 +291,23 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         HostState next;
         if (type != p.chunk) {
             status = LV2_STATE_ERR_BAD_TYPE;
-            p.filter.reject("The saved state has the wrong type; it should be a chunk of bytes "
+            p.filter.reject(HostFailureKind::state_unreadable,
+                            "The saved state has the wrong type; it should be a chunk of bytes "
                             "(atom:Chunk, or xsd:base64Binary in a preset file).");
-            throw std::invalid_argument(p.filter.error());
+            throw std::invalid_argument("wrong state type");
         }
         try {
             if (size > max_host_state_bytes)
                 throw std::invalid_argument("it is larger than " +
                                             std::to_string(max_host_state_bytes) + " bytes");
             next = decode_host_state(std::span(static_cast<const std::byte*>(value), size));
+        } catch (const NewerHostState& e) {
+            p.filter.reject(HostFailureKind::state_newer,
+                            std::string("The saved state could not be read: ") + e.what());
+            throw;
         } catch (const std::exception& e) {
-            p.filter.reject(std::string("The saved state could not be read: ") + e.what());
+            p.filter.reject(HostFailureKind::state_unreadable,
+                            std::string("The saved state could not be read: ") + e.what());
             throw;
         }
         // Bypass is the lv2:enabled port, which the host restores itself;
@@ -308,11 +320,9 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             if (p.host)
                 p.host->replace(c);
         });
-        p.activation_error.clear();
-        p.load_error.clear();
         p.update_status();
         if (p.filter.failed())
-            p.log_error(p.filter.error()); // A saved failure: silence again, explained.
+            p.log_rejection(); // A saved failure: silence again, explained.
         return LV2_STATE_SUCCESS;
     } catch (...) {
         // A failed first load plays silence rather than the unfiltered input.
@@ -322,9 +332,8 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             } catch (...) {
             }
         }
-        p.load_error = p.filter.error();
         p.update_status();
-        p.log_error(p.load_error);
+        p.log_rejection();
         return status;
     }
 }
@@ -342,9 +351,22 @@ LV2_State_Status restore(LV2_Handle handle, LV2_State_Retrieve_Function retrieve
 
 const LV2_State_Interface state_interface{save, restore};
 
+void read_failure(void* handle, void* context, void (*receive)(void*, const HostFailure*)) {
+    auto& p = *static_cast<Instance*>(handle);
+    try {
+        std::lock_guard lock(p.control);
+        const auto& f = p.filter.failure();
+        receive(context, f ? &*f : nullptr);
+    } catch (...) {
+    }
+}
+const TestFailureAccess test_failure{read_failure};
+
 const void* extension_data(const char* uri) {
     if (std::strcmp(uri, LV2_STATE__interface) == 0)
         return &state_interface;
+    if (std::strcmp(uri, test_failure_uri) == 0)
+        return &test_failure;
     return nullptr;
 }
 

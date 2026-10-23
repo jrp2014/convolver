@@ -101,9 +101,13 @@ ctest --test-dir build-native -N
   measured/patient plans and cached matrix processing with FFTW.
 
 - `native.host`: planar/in-place float and double buffers, invalid samples,
-  bypass/reset, concurrent and queued filter replacements, with a callback heap guard.
+  bypass/reset, concurrent and queued filter replacements, with a callback heap guard;
+  the shared adapter contract's `HostFilter`, including the failure record
+  (PLUG-8): its kind, request number and silence for each failure, kept across
+  activations until a later request succeeds.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
-  marker (and that every other state is still written as version 1), embedded configuration round trips, truncation, corrupt headers,
+  marker (and that every other state is still written as version 1), state
+  from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
   creation, Unicode paths, link/overwrite protection and competing creators.

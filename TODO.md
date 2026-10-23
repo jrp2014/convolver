@@ -59,7 +59,7 @@ boundary and C++20 in the core.
 | 1. Done 22 October | **PLUG-4:** layout list and permanent identities | `plugins/identities.json` records the layouts (discrete or named, per side) and IDs (VST3 class IDs, AU `aufx`/`Conv`/`CONV`, LV2 URIs) that every adapter reads; version-1 presets keep loading (PR #27). VST3-1 checks VST3 speaker arrangements against it (done 23 October, PR #42: a notice only). |
 | 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
-| 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 lands before LV2-2 and AU-2 settle their error paths, so no adapter discards a reason. |
+| 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 (done 23 October, PR #46) landed before LV2-2 settles its error paths, so no adapter discards a reason. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Next milestone | jrp's three conditions: the reset fix (VST3-7 follow-up, done 23 October, PR #40), **REL-2** journeys demonstrated, **REL-3** an independent user with an exact **PLUG-5** preview package. Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 5. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
@@ -177,14 +177,12 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   explanatory messages on standard error (for example, a configuration that
   matches nothing lists each candidate and what to change), and
   `--inspect`/`--validate --json` report diagnostics as JSON. The plug-ins
-  have no editor: today the VST3 adapter keeps the newest explanation in
-  `HostFilter` but shows it nowhere. It reports a preset with the wrong rate
-  or channel counts, or with corrupt state, to the host only as
-  `kResultFalse`; a mismatch found at activation activates and plays silence
-  with nothing reported; and `setActive`'s `catch (...)` drops the text of any
-  other activation failure. PLUG-8 keeps a structured reason for every failure first,
-  so this review decides presentation rather than recovering lost
-  information. The
+  have no editor: the VST3 adapter keeps a structured reason for every
+  failure (PLUG-8, done) but shows it nowhere. It reports a preset with the
+  wrong rate or channel counts, or with corrupt state, to the host only as
+  `kResultFalse`, and a mismatch found at activation activates and plays
+  silence with nothing reported. Because PLUG-8 keeps the reasons, this review
+  decides presentation rather than recovering lost information. The
   [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#loading-and-failure)
   asks for the message in the host's log and a "load failed" status, but only
   LV2 has a defined route (`log:log` and the status port). VST3 and AU have no
@@ -319,7 +317,15 @@ Shared groundwork, done once so the three streams stay independent:
   through each adapter in the PLUG-2 harness. LV2-2 extends it with
   outstanding worker loads (a request arriving during preparation, a stale
   completion, teardown with work outstanding).
-- [ ] **PLUG-8 — Keep a structured failure reason.** Today `HostFilter` keeps
+- [x] **PLUG-8 — Keep a structured failure reason.** Done 23 October 2026
+  (PR #46): `HostFailure` in `host.hpp`, kept by `HostFilter` and recorded by
+  the VST3, LV2 and AU adapters on every failure path, with tests reading it
+  through each adapter (`native.host`, `vst3.adapter`, `lv2.adapter`,
+  `au.adapter`). State from a newer Convolver is now told apart from damaged
+  state. The speaker notice stays separate, for the reason given in the
+  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2 is
+  to record `filter_file` failures from its file and worker paths, numbering
+  worker requests with `HostFilter::next_request()`. Original item: today `HostFilter` keeps
   the newest load or preparation error as one string. In VST3, `setState`
   returns `kResultFalse`; a mismatch found at activation activates and plays
   silence with nothing reported; and `setActive`'s `catch (...)` drops the
@@ -402,7 +408,9 @@ LV2 (Linux first; also PipeWire system audio):
   Progress (22 October 2026, PR #43): restoring the embedded state (presets and
   sessions) works, prepared in `restore()`; the path parameter, worker, mapped
   path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
-  sequences with outstanding worker loads.
+  sequences with outstanding worker loads. Record file and worker failures as
+  PLUG-8 records (`filter_file`, request numbers from
+  `HostFilter::next_request()` used as the generation).
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in

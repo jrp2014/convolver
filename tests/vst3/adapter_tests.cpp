@@ -11,7 +11,9 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <stdexcept>
+#include <string>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 using namespace convolver::vst3;
@@ -573,6 +575,83 @@ void failed_first_loads() {
         reopened.terminate();
     }
 }
+// PLUG-8: every rejected setState and every mismatch found at activation keeps
+// a structured reason, which the tests read even though VST3 cannot show it.
+void failure_records() {
+    using convolver::HostFailureKind;
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "failure-record initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "failure-record buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 64, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "failure-record activate");
+    require(!p.failure(), "empty instance has a failure");
+    const auto stream = [](const convolver::HostState& s) {
+        auto m = std::make_unique<MemoryStream>();
+        require(write_state(m.get(), s), "encode failure-record state");
+        m->seek(0, IBStream::kIBSeekSet, nullptr);
+        return m;
+    };
+    convolver::HostState good;
+    good.configuration =
+        convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+    auto wrong = good;
+    wrong.configuration->sample_rate = 44100;
+    require(p.setState(stream(wrong).get()) == kResultFalse, "wrong-rate state accepted");
+    auto f = p.failure();
+    require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 1 && f->silent &&
+                f->sample_rate == 44100 && f->message.find("44100 Hz") != std::string::npos,
+            "wrong-rate first load not recorded");
+    MemoryStream damaged;
+    const std::array<unsigned char, 16> junk{12, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
+    damaged.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&damaged) == kResultFalse, "damaged state accepted");
+    f = p.failure();
+    require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 2,
+            "damaged state not recorded");
+    MemoryStream newer;
+    const std::array<unsigned char, 16> v3{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
+                                           3,  0, 0, 0, 0,    0,    0,    0};
+    newer.write(const_cast<unsigned char*>(v3.data()), 16, nullptr);
+    newer.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&newer) == kResultFalse, "newer state accepted");
+    f = p.failure();
+    require(f && f->kind == HostFailureKind::state_newer && f->request.number == 3 &&
+                f->message.find("newer version of Convolver") != std::string::npos,
+            "newer state not recorded");
+    require(p.setState(stream(good).get()) == kResultOk && !p.failure(),
+            "a good state did not clear the failure");
+    // A failed replacement keeps the working filter and says so.
+    auto crossover = good;
+    crossover.configuration->output_channels = 6;
+    require(p.setState(stream(crossover).get()) == kResultFalse, "2->6 state accepted on 2x2");
+    f = p.failure();
+    require(f && f->kind == HostFailureKind::channels && f->request.number == 5 && !f->silent,
+            "failed replacement not recorded");
+    // Reactivating at another rate: the kept filter does not suit, so silence,
+    // with the reason belonging to the request that supplied it (4).
+    require(p.setActive(false) == kResultOk, "failure-record deactivate");
+    setup.sampleRate = 44100;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "activate at 44.1 kHz");
+    f = p.failure();
+    require(f && f->kind == HostFailureKind::sample_rate && f->request.number == 4 && f->silent &&
+                f->message.find("does not suit the host") != std::string::npos,
+            "mismatch at activation not recorded");
+    require(p.setActive(false) == kResultOk, "failure-record deactivate again");
+    setup.sampleRate = 48000;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "activate at 48 kHz again");
+    f = p.failure();
+    require(f && f->request.number == 5, "activation failure kept, or request 5's failure lost");
+    p.setActive(false);
+    p.terminate();
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
@@ -582,6 +661,7 @@ int run(const std::filesystem::path& preset_path) {
         placeholder_setup();
         restart_mid_transition();
         failed_first_loads();
+        failure_records();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");

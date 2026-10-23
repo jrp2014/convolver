@@ -142,12 +142,13 @@ frames, with the same output.
   cases are skipped (LV2 knows its rate and channels from instantiation) and
   the tail checks are skipped (no tail reporting).
 - `lv2.adapter`: the bundle's plug-ins and ports through lilv; instantiation
-  refusals; the status port, log messages and saved state after good and bad
-  loads; presets written by `convolver-preset` and lilv's own state round
+  refusals; the status port, log messages, saved state and failure record
+  after good and bad loads (the record through an unadvertised extension that
+  exists for the tests only); presets written by `convolver-preset` and lilv's own state round
   trip; long `run()` calls; and lifecycle sequences, one scripted and several
   seeded (loads, failed loads, audio, bypass, reset, reopening a saved
   session). A small model
-  checks the saved state, status and latency after every step, and the exact
+  checks the saved state, status, latency and failure record after every step, and the exact
   output at every reset and at the end; the transitions during audio
   (crossfades, a rejection while playing) are the harness's cases.
 - `lv2.exports` and `lv2.fft_symbols`: the library exports only

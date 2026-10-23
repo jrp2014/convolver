@@ -13,6 +13,7 @@
 #include "host.hpp"
 #include "plugin.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -21,6 +22,7 @@
 #include <lv2/log/log.h>
 #include <lv2/presets/presets.h>
 #include <random>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 
@@ -274,6 +276,12 @@ void status_and_log(host::World& world, const Fixture& f) {
     check(p->log.contains(LV2_LOG__Error, "does not resample"),
           label + "failed first load: the explanation reaches log:log");
     {
+        const auto r = p->failure();
+        check(r && r->kind == HostFailureKind::sample_rate && r->request.number == 1 && r->silent &&
+                  p->log.contains(LV2_LOG__Error, r->message),
+              label + "failed first load: recorded, and the log carries its message");
+    }
+    {
         const auto s = decode_host_state(p->save().bytes);
         check(s.failed && !s.configuration, label + "failed first load is saved as a failure");
     }
@@ -282,6 +290,7 @@ void status_and_log(host::World& world, const Fixture& f) {
     check(p->restore(state_of(a), chunk(world)) == LV2_STATE_SUCCESS, label + "valid load");
     p->run_empty();
     check(p->status == static_cast<float>(lv2::Status::running), label + "status running");
+    check(!p->failure(), label + "a valid load clears the failure");
 
     p->log.messages.clear();
     check(p->restore(state_of(wrong_outputs(a)), chunk(world)) != LV2_STATE_SUCCESS,
@@ -291,6 +300,15 @@ void status_and_log(host::World& world, const Fixture& f) {
           label + "failed replacement: status load failed");
     check(p->log.contains(LV2_LOG__Error, "previous filter is kept"),
           label + "failed replacement: logged, previous filter kept");
+    check(p->failure() && p->failure()->kind == HostFailureKind::channels &&
+              p->failure()->request.number == 3 && !p->failure()->silent,
+          label + "failed replacement: recorded as channels, not silent");
+    p->deactivate();
+    p->activate();
+    p->run_empty();
+    check(p->failure() && p->failure()->request.number == 3 &&
+              p->status == static_cast<float>(lv2::Status::load_failed),
+          label + "failed replacement: still recorded after reactivation");
     check(same(decode_host_state(p->save().bytes).configuration, a),
           label + "failed replacement: saved state is the running filter");
 
@@ -298,10 +316,23 @@ void status_and_log(host::World& world, const Fixture& f) {
     check(p->restore(state_of(a), world.urids().map(LV2_ATOM__String)) == LV2_STATE_ERR_BAD_TYPE,
           label + "state of the wrong type is rejected");
     check(p->log.contains(LV2_LOG__Error, "wrong type"), label + "wrong type is logged");
+    check(p->failure() && p->failure()->kind == HostFailureKind::state_unreadable &&
+              p->failure()->request.number == 4,
+          label + "wrong type: recorded as unreadable state");
     const std::vector<std::byte> garbage(40, std::byte{0x5a});
     p->log.messages.clear();
     check(p->restore(garbage, chunk(world)) != LV2_STATE_SUCCESS, label + "corrupt state rejected");
     check(p->log.contains(LV2_LOG__Error, "could not be read"), label + "corrupt state is logged");
+    check(p->failure() && p->failure()->kind == HostFailureKind::state_unreadable &&
+              p->failure()->request.number == 5,
+          label + "corrupt state: recorded as unreadable state");
+    const auto newer =
+        std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0});
+    p->log.messages.clear();
+    check(p->restore(std::as_bytes(std::span(newer)), chunk(world)) != LV2_STATE_SUCCESS &&
+              p->failure() && p->failure()->kind == HostFailureKind::state_newer &&
+              p->log.contains(LV2_LOG__Error, "newer version of Convolver"),
+          label + "state from a newer Convolver: rejected, recorded and explained");
     check(same(decode_host_state(p->save().bytes).configuration, a),
           label + "rejections keep the running filter saved");
     check(p->restore_empty() == LV2_STATE_SUCCESS &&
@@ -422,6 +453,10 @@ void callback_sizes(host::World& world, const Fixture& f) {
 struct Model {
     std::optional<Configuration> saved;
     bool failed = false, error = false, bypass = false;
+    // PLUG-8: requests made to this instance, and the failure it keeps.
+    std::uint64_t requests = 0;
+    std::optional<HostFailureKind> kind;
+    std::uint64_t failed_request = 0;
     lv2::Status status() const {
         if (error)
             return lv2::Status::load_failed;
@@ -479,6 +514,8 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
                   label() + ": accepted");
             m.saved = c;
             m.failed = m.error = false;
+            ++m.requests;
+            m.kind.reset();
             break;
         }
         case 2: // A load that does not suit the host.
@@ -487,6 +524,8 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
                   label() + ": rejected");
             m.failed = !m.saved;
             m.error = true;
+            m.kind = HostFailureKind::sample_rate;
+            m.failed_request = ++m.requests;
             break;
         case 3: // Some audio, which may start a crossfade.
             trace << " process";
@@ -512,6 +551,9 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
             p->enabled = m.bypass ? 0.f : 1.f; // The host restores its port values.
             check(p->restore(saved.bytes, saved.type) == LV2_STATE_SUCCESS, label() + ": reopened");
             m.error = m.failed; // A saved failure is reported again; a kept filter is not.
+            m.requests = 1;     // A new instance, whose first request is the restore.
+            m.kind = m.failed ? std::optional(HostFailureKind::saved_failure) : std::nullopt;
+            m.failed_request = 1;
             check(p->log.contains(LV2_LOG__Error, "failed to load before") == m.failed,
                   label() + ": a reopened failure is explained in the log, and only then");
             p->activate();
@@ -529,6 +571,11 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
               label() + ": status " + std::to_string(p->status) + ", expected " +
                   std::to_string(static_cast<int>(m.status())));
         check(p->latency == 256, label() + ": latency");
+        const auto r = p->failure();
+        check(r.has_value() == m.kind.has_value() &&
+                  (!r || (r->kind == *m.kind && r->request.number == m.failed_request &&
+                          r->silent == !m.saved)),
+              label() + ": failure record");
     }
     p->deactivate();
     p->activate();

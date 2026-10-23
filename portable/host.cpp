@@ -18,21 +18,28 @@ std::string count(std::size_t n, const char* noun) {
 std::string counts(std::size_t inputs, std::size_t outputs) {
     return count(inputs, "input") + " and " + count(outputs, "output");
 }
-// Why a filter does not suit the host, or empty if it does.
-std::string mismatch(const Configuration& c, const HostLayout& host) {
+struct Mismatch {
+    HostFailureKind kind;
+    std::string why;
+};
+// Why a filter does not suit the host, or nothing if it does.
+std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host) {
     if (c.sample_rate != host.sample_rate)
-        return "The filter was made for " + std::to_string(c.sample_rate) +
-               " Hz, but the host runs at " + std::to_string(host.sample_rate) +
-               " Hz. Convolver does not resample: load a filter made for " +
-               std::to_string(host.sample_rate) + " Hz, or set the host to " +
-               std::to_string(c.sample_rate) + " Hz.";
+        return Mismatch{HostFailureKind::sample_rate,
+                        "The filter was made for " + std::to_string(c.sample_rate) +
+                            " Hz, but the host runs at " + std::to_string(host.sample_rate) +
+                            " Hz. Convolver does not resample: load a filter made for " +
+                            std::to_string(host.sample_rate) + " Hz, or set the host to " +
+                            std::to_string(c.sample_rate) + " Hz."};
     if (c.input_channels != host.inputs || c.output_channels != host.outputs)
-        return "The filter has " + counts(c.input_channels, c.output_channels) +
-               ", but the plug-in is set up with " + counts(host.inputs, host.outputs) +
-               ". Give the plug-in " + counts(c.input_channels, c.output_channels) +
-               " in the host's track or routing settings, or load a filter made for " +
-               counts(host.inputs, host.outputs) + ".";
-    return {};
+        return Mismatch{HostFailureKind::channels,
+                        "The filter has " + counts(c.input_channels, c.output_channels) +
+                            ", but the plug-in is set up with " +
+                            counts(host.inputs, host.outputs) + ". Give the plug-in " +
+                            counts(c.input_channels, c.output_channels) +
+                            " in the host's track or routing settings, or load a filter made for " +
+                            counts(host.inputs, host.outputs) + "."};
+    return std::nullopt;
 }
 // WAV channel-mask bits 0 to 17, the speakers every format shares.
 constexpr std::uint32_t shared_speakers = (1U << identity::speakers.size()) - 1;
@@ -138,69 +145,160 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
     return c;
 }
 
+const std::string& HostFilter::error() const noexcept {
+    static const std::string none;
+    const auto& f = failure();
+    return f ? f->message : none;
+}
+
+HostRequest HostFilter::numbered(HostRequest request) {
+    request.number = request.number ? request.number : requests_ + 1;
+    requests_ = std::max(requests_, request.number);
+    return request;
+}
+
+void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
+                        const Configuration* carried) {
+    // Build everything first, so running out of memory changes nothing.
+    HostFailure f;
+    f.kind = kind;
+    f.request = request;
+    if (carried) {
+        f.sample_rate = carried->sample_rate;
+        f.inputs = carried->input_channels;
+        f.outputs = carried->output_channels;
+    }
+    f.silent = !filter_;
+    f.message = (filter_ ? "Filter not loaded; the previous filter is kept. "
+                         : "Filter not loaded, so Convolver plays silence. ") +
+                why;
+    failed_ = f.silent;
+    load_failure_ = std::move(f);
+}
+
+namespace {
+// A rejection load() has already recorded, told apart from any other
+// std::invalid_argument thrown while checking.
+class Refused : public std::invalid_argument {
+  public:
+    using std::invalid_argument::invalid_argument;
+};
+} // namespace
+
+void HostFilter::refuse(HostFailureKind kind, std::string why, const HostRequest& request,
+                        const Configuration* carried) {
+    record(kind, std::move(why), request, carried);
+    throw Refused(load_failure_->message);
+}
+
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
-                      const std::function<void(const Configuration&)>& install) {
+                      const std::function<void(const Configuration&)>& install,
+                      HostRequest request) {
+    request = numbered(std::move(request));
     auto& next = state.configuration;
+    const Configuration* carried = next ? &*next : nullptr;
     try {
         if (state.failed && next)
-            throw std::invalid_argument("A failed load cannot hold a filter.");
+            refuse(HostFailureKind::state_unreadable, "A failed load cannot hold a filter.",
+                   request, carried);
         if (next && (!next->input_channels || !next->output_channels ||
                      next->input_channels > max_channels_ || next->output_channels > max_channels_))
-            throw std::invalid_argument("The filter has " +
-                                        counts(next->input_channels, next->output_channels) +
-                                        "; this plug-in supports 1 to " +
-                                        std::to_string(max_channels_) + " channels on each side.");
+            refuse(HostFailureKind::channels,
+                   "The filter has " + counts(next->input_channels, next->output_channels) +
+                       "; this plug-in supports 1 to " + std::to_string(max_channels_) +
+                       " channels on each side.",
+                   request, carried);
         if (host) {
-            const auto unfiltered =
-                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
             if (next) {
-                if (auto why = mismatch(*next, *host); !why.empty())
-                    throw std::invalid_argument(why);
+                if (auto m = mismatch(*next, *host))
+                    refuse(m->kind, std::move(m->why), request, carried);
             }
-            if (install)
-                install(next ? *next : unfiltered);
+            if (install) {
+                const auto unfiltered =
+                    next ? Configuration{} : unfiltered_configuration(*host, state.failed);
+                try {
+                    install(next ? *next : unfiltered);
+                } catch (const std::exception& e) {
+                    refuse(HostFailureKind::preparation,
+                           std::string("The filter could not be prepared: ") + e.what(), request,
+                           carried);
+                }
+            }
         }
-    } catch (const std::exception& e) {
-        reject(e.what());
-        throw std::invalid_argument(error_);
+    } catch (const Refused&) {
+        throw; // Recorded above.
     } catch (...) {
-        reject("The filter could not be prepared.");
-        throw std::invalid_argument(error_);
+        // Out of memory building a message, or a non-standard exception.
+        refuse(HostFailureKind::preparation, "The filter could not be prepared.", request, carried);
+    }
+    // Build what is kept before changing anything, so running out of memory
+    // leaves the previous state whole. Without the host's configuration,
+    // activation checks the speakers.
+    auto notice = host && next ? speaker_notice(*next, *host) : std::string();
+    std::optional<HostFailure> saved_failure;
+    if (state.failed) {
+        HostFailure f;
+        f.kind = HostFailureKind::saved_failure;
+        f.request = request;
+        f.silent = true;
+        f.message = "A filter failed to load before this state was saved, so Convolver plays "
+                    "silence. Load a filter made for the host's sample rate and channels.";
+        saved_failure = std::move(f);
     }
     filter_ = std::move(next);
     failed_ = state.failed;
-    error_.clear();
-    // Without the host's configuration, activation checks the speakers.
-    notice_ = host && filter_ ? speaker_notice(*filter_, *host) : std::string();
-    if (failed_)
-        error_ = "A filter failed to load before this state was saved, so Convolver plays "
-                 "silence. Load a filter made for the host's sample rate and channels.";
+    accepted_ = std::move(request);
+    load_failure_ = std::move(saved_failure);
+    activation_failure_.reset();
+    notice_ = std::move(notice);
 }
 
-void HostFilter::reject(std::string why) {
-    failed_ = !filter_;
-    error_ = (filter_ ? "Filter not loaded; the previous filter is kept. "
-                      : "Filter not loaded, so Convolver plays silence. ") +
-             why;
+std::uint64_t HostFilter::next_request() noexcept {
+    return ++requests_;
+}
+
+void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {
+    record(kind, std::move(why), numbered(std::move(request)), nullptr);
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {
     notice_.clear();
-    if (!filter_) {
-        if (!failed_)
-            error_.clear();
+    activation_failure_.reset();
+    if (!filter_)
         return unfiltered_configuration(host, failed_);
+    if (auto m = mismatch(*filter_, host)) {
+        HostFailure f;
+        f.kind = m->kind;
+        f.request = accepted_;
+        f.sample_rate = filter_->sample_rate;
+        f.inputs = filter_->input_channels;
+        f.outputs = filter_->output_channels;
+        f.silent = true;
+        f.message = "The saved filter does not suit the host, so Convolver plays silence until "
+                    "it does. " +
+                    m->why;
+        activation_failure_ = std::move(f);
+        return unfiltered_configuration(host, true);
     }
-    auto why = mismatch(*filter_, host);
-    if (why.empty()) {
-        error_.clear();
-        notice_ = speaker_notice(*filter_, host);
-        return *filter_;
+    notice_ = speaker_notice(*filter_, host);
+    return *filter_;
+}
+
+void HostFilter::fail_activation(std::string why) {
+    HostFailure f;
+    f.kind = HostFailureKind::activation;
+    f.request = accepted_;
+    if (filter_) {
+        f.sample_rate = filter_->sample_rate;
+        f.inputs = filter_->input_channels;
+        f.outputs = filter_->output_channels;
     }
-    error_ = "The saved filter does not suit the host, so Convolver plays silence until it "
-             "does. " +
-             why;
-    return unfiltered_configuration(host, true);
+    f.silent = true;
+    f.message = "The filter could not be prepared when the host started the plug-in, so "
+                "Convolver does not play it: " +
+                why;
+    notice_.clear();
+    activation_failure_ = std::move(f);
 }
 
 struct HostProcessor::Impl {

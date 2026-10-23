@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 using namespace convolver;
 void require(bool v, const char* m) {
     if (!v)
@@ -69,6 +70,31 @@ int main() {
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 2, 0, 0, 0}),
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0})})
             rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad))); });
+        // PLUG-8: a newer state version is told apart from damaged state.
+        for (const unsigned char format : {3, 0xff}) {
+            const auto newer =
+                std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, format, 0, 0, 0, 0, 0, 0, 0});
+            try {
+                (void)decode_host_state(std::as_bytes(std::span(newer)));
+                throw std::runtime_error("newer state version accepted");
+            } catch (const NewerHostState& e) {
+                const std::string why = e.what();
+                require(why.find("newer version of Convolver") != std::string::npos &&
+                            why.find("state version " + std::to_string(format)) !=
+                                std::string::npos,
+                        "newer state version not explained");
+            }
+        }
+        for (auto other : {std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 0, 0, 0, 0}),
+                           std::to_array<unsigned char>({1, 2, 3, 4, 1, 0, 0, 0})}) {
+            try {
+                (void)decode_host_state(std::as_bytes(std::span(other)));
+                throw std::runtime_error("malformed state accepted");
+            } catch (const NewerHostState&) {
+                throw std::runtime_error("malformed state reported as newer");
+            } catch (const std::invalid_argument&) {
+            }
+        }
         auto failed_with_filter = encode_host_state(identity);
         failed_with_filter[4] = std::byte{2};
         failed_with_filter[8] = std::byte{5};

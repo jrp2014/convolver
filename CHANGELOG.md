@@ -35,6 +35,14 @@ Until 1.0 the C++ API may change between minor versions.
   first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
+- `HostFailure` and `HostFilter::failure()` (PLUG-8): every failed load, and
+  every reason a plug-in plays silence, is kept as a value (what failed, the
+  request it belongs to, whether a working filter still plays, and the
+  explanation), not just a string. The VST3, LV2 and AU adapters record it
+  on every failure path, including activation failures VST3 used to drop.
+  Where it is shown is DIAG-1's decision. `decode_host_state` throws
+  `NewerHostState` for state from a newer Convolver, and the message says to
+  update Convolver rather than calling the state damaged.
 - `speaker_notice` and `HostFilter::notice()` (VST3-1) compare the speakers a
   filter's outputs are labelled for (the `.cfg` channel mask) with the host's
   output speakers, now carried in `HostLayout`, and explain which outputs

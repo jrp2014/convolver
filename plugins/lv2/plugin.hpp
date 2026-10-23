@@ -3,6 +3,7 @@
 // and its tests. generate_ttl.py writes the same numbers into convolver.ttl;
 // lv2.adapter checks that the two agree.
 #pragma once
+#include "convolver/host.hpp"
 #include <cstdint>
 
 namespace convolver::lv2 {
@@ -20,4 +21,15 @@ enum class Status : int { running = 0, no_filter = 1, load_failed = 2, loading =
 // run() calls are processed in pieces of at most this many frames.
 inline constexpr std::uint32_t default_max_block = 4096;
 inline constexpr std::uint32_t largest_max_block = 65536;
+
+// For the tests only, never advertised in convolver.ttl: extension_data() with
+// this URI gives the PLUG-8 failure record, which hosts see only as the status
+// port and the log message. Not a stable interface; it may change any time.
+inline constexpr const char* test_failure_uri = "urn:convolver:lv2-test:failure";
+struct TestFailureAccess {
+    // Calls `receive` with the instance's failure record (null if none) under
+    // the control lock. Passes a C++ object, so the caller must be built with
+    // the same compiler and standard library (the tests are).
+    void (*read)(void* instance, void* context, void (*receive)(void*, const HostFailure*));
+};
 } // namespace convolver::lv2

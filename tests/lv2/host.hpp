@@ -4,6 +4,7 @@
 // (urid:map, log:log, options with bufsz:maxBlockLength), connects ports by
 // symbol, and calls the state interface as hosts do.
 #pragma once
+#include "convolver/host.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -125,6 +126,9 @@ class Plugin {
         std::size_t properties = 0;
     };
     Saved save();
+    // The PLUG-8 failure record, read through the plug-in's test-only
+    // extension (plugin.hpp); empty when there is none.
+    std::optional<HostFailure> failure() const;
     Log log;
 
   private:

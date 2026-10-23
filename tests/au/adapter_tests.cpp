@@ -290,6 +290,16 @@ void rejected_presets() {
     check(unit.configure(48000, 2, 2, 512), "formats");
     check(unit.initialize(), "initialization");
     check(unit.load(state_of(filter)), "first filter");
+    require(!unit.failure().present, "a valid first filter left a failure");
+    // PLUG-8: what failed, which request, and whether the unit plays silence.
+    // `request` 0: any request number.
+    const auto recorded = [&](HostFailureKind kind, UInt64 request, bool silent, const char* what) {
+        const auto f = unit.failure();
+        require(f.present && f.kind == static_cast<UInt32>(kind) &&
+                    (!request || f.request == request) && (f.silent != 0) == silent &&
+                    f.message[0] != 0,
+                std::string(what) + " not recorded as its failure");
+    };
     const auto keep = encode_host_state(state_of(filter));
     const auto still_kept = [&](const char* what) {
         require(encode_host_state(unit.saved()) == keep,
@@ -317,6 +327,7 @@ void rejected_presets() {
             }) != noErr,
             "another plug-in's preset accepted");
     still_kept("another plug-in's preset");
+    recorded(HostFailureKind::state_unreadable, 2, false, "another plug-in's preset");
     // The state of one part of a multi-part instrument, not of the whole unit.
     require(modified([&](CFMutableDictionaryRef d) { set_number(d, kAUPresetPartKey, 0); }) !=
                 noErr,
@@ -343,6 +354,18 @@ void rejected_presets() {
             }) != noErr,
             "a truncated convolver-state accepted");
     still_kept("a truncated convolver-state");
+    recorded(HostFailureKind::state_unreadable, 0, false, "a truncated convolver-state");
+    require(modified([&](CFMutableDictionaryRef d) {
+                const auto key = au_test::state_key();
+                const UInt8 newer[] = {'C', 'N', 'V', 'S', 3, 0, 0, 0, 0, 0, 0, 0};
+                const auto data = CFDataCreate(nullptr, newer, sizeof newer);
+                CFDictionarySetValue(d, key, data);
+                CFRelease(data);
+                CFRelease(key);
+            }) != noErr,
+            "state from a newer Convolver accepted");
+    still_kept("state from a newer Convolver");
+    recorded(HostFailureKind::state_newer, 0, false, "state from a newer Convolver");
     // AUBase reads "data" (parameter values) without bounds checks; this unit
     // has no parameters and ignores it, so a damaged one is harmless.
     require(modified([&](CFMutableDictionaryRef d) {
@@ -354,6 +377,7 @@ void rejected_presets() {
             "a preset with unreadable parameter data rejected");
     require(encode_host_state(unit.saved()) == encode_host_state(state_of(stereo(48000, 50))),
             "the preset with unreadable parameter data did not load");
+    require(!unit.failure().present, "a successful load did not clear the failure");
     // Not a dictionary at all.
     const auto text = CFSTR("not a preset");
     require(unit.restore(text) != noErr, "a string accepted as ClassInfo");
@@ -363,12 +387,23 @@ void rejected_presets() {
     check(failed.configure(48000, 2, 2, 512), "formats");
     check(failed.initialize(), "initialization");
     require(failed.load(state_of(stereo(44100))) != noErr, "a 44.1 kHz filter accepted at 48 kHz");
+    {
+        const auto f = failed.failure();
+        require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::sample_rate) &&
+                    f.request == 1 && f.silent && f.sample_rate == 44100 &&
+                    std::string(f.message).find("44100 Hz") != std::string::npos,
+                "a failed first load not recorded as a sample-rate failure");
+    }
     const auto saved = failed.saved();
     require(saved.failed && !saved.configuration, "a failed first load was not saved as failed");
     Unit reopened;
     check(reopened.configure(48000, 2, 2, 512), "formats");
     check(reopened.load(saved), "restoring a saved failed load");
     check(reopened.initialize(), "initialization");
+    require(reopened.failure().present &&
+                reopened.failure().kind == static_cast<UInt32>(HostFailureKind::saved_failure) &&
+                reopened.failure().silent,
+            "a reopened failed load not recorded as a saved failure");
     Buffers b(2, 2, 512);
     std::uint32_t seed = 3;
     b.noise(seed);
@@ -510,6 +545,21 @@ void layout_probe_before_restore() {
             "a rejected restore replaced the filter");
 }
 
+// PLUG-8: a processor that cannot be built at initialization is recorded as an
+// activation failure, and the unit refuses to initialize.
+void failed_initialization() {
+    Unit unit;
+    const UInt32 too_many = (1U << 20) + 1; // More frames per slice than HostProcessor takes.
+    check(unit.configure(48000, 2, 2, too_many), "formats with too many frames per slice");
+    require(unit.initialize() == kAudioUnitErr_FailedInitialization,
+            "initialized with more frames per slice than the processor takes");
+    const auto f = unit.failure();
+    require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::activation) && f.silent &&
+                f.request == 0 &&
+                std::string(f.message).find("could not be prepared") != std::string::npos,
+            "a failed initialization was not recorded as an activation failure");
+}
+
 void render_requires_initialization() {
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "formats");
@@ -531,6 +581,7 @@ int main() {
         no_allocation_while_rendering();
         layout_probe_before_restore();
         render_requires_initialization();
+        failed_initialization();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

@@ -171,6 +171,17 @@ class Unit {
               "timing property");
         return value;
     }
+    // The PLUG-8 failure record, through the unit's test-only property.
+    au::TestFailure failure() {
+        au::TestFailure value;
+        UInt32 size = sizeof value;
+        check(AudioUnitGetProperty(unit_, au::test_failure_property, kAudioUnitScope_Global, 0,
+                                   &value, &size),
+              "test failure property");
+        if (size != sizeof value)
+            throw std::runtime_error("the test failure property has the wrong size");
+        return value;
+    }
     void set_bypass(bool on) {
         const UInt32 value = on ? 1 : 0;
         check(AudioUnitSetProperty(unit_, kAudioUnitProperty_BypassEffect, kAudioUnitScope_Global,

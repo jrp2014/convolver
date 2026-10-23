@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host.hpp"
 #include "convolver_identities.hpp"
+#include "plugin.hpp"
 #include "presets.hpp"
 #include <array>
 #include <cstdarg>
@@ -162,6 +163,19 @@ Plugin::~Plugin() {
     if (active_)
         deactivate();
     lilv_instance_free(instance_);
+}
+std::optional<HostFailure> Plugin::failure() const {
+    const auto* access = static_cast<const lv2::TestFailureAccess*>(
+        lilv_instance_get_extension_data(instance_, lv2::test_failure_uri));
+    if (!access)
+        throw std::runtime_error("the plug-in has no test failure access");
+    std::optional<HostFailure> copy;
+    access->read(lilv_instance_get_handle(instance_), &copy,
+                 [](void* context, const HostFailure* f) {
+                     if (f)
+                         *static_cast<std::optional<HostFailure>*>(context) = *f;
+                 });
+    return copy;
 }
 void Plugin::activate() {
     lilv_instance_activate(instance_);

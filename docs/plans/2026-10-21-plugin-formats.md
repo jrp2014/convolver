@@ -283,6 +283,26 @@ worker completions, and clears it when a later request succeeds. Tests read it
 through the adapter even where the format cannot display it yet. Notices that
 are not failures use the same record unless PLUG-8 records why not.
 
+Implemented 23 October 2026 by PLUG-8 (PR #46): `HostFailure` in
+[`host.hpp`](../../include/convolver/host.hpp), returned by
+`HostFilter::failure()`. A rejected request's reason stays until a later
+request succeeds, across activations, so the "load failed" status does not
+disappear when the host restarts the plug-in. A mismatch found at activation
+belongs to the request that supplied the filter, comes first while it lasts,
+and clears at the next activation that suits the filter. Restoring a saved
+failed load is a successful request whose instance plays silence, so it keeps
+a reason of its own kind (the original reason is not saved; the state format
+is unchanged). The speaker-layout notice stays a separate string
+(`HostFilter::notice()`): it never changes what plays, and it describes the
+host as it is now rather than a request, so it is recomputed at every check
+instead of being kept until a later request succeeds. Adapters log
+`HostFilter::rejection()`, the newest request's own reason, when a load is
+rejected, so a failure found at activation never hides why the new preset was
+refused. A host format that the adapter refuses before any filter is
+involved (an Audio Unit asked for different input and output sample rates)
+is returned to the host as an error and logged, but not recorded: the unit
+does not start, and no filter request failed.
+
 ### Initial restoration and live replacement
 
 - **Initial restoration** installs the filter directly: when no audio has been
