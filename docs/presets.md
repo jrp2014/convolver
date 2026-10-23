@@ -19,7 +19,8 @@
 - A preset must match the host's sample rate and channel counts. A plug-in that
   cannot use a preset as its first filter plays **silence** and reports an error,
   rather than passing unfiltered audio to your speakers.
-- `convolver-vst3-preset` still works exactly as before, for existing scripts.
+- `convolver-vst3-preset` still works exactly as before, for existing scripts,
+  in source builds. Preview packages contain only `convolver-preset`.
 
 Contents: [make a preset](#make-a-preset) · [convert a VST3 preset](#convert-a-vst3-preset) ·
 [load it in a host](#load-it-in-a-host) · [when a preset does not fit](#when-a-preset-does-not-fit) ·
@@ -33,7 +34,8 @@ read, so the same commands work when they arrive.
 ## Make a preset
 
 `convolver-preset` is built with the [CLI](portable-core.md) (`build/convolver-preset`,
-or `build/Release/` with Visual Studio). It needs no plug-in SDK.
+or `build/Release/` with Visual Studio). It needs no plug-in SDK. Preview
+packages have it in `bin/`.
 
 ```sh
 convolver-preset room.cfg room.vstpreset
