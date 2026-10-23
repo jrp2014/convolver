@@ -3,8 +3,8 @@
 
 [Documentation index](README.md) · [TODO](../TODO.md) · [Release record](releases/developer-preview.md)
 
-**In short:** status checked on 22 October 2026 against `main` at `63562ff`
-(0.4.19). Nothing has been published yet: there are no GitHub releases, and
+**In short:** status checked on 23 October 2026 against `main` at `4ce79f9`
+(0.4.20). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3 plug-in are
 implemented and tested automatically; no named host has been tested and no
@@ -42,8 +42,8 @@ documentation alone.
 | --- | --- | --- | --- | --- |
 | Command-line renderer `convolver` ([reference](portable-core.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | No; build from source. Not in the preview package |
 | Configuration inspection and validation ([compatibility](configuration-compatibility.md)) | Yes | Yes: parser tests, a corpus of example configurations, and replay of inputs found by fuzzing | Other readers of `.cfg` not checked (CFG-1) | No |
-| Preset tool `convolver-preset` ([guide](presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | No; joins the preview package with PLUG-5 |
-| Equalizer APO export ([guide](equalizer-apo.md)) | Yes | Against a model of Equalizer APO 1.4.2 only; a check in Equalizer APO itself is HOST-4 (in progress) | Not run in Equalizer APO yet | No |
+| Preset tool `convolver-preset` ([guide](presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | No; in the preview package since PR #38, not yet published |
+| Equalizer APO export ([guide](equalizer-apo.md)) | Yes | Against a model of Equalizer APO 1.4.2 only; a check in Equalizer APO itself is HOST-4 (in progress) | Not run in Equalizer APO yet | No; in the preview package since PR #38, not yet published |
 | VST3 plug-in ([guide](vst3.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Carla suggested) | No; preview candidates are CI artifacts only |
 | LV2 plug-in | In development (LV2-1) | Planned through the shared harness | None | No |
 | AU plug-in | In development (AU-1, AU-2) | Planned through the shared harness and `auval` | None | No |
@@ -87,7 +87,7 @@ still jrp's choice.
 | --- | --- | --- | --- |
 | Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Fix in review, not merged |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
-| An exact preview package: plug-ins, preset tool, examples and guides (the CLI only if jrp decides to ship it) | jrp's milestone | PLUG-5 | Tools being added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); not complete |
+| An exact preview package: plug-ins, preset tool, examples and guides (the CLI only if jrp decides to ship it) | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); journey presets and the CLI question remain |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; needs a tester chosen by jrp |
 | Lifecycle sequences checked against a reference model | Proposed here, so the next defect of this kind is caught | PLUG-7 | Not started |
 | Smoke test in at least one named host per format in the preview | Proposed here, already the preview gate in the plug-in plan | HOST-1 | Not run |
