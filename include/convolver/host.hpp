@@ -202,7 +202,7 @@ class HostFilter {
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, prepare, publish, collect, destruction;
-// serialize these calls. Audio: process, set_bypass, reset, mute; one audio
+// serialize these calls. Audio: process, set_bypass, reset, mute, publications; one audio
 // thread per instance. Control and audio may overlap only for replace, prepare,
 // publish and collect. Teardown requires stopped audio.
 class HostProcessor {
@@ -243,12 +243,22 @@ class HostProcessor {
     void reset() noexcept;
     void set_bypass(bool) noexcept;
     // Audio thread: the current filter ramps to silence over 64 frames and
-    // stays silent until the next published filter takes over, which then
-    // fades in from silence as any replacement does. Bypass still passes the
-    // dry signal. For a failure the audio thread finds itself, before the
-    // control side can publish silence: LV2's run() refusing an empty
-    // instance's first load (no worker, or a full worker queue).
+    // stays silent until a filter published after this call takes over,
+    // which then fades in from silence as any replacement does; one published
+    // before it (still waiting for the audio thread) is silenced too. Bypass
+    // still passes the dry signal. For a failure the audio thread finds
+    // itself, before the control side can publish silence: LV2's run()
+    // refusing an empty instance's first load (no worker, or a full worker
+    // queue).
     void mute() noexcept;
+    // The same for publications up to `through`, a count publications()
+    // returned. An adapter that decides to mute from a flag its control side
+    // clears before publishing reads the count first, then the flag, so a
+    // filter published after the flag was cleared is never silenced.
+    void mute(std::uint64_t through) noexcept;
+    // Audio thread: how many filters replace() and publish() have handed
+    // over so far.
+    std::uint64_t publications() const noexcept;
     std::size_t latency_frames() const noexcept;
     std::size_t tail_frames() const noexcept;
     // Missing input channels mean silence; null output channels are discarded.

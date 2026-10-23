@@ -763,6 +763,40 @@ void muting() {
                                                : 3.25f)) < 1e-5,
                 "filter after a muted reset not installed directly");
     fading.collect();
+    // PLUG-7: a filter published before mute() but not yet picked up by the
+    // audio thread is silenced too; only one published after it plays. Found
+    // in LV2: restoring an empty state while active, then run() refusing a
+    // file, played the empty instance's unfiltered audio.
+    for (const bool started : {true, false}) {
+        HostProcessor early(mono(1), 512, 8);
+        if (started)
+            run(early, 64);
+        early.replace(mono(2));
+        audio_thread = true;
+        early.mute();
+        audio_thread = false;
+        run(early, 512);
+        require(silent_from(started ? 300 : 0, 512),
+                "a filter published before mute() was heard when picked up");
+        early.replace(mono(3));
+        run(early, 512);
+        require(std::abs(output[511] - 3.25f) < 1e-5, "a filter published after mute() is silent");
+        early.collect();
+    }
+    // mute(through): what was published after the count stays audible.
+    HostProcessor counted(mono(1), 512, 8);
+    run(counted, 64);
+    audio_thread = true;
+    const auto seen = counted.publications();
+    audio_thread = false;
+    counted.replace(mono(2));
+    audio_thread = true;
+    counted.mute(seen);
+    audio_thread = false;
+    run(counted, 512);
+    require(seen == 0 && counted.publications() == 1 && std::abs(output[511] - 2.25f) < 1e-5,
+            "mute(through) silenced a later publication");
+    counted.collect();
 }
 // A load is a transaction: whichever allocation runs out of memory, what
 // plays (the last configuration `install` published) is what the filter
