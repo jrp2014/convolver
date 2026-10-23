@@ -102,13 +102,14 @@ paths, and records are never edited.
    `check_repository.py` fail when a file whose paths it checks is missing,
    instead of skipping it.
 
-## Open questions for jrp
+## Decisions
 
-1. One user page for all plug-in formats (`use/plugins.md`, with a per-format
-   table), or one per format? Proposed: one page, since most behaviour is
-   shared.
-2. Drop finished items from `TODO.md`, since each is in `CHANGELOG.md` and its
-   pull request? Proposed: yes.
-3. Retire `REVIEW.md` into `project/status.md`? Proposed: yes.
-4. Ship all of `docs/use/` in preview packages? Proposed: yes.
-5. Keep a decisions log (`project/decisions.md`)? Proposed: yes.
+jrp accepted all five proposals on 23 October 2026 (owner's decision):
+
+1. **One user page for all plug-in formats:** `use/plugins.md`, with a
+   per-format table, since most behaviour is shared.
+2. **TODO holds open work only:** finished items are dropped, since each is in
+   `CHANGELOG.md` and its pull request.
+3. **`REVIEW.md` is retired** into `project/status.md`.
+4. **All of `docs/use/` ships** in preview packages.
+5. **A decisions log** is kept in `project/decisions.md`.

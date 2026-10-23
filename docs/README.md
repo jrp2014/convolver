@@ -145,7 +145,7 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
 - [Documentation by reader](plans/2026-10-23-documentation-by-reader.md)
   (DOC-4): the move into `use/`, `develop/` and `project/`, which page goes
-  where, and the open questions for the remaining steps.
+  where, and jrp's decisions for the remaining steps.
 - [Plug-in distribution](plans/2026-10-18-plugin-distribution.md) and its
   [design](plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
   the 18 October release design. The packaging it describes is merged; signing
