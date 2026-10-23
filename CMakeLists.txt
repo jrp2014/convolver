@@ -35,6 +35,14 @@ option(CONVOLVER_BUILD_LV2 "Build the optional LV2 adapter (requires the lv2 hea
 option(CONVOLVER_BUILD_AU "Build the optional Audio Unit adapter (macOS; requires AudioUnitSDK)" OFF)
 option(CONVOLVER_BUILD_NATIVE "Build the portable FFT/libsndfile core and CLI" ON)
 option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
+# PLUG-7: lifecycle sequences are enumerated up to this many operations after
+# each start. Sanitizers make each sequence about ten times slower, so their
+# builds enumerate one fewer (docs/develop/testing.md#lifecycle-sequences-plug-7).
+if(CONVOLVER_SANITIZERS)
+    set(CONVOLVER_LIFECYCLE_LENGTH 3)
+else()
+    set(CONVOLVER_LIFECYCLE_LENGTH 4)
+endif()
 option(CONVOLVER_BUILD_IO "Build the libsndfile/configuration adapter" ON)
 option(CONVOLVER_BUILD_CLI "Build the command-line renderer" ${CONVOLVER_BUILD_IO})
 option(CONVOLVER_PACKAGE_TESTS "Test installed and source-tree consumers" ON)
@@ -185,6 +193,11 @@ if(CONVOLVER_BUILD_NATIVE)
         add_executable(convolver_host_tests tests/native/host_tests.cpp)
         target_link_libraries(convolver_host_tests PRIVATE Convolver::host Threads::Threads)
         add_test(NAME native.host COMMAND convolver_host_tests)
+        # PLUG-7: lifecycle sequences against the reference model.
+        add_executable(convolver_host_lifecycle_tests tests/native/host_lifecycle_tests.cpp
+            tests/plugins/lifecycle.cpp tests/plugins/audio_guard.cpp)
+        target_link_libraries(convolver_host_lifecycle_tests PRIVATE Convolver::host ${CMAKE_DL_LIBS})
+        add_test(NAME native.host_lifecycle COMMAND convolver_host_lifecycle_tests ${CONVOLVER_LIFECYCLE_LENGTH})
         add_executable(convolver_state_tests tests/native/state_tests.cpp)
         target_link_libraries(convolver_state_tests PRIVATE Convolver::host)
         add_test(NAME native.state COMMAND convolver_state_tests)
@@ -195,8 +208,9 @@ if(CONVOLVER_BUILD_NATIVE)
         target_include_directories(convolver_utility_tests PRIVATE portable)
         target_link_libraries(convolver_utility_tests PRIVATE Convolver::core Threads::Threads)
         add_test(NAME native.utilities COMMAND convolver_utility_tests)
-        set(native_tests native.fft native.engine native.host native.state native.presets native.utilities)
-        set(test_targets convolver_fft_tests convolver_engine_tests convolver_host_tests convolver_state_tests
+        set(native_tests native.fft native.engine native.host native.host_lifecycle native.state native.presets native.utilities)
+        set(test_targets convolver_fft_tests convolver_engine_tests convolver_host_tests
+            convolver_host_lifecycle_tests convolver_state_tests
             convolver_preset_tests convolver_utility_tests)
         if(CONVOLVER_BUILD_IO)
             add_executable(convolver_io_tests tests/native/io_tests.cpp)
