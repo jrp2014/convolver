@@ -110,18 +110,46 @@ and build all enabled targets, not only the nearby test executable. A callback
 heap guard does not prove that every external library is allocation-free or that
 callbacks meet deadlines. Report the actual checks and their limits.
 
+## Dependency choices
+
+FFTW remains the default FFT backend unless the build includes a plug-in
+(`CONVOLVER_BUILD_VST3=ON`). Then `AUTO` picks the built-in Ooura FFT on Linux
+and Windows and Accelerate on macOS for the whole build, CLI included, because
+other code in the host process may call the same FFTW, whose planner Convolver
+cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)). Build the CLI
+separately to keep FFTW for offline rendering. Accelerate uses an Apple system
+framework; Ooura is built in and avoids a separate FFT dependency. The
+[FFT guide](fft-backends.md) has the numerical contract and dated measurements;
+none is asserted to be fastest for every workload.
+
+[libsndfile](https://libsndfile.github.io/libsndfile/) remains the file
+decoding and encoding boundary. The core and host libraries can omit it. It is
+neither an audio-device layer nor a resampler. Replacing it would need a
+concrete format, packaging or correctness benefit and matching real-file tests.
+
+Plug-in adapters use each format's own headers (VST3 SDK, AudioUnitSDK, `lv2`)
+rather than a framework; the pins are in
+[build from source](build.md#pinned-format-dependencies). Keep standard C++20
+facilities where suitable (the Audio Unit target alone is C++23, for
+AudioUnitSDK 1.4.0) and platform-specific operations at the I/O, FFT or host
+boundary. A new library or language standard should earn its deployment cost.
+Alternative FFT implementations are investigations in
+[TODO](../../TODO.md#fft-libraries-and-performance), not implicit fallbacks.
+
 ## Where future work belongs
 
-Keep this page about implemented structure. Put open work in [TODO](../../TODO.md)
-and substantial design decisions in a linked, dated plan in [`plans/`](../plans/).
-Prefer a focused change at the existing boundary over reorganizing files merely
-to shorten them.
+Keep this page about implemented structure. Put open work in [TODO](../../TODO.md),
+substantial designs in a dated plan in [`project/plans/`](../project/plans/),
+and jrp's decisions in the [decisions log](../project/decisions.md). Prefer a
+focused change at the existing boundary over reorganizing files merely to
+shorten them. Move code into a shared layer only when two formats need the
+same behaviour, as `HostFilter` was.
 
 A new plug-in format follows the VST3 layout: the adapter in
-`plugins/<format>/`, its tests in `tests/<format>/`, and its guide at
-`docs/<format>.md`, listed in the [index](../README.md). The
+`plugins/<format>/`, its tests in `tests/<format>/`, and a column for it in
+[how the plug-ins behave](../use/plugins.md). The
 [repository checks](workflow.md#automated-checks) require all three once the
 adapter folder exists, and `scripts/check_format.py` covers the new sources
 without a file list to update.
 The old Windows applications and extracted regression harnesses are explained in
-[history](../history.md); they are not an alternate implementation of the current API.
+[history](../project/history.md); they are not an alternate implementation of the current API.

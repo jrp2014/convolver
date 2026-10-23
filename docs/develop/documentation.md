@@ -17,9 +17,9 @@ For anyone, person or coding agent, who writes or changes documentation.
 - Developer pages double as agent instructions, so repository skills and
   `AGENTS.md` point at them instead of repeating them.
 
-The move into reader folders is under way (DOC-4, [plan](../plans/2026-10-23-documentation-by-reader.md)):
-`docs/use/` and `docs/develop/` exist, and the status, history and plan pages
-at the top of `docs/` move into `project/` in the next step.
+The move into reader folders is under way (DOC-4, [plan](../project/plans/2026-10-23-documentation-by-reader.md)):
+all three folders exist; the last step shortens the front pages and checks that
+every maintained page sits in a reader folder.
 
 Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 [writing rules](#writing-rules) · [pages agents follow](#pages-agents-follow) ·
@@ -71,6 +71,7 @@ pages help only if each sentence can be understood on its own.
 5. Use headings a reader would search for: tasks on how-to pages ("Load a
    filter in your host"), nouns on reference pages ("Output formats"). Keep link
    text meaningful and tables small enough to scan.
+6. Call the project's owner jrp, and give dates as "23 October 2026".
 
 On pages in `docs/use/`:
 
@@ -130,14 +131,16 @@ can act on it without a separate copy of the rules:
 | Plug-in identities and channel layouts | [Plug-in identities](plugin-identities.md) | `plugins/identities.json`, `tests/identities_tests.py`, `vst3.identities` |
 | Plug-in presets and the preset tool | [Plug-in presets](../use/presets.md); file formats in the [contract](plugin-contract.md#preset-files) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
 | System-wide filtering on Windows | [Equalizer APO export](../use/equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
-| Plug-in downloads and release gates | [Install](../use/install.md), [build from source](build.md#pinned-preview-recipe), [host testing](host-testing.md), [release record](../releases/developer-preview.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
-| Release status and evidence levels | [Release readiness](../release-readiness.md) | TODO, open pull requests, GitHub releases, host records |
+| Plug-in downloads and release gates | [Install](../use/install.md), [releasing](releasing.md), [build from source](build.md#pinned-preview-recipe), [host testing](host-testing.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
+| Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |
+| jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to | "Owner's decision" lines in TODO and the guides |
+| Dependency choices | [Implementation map](architecture.md#dependency-choices) | `CMakeLists.txt`, the release policy |
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |
 | Open work | [TODO](../../TODO.md) | Current source and linked issues/plans |
 | Claiming, handing over and reviewing work | [Workflow](workflow.md) | Pull request template, repository checks, `.claude/skills/` (pointers only) |
 | How documentation is organised and written | This page | The index, the link and repository checks |
-| Past releases and provenance | [History](../history.md) and dated records | Recorded evidence; never rewrite a past result as current |
+| Past releases and provenance | [History](../project/history.md) and dated records | Recorded evidence; never rewrite a past result as current |
 
 Short summaries may link to these pages; avoid copying their option lists,
 limits, test counts or TODOs into several places. Preview packages ship every
@@ -174,7 +177,7 @@ compiler, dependency versions, planner mode and workload. Avoid words such as
 
 Keep the historical website under `docs/historical/` byte-identical. Mark dated
 reviews and plans as records rather than updating their results in place. Plans
-in [`plans/`](../plans/) are design records for open work, not special authority
+in [`project/plans/`](../project/plans/) are design records for open work, not special authority
 over current code or user instructions. (Until 21 October 2026 they lived in
 `docs/superpowers/`, a name taken from an agent tool's convention.) When the code on
 `main` implements all of a plan, move it to [`archive/plans/`](../archive/plans/README.md)
@@ -193,7 +196,7 @@ The pre-commit configuration used by lint CI (which also checks C++ formatting) 
 [`check_doc_links.py`](../../scripts/check_doc_links.py) and its
 [regression tests](../../tests/documentation_links_tests.py). The checker scans
 top-level `.md` files and Markdown under `docs/`, excluding `archive/`,
-`historical/` and `review-2026-10/` as source pages. Open plans in `plans/` are
+`historical/` and `review-2026-10/` as source pages. Open plans in `project/plans/` are
 checked like maintained guides. Links to the excluded
 records are still checked. This keeps preserved evidence separate from maintained
 instructions without accepting broken navigation into the evidence.

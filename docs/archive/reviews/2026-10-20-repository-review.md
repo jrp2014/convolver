@@ -1,4 +1,6 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+> **Archived review.** This was `REVIEW.md` at the repository root until 23 October 2026, when it was retired into [status](../../project/status.md) (what is ready, and what the tests do not establish) and the [implementation map](../../develop/architecture.md) (which source implements each behaviour). The text below is unchanged; its links are relative to the repository root, where the page then lived.
+
 # Convolver: current repository review
 
 Documentation and source cross-check dated **20 October 2026**, baseline

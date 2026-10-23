@@ -8,7 +8,7 @@ For anyone writing, changing or reviewing a plug-in adapter (VST3, Audio Unit,
 LV2), and for host integrators. This page is the reference for what every
 adapter must do; [how the plug-ins behave](../use/plugins.md) says how that
 looks to a user. The rules were designed in the
-[plug-in formats plan](../plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
+[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)
 and are maintained here.
 
 **In short:**
@@ -169,7 +169,7 @@ on during bypass, so switching back does not lose history.
 `HostProcessor` implements this, so every adapter that drives it through
 `set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
 must not use its format's own pass-through bypass (see the AU design in the
-[plug-in formats plan](../plans/2026-10-21-plugin-formats.md#au-adapter-design)).
+[plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
 
 Whether saved state records bypass follows each format's convention (owner's
 decision, 23 October 2026). VST3 saves its bypass parameter with the

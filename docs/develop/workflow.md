@@ -58,10 +58,10 @@ Contents: [before you start](#before-you-start) ·
   codes), state or preset formats, `.cfg` syntax, licences, defaults that
   change the sound, dependencies shipped in releases, and anything published.
   Continue only on work that does not depend on the answer. Record the answer where the work is described, as "(owner's decision,
-  21 October 2026)", and in the pull request.
+  21 October 2026)", in the [decisions log](../project/decisions.md) and in the pull request.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
-  `docs/README.md` and the [plug-in formats plan](../plans/2026-10-21-plugin-formats.md).
+  `docs/README.md` and the [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md).
   Change only the lines your item needs, and merge `main` into your branch
   often. A change to something every stream relies on (the
   [shared adapter contract](plugin-contract.md),
@@ -229,7 +229,7 @@ reject a TODO ID that is used but never defined.
 - every TODO ID mentioned in the maintained documentation is defined in TODO,
   and no ID is defined twice;
 - every maintained page under `docs/` is listed in the [index](../README.md);
-- every open plan in [`plans/`](../plans/) has a dated file name, and every
+- every open plan in [`project/plans/`](../project/plans/) has a dated file name, and every
   archived plan is listed in the [archive index](../archive/plans/README.md);
 - repository paths named in `AGENTS.md`, `CONTRIBUTING.md`, the
   [implementation map](architecture.md) and this page exist;

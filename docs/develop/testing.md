@@ -599,7 +599,7 @@ examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
 copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
 the supplied source with networking disabled. See the
-[qualification record](../releases/developer-preview.md) for external gates.
+[qualification record](releasing.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone

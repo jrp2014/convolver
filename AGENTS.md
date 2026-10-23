@@ -14,16 +14,17 @@ holds two implementations:
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-Start with `CONTRIBUTING.md` (formatting, analysis, lint), `REVIEW.md`
-(current status) and `TODO.md` (open work and priorities). The pages written
+Start with `CONTRIBUTING.md` (formatting, analysis, lint), `TODO.md` (open
+work and priorities) and `docs/project/status.md` (what is ready);
+`docs/project/decisions.md` lists what jrp has already decided. The pages written
 for contributors and agents are in `docs/develop/`: build commands in
 `docs/develop/build.md`, the implementation map in
 `docs/develop/architecture.md`, tests in `docs/develop/testing.md`, the
 plug-in rules in `docs/develop/plugin-contract.md` and the procedures in
 `docs/develop/workflow.md`. User behaviour is described in `docs/use/`: the
 command line in `docs/use/command-line.md`, configurations in
-`docs/use/configuration.md` and the plug-ins in `docs/use/plugins.md`. Open plans are in `docs/plans/`;
-the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`. How the
+`docs/use/configuration.md` and the plug-ins in `docs/use/plugins.md`. Open plans are in `docs/project/plans/`;
+the plug-in direction is `docs/project/plans/2026-10-21-plugin-formats.md`. How the
 documentation is organised and written, for agents too, is in
 `docs/develop/documentation.md`.
 

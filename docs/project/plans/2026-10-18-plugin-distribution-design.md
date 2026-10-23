@@ -30,7 +30,7 @@ Historical Windows integrations and recovered documentation remain preserved.
 At source commit `0bf77d0`, the repository has independently buildable core, host
 and I/O libraries; FFTW and Accelerate backends; a thin VST3 adapter; embedded
 presets; real-library, numerical, lifecycle and package-consumer tests. The
-[plug-in guide](../use/plugins.md) records the current contract and release limitations.
+[plug-in guide](../../use/plugins.md) records the current contract and release limitations.
 
 The adapter handles mono/stereo, float/double host buffers and persistent stream
 history. Internal DSP is float; reported latency is 256 samples. A preset must

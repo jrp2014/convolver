@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Documentation by reader (DOC-4)
 
-[Documentation index](../README.md) · [Documentation guide](../develop/documentation.md) ·
-[TODO](../../TODO.md)
+[Documentation index](../../README.md) · [Documentation guide](../../develop/documentation.md) ·
+[TODO](../../../TODO.md)
 
 Plan dated 23 October 2026, from a review of every maintained page on `main`
 at `7f170a8` (0.4.24). jrp asked for documentation that is "more tractable and
@@ -15,9 +15,10 @@ instructions, so that separate skills are not needed.
 **In short:** maintained pages move into three reader folders, `docs/use/`,
 `docs/develop/` and `docs/project/`; each page is one kind (tutorial, how-to,
 reference or background) and follows the
-[writing rules](../develop/documentation.md#writing-rules). Four pull requests,
+[writing rules](../../develop/documentation.md#writing-rules). Four pull requests,
 one per step. Step 1 (`docs/develop/`) was done in the pull request that added
-this plan, and step 2 (`docs/use/`) in the next. Dated records do not move.
+this plan, step 2 (`docs/use/`) in the next and step 3 (`docs/project/`) in
+the one after. Dated records do not move.
 
 ## What was wrong
 
@@ -81,8 +82,9 @@ paths, and records are never edited.
 | `plugins/build.md`, `plugins/hosts.md` | `develop/build.md` (pinned recipe and pins), `develop/host-testing.md` |
 | `release-readiness.md`, `REVIEW.md`, `modernization.md` | `project/status.md`; dependency choices to `develop/architecture.md` |
 | `releases/developer-preview.md` | Procedure to `develop/releasing.md`; the dated record to `archive/releases/` |
+| `REVIEW.md` itself | `archive/reviews/2026-10-20-repository-review.md`, as a dated review |
 | `history.md`, `plans/` | `project/` |
-| `convolverPipe.md` | `archive/` (historical tool) |
+| `convolverPipe.md` | `project/`: kept as a maintained page, not archived, because the historical tool can still get fixes |
 
 ## Steps
 
@@ -94,8 +96,11 @@ paths, and records are never edited.
    `scripts/release/package_docs.py`, `tests/release/docs_tests.py`,
    `tests/release/package_smoke.py`, `scripts/release/verify_artifact.py`).
    Remove TODO IDs and commit references from the user pages as they move.
-3. **`docs/project/`:** one status page, a decisions log started from the
-   decisions recorded in TODO, plans and reviews, then history and plans.
+3. **Done: `docs/project/`:** one status page (release readiness, the review's
+   limits and the modernization priorities), a decisions log started from the
+   decisions recorded in TODO, plans and guides, `develop/releasing.md` from the
+   release record, then history and plans. `check_repository.py` checks plans
+   under `docs/project/plans/`.
 4. **Front doors and checks:** a README of about 80 lines, a shorter
    `AGENTS.md` that links instead of copying, TODO with open work only, and a
    repository check that every maintained page sits in a reader folder. Make

@@ -131,7 +131,7 @@ format's SDK ([build from source](docs/develop/build.md#plug-ins)).
 | [`portable/`](portable/) | Active engine, FFT backends, file I/O and CLI |
 | [`plugins/`](plugins/) | Optional plug-ins, one folder per format ([`vst3/`](plugins/vst3/), [`lv2/`](plugins/lv2/) and [`au/`](plugins/au/)) |
 | [`tests/`](tests/) | Native, host, package, compatibility and historical tests |
-| [`docs/`](docs/README.md) | Current guides, [open plans](docs/plans/) and clearly labelled records ([`archive/`](docs/archive/)) |
+| [`docs/`](docs/README.md) | Current guides, [open plans](docs/project/plans/) and clearly labelled records ([`archive/`](docs/archive/)) |
 | [`cmake/`](cmake/), [`packaging/`](packaging/), [`scripts/`](scripts/) | Build helpers, release packaging, and release and repository checks |
 | [`examples/`](examples/) | First-use example filters with expected output, and notes on the example plug-in presets |
 | [`historical/`](historical/) | Preserved 2005–2006 Windows implementation; not part of the portable CMake build |
@@ -145,7 +145,7 @@ format's SDK ([build from source](docs/develop/build.md#plug-ins)).
 - [How the plug-ins behave](docs/use/plugins.md)
 - [Testing](docs/develop/testing.md), [contributing](CONTRIBUTING.md) and
   [taking on and reviewing work](docs/develop/workflow.md)
-- [Changelog](CHANGELOG.md) and [current review](REVIEW.md)
+- [Status](docs/project/status.md), [decisions](docs/project/decisions.md) and [changelog](CHANGELOG.md)
 
 ## About this project
 
@@ -162,9 +162,9 @@ format's SDK ([build from source](docs/develop/build.md#plug-ins)).
 The historical source is preserved in [`historical/`](historical/) but is not
 built by this project, and an archived copy of the 4.4 website is in
 [`docs/historical/`](docs/historical/convolver-4.4/README.md). The
-[history page](docs/history.md) explains where the code came from, how the
+[history page](docs/project/history.md) explains where the code came from, how the
 portable implementation replaced it and
-[how the two differ](docs/history.md#how-the-portable-version-differs).
+[how the two differ](docs/project/history.md#how-the-portable-version-differs).
 
 ## Licence
 
@@ -180,5 +180,5 @@ explains, so hosts do not mistake it for this one.
 
 See [install](docs/use/install.md) for preview packages and
 [build from source](docs/develop/build.md#pinned-preview-recipe) for the
-pinned recipe that makes them. [Candidate qualification](docs/releases/developer-preview.md)
+pinned recipe that makes them. [Releasing](docs/develop/releasing.md)
 separates automated checks from signing, clean-install and named-host evidence.

@@ -7,12 +7,12 @@ It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
 [plug-in distribution plan](2026-10-18-plugin-distribution.md).
 **Current state:** PLUG-1 (the plug-in FFT backend), PLUG-2 (the
-[shared comparison harness](../develop/testing.md#plug-in-comparisons-plug-2), with
+[shared comparison harness](../../develop/testing.md#plug-in-comparisons-plug-2), with
 DOC-1's first-use fixtures) and PLUG-4 (the
-[identity and layout registry](../develop/plugin-identities.md)) are implemented. Everything
+[identity and layout registry](../../develop/plugin-identities.md)) are implemented. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
-and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
+and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
 The [shared adapter contract](#shared-adapter-contract) below applies to every
 format and takes precedence over a per-format section that seems to disagree.
 
@@ -164,7 +164,7 @@ plumbing) is small, and the existing VST3 adapter is about 500 lines over
 The LV2 adapter therefore uses the `lv2` headers (C, ISC, Ubuntu 24.04 ships
 1.18.10) and, for tests only, `lilv` (0.24.22) to load it as a host would.
 PLUG-6 pinned these versions (22 October 2026); see
-[pinned format dependencies](../develop/build.md#pinned-format-dependencies).
+[pinned format dependencies](../../develop/build.md#pinned-format-dependencies).
 
 Apache-2.0, AudioUnitSDK's licence, is compatible with GPLv3 but not with
 GPLv2. That affects how the AU component may be distributed; see
@@ -180,10 +180,10 @@ behaviour identical:
 | --- | --- | --- |
 | PLUG-1 | A safe FFT backend for every plug-in build (see [FFT backend](#lv2-adapter-design) below). **Done 21 October 2026.** | Affects the existing VST3 build already |
 | PLUG-2 | One adapter test harness, specified under [shared test harness](#shared-test-harness-plug-2): the independent convolution oracle, CLI equivalence, fixed tolerances and lifecycle cases | Each format's tests then only drive its own host API |
-| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../use/presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
-| PLUG-4 | One list of supported channel layouts, with [channel meaning](../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
+| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../../use/presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
+| PLUG-4 | One list of supported channel layouts, with [channel meaning](../../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
-| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
+| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
 
 After that the streams are separate and can be worked on at the same time, by
 different people or threads:
@@ -200,18 +200,18 @@ sounds the same in every format.
 ## Shared adapter contract
 
 These rules hold for VST3, LV2 and AU alike. Since 23 October 2026 (DOC-4) they
-are maintained in the [plug-in adapter contract](../develop/plugin-contract.md),
-which holds the text this section used to: [loading and failure](../develop/plugin-contract.md#loading-and-failure),
-[failure reasons](../develop/plugin-contract.md#failure-reasons),
-[initial restoration and live replacement](../develop/plugin-contract.md#initial-restoration-and-live-replacement)
-and [bypass](../develop/plugin-contract.md#bypass). Channel layouts and old
-presets are in [plug-in identities](../develop/plugin-identities.md#channel-layouts).
+are maintained in the [plug-in adapter contract](../../develop/plugin-contract.md),
+which holds the text this section used to: [loading and failure](../../develop/plugin-contract.md#loading-and-failure),
+[failure reasons](../../develop/plugin-contract.md#failure-reasons),
+[initial restoration and live replacement](../../develop/plugin-contract.md#initial-restoration-and-live-replacement)
+and [bypass](../../develop/plugin-contract.md#bypass). Channel layouts and old
+presets are in [plug-in identities](../../develop/plugin-identities.md#channel-layouts).
 Change the rules there, not here.
 
 ## Shared test harness (PLUG-2)
 
 Implemented 22 October 2026 (PR #28) in `tests/plugins/`; the
-[testing guide](../develop/testing.md#plug-in-comparisons-plug-2) describes the cases
+[testing guide](../../develop/testing.md#plug-in-comparisons-plug-2) describes the cases
 as built. The fixtures are the DOC-1 first-use examples, written by
 `tests/plugins/fixtures.py`, whose helpers the release example generator and
 the pluginval acceptance test now share.
@@ -257,7 +257,7 @@ Cases, run for every adapter:
   and a long → short replacement followed by reactivation (tail reporting),
   live replacement (fresh history, 256-frame warm-up, 256-frame crossfade),
   failed initial load and failed replacement (see the
-  [contract](../develop/plugin-contract.md#loading-and-failure)), and an empty instance;
+  [contract](../../develop/plugin-contract.md#loading-and-failure)), and an empty instance;
 - bypass (64-sample ramp, dry path delayed by the reported latency), reset,
   silence flags, and nonfinite input;
 - variable block sizes (including 1, 61, 300 and the host maximum) and
@@ -284,7 +284,7 @@ separate:
 | | Unsigned preview | Signed production release |
 | --- | --- | --- |
 | Signing | macOS: ad-hoc signature, documented quarantine removal. Windows: unsigned, SmartScreen warning | Developer ID, notarization, Authenticode with timestamps |
-| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../develop/host-testing.md) procedure, clean machines, upgrades, and upgrade tests against files kept from earlier releases (COMPAT-1) |
+| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../../develop/host-testing.md) procedure, clean machines, upgrades, and upgrade tests against files kept from earlier releases (COMPAT-1) |
 | Label | "unsigned developer preview" in the release title and guide | Ordinary release |
 | `production_enabled` | stays false | true only after every production gate |
 
@@ -317,9 +317,9 @@ parameter URI live under the same base.
 separate plug-in URI generated from one template (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4,
 2→6, 2→8, 6→6 and 8→8, all discrete, within the VST3 adapter's 1–8 limit.
 Named layouts (port groups and designations) are added per the
-[layout rules](../develop/plugin-identities.md#channel-layouts). A configuration whose counts
+[layout rules](../../develop/plugin-identities.md#channel-layouts). A configuration whose counts
 differ from the instance's is rejected with an explanation (nothing is
-remapped), and the [failure rules](../develop/plugin-contract.md#loading-and-failure) decide what plays:
+remapped), and the [failure rules](../../develop/plugin-contract.md#loading-and-failure) decide what plays:
 a failed replacement keeps the running filter, a failed initial load is silent.
 
 **Ports.**
@@ -375,7 +375,7 @@ contract:
 - **Initial restoration** before the first audio block (session load, PipeWire
   `config`) prepares the filter in `restore()` and constructs the
   `HostProcessor` with it directly, with no crossfade, per the
-  [contract](../develop/plugin-contract.md#initial-restoration-and-live-replacement). If audio has already
+  [contract](../../develop/plugin-contract.md#initial-restoration-and-live-replacement). If audio has already
   run, `restore()` uses `replace` instead.
 - **Live loads.** `run()` and `work()` share no request buffer, because
   `run()` never takes the lock. A `patch:Set` arriving in `run()` builds a
@@ -506,7 +506,7 @@ beyond eight channels.
 
 PipeWire's `filter-chain` passes `config` entries to the plug-in's state on
 load and reads its latency port. A stereo room correction would look like this
-(URIs from the [PLUG-4 registry](../develop/plugin-identities.md)):
+(URIs from the [PLUG-4 registry](../../develop/plugin-identities.md)):
 
 ```text
 context.modules = [
@@ -553,16 +553,16 @@ AUv2 effects.
   by the type, subtype and manufacturer together; no other use of `CONV` was
   found in public sources, which cannot prove it is unused. The subtype repeats
   the historical VST2 ID `'Conv'`. Forks should change the manufacturer code
-  (see [plug-in identities](../develop/plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
+  (see [plug-in identities](../../develop/plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
   the other permanent IDs in PLUG-4 and never change them after release.
 - **Channels:** advertise the PLUG-4 channel counts through
   `kAudioUnitProperty_SupportedNumChannels`, including unequal pairs such as
   2→6. Those are counts only; named layouts go through
   `kAudioUnitProperty_AudioChannelLayout` and
   `kAudioUnitProperty_SupportedChannelLayoutTags` as the
-  [layout rules](../develop/plugin-identities.md#channel-layouts) describe. A filter whose
+  [layout rules](../../develop/plugin-identities.md#channel-layouts) describe. A filter whose
   counts differ is rejected, as VST3 does, under the
-  [failure rules](../develop/plugin-contract.md#loading-and-failure).
+  [failure rules](../../develop/plugin-contract.md#loading-and-failure).
 - **Timing:** AU reports both values in **seconds**, as `Float64`
   ([`kAudioUnitProperty_Latency`](https://developer.apple.com/documentation/audiotoolbox/kaudiounitproperty_latency)):
   latency is `latency_frames() / sample_rate` (256 frames at 48 kHz is about
@@ -682,7 +682,7 @@ the LV2 plug-in serve FFmpeg too.
   GPL-3.0-or-later, as GPL-2.0-or-later permits, with the Apache-2.0 notices;
   everything else stays GPL-2.0-or-later.
 - What an empty instance with unequal channel counts and a failed initial
-  load play ([loading and failure](../develop/plugin-contract.md#loading-and-failure)). **Decided 21
+  load play ([loading and failure](../../develop/plugin-contract.md#loading-and-failure)). **Decided 21
   October 2026:** silence for both, with an error indication, so an unloaded
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
@@ -691,11 +691,11 @@ the LV2 plug-in serve FFmpeg too.
   (VST3-1). **Decided 23 October 2026 (owner):** neither for now. A filter's
   output mask is compared with the host's arrangement and gives a notice only;
   no host state version 3; buses stay at 1 to 8 channels. Revisit on request.
-- What bypass plays with unequal channel counts ([bypass](../develop/plugin-contract.md#bypass)).
+- What bypass plays with unequal channel counts ([bypass](../../develop/plugin-contract.md#bypass)).
   **Decided 22 October 2026 (owner):** silence on every output, including a
   1→2 filter that forks one input; equal counts keep input *c* to output *c*.
   `HostProcessor` implements it, so VST3 already follows it.
-- Whether saved state records bypass ([bypass](../develop/plugin-contract.md#bypass)). **Decided 23
+- Whether saved state records bypass ([bypass](../../develop/plugin-contract.md#bypass)). **Decided 23
   October 2026 (owner):** follow each format's convention. VST3 saves its
   bypass parameter; LV2 and AU leave bypass to the host and ignore the flag in
   restored state.

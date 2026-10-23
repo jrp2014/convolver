@@ -1,11 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # convolverPipe
 
-[History](history.md) · [Documentation index](README.md)
+[History](history.md) · [Documentation index](../README.md)
 
 This page documents a **historical** Windows tool kept in `historical/`. For
 streaming with the current portable CLI, see
-[RAW streams](use/command-line.md#raw-streams).
+[RAW streams](../use/command-line.md#raw-streams).
 
 `convolverPipe` filters interleaved audio from standard input and writes the
 convolved audio to standard output. It uses the same engine and filter/config
@@ -85,8 +85,8 @@ reported close errors. A failed stream may already contain partial output.
 
 ## Historical usage and validation
 
-The [archived pipe guide](historical/convolver-4.4/convolverpipe.html) and
-[custom-convert.conf](historical/convolver-4.4/custom-convert.conf) preserve the
+The [archived pipe guide](../historical/convolver-4.4/convolverpipe.html) and
+[custom-convert.conf](../historical/convolver-4.4/custom-convert.conf) preserve the
 original SlimServer/SqueezeCenter integration examples. Their paths, host
 versions and command recipes are historical references; compatibility with
 current media servers has not been established.
@@ -96,4 +96,4 @@ exercise the actual pipe control flow with simulated streams, the real audio
 wrapper with libsndfile boundary stubs, and the real extracted convolution
 engine against time-domain reference results. They do not establish a native
 Windows executable build, real descriptor/codec behaviour or real-time
-performance. See [recovery findings](review-2026-10/archive-recovery.md).
+performance. See [recovery findings](../review-2026-10/archive-recovery.md).

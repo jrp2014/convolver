@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver history
 
-[Current documentation](README.md) · [Current implementation](develop/architecture.md)
+[Current documentation](../README.md) · [Current implementation](../develop/architecture.md)
 
 This page is historical context. New users can build and use the portable
 implementation without reading it.
@@ -17,7 +17,7 @@ programs mostly adopted the `.cfg` format rather than the code; see
 
 Convolver began as a set of Windows applications written in 2005 and 2006. Their
 user documentation is still at <https://convolver.sourceforge.net/>, and an
-archived copy of the 4.4 website is in [historical/convolver-4.4](historical/convolver-4.4/README.md).
+archived copy of the 4.4 website is in [historical/convolver-4.4](../historical/convolver-4.4/README.md).
 This page records what the historical code is, where this repository's copy of
 it came from, and how the portable implementation replaced it.
 
@@ -27,8 +27,8 @@ The historical Windows applications by jrp are preserved separately: WMP DSP
 (`convolverWMP`), DirectShow (`convolverFilter`), VST2 (`convolverVST`), command-line
 (`convolverCMD`) and recovered 4.4 streaming [`convolverPipe`](convolverPipe.md).
 They share the old overlap-save engine in
-[`historical/convolution`](../historical/convolution); the portable engine uses
-partitioned overlap-add. The [downstream evidence](review-2026-10/downstream-evidence.json)
+[`historical/convolution`](../../historical/convolution); the portable engine uses
+partitioned overlap-add. The [downstream evidence](../review-2026-10/downstream-evidence.json)
 records the derivative code that was found and the wider adoption of the text
 format; see [downstream use](#downstream-use).
 
@@ -60,10 +60,10 @@ The original import stopped at the 4.3 source release. A subsequently supplied
 `homes.zip` contains corroborated 4.4 source snapshots and a separate tree
 labelled 4.5, alongside a 4.5 prerelease installer. Selected improvements have
 been recovered without replacing the reviewed engine or changing release
-identifiers. See the [comparison and recovery findings](review-2026-10/reconciliation.md)
+identifiers. See the [comparison and recovery findings](../review-2026-10/reconciliation.md)
 for provenance, exclusions and validation limits. The subsequent
-[feature and documentation recovery](review-2026-10/archive-recovery.md)
-restores `convolverPipe` and the [historical 4.4 website](historical/convolver-4.4/README.md),
+[feature and documentation recovery](../review-2026-10/archive-recovery.md)
+restores `convolverPipe` and the [historical 4.4 website](../historical/convolver-4.4/README.md),
 including configuration examples, host guides and release history.
 
 ## Building the historical Windows applications
@@ -93,7 +93,7 @@ ctest --test-dir build --output-on-failure --parallel 2
 These checks cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
 The default native build separately tests the actual portable implementation,
-FFT backends, libsndfile, CLI and external consumers. See [testing instructions and coverage limits](develop/testing.md).
+FFT backends, libsndfile, CLI and external consumers. See [testing instructions and coverage limits](../develop/testing.md).
 
 ## From historical to portable
 
@@ -101,11 +101,11 @@ The portable core and CLI, three FFT backends, offline FFTW planning, package
 exports, configuration inspection, Windows-style relative paths, the
 historical-only output features (dither, noise shaping, PCM8, valid bits,
 automatic attenuation), the host lifecycle and VST3 are implemented. The
-[implementation map](develop/architecture.md) describes the result;
-[TODO](../TODO.md) holds the remaining interoperability, DAW/release validation
-and measured optimization work, and the [modernization direction](modernization.md)
+[implementation map](../develop/architecture.md) describes the result;
+[TODO](../../TODO.md) holds the remaining interoperability, DAW/release validation
+and measured optimization work, and the [direction](status.md#direction)
 explains its priorities.
-Earlier 4.3 assessments are in the [review archive](archive/reviews/README.md).
+Earlier 4.3 assessments are in the [review archive](../archive/reviews/README.md).
 
 ### How the portable version differs
 
@@ -133,11 +133,11 @@ to 8 channels. What remains only in the historical code is the Windows media
 player integration (WMP and DirectShow), the VST 2 build and double-precision
 output formats. The bundled 2005–2006 sample configurations predate the 3.0
 format or use absolute paths, so they need editing before the portable reader
-accepts them; see [bundled samples](use/other-programs.md#configurations-from-the-old-windows-convolver).
+accepts them; see [bundled samples](../use/other-programs.md#configurations-from-the-old-windows-convolver).
 
 ## Downstream use
 
-The [17 October investigation](review-2026-10/downstream-evidence.json) records
+The [17 October investigation](../review-2026-10/downstream-evidence.json) records
 URLs, hashes, binary markers and attribution. It distinguishes:
 
 - **Album Player:** evidence of a Windows ConvolverVST adaptation and Linux core
@@ -151,15 +151,15 @@ URLs, hashes, binary markers and attribution. It distinguishes:
   lineage.
 
 These are dated findings, not a survey of every current release. The
-[inspection script](review-2026-10/inspect_downstream.py) can recheck artifacts,
+[inspection script](../review-2026-10/inspect_downstream.py) can recheck artifacts,
 but upstream downloads change and are not a normal offline CI dependency.
 Compare actual source and tests before importing any downstream fix.
-[Other programs](use/other-programs.md) owns the current
+[Other programs](../use/other-programs.md) owns the current
 format-adoption matrix and its evidence limits.
 
 ## Documentation snapshots
 
-The [pre-refresh documentation](archive/documentation-2026-10-20/README.md)
+The [pre-refresh documentation](../archive/documentation-2026-10-20/README.md)
 retains the complete text of the guides before the 20 October reorganization.
-Use the [review record](archive/reviews/2026-10-20-documentation-review.md) to find their current
+Use the [review record](../archive/reviews/2026-10-20-documentation-review.md) to find their current
 successors. Dated validation and benchmark results retain their original scope.

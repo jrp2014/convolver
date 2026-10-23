@@ -1,4 +1,6 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+> **Archived release record.** Moved on 23 October 2026 from `docs/releases/developer-preview.md`. The candidate workflow, publishing steps, production gates and licence notes are maintained in [releasing](../../develop/releasing.md); current status is in [status](../../project/status.md). The text below records evidence and intent at the time and was not updated; its links point to where pages were then.
+
 # Portable developer-preview release record
 
 Author: jrp. Started 18 October 2026. This records implementation and unfulfilled
