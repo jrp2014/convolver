@@ -215,6 +215,12 @@ Shared work, done once for all three formats:
   both tools. Still to add: the `convolver` CLI, which the first preview ships
   alongside VST3 and the preset tool, with LV2 and AU in later previews
   (owner's decision, 23 October 2026).
+  Also before the first preview: Steinberg's usage guidelines ask anyone who
+  uses the word "VST" for ® on first use, the sentence "VST is a registered
+  trademark of Steinberg Media Technologies GmbH." in documentation and
+  packages, and the VST Compatible logo where they require it
+  ([VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)); jrp
+  to approve the wording.
 - [ ] **PLUG-7 — Lifecycle sequence tests.** The reset defect found in the
   review of 0.4.19 (a filter loaded after a reset during a transition waited
   for the interrupted crossfade) passed every single-operation test: reset,
@@ -366,7 +372,9 @@ means a patched FFmpeg build with `--enable-gpl`.
 ## VST3 SDK features not yet used
 
 Checked against VST SDK 3.8.1 (`pluginterfaces/`, the developer portal's 3.8.0
-and 3.8.1 change notes) on 21 October 2026. The adapter already uses one main
+and 3.8.1 change notes) on 21 October 2026. The whole developer portal and the
+SDK's validator suite were compared with the adapter on 23 October 2026
+([VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)). The adapter already uses one main
 input/output bus, 32/64-bit processing, silence flags, sample-accurate bypass
 (`kIsBypass`), latency/tail reporting, component state, generated
 `moduleinfo.json` and the default (empty) process-context requirements. Items
@@ -398,6 +406,21 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   defined (see limitations), declare the VST2 ID `'Conv'` in `moduleinfo.json`'s
   `Compatibility` section or `IPluginCompatibility`, and map old parameters with
   `IRemapParamID`. Old VST2 chunk state would still need a converter.
+- [ ] **VST3-8 — Follow the SDK documentation where the audit found gaps.** From
+  the [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md) (jrp
+  approved the fixes, 23 October 2026): report the tail including the 256-sample
+  latency, as Steinberg's tail test measures it; read input buffers even when
+  the host flags them silent; let the Bypass parameter's "Off"/"On" text convert
+  back; return success from the controller's own `getState`/`setState`. No
+  change to the sound, saved state or identities.
+- [ ] **VST3-9 — Non-integer host rates.** `setupProcessing` refuses a rate that
+  is not a whole number (for example a 0.1% pull-down rate), so the host reports
+  a failed plug-in. Accept any finite rate in range and play silence with the
+  reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
+  small tolerance counts as a match.
+- [ ] **VST3-10 — Mark silent output.** Set the output silence flags once the
+  output has been silent for the tail and latency, as the Audio Unit does, so
+  hosts can skip downstream work and suspend the instance.
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
