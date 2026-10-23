@@ -9,7 +9,7 @@ reviewed on 21 October against `75f3924`, and the plug-in plans again against
 [CHANGELOG](CHANGELOG.md), and keep this list for outstanding work.
 
 In short: the next milestone is an independent user running an exact preview
-package ([below](#execution-priorities)); [release readiness](docs/release-readiness.md)
+package ([below](#execution-priorities)); [status](docs/project/status.md)
 shows what users can run now and the evidence for it. The main open themes are
 first-use examples and documentation automation (DOC), user journeys, plug-in
 release qualification and host testing (REL, HOST), VST3, LV2 and AU plug-ins
@@ -38,14 +38,14 @@ so independent tasks do not duplicate changes.
 Direction (owner's decision, 21 October 2026): VST3, LV2 and AU are equal first
 priorities, developed in parallel after shared groundwork. The FFmpeg filter and
 Windows-native adapters are parked; CLAP and an editor wait for a request. See
-the [plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md).
+the [plug-in formats plan](docs/project/plans/2026-10-21-plugin-formats.md).
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user successfully installs and uses an exact
 preview package, with the lifecycle regression fixed and the advertised
 workflows demonstrated. "Ready" means the user journeys of REL-2 work, not
 that a set of items is ticked. The blockers and their evidence are listed in
-[release readiness](docs/release-readiness.md#next-milestone-an-independent-user-runs-a-preview).
+[status](docs/project/status.md#next-milestone-an-independent-user-runs-a-preview).
 Finishing a dependable product now matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
 behaviour (as with `HostFilter`), do not generalise host lifecycle or release
@@ -111,18 +111,18 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   merging `REVIEW.md`, release readiness and modernization into one status
   page and starting a decisions log; (4) shorter `README.md`, `AGENTS.md` and
   `TODO.md`, and checks that every maintained page sits in a reader folder.
-  Dated records stay where they are. The page-by-page mapping and jrp's
+  Dated records stay where they are. Steps 1 to 3 are written. The page-by-page mapping and jrp's
   decisions for steps 2 to 4 are in the
-  [plan](docs/plans/2026-10-23-documentation-by-reader.md).
+  [plan](docs/project/plans/2026-10-23-documentation-by-reader.md).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
   `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
   and corresponding source, staging, unsigned installers, artifact verification,
   promotion gates and the candidate workflow
-  ([record](docs/releases/developer-preview.md), [guide](docs/use/README.md)).
+  ([record](docs/develop/releasing.md), [guide](docs/use/README.md)).
   PLUG-5 extends it to LV2 and AU. Still open: track minimum OS/CPU versions,
   dependency closure, licences/corresponding source, signing/notarization, clean
   machine installation and immutable release assets. Start with the
-  [distribution plan](docs/plans/2026-10-18-plugin-distribution.md).
+  [distribution plan](docs/project/plans/2026-10-18-plugin-distribution.md).
 - [ ] **REL-2 — Define the first release by user journeys.** Write three
   journeys as numbered steps for a reader who has never seen the repository:
   stereo room correction and a 2→6 crossover in a plug-in host, and offline
@@ -142,7 +142,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   package contain what they need: presets made from the stereo and 2→6
   filters, the preset tool and the `convolver` CLI, which the first preview
   ships (owner's decision, 23 October 2026); the package has no CLI yet (PLUG-5). See
-  [release readiness](docs/release-readiness.md#user-journeys-for-the-first-preview).
+  [status](docs/project/status.md#user-journeys-for-the-first-preview).
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
@@ -175,7 +175,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   Foundation or WinRT. First name the target users. For system-wide room
   correction, the Equalizer APO export (HOST-4) is cheaper than an MFT or our
   own APO. See the
-  [MFT plan](docs/plans/2026-10-21-media-foundation-transform.md).
+  [MFT plan](docs/project/plans/2026-10-21-media-foundation-transform.md).
 - [ ] **HOST-4 — System-wide filtering through Equalizer APO.** Progress
   22 October 2026: `convolver-equalizer-apo` exports an IR, `.cfg` or list as
   an Equalizer APO configuration ([guide](docs/use/equalizer-apo.md)), chosen by
@@ -221,7 +221,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
 
 First priority (owner's decision, 21 October 2026): develop VST3, LV2 and AU in
 parallel. Design, host evidence and framework choice:
-[plug-in formats plan](docs/plans/2026-10-21-plugin-formats.md). Each
+[plug-in formats plan](docs/project/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor`. VST3
 work continues under VST3-1 to VST3-6, HOST-1 and REL-1 (VST3-7 is done).
 
@@ -239,7 +239,7 @@ Shared groundwork, done once so the three streams stay independent:
   `tests/plugins/harness.hpp` checks every adapter against the double-precision
   oracle (1e-5) and the CLI render of the DOC-1 fixtures (identical after the
   256-frame latency), with exact latency and tails and the lifecycle cases of
-  the [harness spec](docs/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
+  the [harness spec](docs/project/plans/2026-10-21-plugin-formats.md#shared-test-harness-plug-2).
   `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
   and 13 known deviations are left to VST3-7 (since removed: all 66 pass). LV2-1 and AU-1 each add a driver;
   format-specific status and error reporting stay in their own tests. See
@@ -285,7 +285,7 @@ Shared groundwork, done once so the three streams stay independent:
   unsigned code) and the install guide explains removing the download
   quarantine; Windows installers show a SmartScreen warning. Label these
   releases as unsigned previews. The preview gate and the production gate are
-  separate ([criteria](docs/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production)):
+  separate ([criteria](docs/project/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production)):
   signing is not a prerequisite for a preview. The candidate workflow cannot
   publish, so publication is a manual step owned by jrp: run the candidate
   workflow by hand on the chosen tag (the version bot's tag push does not start
@@ -402,7 +402,7 @@ LV2 (Linux first; also PipeWire system audio):
   bundle with a plug-in URI per PLUG-4 layout, generated from the registry;
   `enabled`, latency and status ports; filters through state (the
   `convolver-preset` property), with the control lock and failure rules of the
-  [LV2 design](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  [LV2 design](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
   `lv2.harness` passes every PLUG-2 case (restore-before-setup and tail checks
   skipped: LV2 has neither); `lv2.adapter` covers ports, status, log messages,
   presets, lilv state and seeded lifecycle sequences; `lv2lint` runs on every
@@ -410,7 +410,7 @@ LV2 (Linux first; also PipeWire system audio):
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
-  [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
+  [worker and state lifecycle](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
   one adapter lock for all `HostProcessor` control calls that `run()` never
   takes; requests passed as copied worker payloads with a generation number,
   skipped if already stale after loading and checked again after the
@@ -456,7 +456,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   silence flags and 2→6. Licence (owner's decision, 21 October 2026): the AU
   component is distributed under GPL-3.0-or-later because AudioUnitSDK is
   Apache-2.0, which is compatible with GPLv3 but not GPLv2; ship its notices
-  (see the [plan](docs/plans/2026-10-21-plugin-formats.md#au-licence)).
+  (see the [plan](docs/project/plans/2026-10-21-plugin-formats.md#au-licence)).
   Progress (22 October 2026, PR #44, with AU-2): `plugins/au/` builds
   `Convolver.component` (`-DCONVOLVER_BUILD_AU=ON`); `au.harness` (PLUG-2),
   `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
@@ -487,7 +487,7 @@ prefer the pipe, a filter accepted upstream, or upstream state support in
 FFmpeg's generic `lv2` filter (it cannot pass a file path today), which would let
 the LV2 plug-in serve FFmpeg.
 
-Design and evidence: [FFmpeg filter plan](docs/plans/2026-10-21-ffmpeg-filter.md)
+Design and evidence: [FFmpeg filter plan](docs/project/plans/2026-10-21-ffmpeg-filter.md)
 (21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter
 means a patched FFmpeg build with `--enable-gpl`.
 
@@ -535,9 +535,9 @@ means a patched FFmpeg build with `--enable-gpl`.
   incompatibility is an owner's decision recorded beside it. The literal
   version-1 and version-2 state bytes in `native.state` stay as the first
   fixtures. Add the capture step to the
-  [publication steps](docs/releases/developer-preview.md#publishing-an-unsigned-preview-planned-not-yet-done)
+  [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
-  [release readiness](docs/release-readiness.md#compatibility-guarantees).
+  [status](docs/project/status.md#compatibility-guarantees).
 - [ ] **IO-1 — Large files.** Specify and test RF64 output, boundary sizes and pipe
   behavior. Current output choices are ordinary WAV and raw float; input decoder
   support is not a promise of strict validation for every container.

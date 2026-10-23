@@ -332,7 +332,7 @@ AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds
 as C++23 while the core and the other formats stay C++20. jrp chose 1.4.0 over
 the C++20 1.3.0 on 22 October 2026. Its licence is Apache-2.0, which is why the
 AU component is distributed under GPL-3.0-or-later
-([AU licence](../plans/2026-10-21-plugin-formats.md#au-licence)).
+([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
 
 Each SDK entry in the policy lists the plug-in `formats` that use it.
 `build_dependencies.py --formats vst3 lv2 au` unpacks those formats' SDKs and

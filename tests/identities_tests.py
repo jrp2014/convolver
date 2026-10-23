@@ -65,7 +65,7 @@ REVERSE_DNS = re.compile(r'^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*){2,}$')
 # Files allowed to spell identities out: the registry, this test and dated records.
 COPIES_ALLOWED = ('plugins/identities.json', 'tests/identities_tests.py', 'CHANGELOG.md',
                   'packaging/macos/Distribution.xml', 'packaging/windows/installer.nsi')
-RECORDS = ('historical/', 'docs/', 'TODO.md', 'REVIEW.md')
+RECORDS = ('historical/', 'docs/', 'TODO.md')
 
 
 def lookup(registry, path):

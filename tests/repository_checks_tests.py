@@ -19,9 +19,9 @@ BASE = {
     'README.md': SPDX_MD + '# Home\nSee PLUG-2.\n',
     'TODO.md': TODO,
     'AGENTS.md': SPDX_MD + '# Rules\nRead `docs/README.md`.\n',
-    'docs/README.md': SPDX_MD + '# Index\n[Guide](guide.md)\n[Plan](plans/2026-10-21-formats.md)\n',
+    'docs/README.md': SPDX_MD + '# Index\n[Guide](guide.md)\n[Plan](project/plans/2026-10-21-formats.md)\n',
     'docs/guide.md': SPDX_MD + '# Guide\nPLUG-1 is done; LV2-1 is next.\n',
-    'docs/plans/2026-10-21-formats.md': SPDX_MD + '# Plan\nServes PLUG-2.\n',
+    'docs/project/plans/2026-10-21-formats.md': SPDX_MD + '# Plan\nServes PLUG-2.\n',
     'portable/engine.cpp': SPDX_CPP,
 }
 
@@ -68,14 +68,14 @@ class RepositoryChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_plan_rules(self):
-        index = SPDX_MD + '[Plan](plans/2026-10-21-formats.md)\n[Bad](plans/notes.md)\n[Done](plans/2026-10-18-old.md)\n'
+        index = SPDX_MD + '[Plan](project/plans/2026-10-21-formats.md)\n[Bad](project/plans/notes.md)\n[Done](project/plans/2026-10-18-old.md)\n'
         result = self.run_check({
             'docs/README.md': index,
-            'docs/plans/notes.md': SPDX_MD + 'PLUG-2\n',
-            'docs/plans/2026-10-18-old.md': SPDX_MD + 'Delivered PLUG-1.\n',
+            'docs/project/plans/notes.md': SPDX_MD + 'PLUG-2\n',
+            'docs/project/plans/2026-10-18-old.md': SPDX_MD + 'Delivered PLUG-1.\n',
         })
-        self.assertBroken(result, 'docs/plans/notes.md: plan names start with their date',
-                          'docs/plans/2026-10-18-old.md: every TODO item it names is done')
+        self.assertBroken(result, 'docs/project/plans/notes.md: plan names start with their date',
+                          'docs/project/plans/2026-10-18-old.md: every TODO item it names is done')
         self.assertBroken(self.run_check({'docs/archive/plans/README.md': '# Archive\n',
                                           'docs/archive/plans/2026-10-01-x.md': '# X\n'}),
                           'archived plan missing from docs/archive/plans/README.md')

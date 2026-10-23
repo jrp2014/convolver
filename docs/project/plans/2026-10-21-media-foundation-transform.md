@@ -2,10 +2,10 @@
 # Media Foundation transform (MFT) plan
 
 Status: proposal, dated 21 October 2026, written against `f6ac6c6` (package
-0.4.3). Nothing here is implemented. Tracked as HOST-3 in [TODO](../../TODO.md).
+0.4.3). Nothing here is implemented. Tracked as HOST-3 in [TODO](../../../TODO.md).
 External facts were checked on the date above; recheck them before implementing.
 
-Revision note, 21 October 2026: the [documentation review](../review-2026-10/ooura-and-roadmap-2026-10-21.md)
+Revision note, 21 October 2026: the [documentation review](../../review-2026-10/ooura-and-roadmap-2026-10-21.md)
 corrected speaker-mask semantics, buffering/latency requirements and Equalizer
 APO coverage. These are proposed contracts, not implemented adapter behavior.
 
@@ -15,7 +15,7 @@ before any work starts. VST3, LV2 and AU come first; see the
 
 **Update, 22 October 2026:** asked to choose this plan's target users, the
 owner chose system-wide filtering through Equalizer APO. That route is now the
-[Equalizer APO export](../use/equalizer-apo.md) (HOST-4); the MFT stays parked.
+[Equalizer APO export](../../use/equalizer-apo.md) (HOST-4); the MFT stays parked.
 
 **In short:**
 

@@ -19,16 +19,17 @@ Convolver applies that response continuously to every input sample.
 | Write a filter configuration | [Configuration files](use/configuration.md) |
 | Use a configuration from Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](use/other-programs.md) |
 | Fix a filter that does not load or play | [Troubleshooting](use/troubleshooting.md) |
-| Filter the audio of a video with FFmpeg | [FFmpeg pipe example](use/command-line.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
+| Filter the audio of a video with FFmpeg | [FFmpeg pipe example](use/command-line.md#with-ffmpeg); a built-in filter was [planned](project/plans/2026-10-21-ffmpeg-filter.md) and is parked |
 | Build Convolver from source, or a plug-in | [Build from source](develop/build.md) |
 | Use the C++ libraries in another application | [Library guide](develop/library.md) |
 | Find the implementation or change it safely | [Implementation map](develop/architecture.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](develop/testing.md) |
-| See what is ready to use, what is still unproven and what blocks the next release | [Release readiness](release-readiness.md) |
+| See what is ready to use, what is still unproven and what blocks the next release | [Status](project/status.md) |
+| Check what jrp has already decided | [Decisions](project/decisions.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
 | Pick up, hand over or review a piece of work | [Taking on and reviewing work](develop/workflow.md) |
 | Edit these documents | [Documentation guide](develop/documentation.md) |
-| Learn where Convolver came from | [History](history.md) |
+| Learn where Convolver came from | [History](project/history.md) |
 
 ## All maintained pages
 
@@ -70,16 +71,18 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
 | [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |
 | [Source versioning](develop/versioning.md) | Reference | `VERSION`, automatic tags, recovery |
+| [Releasing](develop/releasing.md) | How-to | Candidate packages, publishing an unsigned preview, production gates, licences |
 
 ### Status, direction and history
 
+These pages are in `docs/project/`.
+
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Release readiness](release-readiness.md) | Reference | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees |
-| [Preview release record](releases/developer-preview.md) | Record | Candidate matrix, evidence and remaining production gates |
-| [Modernization direction](modernization.md) | Background | Priorities and dependency choices |
-| [History](history.md) | Background | Provenance, historical builds, downstream use |
-| [convolverPipe](convolverPipe.md) | Reference | The recovered historical streaming tool (Windows only) |
+| [Status](project/status.md) | Reference | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees, what the tests do not establish, direction |
+| [Decisions](project/decisions.md) | Reference | jrp's decisions, dated, with the page that explains each |
+| [History](project/history.md) | Background | Provenance, historical builds, downstream use |
+| [convolverPipe](project/convolverPipe.md) | Reference | The recovered historical streaming tool (Windows only) |
 
 ### Moved pages
 
@@ -103,27 +106,29 @@ paths.
 | `docs/vst3.md`, `docs/au.md`, `docs/lv2.md` | [`docs/use/plugins.md`](use/plugins.md) and [`docs/use/install.md`](use/install.md); their tests are in [testing](develop/testing.md#plug-in-format-tests) |
 | `docs/plugins/index.md`, `install.md`, `quickstart.md`, `troubleshooting.md` | [`docs/use/README.md`](use/README.md), [`install.md`](use/install.md), [`first-sound-in-a-host.md`](use/first-sound-in-a-host.md), [`troubleshooting.md`](use/troubleshooting.md) |
 | `docs/plugins/build.md`, `docs/plugins/hosts.md` | [`docs/develop/build.md`](develop/build.md#pinned-preview-recipe), [`docs/develop/host-testing.md`](develop/host-testing.md) |
+| `REVIEW.md`, `docs/release-readiness.md`, `docs/modernization.md` | [`docs/project/status.md`](project/status.md); dependency choices in the [implementation map](develop/architecture.md#dependency-choices); the old review is [archived](archive/reviews/2026-10-20-repository-review.md) |
+| `docs/releases/developer-preview.md` | [`docs/develop/releasing.md`](develop/releasing.md); the record is [archived](archive/releases/README.md) |
+| `docs/history.md`, `docs/convolverPipe.md`, `docs/plans/` | The same names in `docs/project/` |
 
 At the top level: [README](../README.md), [TODO](../TODO.md),
-[CHANGELOG](../CHANGELOG.md), [current review](../REVIEW.md),
-[contributing](../CONTRIBUTING.md) and [agent rules](../AGENTS.md).
+[CHANGELOG](../CHANGELOG.md), [contributing](../CONTRIBUTING.md) and [agent rules](../AGENTS.md).
 
 These pages describe the active CMake implementation. The package version is in
 [`VERSION`](../VERSION); use `convolver --version` to identify a particular binary.
-[Changes](../CHANGELOG.md), [source versioning](develop/versioning.md), and the
-[current review](../REVIEW.md) provide release and review context.
+[Changes](../CHANGELOG.md), [source versioning](develop/versioning.md) and
+[status](project/status.md) provide release context.
 
 ## Current source versus historical records
 
 - `include/convolver/`, `portable/`, `plugins/vst3/`, `plugins/au/` and `plugins/lv2/` are the active implementation.
 - `historical/` contains the old Windows applications. You do not need it to learn
   the current API or build the CLI.
-- [History](history.md) explains recovery, provenance and downstream reuse.
+- [History](project/history.md) explains recovery, provenance and downstream reuse.
   [Historical website files](historical/convolver-4.4/README.md) are preserved
   unchanged. Their installation instructions and restrictions are not current
   instructions for the portable code.
-- `review-2026-10/` and `archive/reviews/` contain dated reviews and evidence.
-  [`plans/`](plans/) holds design and implementation plans for open work. Plans
+- `review-2026-10/` and `archive/` contain dated reviews, release records and evidence.
+  [`project/plans/`](project/plans/) holds design and implementation plans for open work. Plans
   describe intent at the time; use the current guides and source to determine
   what is implemented. [Completed plans](archive/plans/README.md) move to
   `archive/plans/`.
@@ -134,26 +139,26 @@ changes to source files, invariants and tests without requiring a history lesson
 
 ## Open plans
 
-These dated plans in [`plans/`](plans/) describe work that is not finished;
+These dated plans in [`project/plans/`](project/plans/) describe work that is not finished;
 open work and the current order are tracked in
 [TODO](../TODO.md#execution-priorities). The plug-in formats plan is the
 current direction; the Media Foundation and FFmpeg plans are parked.
 
-- [Plug-in formats: VST3, LV2 and AU](plans/2026-10-21-plugin-formats.md)
+- [Plug-in formats: VST3, LV2 and AU](project/plans/2026-10-21-plugin-formats.md)
   (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
   choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2
   for PipeWire system audio.
-- [Media Foundation transform](plans/2026-10-21-media-foundation-transform.md)
+- [Media Foundation transform](project/plans/2026-10-21-media-foundation-transform.md)
   (HOST-3, parked): a Windows audio effect for Media Player Legacy, DirectShow players and
   Media Foundation or WinRT applications, with APO and Equalizer APO alternatives
   for system-wide processing. The Equalizer APO route is now the
   [Equalizer APO export](use/equalizer-apo.md) (HOST-4).
-- [FFmpeg filter](plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
+- [FFmpeg filter](project/plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
-- [Documentation by reader](plans/2026-10-23-documentation-by-reader.md)
+- [Documentation by reader](project/plans/2026-10-23-documentation-by-reader.md)
   (DOC-4): the move into `use/`, `develop/` and `project/`, which page goes
   where, and jrp's decisions for the remaining steps.
-- [Plug-in distribution](plans/2026-10-18-plugin-distribution.md) and its
-  [design](plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
+- [Plug-in distribution](project/plans/2026-10-18-plugin-distribution.md) and its
+  [design](project/plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
   the 18 October release design. The packaging it describes is merged; signing
   and production qualification are open.

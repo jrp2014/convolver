@@ -2,20 +2,20 @@
 # Archived plans
 
 These design and implementation plans are finished: the work they describe is on
-`main`. They were moved here from `docs/superpowers/` (now `docs/plans/`) on 21 October 2026 and kept
+`main`. They were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026 and kept
 as records of what was intended, decided and measured at the time. Use the
 [current documentation](../../README.md) for how Convolver behaves now.
 
-Plans for work that is still open stay in [`docs/plans/`](../../plans/). Open work is
+Plans for work that is still open are in [`docs/project/plans/`](../../project/plans/). Open work is
 tracked in [TODO](../../../TODO.md).
 
 | Plan | What it delivered | Implemented in | Current guide |
 | --- | --- | --- | --- |
-| [Portable core and CLI](2026-10-17-portable-core.md) | C++20 engine with uniform partitioned FFT convolution, libsndfile I/O, `.cfg` loader and the `convolver` CLI | `fa8ca77` | [Core and CLI reference](../../portable-core.md) |
+| [Portable core and CLI](2026-10-17-portable-core.md) | C++20 engine with uniform partitioned FFT convolution, libsndfile I/O, `.cfg` loader and the `convolver` CLI | `fa8ca77` | [Command-line reference](../../use/command-line.md) |
 | [FFT backends](2026-10-18-fft-backends.md) | Accelerate backend beside FFTW, FFTW planning modes and wisdom, benchmarks | `2571990` | [FFT guide](../../develop/fft-backends.md) |
 | [Independent core and CMake package](2026-10-18-cmake-package-core.md) | Exported `Convolver::core` and `Convolver::io`, presets, relocatable package consumer tests | `82cf94b` | [Library guide](../../develop/library.md) |
-| [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [VST3 guide](../../vst3.md) |
-| [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Configuration compatibility](../../configuration-compatibility.md) |
+| [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [How the plug-ins behave](../../use/plugins.md) |
+| [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Other programs](../../use/other-programs.md) |
 
 ## How completion was checked
 

@@ -21,7 +21,7 @@ TOP_LEVEL = {
     '.claude', '.clang-format', '.clang-format-ignore', '.clang-tidy', '.github',
     '.gitattributes', '.gitignore', '.markdownlint-cli2.yaml', '.pre-commit-config.yaml',
     '.yamllint.yaml', 'AGENTS.md', 'CHANGELOG.md', 'CLAUDE.md', 'CMakeLists.txt',
-    'CMakePresets.json', 'CONTRIBUTING.md', 'COPYING', 'README.md', 'REVIEW.md', 'TODO.md',
+    'CMakePresets.json', 'CONTRIBUTING.md', 'COPYING', 'README.md', 'TODO.md',
     'VERSION', 'cmake', 'docs', 'examples', 'historical', 'include', 'packaging',
     'plugins', 'portable', 'scripts', 'tests',
 }
@@ -113,7 +113,7 @@ def check_docs_index(root, files, errors):
 
 def check_plans(root, files, defined, errors):
     for name in files:
-        if name.startswith('docs/plans/') and name.endswith('.md'):
+        if name.startswith('docs/project/plans/') and name.endswith('.md'):
             base = name.rsplit('/', 1)[1]
             if base == 'README.md':
                 continue

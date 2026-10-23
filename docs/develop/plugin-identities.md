@@ -2,7 +2,7 @@
 # Plug-in identities and channel layouts
 
 [Documentation index](../README.md) · [plug-in guide](../use/plugins.md) ·
-[Plug-in formats plan](../plans/2026-10-21-plugin-formats.md)
+[Plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md)
 
 **In short:** every plug-in format identifies Convolver by fixed codes: VST3
 class IDs, AU type, subtype and manufacturer codes, LV2 URIs, and macOS bundle

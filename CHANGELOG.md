@@ -125,6 +125,14 @@ Until 1.0 the C++ API may change between minor versions.
   and test evidence from every user page to [testing](docs/develop/testing.md).
   Preview packages ship all of `docs/use/` instead of `docs/plugins/` and two
   copied guides. The tools' messages point at the new paths.
+- Status, direction and decisions moved into `docs/project/` (DOC-4, third
+  step). One [status page](docs/project/status.md) replaces `REVIEW.md`,
+  release readiness and the modernization page; the dependency choices are in
+  the [implementation map](docs/develop/architecture.md#dependency-choices). A
+  new [decisions log](docs/project/decisions.md) lists jrp's decisions with the
+  page that explains each. Releasing is a [developer guide](docs/develop/releasing.md),
+  and the 18 October release record and the old review are archived. History,
+  the convolverPipe page and open plans are in `docs/project/`.
 - Preview packages (PLUG-5) ship `convolver-preset` and
   `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
   guides in `docs/`, instead of `convolver-vst3-preset` (still built from

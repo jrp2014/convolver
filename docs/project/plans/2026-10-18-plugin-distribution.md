@@ -3,10 +3,10 @@
 
 > **For contributors and agents:** the open work from this plan is tracked as
 > TODO items (REL-1, PLUG-5). Take them on as described in
-> [the workflow guide](../develop/workflow.md); the task checkboxes below are the
+> [the workflow guide](../../develop/workflow.md); the task checkboxes below are the
 > 18 October record. (This note replaced a pointer to an agent tool that the
 > repository does not use.) File paths below are as planned on 18 October; the
-> pages have since moved (the [moved pages table](../README.md#moved-pages)
+> pages have since moved (the [moved pages table](../../README.md#moved-pages)
 > gives the current ones).
 
 **Goal:** Deliver tested VST3 downloads and source builds with usable documentation,
@@ -30,12 +30,12 @@ use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
 are superseded. First releases are unsigned previews; signing (Task 4) and
 production acceptance are a later gate. LV2 and AU now share this pipeline
 (PLUG-5). The [plug-in formats plan](2026-10-21-plugin-formats.md) and
-[TODO](../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
+[TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
 dated notes and tasks below are kept as the record.
 
 Status: proposed work, based on `0bf77d0` and portable package 0.2.0. This plan does
 not implement a release or certify any commercial host. The existing
-[configuration interoperability plan](../archive/plans/2026-10-18-configuration-interoperability.md)
+[configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
 **Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.

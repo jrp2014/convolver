@@ -19,7 +19,7 @@ helps you choose how to run it and points to the page for each step.
 
 **Status:** Convolver is a developer preview. Preview packages are not signed,
 and the plug-ins have not yet been tested in named DAWs. The
-[release readiness page](../release-readiness.md) says what is ready.
+[status page](../project/status.md) says what is ready.
 
 ## Choose how to run it
 
