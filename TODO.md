@@ -61,7 +61,7 @@ boundary and C++20 in the core.
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 lands before LV2-2 and AU-2 settle their error paths, so no adapter discards a reason. |
 | 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
-| 4. Next milestone | jrp's three conditions: the reset fix (VST3-7 follow-up), **REL-2** journeys demonstrated, **REL-3** an independent user with an exact **PLUG-5** preview package. Proposed with them: **PLUG-7**, a **HOST-1** smoke test | Which formats the first preview holds (VST3 today; LV2 and AU if ready) is jrp's choice, still open. |
+| 4. Next milestone | jrp's three conditions: the reset fix (VST3-7 follow-up, done 23 October, PR #40), **REL-2** journeys demonstrated, **REL-3** an independent user with an exact **PLUG-5** preview package. Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 5. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 6. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. With PLUG-8 done it mostly decides how to show reasons already kept. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
@@ -121,9 +121,8 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   Write them once in the plug-in guides that ship in the package
   (`docs/plugins/`), with per-platform differences marked, and make the
   package contain what they need: presets made from the stereo and 2→6
-  filters, and the preset tool. The package has no `convolver` CLI today;
-  whether previews ship it, so the CLI journey runs from the package rather
-  than a source build, is jrp's decision. See
+  filters, the preset tool and the `convolver` CLI, which the first preview
+  ships (owner's decision, 23 October 2026); the package has no CLI yet (PLUG-5). See
   [release readiness](docs/release-readiness.md#user-journeys-for-the-first-preview).
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
@@ -284,7 +283,9 @@ Shared groundwork, done once so the three streams stay independent:
   `convolver-vst3-preset` (owner's decisions, 22 October 2026), with the
   presets and Equalizer APO guides;
   `release.stage`, `package_smoke.py` and `verify_artifact.py` require and run
-  both tools.
+  both tools. Still to add: the `convolver` CLI, which the first preview ships
+  alongside VST3 and the preset tool, with LV2 and AU in later previews
+  (owner's decision, 23 October 2026).
 - [x] **PLUG-6 — Pin format dependencies.** Done 22 October 2026 (PR #31).
   AudioUnitSDK 1.4.0 (`bd98b31`) and the `lv2` 1.18.10 headers (`0bcde33`) are
   pinned by commit and archive SHA-256 in `packaging/release-policy.json`, each

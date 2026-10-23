@@ -3,8 +3,8 @@
 
 [Documentation index](README.md) · [TODO](../TODO.md) · [Release record](releases/developer-preview.md)
 
-**In short:** status checked on 23 October 2026 against `main` at `4ce79f9`
-(0.4.20). Nothing has been published yet: there are no GitHub releases, and
+**In short:** status checked on 23 October 2026 against `main` at `f4407f0`
+(0.4.22). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3 plug-in are
 implemented and tested automatically; no named host has been tested and no
@@ -40,7 +40,7 @@ documentation alone.
 
 | Feature | Implemented | Automatically tested | Named host | Published |
 | --- | --- | --- | --- | --- |
-| Command-line renderer `convolver` ([reference](portable-core.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | No; build from source. Not in the preview package |
+| Command-line renderer `convolver` ([reference](portable-core.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | No; build from source. The first preview will ship it (PLUG-5) |
 | Configuration inspection and validation ([compatibility](configuration-compatibility.md)) | Yes | Yes: parser tests, a corpus of example configurations, and replay of inputs found by fuzzing | Other readers of `.cfg` not checked (CFG-1) | No |
 | Preset tool `convolver-preset` ([guide](presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | No; in the preview package since PR #38, not yet published |
 | Equalizer APO export ([guide](equalizer-apo.md)) | Yes | Against a model of Equalizer APO 1.4.2 only; a check in Equalizer APO itself is HOST-4 (in progress) | Not run in Equalizer APO yet | No; in the preview package since PR #38, not yet published |
@@ -50,9 +50,9 @@ documentation alone.
 | C++ libraries ([CMake package](cmake-package.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](portable-core.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
-Known defect: a reset during a filter transition delayed the next filter
-(found in jrp's review of 0.4.19; the fix is the VST3-7 follow-up, not yet
-merged: [PR #40](https://github.com/jrp2014/convolver/pull/40)). Lifecycle
+Fixed defect: a reset during a filter transition delayed the next filter
+(found in jrp's review of 0.4.19; fixed on 23 October 2026 by the VST3-7
+follow-up, [PR #40](https://github.com/jrp2014/convolver/pull/40)). Lifecycle
 sequences that would catch defects like it are PLUG-7.
 
 ## User journeys for the first preview
@@ -66,9 +66,9 @@ not fit its input instead of saving and presets.
 
 | Journey | Filter | Surfaces | Status |
 | --- | --- | --- | --- |
-| Stereo room correction | [`examples/first-use/stereo`](../examples/first-use/README.md) | Each plug-in format in the preview (VST3 today) in a named host; CLI | CLI commands run in CI (`examples.first_use`). The preview package has no preset made from this filter yet. Not demonstrated. |
-| 2→6 crossover | [`examples/first-use/crossover`](../examples/first-use/README.md) | Each plug-in format in the preview (VST3 today) in a named host; CLI | CLI commands run in CI. No 2→6 preset in the package yet. Not demonstrated. |
-| Offline file rendering | All three first-use filters | CLI | Run from the source tree in CI. The preview package has no CLI; whether it should is jrp's decision, and until then this journey starts from a source build. Not demonstrated. |
+| Stereo room correction | [`examples/first-use/stereo`](../examples/first-use/README.md) | VST3 in a named host; CLI | CLI commands run in CI (`examples.first_use`). The preview package has no preset made from this filter yet. Not demonstrated. |
+| 2→6 crossover | [`examples/first-use/crossover`](../examples/first-use/README.md) | VST3 in a named host; CLI | CLI commands run in CI. No 2→6 preset in the package yet. Not demonstrated. |
+| Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI. The package has no CLI yet; the first preview will ship it (PLUG-5). Not demonstrated. |
 
 Recovering from a wrong preset is the weakest step today: VST3 keeps the
 working filter but reports the rejection only as `kResultFalse`, so the host
@@ -80,17 +80,18 @@ the reason; DIAG-1 decides where it is shown.
 From jrp's [guidance of 22 October 2026](review-2026-10/release-readiness-guidance-2026-10-22.md):
 an independent user successfully installs and uses an exact preview package,
 with the lifecycle regression fixed and the advertised workflows demonstrated.
-Which formats the first preview holds (VST3 today; LV2 and AU if ready) is
-still jrp's choice.
+The first preview holds VST3, the `convolver` CLI and the preset tool; LV2
+and AU join later previews once their own journeys are demonstrated
+(owner's decision, 23 October 2026).
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
-| Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Fix in review, not merged |
+| Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Done, merged 23 October 2026 |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
-| An exact preview package: plug-ins, preset tool, examples and guides (the CLI only if jrp decides to ship it) | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); journey presets and the CLI question remain |
+| An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI and the journey presets remain |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; needs a tester chosen by jrp |
 | Lifecycle sequences checked against a reference model | Proposed here, so the next defect of this kind is caught | PLUG-7 | Not started |
-| Smoke test in at least one named host per format in the preview | Proposed here, already the preview gate in the plug-in plan | HOST-1 | Not run |
+| Smoke test of VST3 in at least one named host | Proposed here, already the preview gate in the plug-in plan | HOST-1 | Not run |
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
