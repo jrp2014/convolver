@@ -168,8 +168,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   decides presentation rather than recovering lost information. The
   [shared adapter contract](docs/develop/plugin-contract.md#loading-and-failure)
   asks for the message in the host's log and a "load failed" status, but only
-  LV2 has a defined route (`log:log` and the status port). VST3 and AU have no
-  host log interface and no agreed place yet; an editor is VST3-3/HOST-2. Make
+  LV2 had a defined route (`log:log` and the status port); VST3 and AU have no
+  host log interface, so they now use a Status parameter and the Convolver log
+  (progress below); an editor is VST3-3/HOST-2. Make
   a table of failures (missing or unreadable filter, rate mismatch, channel
   count or layout mismatch, corrupt or newer state, failed preparation, failed
   activation) against surfaces (CLI standard error, exit status and JSON

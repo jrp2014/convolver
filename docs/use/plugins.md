@@ -130,10 +130,11 @@ How each format reports a refusal:
 Convolver has no window of its own, so the VST3 and the Audio Unit say what
 they are doing in two places.
 
-**The Status parameter** is a read-only parameter that hosts list with the
+**The Status parameter** is a read-only parameter that hosts can list with the
 plug-in's controls, for example in their generic plug-in window or parameter
-list. It never changes the sound and is never automated or saved. It reads,
-for example:
+list. It never changes the sound, is never automated, and is not restored
+from saved projects. Where the host shows parameter text, it reads, for
+example (some hosts show only the status name in the first column):
 
 | Status | Example text |
 | --- | --- |
@@ -145,9 +146,13 @@ for example:
 
 "Not checked yet" means the host has not started the plug-in at a sample rate
 and channel layout yet. Some hosts show a separate copy of the plug-in in its
-window: Audacity's real-time effects window, for one, never starts its copy,
-so it always shows this line; compare the filter's rate and channels in it
-with your project's, and read the log for what the playing copy did.
+window, not the one that plays. Audacity's real-time effects window is one:
+its copy usually reads "Not checked yet", but Audacity may start it briefly at
+44100 Hz, whatever the project's rate, and then it can read `Silent: the
+filter is for 48000 Hz, the host runs at 44100 Hz` while the playing copy is
+fine. When the window and the sound disagree, trust the log: each copy has its
+own number (`VST3 #1`, `VST3 #2`), and the one playing logs `Started at` with
+your project's rate.
 
 **The Convolver log** is a text file with one line for each filter loaded,
 each time the host starts the plug-in (with the sample rate, channels and block

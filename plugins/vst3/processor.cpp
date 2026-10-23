@@ -74,6 +74,12 @@ tresult PLUGIN_API Processor::initialize(FUnknown* context) {
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
                                                  SpeakerArrangement* out, int32 no) {
+    const auto result = arrange(in, ni, out, no);
+    if (result == kResultOk)
+        send_status(); // Whether the filter has been checked may have changed.
+    return result;
+}
+tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement* out, int32 no) {
     std::lock_guard lock(control_);
     if (active_ || ni != 1 || no != 1 || !in || !out)
         return kResultFalse;
@@ -95,13 +101,19 @@ tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
     return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
 }
 tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
-    std::lock_guard lock(control_);
-    if (active_ || !std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
-        setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate ||
-        setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20) ||
-        canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
-        return kInvalidArgument;
-    return AudioEffect::setupProcessing(setup);
+    tresult result = kInvalidArgument;
+    {
+        std::lock_guard lock(control_);
+        if (active_ || !std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
+            setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate ||
+            setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20) ||
+            canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
+            return kInvalidArgument;
+        result = AudioEffect::setupProcessing(setup);
+    }
+    if (result == kResultOk)
+        send_status(); // Whether the filter has been checked may have changed.
+    return result;
 }
 HostLayout Processor::layout() const {
     return {static_cast<int>(processSetup.sampleRate), static_cast<std::size_t>(inputs_),
@@ -123,6 +135,7 @@ std::optional<HostLayout> Processor::known_layout() const {
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
     const auto result = activate(state);
+    write_log();
     send_status();
     return result;
 }
@@ -171,10 +184,19 @@ void Processor::log(const std::string& message, bool problem) noexcept {
     try {
         if (message.empty() || message == logged_)
             return;
-        host_log(tag_.c_str(), message, problem);
+        unlogged_.emplace_back(message, problem);
         logged_ = message;
     } catch (...) { // Out of memory: the line is dropped.
     }
+}
+void Processor::write_log() noexcept {
+    std::vector<std::pair<std::string, bool>> lines;
+    {
+        std::lock_guard lock(control_);
+        lines.swap(unlogged_);
+    }
+    for (const auto& [line, problem] : lines)
+        host_log(tag_.c_str(), line, problem);
 }
 HostStatusLine Processor::status_locked() const {
     return host_status(filter_, host_ ? std::optional(layout()) : known_layout());
@@ -216,6 +238,7 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
     const auto result = load_state(stream);
+    write_log();
     send_status();
     return result;
 }
@@ -405,12 +428,19 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         status >= static_cast<int64>(status_names.size()) ||
         attributes->getBinary("text", data, size) != kResultOk || (size && !data))
         return kInvalidArgument;
+    std::string text;
     try {
-        status_text_.assign(static_cast<const char*>(data), size);
+        text.assign(static_cast<const char*>(data), size);
     } catch (...) {
         return kOutOfMemory;
     }
     auto* parameter = getParameterObject(status_id);
+    if (!parameter) // Not initialized, or terminated: nothing to show it on.
+        return kResultFalse;
+    {
+        std::lock_guard lock(status_lock_);
+        status_text_.swap(text);
+    }
     setParamNormalized(status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
@@ -420,9 +450,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
 }
 tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
                                                      String128 string) {
-    if (id == status_id && !status_text_.empty() && value == getParamNormalized(status_id)) {
-        copy(status_text_, string);
-        return kResultOk;
+    if (id == status_id && value == getParamNormalized(status_id)) {
+        std::lock_guard lock(status_lock_);
+        if (!status_text_.empty()) {
+            copy(status_text_, string);
+            return kResultOk;
+        }
     }
     return EditController::getParamStringByValue(id, value, string);
 }

@@ -14,6 +14,8 @@
 #include <iterator>
 #include <limits>
 #include <new>
+#include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -838,6 +840,33 @@ void allocation_failures() {
     f.load(HostState{filter(2)}, host, [](const Configuration&) {});
     require(!f.notice().empty(), "speaker notice not kept");
 }
+// CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
+// since temporary folders may hold characters outside the ANSI code page.
+std::optional<std::filesystem::path> log_variable() {
+#ifdef _WIN32
+    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#else
+    if (const char* value = std::getenv("CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#endif
+    return std::nullopt;
+}
+void set_log_variable(const std::optional<std::filesystem::path>& value) {
+#ifdef _WIN32
+    _wputenv_s(L"CONVOLVER_LOG", value ? value->wstring().c_str() : L""); // Empty removes it.
+#else
+    if (value)
+        setenv("CONVOLVER_LOG", value->c_str(), 1);
+    else
+        unsetenv("CONVOLVER_LOG");
+#endif
+}
+// A file name of this process's own, so that concurrent runs never share it.
+std::filesystem::path private_temp(const char* name) {
+    return std::filesystem::temp_directory_path() /
+           (std::string(name) + "-" + std::to_string(std::random_device{}()));
+}
 // DIAG-1: the status line a host shows, and the Convolver log.
 void status_lines() {
     using Status = HostStatus;
@@ -951,14 +980,11 @@ void status_lines() {
 
     // The file: one dated line per message, with the version and format, and
     // rotation once it has grown past 1 MB.
-    const auto folder = std::filesystem::temp_directory_path() / "convolver-host-log-test";
+    const auto folder = private_temp("convolver-host-log-test");
     std::filesystem::remove_all(folder);
     const auto path = folder / "nested" / "Convolver.log";
-#ifdef _WIN32
-    _putenv_s("CONVOLVER_LOG", path.string().c_str());
-#else
-    setenv("CONVOLVER_LOG", path.c_str(), 1);
-#endif
+    const auto earlier = log_variable(); // Restored below.
+    set_log_variable(path);
     require(host_log_path() == path, "CONVOLVER_LOG not used");
     host_log("Test #1", "first line");
     host_log("Test #1", "second line", false);
@@ -983,17 +1009,13 @@ void status_lines() {
                 contains(read(path), "after rotation"),
             "log not rotated");
     // Empty turns the file off; an unwritable place is not an error.
-#ifdef _WIN32
-    _putenv_s("CONVOLVER_LOG", (folder / "nested").string().c_str());
-#else
-    setenv("CONVOLVER_LOG", (folder / "nested").c_str(), 1); // A folder: cannot be opened.
-#endif
+    set_log_variable(folder / "nested"); // A folder: cannot be opened.
     host_log("Test #1", "dropped");
 #ifndef _WIN32
     setenv("CONVOLVER_LOG", "", 1);
     require(host_log_path().empty(), "empty CONVOLVER_LOG does not turn the log off");
 #endif
-    // Nothing later in this test writes the log.
+    set_log_variable(earlier);
     std::filesystem::remove_all(folder);
 }
 

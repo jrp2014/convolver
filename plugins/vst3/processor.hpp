@@ -9,6 +9,8 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace convolver::vst3 {
 // Permanent class IDs from plugins/identities.json (PLUG-4); never change them.
@@ -71,9 +73,14 @@ class Processor final : public Steinberg::Vst::AudioEffect {
 
   private:
     void record_activation_failure(const char* why) noexcept;
-    // Writes to the Convolver log (host_log), skipping a repeat of the line
-    // this instance wrote last, as hosts restart plug-ins often.
+    // Queues a line for the Convolver log under control_, skipping a repeat
+    // of the line this instance queued last, as hosts restart plug-ins often;
+    // write_log() writes the queue (host_log) after control_ is released, so
+    // file access never holds up the host's other control calls.
     void log(const std::string&, bool problem = true) noexcept;
+    void write_log() noexcept;
+    Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
+                               Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
     // Sends status() to the controller; outside control_, as the controller
     // may call back into the host.
     void send_status() noexcept;
@@ -96,7 +103,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
     std::optional<HostLayout> activated_;
-    std::string logged_;    // The last line log() wrote.
+    std::string logged_;                                 // The last line log() queued.
+    std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
     const std::string tag_; // "VST3 #n": this instance in the Convolver log.
 };
 class Controller final : public Steinberg::Vst::EditController {
@@ -113,11 +121,15 @@ class Controller final : public Steinberg::Vst::EditController {
     Steinberg::tresult PLUGIN_API getParamStringByValue(Steinberg::Vst::ParamID,
                                                         Steinberg::Vst::ParamValue,
                                                         Steinberg::Vst::String128) override;
-    std::string status_text() const {
+    std::string status_text() {
+        std::lock_guard lock(status_lock_);
         return status_text_;
     }
 
   private:
+    // The host may restore state (and so send the status) on another thread
+    // than the one reading parameter text.
+    std::mutex status_lock_;
     std::string status_text_;
 };
 } // namespace convolver::vst3

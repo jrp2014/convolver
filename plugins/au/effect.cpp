@@ -368,8 +368,16 @@ OSStatus Effect::ChangeStreamFormat(AudioUnitScope scope, AudioUnitElement eleme
                                     const AudioStreamBasicDescription& previous,
                                     const AudioStreamBasicDescription& next) {
     const auto result = AUBase::ChangeStreamFormat(scope, element, previous, next);
-    if (result == noErr && previous.mSampleRate != next.mSampleRate)
+    if (result != noErr)
+        return result;
+    if (previous.mSampleRate != next.mSampleRate)
         timing_changed(); // Seconds depend on the rate.
+    {
+        // Whether the filter counts as checked depends on the formats.
+        std::lock_guard lock(control_);
+        update_status();
+    }
+    notify_status();
     return result;
 }
 

@@ -11,7 +11,8 @@
 // report (docs/use/plugins.md#status-and-the-convolver-log). Control thread
 // only: never from audio processing.
 namespace convolver {
-// Where the log goes: CONVOLVER_LOG when set (empty turns the file off);
+// Where the log goes: CONVOLVER_LOG when set (empty turns the file off, except
+// on Windows, where setting a variable empty removes it);
 // otherwise ~/Library/Logs/Convolver/Convolver.log on macOS,
 // %LOCALAPPDATA%\Convolver\Convolver.log on Windows, and
 // $XDG_STATE_HOME/convolver/convolver.log (default ~/.local/state) elsewhere.

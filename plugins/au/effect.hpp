@@ -19,7 +19,8 @@ inline constexpr std::size_t latency_frames = 256;
 inline constexpr UInt32 max_channels = identity::max_channels;
 // DIAG-1: the read-only Status parameter, an indexed HostStatus whose current
 // value reads (kAudioUnitProperty_ParameterStringFromValue) as the unit's
-// HostStatusLine. Never saved: RestoreState ignores parameter data.
+// HostStatusLine. AUBase::SaveState writes its value with the other
+// parameters, but RestoreState ignores parameter data, so it never comes back.
 inline constexpr AudioUnitParameterID status_parameter = 0;
 
 // For the tests only, never offered to hosts as a feature: a custom global

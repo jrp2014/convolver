@@ -159,20 +159,25 @@ format.
   and channels. The parameter is not automatable and is not part of the host
   state. VST3: parameter ID 1, a list parameter with `kIsReadOnly`; the
   processor sends the line to the controller in a `ConvolverStatus` message
-  after every load, activation and connection, and the controller asks the
+  after every load, activation, connection, `setupProcessing` and
+  `setBusArrangements` (outside its control lock), and the controller asks the
   host to reread its parameters (`restartComponent(kParamValuesChanged)`;
   hosts may ignore it). Audio Unit: global parameter 0, indexed, readable
   and not writable; the line is the current value's
-  `kAudioUnitProperty_ParameterStringFromValue`, and a parameter-change event
-  is sent outside the control lock. Host writes to it are ignored.
+  `kAudioUnitProperty_ParameterStringFromValue`, recomputed after every
+  restore, initialization, cleanup and stream format change, and a
+  parameter-change event is sent outside the control lock. Host writes to it
+  are ignored, and the value `AUBase::SaveState` writes with the other
+  parameters is ignored on restore.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size
   and what plays, with the failure or speaker notice in full) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the
-  one it wrote last, as hosts restart plug-ins often. On macOS the lines also
-  go to the unified log. Control thread only. Locations are in the
+  one it wrote last, as hosts restart plug-ins often. Adapters write the file
+  outside their control lock. On macOS the lines also go to the unified log.
+  Control thread only. Locations are in the
   [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
   `CONVOLVER_LOG` into the build folder.
 

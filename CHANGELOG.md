@@ -13,7 +13,7 @@ Until 1.0 the C++ API may change between minor versions.
 ### Added
 
 - The VST3 and the Audio Unit say why they are silent or refused a preset
-  (DIAG-1): a read-only **Status** parameter, which hosts list with the
+  (DIAG-1): a read-only **Status** parameter, which hosts can list with the
   plug-in's controls, shows one line such as "Silent: the filter is for 44100
   Hz, the host runs at 48000 Hz", and the new Convolver log
   (`~/Library/Logs/Convolver/Convolver.log`, `%LOCALAPPDATA%\Convolver\Convolver.log`

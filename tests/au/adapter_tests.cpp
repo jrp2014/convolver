@@ -16,6 +16,8 @@
 #include <iterator>
 #include <map>
 #include <new>
+#include <optional>
+#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -590,10 +592,14 @@ void status_parameter() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
     };
+    // A log of this process's own: CTest's is shared with the other AU tests.
+    const auto log_path =
+        std::filesystem::temp_directory_path() /
+        ("convolver-au-status-" + std::to_string(std::random_device{}()) + ".log");
     const char* configured = std::getenv("CONVOLVER_LOG");
-    require(configured && *configured, "the AU tests must set CONVOLVER_LOG");
-    const std::string log_path = configured;
-    std::filesystem::remove(log_path); // Only this run's lines count.
+    const std::optional<std::string> earlier =
+        configured ? std::optional<std::string>(configured) : std::nullopt;
+    setenv("CONVOLVER_LOG", log_path.c_str(), 1);
     const auto log_text = [&] {
         std::ifstream in(log_path, std::ios::binary);
         return std::string(std::istreambuf_iterator<char>(in), {});
@@ -687,6 +693,11 @@ void status_parameter() {
             "Status value name");
     CFRelease(request.outString);
     unit.uninitialize();
+    if (earlier)
+        setenv("CONVOLVER_LOG", earlier->c_str(), 1);
+    else
+        unsetenv("CONVOLVER_LOG");
+    std::filesystem::remove(log_path);
 }
 
 int main() {

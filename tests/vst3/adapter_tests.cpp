@@ -13,6 +13,8 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 using namespace Steinberg;
@@ -653,21 +655,42 @@ void failure_records() {
     p.setActive(false);
     p.terminate();
 }
+// CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
+// since temporary folders may hold characters outside the ANSI code page.
+std::optional<std::filesystem::path> log_variable() {
+#ifdef _WIN32
+    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#else
+    if (const char* value = std::getenv("CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#endif
+    return std::nullopt;
+}
+void set_log_variable(const std::optional<std::filesystem::path>& value) {
+#ifdef _WIN32
+    _wputenv_s(L"CONVOLVER_LOG", value ? value->wstring().c_str() : L""); // Empty removes it.
+#else
+    if (value)
+        setenv("CONVOLVER_LOG", value->c_str(), 1);
+    else
+        unsetenv("CONVOLVER_LOG");
+#endif
+}
+// A file name of this process's own, so that concurrent runs never share it.
+std::filesystem::path private_temp(const char* name) {
+    return std::filesystem::temp_directory_path() /
+           (std::string(name) + "-" + std::to_string(std::random_device{}()));
+}
 // DIAG-1: the Status parameter shows each failure in one line, and the
 // Convolver log holds the full explanation.
 void status_and_log() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
     };
-    const auto log_path = std::filesystem::temp_directory_path() / "convolver-vst3-status.log";
-    std::filesystem::remove(log_path);
-    const char* earlier = std::getenv("CONVOLVER_LOG"); // CTest's, restored below.
-    const std::string restore = earlier ? earlier : "";
-#ifdef _WIN32
-    _putenv_s("CONVOLVER_LOG", log_path.string().c_str());
-#else
-    setenv("CONVOLVER_LOG", log_path.c_str(), 1);
-#endif
+    const auto log_path = private_temp("convolver-vst3-status") += ".log";
+    const auto earlier = log_variable(); // Restored below.
+    set_log_variable(log_path);
     const auto log_text = [&] {
         std::ifstream in(log_path, std::ios::binary);
         return std::string(std::istreambuf_iterator<char>(in), {});
@@ -796,14 +819,7 @@ void status_and_log() {
     c.disconnect(&p);
     p.terminate();
     c.terminate();
-#ifdef _WIN32
-    _putenv_s("CONVOLVER_LOG", restore.c_str());
-#else
-    if (earlier)
-        setenv("CONVOLVER_LOG", restore.c_str(), 1);
-    else
-        unsetenv("CONVOLVER_LOG");
-#endif
+    set_log_variable(earlier);
     std::filesystem::remove(log_path);
 }
 int run(const std::filesystem::path& preset_path) {
@@ -902,5 +918,16 @@ int wmain(int argc, wchar_t** argv) {
 #else
 int main(int argc, char** argv) {
 #endif
+    // CTest sets CONVOLVER_LOG; run by hand, keep test lines out of the user's log.
+    const auto own_log = private_temp("convolver-vst3-tests") += ".log";
+    if (!log_variable())
+        set_log_variable(own_log);
+    struct Remove {
+        std::filesystem::path path;
+        ~Remove() {
+            std::error_code ignored;
+            std::filesystem::remove(path, ignored);
+        }
+    } remove{own_log};
     return run(argc == 2 ? std::filesystem::path(argv[1]) : std::filesystem::path{});
 }
