@@ -80,9 +80,12 @@ macOS 14 or later. Checked on 23 October 2026:
   true, use the notarized build. If not, or if REAPER lists Convolver but will
   not load it, use the non-notarized build from the same page, and record which
   build you used.
-- **Audacity:** use the **Universal DMG** (4.0.1). It runs natively on Apple
-  silicon. The download page shows "No plugin support" under the ARM64 DMG,
-  but that note was written for Windows on ARM:
+- **Audacity:** the **ARM64 DMG** and the **Universal DMG** (4.0.1) run the
+  same arm64 code on Apple silicon, built with the same options; either will
+  do. The universal one can also be switched to Rosetta (*Get Info › Open
+  using Rosetta*) to try the `macos-x86_64` Convolver on the same Mac. The
+  download page shows "No plugin support" under the ARM64 DMG, but that note
+  was written for Windows on ARM:
   - The website's
     [`DownloadCard.jsx`](https://github.com/audacity/audacity.github.io/blob/191c2e8461a9ee7ec71f32a00a21a98c4924bb92/src/components/card/DownloadCard.jsx#L64-L74)
     adds it to every download whose title contains "ARM64", whichever page
