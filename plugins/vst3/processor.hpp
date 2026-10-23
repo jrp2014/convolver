@@ -93,7 +93,7 @@ class Controller final : public Steinberg::Vst::EditController {
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
     Steinberg::tresult PLUGIN_API setComponentState(Steinberg::IBStream*) override;
     // Bypass reads "Off" and "On"; accept them back, as hosts that let users
-    // type a value need (VST3-8). Other text goes to the SDK's conversion.
+    // type a value need (VST3-8), with 0 and 1, and refuse other text.
     Steinberg::tresult PLUGIN_API getParamValueByString(Steinberg::Vst::ParamID,
                                                         Steinberg::Vst::TChar*,
                                                         Steinberg::Vst::ParamValue&) override;

@@ -737,7 +737,13 @@ void controller_conversions() {
     require(c.getParamValueByString(bypass_id, upper, value) == kResultOk && value == 1,
             "ON not accepted");
     require(c.getParamValueByString(bypass_id, number, value) == kResultOk && value == 0,
-            "a number is no longer accepted");
+            "0 not accepted");
+    String128 one{'1', 0}, fraction{'0', '.', '5', 0};
+    require(c.getParamValueByString(bypass_id, one, value) == kResultOk && value == 1,
+            "1 not accepted");
+    // The SDK's own conversion reads any text as 0 on macOS.
+    require(c.getParamValueByString(bypass_id, fraction, value) != kResultOk,
+            "a fraction accepted");
     require(c.getParamValueByString(bypass_id, other, value) != kResultOk,
             "unrelated text accepted");
     MemoryStream state;

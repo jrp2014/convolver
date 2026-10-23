@@ -314,14 +314,17 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
             }
             return string[i] == 0;
         };
-        if (is("off")) {
+        if (is("off") || is("0")) {
             value = 0;
             return kResultOk;
         }
-        if (is("on")) {
+        if (is("on") || is("1")) {
             value = 1;
             return kResultOk;
         }
+        // Not the SDK's conversion: it reads any text as 0 on macOS and
+        // leaves the value unset on Windows.
+        return kResultFalse;
     }
     return EditController::getParamValueByString(id, string, value);
 }
