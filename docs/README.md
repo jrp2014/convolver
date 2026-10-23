@@ -155,9 +155,6 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   [Equalizer APO export](use/equalizer-apo.md) (HOST-4).
 - [FFmpeg filter](project/plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
-- [Documentation by reader](project/plans/2026-10-23-documentation-by-reader.md)
-  (DOC-4): the move into `use/`, `develop/` and `project/`, which page goes
-  where, and jrp's decisions for the remaining steps.
 - [Plug-in distribution](project/plans/2026-10-18-plugin-distribution.md) and its
   [design](project/plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
   the 18 October release design. The packaging it describes is merged; signing
