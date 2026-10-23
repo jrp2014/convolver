@@ -39,7 +39,7 @@ configuration is read before rendering with it:
 ```
 
 The `.cfg` files are commented line by line; the
-[configuration reference](../../docs/configuration.md) explains every field. The
+[configuration reference](../../docs/use/configuration.md) explains every field. The
 crossover's bands are deliberately simple near-Gaussian filters that add back
 to the original signal: they show routing, not a crossover ready for real
 speakers.
@@ -51,7 +51,7 @@ the CLI that was just built, and compares every output with `expected.wav`
 (at most 1e-5 apart). The plug-in tests then load the same filters through each
 plug-in format and require output identical to those CLI renders, once the
 plug-in's 256-frame latency is allowed for, and within 1e-5 of the reference;
-see [plug-in comparisons](../../docs/testing.md#plug-in-comparisons-plug-2).
+see [plug-in comparisons](../../docs/develop/testing.md#plug-in-comparisons-plug-2).
 `examples.fixtures` checks that the files here are exactly what the generator
 writes.
 

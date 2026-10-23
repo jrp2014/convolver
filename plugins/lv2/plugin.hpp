@@ -52,7 +52,7 @@ struct TestFailureAccess {
     void (*read)(void* instance, void* context, void (*receive)(void*, const HostFailure*));
 };
 // Also for the tests only: pauses inside the worker, at the points where a
-// newer request can overtake a load (docs/plans/2026-10-21-plugin-formats.md
+// newer request can overtake a load (docs/project/plans/2026-10-21-plugin-formats.md
 // #lv2-adapter-design). work() calls `pause(context, point)` under the control
 // lock, so the caller must not make control calls until it returns.
 inline constexpr const char* test_worker_uri = "urn:convolver:lv2-test:worker";

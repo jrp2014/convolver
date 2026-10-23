@@ -2,7 +2,7 @@
 <!-- markdownlint-disable MD041 -->
 <!--
 Title: "ID: what it does", for example "PLUG-2: shared adapter test harness".
-Open as a draft when you start; that is the claim. See docs/workflow.md.
+Open as a draft when you start; that is the claim. See docs/develop/workflow.md.
 -->
 
 ## TODO items
@@ -34,7 +34,7 @@ Open as a draft when you start; that is the claim. See docs/workflow.md.
 
 ## Documentation and tracking
 
-- [ ] Owning guide updated (docs/documentation.md#one-home-for-each-topic)
+- [ ] Owning guide updated (docs/develop/documentation.md#one-home-for-each-topic)
 - [ ] CHANGELOG updated for user-visible changes
 - [ ] TODO item ticked with evidence, or a `Progress` line added
 - [ ] Shared files touched (TODO, CHANGELOG, CMakeLists.txt, release policy, docs index, plug-in plan) are listed here:

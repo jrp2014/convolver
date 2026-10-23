@@ -396,7 +396,7 @@ void check_writable(Format format, const HostState& state, std::string_view name
             lv2_layout_list() + "), and this filter has " +
             channels_text(c.input_channels, c.output_channels) +
             ". Use the VST3 or AU plug-in for it, or ask for the layout to be added "
-            "(docs/plugin-identities.md).");
+            "(docs/develop/plugin-identities.md).");
 }
 
 void write_preset(Format format, const HostState& state, const std::filesystem::path& path,

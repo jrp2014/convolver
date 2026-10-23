@@ -14,15 +14,23 @@ holds two implementations:
   and DirectShow/WMP/VST 2/CMD/Pipe front ends. It needs a Visual Studio
   2005-era toolchain and is not built by CI. Fix only proven defects there.
 
-Start with `CONTRIBUTING.md` (build, presets, formatting, analysis),
-`REVIEW.md` (current status) and `TODO.md` (open work and priorities).
-Implementation: `docs/project-structure.md`; behaviour: `docs/portable-core.md`,
-`docs/configuration.md`, `docs/testing.md`, `docs/vst3.md`. Open plans are in
-`docs/plans/`; the plug-in direction is `docs/plans/2026-10-21-plugin-formats.md`.
+Start with `CONTRIBUTING.md` (formatting, analysis, lint), `TODO.md` (open
+work and priorities) and `docs/project/status.md` (what is ready);
+`docs/project/decisions.md` lists what jrp has already decided. The pages written
+for contributors and agents are in `docs/develop/`: build commands in
+`docs/develop/build.md`, the implementation map in
+`docs/develop/architecture.md`, tests in `docs/develop/testing.md`, the
+plug-in rules in `docs/develop/plugin-contract.md` and the procedures in
+`docs/develop/workflow.md`. User behaviour is described in `docs/use/`: the
+command line in `docs/use/command-line.md`, configurations in
+`docs/use/configuration.md` and the plug-ins in `docs/use/plugins.md`. Open plans are in `docs/project/plans/`;
+the plug-in direction is `docs/project/plans/2026-10-21-plugin-formats.md`. How the
+documentation is organised and written, for agents too, is in
+`docs/develop/documentation.md`.
 
 ## Taking on work
 
-Follow `docs/workflow.md`. In short:
+Follow `docs/develop/workflow.md`. In short:
 
 - One TODO item (or a tightly coupled group) per branch. Open a **draft pull
   request titled with the ID** as soon as you start; that is the claim. Check
@@ -36,10 +44,14 @@ Follow `docs/workflow.md`. In short:
   **independent review** by someone who did not write the change.
 - jrp merges. Never merge, approve, push to `main` or move tags.
 
-Claude Code sessions have two repository skills: `todo-item` (start, resume or
-hand over an item) and `review-change` (the independent review).
+Claude Code sessions have two repository skills, `todo-item` (start, resume or
+hand over an item) and `review-change` (the independent review). Both only
+point to sections of `docs/develop/workflow.md`, which holds the procedures.
 
 ## Build and test
+
+Use the sanitizer build for every change (all builds, presets and plug-in SDKs
+are in `docs/develop/build.md`):
 
 ```sh
 cmake -S . -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
@@ -49,11 +61,11 @@ ctest --test-dir build --output-on-failure --parallel 4
 
 The default build needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and
 libsndfile. Accelerate (Apple only) or built-in Ooura can replace FFTW; see
-[backend selection](docs/fft-backends.md). On Ubuntu:
+[backend selection](docs/develop/fft-backends.md). On Ubuntu:
 `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev clang-format-18 clang-tidy-18`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
 CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg),
-plus Ooura configurations described in [testing](docs/testing.md).
+plus Ooura configurations described in [testing](docs/develop/testing.md).
 
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed.
@@ -66,46 +78,32 @@ plus Ooura configurations described in [testing](docs/testing.md).
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
   Portable sources must also pass the `.clang-tidy` checks (commands in
   `CONTRIBUTING.md`).
-- `python3 scripts/check_repository.py` must pass: TODO IDs defined, every
-  maintained page indexed, plans dated and current, paths in this file real,
-  SPDX lines, and the top-level layout. Lint CI runs it through pre-commit.
+- `python3 scripts/check_repository.py` must pass (pre-commit runs it; the
+  list of checks is in the [workflow guide](docs/develop/workflow.md#automated-checks)).
 - Do not claim something builds or passes unless you ran it.
 
 ## Versioning
 
-- `VERSION` is the single `MAJOR.MINOR.PATCH` source for the portable CMake
-  package, CLI and VST3 bundle. Do not hardcode copies elsewhere. Historical
-  Windows resource versions and `convolver*` tags have separate histories.
-- For ordinary changes, leave `VERSION` and tags alone. After a push to `main`,
-  **Version source changes** increments PATCH, commits `VERSION` and atomically
-  publishes an annotated `vX.Y.Z` tag. Feature branches and PRs do not create tags.
-  Concurrent pushes may be grouped into one version; repeat runs are no-ops.
-- `SOURCE_PATHS` in `scripts/version_source.py` defines what counts: sources,
-  tests, CMake files, scripts and workflows. Changes confined to `docs/` or
-  top-level Markdown files (including this file) do not bump the version.
-- For an intentional minor/major milestone, edit `VERSION` in that change and
-  reset the lower components (for example, `0.3.0`). The workflow honours the
-  higher number. Before 1.0, API incompatibilities belong in minor versions;
-  preserve the package's matching-minor compatibility policy. Record noteworthy
-  changes in `CHANGELOG.md`; do not change plug-in IDs or state-format versions
-  merely to match a package version.
-- On `main`, use `git pull --ff-only` after the bot's version commit; fetch tags
-  when looking up versions. Never move or overwrite published tags. CLI/VST3
-  build identifiers append the Git revision and `.dirty` for uncommitted files;
-  numeric package/bundle versions remain `MAJOR.MINOR.PATCH`.
-- Source tags identify revisions, not passing CI or production binary releases.
-  Test versioning with `python3 tests/versioning_tests.py`. For workflow recovery,
-  follow [the versioning guide](docs/versioning.md): the helper creates commits
-  and tags even without `--push`, so it is **not a dry run**.
+Full rules: [source versioning](docs/develop/versioning.md).
+
+- `VERSION` is the one `MAJOR.MINOR.PATCH` source for the CMake package, CLI and
+  plug-ins; never copy it elsewhere. Leave `VERSION` and tags alone in ordinary
+  changes: after a push to `main`, **Version source changes** bumps PATCH and
+  tags `vX.Y.Z`. Edit `VERSION` only for a deliberate minor or major step (an
+  incompatible API change before 1.0 needs a minor step), and never move a
+  published tag.
+- Do not change plug-in IDs or state-format versions to match a package
+  version. The version helper creates commits and tags even without `--push`,
+  so it is **not a dry run**; test versioning with
+  `python3 tests/versioning_tests.py`.
 
 ## Rules
 
-- Documentation: follow [page ownership and maintenance](docs/documentation.md).
-  Use [the implementation map](docs/project-structure.md) to find symbols,
-  invariants and tests. Update the owning guide when behavior changes; keep open
-  work and documented limitations in [TODO.md](TODO.md). Run the documentation
-  checks in `CONTRIBUTING.md` and distinguish actual test results from configured
-  CI coverage. Preserve dated evidence and historical originals.
+- Documentation: follow the [documentation guide](docs/develop/documentation.md)
+  (readers, kinds of page, writing rules, which page owns each topic). Update
+  the owning page when behaviour changes; keep open work and documented
+  limitations in [TODO.md](TODO.md). Distinguish tests you ran from configured
+  CI coverage, and preserve dated evidence and historical originals.
 
 - Real-time path: `Engine::process` and everything it calls must not allocate,
   lock or do I/O (`engine_tests.cpp` checks allocation). Preparation, FFTW
@@ -113,7 +111,7 @@ plus Ooura configurations described in [testing](docs/testing.md).
 - `.cfg` compatibility is a product feature (Roon, JRiver and Audiolense use it).
   Preserve relative paths, signed-zero routes, fractional route gains, delay
   truncation and list selection. Syntax changes need a recorded decision.
-- Keep component boundaries in `docs/project-structure.md`; split files only
+- Keep component boundaries in `docs/develop/architecture.md`; split files only
   when a responsibility grows.
 - `docs/historical/` files are byte-exact copies with recorded hashes; never edit
   them. Do not reformat files under `historical/`; it destroys `git blame`.

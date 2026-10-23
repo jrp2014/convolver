@@ -6,7 +6,7 @@ Three kinds of check:
 
 - the registry follows each format's rules (AU codes, VST3 class IDs, URIs);
 - its permanent values equal the frozen copy below, so changing one takes two
-  deliberate edits and an owner's decision (docs/plugin-identities.md);
+  deliberate edits and an owner's decision (docs/develop/plugin-identities.md);
 - files that must agree with it (installer scripts, state codec) do, and no
   source file keeps its own copy of an identity.
 
@@ -22,7 +22,7 @@ import sys
 
 # Released or reserved identities. Hosts store them in projects, presets and
 # installer receipts. Change one only by an owner's decision, recorded in
-# docs/plugin-identities.md, and only before the first release that uses it.
+# docs/develop/plugin-identities.md, and only before the first release that uses it.
 FROZEN = {
     ('vendor', 'name'): 'Convolver',
     ('vendor', 'url'): 'https://github.com/jrp2014/convolver',
@@ -65,7 +65,7 @@ REVERSE_DNS = re.compile(r'^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*){2,}$')
 # Files allowed to spell identities out: the registry, this test and dated records.
 COPIES_ALLOWED = ('plugins/identities.json', 'tests/identities_tests.py', 'CHANGELOG.md',
                   'packaging/macos/Distribution.xml', 'packaging/windows/installer.nsi')
-RECORDS = ('historical/', 'docs/', 'TODO.md', 'REVIEW.md')
+RECORDS = ('historical/', 'docs/', 'TODO.md')
 
 
 def lookup(registry, path):
@@ -164,7 +164,7 @@ def check_frozen(registry, errors):
         actual = lookup(registry, path)
         if actual != value:
             errors.append(f"{'.'.join(path)} is {actual!r}, frozen as {value!r}. Released "
-                          'identities never change; see docs/plugin-identities.md')
+                          'identities never change; see docs/develop/plugin-identities.md')
     layouts = {layout['id']: (layout['inputs'], layout['outputs'])
                for layout in registry['fixed_layouts']}
     for lid, counts in FROZEN_LAYOUTS.items():

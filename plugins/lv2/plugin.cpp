@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The LV2 adapter (LV2-1, LV2-2). One shared library serves every fixed layout
 // in plugins/identities.json; each layout is its own plug-in URI with fixed
-// ports (docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+// ports (docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
 //
 // Threads, as the LV2 specifications define them:
 // - run(), connect_port() and the worker's work_response() are the audio

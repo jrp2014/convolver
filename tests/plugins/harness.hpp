@@ -11,7 +11,7 @@
 //   exactly once its latency is allowed for (both run the same engine);
 // - exact latency (256 frames), exact tail for a fresh processor, and the
 //   never-shrinking tail bound after live replacements;
-// - the shared adapter contract in docs/plans/2026-10-21-plugin-formats.md.
+// - the shared adapter contract in docs/develop/plugin-contract.md.
 //
 // A format that does not yet follow part of the contract lists those cases as
 // known deviations with the TODO item that fixes them. A listed case that

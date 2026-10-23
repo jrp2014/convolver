@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "about": "Permanent plug-in identities and channel layouts (TODO PLUG-4). Hosts save these identities in projects, presets and installer receipts, so a released value must never change. Before distributing a modified build, please change the product identities listed in docs/plugin-identities.md (vendor, class IDs, AU manufacturer, bundle, installer and LV2 names, and the install names outside this file); keep format constants and layout definitions.",
+  "about": "Permanent plug-in identities and channel layouts (TODO PLUG-4). Hosts save these identities in projects, presets and installer receipts, so a released value must never change. Before distributing a modified build, please change the product identities listed in docs/develop/plugin-identities.md (vendor, class IDs, AU manufacturer, bundle, installer and LV2 names, and the install names outside this file); keep format constants and layout definitions.",
   "vendor": {
     "name": "Convolver",
     "url": "https://github.com/jrp2014/convolver"

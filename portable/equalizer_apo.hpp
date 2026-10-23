@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Equalizer APO export: Convolver configurations as Equalizer APO commands.
-// See docs/equalizer-apo.md for the mapping and its limits.
+// See docs/use/equalizer-apo.md for the mapping and its limits.
 #pragma once
 #include "convolver/engine.hpp"
 #include <cstddef>

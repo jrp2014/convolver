@@ -1,14 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Working on portable Convolver
 
-Start with [the implementation map](docs/project-structure.md) for source entry
+Start with [the implementation map](docs/develop/architecture.md) for source entry
 points, invariants and tests. Coding agents must also follow [AGENTS.md](AGENTS.md).
-[Taking on and reviewing work](docs/workflow.md) explains how to claim a TODO
+[Taking on and reviewing work](docs/develop/workflow.md) explains how to claim a TODO
 item, leave a handoff note and get a pull request reviewed and merged.
-For prose changes, use [the documentation maintenance guide](docs/documentation.md).
+For prose changes, use [the documentation maintenance guide](docs/develop/documentation.md).
 
-Use CMake 3.20+, C++20 and the real FFT/library dependencies. Start with
-[the portable guide](docs/portable-core.md) and [package/preset instructions](docs/cmake-package.md).
+Build with the commands in [build from source](docs/develop/build.md), using the real
+FFT and library dependencies; the [library guide](docs/develop/library.md) covers presets and package use.
 Keep host APIs and file access outside the DSP core. Preserve the historical
 source/documents and their provenance; do not mechanically modernize them when
 editing the portable implementation.
@@ -101,7 +101,7 @@ The local hooks also check maintained Markdown links and the repository rules
 (TODO IDs, the documentation index, plan folders, paths named in agent
 guidance, licence lines and the top-level layout), and run both checkers'
 regression tests on every invocation. A further hook checks the
-[permanent plug-in identities](docs/plugin-identities.md#changing-the-registry). They use only Python's standard library
+[permanent plug-in identities](docs/develop/plugin-identities.md#changing-the-registry). They use only Python's standard library
 and can be run independently:
 
 ```sh
@@ -112,14 +112,14 @@ python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
 ```
 
-[Repository checks](docs/workflow.md#automated-checks) lists each rule and what
+[Repository checks](docs/develop/workflow.md#automated-checks) lists each rule and what
 to do when one fails.
 
 The link check scans top-level Markdown and maintained guides under `docs/`,
 including untracked files. Dated records and archives are excluded as source
 pages; links into them must still resolve. It checks local destinations and
 supported heading/HTML anchors, not external websites or agreement with code.
-See [documentation maintenance](docs/documentation.md#automated-checks) for scope.
+See [documentation maintenance](docs/develop/documentation.md#automated-checks) for scope.
 
 Workflows use the latest major release of each action. Dependabot
 (`.github/dependabot.yml`) checks weekly and opens one grouped pull request when
@@ -146,7 +146,7 @@ generation if needed; an unavailable cache must only affect build time.
 
 The portable CMake package, CLI and VST3 plug-in share `VERSION`. Source changes
 on `main` receive automatic patch versions and annotated Git tags; see
-[source versioning](docs/versioning.md) for scope, deliberate minor/major bumps
+[source versioning](docs/develop/versioning.md) for scope, deliberate minor/major bumps
 and recovery. The pre-1.0 API can evolve between minor versions; no stable binary
 ABI is promised. Archived releases retain their separate history.
 Installed dependency versions remain externally managed. A future
@@ -154,10 +154,10 @@ binary-release milestone should pin baselines and define dependency bundling.
 
 Compatibility changes need fixtures for the affected config/path or file
 semantics. PCM8/16/24/32 quantization, optional dither, noise shaping and valid bits follow
-[the portable guide](docs/portable-core.md#integer-formats-dither-and-noise-shaping).
+[the portable guide](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
 Do not change their audible or numerical behavior in a build-system or formatting
 patch; keep optional processing explicit and test exact samples as well as statistics.
 
 For host changes, run the optional SDK build and its validator/adapter/preset
-tests, and pluginval if you can, as described in [the VST3 guide](docs/vst3.md). Report actual DAW tests
+tests, and pluginval if you can, as described in [testing](docs/develop/testing.md#pluginval). Report actual DAW tests
 separately from SDK validation.

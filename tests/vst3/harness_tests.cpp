@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     // The adapter follows the shared adapter contract
-    // (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract), so no
+    // (docs/develop/plugin-contract.md), so no
     // case is listed as a known deviation (VST3-7 removed the last ones).
     const test::Options options;
     Vst3 adapter;

@@ -42,7 +42,7 @@ constexpr const char* usage =
     "               choose the entry of a configuration list, as the CLI does\n"
     "  --name NAME  the name hosts show for AU and LV2 presets (default: the first\n"
     "               AU or LV2 file name, without its extension)\n"
-    "See docs/presets.md.\n";
+    "See docs/use/presets.md.\n";
 
 // Options are ASCII; anything else cannot match one.
 template <class Char> std::string ascii(const Char* text) {

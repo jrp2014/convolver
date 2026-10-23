@@ -1,16 +1,19 @@
 # Archived review documents
 
-These assessments were superseded on 18 October 2026 by the
-[current repository review](../../../REVIEW.md), based on portable 0.2.0 at
-`5df874e`. They preserve how the project reached its present state.
+These assessments were superseded on 18 October 2026 by a repository review
+based on portable 0.2.0 at `5df874e`, kept at the root as `REVIEW.md` until
+23 October 2026 and now [archived here](2026-10-20-repository-review.md). The
+current status is in [status](../../project/status.md). These records preserve
+how the project reached its present state.
 
 | Record | Original scope | Successor |
 | --- | --- | --- |
-| [4.3 local review](4.3-local-review.md) | SourceForge 4.3 archive and a separate local patched source snapshot | [Current correctness review](../../../REVIEW.md#correctness-and-compatibility) |
+| [4.3 local review](4.3-local-review.md) | SourceForge 4.3 archive and a separate local patched source snapshot | [Implementation map](../../develop/architecture.md) |
 | [4.3 branch review](4.3-branch-review.md) | Python model of 4.3 and initial review-branch fixes | [Current review entry point](../../review-2026-10/convolver-review.md) |
-| [Original modernization assessment](2026-10-17-modernization.md) | Initial architecture/options assessment at `b3b479f`, with incremental early-port updates | [Current modernization priorities](../../modernization.md) |
-| [Early portable structure review](early-portable-structure.md) | FFT abstraction and packaging milestone, with later partial updates | [Current structure review](../../project-structure.md) |
-| [Documentation review, 20 October 2026](2026-10-20-documentation-review.md) | Reorganized the maintained guides at `2fe503e` (0.4.0); pre-review copies are in [documentation-2026-10-20](../documentation-2026-10-20/README.md) | [Documentation maintenance](../../documentation.md) |
+| [Original modernization assessment](2026-10-17-modernization.md) | Initial architecture/options assessment at `b3b479f`, with incremental early-port updates | [Status: direction](../../project/status.md#direction) |
+| [Early portable structure review](early-portable-structure.md) | FFT abstraction and packaging milestone, with later partial updates | [Implementation map](../../develop/architecture.md) |
+| [Repository review, 20 October 2026](2026-10-20-repository-review.md) | Status guide mapping implemented behaviour to source and checks at `2fe503e`; root `REVIEW.md` until 23 October 2026 | [Status](../../project/status.md), [implementation map](../../develop/architecture.md) |
+| [Documentation review, 20 October 2026](2026-10-20-documentation-review.md) | Reorganized the maintained guides at `2fe503e` (0.4.0); pre-review copies are in [documentation-2026-10-20](../documentation-2026-10-20/README.md) | [Documentation guide](../../develop/documentation.md) |
 
 The first two reports describe different intermediate patches, not the final
 merged implementation. The [reconciliation](../../review-2026-10/reconciliation.md)

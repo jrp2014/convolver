@@ -166,7 +166,7 @@
     {
       "id": "unequal-ir-lengths",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "IRs of different lengths; the historical spec required equal lengths, the portable reader zero-pads each path.",
       "files": {
         "long.wav": {
@@ -240,7 +240,7 @@
     {
       "id": "truncated-delays",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "Fractional-frame delays truncate: 0.05 ms at 44.1 kHz is 2.205 frames -> 2, 0.01 ms is 0.441 -> 0.",
       "files": {
         "ir.wav": {"rate": 44100, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -262,7 +262,7 @@
     {
       "id": "delay-float-precision",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "Single-precision delay parsing: 0.0208333 ms at 48 kHz is 0.99999 frames -> 0; 0.0625 ms is exactly 3 frames.",
       "files": {
         "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0]]},
@@ -329,7 +329,7 @@
     {
       "id": "bom-crlf",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "UTF-8 byte-order mark and CRLF line endings, as written by Windows editors.",
       "files": {
         "ir.wav": {"rate": 48000, "format": "float", "channels": [[0.5, 0.25]]},
@@ -403,7 +403,7 @@
     {
       "id": "relative-windows-separators",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "Windows separators in a relative reference load on every platform.",
       "files": {
         "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -425,7 +425,7 @@
     {
       "id": "relative-mixed-separators",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "Mixed separators in a relative reference.",
       "files": {
         "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -447,7 +447,7 @@
     {
       "id": "cwd-relative-filter",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "Filter given relative to the working directory; its references still resolve beside the configuration.",
       "files": {
         "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -471,7 +471,7 @@
     {
       "id": "absolute-native-path",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "A native absolute IR path (forward slashes) is accepted where it exists.",
       "files": {
         "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -493,7 +493,7 @@
     {
       "id": "unicode-and-spaces",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "UTF-8 names with spaces in the configuration, its directory and its IR.",
       "files": {
         "räume/ir ü 1.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -565,7 +565,7 @@
     {
       "id": "list-missing-unselected-asset",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "An earlier, nonmatching entry may reference an IR that is not installed.",
       "files": {
         "ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -589,7 +589,7 @@
     {
       "id": "nested-list-windows-separators",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "A list naming a list in a subdirectory with Windows separators.",
       "files": {
         "irs/ir.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -613,7 +613,7 @@
     {
       "id": "raw-pipe-split-writes",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/command-line.md#raw-streams",
       "description": "RAW float32 stdin delivered in 7-byte writes, splitting samples.",
       "files": {
         "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[8192, 4096, -2048]]},
@@ -643,7 +643,7 @@
     {
       "id": "case-differs",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "A reference whose letter case differs from the file on disk. It loads only where the filesystem ignores case; the portable-paths profile warns either way.",
       "files": {
         "Irs/IR.wav": {"rate": 48000, "format": "float", "channels": [[1.0, -0.5, 0.25]]},
@@ -666,7 +666,7 @@
     {
       "id": "list-cycle",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/configuration.md#paths-and-configuration-lists",
       "description": "Lists that include each other are rejected.",
       "files": {"a.txt": {"text": "b.txt\n"}, "b.txt": {"text": "a.txt\n"}},
       "filter": "a.txt",
@@ -751,7 +751,7 @@
     {
       "id": "drive-letter-path",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "A Windows drive-letter path. Rejected with an explicit diagnostic on macOS/Linux; on Windows it is an absolute path that does not exist here.",
       "files": {"room.cfg": {"text": "48000 1 1 0\n0\n0\nC:\\convolver-corpus-missing\\ir.wav\n0\n0\n0\n"}},
       "filter": "room.cfg",
@@ -762,7 +762,7 @@
     {
       "id": "unc-path",
       "label": "current-behavior",
-      "evidence": "docs/portable-core.md#compatibility-and-library-api",
+      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
       "description": "A UNC network path is rejected with an explicit diagnostic on macOS/Linux.",
       "files": {"room.cfg": {"text": "48000 1 1 0\n0\n0\n\\\\server\\share\\ir.wav\n0\n0\n0\n"}},
       "filter": "room.cfg",

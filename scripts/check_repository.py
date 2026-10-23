@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Check repository-wide rules that keep the project navigable.
 
-Each rule is described in docs/workflow.md#automated-checks. The checks use
+Each rule is described in docs/develop/workflow.md#automated-checks. The checks use
 only the standard library and read files; they never change anything. Run
 from anywhere: python3 scripts/check_repository.py [--root DIR].
 """
@@ -14,6 +14,11 @@ import sys
 
 # Dated records and preserved copies: never rewritten, so not held to these rules.
 RECORDS = ('historical/', 'docs/historical/', 'docs/archive/', 'docs/review-2026-10/')
+# Maintained pages under docs/ live in one of these reader folders.
+READER_FOLDERS = ('docs/use/', 'docs/develop/', 'docs/project/')
+# Pages whose backticked repository paths must exist.
+PATH_SOURCES = ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md',
+                'docs/develop/workflow.md')
 
 # What may sit at the top of the repository. Add to this list deliberately,
 # and describe the new entry in the README's repository table.
@@ -21,7 +26,7 @@ TOP_LEVEL = {
     '.claude', '.clang-format', '.clang-format-ignore', '.clang-tidy', '.github',
     '.gitattributes', '.gitignore', '.markdownlint-cli2.yaml', '.pre-commit-config.yaml',
     '.yamllint.yaml', 'AGENTS.md', 'CHANGELOG.md', 'CLAUDE.md', 'CMakeLists.txt',
-    'CMakePresets.json', 'CONTRIBUTING.md', 'COPYING', 'README.md', 'REVIEW.md', 'TODO.md',
+    'CMakePresets.json', 'CONTRIBUTING.md', 'COPYING', 'README.md', 'TODO.md',
     'VERSION', 'cmake', 'docs', 'examples', 'historical', 'include', 'packaging',
     'plugins', 'portable', 'scripts', 'tests',
 }
@@ -111,9 +116,18 @@ def check_docs_index(root, files, errors):
                           'or the plans list so readers can find it')
 
 
+def check_reader_folders(files, errors):
+    for name in maintained_markdown(files):
+        if name.startswith('docs/') and name != 'docs/README.md' \
+                and not name.startswith(READER_FOLDERS):
+            errors.append(f'{name}: maintained pages belong in a reader folder (docs/use/, '
+                          'docs/develop/ or docs/project/); dated records go in docs/archive/. '
+                          'See docs/develop/documentation.md#readers-and-folders')
+
+
 def check_plans(root, files, defined, errors):
     for name in files:
-        if name.startswith('docs/plans/') and name.endswith('.md'):
+        if name.startswith('docs/project/plans/') and name.endswith('.md'):
             base = name.rsplit('/', 1)[1]
             if base == 'README.md':
                 continue
@@ -150,8 +164,10 @@ def path_like(token):
 
 def check_agent_paths(root, files, errors):
     tracked_top = {name.split('/', 1)[0] for name in files}
-    for source in ('AGENTS.md', 'CONTRIBUTING.md', 'docs/project-structure.md', 'docs/workflow.md'):
+    for source in PATH_SOURCES:
         if not (root / source).exists():
+            errors.append(f'{source}: missing; its repository paths cannot be checked. Restore it, '
+                          'or update PATH_SOURCES in scripts/check_repository.py if it moved')
             continue
         for number, line in enumerate(read(root, source).splitlines(), 1):
             for match in CODE_SPAN.finditer(line):
@@ -192,8 +208,10 @@ def check_layout(root, files, errors):
     for adapter in adapters:
         if not any(name.startswith(f'tests/{adapter}/') for name in files):
             errors.append(f'plugins/{adapter}/: adapter has no tests in tests/{adapter}/')
-        if f'docs/{adapter}.md' not in files:
-            errors.append(f'plugins/{adapter}/: adapter has no user guide at docs/{adapter}.md')
+        guide = 'docs/use/plugins.md'
+        if guide not in files or not re.search(rf'\b{re.escape(adapter)}\b', read(root, guide), re.I):
+            errors.append(f'plugins/{adapter}/: adapter is not described in {guide}; add it to the '
+                          f'formats table there (the page must name {adapter.upper()})')
 
 
 def check(root):
@@ -201,6 +219,7 @@ def check(root):
     errors = []
     defined = check_todo_ids(root, files, errors)
     check_docs_index(root, files, errors)
+    check_reader_folders(files, errors)
     check_plans(root, files, defined, errors)
     check_agent_paths(root, files, errors)
     check_spdx(root, files, errors)
@@ -217,7 +236,7 @@ def main():
     for error in errors:
         print(error, file=sys.stderr)
     if errors:
-        print(f'{len(errors)} repository rule(s) broken; see docs/workflow.md#automated-checks',
+        print(f'{len(errors)} repository rule(s) broken; see docs/develop/workflow.md#automated-checks',
               file=sys.stderr)
         return 1
     print(f'Repository rules hold for {count} files')

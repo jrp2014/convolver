@@ -33,7 +33,7 @@ struct TestFailure {
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
-// (docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
+// (docs/develop/plugin-contract.md).
 //
 // Derived from AUBase rather than AUEffectBase on purpose: AUEffectBase's
 // bypass copies input to output, skipping Convolver's latency-aligned dry
