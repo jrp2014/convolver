@@ -10,9 +10,13 @@
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <new>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -367,7 +371,7 @@ void rejected_presets() {
     still_kept("state from a newer Convolver");
     recorded(HostFailureKind::state_newer, 0, false, "state from a newer Convolver");
     // AUBase reads "data" (parameter values) without bounds checks; this unit
-    // has no parameters and ignores it, so a damaged one is harmless.
+    // ignores it (its one parameter, Status, is read-only), so a damaged one is harmless.
     require(modified([&](CFMutableDictionaryRef d) {
                 const UInt8 junk[] = {0, 0, 0, 0, 0xff, 0xff, 0xff};
                 const auto data = CFDataCreate(nullptr, junk, sizeof junk);
@@ -580,6 +584,111 @@ void render_requires_initialization() {
 }
 } // namespace
 
+// DIAG-1: the read-only Status parameter says in one line why the unit is
+// silent or refused a preset, and the Convolver log explains in full.
+void status_parameter() {
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    const char* configured = std::getenv("CONVOLVER_LOG");
+    require(configured && *configured, "the AU tests must set CONVOLVER_LOG");
+    const std::string log_path = configured;
+    std::filesystem::remove(log_path); // Only this run's lines count.
+    const auto log_text = [&] {
+        std::ifstream in(log_path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    };
+    Unit unit;
+    const auto au = unit.get();
+    AudioUnitParameterID ids[4]{};
+    UInt32 size = sizeof ids;
+    check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterList, kAudioUnitScope_Global, 0, ids,
+                               &size),
+          "parameter list");
+    require(size == sizeof(AudioUnitParameterID) && ids[0] == au::status_parameter,
+            "the unit should have exactly one parameter, Status");
+    AudioUnitParameterInfo info{};
+    size = sizeof info;
+    check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
+                               au::status_parameter, &info, &size),
+          "Status parameter info");
+    require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
+                info.maxValue == 3 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
+                !(info.flags & kAudioUnitParameterFlag_IsWritable) &&
+                (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings),
+            "Status parameter not a read-only indexed parameter");
+    if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
+        CFRelease(info.cfNameString);
+    CFArrayRef names = nullptr;
+    size = sizeof names;
+    check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterValueStrings, kAudioUnitScope_Global,
+                               au::status_parameter, &names, &size),
+          "Status value strings");
+    require(names && CFArrayGetCount(names) == 4, "Status value strings");
+    CFRelease(names);
+    const auto value = [&] {
+        AudioUnitParameterValue v = -1;
+        check(AudioUnitGetParameter(au, au::status_parameter, kAudioUnitScope_Global, 0, &v),
+              "Status value");
+        return static_cast<HostStatus>(std::lround(v));
+    };
+    // What a host shows for the current value.
+    const auto shown = [&] {
+        AudioUnitParameterStringFromValue request{au::status_parameter, nullptr, nullptr};
+        UInt32 bytes = sizeof request;
+        check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterStringFromValue,
+                                   kAudioUnitScope_Global, 0, &request, &bytes),
+              "Status text");
+        require(request.outString != nullptr, "Status text missing");
+        char text[256] = {};
+        CFStringGetCString(request.outString, text, sizeof text, kCFStringEncodingUTF8);
+        CFRelease(request.outString);
+        return std::string(text);
+    };
+    require(shown() == "No filter loaded. Load a Convolver preset." &&
+                value() == HostStatus::no_filter,
+            "status before initialization: " + shown());
+    check(unit.configure(48000, 2, 2, 512), "status formats");
+    check(unit.initialize(), "status initialization");
+    require(contains(shown(), "audio passes unchanged") && contains(log_text(), "Audio Unit #") &&
+                contains(log_text(), "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 "
+                                     "frames. No filter, so audio passes unchanged."),
+            "empty start not shown or logged: " + shown());
+    // A preset for another rate as the first load: silence, said and explained.
+    require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
+    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in "
+                       "the Convolver log." &&
+                value() == HostStatus::load_failed,
+            "failed first load not shown: " + shown());
+    require(contains(log_text(), "Filter not loaded, so Convolver plays silence. The filter was "
+                                 "made for 44100 Hz, but the host runs at 48000 Hz."),
+            "failed first load not logged");
+    check(unit.load(state_of(stereo(48000))), "status good preset");
+    require(shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." && value() == HostStatus::playing,
+            "good load not shown: " + shown());
+    // A host cannot write the status.
+    check(AudioUnitSetParameter(au, au::status_parameter, kAudioUnitScope_Global, 0, 3, 0),
+          "Status write");
+    require(value() == HostStatus::playing, "a host write changed the status");
+    // A wrong preset while a filter plays: it keeps playing, and both say so.
+    require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate replacement accepted");
+    require(contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
+                contains(log_text(), "Filter not loaded; the previous filter is kept."),
+            "refused replacement not shown or logged: " + shown());
+    // Another value reads as its name.
+    AudioUnitParameterValue playing = 0;
+    AudioUnitParameterStringFromValue request{au::status_parameter, &playing, nullptr};
+    size = sizeof request;
+    check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterStringFromValue,
+                               kAudioUnitScope_Global, 0, &request, &size),
+          "Status name");
+    require(request.outString &&
+                CFStringCompare(request.outString, CFSTR("Playing"), 0) == kCFCompareEqualTo,
+            "Status value name");
+    CFRelease(request.outString);
+    unit.uninitialize();
+}
+
 int main() {
     try {
         channel_capabilities();
@@ -592,6 +701,7 @@ int main() {
         layout_probe_before_restore();
         render_requires_initialization();
         failed_initialization();
+        status_parameter();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

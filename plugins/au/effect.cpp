@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "effect.hpp"
+#include "host_log.hpp"
 #include "presets.hpp"
+#include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
 #include <exception>
-#include <os/log.h>
 #include <span>
 #include <stdexcept>
 #include <vector>
 
 namespace convolver::au {
 namespace {
-void log_error(const std::string& message) {
-    if (!message.empty())
-        os_log_error(OS_LOG_DEFAULT, "Convolver: %{public}s", message.c_str());
+// The Status parameter's values, in HostStatus order.
+constexpr std::array<const char*, 4> status_names{"Playing", "No filter", "Load failed",
+                                                  "Not checked yet"};
+
+std::string next_tag() {
+    static std::atomic<unsigned> instances{0};
+    return "Audio Unit #" + std::to_string(++instances);
 }
 
 // Every pairing of 1 to 8 input and output channels (equal counts first), or
@@ -78,7 +83,84 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
 }
 } // namespace
 
-Effect::Effect(AudioComponentInstance instance) : AUBase(instance, 1, 1) {}
+Effect::Effect(AudioComponentInstance instance)
+    : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt)), tag_(next_tag()) {
+    Globals()->UseIndexedParameters(1);
+    Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));
+}
+
+void Effect::log(const std::string& message, bool problem) noexcept {
+    try {
+        std::lock_guard lock(logging_);
+        if (message.empty() || message == logged_)
+            return;
+        host_log(tag_.c_str(), message, problem);
+        logged_ = message;
+    } catch (...) { // Out of memory: the line is dropped.
+    }
+}
+
+void Effect::update_status() noexcept {
+    try {
+        status_ = host_status(filter_, known_layout());
+        Globals()->SetParameter(status_parameter,
+                                static_cast<AudioUnitParameterValue>(status_.status), true);
+    } catch (...) { // Out of memory: the previous status stays.
+    }
+}
+
+void Effect::notify_status() noexcept {
+    AudioUnitEvent event{};
+    event.mEventType = kAudioUnitEvent_ParameterValueChange;
+    event.mArgument.mParameter = {GetComponentInstance(), status_parameter, kAudioUnitScope_Global,
+                                  0};
+    AUEventListenerNotify(nullptr, nullptr, &event);
+}
+
+HostStatusLine Effect::status() {
+    std::lock_guard lock(control_);
+    return status_;
+}
+
+OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
+                                  AudioUnitParameterInfo& info) {
+    if (scope != kAudioUnitScope_Global || id != status_parameter)
+        return kAudioUnitErr_InvalidParameter;
+    FillInParameterName(info, CFSTR("Status"), false);
+    info.unit = kAudioUnitParameterUnit_Indexed;
+    info.minValue = 0;
+    info.maxValue = static_cast<AudioUnitParameterValue>(status_names.size() - 1);
+    info.defaultValue = static_cast<AudioUnitParameterValue>(HostStatus::no_filter);
+    // Readable, not writable: hosts show it and never automate it.
+    info.flags = kAudioUnitParameterFlag_HasCFNameString | kAudioUnitParameterFlag_IsReadable |
+                 kAudioUnitParameterFlag_ValuesHaveStrings;
+    return noErr;
+}
+
+OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id,
+                                          CFArrayRef* out) {
+    if (scope != kAudioUnitScope_Global || id != status_parameter)
+        return kAudioUnitErr_InvalidProperty;
+    if (!out) // Asked whether the strings exist.
+        return noErr;
+    std::array<CFStringRef, status_names.size()> names{};
+    for (std::size_t i = 0; i < names.size(); ++i)
+        names[i] = CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8);
+    *out = CFArrayCreate(nullptr, reinterpret_cast<const void**>(names.data()),
+                         static_cast<CFIndex>(names.size()), &kCFTypeArrayCallBacks);
+    for (auto* name : names)
+        if (name)
+            CFRelease(name);
+    return *out ? noErr : kAudioUnitErr_InvalidProperty;
+}
+
+OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
+                              AudioUnitElement element, AudioUnitParameterValue value,
+                              UInt32 offset) AUSDK_RTSAFE {
+    if (scope == kAudioUnitScope_Global && id == status_parameter)
+        return noErr;
+    return AUBase::SetParameter(id, scope, element, value, offset);
+}
 
 HostLayout Effect::layout() {
     const auto in = Input(0).GetStreamFormat(), out = Output(0).GetStreamFormat();
@@ -100,15 +182,15 @@ std::optional<HostLayout> Effect::known_layout() {
 OSStatus Effect::Initialize() {
     const auto in = Input(0).GetStreamFormat(), out = Output(0).GetStreamFormat();
     if (in.mSampleRate != out.mSampleRate) {
-        log_error("The host set different input and output sample rates (" + hz(in.mSampleRate) +
-                  " and " + hz(out.mSampleRate) +
-                  " Hz). Convolver does not resample, so both must be the same.");
+        log("The host set different input and output sample rates (" + hz(in.mSampleRate) +
+            " and " + hz(out.mSampleRate) +
+            " Hz). Convolver does not resample, so both must be the same.");
         return kAudioUnitErr_FormatNotSupported;
     }
     if (!identity::unequal_counts && in.mChannelsPerFrame != out.mChannelsPerFrame)
         return kAudioUnitErr_FormatNotSupported;
     std::string message;
-    bool started = false;
+    bool started = false, problem = true;
     {
         std::lock_guard lock(control_);
         try {
@@ -124,8 +206,6 @@ OSStatus Effect::Initialize() {
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
-            // Why it plays silence, if it does. A rejected replacement's
-            // reason (the working filter plays) was logged when it happened.
             started = true;
         } catch (const std::exception& e) {
             message = activation_failed(e.what());
@@ -133,14 +213,20 @@ OSStatus Effect::Initialize() {
             message = activation_failed("the processor could not be built.");
         }
         if (started) {
+            // What plays and why: a filter restored before the formats were
+            // known may not suit them. A rejected replacement's reason (the
+            // working filter plays) was logged when it happened.
             try {
-                if (const auto& f = filter_.failure(); f && f->silent)
-                    message = f->message;
+                const auto& f = filter_.failure();
+                problem = (f && f->silent) || !filter_.notice().empty();
+                message = started_line(filter_, *initialized_, GetMaxFramesPerSlice());
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }
+        update_status();
     }
-    log_error(message);
+    log(message, problem);
+    notify_status();
     if (!started)
         return kAudioUnitErr_FailedInitialization;
     timing_changed();
@@ -165,6 +251,7 @@ void Effect::Cleanup() {
     if (rendered_.load())
         committed_ = initialized_;
     host_.reset();
+    update_status(); // Read when the host next asks; no notification while it tears down.
 }
 
 // The host may call Reset from any thread, so the audio thread performs it at
@@ -183,6 +270,11 @@ OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
     }
     if (scope == kAudioUnitScope_Global && id == test_failure_property) {
         size = sizeof(TestFailure);
+        writable = false;
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {
+        size = sizeof(AudioUnitParameterStringFromValue);
         writable = false;
         return noErr;
     }
@@ -212,6 +304,31 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         }
         std::memcpy(data, &t, sizeof t);
         return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {
+        // The Status parameter's current value reads as the unit's status
+        // line; any other value (or no value: the current one) as its name.
+        auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
+        if (request->inParamID != status_parameter)
+            return kAudioUnitErr_InvalidParameter;
+        std::string text;
+        try {
+            std::lock_guard lock(control_);
+            const auto current = static_cast<AudioUnitParameterValue>(status_.status);
+            const auto value = request->inValue ? *request->inValue : current;
+            const auto index = static_cast<long>(std::lround(value));
+            if (value == current)
+                text = status_.text;
+            else if (index >= 0 && index < static_cast<long>(status_names.size()))
+                text = status_names[static_cast<std::size_t>(index)];
+        } catch (...) {
+            return kAudioUnitErr_InvalidPropertyValue;
+        }
+        if (text.empty())
+            return kAudioUnitErr_InvalidPropertyValue;
+        request->outString =
+            CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
+        return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
     }
     return AUBase::GetProperty(id, scope, element, data);
 }
@@ -338,13 +455,15 @@ void Effect::reject(HostFailureKind kind, const std::string& why) {
     }
     if (!host_ && filter_.failed())
         tail_.store(0);
+    update_status();
 }
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
                "The saved state is not an Audio Unit preset dictionary.");
-        log_error(rejection());
+        log(rejection());
+        notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     }
     const auto dict = static_cast<CFDictionaryRef>(plist);
@@ -366,16 +485,18 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     } catch (const NewerHostState& e) {
         reject(HostFailureKind::state_newer,
                std::string("The saved state could not be read: ") + e.what());
-        log_error(rejection());
+        log(rejection());
+        notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
         reject(HostFailureKind::state_unreadable,
                std::string("The saved state could not be read: ") + e.what());
-        log_error(rejection());
+        log(rejection());
+        notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
-    bool accepted = false;
+    bool accepted = false, problem = true;
     std::string message;
     {
         std::lock_guard lock(control_);
@@ -406,21 +527,29 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             if (!host_ && filter_.failed())
                 tail_.store(0);
         }
-        // Why this request failed, or the saved failure it restored; not an
-        // older failure found at initialization.
-        if (const auto& r = filter_.rejection())
-            message = r->message;
+        try {
+            // Why this request failed, or what was loaded (with the saved
+            // failure it restored); not an older failure found at initialization.
+            if (!accepted) {
+                if (const auto& r = filter_.rejection())
+                    message = r->message;
+            } else {
+                problem = filter_.failure().has_value() || !filter_.notice().empty();
+                message = loaded_line(filter_, host.has_value());
+            }
+        } catch (...) { // Out of memory for the message: it is dropped.
+        }
+        update_status();
     }
     // Listeners may call back into the unit, so notify outside the lock.
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
-    if (!accepted) {
-        log_error(message);
+    log(message, problem); // A restored failed load says why it plays silence.
+    notify_status();
+    if (!accepted)
         return kAudioUnitErr_InvalidPropertyValue;
-    }
-    log_error(message); // A restored failed load says why it plays silence.
     // The preset name and element names, as AUBase restores them. Its "data"
-    // (parameter values) is left out: this unit has no parameters, and AUBase
-    // reads that blob without bounds checks.
+    // (parameter values) is left out: the only parameter is the read-only
+    // Status, and AUBase reads that blob without bounds checks.
     const auto copy = CFDictionaryCreateMutableCopy(nullptr, 0, dict);
     if (!copy)
         return noErr;

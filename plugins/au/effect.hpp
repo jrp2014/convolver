@@ -17,6 +17,10 @@ namespace convolver::au {
 // HostProcessor's fixed latency; AU reports it in seconds.
 inline constexpr std::size_t latency_frames = 256;
 inline constexpr UInt32 max_channels = identity::max_channels;
+// DIAG-1: the read-only Status parameter, an indexed HostStatus whose current
+// value reads (kAudioUnitProperty_ParameterStringFromValue) as the unit's
+// HostStatusLine. Never saved: RestoreState ignores parameter data.
+inline constexpr AudioUnitParameterID status_parameter = 0;
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
@@ -57,6 +61,12 @@ class Effect final : public ausdk::AUBase {
     OSStatus GetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, void*) override;
     OSStatus SetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void*,
                          UInt32) override;
+    OSStatus GetParameterInfo(AudioUnitScope, AudioUnitParameterID,
+                              AudioUnitParameterInfo&) override;
+    OSStatus GetParameterValueStrings(AudioUnitScope, AudioUnitParameterID, CFArrayRef*) override;
+    // The Status parameter is read-only: a host's write is ignored.
+    OSStatus SetParameter(AudioUnitParameterID, AudioUnitScope, AudioUnitElement,
+                          AudioUnitParameterValue, UInt32) AUSDK_RTSAFE override;
 
     bool StreamFormatWritable(AudioUnitScope, AudioUnitElement) override;
     bool ValidFormat(AudioUnitScope, AudioUnitElement, const AudioStreamBasicDescription&) override;
@@ -88,6 +98,8 @@ class Effect final : public ausdk::AUBase {
     std::string error();
     // Why the newest request failed (HostFilter::rejection), to log it.
     std::string rejection();
+    // What the Status parameter shows (DIAG-1).
+    HostStatusLine status();
 
   private:
     HostLayout layout();
@@ -99,6 +111,13 @@ class Effect final : public ausdk::AUBase {
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;
     void timing_changed();
+    // Writes to the Convolver log (host_log), skipping a repeat of the line
+    // this instance wrote last, as hosts restart plug-ins often.
+    void log(const std::string&, bool problem = true) noexcept;
+    // Recomputes the status under `control_`; notify_status() then tells
+    // listeners, outside the lock, as they may call back into the unit.
+    void update_status() noexcept;
+    void notify_status() noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
@@ -114,5 +133,9 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> initialized_;
     std::atomic<bool> rendered_{false};
     std::optional<HostLayout> committed_;
+    HostStatusLine status_; // Under control_.
+    std::mutex logging_;
+    std::string logged_;    // The last line log() wrote, under logging_.
+    const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.
 };
 } // namespace convolver::au
