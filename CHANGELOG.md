@@ -31,6 +31,14 @@ Until 1.0 the C++ API may change between minor versions.
 - `HostProcessor::mute()`, an audio-thread call: the current filter ramps to
   silence over 64 samples until the next published filter fades in. The LV2
   adapter uses it when `run()` refuses a first filter file.
+  `HostProcessor::publications()` and `mute(through)` let an adapter mute
+  only what was published before it checked its own state.
+- Lifecycle sequence tests (PLUG-7): `native.host_lifecycle`,
+  `vst3.lifecycle`, `lv2.lifecycle` and `au.lifecycle` run every short
+  sequence of host operations, and long seeded ones, against a reference
+  model of the shared adapter contract, checking the saved filter, the failure
+  record, what is audible and that audio-thread calls neither allocate nor
+  lock ([testing](docs/develop/testing.md#lifecycle-sequences-plug-7)).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
@@ -211,6 +219,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- LV2: after an empty state (or an empty state map) was restored while the
+  plug-in was running, a filter file that `run()` refused in the same cycle (no
+  worker, or a full worker queue) let the unfiltered input play until the
+  next save or other control call, though the status said "load failed".
+  `HostProcessor::mute()` now also silences a filter published before it that
+  the audio thread had not yet picked up; only a filter published after it
+  ends the silence. Found by the PLUG-7 lifecycle sequences.
+- VST3 and AU: a filter state restored while inactive could be kept although
+  `setState` or `RestoreState` reported a failure, when memory ran out while
+  working out its tail after the load. The tail is now worked out first, so
+  the request is rejected whole. Found by the PLUG-7 lifecycle sequences.
 - A filter loaded while the host had stopped processing in the middle of a
   crossfade now plays from the first resumed sample. Before, `HostProcessor`
   kept the interrupted transition after `reset()`, so the old filter went on

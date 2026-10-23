@@ -536,8 +536,16 @@ const LV2_Worker_Interface worker_interface{work, work_response, nullptr};
 void refuse_request(Instance& p, std::uint64_t generation, bool no_worker) {
     p.answered = p.refused_here = generation;
     p.dropped.store(generation << 1 | (no_worker ? 1 : 0), std::memory_order_release);
-    if (p.host && p.unfiltered.load(std::memory_order_acquire))
-        p.host->mute();
+    if (!p.host)
+        return;
+    // The count first, then the flag: the worker clears the flag before it
+    // publishes, so a filter it publishes after this sees the flag clear or
+    // is newer than the count, and is never silenced. An unfiltered
+    // configuration that restore() published and run() has not yet picked up
+    // is silenced as well.
+    const auto published = p.host->publications();
+    if (p.unfiltered.load(std::memory_order_acquire))
+        p.host->mute(published);
 }
 
 void request_file(Instance& p, const LV2_Atom* value) {
