@@ -74,24 +74,6 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
   [check scope](docs/develop/documentation.md#automated-checks).
-- [ ] **DOC-4 — Organise the documentation by reader.** jrp chose on
-  23 October 2026 to sort maintained pages into reader folders: `docs/use/`
-  (people applying filters; shipped whole in preview packages), `docs/develop/`
-  (people building, embedding or changing Convolver, coding agents included)
-  and `docs/project/` (status, decisions, history, plans). Each page is one kind
-  (tutorial, how-to, reference or background) and follows the
-  [writing rules](docs/develop/documentation.md#writing-rules); developer pages
-  double as agent instructions, so skills only point at them. Four steps, one
-  pull request each: (1) `docs/develop/`, the single build page, the plug-in
-  adapter contract taken out of the plan, the writing rules and thin skills;
-  (2) `docs/use/` by splitting the CLI and format guides and merging
-  `docs/plugins/`, with packaging shipping `docs/use/`; (3) `docs/project/`,
-  merging `REVIEW.md`, release readiness and modernization into one status
-  page and starting a decisions log; (4) shorter `README.md`, `AGENTS.md` and
-  `TODO.md`, and checks that every maintained page sits in a reader folder.
-  Dated records stay where they are. All four steps are written; the item is done when their pull requests are merged. The page-by-page mapping and jrp's
-  decisions for steps 2 to 4 are in the
-  [plan](docs/project/plans/2026-10-23-documentation-by-reader.md).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
   `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
   and corresponding source, staging, unsigned installers, artifact verification,
@@ -530,6 +512,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
   [first-use examples](examples/first-use/README.md).
+- [x] **DOC-4 — Organise the documentation by reader.** 23 October 2026,
+  PRs #47, #51, #52 and #53; [documentation guide](docs/develop/documentation.md),
+  [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
 - [x] **DOC-3 — Resolve adapter-plan review findings.** 21 October 2026;
   [review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;

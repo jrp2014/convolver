@@ -18,7 +18,7 @@ For anyone, person or coding agent, who writes or changes documentation.
   `AGENTS.md` point at them instead of repeating them.
 
 The pages were sorted into these folders on 23 October 2026 (DOC-4,
-[plan](../project/plans/2026-10-23-documentation-by-reader.md)), and the
+[plan](../archive/plans/2026-10-23-documentation-by-reader.md)), and the
 repository checks keep new pages in them.
 
 Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
