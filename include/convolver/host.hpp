@@ -13,6 +13,8 @@ struct HostState {
     // Absent means an empty instance: identity at the host's rate and layout for
     // equal counts, otherwise (or when failed is set) silence.
     std::optional<Configuration> configuration;
+    // Saved and applied by the VST3 adapter only. The LV2 and AU adapters leave
+    // bypass to the host, as those formats do, and ignore this flag.
     bool bypass = false;
     // A load failed and nothing was accepted, so the instance plays silence;
     // saved so that reopening a project stays silent. Never with a configuration.

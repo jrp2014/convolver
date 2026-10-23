@@ -25,8 +25,8 @@ Until 1.0 the C++ API may change between minor versions.
   host's preset menu. 1 to 8 channels per side (counts may differ), latency and
   tail reported in seconds, bypass with the same 64-sample ramp and delayed dry
   signal as VST3 (left to the host to save, as is usual for Audio Units), and
-  the shared rules for presets that do not fit. The
-  component is distributed under GPL-3.0-or-later because it includes
+  the shared rules for presets that do not fit. The component is distributed
+  under GPL-3.0-or-later because it includes
   AudioUnitSDK (Apache-2.0). See the [AU guide](docs/au.md). Not yet tested in
   named hosts.
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
