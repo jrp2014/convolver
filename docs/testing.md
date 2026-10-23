@@ -136,8 +136,17 @@ ctest --test-dir build-native -N
   a `config.txt` are covered, and other sample rates and devices over 32
   channels must be silent. It also checks that existing folders and folder
   names too long for Equalizer APO are refused, that file names cannot add
-  commands, and that failed exports leave nothing. The model is not Equalizer APO itself; running the export there
-  is open as HOST-4. See the [guide](equalizer-apo.md#how-it-is-tested).
+  commands, and that failed exports leave nothing. See the
+  [guide](equalizer-apo.md#how-it-is-tested).
+
+- `export.equalizer_apo.runtime` (Windows CI, or a Windows build configured
+  with `CONVOLVER_EQUALIZER_APO_BENCHMARK` and `CONVOLVER_EQUALIZER_APO_CONFIG`
+  on a computer whose devices do not use Equalizer APO):
+  the same cases also run in Equalizer APO 1.4.2's `Benchmark.exe`, which
+  applies a `config.txt` to a WAV file with Equalizer APO's own filter code.
+  The output must match the oracle within half a 16-bit step (its rounding) plus 1e-5, because
+  `Benchmark.exe` writes 16-bit files, and silence must be exactly zero. A real audio device and exclusive-mode
+  bypass are checked by hand (steps in the guide).
 
 The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR

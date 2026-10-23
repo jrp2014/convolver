@@ -95,7 +95,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | Host lifecycle or state | Host/state implementation and VST3 adapter | `native.host`, `native.state`, host-state fuzz replay and all VST3 tests, including `vst3.harness` |
 | Plug-in identities or layouts | [Plug-in identities](plugin-identities.md); never change a released value | `identities` (also pre-commit), `vst3.identities`, `vst3.adapter` |
 | Preset files or the preset tool | [Presets guide](presets.md); version-1 state must keep loading | `native.presets`, `plugins.presets`, and with the SDK `vst3.preset_format` and `vst3.preset` |
-| The Equalizer APO export | [Equalizer APO guide](equalizer-apo.md); the model in the test must follow Equalizer APO's sources | `export.equalizer_apo`; report its worst error |
+| The Equalizer APO export | [Equalizer APO guide](equalizer-apo.md); the model in the test must follow Equalizer APO's sources | `export.equalizer_apo`, and `export.equalizer_apo.runtime` in Equalizer APO itself on Windows CI; report their worst errors |
 | A plug-in adapter | Its format folder, the [shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract) | Its `Adapter` driver for the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), its validator, pluginval where it applies |
 | First-use examples or their generator | `examples/first-use/`, `tests/plugins/fixtures.py`, marked commands in the READMEs | `examples.fixtures`, `examples.first_use`, then every adapter's harness test |
 | Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer` |
