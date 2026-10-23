@@ -512,11 +512,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
   [first-use examples](examples/first-use/README.md).
+- [x] **DOC-3 — Resolve adapter-plan review findings.** 21 October 2026;
+  [review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [x] **DOC-4 — Organise the documentation by reader.** 23 October 2026,
   PRs #47, #51, #52 and #53; [documentation guide](docs/develop/documentation.md),
   [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
-- [x] **DOC-3 — Resolve adapter-plan review findings.** 21 October 2026;
-  [review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;

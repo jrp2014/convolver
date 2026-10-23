@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
-> **Archived plan — completed.** Moved on 23 October 2026 from `docs/project/plans/2026-10-23-documentation-by-reader.md`. Implemented in PRs #47, #51, #52 and #53 (merged `41d1d3a`). Current rules: [documentation guide](../../develop/documentation.md). The text below records intent and decisions at that time; its status lines were not updated.
+> **Archived plan — completed.** Moved on 23 October 2026 from `docs/project/plans/2026-10-23-documentation-by-reader.md`. Implemented in PRs #47, #51, #52 and #53 (the last merged in `41d1d3a`). Current rules: [documentation guide](../../develop/documentation.md). The text below records intent and decisions at that time; its status lines were not updated. For current behaviour read the guides, not this plan.
+
 # Documentation by reader (DOC-4)
 
 [Documentation index](../../README.md) · [Documentation guide](../../develop/documentation.md) ·
