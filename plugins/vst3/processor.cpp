@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "processor.hpp"
 #include "bytes.hpp"
+#include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 
 namespace convolver::vst3 {
@@ -53,7 +55,13 @@ bool write_state(IBStream* stream, const HostState& state) {
     return transfer(stream, header.data(), 4, true) &&
            transfer(stream, bytes.data(), bytes.size(), true);
 }
-Processor::Processor() {
+namespace {
+std::string next_tag() {
+    static std::atomic<unsigned> instances{0};
+    return "VST3 #" + std::to_string(++instances);
+}
+} // namespace
+Processor::Processor() : tag_(next_tag()) {
     setControllerClass(controller_id);
 }
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {
@@ -114,6 +122,11 @@ std::optional<HostLayout> Processor::known_layout() const {
     return now;
 }
 tresult PLUGIN_API Processor::setActive(TBool state) {
+    const auto result = activate(state);
+    send_status();
+    return result;
+}
+tresult Processor::activate(TBool state) {
     std::lock_guard lock(control_);
     try {
         if (state) {
@@ -126,6 +139,15 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
             next->reset();
             host_ = std::move(next);
             activated_ = layout();
+            // What plays and why: a filter restored before the host's rate
+            // and buses were known may not suit them.
+            try { // Started: nothing here may turn that into a failure.
+                const auto& f = filter_.failure();
+                log(started_line(filter_, *activated_,
+                                 static_cast<std::size_t>(processSetup.maxSamplesPerBlock)),
+                    (f && f->silent) || !filter_.notice().empty());
+            } catch (...) { // Out of memory for the line: it is dropped.
+            }
         } else
             host_.reset();
         active_ = state != 0;
@@ -141,8 +163,49 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
 void Processor::record_activation_failure(const char* why) noexcept {
     try {
         filter_.fail_activation(why);
+        log(filter_.error());
     } catch (...) { // Out of memory for the message: nothing more to keep.
     }
+}
+void Processor::log(const std::string& message, bool problem) noexcept {
+    try {
+        if (message.empty() || message == logged_)
+            return;
+        host_log(tag_.c_str(), message, problem);
+        logged_ = message;
+    } catch (...) { // Out of memory: the line is dropped.
+    }
+}
+HostStatusLine Processor::status_locked() const {
+    return host_status(filter_, host_ ? std::optional(layout()) : known_layout());
+}
+HostStatusLine Processor::status() {
+    std::lock_guard lock(control_);
+    return status_locked();
+}
+void Processor::send_status() noexcept {
+    try {
+        const auto line = status();
+        if (!getPeer())
+            return;
+        auto message = owned(allocateMessage());
+        if (!message)
+            return;
+        message->setMessageID(status_message);
+        auto* attributes = message->getAttributes();
+        if (!attributes)
+            return;
+        attributes->setInt("status", static_cast<int64>(line.status));
+        attributes->setBinary("text", line.text.data(), static_cast<uint32>(line.text.size()));
+        sendMessage(message);
+    } catch (...) { // Out of memory: the controller keeps the previous status.
+    }
+}
+tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
+    const auto result = AudioEffect::connect(other);
+    if (result == kResultOk)
+        send_status();
+    return result;
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     if (state && host_) {
@@ -152,6 +215,11 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
     return kResultOk;
 }
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
+    const auto result = load_state(stream);
+    send_status();
+    return result;
+}
+tresult Processor::load_state(IBStream* stream) {
     std::lock_guard lock(control_);
     const bool was_failed = filter_.failed();
     try {
@@ -182,6 +250,13 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
                             ? static_cast<uint32>(configuration_tail_frames(*filter_.filter()))
                             : 0);
         bypass_.store(bypass);
+        logged_.clear(); // A later failure is logged even if it repeats an earlier one.
+        try {            // Accepted: nothing here may turn that into a rejection.
+            // A restored failed load says why it plays silence.
+            log(loaded_line(filter_, host.has_value()),
+                filter_.failure().has_value() || !filter_.notice().empty());
+        } catch (...) { // Out of memory for the line: it is dropped.
+        }
         return kResultOk;
     } catch (...) {
         // A failed first load plays silence rather than the unfiltered input.
@@ -193,6 +268,8 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
         }
         if (!host_ && filter_.failed())
             tail_.store(0);
+        if (const auto& r = filter_.rejection())
+            log(r->message);
         return kResultFalse;
     }
 }
@@ -287,12 +364,67 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     }
     return render(position, d.numSamples - position) ? kResultOk : kInvalidArgument;
 }
+namespace {
+// The Status parameter's values, in HostStatus order.
+constexpr std::array<const char*, 4> status_names{"Playing", "No filter", "Load failed",
+                                                  "Not checked yet"};
+void copy(const std::string& text, String128 out) {
+    std::size_t i = 0;
+    for (; i < text.size() && i < 127; ++i) // ASCII (HostStatusLine), widened.
+        out[i] = static_cast<TChar>(static_cast<unsigned char>(text[i]));
+    out[i] = 0;
+}
+} // namespace
 tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     auto result = EditController::initialize(context);
-    if (result == kResultOk)
+    if (result == kResultOk) {
         parameters.addParameter(STR16("Bypass"), nullptr, 1, 0,
                                 ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, bypass_id);
+        auto* status = new StringListParameter(STR16("Status"), status_id, nullptr,
+                                               ParameterInfo::kIsReadOnly | ParameterInfo::kIsList);
+        for (const auto* name : status_names) {
+            String128 text{};
+            copy(name, text);
+            status->appendString(text);
+        }
+        status->setNormalized(status->toNormalized(static_cast<ParamValue>(HostStatus::no_filter)));
+        status->getInfo().defaultNormalizedValue = status->getNormalized();
+        parameters.addParameter(status);
+    }
     return result;
+}
+tresult PLUGIN_API Controller::notify(IMessage* message) {
+    if (!message || !message->getMessageID() ||
+        std::string_view(message->getMessageID()) != status_message)
+        return EditController::notify(message);
+    auto* attributes = message->getAttributes();
+    int64 status = 0;
+    const void* data = nullptr;
+    uint32 size = 0;
+    if (!attributes || attributes->getInt("status", status) != kResultOk || status < 0 ||
+        status >= static_cast<int64>(status_names.size()) ||
+        attributes->getBinary("text", data, size) != kResultOk || (size && !data))
+        return kInvalidArgument;
+    try {
+        status_text_.assign(static_cast<const char*>(data), size);
+    } catch (...) {
+        return kOutOfMemory;
+    }
+    auto* parameter = getParameterObject(status_id);
+    setParamNormalized(status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
+    // Ask the host to read the parameters again (the status is not edited
+    // by the user, so performEdit does not apply). Hosts may ignore this.
+    if (componentHandler)
+        componentHandler->restartComponent(kParamValuesChanged);
+    return kResultOk;
+}
+tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
+                                                     String128 string) {
+    if (id == status_id && !status_text_.empty() && value == getParamNormalized(status_id)) {
+        copy(status_text_, string);
+        return kResultOk;
+    }
+    return EditController::getParamStringByValue(id, value, string);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     try {
