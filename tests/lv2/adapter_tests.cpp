@@ -385,10 +385,6 @@ void status_and_log(host::World& world, const Fixture& f) {
           label + "state from a newer Convolver: rejected, recorded and explained");
     check(same(decode_host_state(p->save().bytes).configuration, a),
           label + "rejections keep the running filter saved");
-    check(p->restore_empty() == LV2_STATE_SUCCESS &&
-              same(decode_host_state(p->save().bytes).configuration, a),
-          label + "state without our property changes nothing");
-
     const auto saved = p->save();
     check(saved.type == chunk(world) && (saved.flags & LV2_STATE_IS_POD) &&
               (saved.flags & LV2_STATE_IS_PORTABLE),
@@ -516,7 +512,8 @@ struct Model {
 };
 
 // Operation codes: 0 load A, 1 load B, 2 failed load, 3 audio, 4 toggle bypass,
-// 5 reset, 6 save and reopen, 7 restore with nothing of ours, 8 choose A's file
+// 5 reset, 6 save and reopen, 7 restore an empty map (LV2's reset to defaults:
+// an empty instance again), 8 choose A's file
 // (through the worker, synchronously as when a host free-wheels), 9 choose a
 // missing file. Seed 0 plays `script` instead of random steps.
 void lifecycle(host::World& world, const Fixture& f, unsigned seed,
@@ -631,9 +628,14 @@ void lifecycle(host::World& world, const Fixture& f, unsigned seed,
             p->activate();
             break;
         }
-        default: // The host restores port values only.
+        default: // An empty map: the host resets the plug-in to its defaults.
             trace << " restore-nothing";
             check(p->restore_empty() == LV2_STATE_SUCCESS, label() + ": empty restore");
+            m.saved.reset();
+            m.failed = m.error = false;
+            ++m.requests;
+            m.kind.reset();
+            m.path.clear();
             break;
         }
         const auto saved = p->save();
@@ -1119,6 +1121,200 @@ void worker_loads(host::World& world, const fs::path& work) {
     }
 }
 
+// --- Expectations from the shared contract and the LV2 specification -------------
+// Found in jrp's review of 0.4.30, where tests had followed the implementation.
+
+// Shared contract, "Loading and failure": a first filter that cannot be used
+// plays silence, never unfiltered audio, and a rejected replacement keeps the
+// working filter. When run() itself refuses a file (no worker, or the host
+// cannot queue it), the silence starts at once: no control call need follow.
+void refused_first_loads(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    using host::Worker;
+    using lv2::Status;
+    const auto all_zero_from = [](const std::vector<float>& out, std::size_t from) {
+        return std::all_of(out.begin() + static_cast<std::ptrdiff_t>(from), out.end(),
+                           [](float v) { return v == 0; });
+    };
+    for (const bool no_worker : {true, false}) {
+        const auto label =
+            std::string(no_worker ? "no worker" : "worker queue full") + ", first load: ";
+        auto p = worker_instance(world, no_worker ? Worker::none : Worker::threaded);
+        p->scheduling_fails = !no_worker;
+        p->activate();
+        check(near(play_constant(*p, 1024).back(), 1.f), label + "empty instance plays identity");
+        p->set_filter(files.original.string());
+        // Only audio from here on: no save, restore or other control call.
+        const auto out = play_constant(*p, 4096);
+        check(all_zero_from(out, 64) && out.front() <= 1.f,
+              label + "silent within 64 frames of the refusal, without a control call");
+        check(p->status == as_float(Status::load_failed), label + "status load failed");
+        check(all_zero_from(play_constant(*p, 4096), 0), label + "stays silent");
+        // Bypass still passes the dry signal, as with any failed first load.
+        p->enabled = 0;
+        check(near(play_constant(*p, 2048).back(), 1.f), label + "bypass passes the input");
+        p->enabled = 1;
+        check(all_zero_from(play_constant(*p, 2048), 64), label + "silent again after bypass");
+        // The next control call records it; the instance stays silent, also
+        // after a restart.
+        check(decode_host_state(p->save().bytes).failed && p->failure() && p->failure()->silent,
+              label + "recorded and saved as a failed first load");
+        check(all_zero_from(play_constant(*p, 2048), 0), label + "silent after the record");
+        p->deactivate();
+        p->activate();
+        check(all_zero_from(play_constant(*p, 2048), 0), label + "silent after a restart");
+        // A filter accepted later plays; the refusal does not outlive it.
+        HostState state;
+        state.configuration = load_configuration(files.b);
+        check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "a later restore is accepted");
+        check(near(play_constant(*p, 4096).back(), .75f), label + "the restored filter plays");
+    }
+    // A refusal while a filter plays keeps it playing.
+    for (const bool no_worker : {true, false}) {
+        const auto label =
+            std::string(no_worker ? "no worker" : "worker queue full") + ", replacement: ";
+        auto p = worker_instance(world, no_worker ? Worker::none : Worker::threaded);
+        HostState state;
+        state.configuration = load_configuration(files.original);
+        check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "restored");
+        p->activate();
+        play_constant(*p, 1024);
+        p->scheduling_fails = !no_worker;
+        p->set_filter(files.b.string());
+        const auto out = play_constant(*p, 4096);
+        check(std::all_of(out.begin(), out.end(), [](float v) { return near(v, .5f); }),
+              label + "the working filter keeps playing");
+        check(p->status == as_float(Status::load_failed) &&
+                  !decode_host_state(p->save().bytes).failed,
+              label + "status load failed; the working filter is saved");
+    }
+    // A refusal that races a worker load publishing its filter: the load
+    // that was accepted plays, whatever the order.
+    {
+        const std::string label = "refusal while the first file is published: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        play_constant(*p, 1024);
+        p->pause_at(lv2::WorkerPoint::checked);
+        p->set_filter(files.a.string());
+        p->run_empty();
+        p->wait_until_paused(); // A passed its last check; it publishes on resume.
+        p->resume();
+        p->wait_for_worker(); // Published, not yet heard.
+        p->scheduling_fails = true;
+        p->set_filter(files.b.string());
+        p->run_empty();
+        p->scheduling_fails = false;
+        settle(*p);
+        check(
+            near(play_constant(*p, 4096).back(), .25f) &&
+                same(decode_host_state(p->save().bytes).configuration, load_configuration(files.a)),
+            label + "A plays and is saved");
+    }
+}
+
+// LV2 state, restore(): "The plugin MUST gracefully fall back to a default
+// value when a value can not be retrieved. This allows the host to reset the
+// plugin state with an empty map." The default is an empty instance: identity
+// for equal counts, no failure, no path, and loads still outstanding lose.
+void empty_state_resets(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    using host::Worker;
+    using lv2::Status;
+    const auto is_empty_instance = [&](host::Plugin& p, const std::string& label) {
+        const auto s = decode_host_state(p.save().bytes);
+        check(!s.configuration && !s.failed, label + "saved as an empty instance");
+        check(saved_path(p).empty() && reported(p).empty(), label + "no path saved or reported");
+        check(!p.failure() && status_of(p) == as_float(Status::no_filter),
+              label + "no failure, status no filter");
+        check(near(play_constant(p, 4096).back(), 1.f), label + "plays identity");
+    };
+    {
+        // jrp's reproduction: a gain-of-two filter, then an empty map.
+        const std::string label = "empty map over a filter: ";
+        auto p = worker_instance(world, Worker::threaded);
+        HostState state;
+        state.configuration = load_configuration(files.original);
+        for (auto& path : state.configuration->paths)
+            for (auto& v : path.impulse)
+                v *= 4; // .5 to 2.
+        check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "restored");
+        p->activate();
+        check(near(play_constant(*p, 2048).back(), 2.f), label + "gain two plays");
+        check(p->restore_empty() == LV2_STATE_SUCCESS, label + "empty map accepted");
+        is_empty_instance(*p, label);
+    }
+    {
+        const std::string label = "empty map over a file: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->set_filter(files.original.string());
+        settle(*p);
+        check(saved_path(*p) == files.original.string(), label + "file loaded");
+        p->notified.clear();
+        check(p->restore_empty() == LV2_STATE_SUCCESS, label + "empty map accepted");
+        p->run_empty();
+        check(!p->notified.empty() && p->notified.front().empty(),
+              label + "patch:Set reports that no file plays");
+        is_empty_instance(*p, label);
+    }
+    {
+        const std::string label = "empty map after a failed first load: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->set_filter(files.missing.string());
+        settle(*p);
+        check(p->failure() && silent(play_constant(*p, 1024)), label + "failed and silent");
+        check(p->restore_empty() == LV2_STATE_SUCCESS, label + "empty map accepted");
+        is_empty_instance(*p, label);
+    }
+    // Loads still outstanding lose to the reset: one whose answer has not
+    // arrived, and ones queued or running when restore() is called (restore()
+    // waits for work() and is the newer request either way).
+    {
+        const std::string label = "empty map with an answer outstanding: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->set_filter(files.a.string());
+        p->run_empty();
+        p->wait_for_worker(); // A is installed; its answer is not yet delivered.
+        check(p->restore_empty() == LV2_STATE_SUCCESS, label + "empty map accepted");
+        p->run_empty();
+        p->run_empty();
+        is_empty_instance(*p, label);
+    }
+    for (int i = 0; i < 4; ++i) {
+        const std::string label = "empty map during a load: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->set_filter(files.original.string());
+        settle(*p);
+        p->set_filter(files.a.string());
+        p->run_empty();
+        check(p->restore_empty() == LV2_STATE_SUCCESS, label + "empty map accepted");
+        settle(*p);
+        is_empty_instance(*p, label);
+    }
+    {
+        // Unequal counts: an empty instance is silent.
+        const std::string label = "empty map, 2 to 6: ";
+        HostState state;
+        state.configuration = Configuration{48000, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+        auto p = instance(world, *state.configuration);
+        check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "restored");
+        p->activate();
+        check(p->restore_empty() == LV2_STATE_SUCCESS && !p->failure() &&
+                  !decode_host_state(p->save().bytes).configuration,
+              label + "empty map accepted, nothing saved");
+        std::vector<float> ones(4096 * 2, 1.f);
+        check(silent(render(*p, ones, 4096, 256)), label + "plays silence");
+    }
+}
+
 // --- State with a path (LV2-2) ------------------------------------------------------
 void path_state(host::World& world, const fs::path& work) {
     const auto files = worker_files(work);
@@ -1280,6 +1476,8 @@ int main(int argc, char** argv) {
         instantiation(world);
         worker_loads(world, work);
         path_state(world, work);
+        refused_first_loads(world, work);
+        empty_state_resets(world, work);
         for (const auto& f : fixtures) {
             status_and_log(world, f);
             presets(world, f, tool, work);

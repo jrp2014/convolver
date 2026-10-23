@@ -125,6 +125,13 @@ struct Instance {
     // call to record: its generation times two, plus one without a worker.
     std::atomic<std::uint64_t> dropped{0};
     std::atomic<bool> stopping{false}; // Set at cleanup: later answers do nothing.
+    // True while the processor plays what an instance without a filter plays
+    // (identity for equal counts), so a first load that run() refuses must
+    // mute it at once (HostProcessor::mute) rather than wait for the next
+    // control call. The control side sets it whenever it installs something,
+    // and clears it before publishing a filter, so run() never mutes a filter
+    // it has already started playing.
+    std::atomic<bool> unfiltered{true};
 
     // Audio side: run() and work_response(), and restore(), which never
     // runs at the same time as them.
@@ -323,6 +330,7 @@ void activate_locked(Instance& p) {
         p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
+    p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
     p.update_status();
 }
 
@@ -414,7 +422,11 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
         p.filter.reject(why.kind, std::move(why.message), request);
         return failed();
     }
+    // Copied before anything is published, so recording what plays below
+    // cannot run out of memory.
+    std::string kept_path;
     try {
+        kept_path = path;
         p.filter.load(
             HostState{std::move(next)}, p.layout,
             [&](const Configuration& c) {
@@ -436,7 +448,9 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
                 if (r.generation != newest())
                     throw SupersededRequest();
                 pause_at(p, WorkerPoint::checked);
-                // 3. Publish.
+                // 3. Publish. From here on run() must not mute: the filter is
+                // accepted (HostFilter::load commits without throwing).
+                p.unfiltered.store(false, std::memory_order_release);
                 p.host->publish(std::move(*prepared));
             },
             request);
@@ -446,7 +460,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
         return failed();
     }
     p.installed = r.generation;
-    p.installed_path = path;
+    p.installed_path = std::move(kept_path);
     p.handled = std::max(p.handled, r.generation);
     p.update_status();
     return Outcome::installed;
@@ -515,9 +529,14 @@ const LV2_Worker_Interface worker_interface{work, work_response, nullptr};
 // --- Audio thread -----------------------------------------------------------------
 
 // A request run() answers itself: no worker, or the host could not queue it.
+// An instance with no filter accepted fails its first load here, so it plays
+// silence from now on, not its unfiltered input (the shared contract); the
+// next control call records why. An accepted filter keeps playing.
 void refuse_request(Instance& p, std::uint64_t generation, bool no_worker) {
     p.answered = p.refused_here = generation;
     p.dropped.store(generation << 1 | (no_worker ? 1 : 0), std::memory_order_release);
+    if (p.host && p.unfiltered.load(std::memory_order_acquire))
+        p.host->mute();
 }
 
 void request_file(Instance& p, const LV2_Atom* value) {
@@ -802,8 +821,6 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     std::uint32_t state_type = 0, path_type = 0, flags = 0;
     const void* embedded = retrieve(state, p.uris.state_key, &state_size, &state_type, &flags);
     const void* saved_path = retrieve(state, p.uris.filter_key, &path_size, &path_type, &flags);
-    if (!embedded && !saved_path)
-        return LV2_STATE_SUCCESS; // Nothing of ours saved (for example, port values only).
     // A request like any other, so answers to older ones no longer count.
     // run() never runs during restore(), so the audio side is ours here.
     const auto generation = p.requested.load(std::memory_order_relaxed) + 1;
@@ -824,7 +841,21 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         if (p.host)
             p.host->replace(c);
     };
+    // The path that plays if a load succeeds, copied before anything is
+    // published so that recording it cannot run out of memory.
+    std::string kept_path = path.value_or("");
     bool loaded = false;
+    if (!embedded && !saved_path) {
+        // Neither property: LV2 requires falling back to defaults ("This
+        // allows the host to reset the plugin state with an empty map"), so
+        // this returns to an empty instance, clears any failure and path, and
+        // supersedes loads still outstanding.
+        try {
+            p.filter.load(HostState{}, p.layout, install, from_state);
+            loaded = true;
+        } catch (...) {
+        }
+    }
     if (embedded) {
         if (auto next = read_state(p, embedded, state_size, state_type, from_state, status)) {
             try {
@@ -854,7 +885,8 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
     }
     if (loaded) {
         p.installed = generation;
-        p.installed_path = path.value_or("");
+        p.installed_path = std::move(kept_path);
+        p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
         status = LV2_STATE_SUCCESS;
     } else {
         p.silence_failed_first_load(was_failed);
