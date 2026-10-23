@@ -72,8 +72,8 @@ not fit its input instead of saving and presets.
 
 Recovering from a wrong preset is the weakest step today: VST3 keeps the
 working filter but reports the rejection only as `kResultFalse`, so the host
-may show nothing ([loading filters](vst3.md#loading-filters)). PLUG-8 keeps
-the reason; DIAG-1 decides where it is shown.
+may show nothing ([loading filters](vst3.md#loading-filters)). PLUG-8 (done)
+keeps the reason; DIAG-1 decides where it is shown.
 
 ## Next milestone: an independent user runs a preview
 
@@ -97,7 +97,7 @@ At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
 tested against them. Not part of this milestone, but tracked: signing and
 notarization (the production gate, PLUG-5), resource budgets (PERF-3), showing
-failure messages (PLUG-8, DIAG-1), other `.cfg` readers (CFG-1) and Equalizer
+failure messages (DIAG-1; PLUG-8 already keeps the reasons), other `.cfg` readers (CFG-1) and Equalizer
 APO itself (HOST-4).
 
 ## Compatibility guarantees

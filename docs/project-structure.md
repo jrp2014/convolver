@@ -17,7 +17,7 @@ For the audio vocabulary, start with [concepts](concepts.md).
 | Offline attenuation estimates | `estimate_attenuation` in [`attenuation.cpp`](../portable/attenuation.cpp) | Core; prepares and runs an engine, so never call it from an audio callback |
 | FFT contract and implementations | [`fft.hpp`](../portable/fft.hpp): `RealFft`, `fft_size`, `fft_storage`; [`fft_fftw.cpp`](../portable/fft_fftw.cpp), [`fft_accelerate.cpp`](../portable/fft_accelerate.cpp), [`fft_ooura.cpp`](../portable/fft_ooura.cpp) | One backend per build; plan/storage details stay private |
 | Host buffering, bypass and filter replacement | [`host.hpp`](../include/convolver/host.hpp): `HostProcessor`; [`host.cpp`](../portable/host.cpp) | `Convolver::host` depends on core; planar/in-place host buffers |
-| Shared adapter contract, control side | `HostFilter`, `HostLayout`, `unfiltered_configuration`, `speaker_notice` in [`host.hpp`](../include/convolver/host.hpp) | Which filter a load replaces, what is saved and what plays; every plug-in adapter uses it under its control lock |
+| Shared adapter contract, control side | `HostFilter`, `HostLayout`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../include/convolver/host.hpp) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
 | Embedded state | `HostState`, `encode_host_state`, `decode_host_state`; [`state.cpp`](../portable/state.cpp) | Bounded wire format; control-side work |
 | Sound files, RAW streams and integer conversion | [`io.hpp`](../include/convolver/io.hpp): `AudioReader`, `AudioWriter`, `Quantizer`; [`io.cpp`](../portable/io.cpp) | `Convolver::io` adds libsndfile; `Pcm16Quantizer` wraps the 16-bit case |
 | Configuration grammar | [`config_parse.hpp`](../portable/config_parse.hpp), [`config_parse.cpp`](../portable/config_parse.cpp) | Private parser; retains tokens and source positions; no decoding |
@@ -68,6 +68,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Errors | Expected input errors become located diagnostics; resource exhaustion propagates; all-entry validation can continue | `native.inspection_cli`, `native.limits` |
 | Integer output | Seeded draw order and per-channel shaping state are independent of caller chunking | `native.io`, `native.cli` |
 | State | Bounded transactional decoding; no partial application of invalid state | `native.state`, `vst3.adapter`, `lv2.adapter` |
+| Failure reasons | Every failed request, and every reason an instance plays silence, is kept as a `HostFailure` on the control side; never touched by the audio thread | `native.host` (`failure_reasons`), `vst3.adapter` (`failure_records`), `lv2.adapter`, `au.adapter` |
 | Identities and old presets | Released plug-in identities never change; version-1 state loads on any arrangement with matching counts | `identities`, `vst3.identities`, `vst3.adapter` (`version1_presets`) |
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
 
