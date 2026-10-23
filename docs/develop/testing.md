@@ -177,7 +177,9 @@ copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json
 [`plugins/identities.json`](../../plugins/identities.json), and that each VST3
 speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
-queries, silent-input tails, automation offsets and failed state restore rollback.
+queries, a tail that ends exactly at the reported length (latency included),
+input flagged silent that is still read, the Bypass parameter's text
+conversions, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 [pluginval](#pluginval), a host that does not share

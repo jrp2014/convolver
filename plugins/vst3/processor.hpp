@@ -21,6 +21,8 @@ inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0]
                                            identity::vst3_controller_class_id[2],
                                            identity::vst3_controller_class_id[3]);
 inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
+// HostProcessor's block: the fixed delay between input and output.
+inline constexpr Steinberg::uint32 latency_samples = 256;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
 inline constexpr int min_bus_channels = identity::min_channels;
 inline constexpr int max_bus_channels = identity::max_channels;
@@ -47,11 +49,13 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API process(Steinberg::Vst::ProcessData&) override;
     Steinberg::uint32 PLUGIN_API getLatencySamples() override {
-        return 256;
+        return latency_samples;
     }
-    Steinberg::uint32 PLUGIN_API getTailSamples() override {
-        return tail_.load();
-    }
+    // How long the output keeps sounding after the input stops, measured at the
+    // plug-in's output as Steinberg's tail test does: the filter's tail plus
+    // the latency (VST3-8). Bypass and the empty instance's identity play the
+    // input delayed by the latency, so even they report it.
+    Steinberg::uint32 PLUGIN_API getTailSamples() override;
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
@@ -88,5 +92,18 @@ class Controller final : public Steinberg::Vst::EditController {
     }
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
     Steinberg::tresult PLUGIN_API setComponentState(Steinberg::IBStream*) override;
+    // Bypass reads "Off" and "On"; accept them back, as hosts that let users
+    // type a value need (VST3-8). Other text goes to the SDK's conversion.
+    Steinberg::tresult PLUGIN_API getParamValueByString(Steinberg::Vst::ParamID,
+                                                        Steinberg::Vst::TChar*,
+                                                        Steinberg::Vst::ParamValue&) override;
+    // The controller keeps no state of its own; hosts call these on every save
+    // and load, so they succeed rather than report kNotImplemented (VST3-8).
+    Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override {
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override {
+        return Steinberg::kResultOk;
+    }
 };
 } // namespace convolver::vst3

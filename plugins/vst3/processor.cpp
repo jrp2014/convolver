@@ -83,6 +83,10 @@ tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 n
     }
     return result;
 }
+uint32 PLUGIN_API Processor::getTailSamples() {
+    const auto tail = tail_.load();
+    return tail >= kInfiniteTail - latency_samples ? kInfiniteTail - 1 : tail + latency_samples;
+}
 tresult PLUGIN_API Processor::canProcessSampleSize(int32 size) {
     return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
 }
@@ -225,16 +229,18 @@ template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 co
         auto& bus = d.inputs[0];
         if (bus.numChannels != inputs_)
             return false;
-        for (int c = 0; c < inputs_; ++c)
-            if (!(bus.silenceFlags & (uint64(1) << c))) {
-                if constexpr (std::is_same_v<T, float>) {
-                    if (bus.channelBuffers32 && bus.channelBuffers32[c])
-                        in[c] = bus.channelBuffers32[c] + start;
-                } else {
-                    if (bus.channelBuffers64 && bus.channelBuffers64[c])
-                        in[c] = bus.channelBuffers64[c] + start;
-                }
+        // Input silence flags are not trusted: a flagged buffer must hold
+        // zeros, so reading it costs nothing, and a host that flags audio by
+        // mistake (the SDK validator's tail test does) is not silenced (VST3-8).
+        for (int c = 0; c < inputs_; ++c) {
+            if constexpr (std::is_same_v<T, float>) {
+                if (bus.channelBuffers32 && bus.channelBuffers32[c])
+                    in[c] = bus.channelBuffers32[c] + start;
+            } else {
+                if (bus.channelBuffers64 && bus.channelBuffers64[c])
+                    in[c] = bus.channelBuffers64[c] + start;
             }
+        }
     }
     if (d.numOutputs && d.outputs && getAudioOutput(0)->isActive()) {
         auto& bus = d.outputs[0];
@@ -293,6 +299,31 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         parameters.addParameter(STR16("Bypass"), nullptr, 1, 0,
                                 ParameterInfo::kCanAutomate | ParameterInfo::kIsBypass, bypass_id);
     return result;
+}
+tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, ParamValue& value) {
+    if (id == bypass_id && string) {
+        // Case-insensitive ASCII comparison of the host's UTF-16 text.
+        auto is = [string](const char* word) {
+            std::size_t i = 0;
+            for (; word[i]; ++i) {
+                auto c = string[i];
+                if (c >= u'A' && c <= u'Z')
+                    c = static_cast<TChar>(c - u'A' + u'a');
+                if (c != static_cast<TChar>(word[i]))
+                    return false;
+            }
+            return string[i] == 0;
+        };
+        if (is("off")) {
+            value = 0;
+            return kResultOk;
+        }
+        if (is("on")) {
+            value = 1;
+            return kResultOk;
+        }
+    }
+    return EditController::getParamValueByString(id, string, value);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     try {
