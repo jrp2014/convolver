@@ -120,10 +120,11 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
-  Progress (22 October 2026): the SDK sample hosts were evaluated and not
-  added to CI ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
-  Progress (23 October 2026): jrp's first hosts, on his Mac, are REAPER and
-  Audacity for VST3 (owner's decision, 23 October 2026, replacing REAPER and
+  Progress (22 October 2026): REAPER and Carla are the suggested first hosts
+  (jrp to try); the SDK sample hosts were evaluated and not added to CI
+  ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
+  Progress (23 October 2026, PR #56): jrp's first hosts, on his Mac, are
+  REAPER and Audacity for VST3 (owner's decision, 23 October 2026, replacing REAPER and
   Carla); each has a step-by-step
   [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host).
   Not yet run.
@@ -280,8 +281,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
-  SoundSource, Live, REAPER and FL Studio results. Progress (23 October 2026):
-  GarageBand is jrp's first Audio Unit host (owner's decision, 23 October 2026),
+  SoundSource, Live, REAPER and FL Studio results. Progress (23 October 2026,
+  PR #56): GarageBand is jrp's first Audio Unit host (owner's decision, 23 October 2026),
   with a [smoke test](docs/develop/host-testing.md#garageband-audio-unit)
   limited to 44.1 kHz stereo. Not yet run.
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc

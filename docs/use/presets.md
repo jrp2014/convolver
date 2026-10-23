@@ -98,9 +98,10 @@ already holds one filter.
   `/Library/Audio/Presets/Convolver/Convolver/` on macOS,
   `C:\ProgramData\VST3 Presets\Convolver\Convolver\` on Windows and
   `/usr/local/share/vst3/presets/Convolver/Convolver/` on Linux (copying there
-  needs an administrator). They appear in the effect's preset menu under
-  their file names, so give each preset its own name, such as
-  `room-48000.vstpreset`.
+  needs an administrator), then restart Audacity. They appear in the
+  effect's preset menu under their file names, so give each preset its own
+  name, such as `room-48000.vstpreset`. Audacity always runs Convolver with
+  two channels, even on a mono track, so use a stereo (2-in, 2-out) preset.
 - **AU:** load the `.aupreset` from the host's preset menu. Logic and
   GarageBand list user presets saved under
   `~/Library/Audio/Presets/Convolver/Convolver/`.

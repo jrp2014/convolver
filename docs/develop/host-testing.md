@@ -41,11 +41,36 @@ Host facts were checked on 23 October 2026.
 | Host | Format tested | Cost | What it adds | Limits for this test |
 | --- | --- | --- | --- | --- |
 | [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
-| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track. The Apple silicon build loads only arm64 plug-ins |
+| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track |
 | GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, and GarageBand offers only the stereo version of an effect, so only the `44100-stereo` presets apply. Preview packages hold no Audio Unit yet, so build it from source |
 
 Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
 [TODO](../../TODO.md), with the details in [every report](#every-report).
+
+### Apple silicon and macOS 26
+
+A host loads only plug-ins built for the architecture it is running as. On an
+Apple silicon Mac, run every host natively (arm64) with the `macos-arm64`
+Convolver; an Intel Mac uses `macos-x86_64`. The `macos-arm64` preview needs
+macOS 14 or later. Checked on 23 October 2026:
+
+- **REAPER:** use the **macOS Universal** download (`reaper782_universal.dmg`
+  for version 7.82). Its download page says REAPER supports macOS up to
+  macOS 26; if your copy says it supports only up to macOS 15, download the
+  current version. The universal app runs natively on Apple silicon. Do not
+  tick *Open using Rosetta* in its Finder *Get Info* window: under Rosetta
+  REAPER runs as x86_64 and cannot load the arm64 plug-in.
+- **Audacity:** use the **Universal DMG** (4.0.1). It runs natively on Apple
+  silicon. The download page shows "No plugin support" under the ARM64 DMG,
+  but that note belongs to Windows on ARM: the website adds it to every card
+  whose title contains "ARM64", and its "More info" link points to the Windows
+  page's section. Audacity's macOS builds enable VST3 and Audio Units for every
+  architecture. Audacity says it is tested on macOS 14 and 15, so record any
+  macOS 26 problem as Audacity's, not Convolver's, only after the same steps
+  fail with another VST3 plug-in.
+- **GarageBand:** the version from the App Store for your macOS is native on
+  both architectures. Build the Audio Unit on the Mac that runs GarageBand, so
+  it matches.
 
 ## Steinberg's SDK hosts
 
@@ -91,7 +116,8 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    its quarantine removal on macOS for this bundle only. Never disable security
    system-wide.
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
-   stereo, where the host offers both ([first hosts](#first-hosts)). Check that the identity and echo examples sound as expected.
+   stereo, where the host offers both ([first hosts](#first-hosts)). Check
+   that the identity and echo examples sound as expected.
 3. Save the project, close and reopen it, and check that the filter is restored.
 4. Try a preset with the wrong rate or channel count while a working filter is
    running. The working filter must keep running, and the host should show an
@@ -108,10 +134,14 @@ what you actually chose. Play quiet audio and keep the volume low.
 Do this once. Run the commands in the extracted preview package folder,
 except the Audio Unit build, which runs in a source checkout.
 
-1. Download the preview for your Mac's processor (`macos-arm64` on Apple
-   silicon, `macos-x86_64` on Intel), check its SHA-256, and install
-   `Convolver.vst3` as the [install guide](../use/install.md) says, clearing
-   the quarantine for this bundle only.
+1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
+   `macos-x86_64` on Intel). Until a preview is published, download the
+   `candidate-macos-arm64` (or `candidate-macos-x86_64`) artifact from the
+   latest successful "Plug-in distribution candidates" run on `main`, and
+   unzip the package inside it. Check its SHA-256, install `Convolver.vst3` as
+   the [install guide](../use/install.md) says, and clear the quarantine for
+   the bundle and for `bin/` only
+   ([unsigned previews](../use/install.md#unsigned-previews)).
 2. For GarageBand, build the Audio Unit ([Audio Unit build](build.md#audio-unit)),
    copy `build-au/plugins/au/Convolver.component` to
    `~/Library/Audio/Plug-Ins/Components/` and check it:
@@ -121,9 +151,10 @@ except the Audio Unit build, which runs in a source checkout.
    auval -v aufx Conv CONV
    ```
 
-   The last line must say `AU VALIDATION SUCCEEDED`. Then make the two
+   The output must end with `AU VALIDATION SUCCEEDED`. Then make the two
    GarageBand presets from the package's VST3 examples, so they appear in the
-   unit's preset menu:
+   unit's preset menu (the tool refuses to overwrite, so delete old copies
+   before running it again):
 
    ```sh
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
@@ -144,7 +175,9 @@ except the Audio Unit build, which runs in a source checkout.
    done
    ```
 
-   Remove that folder after testing (`sudo rm -r /Library/Audio/Presets/Convolver`).
+   Audacity reads this folder once per session, so restart it if it was
+   open. Remove the folder after testing
+   (`sudo rm -r /Library/Audio/Presets/Convolver`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word).
 
@@ -161,9 +194,9 @@ except the Audio Unit build, which runs in a source checkout.
 4. From the **+** button beside the FX window's preset menu, import
    `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
-   `presets/echo-48000-stereo/filter.vstpreset`: the level drops and the tone
-   changes slightly. (Its echo comes 257 samples, about 5 ms, after the direct
-   sound, too soon to hear as a separate repeat.)
+   `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
+   hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
+   the direct sound, too soon to hear as a separate repeat.)
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
@@ -184,8 +217,9 @@ except the Audio Unit build, which runs in a source checkout.
 3. Open the track's real-time effects (the track's **Effects** button, or
    **E**) and add Convolver. In its preset menu choose `identity-48000-stereo`
    (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
-   Play: unchanged. Choose `echo-48000-stereo`: quieter and slightly
-   coloured, as in REAPER.
+   Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
+   REAPER. Record whether a preset chosen during playback is heard at once or
+   only after stopping and starting playback again.
 4. Switch the effect off and on with its power button while playing; note
    any click.
 5. Save the project, quit, reopen and play: the echo is still there.
@@ -194,8 +228,9 @@ except the Audio Unit build, which runs in a source checkout.
    a transient: the result starts where the original did (Audacity removes the
    reported 256-sample delay by default). Undo.
 7. Add the effect again with the echo preset, play, and choose
-   `identity-44100-stereo`. The echo keeps playing. Record what Audacity
-   shows.
+   `identity-44100-stereo`. The echo keeps playing. Stop and start playback:
+   the echo must still play, not silence or unfiltered sound. Record what
+   Audacity shows.
 8. Record what a mono track does with a stereo preset; Audacity asks the
    plug-in for two channels even there, so no particular result is expected.
 
