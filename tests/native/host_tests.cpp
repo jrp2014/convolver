@@ -467,17 +467,32 @@ void failure_reasons() {
                 early.failure()->silent && early.failure()->sample_rate == 44100 &&
                 contains(early.error(), "does not suit the host"),
             "mismatch at activation not recorded");
+    // A request rejected while the activation failure lasts: failure() still
+    // explains the silence, rejection() explains the new request (to log it).
+    refused([&] { early.load(HostState{crossover}, stereo); }); // Request 3.
+    require(early.failure()->request.number == 1 && early.rejection() &&
+                early.rejection()->request.number == 3 &&
+                contains(early.rejection()->message, "6 outputs"),
+            "a request rejected during an activation failure is not its own rejection");
+    refused([&] { early.load(HostState{crossover}, {{44100, 2, 2}}); }); // Request 4.
     require(early.activate({44100, 2, 2}).sample_rate == 44100 && early.failure() &&
-                early.failure()->request.number == 2 && !early.failure()->silent,
+                early.failure()->request.number == 4 && !early.failure()->silent,
             "rejected request's failure lost behind an activation failure");
     early.fail_activation("out of memory");
     require(early.failure()->kind == Kind::activation && early.failure()->request.number == 1 &&
                 early.failure()->silent && contains(early.error(), "out of memory"),
             "activation failure not recorded");
     early.activate({44100, 2, 2});
-    require(early.failure()->kind != Kind::activation && early.failure()->request.number == 2,
+    require(early.failure()->kind != Kind::activation && early.failure()->request.number == 4,
             "activation failure outlived activation");
-    early.load(HostState{}, std::nullopt); // An empty instance: request 3 succeeds.
+    // A number reserved before load() (an LV2 worker generation) is never reused.
+    const auto reserved = early.next_request();
+    require(reserved == 5, "next_request does not continue the numbering");
+    early.load(HostState{}, std::nullopt, {}, {HostFilterSource::file, "/x.cfg", reserved});
+    require(!early.failure() && !early.rejection(), "empty state did not clear the failure");
+    early.reject("damaged");
+    require(early.failure()->request.number == 6, "a reserved number was reused");
+    early.load(HostState{}, std::nullopt); // An empty instance succeeds.
     require(!early.failure(), "empty state did not clear the failure");
     HostFilter empty(8);
     empty.activate(stereo);

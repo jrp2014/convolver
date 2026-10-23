@@ -159,7 +159,7 @@ HostRequest HostFilter::numbered(HostRequest request) {
 
 void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
                         const Configuration* carried) {
-    failed_ = !filter_;
+    // Build everything first, so running out of memory changes nothing.
     HostFailure f;
     f.kind = kind;
     f.request = request;
@@ -168,17 +168,27 @@ void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest
         f.inputs = carried->input_channels;
         f.outputs = carried->output_channels;
     }
-    f.silent = failed_;
+    f.silent = !filter_;
     f.message = (filter_ ? "Filter not loaded; the previous filter is kept. "
                          : "Filter not loaded, so Convolver plays silence. ") +
                 why;
+    failed_ = f.silent;
     load_failure_ = std::move(f);
 }
+
+namespace {
+// A rejection load() has already recorded, told apart from any other
+// std::invalid_argument thrown while checking.
+class Refused : public std::invalid_argument {
+  public:
+    using std::invalid_argument::invalid_argument;
+};
+} // namespace
 
 void HostFilter::refuse(HostFailureKind kind, std::string why, const HostRequest& request,
                         const Configuration* carried) {
     record(kind, std::move(why), request, carried);
-    throw std::invalid_argument(load_failure_->message);
+    throw Refused(load_failure_->message);
 }
 
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
@@ -215,28 +225,36 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                 }
             }
         }
-    } catch (const std::invalid_argument&) {
-        throw; // Refused and recorded above.
+    } catch (const Refused&) {
+        throw; // Recorded above.
     } catch (...) {
         // Out of memory building a message, or a non-standard exception.
         refuse(HostFailureKind::preparation, "The filter could not be prepared.", request, carried);
     }
-    filter_ = std::move(next);
-    failed_ = state.failed;
-    accepted_ = std::move(request);
-    load_failure_.reset();
-    activation_failure_.reset();
-    // Without the host's configuration, activation checks the speakers.
-    notice_ = host && filter_ ? speaker_notice(*filter_, *host) : std::string();
-    if (failed_) {
+    // Build what is kept before changing anything, so running out of memory
+    // leaves the previous state whole. Without the host's configuration,
+    // activation checks the speakers.
+    auto notice = host && next ? speaker_notice(*next, *host) : std::string();
+    std::optional<HostFailure> saved_failure;
+    if (state.failed) {
         HostFailure f;
         f.kind = HostFailureKind::saved_failure;
-        f.request = accepted_;
+        f.request = request;
         f.silent = true;
         f.message = "A filter failed to load before this state was saved, so Convolver plays "
                     "silence. Load a filter made for the host's sample rate and channels.";
-        load_failure_ = std::move(f);
+        saved_failure = std::move(f);
     }
+    filter_ = std::move(next);
+    failed_ = state.failed;
+    accepted_ = std::move(request);
+    load_failure_ = std::move(saved_failure);
+    activation_failure_.reset();
+    notice_ = std::move(notice);
+}
+
+std::uint64_t HostFilter::next_request() noexcept {
+    return ++requests_;
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {

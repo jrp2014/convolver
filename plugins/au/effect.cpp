@@ -126,13 +126,18 @@ OSStatus Effect::Initialize() {
             reset_requested_.store(false);
             // Why it plays silence, if it does. A rejected replacement's
             // reason (the working filter plays) was logged when it happened.
-            if (const auto& f = filter_.failure(); f && f->silent)
-                message = f->message;
             started = true;
         } catch (const std::exception& e) {
             message = activation_failed(e.what());
         } catch (...) {
             message = activation_failed("the processor could not be built.");
+        }
+        if (started) {
+            try {
+                if (const auto& f = filter_.failure(); f && f->silent)
+                    message = f->message;
+            } catch (...) { // Out of memory for the message: the unit still plays.
+            }
         }
     }
     log_error(message);
@@ -278,6 +283,12 @@ std::string Effect::error() {
     return filter_.error();
 }
 
+std::string Effect::rejection() {
+    std::lock_guard lock(control_);
+    const auto& r = filter_.rejection();
+    return r ? r->message : std::string();
+}
+
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
@@ -331,7 +342,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
                "The saved state is not an Audio Unit preset dictionary.");
-        log_error(error());
+        log_error(rejection());
         return kAudioUnitErr_InvalidPropertyValue;
     }
     const auto dict = static_cast<CFDictionaryRef>(plist);
@@ -353,12 +364,12 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     } catch (const NewerHostState& e) {
         reject(HostFailureKind::state_newer,
                std::string("The saved state could not be read: ") + e.what());
-        log_error(error());
+        log_error(rejection());
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
         reject(HostFailureKind::state_unreadable,
                std::string("The saved state could not be read: ") + e.what());
-        log_error(error());
+        log_error(rejection());
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
@@ -394,7 +405,10 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             if (!host_ && filter_.failed())
                 tail_.store(0);
         }
-        message = filter_.error();
+        // Why this request failed, or the saved failure it restored; not an
+        // older failure found at initialization.
+        if (const auto& r = filter_.rejection())
+            message = r->message;
     }
     // Listeners may call back into the unit, so notify outside the lock.
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);

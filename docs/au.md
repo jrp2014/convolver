@@ -143,7 +143,8 @@ Three CTest tests run when the adapter is built (label `au`):
   rejected formats, latency and tail in seconds with change notifications, the
   `ClassInfo` keys, foreign, damaged, newer and failed presets with the
   failure record each leaves (read through a custom property, 64800, that
-  exists for the tests only), bypass switched from
+  exists for the tests only), an initialization that cannot build its
+  processor, bypass switched from
   another thread while rendering, the output silence flag, and no C++
   allocation while rendering.
 - `au.bundle`: the bundle's codes and version against the

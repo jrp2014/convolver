@@ -67,11 +67,17 @@ struct Instance {
     void update_status() {
         auto s = Status::no_filter;
         // A failure stays recorded until a later load succeeds (PLUG-8).
-        if (filter.failure())
+        // failed() also covers a record that could not be built.
+        if (filter.failure() || filter.failed())
             s = Status::load_failed;
         else if (filter.filter())
             s = Status::running;
         shown.store(static_cast<int>(s), std::memory_order_relaxed);
+    }
+    // Why the newest request failed, or the saved failure it restored.
+    void log_rejection() {
+        if (const auto& r = filter.rejection())
+            log_error(r->message);
     }
     void log_error(const std::string& message) {
         // Without the host's log feature this prints to stderr, which is
@@ -157,6 +163,13 @@ void connect_port(LV2_Handle handle, std::uint32_t port, void* data) {
         p.out[port - first_audio_port - ni] = static_cast<float*>(data);
 }
 
+void record_activation_failure(Instance& p, const char* why) noexcept {
+    try {
+        p.filter.fail_activation(why);
+    } catch (...) { // Out of memory for the message: nothing more to keep.
+    }
+}
+
 void activate_locked(Instance& p) {
     p.host.reset();
     try {
@@ -164,9 +177,9 @@ void activate_locked(Instance& p) {
         // and history start afresh, and LV2's activate() is also its reset.
         p.host = std::make_unique<HostProcessor>(p.filter.activate(p.layout), p.max_block);
     } catch (const std::exception& e) {
-        p.filter.fail_activation(e.what());
+        record_activation_failure(p, e.what());
     } catch (...) {
-        p.filter.fail_activation("the processor could not be built.");
+        record_activation_failure(p, "the processor could not be built.");
     }
     if (!p.host) {
         try {
@@ -281,7 +294,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             p.filter.reject(HostFailureKind::state_unreadable,
                             "The saved state has the wrong type; it should be a chunk of bytes "
                             "(atom:Chunk, or xsd:base64Binary in a preset file).");
-            throw std::invalid_argument(p.filter.error());
+            throw std::invalid_argument("wrong state type");
         }
         try {
             if (size > max_host_state_bytes)
@@ -309,7 +322,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         });
         p.update_status();
         if (p.filter.failed())
-            p.log_error(p.filter.error()); // A saved failure: silence again, explained.
+            p.log_rejection(); // A saved failure: silence again, explained.
         return LV2_STATE_SUCCESS;
     } catch (...) {
         // A failed first load plays silence rather than the unfiltered input.
@@ -320,7 +333,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             }
         }
         p.update_status();
-        p.log_error(p.filter.error());
+        p.log_rejection();
         return status;
     }
 }

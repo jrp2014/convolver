@@ -323,9 +323,9 @@ Shared groundwork, done once so the three streams stay independent:
   through each adapter (`native.host`, `vst3.adapter`, `lv2.adapter`,
   `au.adapter`). State from a newer Convolver is now told apart from damaged
   state. The speaker notice stays separate, for the reason given in the
-  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2's
-  file and worker paths record `filter_file` failures with their own request
-  numbers. Original item: today `HostFilter` keeps
+  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2 is
+  to record `filter_file` failures from its file and worker paths, numbering
+  worker requests with `HostFilter::next_request()`. Original item: today `HostFilter` keeps
   the newest load or preparation error as one string. In VST3, `setState`
   returns `kResultFalse`; a mismatch found at activation activates and plays
   silence with nothing reported; and `setActive`'s `catch (...)` drops the
@@ -408,7 +408,9 @@ LV2 (Linux first; also PipeWire system audio):
   Progress (22 October 2026, PR #43): restoring the embedded state (presets and
   sessions) works, prepared in `restore()`; the path parameter, worker, mapped
   path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
-  sequences with outstanding worker loads.
+  sequences with outstanding worker loads. Record file and worker failures as
+  PLUG-8 records (`filter_file`, request numbers from
+  `HostFilter::next_request()` used as the generation).
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in

@@ -77,8 +77,10 @@ struct HostRequest {
     HostFilterSource source = HostFilterSource::state;
     std::string path; // The filter file, for HostFilterSource::file.
     // Numbers requests in order, so a later request's outcome is never
-    // mistaken for this one's. 0 asks HostFilter to number it; an adapter
-    // that numbers its own (an LV2 worker generation) passes a larger number.
+    // mistaken for this one's. 0 asks HostFilter to number it. An adapter
+    // that needs the number before it calls load() (an LV2 worker
+    // generation) takes it from HostFilter::next_request(), so numbers never
+    // repeat; any other number must be larger than every earlier one.
     // A failure at activation carries the accepted filter's request, which is
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
@@ -121,6 +123,14 @@ class HostFilter {
     }
     // failure()'s message, or empty.
     const std::string& error() const noexcept;
+    // Why the newest request failed (or the saved failure it restored), even
+    // while a failure found at activation comes first in failure(). This is
+    // what to log when a load is rejected.
+    const std::optional<HostFailure>& rejection() const noexcept {
+        return load_failure_;
+    }
+    // Reserves the next request number, for a request numbered before load().
+    std::uint64_t next_request() noexcept;
     // A possible problem that does not stop the accepted filter playing, from
     // the last check against the host (speaker_notice); empty if none. It
     // describes the host as of the last load() with a host or activate(); an

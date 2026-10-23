@@ -28,7 +28,8 @@ inline constexpr std::uint32_t largest_max_block = 65536;
 inline constexpr const char* test_failure_uri = "urn:convolver:lv2-test:failure";
 struct TestFailureAccess {
     // Calls `receive` with the instance's failure record (null if none) under
-    // the control lock; not while run() may be called. Same build only.
+    // the control lock. Passes a C++ object, so the caller must be built with
+    // the same compiler and standard library (the tests are).
     void (*read)(void* instance, void* context, void (*receive)(void*, const HostFailure*));
 };
 } // namespace convolver::lv2

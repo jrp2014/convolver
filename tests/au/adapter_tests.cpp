@@ -545,6 +545,21 @@ void layout_probe_before_restore() {
             "a rejected restore replaced the filter");
 }
 
+// PLUG-8: a processor that cannot be built at initialization is recorded as an
+// activation failure, and the unit refuses to initialize.
+void failed_initialization() {
+    Unit unit;
+    const UInt32 too_many = (1U << 20) + 1; // More frames per slice than HostProcessor takes.
+    check(unit.configure(48000, 2, 2, too_many), "formats with too many frames per slice");
+    require(unit.initialize() == kAudioUnitErr_FailedInitialization,
+            "initialized with more frames per slice than the processor takes");
+    const auto f = unit.failure();
+    require(f.present && f.kind == static_cast<UInt32>(HostFailureKind::activation) && f.silent &&
+                f.request == 0 &&
+                std::string(f.message).find("could not be prepared") != std::string::npos,
+            "a failed initialization was not recorded as an activation failure");
+}
+
 void render_requires_initialization() {
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "formats");
@@ -566,6 +581,7 @@ int main() {
         no_allocation_while_rendering();
         layout_probe_before_restore();
         render_requires_initialization();
+        failed_initialization();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {
