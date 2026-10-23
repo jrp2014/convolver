@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # FFT backends and measurements
 
-[Documentation index](README.md) · [Concepts](concepts.md) · [Open FFT work](../TODO.md#fft-libraries-and-performance)
+[Documentation index](../README.md) · [Concepts](../concepts.md) · [Open FFT work](../../TODO.md#fft-libraries-and-performance)
 
 **In short:**
 
@@ -36,11 +36,11 @@ Contents: [selection and contract](#selection-and-contract),
 | Accelerate | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
 | Ooura | Built into portable source | None | Prepared tables; estimate mode only |
 
-See [build and tuning commands](portable-core.md#build). Primary references:
+See [build commands](build.md#fft-backend) and [FFTW plan tuning](../portable-core.md#fftw-plan-tuning). Primary references:
 [FFTW manual](https://fftw.org/fftw3_doc/),
 [Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp), and
 [Ooura packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html).
-The [vendored-copy record](../portable/third_party/ooura/README.md) describes
+The [vendored-copy record](../../portable/third_party/ooura/README.md) describes
 local Ooura modifications. Its freshness was checked on 21 October 2026 (FFT-1, complete).
 
 ## Selection and contract
@@ -142,9 +142,9 @@ latency modes. They cover B=1,3,17,64,128,192,256,1024: 16 cases and 213,324 sam
 No tolerance was relaxed. The acceptance bound is
 `abs(a-b) <= 2e-5*(1+max(abs(a),abs(b)))`.
 
-- [Release, FFTW NEON vs Accelerate](benchmarks/2026-10-18-release-equivalence.json):
+- [Release, FFTW NEON vs Accelerate](../benchmarks/2026-10-18-release-equivalence.json):
   maximum absolute error **7.45e-7**, RMS error **8.19e-8**.
-- [Debug sanitizer comparison](benchmarks/2026-10-18-debug-equivalence.json):
+- [Debug sanitizer comparison](../benchmarks/2026-10-18-debug-equivalence.json):
   maximum absolute error **8.34e-7**, RMS error **8.11e-8**. This used the original
   scalar FFTW test dependency; the optimized Release comparison used NEON.
 
@@ -217,7 +217,7 @@ Setup medians include plan construction and all filter spectra, separately timed
 | stereo_large_block | 1024 | 65536 | 2 | 1.088 | 0.396 |
 | stereo_odd_size | 192 | 8192 | 2 | 0.879 | 0.116 |
 
-[Raw measurements](benchmarks/2026-10-18-m5-max.csv) preserve every repetition,
+[Raw measurements](../benchmarks/2026-10-18-m5-max.csv) preserve every repetition,
 setup time, processed-frame count, checksum and separately sampled p99 block time.
 The p99 measurements are descriptive samples of 512 calls, not deadline guarantees.
 
@@ -226,7 +226,7 @@ The p99 measurements are descriptive samples of 512 calls, not deadline guarante
 On the same M5 Max, seven alternating rounds of at least 0.2 seconds per case
 compared scalar and NEON builds of FFTW 3.3.11 with the same configure-selected
 compiler flags. NEON improved full-engine throughput by approximately 2–24%
-across these eight workloads. [Scalar/NEON measurements](benchmarks/2026-10-18-fftw-scalar-neon.csv).
+across these eight workloads. [Scalar/NEON measurements](../benchmarks/2026-10-18-fftw-scalar-neon.csv).
 This supports keeping the native NEON build as the Mac baseline; it does not
 establish an optimal FFT implementation for every machine or workload.
 
@@ -234,12 +234,12 @@ A separate five-round, 0.2-second comparison changed only FFTW planning from
 ESTIMATE to MEASURE in a temporary backend source copy, using the same optimized
 engine and benchmark. Several workloads gained about 2–6%, while the others
 changed little; measured setup medians ranged approximately 4–26 ms.
-[ESTIMATE/MEASURE measurements](benchmarks/2026-10-18-fftw-estimate-measure.csv).
+[ESTIMATE/MEASURE measurements](../benchmarks/2026-10-18-fftw-estimate-measure.csv).
 These numbers precede the new public planning API; the temporary measured build
 also passed the native engine oracle. They are a planning experiment, not a
 benchmark of wisdom loading or patient planning. Saved wisdom support is now
 tested independently through fresh CLI processes, and FFT/engine oracles run
-estimate, measure and patient plans. See [the tuning workflow](portable-core.md#fftw-plan-tuning).
+estimate, measure and patient plans. See [the tuning workflow](../portable-core.md#fftw-plan-tuning).
 
 ## FFTW tuning on x86-64 and split spectra
 
@@ -253,9 +253,9 @@ measured. The M5 Max figures above predate the split-spectrum change below.
 
 ### Where the time goes
 
-[`src/fft_breakdown.cpp`](benchmarks/src/fft_breakdown.cpp) times one path's
+[`src/fft_breakdown.cpp`](../benchmarks/src/fft_breakdown.cpp) times one path's
 forward FFT, partition multiply-accumulate and inverse FFT separately
-([raw data](benchmarks/2026-10-18-x86-fftw-builds.csv)). With the AVX2 build and
+([raw data](../benchmarks/2026-10-18-x86-fftw-builds.csv)). With the AVX2 build and
 MEASURE plans, the two FFTs are about 50% of per-block work for a 256-frame IR
 at B=64, 20% for 4096 frames at B=256, and under 4% for 16384 frames or more at
 B=128–256. Long
@@ -306,12 +306,12 @@ pairs. Each partition's multiply-accumulate then needed shuffles on x86. Spectra
 are now stored per partition as all real parts followed by all imaginary parts;
 the forward spectrum is split once per block and the sum is re-interleaved once
 before the inverse FFT. Arithmetic per bin is unchanged.
-[`src/spectrum_layout.cpp`](benchmarks/src/spectrum_layout.cpp) measured the
+[`src/spectrum_layout.cpp`](../benchmarks/src/spectrum_layout.cpp) measured the
 multiply-accumulate alone at 1.4–1.8× faster with identical results
-([raw data](benchmarks/2026-10-18-x86-mac-layout.csv)).
+([raw data](../benchmarks/2026-10-18-x86-mac-layout.csv)).
 
 Full engine benchmark, seven alternating rounds of 0.3 s, median ns/frame, FFTW
-ESTIMATE plans ([raw data](benchmarks/2026-10-18-x86-split-spectra.csv)):
+ESTIMATE plans ([raw data](../benchmarks/2026-10-18-x86-split-spectra.csv)):
 
 | Case | Scalar FFTW, before | Scalar FFTW, after | AVX2 FFTW, before | AVX2 FFTW, after | Layout gain (AVX2) |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -330,7 +330,7 @@ to confirm. Larger gains for long filters need fewer multiply-accumulates rather
 than faster FFTs. Sharing forward FFTs between paths with the same input mix is
 now implemented ([below](#shared-forward-transforms)); inverse-transform sharing
 and non-uniform partitioning remain open as **PERF-2** in
-[TODO](../TODO.md#fft-libraries-and-performance).
+[TODO](../../TODO.md#fft-libraries-and-performance).
 
 ### Shared forward transforms
 
@@ -393,14 +393,14 @@ and bookkeeping. Overlap-save reads and writes back P output spectra. Overlap-ad
 reads P history spectra into a single accumulator, and pads its input with zeros
 and adds the overlap afterwards.
 
-[`src/overlap_schemes.cpp`](benchmarks/src/overlap_schemes.cpp) times both on one
+[`src/overlap_schemes.cpp`](../benchmarks/src/overlap_schemes.cpp) times both on one
 path with the same FFTW MEASURE plans and the same split-spectrum MAC loop, so
 only the scheme differs. Both agree with a direct double-precision convolution
 to within 1e-5. Measured 19 October 2026 on a 4-vCPU Intel Xeon cloud VM at
 2.8 GHz, Ubuntu 24.04, GCC 13.3 `-O3`, Ubuntu's FFTW 3.3.10. Each case ran seven
 alternating rounds of 0.2 s, and the whole benchmark ran three times. The table
 shows medians across the three runs and each run's ratio
-([raw data](benchmarks/2026-10-19-x86-overlap-schemes.csv)). A ratio below 1
+([raw data](../benchmarks/2026-10-19-x86-overlap-schemes.csv)). A ratio below 1
 means overlap-save was faster.
 
 | IR frames | B | Partitions | Overlap-add µs/block | Overlap-save µs/block | Save/add (each run) |
@@ -455,7 +455,7 @@ NEON is not new in FFTW 3.3.11: earlier releases already support it. Version
 3.3.11 adds Apple ARM cycle counters and SVE support, among other changes; NEON
 is the SIMD backend enabled in this Mac's verified build. See the
 [official release notes](https://fftw.org/release-notes.html). Rendering defaults to
-`FFTW_ESTIMATE`; [offline measured planning and persisted wisdom](portable-core.md#fftw-plan-tuning)
+`FFTW_ESTIMATE`; [offline measured planning and persisted wisdom](../portable-core.md#fftw-plan-tuning)
 are now available explicitly.
 
 The benchmark dependency was built from the official source archive with the
@@ -518,7 +518,7 @@ python3 tests/native/benchmark_backends.py build-fftw/convolver_benchmark build-
 
 Repeat correctness tests in separate Debug build directories with
 `-DCONVOLVER_SANITIZERS=ON`. Never benchmark sanitizer builds. Native baseline
-sources and dependency archive hashes are recorded in [the portable guide](portable-core.md).
+sources and dependency archive hashes are recorded in [the portable guide](../portable-core.md).
 
 For Ooura, configure another directory with `-DCONVOLVER_FFT_BACKEND=OOURA`
 and pass that CLI/benchmark as one side of the same pairwise comparison.

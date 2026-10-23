@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Modernization direction
 
-[Documentation index](README.md) · [Implementation map](project-structure.md) · [TODO](../TODO.md)
+[Documentation index](README.md) · [Implementation map](develop/architecture.md) · [TODO](../TODO.md)
 
 Convolver already has a portable C++20 core, CLI, VST3 adapter, three FFT backends,
 configuration inspection, integer dither/noise shaping, CMake exports and tests
@@ -42,10 +42,10 @@ FFTW remains the default FFT backend unless the build includes a plug-in
 (`CONVOLVER_BUILD_VST3=ON`). Then `AUTO` picks the built-in Ooura FFT on Linux
 and Windows and Accelerate on macOS for the whole build, CLI included, because
 other code in the host process may call the same FFTW, whose planner Convolver
-cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)). Build the CLI
+cannot lock ([plug-in builds](develop/fft-backends.md#plug-in-builds)). Build the CLI
 separately to keep FFTW for offline rendering. Accelerate uses an Apple system
 framework; Ooura is built in and avoids a separate FFT dependency. Use
-[the FFT guide](fft-backends.md) for contract details and dated measurements;
+[the FFT guide](develop/fft-backends.md) for contract details and dated measurements;
 none is asserted to be fastest for every workload.
 
 [libsndfile](https://libsndfile.github.io/libsndfile/) remains the file-decoding and

@@ -13,7 +13,7 @@ independent user installing and using an exact preview package.
 
 The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
-([testing](testing.md)).
+([testing](develop/testing.md)).
 
 This page is the short answer to "what is ready?". [TODO](../TODO.md) is the
 backlog and owns the order of work; the linked guides own the behaviour. Update
@@ -47,7 +47,7 @@ documentation alone.
 | VST3 plug-in ([guide](vst3.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Carla suggested) | No; preview candidates are CI artifacts only |
 | LV2 plug-in ([guide](lv2.md)) | Yes: adapter and layouts (LV2-1); loading filters from a file is LV2-2 | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
 | AU plug-in | In development (AU-1, AU-2) | Planned through the shared harness and `auval` | None | No; joins a later preview |
-| C++ libraries ([CMake package](cmake-package.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
+| C++ libraries ([CMake package](develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](portable-core.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
 Fixed defect: a reset during a filter transition delayed the next filter
@@ -108,6 +108,6 @@ any of them is an owner's decision.
 | Guarantee | What is promised | Owning guide | Checked by |
 | --- | --- | --- | --- |
 | `.cfg` and list syntax | Existing files keep loading with the same routes, gains, delays, paths and list selection; syntax changes need a recorded decision | [Configuration](configuration.md), [compatibility](configuration-compatibility.md) | Compatibility corpus, parser and fuzz replay |
-| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading; version 2 only marks a failed first load | [Presets](presets.md#compatibility), [presets without a layout](plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; files from releases are COMPAT-1 |
-| Plug-in identity | VST3 class IDs, AU codes, LV2 URIs and bundle IDs never change after release | [Identities](plugin-identities.md) | `identities` (frozen values), `vst3.identities` |
-| C++ API and CMake package | Before 1.0, incompatible changes only in a new minor version; consumers require a matching minor version | [Versioning](versioning.md#minor-and-major-versions), [package guide](cmake-package.md) | Installed and source-tree consumer tests |
+| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading; version 2 only marks a failed first load | [Presets](presets.md#compatibility), [presets without a layout](develop/plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; files from releases are COMPAT-1 |
+| Plug-in identity | VST3 class IDs, AU codes, LV2 URIs and bundle IDs never change after release | [Identities](develop/plugin-identities.md) | `identities` (frozen values), `vst3.identities` |
+| C++ API and CMake package | Before 1.0, incompatible changes only in a new minor version; consumers require a matching minor version | [Versioning](develop/versioning.md#minor-and-major-versions), [package guide](develop/library.md) | Installed and source-tree consumer tests |

@@ -81,6 +81,6 @@ and combines them with a history of transformed input blocks. It converts the
 result back to samples and adds the part overlapping the next block. This is
 **uniform partitioned overlap-add**.
 
-The [implementation map](project-structure.md#processing-data-flow) shows where
-those steps live. The [FFT guide](fft-backends.md) explains transform scaling,
+The [implementation map](develop/architecture.md#processing-data-flow) shows where
+those steps live. The [FFT guide](develop/fft-backends.md) explains transform scaling,
 backend choices and dated performance measurements.
