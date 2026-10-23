@@ -5,7 +5,8 @@ Usage: generate_ttl.py IDENTITIES_JSON VERSION_FILE BINARY_NAME OUTPUT_DIRECTORY
 
 One plug-in per fixed layout in plugins/identities.json (PLUG-4), all from the
 same template. Port numbers match plugins/lv2/plugin.hpp: three control ports,
-then the audio inputs, then the audio outputs. The lv2.adapter test reads the
+then the audio inputs, then the audio outputs, then the control and notify
+atom ports. The lv2.adapter test reads the
 result through lilv and checks it against the adapter.
 """
 import json
@@ -14,21 +15,28 @@ import re
 import sys
 
 PREFIXES = """\
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
 @prefix bufsz: <http://lv2plug.in/ns/ext/buf-size#> .
 @prefix doap: <http://usefulinc.com/ns/doap#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix log: <http://lv2plug.in/ns/ext/log#> .
 @prefix lv2: <http://lv2plug.in/ns/lv2core#> .
 @prefix opts: <http://lv2plug.in/ns/ext/options#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rsz: <http://lv2plug.in/ns/ext/resize-port#> .
 @prefix state: <http://lv2plug.in/ns/ext/state#> .
 @prefix units: <http://lv2plug.in/ns/extensions/units#> .
 @prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+@prefix work: <http://lv2plug.in/ns/ext/worker#> .
 """
 
 # Status port values, as in plugin.hpp's Status.
 STATUS = [(0, 'Running'), (1, 'No filter'), (2, 'Load failed'), (3, 'Loading')]
+# The filter parameter's suffix and the atom ports' buffer size, as in plugin.hpp.
+FILTER = 'filter'
+ATOM_BUFFER_BYTES = 8192
 
 
 def turtle_string(text):
@@ -101,7 +109,30 @@ def plugin(base, layout, vendor, version):
 {status_points}
 \t]""",
     ]
-    ports = ' ,\n'.join(control + audio_ports(layout, 3))
+    first_atom = 3 + inputs + outputs
+    atoms = [
+        f"""\t[
+\t\ta lv2:InputPort , atom:AtomPort ;
+\t\tatom:bufferType atom:Sequence ;
+\t\tatom:supports patch:Message ;
+\t\tlv2:designation lv2:control ;
+\t\trsz:minimumSize {ATOM_BUFFER_BYTES} ;
+\t\tlv2:index {first_atom} ;
+\t\tlv2:symbol "control" ;
+\t\tlv2:name "Control"
+\t]""",
+        f"""\t[
+\t\ta lv2:OutputPort , atom:AtomPort ;
+\t\tatom:bufferType atom:Sequence ;
+\t\tatom:supports patch:Message ;
+\t\tlv2:designation lv2:control ;
+\t\trsz:minimumSize {ATOM_BUFFER_BYTES} ;
+\t\tlv2:index {first_atom + 1} ;
+\t\tlv2:symbol "notify" ;
+\t\tlv2:name "Notify"
+\t]""",
+    ]
+    ports = ' ,\n'.join(control + audio_ports(layout, 3) + atoms)
     name = turtle_string(f"{vendor['name']} ({inputs} in, {outputs} out)")
     comment = turtle_string(
         'Applies the FIR filters of a Convolver configuration (.cfg) or impulse response '
@@ -118,11 +149,25 @@ def plugin(base, layout, vendor, version):
 \tlv2:minorVersion {minor} ;
 \tlv2:microVersion {micro} ;
 \tlv2:requiredFeature urid:map ;
-\tlv2:optionalFeature lv2:hardRTCapable , log:log , opts:options ;
+\tlv2:optionalFeature lv2:hardRTCapable , log:log , opts:options , work:schedule ;
 \topts:supportedOption bufsz:maxBlockLength ;
-\tlv2:extensionData state:interface ;
+\tlv2:extensionData state:interface , work:interface ;
+\tpatch:writable <{base}{FILTER}> ;
 \tlv2:port
 {ports} .
+"""
+
+
+def parameter(base):
+    """The filter parameter: hosts show a file chooser for it."""
+    comment = turtle_string(
+        'The filter to apply: a Convolver configuration (.cfg), a list of them, or an impulse '
+        'response file. Lists choose the entry for the sample rate and channels.')
+    return f"""<{base}{FILTER}>
+\ta lv2:Parameter ;
+\trdfs:label "Filter" ;
+\trdfs:comment {comment} ;
+\trdfs:range atom:Path .
 """
 
 
@@ -151,7 +196,7 @@ def main(argv):
               '# Plug-in URIs are permanent: never change a released one.\n\n')
     files = {
         'manifest.ttl': header + '\n'.join(manifest),
-        'convolver.ttl': header + PREFIXES + '\n' + '\n'.join(
+        'convolver.ttl': header + PREFIXES + '\n' + parameter(base) + '\n' + '\n'.join(
             plugin(base, layout, identities['vendor'], version) for layout in layouts),
     }
     for name, content in files.items():

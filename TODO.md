@@ -323,9 +323,9 @@ Shared groundwork, done once so the three streams stay independent:
   through each adapter (`native.host`, `vst3.adapter`, `lv2.adapter`,
   `au.adapter`). State from a newer Convolver is now told apart from damaged
   state. The speaker notice stays separate, for the reason given in the
-  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2 is
-  to record `filter_file` failures from its file and worker paths, with its
-  own generations as request numbers. Original item: today `HostFilter` keeps
+  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2 (PR #48)
+  records `filter_file` failures from its file and worker paths, with its own
+  generations as request numbers. Original item: today `HostFilter` keeps
   the newest load or preparation error as one string. In VST3, `setState`
   returns `kResultFalse`; a mismatch found at activation activates and plays
   silence with nothing reported; and `setActive`'s `catch (...)` drops the
@@ -389,7 +389,7 @@ LV2 (Linux first; also PipeWire system audio):
   skipped: LV2 has neither); `lv2.adapter` covers ports, status, log messages,
   presets, lilv state and seeded lifecycle sequences; `lv2lint` runs on every
   plug-in in CI ([LV2 guide](docs/lv2.md)).
-- [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
+- [x] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
   [worker and state lifecycle](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
@@ -405,12 +405,19 @@ LV2 (Linux first; also PipeWire system audio):
   rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown
   with work outstanding, each with a test.
-  Progress (22 October 2026, PR #43): restoring the embedded state (presets and
-  sessions) works, prepared in `restore()`; the path parameter, worker, mapped
-  path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
-  sequences with outstanding worker loads. Record file and worker failures as
-  PLUG-8 records (`filter_file`, with the generation as the request
-  number).
+  Done 23 October 2026 (PR #48): the `filter` parameter through the worker,
+  with the two-step `HostProcessor::prepare()`/`publish()` and
+  `SupersededRequest`; status, notify and saved path as the
+  [plan](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design) says;
+  mapped and PipeWire-style paths in state. `lv2.adapter` covers every case
+  the item lists (worker on a thread, synchronous and answering inside
+  `run()`; no worker; scheduling failure; both preparation-window cases;
+  restore and save during a load; teardown with work queued), its lifecycle
+  sequences include file loads, and file and worker failures are PLUG-8
+  records numbered by generation. `lv2.adapter` runs under ASan/UBSan and,
+  in the LV2 workflow, ThreadSanitizer. Original progress (22 October 2026, PR #43):
+  restoring the embedded state (presets and sessions), prepared in
+  `restore()`.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in

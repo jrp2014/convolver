@@ -193,7 +193,9 @@ Consult the [native workflow](../.github/workflows/regression.yml) and
 file alone is not evidence that a job passed. The [LV2](../.github/workflows/lv2.yml)
 workflow installs the
 [pinned format tools](plugins/build.md#pinned-format-dependencies) and checks
-them on LV2's example plug-ins until the LV2 adapter adds its bundle. The
+them on LV2's example plug-ins, then builds Convolver's bundle and runs the
+LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
+`lv2lint` on every plug-in ([LV2 guide](lv2.md#tests)). The
 [Audio Unit](../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
 it ([AU guide](au.md#testing)). The weekly [Dependency updates](../.github/workflows/updates.yml)

@@ -642,6 +642,21 @@ contract:
   - *`restore()` with a response outstanding:* the older response does not
     overwrite the status or path that `restore()` installed.
 
+  Implemented 23 October 2026 by LV2-2 (PR #48), as above, with these
+  details. `HostProcessor::prepare()` and `publish()` are the two steps, and
+  an install callback throws `SupersededRequest` so that `HostFilter` records
+  nothing for an overtaken request. LV2 numbers every request with its
+  generations, so failure records carry them. The atom ports follow the
+  audio ports (`control`, then `notify`, 8192-byte buffers), so the earlier
+  port numbers are unchanged. A request that never reaches `work()` (no
+  worker, or a failed `schedule_work`) shows "load failed" at once and is
+  recorded and logged, without its path, by the next control call. Paths
+  longer than 4096 bytes are refused. A file that is readable but made for
+  another rate or other channels is recorded as `sample_rate` or `channels`
+  with the CLI's explanation. The tests pause `work()` through a test-only
+  extension, as PLUG-8's failure record is read, and also run the worker
+  synchronously with answers delivered inside `run()`.
+
 **State.** Save the mapped path (`state:mapPath`, so sessions can move) and the
 encoded host state (the VST3 preset format), so a session still sounds the same
 if the file later changes or disappears. Restore prefers the embedded copy; an

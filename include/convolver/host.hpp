@@ -189,9 +189,10 @@ class HostFilter {
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
-// Control: construction, replace, collect, destruction; serialize these calls.
-// Audio: process, set_bypass, reset; one audio thread per instance. Control and
-// audio may overlap only for replace/collect. Teardown requires stopped audio.
+// Control: construction, replace, prepare, publish, collect, destruction;
+// serialize these calls. Audio: process, set_bypass, reset; one audio thread
+// per instance. Control and audio may overlap only for replace, prepare,
+// publish and collect. Teardown requires stopped audio.
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);

@@ -17,8 +17,17 @@ Until 1.0 the C++ API may change between minor versions.
   2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
   `convolver-preset` and from saved sessions; bypass, 256-frame latency
   reporting and a status port; rejected loads are explained in the host's log.
-  A filter file parameter and worker-thread loading follow in LV2-2. See the
-  [LV2 guide](docs/lv2.md).
+  See the [LV2 guide](docs/lv2.md).
+- LV2 filter files (LV2-2): a **Filter** parameter that hosts such as Ardour
+  and Jalv show as a file chooser, loaded on the host's worker thread with a
+  Loading status while it is prepared; rapid choices load only the newest,
+  and an overtaken load is never heard. Sessions save the file's path
+  (mapped with `state:mapPath`) beside the embedded filter, and restoring
+  falls back on the file when the embedded copy cannot be used; a path alone
+  restores too, as PipeWire's `filter-chain` `config` passes it. The plug-in
+  now links libsndfile. For adapters, `HostProcessor::prepare()` and
+  `publish()` split `replace()` in two, and `SupersededRequest` abandons an
+  overtaken request; `HostFilter::next_request()` is gone.
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the

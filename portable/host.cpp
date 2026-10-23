@@ -483,7 +483,7 @@ void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);
 }
 struct HostProcessor::Replacement::Data {
-    const Impl* owner;
+    const Impl* owner = nullptr;
     std::unique_ptr<Impl::Prepared> prepared;
 };
 HostProcessor::Replacement::Replacement(std::unique_ptr<Data> data) noexcept
@@ -493,7 +493,11 @@ HostProcessor::Replacement& HostProcessor::Replacement::operator=(Replacement&&)
 HostProcessor::Replacement::~Replacement() = default;
 HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const {
     auto prepared = impl_->prepare(c);
-    return Replacement(std::make_unique<Replacement::Data>(impl_.get(), std::move(prepared)));
+    // Member by member: Apple Clang lacks parenthesized aggregate initialization.
+    auto data = std::make_unique<Replacement::Data>();
+    data->owner = impl_.get();
+    data->prepared = std::move(prepared);
+    return Replacement(std::move(data));
 }
 void HostProcessor::publish(Replacement&& r) noexcept {
     // A Replacement from another processor, or one already published, is ignored.
