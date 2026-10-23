@@ -3,7 +3,7 @@
 
 > **For contributors and agents:** the open work from this plan is tracked as
 > TODO items (REL-1, PLUG-5). Take them on as described in
-> [the workflow guide](../workflow.md); the task checkboxes below are the
+> [the workflow guide](../develop/workflow.md); the task checkboxes below are the
 > 18 October record. (This note replaced a pointer to an agent tool that the
 > repository does not use.)
 
@@ -96,7 +96,7 @@ Existing files to extend: `CMakeLists.txt`, `CMakePresets.json`,
 `plugins/vst3/CMakeLists.txt`, `plugins/vst3/preset.cpp`,
 `tests/vst3/adapter_tests.cpp`, `tests/vst3/preset_tests.py`,
 `.github/workflows/vst3.yml`, `README.md`, `CHANGELOG.md`, `docs/vst3.md`,
-`docs/testing.md`, `docs/cmake-package.md` and `docs/modernization.md`.
+`docs/develop/testing.md`, `docs/develop/library.md` and `docs/modernization.md`.
 
 Proposed new files:
 

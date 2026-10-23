@@ -57,7 +57,7 @@ cmake --build build-core
 ```
 
 This needs neither Python, libsndfile nor the VST3 SDK. It uses FFTW by default;
-choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/cmake-package.md` in that source bundle for
+choose Accelerate on macOS or Ooura anywhere to avoid it. See `docs/develop/library.md` in that source bundle for
 `Convolver::core`, `Convolver::host` and `Convolver::io` consumers.
 
 ## Pinned format dependencies

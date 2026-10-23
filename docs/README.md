@@ -22,44 +22,80 @@ Convolver applies that response continuously to every input sample.
 | Turn a filter into a preset for a plug-in | [Plug-in presets](presets.md) |
 | Filter everything Windows plays (system-wide) | [Equalizer APO export](equalizer-apo.md) |
 | Filter the audio of a video or other file with FFmpeg | [FFmpeg pipe example](portable-core.md#with-ffmpeg); a built-in filter was [planned](plans/2026-10-21-ffmpeg-filter.md) and is parked |
-| Use the C++ libraries in another application | [CMake package guide](cmake-package.md) |
-| Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
-| Understand what the tests establish | [Testing](testing.md) |
-| Choose an FFT backend or reproduce measurements | [FFT guide](fft-backends.md) |
+| Build Convolver from source, or a plug-in | [Build from source](develop/build.md) |
+| Use the C++ libraries in another application | [Library guide](develop/library.md) |
+| Find the implementation or change it safely | [Implementation map](develop/architecture.md), then [contributing](../CONTRIBUTING.md) |
+| Understand what the tests establish | [Testing](develop/testing.md) |
+| Choose an FFT backend or reproduce measurements | [FFT guide](develop/fft-backends.md) |
 | See what is ready to use, what is still unproven and what blocks the next release | [Release readiness](release-readiness.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
-| Understand version numbers and tags | [Source versioning](versioning.md) |
-| Edit these documents | [Documentation maintenance](documentation.md) |
-| Pick up, hand over or review a piece of work | [Taking on and reviewing work](workflow.md) |
+| Understand version numbers and tags | [Source versioning](develop/versioning.md) |
+| Edit these documents | [Documentation guide](develop/documentation.md) |
+| Pick up, hand over or review a piece of work | [Taking on and reviewing work](develop/workflow.md) |
 | Learn where Convolver came from | [History](history.md) |
 
 ## All maintained pages
 
-| Page | What it covers |
+Pages are grouped by who they are for. The [documentation guide](develop/documentation.md#kinds-of-page)
+explains the kinds. The user guides still sit at the top of `docs/`; they move
+into `docs/use/` in a later step (DOC-4).
+
+### For people using Convolver
+
+| Page | Kind | What it covers |
+| --- | --- | --- |
+| [Concepts](concepts.md) | Background | Audio terms, latency, tails, files versus streams |
+| [Configuration format](configuration.md) | Reference | `.cfg` and list syntax, routes, paths, troubleshooting |
+| [Configuration compatibility](configuration-compatibility.md) | Reference | What is tested, path-portability profile, other readers of the format |
+| [Core and CLI reference](portable-core.md) | Reference | Every CLI option, output formats, inspection, library API, limits |
+| [VST3 guide](vst3.md) | How-to | Installing the plug-in and loading filters; how it behaves |
+| [Audio Unit guide](au.md) | How-to | Installing the macOS Audio Unit and loading filters; its behaviour, licence and tests |
+| [LV2 guide](lv2.md) | How-to | Installing the LV2 plug-ins, loading a filter as a preset, ports, behaviour and tests |
+| [Plug-in presets](presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, what a preset that does not fit plays, file contents |
+| [Equalizer APO export](equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
+| [Plug-in distribution](plugins/index.md) | How-to | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
+
+### For people building, embedding or changing Convolver (people and agents)
+
+| Page | Kind | What it covers |
+| --- | --- | --- |
+| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs |
+| [Library guide](develop/library.md) | How-to | Using the libraries from another CMake project; presets |
+| [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
+| [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state |
+| [Plug-in identities and channel layouts](develop/plugin-identities.md) | Reference | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
+| [FFT guide](develop/fft-backends.md) | Background | Backend choice, numerical contract, dated benchmarks |
+| [Testing](develop/testing.md) | Reference | What each test establishes and its limits |
+| [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
+| [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |
+| [Source versioning](develop/versioning.md) | Reference | `VERSION`, automatic tags, recovery |
+
+### Status, direction and history
+
+| Page | Kind | What it covers |
+| --- | --- | --- |
+| [Release readiness](release-readiness.md) | Reference | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees |
+| [Preview release record](releases/developer-preview.md) | Record | Candidate matrix, evidence and remaining production gates |
+| [Modernization direction](modernization.md) | Background | Priorities and dependency choices |
+| [History](history.md) | Background | Provenance, historical builds, downstream use |
+| [convolverPipe](convolverPipe.md) | Reference | The recovered historical streaming tool (Windows only) |
+
+### Moved pages
+
+These pages moved on 23 October 2026 (DOC-4). Dated records
+still link to the old paths.
+
+| Old path | New path |
 | --- | --- |
-| [Concepts](concepts.md) | Audio terms, latency, tails, files versus streams |
-| [Configuration format](configuration.md) | `.cfg` and list syntax, routes, paths, troubleshooting |
-| [Configuration compatibility](configuration-compatibility.md) | What is tested, path-portability profile, other readers of the format |
-| [Core and CLI reference](portable-core.md) | Build options, every CLI option, output formats, inspection, library API, limits |
-| [VST3 guide](vst3.md) | Building, installing and loading the plug-in; host lifecycle |
-| [Audio Unit guide](au.md) | Building, installing and loading the macOS Audio Unit; its behaviour, licence and tests |
-| [LV2 guide](lv2.md) | Building the LV2 plug-ins, loading a filter as a preset, ports, behaviour and tests |
-| [Plug-in presets](presets.md) | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, what a preset that does not fit plays, file contents |
-| [Equalizer APO export](equalizer-apo.md) | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
-| [Plug-in identities and channel layouts](plugin-identities.md) | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
-| [Plug-in distribution](plugins/index.md) | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
-| [Release readiness](release-readiness.md) | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees |
-| [Preview release record](releases/developer-preview.md) | Candidate matrix, evidence and remaining production gates |
-| [CMake package guide](cmake-package.md) | Using the libraries from another CMake project; presets |
-| [FFT guide](fft-backends.md) | Backend choice, numerical contract, dated benchmarks |
-| [Testing](testing.md) | What each test establishes and its limits |
-| [Implementation map](project-structure.md) | Source responsibilities, invariants, change-to-test map |
-| [Modernization direction](modernization.md) | Priorities and dependency choices |
-| [Source versioning](versioning.md) | `VERSION`, automatic tags, recovery |
-| [Documentation maintenance](documentation.md) | Which page owns each topic; link checks |
-| [Taking on and reviewing work](workflow.md) | Claiming a TODO item, handoff notes, definition of done, review and merge, repository checks |
-| [History](history.md) | Provenance, historical builds, downstream use |
-| [convolverPipe](convolverPipe.md) | The recovered historical streaming tool (Windows only) |
+| `docs/project-structure.md` | [`docs/develop/architecture.md`](develop/architecture.md) |
+| `docs/cmake-package.md` | [`docs/develop/library.md`](develop/library.md) |
+| `docs/fft-backends.md` | [`docs/develop/fft-backends.md`](develop/fft-backends.md) |
+| `docs/plugin-identities.md` | [`docs/develop/plugin-identities.md`](develop/plugin-identities.md) |
+| `docs/testing.md` | [`docs/develop/testing.md`](develop/testing.md) |
+| `docs/workflow.md` | [`docs/develop/workflow.md`](develop/workflow.md) |
+| `docs/documentation.md` | [`docs/develop/documentation.md`](develop/documentation.md) |
+| `docs/versioning.md` | [`docs/develop/versioning.md`](develop/versioning.md) |
+| Shared adapter contract in the plug-in formats plan | [`docs/develop/plugin-contract.md`](develop/plugin-contract.md) |
 
 At the top level: [README](../README.md), [TODO](../TODO.md),
 [CHANGELOG](../CHANGELOG.md), [current review](../REVIEW.md),
@@ -67,7 +103,7 @@ At the top level: [README](../README.md), [TODO](../TODO.md),
 
 These pages describe the active CMake implementation. The package version is in
 [`VERSION`](../VERSION); use `convolver --version` to identify a particular binary.
-[Changes](../CHANGELOG.md), [source versioning](versioning.md), and the
+[Changes](../CHANGELOG.md), [source versioning](develop/versioning.md), and the
 [current review](../REVIEW.md) provide release and review context.
 
 ## Current source versus historical records
@@ -86,7 +122,7 @@ These pages describe the active CMake implementation. The package version is in
   `archive/plans/`.
 
 For maintainers and coding agents, [AGENTS.md](../AGENTS.md) supplies repository
-rules. The [implementation map](project-structure.md#change-and-test-map) connects
+rules. The [implementation map](develop/architecture.md#change-and-test-map) connects
 changes to source files, invariants and tests without requiring a history lesson.
 
 ## Open plans
@@ -107,6 +143,9 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   [Equalizer APO export](equalizer-apo.md) (HOST-4).
 - [FFmpeg filter](plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
+- [Documentation by reader](plans/2026-10-23-documentation-by-reader.md)
+  (DOC-4): the move into `use/`, `develop/` and `project/`, which page goes
+  where, and jrp's decisions for the remaining steps.
 - [Plug-in distribution](plans/2026-10-18-plugin-distribution.md) and its
   [design](plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
   the 18 October release design. The packaging it describes is merged; signing

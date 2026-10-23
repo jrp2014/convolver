@@ -87,7 +87,7 @@ Until 1.0 the C++ API may change between minor versions.
   installer keys and the speaker meaning of each WAV channel-mask bit in VST3, AU
   and LV2. The build generates `convolver_identities.hpp` from it, and new tests
   (`identities`, `vst3.identities`) stop identities from changing or being copied
-  elsewhere. See [plug-in identities](docs/plugin-identities.md); modified
+  elsewhere. See [plug-in identities](docs/develop/plugin-identities.md); modified
   builds should change the product identities it lists.
 - VST3 CI loads the plug-in in an independent host as well as Steinberg's SDK:
   [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on
@@ -105,6 +105,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Documentation for contributors and coding agents moved into `docs/develop/`
+  (DOC-4, first step): one [build page](docs/develop/build.md) for every build,
+  the [plug-in adapter contract](docs/develop/plugin-contract.md) taken out of
+  the plug-in formats plan, and writing rules for each reader and kind of page.
+  The `todo-item` and `review-change` skills now only point to the workflow
+  guide, which holds the full procedures. The
+  [index](docs/README.md#moved-pages) lists the old and new paths.
 - Preview packages (PLUG-5) ship `convolver-preset` and
   `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
   guides in `docs/`, instead of `convolver-vst3-preset` (still built from
@@ -291,7 +298,7 @@ Features that only the historical engine had:
 - Automatic patch versions and annotated source tags on `main`, with one
   `VERSION` file shared by the CMake package, CLI and VST3 bundle.
 - CLI and VST3 factory build identification including the Git revision and a
-  marker for uncommitted changes. See [source versioning](docs/versioning.md).
+  marker for uncommitted changes. See [source versioning](docs/develop/versioning.md).
 
 ## [0.2.0] - 2026-10-18
 

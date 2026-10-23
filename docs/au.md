@@ -27,27 +27,9 @@ Contents: [build](#build) · [install](#install) · [loading filters](#loading-f
 
 ## Build
 
-The adapter needs macOS 11 or later, CMake 3.20+, Xcode's command-line tools
-(C++23, for AudioUnitSDK 1.4.0) and the AudioUnitSDK commit pinned in
-`packaging/release-policy.json`
-([pinned format dependencies](plugins/build.md#pinned-format-dependencies)).
-Fetch and unpack it, then configure with it:
-
-```sh
-python3 scripts/release/sources.py --fetch --cache build/downloads \
-  --destination build/sources audiounitsdk
-cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_AU=ON \
-  -DCONVOLVER_AU_SDK="$PWD/build/sources/AudioUnitSDK"
-cmake --build build-au --parallel
-ctest --test-dir build-au --output-on-failure
-```
-
-The component is `build-au/plugins/au/Convolver.component`. As for VST3, the
-default FFT backend (`AUTO`) of a plug-in build is Apple's Accelerate, so the
-component links no FFT library; libsndfile is used only by the command-line
-tools and tests. Do not combine `CONVOLVER_SANITIZERS=ON` with a component you
-intend to load in a host: hosts and `auval` cannot load sanitizer-instrumented
-code.
+Build the component on macOS with `-DCONVOLVER_BUILD_AU=ON` and the pinned
+AudioUnitSDK, as [build from source](develop/build.md#audio-unit) describes.
+The result is `build-au/plugins/au/Convolver.component`.
 
 ## Install
 
@@ -64,7 +46,7 @@ auval -v aufx Conv CONV
 `auval` is Apple's validator; hosts such as Logic run it themselves when they
 first see the component. The unit appears as **Convolver: Convolver** under
 effects. Its codes `aufx`, `Conv` and `CONV` are permanent
-([plug-in identities](plugin-identities.md)).
+([plug-in identities](develop/plugin-identities.md)).
 
 ## Loading filters
 
@@ -138,7 +120,7 @@ and AudioUnitSDK's licence.
 
 Three CTest tests run when the adapter is built (label `au`):
 
-- `au.harness`: the shared [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2)
+- `au.harness`: the shared [PLUG-2 comparisons](develop/testing.md#plug-in-comparisons-plug-2)
   through the Audio Unit API, with filters loaded as `.aupreset` dictionaries
   and latency and tail converted from seconds.
 - `au.adapter`: what is specific to Audio Units: the channel pairs offered,
@@ -150,7 +132,7 @@ Three CTest tests run when the adapter is built (label `au`):
   another thread while rendering, the output silence flag, and no C++
   allocation while rendering.
 - `au.bundle`: the bundle's codes and version against the
-  [identity registry](plugin-identities.md), a single exported symbol
+  [identity registry](develop/plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.
 
 The tests register the unit inside the test process with

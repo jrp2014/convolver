@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Building and consuming the portable library
 
-[Documentation index](README.md) · [Implementation map](project-structure.md)
+[Documentation index](../README.md) · [Implementation map](architecture.md)
 
 **In short:** install Convolver (or add it with `add_subdirectory`), then
 `find_package(Convolver 0.4 REQUIRED COMPONENTS core)` and link
@@ -10,7 +10,7 @@ and `io` for sound files and configurations (needs libsndfile). The libraries ar
 static development packages for the same toolchain, not a stable binary ABI.
 The core-only build needs only an FFT library (or none, with Ooura).
 
-The portable package reads its version from [VERSION](../VERSION). It provides static C++20 libraries. The API is evolving: package
+The portable package reads its version from [VERSION](../../VERSION). It provides static C++20 libraries. The API is evolving: package
 version checks accept compatible patch releases within the same minor version,
 but this is not a stable binary ABI promise. Rebuild consumers with the same
 toolchain/runtime. `BUILD_SHARED_LIBS` does not change these static targets.
@@ -65,7 +65,7 @@ target_link_libraries(my_app PRIVATE Convolver::core Convolver::io)
 
 `Convolver::host` adds the prepared planar host lifecycle and embedded-state codec.
 Request `COMPONENTS host` to use it; it depends only on core and has no SDK/file I/O
-dependency. See [VST3 and host lifecycle](vst3.md).
+dependency. Its threading rules are in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads).
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
@@ -97,23 +97,8 @@ must be provided by installed packages or suitable pre-existing imported targets
 
 ## Presets
 
-`CMakePresets.json` uses schema 2, supported by CMake 3.20. Presets require Ninja;
-the ordinary `cmake -S/-B` commands also work with Makefiles and Visual Studio.
-On Windows, run Ninja presets from a Visual Studio developer shell. The sanitizer
-presets require Clang/GCC; the Accelerate presets require Apple platforms.
-
-```sh
-cmake --list-presets
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
-```
-
-Presets are `release`, `debug-sanitizers`, `core-only`, `accelerate`,
-`accelerate-debug` and `ooura`. Each has matching configure/build/test presets and a separate
-directory under `build/presets/`. Pass `-DCMAKE_PREFIX_PATH=...` during configure
-for local dependencies. Keep personal paths/toolchain overrides in the ignored
-`CMakeUserPresets.json`, inheriting one of the checked-in presets.
+`CMakePresets.json` names the common configurations, including `core-only`.
+Their prerequisites and commands are in [build from source](build.md#cmake-presets).
 
 ## What verifies the package
 
@@ -125,7 +110,7 @@ also exercises a real-file I/O round trip; a core-only package verifies that I/O
 cannot be requested. Unknown required and optional components, repeated lookup,
 and `add_subdirectory` consumption are covered. Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
-[`tests/consumer`](../tests/consumer).
+[`tests/consumer`](../../tests/consumer).
 
 The test builds small secondary projects, so build the primary targets before
 running CTest. Disable `CONVOLVER_PACKAGE_TESTS` for cross builds which cannot
@@ -140,4 +125,4 @@ The `release-vst3` preset enables the separate `PluginDistribution` installation
 component. It stages the SDK bundle, `convolver-preset`, `convolver-equalizer-apo`, presets,
 notices and user guide (with the presets and Equalizer APO guides);
 it does not replace the C++ library exports above. See the
-[pinned source recipe](plugins/build.md) and [preview qualification record](releases/developer-preview.md).
+[pinned source recipe](../plugins/build.md) and [preview qualification record](../releases/developer-preview.md).

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver history
 
-[Current documentation](README.md) · [Current implementation](project-structure.md)
+[Current documentation](README.md) · [Current implementation](develop/architecture.md)
 
 This page is historical context. New users can build and use the portable
 implementation without reading it.
@@ -93,7 +93,7 @@ ctest --test-dir build --output-on-failure --parallel 2
 These checks cover extracted production routines and preservation of the
 historical documentation. `python3 tests/regression/run_all.py` remains available.
 The default native build separately tests the actual portable implementation,
-FFT backends, libsndfile, CLI and external consumers. See [testing instructions and coverage limits](testing.md).
+FFT backends, libsndfile, CLI and external consumers. See [testing instructions and coverage limits](develop/testing.md).
 
 ## From historical to portable
 
@@ -101,7 +101,7 @@ The portable core and CLI, three FFT backends, offline FFTW planning, package
 exports, configuration inspection, Windows-style relative paths, the
 historical-only output features (dither, noise shaping, PCM8, valid bits,
 automatic attenuation), the host lifecycle and VST3 are implemented. The
-[implementation map](project-structure.md) describes the result;
+[implementation map](develop/architecture.md) describes the result;
 [TODO](../TODO.md) holds the remaining interoperability, DAW/release validation
 and measured optimization work, and the [modernization direction](modernization.md)
 explains its priorities.

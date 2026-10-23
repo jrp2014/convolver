@@ -29,30 +29,10 @@ Contents: [build](#build), [install for a host](#make-the-plug-in-discoverable),
 
 ## Build
 
-```sh
-sudo apt-get install lv2-dev liblilv-dev lilv-utils
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_LV2=ON
-cmake --build build --parallel
-ctest --test-dir build -L lv2 --output-on-failure
-```
-
-The plug-in needs `lv2` 1.18 or later (headers only). Its tests need `lilv`
-0.24 or later, which CMake therefore requires while `CONVOLVER_BUILD_TESTS`
-is on (the default for a top-level build); configure with
-`-DCONVOLVER_BUILD_TESTS=OFF` to build the plug-in without it. As for VST3, a plug-in build uses the built-in Ooura
-FFT by default rather than FFTW, whose planner a host process may share with
-other plug-ins ([backend selection](fft-backends.md)). The library exports
-only `lv2_descriptor`, so it cannot clash with the VST3 build or another
-version loaded in the same host.
-
-The bundle is written to `BUILD/lv2/convolver.lv2/`: the library
-`convolver.so`, `manifest.ttl` and `convolver.ttl`.
-[`plugins/lv2/generate_ttl.py`](../plugins/lv2/generate_ttl.py) writes both
-Turtle files from [`plugins/identities.json`](../plugins/identities.json), so
-the plug-in URIs and layouts have one source
-([identities](plugin-identities.md)). A build with `CONVOLVER_SANITIZERS=ON`
-can be loaded only by programs built with the same sanitizers, such as the
-tests; use a build without them for a host.
+Build the plug-ins with `-DCONVOLVER_BUILD_LV2=ON`; they need the `lv2`
+headers, and their tests need `lilv`. The commands are in
+[build from source](develop/build.md#lv2). The bundle is
+`BUILD/lv2/convolver.lv2/`.
 
 ## Make the plug-in discoverable
 
@@ -94,7 +74,7 @@ rejected replacement keeps the running filter, which the session still saves.
 A rejected first filter plays silence, never the unfiltered input, and saving
 the session then records the failure, so reopening it stays silent. These are
 the rules of the
-[shared adapter contract](plans/2026-10-21-plugin-formats.md#shared-adapter-contract).
+[shared adapter contract](develop/plugin-contract.md).
 
 ## Ports
 
@@ -137,7 +117,7 @@ frames, with the same output.
 
 `ctest -L lv2` runs:
 
-- `lv2.harness`: the [PLUG-2 comparisons](testing.md#plug-in-comparisons-plug-2)
+- `lv2.harness`: the [PLUG-2 comparisons](develop/testing.md#plug-in-comparisons-plug-2)
   with the plug-in hosted by lilv. All cases pass; the restore-before-setup
   cases are skipped (LV2 knows its rate and channels from instantiation) and
   the tail checks are skipped (no tail reporting).

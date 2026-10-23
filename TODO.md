@@ -24,7 +24,7 @@ justify it (FFT, PERF). The
 
 Each item has a stable ID. To take one on, open a draft pull request titled with
 its ID; that is the claim, and its description holds the handoff note. Record
-progress and the outcome here as the [workflow guide](docs/workflow.md#recording-progress-in-todo)
+progress and the outcome here as the [workflow guide](docs/develop/workflow.md#recording-progress-in-todo)
 describes. Confirm the current source first: separate work may already have
 implemented part of it. Compatibility takes priority over
 speed. Do not change the historical archive to implement a portable feature.
@@ -60,7 +60,7 @@ boundary and C++20 in the core.
 | 1. Done 22 October | **PLUG-6:** pin format dependencies | AudioUnitSDK 1.4.0 and `lv2` 1.18.10 pinned by commit and checksum in the release policy; `lilv` and `lv2lint` pinned in the LV2 workflow (extended by LV2-1), the SDK compiled and `auval` run in the Audio Unit workflow (extended by AU-1) ([pins](docs/plugins/build.md#pinned-format-dependencies)). |
 | 2. Done 21 October | **REL-1:** reconcile `codex/plugin-distribution` | Merged into `main`: pinned sources, VST3 staging, unsigned installers, artifact checks and the candidate workflow. The signing scripts stayed on the branch. PLUG-5 extends this pipeline; do not start a second one. |
 | 3. Now, shared | **PLUG-7:** lifecycle sequences; **PLUG-8:** failure reasons | PLUG-7 checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. PLUG-8 (done 23 October, PR #46) landed before LV2-2 settles its error paths, so no adapter discards a reason. |
-| 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
+| 3. In parallel | **VST3** (VST3-1, VST3-7, HOST-1), **LV2-1 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); **PLUG-3** (preset tool, done 22 October, PR #32) writes the presets LV2-2 and AU-2 must load. The AU component is GPL-3.0-or-later (decided 21 October 2026). |
 | 4. Next milestone | jrp's three conditions: the reset fix (VST3-7 follow-up, done 23 October, PR #40), **REL-2** journeys demonstrated, **REL-3** an independent user with an exact **PLUG-5** preview package. Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 5. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 6. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. With PLUG-8 done it mostly decides how to show reasons already kept. |
@@ -84,18 +84,36 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   `examples.first_use` runs the commands marked in the README and the examples
   README exactly as written and compares with the expected output;
   `examples.fixtures` checks the files against their generator. See
-  [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
+  [plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2).
 - [ ] **DOC-2 — Maintain documentation automatically.** Extend checks to build
   options and executable CLI examples in CI. Local Markdown links/anchors and
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
-  [check scope](docs/documentation.md#automated-checks).
+  [check scope](docs/develop/documentation.md#automated-checks).
 - [x] **DOC-3 — Resolve adapter-plan review findings.** Corrected the plans and
   maintained guide: separate input/output speaker layouts, specify MFT partial
   buffering and queried latency, require host FFT-option support, and explain
   the pipe's stream/channel scope and Equalizer APO coverage. Adapter code and
   planned tests remain future work. See the
   [21 October review and recommended order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
+- [ ] **DOC-4 — Organise the documentation by reader.** jrp chose on
+  23 October 2026 to sort maintained pages into reader folders: `docs/use/`
+  (people applying filters; shipped whole in preview packages), `docs/develop/`
+  (people building, embedding or changing Convolver, coding agents included)
+  and `docs/project/` (status, decisions, history, plans). Each page is one kind
+  (tutorial, how-to, reference or background) and follows the
+  [writing rules](docs/develop/documentation.md#writing-rules); developer pages
+  double as agent instructions, so skills only point at them. Four steps, one
+  pull request each: (1) `docs/develop/`, the single build page, the plug-in
+  adapter contract taken out of the plan, the writing rules and thin skills;
+  (2) `docs/use/` by splitting the CLI and format guides and merging
+  `docs/plugins/`, with packaging shipping `docs/use/`; (3) `docs/project/`,
+  merging `REVIEW.md`, release readiness and modernization into one status
+  page and starting a decisions log; (4) shorter `README.md`, `AGENTS.md` and
+  `TODO.md`, and checks that every maintained page sits in a reader folder.
+  Dated records stay where they are. The page-by-page mapping and the open
+  questions for steps 2 to 4 are in the
+  [plan](docs/plans/2026-10-23-documentation-by-reader.md).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
   `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
   and corresponding source, staging, unsigned installers, artifact verification,
@@ -127,11 +145,10 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
-  machine, using only the documentation. Proposal for jrp: the tester uses the
-  chosen candidate run's files before they are uploaded, so the pre-release
-  can describe what was demonstrated; the alternative is to publish first,
-  labelled unverified, and update the release notes (never the assets)
-  afterwards. Record who (a name or "independent
+  machine, using only the documentation. The tester uses the chosen
+  candidate run's files before they are uploaded, so the pre-release can
+  describe what was demonstrated (owner's decision, 23 October 2026); the
+  tester is still to be chosen. Record who (a name or "independent
   tester"), the package hash, OS, host and version, and for each step whether
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
@@ -183,7 +200,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   `kResultFalse`, and a mismatch found at activation activates and plays
   silence with nothing reported. Because PLUG-8 keeps the reasons, this review
   decides presentation rather than recovering lost information. The
-  [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#loading-and-failure)
+  [shared adapter contract](docs/develop/plugin-contract.md#loading-and-failure)
   asks for the message in the host's log and a "load failed" status, but only
   LV2 has a defined route (`log:log` and the status port). VST3 and AU have no
   host log interface and no agreed place yet; an editor is VST3-3/HOST-2. Make
@@ -216,7 +233,7 @@ Shared groundwork, done once so the three streams stay independent:
   warning. `vst3.fft_symbols` checks that the plug-in exports no FFTW symbols and,
   unless FFTW was chosen, imports none. The release policy uses the same
   backends and ships FFTW's notice only when FFTW is linked. See
-  [plug-in builds](docs/fft-backends.md#plug-in-builds).
+  [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** Done 22 October 2026 (PR #28).
   `tests/plugins/harness.hpp` checks every adapter against the double-precision
   oracle (1e-5) and the CLI render of the DOC-1 fixtures (identical after the
@@ -225,7 +242,7 @@ Shared groundwork, done once so the three streams stay independent:
   `vst3.harness` drives the VST3 adapter: 53 cases pass (worst error 1.8e-7)
   and 13 known deviations are left to VST3-7 (since removed: all 66 pass). LV2-1 and AU-1 each add a driver;
   format-specific status and error reporting stay in their own tests. See
-  [plug-in comparisons](docs/testing.md#plug-in-comparisons-plug-2).
+  [plug-in comparisons](docs/develop/testing.md#plug-in-comparisons-plug-2).
 - [x] **PLUG-3 — One preset tool.** Done 22 October 2026 (PR #32).
   `convolver-preset` writes `.vstpreset`, `.aupreset` and LV2 preset bundles
   from one encoded host state, several per run, and converts an existing
@@ -255,7 +272,7 @@ Shared groundwork, done once so the three streams stay independent:
   identifier, SDK speaker bits), and `vst3.adapter`'s `version1_presets`
   (version-1 presets with any output mask load on every six-channel arrangement
   and route by bus index). Modified builds are asked to change the product
-  identities listed in the [identities guide](docs/plugin-identities.md), which
+  identities listed in the [identities guide](docs/develop/plugin-identities.md), which
   owns the layout rules.
   Recording an input layout still needs a new state version, 3 (an owner's
   decision; version 2 is VST3-7's failed-load marker).
@@ -323,7 +340,7 @@ Shared groundwork, done once so the three streams stay independent:
   through each adapter (`native.host`, `vst3.adapter`, `lv2.adapter`,
   `au.adapter`). State from a newer Convolver is now told apart from damaged
   state. The speaker notice stays separate, for the reason given in the
-  [plan](docs/plans/2026-10-21-plugin-formats.md#failure-reasons). LV2-2 is
+  [contract](docs/develop/plugin-contract.md#failure-reasons). LV2-2 is
   to record `filter_file` failures from its file and worker paths, numbering
   worker requests with `HostFilter::next_request()`. Original item: today `HostFilter` keeps
   the newest load or preparation error as one string. In VST3, `setState`
@@ -341,11 +358,11 @@ Shared groundwork, done once so the three streams stay independent:
   then decides only where it appears. Notices that are not failures (such
   as the speaker-layout notice VST3-1 proposes) use the same record, or the
   item says why not. The
-  [shared adapter contract](docs/plans/2026-10-21-plugin-formats.md#failure-reasons)
+  [shared adapter contract](docs/develop/plugin-contract.md#failure-reasons)
   states the rule.
 
 Shared adapter contract, for every format (detail in the
-[plan](docs/plans/2026-10-21-plugin-formats.md#shared-adapter-contract)):
+[contract](docs/develop/plugin-contract.md)):
 a failed replacement keeps the running filter, with an explicit error; initial
 restoration installs the filter directly, without a crossfade; an empty
 instance and a failed initial load have one stated, tested behaviour (owner's
@@ -556,7 +573,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   order channels by bit. Owner's decision, 23 October 2026: warn only, with no
   enforced layouts (no host state version 3) and no buses above 8 channels;
   revisit either on request. The notice reaches users only with DIAG-1 or
-  VST3-3. [Layout rules](docs/plugin-identities.md#channel-layouts).
+  VST3-3. [Layout rules](docs/develop/plugin-identities.md#channel-layouts).
 - [ ] **VST3-2 — Switch filters from the host without an editor.** Expose a set of
   filters as a program list (`IUnitInfo`, `IProgramListData`, a `kIsProgramChange`
   parameter), for example the entries of a configuration list, possibly chosen
@@ -642,7 +659,7 @@ so the preset file path is not needed).
   at the host block sizes users meet. Include the costly moments: a live
   replacement, while two engines run together, and a reset, whose work grows
   with stored history. Record the results as dated measurements in the
-  [FFT guide](docs/fft-backends.md) and turn them into stated supported
+  [FFT guide](docs/develop/fft-backends.md) and turn them into stated supported
   workloads (for example "8 channels of 65536 taps at 96 kHz uses under N% of
   one core and M MB") in the user guides. Only these results decide whether
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
@@ -661,23 +678,23 @@ with compatibility tests; linked IDs point to open work above.
 | One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate layouts/editor under HOST-1/HOST-2 and VST3-1 to VST3-3. | [VST3](docs/vst3.md#loading-filters) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/vst3.md#loading-filters) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/concepts.md#files-and-continuous-streams) |
-| One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/fft-backends.md#selection-and-contract) |
+| One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/portable-core.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/portable-core.md#engine-api) |
-| Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with storage. | [Lifecycle](docs/vst3.md#processing-and-lifecycle) |
-| Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/project-structure.md#invariants-to-preserve) |
-| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/portable-core.md#resource-limits), [tests](docs/testing.md) |
+| Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with storage. | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
+| Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
+| Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/portable-core.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/configuration-compatibility.md#compatibility-matrix) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/configuration-compatibility.md#profiles) |
 | Output is ordinary WAV or little-endian raw float; codecs depend on libsndfile build | WAV size limits and broader container validation remain IO-1. RAW has no embedded rate/channel metadata. | [RAW I/O](docs/portable-core.md#raw-streams) |
 | Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/portable-core.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/portable-core.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/portable-core.md#integer-formats-dither-and-noise-shaping) |
-| C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/cmake-package.md) |
-| Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/versioning.md), [testing](docs/testing.md) |
-| Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/testing.md#validation-limits-and-release-work) |
+| C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
+| Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
+| Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/develop/testing.md#validation-limits-and-release-work) |
 | Equalizer APO 1.4.2 (x86/x64) convolution drops up to three bins just below half the sample rate when a block is not a multiple of four frames | Upstream behaviour, inaudible (about 22 kHz at 44.1 kHz); the export does not work around it. The runtime test uses 480-frame blocks. | [Equalizer APO guide](docs/equalizer-apo.md#how-it-is-tested) |
-| Historical Windows applications are not built or host-tested by portable CI | Old PCM32, shaping, CMD tail and host-negotiation gaps remain historical; fix only proven defects, without implying modern host support. | [Historical coverage](docs/testing.md#historical-coverage) |
+| Historical Windows applications are not built or host-tested by portable CI | Old PCM32, shaping, CMD tail and host-negotiation gaps remain historical; fix only proven defects, without implying modern host support. | [Historical coverage](docs/develop/testing.md#historical-coverage) |
 
 ## Documentation maintenance
 

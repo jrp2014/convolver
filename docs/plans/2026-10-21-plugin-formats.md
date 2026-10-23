@@ -7,9 +7,9 @@ It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
 [plug-in distribution plan](2026-10-18-plugin-distribution.md).
 **Current state:** PLUG-1 (the plug-in FFT backend), PLUG-2 (the
-[shared comparison harness](../testing.md#plug-in-comparisons-plug-2), with
+[shared comparison harness](../develop/testing.md#plug-in-comparisons-plug-2), with
 DOC-1's first-use fixtures) and PLUG-4 (the
-[identity and layout registry](../plugin-identities.md)) are implemented. Everything
+[identity and layout registry](../develop/plugin-identities.md)) are implemented. Everything
 else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
 listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
 and AU-1 to AU-5 in [TODO](../../TODO.md#plug-ins-vst3-lv2-and-au).
@@ -181,7 +181,7 @@ behaviour identical:
 | PLUG-1 | A safe FFT backend for every plug-in build (see [FFT backend](#lv2-adapter-design) below). **Done 21 October 2026.** | Affects the existing VST3 build already |
 | PLUG-2 | One adapter test harness, specified under [shared test harness](#shared-test-harness-plug-2): the independent convolution oracle, CLI equivalence, fixed tolerances and lifecycle cases | Each format's tests then only drive its own host API |
 | PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
-| PLUG-4 | One list of supported channel layouts, with [channel meaning](#channel-layouts-and-old-presets) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
+| PLUG-4 | One list of supported channel layouts, with [channel meaning](../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
 | PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../plugins/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
 
@@ -199,193 +199,19 @@ sounds the same in every format.
 
 ## Shared adapter contract
 
-These rules hold for VST3, LV2 and AU alike. Each adapter's tests check them
-through the PLUG-2 harness.
-
-### Loading and failure
-
-An adapter instance is in one of three situations, and each has one defined
-behaviour:
-
-| Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
-| --- | --- | --- | --- |
-| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence with no message, because VST3 has no status display without an editor; accepted until VST3-3 (owner's decision, 22 October 2026) |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
-
-The control side of these rules is shared code in the host layer, so every
-adapter gets the same decisions and messages: `HostFilter` (which filter a load
-replaces, which is saved and what plays) and `unfiltered_configuration` in
-[`host.hpp`](../../include/convolver/host.hpp). `HostProcessor` installs a
-filter directly when nothing has been processed since construction or reset.
-
-**Saving after a failed initial load** saves the failure: the host state
-records "load failed" (flag 4, state version 2; owner's decision, 22 October
-2026) and no filter, so reopening the project plays silence again instead of
-an empty instance's identity. Only this state is written as version 2.
-Restoring it is a successful load of what was saved, not a rejected
-replacement, so it replaces a working filter with silence.
-
-A replacement is accepted only after it has been fully validated and prepared,
-so rejection never disturbs the running filter. The rejected request is not
-retried automatically.
-
-**State that arrives before the host is configured.** Hosts can restore state
-before they set the sample rate and channel layout (VST3 `setState` before
-`setupProcessing`/`setBusArrangements`; AU `RestoreState` before
-`Initialize`). Two kinds of check are therefore kept apart:
-
-- **Checks on the state itself** run immediately: decoding, the version, the
-  resource limits and the 1–8 channel bound. Malformed state is rejected at
-  once, and the previously accepted state is unchanged.
-- **Checks against the host's configuration** (sample rate, channel counts,
-  layout) run as soon as that configuration is known. If it is already known
-  when the state arrives, a mismatch is rejected at once, as a failed
-  replacement (or a failed initial load if nothing was accepted before).
-- **When the configuration is not known yet,** well-formed state replaces the
-  previously accepted state straight away: the host is restoring what it saved.
-  The configuration check then happens at activation. If it fails there, that is
-  a failed initial load (silence and an error), but the restored state is kept
-  as the saved state, so opening a project at the wrong sample rate and then
-  correcting the rate brings the filter back, and saving the project does not
-  lose it.
-- LV2 knows the sample rate at instantiation and its ports are fixed, so its
-  configuration is always known and both kinds of check run in `restore()`.
-- VST3 counts its configuration as known once the plug-in has been activated
-  with it, and while the rate and buses stay the same. `setupProcessing` alone
-  is not binding: JUCE-based hosts, pluginval among them, call it with
-  placeholder values (44.1 kHz) before restoring state made for another rate,
-  which a check at that point would wrongly reject (found by
-  `vst3.pluginval.acceptance` in VST3-7; owner's decision, 22 October 2026).
-
-### Failure reasons
-
-Added 22 October 2026 from jrp's
-[release-readiness guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md);
-PLUG-8 implements it. Silence can be correct processing and still confuse the
-user, so every failure in the table above keeps a structured reason, even while
-the place it is shown is undecided (DIAG-1):
-
-- **What failed:** a missing or unreadable filter file, unreadable or
-  malformed state, a newer state version, the sample rate, the channel counts
-  or layout, preparation, or activation (the same list as DIAG-1's table).
-- **The request it belongs to:** where the filter came from (preset, saved
-  state, file path), its rate and channel counts, and a request number, so a
-  later request's success or failure is never confused with it.
-- **The outcome:** a working filter kept, or silence.
-- **The explanatory message,** written as the CLI writes its diagnostics: what
-  failed, why, and what to change.
-
-The reason lives on the control side (in `HostFilter` or beside it) and never
-on the audio thread: the audio callback only plays what it was given. Every
-adapter records a reason on every failure path, including activation and
-worker completions, and clears it when a later request succeeds. Tests read it
-through the adapter even where the format cannot display it yet. Notices that
-are not failures use the same record unless PLUG-8 records why not.
-
-Implemented 23 October 2026 by PLUG-8 (PR #46): `HostFailure` in
-[`host.hpp`](../../include/convolver/host.hpp), returned by
-`HostFilter::failure()`. A rejected request's reason stays until a later
-request succeeds, across activations, so the "load failed" status does not
-disappear when the host restarts the plug-in. A mismatch found at activation
-belongs to the request that supplied the filter, comes first while it lasts,
-and clears at the next activation that suits the filter. Restoring a saved
-failed load is a successful request whose instance plays silence, so it keeps
-a reason of its own kind (the original reason is not saved; the state format
-is unchanged). The speaker-layout notice stays a separate string
-(`HostFilter::notice()`): it never changes what plays, and it describes the
-host as it is now rather than a request, so it is recomputed at every check
-instead of being kept until a later request succeeds. Adapters log
-`HostFilter::rejection()`, the newest request's own reason, when a load is
-rejected, so a failure found at activation never hides why the new preset was
-refused. A host format that the adapter refuses before any filter is
-involved (an Audio Unit asked for different input and output sample rates)
-is returned to the host as an error and logged, but not recorded: the unit
-does not start, and no filter request failed.
-
-### Initial restoration and live replacement
-
-- **Initial restoration** installs the filter directly: when no audio has been
-  processed since activation, the adapter constructs the `HostProcessor` with
-  the restored configuration. There is no warm-up or crossfade, so output
-  matches the filter from the first block (after the reported latency).
-- **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for 256 frames and crossfades for 256 frames, as the
-  [VST3 lifecycle](../vst3.md#processing-and-lifecycle) describes.
-- Pending replacements coalesce to the newest, as `HostProcessor` already does.
-
-### Bypass
-
-Bypass ramps over 64 samples to the dry signal and back, with the dry path
-delayed by the reported latency so wet and dry line up. Wet processing carries
-on during bypass, so switching back does not lose history.
-
-- **Equal input and output counts:** the dry signal is input *c* on output *c*.
-- **Unequal counts:** every output ramps to silence (owner's decision,
-  22 October 2026). No output has an unfiltered counterpart: bypassing a 2→6
-  crossover must not send full-range audio to a tweeter, and a 1→2 filter that
-  forks a mono input to two outputs cannot tell which output the input belongs
-  on. This matches the contract for an empty instance with unequal counts.
-
-`HostProcessor` implements this, so every adapter that drives it through
-`set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
-must not use its format's own pass-through bypass (see the AU design).
-
-Whether saved state records bypass follows each format's convention (owner's
-decision, 23 October 2026). VST3 saves its bypass parameter with the
-component state, as the SDK's examples do. In LV2 (the `enabled` port) and
-Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
-bypass itself, so those adapters do not record it and ignore the flag in a
-state from another format.
-
-### Channel layouts and old presets
-
-PLUG-4's list currently names channel *counts*. A count does not say what the
-channels mean: six crossover outputs are not 5.1 speakers. So each side of a
-filter (input and output, independently) has one of two meanings:
-
-- **Discrete:** channels are numbered 1 to N in the host's bus order, and their
-  meaning is up to the filter's author (crossover bands, a microphone array).
-  Any host arrangement with N channels is accepted.
-- **Named speaker layout:** channels are speaker positions in WAV/SMPTE order
-  (for example L R C LFE Ls Rs), from the IR's WAV channel mask or the CLI's
-  `--speaker-map`. The adapter checks the host's arrangement against it, or maps
-  it where the format defines a mapping.
-
-The current state format (version 1) stores the channel counts and an *output*
-channel mask only; it records no input layout. Compatibility rules:
-
-- Version-1 presets and any filter with no recorded layout are **unspecified**,
-  treated as discrete on both sides: accepted on any arrangement with matching
-  counts, exactly as today. A preset that works now must keep working; stricter
-  checks must never reject it.
-- A version-1 output mask is advisory: an adapter may warn when it disagrees
-  with the host's arrangement, but does not reject the preset.
-- Recording an input layout, or making a layout binding, needs a new state
-  version (3; version 2 only adds the failed-load marker below). Decoders keep
-  reading versions 1 and 2; encoders write version 1 whenever nothing new is
-  recorded, so older builds still read those presets.
-- The layout list names entries as counts plus meaning, for example "2→6
-  discrete", not "5.1".
-
-Per format:
-
-- **VST3:** discrete accepts any `SpeakerArrangement` with N channels; a named
-  layout must match the arrangement (VST3-1). Version-1 output masks are
-  compared and give a notice only (implemented 22 October 2026).
-- **AU:** `kAudioUnitProperty_SupportedNumChannels` gives counts only, so it
-  cannot carry layout checks on its own. Named layouts need
-  `kAudioUnitProperty_AudioChannelLayout` and
-  `kAudioUnitProperty_SupportedChannelLayoutTags`; discrete uses
-  `kAudioChannelLayoutTag_DiscreteInOrder`.
-- **LV2:** ports are fixed per plug-in URI. Named layouts use port groups and
-  `lv2:designation` (for example `pg:FivePointOneGroup`); discrete ports have no
-  designation.
+These rules hold for VST3, LV2 and AU alike. Since 23 October 2026 (DOC-4) they
+are maintained in the [plug-in adapter contract](../develop/plugin-contract.md),
+which holds the text this section used to: [loading and failure](../develop/plugin-contract.md#loading-and-failure),
+[failure reasons](../develop/plugin-contract.md#failure-reasons),
+[initial restoration and live replacement](../develop/plugin-contract.md#initial-restoration-and-live-replacement)
+and [bypass](../develop/plugin-contract.md#bypass). Channel layouts and old
+presets are in [plug-in identities](../develop/plugin-identities.md#channel-layouts).
+Change the rules there, not here.
 
 ## Shared test harness (PLUG-2)
 
 Implemented 22 October 2026 (PR #28) in `tests/plugins/`; the
-[testing guide](../testing.md#plug-in-comparisons-plug-2) describes the cases
+[testing guide](../develop/testing.md#plug-in-comparisons-plug-2) describes the cases
 as built. The fixtures are the DOC-1 first-use examples, written by
 `tests/plugins/fixtures.py`, whose helpers the release example generator and
 the pluginval acceptance test now share.
@@ -431,7 +257,7 @@ Cases, run for every adapter:
   and a long → short replacement followed by reactivation (tail reporting),
   live replacement (fresh history, 256-frame warm-up, 256-frame crossfade),
   failed initial load and failed replacement (see the
-  [contract](#loading-and-failure)), and an empty instance;
+  [contract](../develop/plugin-contract.md#loading-and-failure)), and an empty instance;
 - bypass (64-sample ramp, dry path delayed by the reported latency), reset,
   silence flags, and nonfinite input;
 - variable block sizes (including 1, 61, 300 and the host maximum) and
@@ -464,8 +290,8 @@ separate:
 
 The next milestone (TODO, "Execution priorities") adds an independent user
 following the REL-2 journeys from the first preview's exact files (REL-3).
-Whether that happens before upload or after publication is a proposal for jrp
-(see REL-3).
+It happens with the chosen candidate run's files before they are uploaded
+(owner's decision, 23 October 2026; see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:
@@ -491,9 +317,9 @@ parameter URI live under the same base.
 separate plug-in URI generated from one template (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4,
 2→6, 2→8, 6→6 and 8→8, all discrete, within the VST3 adapter's 1–8 limit.
 Named layouts (port groups and designations) are added per the
-[layout rules](#channel-layouts-and-old-presets). A configuration whose counts
+[layout rules](../develop/plugin-identities.md#channel-layouts). A configuration whose counts
 differ from the instance's is rejected with an explanation (nothing is
-remapped), and the [failure rules](#loading-and-failure) decide what plays:
+remapped), and the [failure rules](../develop/plugin-contract.md#loading-and-failure) decide what plays:
 a failed replacement keeps the running filter, a failed initial load is silent.
 
 **Ports.**
@@ -549,7 +375,7 @@ contract:
 - **Initial restoration** before the first audio block (session load, PipeWire
   `config`) prepares the filter in `restore()` and constructs the
   `HostProcessor` with it directly, with no crossfade, per the
-  [contract](#initial-restoration-and-live-replacement). If audio has already
+  [contract](../develop/plugin-contract.md#initial-restoration-and-live-replacement). If audio has already
   run, `restore()` uses `replace` instead.
 - **Live loads.** `run()` and `work()` share no request buffer, because
   `run()` never takes the lock. A `patch:Set` arriving in `run()` builds a
@@ -680,7 +506,7 @@ beyond eight channels.
 
 PipeWire's `filter-chain` passes `config` entries to the plug-in's state on
 load and reads its latency port. A stereo room correction would look like this
-(URIs from the [PLUG-4 registry](../plugin-identities.md)):
+(URIs from the [PLUG-4 registry](../develop/plugin-identities.md)):
 
 ```text
 context.modules = [
@@ -727,16 +553,16 @@ AUv2 effects.
   by the type, subtype and manufacturer together; no other use of `CONV` was
   found in public sources, which cannot prove it is unused. The subtype repeats
   the historical VST2 ID `'Conv'`. Forks should change the manufacturer code
-  (see [plug-in identities](../plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
+  (see [plug-in identities](../develop/plugin-identities.md#if-you-distribute-a-modified-build)). Record them with
   the other permanent IDs in PLUG-4 and never change them after release.
 - **Channels:** advertise the PLUG-4 channel counts through
   `kAudioUnitProperty_SupportedNumChannels`, including unequal pairs such as
   2→6. Those are counts only; named layouts go through
   `kAudioUnitProperty_AudioChannelLayout` and
   `kAudioUnitProperty_SupportedChannelLayoutTags` as the
-  [layout rules](#channel-layouts-and-old-presets) describe. A filter whose
+  [layout rules](../develop/plugin-identities.md#channel-layouts) describe. A filter whose
   counts differ is rejected, as VST3 does, under the
-  [failure rules](#loading-and-failure).
+  [failure rules](../develop/plugin-contract.md#loading-and-failure).
 - **Timing:** AU reports both values in **seconds**, as `Float64`
   ([`kAudioUnitProperty_Latency`](https://developer.apple.com/documentation/audiotoolbox/kaudiounitproperty_latency)):
   latency is `latency_frames() / sample_rate` (256 frames at 48 kHz is about
@@ -856,7 +682,7 @@ the LV2 plug-in serve FFmpeg too.
   GPL-3.0-or-later, as GPL-2.0-or-later permits, with the Apache-2.0 notices;
   everything else stays GPL-2.0-or-later.
 - What an empty instance with unequal channel counts and a failed initial
-  load play ([loading and failure](#loading-and-failure)). **Decided 21
+  load play ([loading and failure](../develop/plugin-contract.md#loading-and-failure)). **Decided 21
   October 2026:** silence for both, with an error indication, so an unloaded
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
@@ -865,11 +691,11 @@ the LV2 plug-in serve FFmpeg too.
   (VST3-1). **Decided 23 October 2026 (owner):** neither for now. A filter's
   output mask is compared with the host's arrangement and gives a notice only;
   no host state version 3; buses stay at 1 to 8 channels. Revisit on request.
-- What bypass plays with unequal channel counts ([bypass](#bypass)).
+- What bypass plays with unequal channel counts ([bypass](../develop/plugin-contract.md#bypass)).
   **Decided 22 October 2026 (owner):** silence on every output, including a
   1→2 filter that forks one input; equal counts keep input *c* to output *c*.
   `HostProcessor` implements it, so VST3 already follows it.
-- Whether saved state records bypass ([bypass](#bypass)). **Decided 23
+- Whether saved state records bypass ([bypass](../develop/plugin-contract.md#bypass)). **Decided 23
   October 2026 (owner):** follow each format's convention. VST3 saves its
   bypass parameter; LV2 and AU leave bypass to the host and ignore the flag in
   restored state.

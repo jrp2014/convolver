@@ -203,7 +203,7 @@ inverted routes, delays and shared IRs, the choice between list entries
 from a `config.txt` between other commands, silence for other rates and devices
 over 32 channels, file names that try to add commands, and folder names too
 long for Equalizer APO's paths. See
-[testing](testing.md#native-production-tests).
+[testing](develop/testing.md#native-production-tests).
 
 On Windows CI the same cases also run in Equalizer APO itself, as the
 `export.equalizer_apo.runtime` test. Equalizer APO's installer contains

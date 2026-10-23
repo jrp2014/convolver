@@ -7,7 +7,7 @@ name: Audio Unit
 
 'on':
   # Pull requests run on their own event; a branch push without a pull
-  # request can be tested with "Run workflow" (docs/testing.md#ci-triggers).
+  # request can be tested with "Run workflow" (docs/develop/testing.md#ci-triggers).
   push:
     branches: [main]
   pull_request:
