@@ -1022,10 +1022,12 @@ void worker_loads(host::World& world, const fs::path& work) {
     // work() and is the newer request either way.
     for (int i = 0; i < 4; ++i) {
         auto p = with_original();
-        p->set_filter(a);
-        p->run_empty();
+        // Read before the load starts: this program has its own copy of the
+        // reader, and libsndfile's globals are not guarded across copies.
         HostState state;
         state.configuration = load_configuration(files.b);
+        p->set_filter(a);
+        p->run_empty();
         check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
               "restore during a load: restored");
         settle(*p);
