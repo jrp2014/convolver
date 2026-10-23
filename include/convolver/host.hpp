@@ -198,8 +198,8 @@ class HostFilter {
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, prepare, publish, collect, destruction;
-// serialize these calls. Audio: process, set_bypass, reset; one audio thread
-// per instance. Control and audio may overlap only for replace, prepare,
+// serialize these calls. Audio: process, set_bypass, reset, mute; one audio
+// thread per instance. Control and audio may overlap only for replace, prepare,
 // publish and collect. Teardown requires stopped audio.
 class HostProcessor {
   public:
@@ -238,6 +238,13 @@ class HostProcessor {
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
     void set_bypass(bool) noexcept;
+    // Audio thread: the current filter ramps to silence over 64 frames and
+    // stays silent until the next published filter takes over, which then
+    // fades in from silence as any replacement does. Bypass still passes the
+    // dry signal. For a failure the audio thread finds itself, before the
+    // control side can publish silence: LV2's run() refusing an empty
+    // instance's first load (no worker, or a full worker queue).
+    void mute() noexcept;
     std::size_t latency_frames() const noexcept;
     std::size_t tail_frames() const noexcept;
     // Missing input channels mean silence; null output channels are discarded.
