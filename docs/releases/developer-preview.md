@@ -101,7 +101,9 @@ separate. Publication is a manual step owned by jrp:
    other workflows. Wait for the whole run to pass.
 2. Download that run's `complete-preview-candidate` artifact (made by its
    `collect` job) and check every file against the `SHA256SUMS` file it
-   contains. Publish exactly those files, unchanged.
+   contains. Publish exactly those files, unchanged. For the first preview,
+   the independent walkthrough (REL-3 in the TODO list) uses these same files
+   before they are uploaded (owner's decision, 23 October 2026).
 3. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
    developer preview)". Put the SHA-256 sums, the run link and download and
    installation instructions (pointing to the install guide's unsigned-preview

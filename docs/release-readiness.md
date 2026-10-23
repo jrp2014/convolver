@@ -89,7 +89,7 @@ and AU join later previews once their own journeys are demonstrated
 | Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Done, merged 23 October 2026 |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI and the journey presets remain |
-| An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; needs a tester chosen by jrp |
+| An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload (owner's decision, 23 October 2026); the tester is still to be chosen by jrp |
 | Lifecycle sequences checked against a reference model | Proposed here, so the next defect of this kind is caught | PLUG-7 | Not started |
 | Smoke test of VST3 in at least one named host | Proposed here, already the preview gate in the plug-in plan | HOST-1 | Not run |
 
