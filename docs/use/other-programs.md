@@ -50,6 +50,7 @@ resolved or rendered. No profile rewrites paths.
 | `outside-tree` | A relative path (with `..`) leaving the folder of the inspected file. Copying that folder alone will not carry the IR. | Move the IR into the folder, or ship the parent folder. |
 | `case-mismatch` | The spelling differs in letter case from the name stored on disk. It loads on case-insensitive filesystems (usual on macOS and Windows) and fails on case-sensitive ones (usual on Linux). | Match the stored spelling. |
 | `windows-invalid-name` | A name containing `< > " \| ? *`, which Windows cannot store. | Rename the file. |
+| `raw-filter` | A `.pcm` or `.raw` filter. Convolver reads it as mono float32 at the configuration's rate ([filter files](configuration.md#filter-files)); other programs expect sound files. | Convert it to WAV for other readers. |
 
 Separator style is not a warning: `/`, `\` and mixed separators in relative
 references load on every platform. Windows drive-letter, UNC and `\`-rooted

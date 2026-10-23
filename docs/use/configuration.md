@@ -98,6 +98,21 @@ The speaker mask is metadata, not a routing instruction. `0` means unspecified;
 those labels only with `--speaker-map config`, and never reorders samples to
 match them. See [speaker labels](command-line.md#speaker-labels).
 
+## Filter files
+
+An IR file can be any sound file libsndfile reads, such as WAV, RF64, W64,
+AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's.
+
+A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter: a
+headerless file of mono little-endian 32-bit float samples, as
+[DRC](https://drc-fir.sourceforge.net/) and BruteFIR setups usually write them.
+Raw filters have no header to state a sample rate, so they take the
+configuration's rate; their IR channel must be `0`. A raw file whose size is
+not a whole number of samples is reported as damaged. Convert raw files in
+other sample types to WAV first. Other programs that read `.cfg` files expect
+sound files, so `--inspect --profile portable-paths` warns about raw filters
+(`raw-filter`).
+
 ## Route numbers combine a channel and a gain
 
 Each input/output route line contains one or more space-separated numbers.

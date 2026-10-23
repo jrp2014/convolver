@@ -4,6 +4,7 @@
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -350,6 +351,13 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
     return cfg;
 }
 
+bool raw_filter_name(const std::filesystem::path& path) {
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return extension == ".pcm" || extension == ".raw";
+}
+
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
                                        std::size_t& budget) {
     std::vector<DecodedIr> result;
@@ -358,10 +366,18 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         const auto& path = parsed.paths[i];
         const auto resolved = resolve_reference(doc.source, path.ir);
         std::optional<AudioReader> ir;
+        const bool raw = raw_filter_name(resolved);
         try {
-            ir.emplace(resolved);
+            if (raw)
+                ir.emplace(resolved, RawSpec{cfg.sample_rate, 1});
+            else
+                ir.emplace(resolved);
         } catch (const std::exception& e) {
             std::error_code ec; // On failure absolute() returns an empty path.
+            if (raw && std::filesystem::is_regular_file(resolved, ec))
+                throw ConfigurationError("damaged-asset", path.ir.location,
+                                         "raw filter '" + path.ir.spelling + "': " + e.what() +
+                                             " (raw filters are mono little-endian float32)");
             // Includes a bare "-": standard input cannot be a filter.
             throw ConfigurationError(
                 "missing-asset", path.ir.location,

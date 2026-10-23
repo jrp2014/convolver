@@ -266,6 +266,38 @@ void run(const fs::path& dir) {
         require(report.valid && report.configurations[0].paths[0].reference == odd_text,
                 "Unicode reference spelling");
     }
+    // A .pcm or .raw filter is mono little-endian float32 at the configuration's
+    // rate: decoded, located when damaged, and flagged by portable-paths.
+    {
+        const auto raw_bytes = [&](const char* name, const std::vector<unsigned char>& b) {
+            std::ofstream f(dir / name, std::ios::binary);
+            f.write(reinterpret_cast<const char*>(b.data()),
+                    static_cast<std::streamsize>(b.size()));
+        };
+        raw_bytes("drc.pcm", {0, 0, 0, 0x3f, 0, 0, 0x80, 0x3e}); // 0.5, 0.25
+        raw_bytes("cut.RAW", {0, 0, 0x80});
+        text_file(dir / "raw.cfg", "44100 1 1 0\n0\n0\ndrc.pcm\n0\n0\n0\n");
+        text_file(dir / "cut.cfg", "44100 1 1 0\n0\n0\ncut.RAW\n0\n0\n0\n");
+        text_file(dir / "rawch.cfg", "44100 1 1 0\n0\n0\ndrc.pcm\n1\n0\n0\n");
+        const auto raw = inspect_configuration(dir / "raw.cfg");
+        const auto& f = raw.configurations.at(0).paths.at(0);
+        require(raw.valid && raw.diagnostics.empty() && f.ir_frames == 2 &&
+                    f.ir_sample_rate == 44100 && f.ir_file_channels == 1,
+                "a raw filter takes the configuration's rate");
+        const auto loaded = load_configuration(dir / "raw.cfg");
+        require(loaded.paths.at(0).impulse == std::vector<float>{.5f, .25f},
+                "raw filter coefficients");
+        const auto cut = inspect_configuration(dir / "cut.cfg");
+        require(!cut.valid && has_code(cut, "damaged-asset") &&
+                    cut.diagnostics[0].location.line == 4,
+                "a damaged raw filter is located");
+        require(!inspect_configuration(dir / "rawch.cfg").valid, "a raw filter has only channel 0");
+        InspectionOptions portable;
+        portable.profile = InspectionProfile::portable_paths;
+        const auto flagged = inspect_configuration(dir / "raw.cfg", portable);
+        require(flagged.valid && has_code(flagged, "raw-filter"),
+                "portable-paths warns that other readers expect sound files");
+    }
     // Profiles: portable-paths adds warnings only; it never changes validity of errors.
     {
         fs::create_directory(dir / "pack");
@@ -334,9 +366,10 @@ void run(const fs::path& dir) {
     auto after = listing(dir);
     for (const auto& p : before)
         after.erase(p);
-    for (const auto* name : {"absent.cfg", "two.txt", "bad.cfg", "unrelated.cfg", "list.txt",
-                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",
-                             "drive.txt", "outer.txt", "sub.txt", "dash.cfg"})
+    for (const auto* name :
+         {"absent.cfg", "two.txt", "bad.cfg", "unrelated.cfg", "list.txt", "cyclic.txt",
+          "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg", "drive.txt", "outer.txt", "sub.txt",
+          "dash.cfg", "drc.pcm", "cut.RAW", "raw.cfg", "cut.cfg", "rawch.cfg"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

@@ -350,6 +350,15 @@ class Inspector {
         for (const auto& ref : refs)
             for (auto& [code, message] : portability_problems(doc.source, ref.spelling))
                 add({code, DiagnosticSeverity::warning, message, position(ref.location), chain(c)});
+        if (doc.kind == ParsedDocument::Kind::configuration)
+            for (const auto& p : doc.configuration.paths)
+                if (detail::raw_filter_name(std::filesystem::path(
+                        std::u8string(p.ir.spelling.begin(), p.ir.spelling.end()))))
+                    add({"raw-filter", DiagnosticSeverity::warning,
+                         "'" + p.ir.spelling +
+                             "' is a raw filter; Convolver reads it as mono float32, but other "
+                             "programs that read .cfg files expect sound files such as WAV",
+                         position(p.ir.location), chain(c)});
     }
     std::vector<std::pair<std::string, std::string>>
     portability_problems(const std::filesystem::path& owner, std::string spelling) const {

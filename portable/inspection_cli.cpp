@@ -530,7 +530,7 @@ std::string report_json(InspectionReport& r, bool validate, bool warnings_as_err
 
 bool is_inspection(int argc, char** argv) {
     // Skip the values of render options, so a file named "--validate" stays a file.
-    constexpr std::array<std::pair<std::string_view, int>, 17> render_values{{
+    constexpr std::array<std::pair<std::string_view, int>, 18> render_values{{
         {"--filter", 1},
         {"--input", 1},
         {"--output", 1},
@@ -542,6 +542,7 @@ bool is_inspection(int argc, char** argv) {
         {"--output-format", 1},
         {"--speaker-map", 1},
         {"--raw-input", 2},
+        {"--raw-format", 1},
         {"--dither", 1},
         {"--dither-seed", 1},
         {"--noise-shaping", 1},

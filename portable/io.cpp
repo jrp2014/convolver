@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <climits>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <fstream>
 #include <limits>
@@ -57,11 +58,14 @@ constexpr std::array<int, 18> speaker_map{SF_CHANNEL_MAP_LEFT,
                                           SF_CHANNEL_MAP_TOP_REAR_CENTER,
                                           SF_CHANNEL_MAP_TOP_REAR_RIGHT};
 static_assert(known_speaker_bits == (1u << speaker_map.size()) - 1);
-void validate_speakers(std::uint32_t mask, std::size_t channels, OutputFormat format) {
+void validate_speakers(std::uint32_t mask, std::size_t channels, Container container) {
     if (!mask)
         return;
-    if (format == OutputFormat::raw_float)
+    if (container == Container::raw)
         throw std::invalid_argument("a speaker map needs WAV output; RAW has no header");
+    if (container != Container::wav)
+        throw std::invalid_argument("a speaker map needs WAV output; other containers do not "
+                                    "carry speaker labels yet");
     if (mask & ~known_speaker_bits)
         throw std::invalid_argument("speaker mask has unknown speaker bits (only 0x3ffff are "
                                     "defined): 0x" +
@@ -127,7 +131,7 @@ void write_extensible(const std::filesystem::path& path, unsigned bits, std::uin
     if (!file)
         throw std::runtime_error("cannot record valid bits in " + path.string());
 }
-void validate_raw_stdin(std::size_t channels) {
+void validate_raw_stdin(std::size_t frame_bytes) {
     // On a seekable descriptor libsndfile reports a whole-frame count, which
     // can conceal trailing bytes if a read ends exactly at that frame count.
 #ifdef _WIN32
@@ -142,7 +146,7 @@ void validate_raw_stdin(std::size_t channels) {
     const auto position = lseek(0, 0, SEEK_CUR);
 #endif
     if (position < 0 || status.st_size < position ||
-        static_cast<std::uint64_t>(status.st_size - position) % (4 * channels))
+        static_cast<std::uint64_t>(status.st_size - position) % frame_bytes)
         throw std::runtime_error("RAW input ends with an incomplete frame");
 }
 // libsndfile accepts truncated RIFF data by reducing the frame count. Check
@@ -206,10 +210,12 @@ SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
             throw std::invalid_argument(
                 mode == SFM_READ
                     ? "reading audio from standard input ('-') needs --raw-input RATE CHANNELS: "
-                      "a pipe carries headerless little-endian float32 samples, so the sample "
-                      "rate and channel count must be given on the command line"
-                    : "writing audio to standard output ('-') needs --output-format raw-float: "
-                      "a WAV header cannot be completed on a pipe");
+                      "a pipe carries headerless samples (little-endian float32 unless "
+                      "--raw-format says otherwise), so the sample rate and channel count "
+                      "must be given on the command line"
+                    : "writing audio to standard output ('-') needs a raw output format such "
+                      "as --output-format raw-float: a file header cannot be completed on a "
+                      "pipe");
         const int fd = mode == SFM_READ ? 0 : 1;
 #ifdef _WIN32
         if (_setmode(fd, _O_BINARY) == -1)
@@ -270,19 +276,58 @@ std::uint64_t splitmix64(std::uint64_t& state) noexcept {
     return z ^ (z >> 31);
 }
 } // namespace
-unsigned container_bits(OutputFormat format) noexcept {
+bool supported(OutputEncoding e) noexcept {
+    switch (e.container) {
+    case Container::flac:
+        return e.sample == SampleType::pcm8 || e.sample == SampleType::pcm16 ||
+               e.sample == SampleType::pcm24;
+    case Container::raw:
+        return e.sample != SampleType::pcm8;
+    default:
+        return true;
+    }
+}
+OutputEncoding output_encoding(OutputFormat format) noexcept {
     switch (format) {
     case OutputFormat::wav_pcm8:
-        return 8;
+        return {Container::wav, SampleType::pcm8};
     case OutputFormat::wav_pcm16:
-        return 16;
+        return {Container::wav, SampleType::pcm16};
     case OutputFormat::wav_pcm24:
-        return 24;
+        return {Container::wav, SampleType::pcm24};
     case OutputFormat::wav_pcm32:
+        return {Container::wav, SampleType::pcm32};
+    case OutputFormat::raw_float:
+        return {Container::raw, SampleType::float32};
+    default:
+        return {Container::wav, SampleType::float32};
+    }
+}
+unsigned container_bits(SampleType sample) noexcept {
+    switch (sample) {
+    case SampleType::pcm8:
+        return 8;
+    case SampleType::pcm16:
+        return 16;
+    case SampleType::pcm24:
+        return 24;
+    case SampleType::pcm32:
         return 32;
     default:
         return 0;
     }
+}
+unsigned container_bits(OutputFormat format) noexcept {
+    switch (format) {
+    case OutputFormat::wav_float:
+    case OutputFormat::wav_pcm16:
+    case OutputFormat::wav_pcm24:
+    case OutputFormat::wav_pcm32:
+    case OutputFormat::raw_float:
+    case OutputFormat::wav_pcm8:
+        return container_bits(output_encoding(format).sample);
+    }
+    return 0;
 }
 namespace {
 // Error-feedback coefficients of the historical noise shapers (dither.h),
@@ -407,25 +452,75 @@ void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t>
             out[offset + i] = static_cast<std::int16_t>(part[i]);
     }
 }
+namespace {
+std::size_t raw_sample_bytes(SampleType sample) {
+    switch (sample) {
+    case SampleType::pcm16:
+        return 2;
+    case SampleType::pcm24:
+        return 3;
+    case SampleType::pcm32:
+    case SampleType::float32:
+        return 4;
+    case SampleType::float64:
+        return 8;
+    default:
+        throw std::invalid_argument("RAW samples must be pcm16, pcm24, pcm32, float32 or float64");
+    }
+}
+// One RAW sample as float. Integers are scaled by 2^-(bits-1), as libsndfile does.
+float decode_raw(const std::byte* p, RawEncoding e) noexcept {
+    const auto width = e.sample == SampleType::float64 ? 8u
+                       : e.sample == SampleType::pcm16 ? 2u
+                       : e.sample == SampleType::pcm24 ? 3u
+                                                       : 4u;
+    std::uint64_t v = 0;
+    for (unsigned i = 0; i < width; ++i) {
+        const auto byte = std::to_integer<std::uint64_t>(p[e.big_endian ? i : width - 1 - i]);
+        v = (v << 8) | byte;
+    }
+    switch (e.sample) {
+    case SampleType::float32:
+        return std::bit_cast<float>(static_cast<std::uint32_t>(v));
+    case SampleType::float64:
+        return static_cast<float>(std::bit_cast<double>(v));
+    default: {
+        // Sign-extend from the sample width, then scale exactly.
+        const auto bits = 8 * width;
+        const auto shift = 64 - bits;
+        const auto value = static_cast<std::int64_t>(v << shift) >> shift;
+        return static_cast<float>(static_cast<double>(value) * std::ldexp(1.0, 1 - int(bits)));
+    }
+    }
+}
+} // namespace
 struct AudioReader::Impl {
     Handle handle;
     AudioInfo info{};
     std::optional<std::size_t> frames;
     bool raw = false, raw_stdin = false;
+    RawEncoding encoding;
+    std::size_t sample_bytes = 4;
+    std::vector<std::byte> bytes;
 };
-AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw)
+AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw,
+                         RawEncoding encoding)
     : impl_(std::make_unique<Impl>()) {
     SF_INFO sf{};
     if (raw) {
         impl_->raw = true;
         validate(*raw);
+        impl_->encoding = encoding;
+        impl_->sample_bytes = raw_sample_bytes(encoding.sample);
+        const auto frame_bytes = impl_->sample_bytes * raw->channels;
         sf.samplerate = raw->sample_rate;
         sf.channels = static_cast<int>(raw->channels);
+        // libsndfile only opens the stream; read() decodes the bytes itself.
         sf.format = SF_FORMAT_RAW | SF_FORMAT_FLOAT | SF_ENDIAN_LITTLE;
         if (path == "-")
-            validate_raw_stdin(raw->channels);
+            validate_raw_stdin(frame_bytes);
         if (path != "-" && std::filesystem::is_regular_file(path) &&
-            std::filesystem::file_size(path) % (4 * raw->channels))
+            std::filesystem::file_size(path) % frame_bytes)
             throw std::runtime_error("RAW input ends with an incomplete frame");
     } else
         validate_wave(path);
@@ -469,18 +564,21 @@ std::size_t AudioReader::read(std::span<float> data) {
     sf_count_t got;
     if (impl_->raw) {
         static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
-        if (data.size() > static_cast<std::size_t>(std::numeric_limits<sf_count_t>::max() / 4))
+        const auto width = impl_->sample_bytes;
+        if (data.size() > static_cast<std::size_t>(std::numeric_limits<sf_count_t>::max()) / 8)
             throw std::length_error("RAW buffer too large");
+        const auto wanted = static_cast<sf_count_t>(data.size() * width);
+        impl_->bytes.resize(data.size() * width);
+        auto* buffer = impl_->bytes.data();
         // Reading bytes preserves incomplete frames on nonseekable inputs;
         // sf_readf_float silently drops their trailing samples/bytes.
         sf_count_t bytes = 0;
 #ifdef _WIN32
         if (impl_->raw_stdin) {
-            const auto wanted = static_cast<sf_count_t>(data.size() * 4);
             while (bytes < wanted) {
                 const auto chunk =
                     static_cast<unsigned>(std::min<sf_count_t>(wanted - bytes, INT_MAX));
-                const auto n = _read(0, reinterpret_cast<char*>(data.data()) + bytes, chunk);
+                const auto n = _read(0, reinterpret_cast<char*>(buffer) + bytes, chunk);
                 if (n < 0) {
                     if (errno == EINTR)
                         continue;
@@ -494,18 +592,16 @@ std::size_t AudioReader::read(std::span<float> data) {
         } else
 #endif
         {
-            bytes = sf_read_raw(file, data.data(), static_cast<sf_count_t>(data.size() * 4));
+            bytes = sf_read_raw(file, buffer, wanted);
             if (bytes < 0 || sf_error(file))
                 throw error("RAW audio read failed", file);
         }
-        if (bytes % static_cast<sf_count_t>(4 * impl_->info.channels))
+        const auto frame_bytes = static_cast<sf_count_t>(width * impl_->info.channels);
+        if (bytes % frame_bytes)
             throw std::runtime_error("RAW input ends with an incomplete frame");
-        const auto raw_bytes = std::as_bytes(data);
-        for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / 4; ++i) {
-            const auto bits = detail::read_le32(raw_bytes.subspan(i * 4));
-            data[i] = std::bit_cast<float>(bits);
-        }
-        got = bytes / static_cast<sf_count_t>(4 * impl_->info.channels);
+        for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / width; ++i)
+            data[i] = decode_raw(buffer + i * width, impl_->encoding);
+        got = bytes / frame_bytes;
     } else {
         got = sf_readf_float(file, data.data(), count);
     }
@@ -526,44 +622,87 @@ struct AudioWriter::Impl {
     std::filesystem::path path;
     std::uint32_t speakers = 0;
     unsigned valid_bits = 0, container_bits = 0;
-    bool raw = false;
+    bool raw = false, limited = false;
     std::size_t frame_bytes = 0;
     std::optional<Quantizer> quantizer;
     std::vector<std::int32_t> buffer;
     // Reserve ample room for the WAV headers written by this wrapper.
     std::uint64_t wav_remaining = std::uint64_t(UINT32_MAX) - 4096;
 };
+namespace {
+OutputEncoding checked(OutputFormat format) {
+    switch (format) {
+    case OutputFormat::wav_float:
+    case OutputFormat::wav_pcm16:
+    case OutputFormat::wav_pcm24:
+    case OutputFormat::wav_pcm32:
+    case OutputFormat::raw_float:
+    case OutputFormat::wav_pcm8:
+        return output_encoding(format);
+    }
+    throw std::invalid_argument("unknown audio output format");
+}
+int sndfile_format(OutputEncoding e) {
+    if (!supported(e))
+        throw std::invalid_argument("unsupported audio output format");
+    int container = 0;
+    switch (e.container) {
+    case Container::wav:
+        container = SF_FORMAT_WAV;
+        break;
+    case Container::rf64:
+        container = SF_FORMAT_RF64;
+        break;
+    case Container::w64:
+        container = SF_FORMAT_W64;
+        break;
+    case Container::aiff:
+        container = SF_FORMAT_AIFF;
+        break;
+    case Container::caf:
+        container = SF_FORMAT_CAF;
+        break;
+    case Container::flac:
+        container = SF_FORMAT_FLAC;
+        break;
+    case Container::raw:
+        container = SF_FORMAT_RAW | SF_ENDIAN_LITTLE;
+        break;
+    default:
+        throw std::invalid_argument("unknown audio output container");
+    }
+    const bool wav_family = e.container == Container::wav || e.container == Container::rf64 ||
+                            e.container == Container::w64;
+    switch (e.sample) {
+    case SampleType::pcm8:
+        return container | (wav_family ? SF_FORMAT_PCM_U8 : SF_FORMAT_PCM_S8);
+    case SampleType::pcm16:
+        return container | SF_FORMAT_PCM_16;
+    case SampleType::pcm24:
+        return container | SF_FORMAT_PCM_24;
+    case SampleType::pcm32:
+        return container | SF_FORMAT_PCM_32;
+    case SampleType::float32:
+        return container | SF_FORMAT_FLOAT;
+    case SampleType::float64:
+        return container | SF_FORMAT_DOUBLE;
+    }
+    throw std::invalid_argument("unknown audio sample type");
+}
+} // namespace
 AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputFormat format,
+                         QuantizationOptions quantization, OutputMetadata metadata)
+    : AudioWriter(path, info, checked(format), quantization, metadata) {}
+AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputEncoding encoding,
                          QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
     validate(info);
-    validate_speakers(metadata.channel_mask, info.channels, format);
+    validate_speakers(metadata.channel_mask, info.channels, encoding.container);
     SF_INFO sf{};
     sf.samplerate = info.sample_rate;
     sf.channels = static_cast<int>(info.channels);
-    switch (format) {
-    case OutputFormat::wav_float:
-        sf.format = SF_FORMAT_WAV | SF_FORMAT_FLOAT;
-        break;
-    case OutputFormat::wav_pcm8:
-        sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_U8; // WAV 8-bit PCM is unsigned.
-        break;
-    case OutputFormat::wav_pcm16:
-        sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
-        break;
-    case OutputFormat::wav_pcm24:
-        sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_24;
-        break;
-    case OutputFormat::wav_pcm32:
-        sf.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32;
-        break;
-    case OutputFormat::raw_float:
-        sf.format = SF_FORMAT_RAW | SF_FORMAT_FLOAT | SF_ENDIAN_LITTLE;
-        break;
-    default:
-        throw std::invalid_argument("unknown audio output format");
-    }
-    const auto bits = container_bits(format);
+    sf.format = sndfile_format(encoding);
+    const auto bits = container_bits(encoding.sample);
     if (!bits && (quantization.dither != Dither::none ||
                   quantization.noise_shaping != NoiseShaping::none || quantization.valid_bits))
         throw std::invalid_argument(
@@ -578,8 +717,15 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
     impl_->info = info;
     impl_->path = path;
     impl_->speakers = metadata.channel_mask;
-    impl_->raw = format == OutputFormat::raw_float;
-    impl_->frame_bytes = info.channels * (bits ? bits / 8 : 4);
+    impl_->raw = encoding.container == Container::raw;
+    if (impl_->valid_bits != bits && encoding.container != Container::wav)
+        throw std::invalid_argument("valid bits below the container size need WAV output");
+    // RIFF/WAVE and AIFF chunk sizes are 32-bit; the other containers have no
+    // such limit (FLAC frames are counted in 36 bits).
+    impl_->limited = encoding.container == Container::wav || encoding.container == Container::aiff;
+    impl_->frame_bytes = info.channels * (bits                                     ? bits / 8
+                                          : encoding.sample == SampleType::float64 ? 8
+                                                                                   : 4);
     // Speaker labels and reduced valid bits both need WAVE_FORMAT_EXTENSIBLE.
     if (impl_->speakers || impl_->valid_bits != bits)
         sf.format = (sf.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
@@ -611,10 +757,11 @@ void AudioWriter::write(std::span<const float> data) {
             throw std::runtime_error("nonfinite audio sample");
     if (!count)
         return;
-    if (!impl_->raw &&
+    if (impl_->limited &&
         static_cast<std::uint64_t>(count) > impl_->wav_remaining / impl_->frame_bytes)
-        throw std::length_error(
-            "WAV output exceeds 4 GiB container limit; select raw-float for a larger stream");
+        throw std::length_error("WAV or AIFF output exceeds the 4 GiB container limit; select "
+                                "an rf64, w64, caf, flac or raw output format for a larger "
+                                "stream");
     sf_count_t written;
     if (impl_->quantizer) {
         // Bound scratch memory; the quantizer carries its state across calls.
@@ -642,7 +789,7 @@ void AudioWriter::write(std::span<const float> data) {
         written = sf_writef_float(file, data.data(), count);
     if (written != count || sf_error(file))
         throw error("audio write failed or was short", file);
-    if (!impl_->raw)
+    if (impl_->limited)
         impl_->wav_remaining -= static_cast<std::uint64_t>(count) * impl_->frame_bytes;
 }
 void AudioWriter::close() {

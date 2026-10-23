@@ -153,6 +153,14 @@ length, accounted storage and partitions for an in-memory `Configuration`.
 
 ### Writing files
 
+`AudioWriter` takes either an `OutputEncoding` (a `Container` and a
+`SampleType`, for example `{Container::flac, SampleType::pcm24}`) or one of the
+original `OutputFormat` shorthands, which `output_encoding()` maps to the same
+pairs; `supported()` says which pairs exist ([output formats](../use/command-line.md#output-formats)).
+`AudioReader` takes an optional `RawSpec` and a `RawEncoding` for headerless
+input ([RAW streams](../use/command-line.md#raw-streams)); the encoding is
+ignored for files with a header.
+
 `AudioWriter` defaults to plain rounding for integer formats; pass
 `QuantizationOptions` to enable dither, noise shaping or valid bits, as the
 command line's [integer output](../use/command-line.md#integer-formats-dither-and-noise-shaping)

@@ -167,6 +167,54 @@ def speaker_map_tests(d):
         assert not out.exists() and b'speaker' in p.stderr, p.stderr
     call(['--filter',config(0x3,2),'--input',src,'--output',out,'--speaker-map','wave'],ok=False)
 
+def container_tests(d):
+    """--output-format CONTAINER-TYPE and --raw-format, end to end."""
+    ir=d/'ct-ir.wav'; pcm(ir,[16384]); raw=struct.pack('<4f',.5,-.25,.125,-1.)
+    base=['--filter',ir,'--raw-input','48000','1','--input','-']
+    magic={'wav':b'RIFF','rf64':b'RF64','w64':b'riff','aiff':b'FORM','caf':b'caff','flac':b'fLaC'}
+    for name in ('wav-double','rf64-pcm24','w64-pcm8','aiff-pcm16','aiff-float','caf-pcm32',
+                 'caf-double','flac-pcm8','flac-pcm16','flac-pcm24'):
+        out=d/('ct.'+name.split('-')[0])
+        call(base+['--output',out,'--output-format',name],data=raw)
+        assert out.read_bytes()[:4]==magic[name.split('-')[0]], name
+    # Integer and double raw output, read back with the matching --raw-format.
+    for name, fmt, size in (('raw-pcm16','s16le',2),('raw-pcm24','s24le',3),
+                            ('raw-pcm32','s32le',4),('raw-double','f64le',8)):
+        p=call(base+['--output','-','--output-format',name],data=raw)
+        assert len(p.stdout)==4*size, (name, len(p.stdout))
+        back=call(['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--input','-',
+                   '--output','-','--output-format','raw-float'],data=p.stdout)
+        near(struct.unpack('<4f',back.stdout),[.125,-.0625,.03125,-.25])  # filtered twice
+    assert call(base+['--output','-','--output-format','raw-pcm16'],data=raw).stdout[:2]==b'\0\x20'
+    # Big-endian input in each type.
+    for fmt, packed in (('s16be',struct.pack('>4h',16384,-8192,4096,-32768)),
+                        ('s32be',struct.pack('>4i',1<<30,-(1<<29),1<<28,-(1<<31))),
+                        ('f32be',struct.pack('>4f',.5,-.25,.125,-1.)),
+                        ('f64be',struct.pack('>4d',.5,-.25,.125,-1.)),
+                        ('s24be',b''.join(v.to_bytes(3,'big',signed=True)
+                                          for v in (1<<22,-(1<<21),1<<20,-(1<<23))))):
+        p=call(['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--input','-',
+                '--output','-','--output-format','raw-float'],data=packed)
+        near(struct.unpack('<4f',p.stdout),[.25,-.125,.0625,-.5])
+    out=d/'ct.flac'
+    for bad in (['--output-format','flac-float'],['--output-format','raw-pcm8'],
+                ['--output-format','flac-pcm32'],['--output-format','ogg-pcm16'],
+                ['--output-format','wav'],['--raw-format','u8'],['--raw-format','s16'],
+                ['--output-format','flac-pcm24','--speaker-map','config'],
+                ['--output-format','aiff-pcm24','--valid-bits','20']):
+        out.unlink(missing_ok=True)
+        call(base+['--output',out,*bad],ok=False,data=raw); assert not out.exists(), bad
+    call(['--filter',ir,'--input',d/'ct.aiff','--raw-format','s16le','--output',out],ok=False)
+    # A non-raw stream on stdout names the raw formats.
+    p=call(base+['--output','-','--output-format','flac-pcm16'],ok=False,data=raw)
+    assert b'raw output format' in p.stderr, p.stderr
+    # A DRC-style .pcm filter in a configuration.
+    (d/'ct.pcm').write_bytes(struct.pack('<2f',.5,.25))
+    cfg=d/'ct-raw.cfg'; cfg.write_text('48000 1 1 0\n0\n0\nct.pcm\n0\n0\n0\n')
+    p=call(['--filter',cfg,'--raw-input','48000','1','--input','-','--output','-',
+            '--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+
 def main():
     call(['--help'])
     version = call(['--version']).stdout
@@ -275,6 +323,7 @@ def main():
         call(args,data=b'')
         repeatability_tests(d)
         speaker_map_tests(d)
+        container_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d/'v-ir.wav',[16384]); pcm(d/'v-in.wav',[1000,-1000])
         p=subprocess.run([EXE,'--filter','v-ir.wav','--input','v-in.wav','--output','--validate'],
