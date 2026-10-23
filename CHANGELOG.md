@@ -208,6 +208,20 @@ Until 1.0 the C++ API may change between minor versions.
   where 3 was expected). Any reset now ends the transition and the newer filter
   plays at once; that includes the internal recovery reset after non-finite
   output, which used to bring the old filter back and repeat the crossfade.
+- LV2: choosing a filter file in a host without a worker thread, or when the
+  host could not queue the load, left an instance with no filter passing its
+  input through until the next save or restore. It now falls silent within
+  64 samples, as for any first filter that cannot be used; a filter that was
+  already playing keeps playing. `HostProcessor::mute()` is the new
+  audio-thread call that does this.
+- LV2: restoring a state or preset with none of Convolver's properties now
+  resets the plug-in to an empty instance (no filter, failure or path; a file
+  still loading is abandoned), as the LV2 state specification requires. It
+  used to keep the previous filter.
+- `HostFilter::load` builds everything it keeps before its install callback
+  publishes the new filter, so running out of memory can no longer leave one
+  filter playing while another is saved (jrp reproduced a restored failed
+  state saving the old filter while the output was silent).
 
 ## [0.4.0] - 2026-10-19
 

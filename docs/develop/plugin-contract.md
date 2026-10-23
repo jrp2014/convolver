@@ -214,7 +214,14 @@ Prepare, replace, collect and destruct calls must be serialized on the control
 side. `replace()` is `prepare()` then `publish()`; an adapter that must check
 for a newer request between the two (LV2's worker) calls them itself, and an
 install callback that throws `SupersededRequest` abandons the request without
-changing the filter or its failure record. One audio thread calls process, reset and set_bypass. Destruction and
+changing the filter or its failure record. `HostFilter::load` builds
+everything it keeps (messages, the speaker notice) before calling the install
+callback, and nothing after the callback publishes can throw, so running out
+of memory never leaves one filter playing while another is saved. One audio
+thread calls process, reset, set_bypass and mute. `mute()` is for a failure
+found on the audio thread itself: the current filter ramps to silence over 64
+samples and stays silent until the next published filter takes over and fades
+in from silence; bypass still passes the dry signal. Destruction and
 reconfiguration require audio to have stopped. Reset clears history without
 allocation, but its work scales with prepared storage. Filter preparation can
 be expensive; neither FFT planning nor file access belongs in a callback.
@@ -311,11 +318,19 @@ How each adapter meets the contract where its format differs:
   tail. `run()` and the worker's answers (`work_response()`) do not allocate,
   lock or do I/O; a file choice on the `filter` parameter reaches the worker as
   a request numbered by generation, which is also its failure record's request
-  number. The worker's `work()`, state restore and save, activation and
+  number. When `run()` itself refuses a file (the host has no worker, or
+  cannot queue the request), an instance with no accepted filter mutes at
+  once (`HostProcessor::mute()`), so a failed first load is silent without
+  waiting for a control call; an accepted filter keeps playing. The worker's
+  `work()`, state restore and save, activation and
   cleanup share a lock that `run()` never takes, and the plug-in does not
   declare `state:threadSafeRestore`. `work()` stops before recording anything
   for a request a newer one has overtaken: after reading the file, and again
-  after `HostProcessor::prepare()`, just before `publish()`. The status port
+  after `HostProcessor::prepare()`, just before `publish()`. Restoring a map
+  with neither of the adapter's properties resets it to an empty instance, as
+  the LV2 state specification requires ("This allows the host to reset the
+  plugin state with an empty map"): no filter, no failure, no path, and loads
+  still outstanding are superseded. The status port
   follows the newest request (3, Loading, while it is outstanding); the path
   it reports and saves follows the installed filter. The full rules are in
   the plan's

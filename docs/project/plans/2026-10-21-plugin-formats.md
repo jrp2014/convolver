@@ -483,7 +483,10 @@ contract:
   audio ports (`control`, then `notify`, 8192-byte buffers), so the earlier
   port numbers are unchanged. A request that never reaches `work()` (no
   worker, or a failed `schedule_work`) shows "load failed" at once and is
-  recorded and logged, without its path, by the next control call. Paths
+  recorded and logged, without its path, by the next control call; since
+  jrp's review of 0.4.30 an instance with no accepted filter also mutes at
+  once (`HostProcessor::mute()`), so it does not play unfiltered audio
+  meanwhile. Paths
   longer than 4096 bytes are refused. A file that is readable but made for
   another rate or other channels is recorded as `sample_rate` or `channels`
   with the CLI's explanation. The tests pause `work()` through a test-only

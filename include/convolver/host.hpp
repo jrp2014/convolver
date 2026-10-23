@@ -162,6 +162,10 @@ class HostFilter {
     // is accepted and checked at activation. On rejection this records the
     // error, keeps the accepted filter (a failed initial load if there was
     // none) and throws std::invalid_argument with an explanation.
+    // A transaction: everything kept is built before `install` is called and
+    // nothing after it throws, so `install` must publish as its last step
+    // (prepare, which may throw, then publish, which cannot). What plays is
+    // then always what is saved, even when memory runs out.
     // `request` says where the state came from (numbered if 0).
     void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {},

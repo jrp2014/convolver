@@ -394,7 +394,12 @@ AU-4.
   teardown with work queued; state with a path (mapped, PipeWire's bare value,
   an unusable embedded copy, lilv's own state files); and lifecycle
   sequences, one scripted and several seeded (loads, file loads, failed
-  loads, audio, bypass, reset, reopening a saved session). A small model checks the saved state, status, latency and
+  loads, audio, bypass, reset, reopening a saved session, an empty state
+  map). Cases taken from the shared contract and the LV2 specification
+  rather than from the implementation: a first file refused by `run()` is
+  silent within 64 frames with no control call, and an empty state map resets
+  to an empty instance (over a filter, a file, a failure, and with loads
+  outstanding). A small model checks the saved state, status, latency and
   failure record after every step, and the exact output at every reset and at
   the end; the transitions during audio (crossfades, a rejection while
   playing) are the harness's cases.

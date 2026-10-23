@@ -8,8 +8,8 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** status checked on 23 October 2026 against `main` at `f593216`
-(0.4.25). Nothing has been published yet: there are no GitHub releases, and
+**In short:** status checked on 23 October 2026 against `main` at `edd08d5`
+(0.4.30). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
 and LV2 plug-ins are implemented and tested automatically; no named host has
@@ -58,7 +58,7 @@ documentation alone.
 | Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | No; in the preview package since PR #38, not yet published |
 | VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Carla suggested) | No; preview candidates are CI artifacts only |
 | LV2 plug-in ([guide](../use/plugins.md)) | Yes: adapter and layouts (LV2-1); filter files through the worker and saved paths (LV2-2) | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
-| Audio Unit ([guide](../use/plugins.md)) | Yes, built from source (AU-1, AU-2; PR #44) | Yes: `au.harness`, `au.adapter`, `au.bundle` and `auval -strict` on macOS | None (AU-4) | No; joins a later preview |
+| Audio Unit ([guide](../use/plugins.md)) | Yes, built from source: adapter and tests (AU-1, done), state and `.aupreset` loading (AU-2; a named host's preset menu is checked under AU-4) | Yes: `au.harness`, `au.adapter`, `au.bundle` and `auval -strict` on macOS | None (AU-4) | No; joins a later preview |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
@@ -66,6 +66,14 @@ Fixed defect: a reset during a filter transition delayed the next filter
 (found in jrp's review of 0.4.19; fixed on 23 October 2026 by the VST3-7
 follow-up, [PR #40](https://github.com/jrp2014/convolver/pull/40)). Lifecycle
 sequences that would catch defects like it are PLUG-7.
+
+Fixed defects from jrp's review of 0.4.30 ([PR #55](https://github.com/jrp2014/convolver/pull/55)):
+an LV2 first load refused without a worker played unfiltered audio until the
+next control call; restoring an empty LV2 state map did not reset the plug-in,
+as the LV2 specification requires; and running out of memory in
+`HostFilter::load` could leave one filter playing while another was saved.
+The tests had followed the implementation, so PLUG-7 now takes its
+expectations from the shared contract and each format's specification.
 
 ## User journeys for the first preview
 
