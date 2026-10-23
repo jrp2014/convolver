@@ -695,7 +695,7 @@ the LV2 plug-in serve FFmpeg too.
   **Decided 22 October 2026 (owner):** silence on every output, including a
   1→2 filter that forks one input; equal counts keep input *c* to output *c*.
   `HostProcessor` implements it, so VST3 already follows it.
-- Whether saved state records bypass ([bypass](../develop/plugin-contract.md#bypass)). **Decided 23
+- Whether saved state records bypass ([bypass](../../develop/plugin-contract.md#bypass)). **Decided 23
   October 2026 (owner):** follow each format's convention. VST3 saves its
   bypass parameter; LV2 and AU leave bypass to the host and ignore the flag in
   restored state.
