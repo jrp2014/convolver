@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleExecutable</key><string>Convolver</string>
+<key>CFBundleIdentifier</key><string>${CONVOLVER_ID_AU_BUNDLE}</string>
+<key>CFBundleName</key><string>Convolver</string>
+<key>CFBundlePackageType</key><string>BNDL</string>
+<key>CFBundleShortVersionString</key><string>${Convolver_VERSION}</string>
+<key>CFBundleVersion</key><string>${Convolver_VERSION}</string>
+<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+<key>NSHumanReadableCopyright</key><string>GPL-3.0-or-later; see Contents/Resources/licenses</string>
+<key>AudioComponents</key>
+<array><dict>
+<key>type</key><string>${CONVOLVER_ID_AU_TYPE}</string>
+<key>subtype</key><string>${CONVOLVER_ID_AU_SUBTYPE}</string>
+<key>manufacturer</key><string>${CONVOLVER_ID_AU_MANUFACTURER}</string>
+<key>name</key><string>${CONVOLVER_ID_VENDOR}: Convolver</string>
+<key>description</key><string>Multichannel FIR convolution</string>
+<key>version</key><integer>${CONVOLVER_AU_VERSION}</integer>
+<key>factoryFunction</key><string>ConvolverAUFactory</string>
+<key>sandboxSafe</key><true/>
+<key>tags</key><array><string>Effects</string></array>
+</dict></array>
+</dict></plist>

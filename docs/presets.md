@@ -27,9 +27,9 @@ Contents: [make a preset](#make-a-preset) · [convert a VST3 preset](#convert-a-
 [messages](#messages) · [what the files contain](#what-the-files-contain) ·
 [compatibility](#compatibility)
 
-The AU and LV2 plug-ins are still being written (TODO AU-1, AU-2, LV2-1 and
-LV2-2). The tool already writes their presets, in the form those plug-ins will
-read, so the same commands work when they arrive.
+The [Audio Unit](au.md) reads its presets (AU-1 and AU-2, not yet tested in
+named hosts). The LV2 plug-in is still being written (LV2-1 and LV2-2); the tool
+already writes its presets in the form it will read.
 
 ## Make a preset
 
@@ -94,7 +94,7 @@ already holds one filter.
   on the plug-in, as in the [VST3 guide](vst3.md#loading-filters). Hosts that
   keep a preset library also find presets in their VST3 preset folder, for
   example `~/Library/Audio/Presets/Convolver/Convolver/` on macOS.
-- **AU (planned, AU-2):** load the `.aupreset` from the host's preset menu.
+- **AU:** load the `.aupreset` from the host's preset menu ([AU guide](au.md#loading-filters)).
   Logic and GarageBand list user presets saved under
   `~/Library/Audio/Presets/` in a folder for the plug-in's manufacturer and name.
 - **LV2 (planned, LV2-2):** copy the whole `room.preset.lv2` folder into a folder

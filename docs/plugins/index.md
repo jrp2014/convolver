@@ -25,8 +25,9 @@ mono and stereo. Previews are **unsigned** on macOS and Windows for now; see
 Convolver needs a VST3 host. Installing it alone does not process every player or
 all system audio. Historical WMP, DirectShow and VST2 binaries belong to the old
 Windows implementation; old plug-in identities and projects do not automatically
-migrate. LV2 and Audio Unit (AUv2) adapters are planned alongside VST3 (see the
-plug-in formats plan in the source repository's `docs/plans/`); CLAP,
+migrate. LV2 and Audio Unit (AUv2) adapters can be built from source but are
+not yet in preview packages (see the plug-in formats plan in the source
+repository's `docs/plans/`); CLAP,
 a custom editor, AAX and a system-audio application are not part of this preview.
 
 ## Tools in bin
