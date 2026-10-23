@@ -325,6 +325,14 @@ means a patched FFmpeg build with `--enable-gpl`.
   Roon/JRiver/Audiolense-related workflows; record versions and exact supported
   subsets before adding a consumer-specific profile. See
   [configuration compatibility](docs/use/other-programs.md).
+- [ ] **CFG-2 — Configurations from and for other programs.** Import Equalizer
+  APO `Convolution:` files, CamillaDSP YAML and BruteFIR configurations into a
+  `.cfg` with its filters, so an existing setup can be brought over; and export
+  to CamillaDSP, which would do for Linux and Raspberry Pi players what HOST-4
+  does for Windows. Each converter needs fixtures from the program's own
+  documentation or sources, states what it cannot represent (per-channel EQ,
+  mixers with gains above unity, resampling) and fails rather than guess.
+  Optional; after CFG-1 shows which readers matter.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files. When jrp publishes a preview, keep a small collection
@@ -348,6 +356,20 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **IO-1 — Large files.** Specify and test RF64 output, boundary sizes and pipe
   behavior. Current output choices are ordinary WAV and raw float; input decoder
   support is not a promise of strict validation for every container.
+- [ ] **IO-3 — More output containers.** FLAC, AIFF, W64, CAF and RF64
+  output with the existing integer and float sample types, so renders can be
+  lossless-compressed or exceed WAV's 4 GiB limit (requested by jrp, 23 October
+  2026). Speaker labels stay WAV-only (IO-5).
+- [ ] **IO-4 — Raw filters and raw sample types.** Read headerless filter files
+  such as DRC and BruteFIR `.pcm` output from a configuration, and accept and
+  write 16-, 24- and 32-bit integer and 64-bit float raw streams, so these tools
+  and `sox`/`ffmpeg` pipes need no conversion step (requested by jrp,
+  23 October 2026).
+- [ ] **IO-5 — Speaker labels beyond WAV.** Carry `--speaker-map` labels into
+  the channel layouts of the other containers (WAVE_FORMAT_EXTENSIBLE in RF64
+  and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
+  layouts). Check what libsndfile can write and what readers honour first; a
+  rejected layout must fail as WAV does, not fall back to a default.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
