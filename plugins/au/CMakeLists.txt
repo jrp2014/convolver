@@ -101,4 +101,11 @@ if(CONVOLVER_BUILD_TESTS)
         endif()
     endforeach()
     add_dependencies(check ${au_test_targets})
+    # DIAG-1: tests write the Convolver log in the build folder, never the user's.
+    set_property(TEST au.adapter au.bundle APPEND PROPERTY ENVIRONMENT
+        "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+    if(TEST au.harness)
+        set_property(TEST au.harness APPEND PROPERTY ENVIRONMENT
+            "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+    endif()
 endif()

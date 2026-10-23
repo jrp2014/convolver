@@ -55,7 +55,7 @@ boundary and C++20 in the core.
 | 1. In parallel | **VST3** (HOST-1), **LV2-3 and LV2-4**, **AU-2 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
 | 2. Next milestone | jrp's conditions: **REL-2** journeys demonstrated and **REL-3** an independent user with an exact **PLUG-5** preview package (the third, the reset fix, is done). Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 3. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
-| 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8); it decides how to show them. |
+| 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8). The plug-ins' Status parameter and Convolver log came first, before the host smoke tests (owner's decision, 23 October 2026); the rest of the review remains. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
 | Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
@@ -161,15 +161,16 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   matches nothing lists each candidate and what to change), and
   `--inspect`/`--validate --json` report diagnostics as JSON. The plug-ins
   have no editor: the VST3 adapter keeps a structured reason for every
-  failure (PLUG-8, done) but shows it nowhere. It reports a preset with the
+  failure (PLUG-8, done) but, before the progress below, showed it nowhere. It reports a preset with the
   wrong rate or channel counts, or with corrupt state, to the host only as
   `kResultFalse`, and a mismatch found at activation activates and plays
   silence with nothing reported. Because PLUG-8 keeps the reasons, this review
   decides presentation rather than recovering lost information. The
   [shared adapter contract](docs/develop/plugin-contract.md#loading-and-failure)
   asks for the message in the host's log and a "load failed" status, but only
-  LV2 has a defined route (`log:log` and the status port). VST3 and AU have no
-  host log interface and no agreed place yet; an editor is VST3-3/HOST-2. Make
+  LV2 had a defined route (`log:log` and the status port); VST3 and AU have no
+  host log interface, so they now use a Status parameter and the Convolver log
+  (progress below); an editor is VST3-3/HOST-2. Make
   a table of failures (missing or unreadable filter, rate mismatch, channel
   count or layout mismatch, corrupt or newer state, failed preparation, failed
   activation) against surfaces (CLI standard error, exit status and JSON
@@ -181,6 +182,12 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   generously: what failed, why, and what to change, without needing the
   documentation (owner, 21 October 2026). Add tests that each failure produces
   its message on each surface.
+  Progress (23 October 2026, PR #57): the host-facing part was brought forward
+  before the HOST-1 smoke tests (owner's decision, 23 October 2026). VST3 and
+  AU have a read-only Status parameter and write every load, start and failure
+  to the Convolver log ([status and log](docs/develop/plugin-contract.md#status-and-log)),
+  tested per failure through each adapter. Remaining: the failure-by-surface
+  table, the CLI and preset tool, and what named hosts actually show (HOST-1).
 
 ## Plug-ins: VST3, LV2 and AU
 

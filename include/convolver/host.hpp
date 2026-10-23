@@ -61,7 +61,8 @@ Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
 // thread (docs/develop/plugin-contract.md#failure-reasons). Adapters
-// read it from HostFilter::failure(); where it is shown is DIAG-1's decision.
+// read it from HostFilter::failure(), show it with host_status() and log it
+// (docs/develop/plugin-contract.md#status-and-log).
 enum class HostFailureKind {
     filter_file,      // The filter file is missing or cannot be read.
     state_unreadable, // The saved state or preset is malformed or the wrong type.
@@ -198,6 +199,28 @@ class HostFilter {
     std::optional<HostFailure> load_failure_, activation_failure_;
     std::string notice_;
 };
+
+// DIAG-1: what a host's status display shows for an instance, for formats
+// with no editor (a read-only parameter in VST3 and AU). The status follows
+// failure(): a refused replacement shows "load failed" although the previous
+// filter keeps playing, as LV2's status port does.
+enum class HostStatus {
+    playing = 0,     // A filter is accepted and suits the host.
+    no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
+    load_failed = 2, // The newest request failed, or the instance plays silence.
+    unchecked = 3,   // A filter is accepted, but the host's configuration is not known yet.
+};
+struct HostStatusLine {
+    HostStatus status = HostStatus::no_filter;
+    // One line of at most max_status_text characters (ASCII), saying what the
+    // instance plays and, after a failure, why, in short; the full
+    // explanation is HostFilter::failure()'s message, which adapters log.
+    std::string text;
+};
+inline constexpr std::size_t max_status_text = 127; // VST3's String128, less its terminator.
+// `host` is the configuration the instance plays under, or nullopt while it
+// is not known (VST3 before activation, AU before initialization).
+HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
