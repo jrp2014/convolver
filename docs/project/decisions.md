@@ -33,6 +33,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | Next milestone: an independent user installs and uses an exact preview package by following the documentation | [Status](status.md#next-milestone-an-independent-user-runs-a-preview), [guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md) |
 | 22 October 2026 | REAPER and Carla are the suggested first named hosts; jrp will try them (replaced 23 October 2026) | [Host testing](../develop/host-testing.md#first-hosts) |
 | 23 October 2026 | jrp's first named hosts, on his Mac: REAPER and Audacity for VST3, GarageBand for the Audio Unit (a smoke test only). Replaces REAPER and Carla | [Host testing](../develop/host-testing.md#first-hosts) |
+| 23 October 2026 | The host-facing part of DIAG-1 comes before the named-host smoke tests. VST3 and AU show why they are silent in a read-only Status parameter and write the full explanation to a Convolver log file (and the macOS unified log), detailed enough to send with a report | [Adapter contract](../develop/plugin-contract.md#status-and-log), [plug-ins](../use/plugins.md#status-and-the-convolver-log) |
 
 ## Releases
 

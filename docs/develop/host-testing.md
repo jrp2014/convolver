@@ -148,6 +148,10 @@ These are tools for developers, not evidence that a DAW works.
 
 Record host version, OS version/build, CPU architecture, package SHA-256, FFT
 backend, sample rate, input/output channel layout, buffer size and exact steps/results.
+Attach the [Convolver log](../use/plugins.md#status-and-the-convolver-log)
+from the session (on macOS, `pbcopy < ~/Library/Logs/Convolver/Convolver.log`
+copies it): each line names the version, format, instance and host, and says
+what was loaded, how the host started the plug-in and why anything failed.
 Keep private audio out of reports. Use the supplied synthetic examples.
 
 ## Smoke test for an unsigned preview
@@ -161,8 +165,10 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    that the identity and echo examples sound as expected.
 3. Save the project, close and reopen it, and check that the filter is restored.
 4. Try a preset with the wrong rate or channel count while a working filter is
-   running. The working filter must keep running, and the host should show an
-   error. Record what the host displays.
+   running. The working filter must keep running, the plug-in's Status
+   parameter must say why (`Load failed, previous filter kept: ...`), and the
+   Convolver log must explain it in full. Record what the host itself
+   displays, and where it shows the Status parameter, if it does.
 
 ## Smoke test in each first host
 
@@ -221,6 +227,19 @@ except the Audio Unit build, which runs in a source checkout.
    (`sudo rm -r /Library/Audio/Presets/Convolver`).
 4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
    transients (a click track or spoken word).
+5. Start each host's test with an empty
+   [Convolver log](../use/plugins.md#status-and-the-convolver-log), and copy it
+   into the report afterwards:
+
+   ```sh
+   mkdir -p ~/Library/Logs/Convolver && : > ~/Library/Logs/Convolver/Convolver.log
+   # ... run the host's steps, then:
+   pbcopy < ~/Library/Logs/Convolver/Convolver.log
+   ```
+
+   GarageBand is sandboxed, so its copy of the log may be inside its
+   container; the system log has the same lines either way:
+   `log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --style compact | pbcopy`.
 
 ### REAPER (VST3)
 
@@ -231,13 +250,18 @@ except the Audio Unit build, which runs in a source checkout.
 2. Set *File › Project settings* to 48000 Hz and the audio device to 48 kHz.
    Import the 48 kHz test file onto a track.
 3. Open the track's FX window and add Convolver. With no preset loaded it
-   passes stereo audio unchanged.
+   passes stereo audio unchanged. Convolver has no window of its own, so
+   REAPER shows its generic controls: Bypass and a read-only **Status**.
+   Status should read `No filter: audio passes unchanged. Load a Convolver
+   preset.` Record whether REAPER shows Status, and where (the generic
+   controls, or the **Param** button's list).
 4. From the **+** button beside the FX window's preset menu, import
    `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
    `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
    hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
-   the direct sound, too soon to hear as a separate repeat.)
+   the direct sound, too soon to hear as a separate repeat.) Status reads
+   `Filter loaded: 48000 Hz, 2 in, 2 out.`
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
@@ -246,7 +270,15 @@ except the Audio Unit build, which runs in a source checkout.
 7. Save the project, quit REAPER, reopen the project and play: the echo is
    still there.
 8. While the echo plays, import `presets/identity-44100-stereo/filter.vstpreset`.
-   The echo keeps playing. Record what REAPER shows, if anything.
+   The echo keeps playing. Status reads `Load failed, previous filter kept:
+   the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the
+   Convolver log.`, and the log has a line starting `Filter not loaded; the
+   previous filter is kept.` that says to load a 48000 Hz filter or set the
+   host to 44100 Hz. Record what REAPER itself shows, if anything.
+9. Set *File › Project settings* and the device to 44100 Hz and play: silence,
+   with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
+   and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
+   48000 Hz: the echo returns. Copy the log into the report.
 
 ### Audacity (VST3)
 
@@ -260,7 +292,10 @@ except the Audio Unit build, which runs in a source checkout.
    (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
    Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
    REAPER. Record whether a preset chosen during playback is heard at once or
-   only after stopping and starting playback again.
+   only after stopping and starting playback again. The effect's window lists
+   a read-only Status. Audacity's window has its own copy of the plug-in, which
+   it never starts, so Status reads `Filter loaded: 48000 Hz, 2 in, 2 out;
+   checked when the host starts it.`; record what it shows.
 4. Switch the effect off and on with its power button while playing; note
    any click.
 5. Save the project, quit, reopen and play: the echo is still there.
@@ -271,7 +306,12 @@ except the Audio Unit build, which runs in a source checkout.
 7. Add the effect again with the echo preset, play, and choose
    `identity-44100-stereo`. The echo keeps playing. Stop and start playback:
    the echo must still play, not silence or unfiltered sound. Record what
-   Audacity shows.
+   Audacity shows. Status should name the 44100 Hz filter, and the log should
+   say what each playing copy did: a `Filter not loaded; the previous filter
+   is kept.` line, or, if playback went silent, a `Started at 48000 Hz, ...`
+   line saying the filter does not suit the host. Copy the log into the
+   report; this step is where the window's copy and the playing copy can
+   disagree.
 8. Record what a mono track does with a stereo preset; Audacity asks the
    plug-in for two channels even there, so no particular result is expected.
 
@@ -284,7 +324,8 @@ except the Audio Unit build, which runs in a source checkout.
 3. Show Smart Controls (**B**) and open the **Plug-ins** area. Click an empty
    plug-in slot and choose *Audio Units › Convolver › Convolver*. Click the
    middle of the slot to open its window. With no preset loaded it passes the
-   audio unchanged.
+   audio unchanged. Record whether the window lists a read-only Status and
+   what it reads (`No filter: audio passes unchanged. ...`).
 4. From the window's preset menu choose `identity-44100-stereo`, then
    `echo-44100-stereo`, and listen as in REAPER.
 5. Switch the plug-in off and on with the slot's power button while playing;
@@ -296,7 +337,10 @@ except the Audio Unit build, which runs in a source checkout.
    presets/echo-48000-stereo/filter.vstpreset
    ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
    and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
-   what GarageBand shows; the reason is in the Console application (search
+   what GarageBand shows. Status, where it is shown, reads `Load failed,
+   previous filter kept: the filter is for 48000 Hz, the host runs at 44100
+   Hz. ...`; the full reason is in the system log (the `log show` command in
+   [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
 
 ## Production qualification

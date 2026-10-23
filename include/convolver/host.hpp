@@ -61,7 +61,8 @@ Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
 // thread (docs/develop/plugin-contract.md#failure-reasons). Adapters
-// read it from HostFilter::failure(); where it is shown is DIAG-1's decision.
+// read it from HostFilter::failure(), show it with host_status() and log it
+// (docs/develop/plugin-contract.md#status-and-log).
 enum class HostFailureKind {
     filter_file,      // The filter file is missing or cannot be read.
     state_unreadable, // The saved state or preset is malformed or the wrong type.

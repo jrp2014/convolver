@@ -8,7 +8,7 @@
 // DIAG-1: the Convolver log, where plug-ins without a host log interface (VST3,
 // Audio Unit) write what they load and start with, and why a filter was refused
 // or why they play silence, in full, so that a user can send the file with a
-// report (docs/use/plugins.md#when-a-filter-does-not-load). Control thread
+// report (docs/use/plugins.md#status-and-the-convolver-log). Control thread
 // only: never from audio processing.
 namespace convolver {
 // Where the log goes: CONVOLVER_LOG when set (empty turns the file off);

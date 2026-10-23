@@ -15,7 +15,8 @@ does not fit. Installing is in [install](install.md); making presets is in
   for example 2 in and 6 out for a crossover.
 - There is no window of its own. You choose a filter by loading a preset (in
   LV2 also by choosing a file), and the host saves the filter inside your
-  project.
+  project. A read-only Status parameter says what is playing, and the
+  [Convolver log](#status-and-the-convolver-log) says why a filter failed.
 - Latency is always 256 samples, and the host makes up for it.
 - A filter that does not fit the host's sample rate or channel counts never
   lets unfiltered audio through: a first filter that does not fit plays
@@ -25,6 +26,7 @@ does not fit. Installing is in [install](install.md); making presets is in
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
 [when a filter does not fit](#when-a-filter-does-not-fit) ·
+[status and the Convolver log](#status-and-the-convolver-log) ·
 [latency and tail](#latency-and-tail) · [bypass](#bypass) ·
 [replacing a filter](#replacing-a-filter) · [audio](#audio) ·
 [LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
@@ -115,14 +117,64 @@ preset to replace it.
 
 How each format reports a refusal:
 
-- **VST3:** the host is told the load failed and shows that in its own way, or
-  not at all. A project that turns out not to match when the host starts
-  processing plays silence with no message.
-- **Audio Unit:** the host gets an error. Open the Console application and
-  search for "Convolver" to read why.
+- **VST3 and Audio Unit:** the host is told the load failed and shows that in
+  its own way, or not at all. The plug-in's **Status** parameter says in one
+  line what is wrong, and the [Convolver log](#status-and-the-convolver-log)
+  explains it in full.
 - **LV2:** the host's restore fails, the `status` output shows Load failed
   until a filter loads, and the host's log explains what differs and what to
   change.
+
+## Status and the Convolver log
+
+Convolver has no window of its own, so the VST3 and the Audio Unit say what
+they are doing in two places.
+
+**The Status parameter** is a read-only parameter that hosts list with the
+plug-in's controls, for example in their generic plug-in window or parameter
+list. It never changes the sound and is never automated or saved. It reads,
+for example:
+
+| Status | Example text |
+| --- | --- |
+| Playing | `Filter loaded: 48000 Hz, 2 in, 2 out.` |
+| No filter | `No filter: audio passes unchanged. Load a Convolver preset.` |
+| Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
+| Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
+| Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
+
+"Not checked yet" means the host has not started the plug-in at a sample rate
+and channel layout yet. Some hosts show a separate copy of the plug-in in its
+window: Audacity's real-time effects window, for one, never starts its copy,
+so it always shows this line; compare the filter's rate and channels in it
+with your project's, and read the log for what the playing copy did.
+
+**The Convolver log** is a text file with one line for each filter loaded,
+each time the host starts the plug-in (with the sample rate, channels and block
+size), and each failure, explained in full with what to change. Each line
+starts with the time, the Convolver version, the format and instance (`VST3 #2`)
+and the host program. When something does not work, send this file with
+your report.
+
+| System | Log file | Copy it to the clipboard |
+| --- | --- | --- |
+| macOS | `~/Library/Logs/Convolver/Convolver.log` (the Console application lists it under Log Reports) | `pbcopy < ~/Library/Logs/Convolver/Convolver.log` |
+| Windows | `%LOCALAPPDATA%\Convolver\Convolver.log` | `Get-Content "$env:LOCALAPPDATA\Convolver\Convolver.log" \| Set-Clipboard` (PowerShell) |
+| Linux | `~/.local/state/convolver/convolver.log` (or under `$XDG_STATE_HOME`) | `xclip -selection clipboard < ~/.local/state/convolver/convolver.log` |
+
+On macOS the same lines also go to the system log, which also works when a
+sandboxed host such as GarageBand keeps the file inside its own container
+(`~/Library/Containers/<host>/Data/Library/Logs/Convolver/`). To copy the
+last hour's lines from there:
+
+```sh
+log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --style compact | pbcopy
+```
+
+When the file passes 1 MB it is renamed with `.old` added and a new one is
+started. Setting the environment variable `CONVOLVER_LOG` to a file path
+sends the log there instead; on macOS and Linux, setting it empty turns the file off. LV2 has
+no file of its own: it writes to the host's log.
 
 ## Latency and tail
 

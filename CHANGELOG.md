@@ -12,6 +12,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- The VST3 and the Audio Unit say why they are silent or refused a preset
+  (DIAG-1): a read-only **Status** parameter, which hosts list with the
+  plug-in's controls, shows one line such as "Silent: the filter is for 44100
+  Hz, the host runs at 48000 Hz", and the new Convolver log
+  (`~/Library/Logs/Convolver/Convolver.log`, `%LOCALAPPDATA%\Convolver\Convolver.log`
+  or `~/.local/state/convolver/convolver.log`; `CONVOLVER_LOG` overrides)
+  records every load, start and failure with the full explanation, ready to
+  send with a report. See [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
+
 - An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
   bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
   2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
