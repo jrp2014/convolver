@@ -138,7 +138,8 @@ filters/room-48000.cfg
 Rendering selects the first entry matching the input sample rate and channel
 count. `--output-channels N` adds an output-count constraint. Inspection and
 `convolver-preset` accept explicit rate/input/output selectors; with none, they
-select the first entry. Lists are searched in order, including nested lists.
+select the first entry. Lists are searched in order, including nested lists;
+a list that includes itself, directly or through another list, is an error.
 A malformed visited entry can fail selection; a list is not a fallback that
 silently skips broken configurations. Unselected configurations' IR samples are
 not decoded. `--all-configurations` instead diagnoses errors and continues to

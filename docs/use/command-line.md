@@ -31,7 +31,7 @@ Contents:
 - [FFTW plan tuning](#fftw-plan-tuning)
 
 The examples assume `convolver` is on your `PATH`; from a source build, use
-`convolver`. `convolver --version` names the FFT library it was built
+`./build/convolver`. `convolver --version` names the FFT library it was built
 with, and `convolver --help` lists every option.
 
 ## File rendering
@@ -306,6 +306,6 @@ See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wis
 ## Limits
 
 Up to 256 channels, sample rates up to 768 kHz and block sizes up to 1048576
-frames. A configuration has at most 4096 paths, and each IR or delay at most
-67108864 frames; the [library guide](../develop/library.md#resource-limits) has
+frames. A configuration has at most 4096 paths, each delay at most 16777216 frames,
+and all its IRs together at most 67108864 samples; the [library guide](../develop/library.md#resource-limits) has
 the complete list. What Convolver does not do is in [limits](limits.md).

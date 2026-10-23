@@ -17,7 +17,7 @@ package or from your own build. Afterwards, follow
 ## What a preview package contains
 
 `VST3/Convolver.vst3`, the tools in `bin/`, example presets in `presets/`,
-these pages in `docs/` and licence notices in `licenses/`. Check the package's
+these pages in `docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
 SHA-256 checksum against the one published with it before going further.
 
 Windows needs the Microsoft Visual C++ 2015–2022 x64 runtime. The plug-in has

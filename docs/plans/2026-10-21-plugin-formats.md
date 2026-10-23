@@ -657,7 +657,7 @@ are described in TODO. The streams then run side by side:
 | 1 | VST3-1: speaker arrangements and the PLUG-4 layouts | LV2-1: adapter with ports, `run()`, latency and bypass; headless `lilv` test against PLUG-2 | AU-1: adapter with channel configurations, latency and tail in seconds, and explicit bypass; test against PLUG-2 |
 | 2 | Preset tool moved to PLUG-3 | LV2-2: file parameter, worker loading, state (embedded and path), PipeWire-style restore | AU-2: ClassInfo state and `.aupreset` loading |
 | 3 | pluginval (exists) on PLUG-2 fixtures | LV2-3: generated layouts, `lv2lint` and pluginval in CI | AU-3: `auval` and pluginval in macOS CI |
-| 4 | HOST-1 host matrix | LV2-4: user guide (`docs/lv2.md`) with PipeWire example; host matrix | AU-4: user guide (`docs/au.md`); Logic, GarageBand, SoundSource, Live, REAPER |
+| 4 | HOST-1 host matrix | LV2-4: user guide (LV2 in `docs/use/plugins.md` and `install.md`) with PipeWire example; host matrix | AU-4: user guide (the Audio Unit in `docs/use/plugins.md` and `install.md`); Logic, GarageBand, SoundSource, Live, REAPER |
 | 5 | Unsigned preview under PLUG-5 | LV2-5: release bundles (Linux, then macOS/Windows), unsigned previews first | AU-5: unsigned preview component under PLUG-5; Developer ID signing and notarization later, at the production gate |
 
 FFMPEG-1 (testing the pipe in CI) stays cheap and useful. FFMPEG-2 to FFMPEG-5

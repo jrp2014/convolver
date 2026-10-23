@@ -78,6 +78,10 @@ installation steps.
 4. In Windows sound settings, open the device's properties and, on the
    *Advanced* tab, choose the filter's sample rate (for example "24 bit,
    48000 Hz"). Equalizer APO does not resample IRs: another rate is silent.
+5. Check it worked: play something on the device and listen. Putting `#` at the
+   start of the `Include:` line switches the filter off for a quick comparison;
+   remove it again afterwards. If nothing changes, see
+   [troubleshooting](#troubleshooting).
 
 ## How a filter is chosen
 

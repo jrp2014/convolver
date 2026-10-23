@@ -20,8 +20,9 @@ preset from an IR or `.cfg` with `convolver-preset` and load it in your host.
   the original WAV and `.cfg` files move or are deleted. All three formats carry
   the same bytes, so the filter sounds the same in every format.
 - A preset must match the host's sample rate and channel counts. A plug-in that
-  cannot use a preset as its first filter plays **silence** and reports an error,
-  rather than passing unfiltered audio to your speakers.
+  cannot use a preset as its first filter plays **silence** rather than passing
+  unfiltered audio to your speakers; [how the plug-ins behave](plugins.md#when-a-filter-does-not-fit)
+  says how each format reports it.
 - `convolver-vst3-preset`, the tool's older name, still works in source
   builds for existing scripts. Preview packages contain only `convolver-preset`.
 
@@ -107,6 +108,10 @@ The preset holds the whole filter, and the host saves the same data in your
 project, so the project keeps working after the original WAV and `.cfg` files
 are moved or deleted.
 
+**Check it worked:** the tool prints `Created self-contained … preset` and the
+path of each file it wrote, and the host plays the filtered sound once the preset is loaded. If the
+plug-in plays silence, see [when a preset does not fit](#when-a-preset-does-not-fit).
+
 ## When a preset does not fit
 
 A preset holds one filter at one sample rate, with fixed input and output
@@ -142,7 +147,8 @@ give the same explanations as `convolver`; see
   arrangement with matching sample rate and channel counts. A recorded speaker
   layout only ever gives a note; it never makes a preset fail.
 - A preset made by a newer version that records something an older plug-in
-  cannot read is refused by that older plug-in, which keeps its working filter.
+  cannot read is refused by that older plug-in: a filter already playing keeps
+  playing, and otherwise the plug-in plays silence.
 - `convolver-vst3-preset`, the older name, takes the same arguments and writes
   the same bytes as before, and makes only `.vstpreset` files.
 

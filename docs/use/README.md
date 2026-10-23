@@ -52,7 +52,7 @@ To build Convolver yourself, see [build from source](../develop/build.md).
 ## Tools in a preview package
 
 A preview package holds the VST3 plug-in, two tools in `bin/`, example presets
-in `presets/`, these pages in `docs/` and licence notices in `licenses/`.
+in `presets/`, these pages in `docs/use/` and licence notices in `licenses/`.
 Check the package's SHA-256 checksum against the one published with it before
 installing ([install](install.md)).
 

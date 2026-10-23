@@ -37,7 +37,7 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | --- | --- |
 | The preset's sample rate differs from the host's | Set the host to the preset's rate, or make a preset at the host's rate; Convolver does not resample |
 | The preset's channel counts differ from the track's | Use a track or bus with the preset's input and output counts, or a matching preset |
-| A project was opened at another rate or layout | Set the host back to the rate and layout the filter was made for; the filter returns |
+| A project was opened at another rate or layout | VST3 and Audio Unit: set the host back to the rate and layout the filter was made for, and the filter returns. LV2: do not save; reopen the session at the filter's rate, or load the preset again ([details](plugins.md#when-a-filter-does-not-fit)) |
 | No preset is loaded, and the input and output counts differ (a crossover, for example) | Load a preset |
 | The project was saved after its first preset failed | Load a matching preset |
 | Bypass is on with different input and output counts | Switch bypass off |

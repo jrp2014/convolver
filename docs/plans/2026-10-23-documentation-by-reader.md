@@ -72,7 +72,7 @@ paths, and records are never edited.
 
 | Today | Goes to |
 | --- | --- |
-| `portable-core.md` | Rendering, gain, dither, speaker labels, output safety, streams, FFmpeg, inspection and FFTW tuning to `use/command-line.md`; Engine API and resource limits to `develop/library.md`; the dated dependency record to `archive/` |
+| `portable-core.md` | Rendering, gain, dither, speaker labels, output safety, streams, FFmpeg, inspection and FFTW tuning to `use/command-line.md`; Engine API and resource limits to `develop/library.md`; the dated dependency record to `develop/testing.md`, as a record section beside the tests it describes |
 | `vst3.md`, `au.md`, `lv2.md` | Installing to `use/install.md`; loading, buses, latency, bypass, ports and the AU licence note to `use/plugins.md`; test evidence to `develop/testing.md` |
 | `presets.md` | Making, converting and loading presets, and messages, to `use/presets.md`; file contents to `develop/plugin-contract.md` |
 | `concepts.md`, `configuration.md`, `equalizer-apo.md` | `use/`; Equalizer APO's "how it is tested" to `develop/testing.md` |

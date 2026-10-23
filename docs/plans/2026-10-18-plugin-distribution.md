@@ -5,7 +5,9 @@
 > TODO items (REL-1, PLUG-5). Take them on as described in
 > [the workflow guide](../develop/workflow.md); the task checkboxes below are the
 > 18 October record. (This note replaced a pointer to an agent tool that the
-> repository does not use.)
+> repository does not use.) File paths below are as planned on 18 October; the
+> pages have since moved (the [moved pages table](../README.md#moved-pages)
+> gives the current ones).
 
 **Goal:** Deliver tested VST3 downloads and source builds with usable documentation,
 then extend the same release system to a macOS Audio Unit.

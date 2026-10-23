@@ -91,10 +91,17 @@ Convolver never falls back to unfiltered audio when a filter fails: a room
 correction or crossover that quietly plays unfiltered audio can be worse than
 an obvious failure, and could send full-range audio to a tweeter.
 
-**A project opened at another sample rate or layout** keeps its filter but
-plays silence. Set the host back to the filter's rate and layout and the
-filter returns; saving the project keeps it. Some hosts briefly try a default
-44.1 kHz before setting the real rate; that does not count.
+**A project opened at another sample rate or layout** plays silence. What
+happens next depends on the format:
+
+- **VST3 and Audio Unit** keep the filter. Set the host back to the filter's
+  rate and layout and the filter returns; saving the project in between keeps
+  it. Some hosts briefly try a default 44.1 kHz before setting the real rate;
+  that does not count.
+- **LV2** refuses the filter as soon as the session opens, and `status` shows
+  Load failed. **Do not save the session**: saving records the failure and
+  drops the filter. Close it without saving and reopen it at the filter's rate,
+  or load the preset again.
 
 **Saving after a first filter failed** saves the failure, so reopening the
 project plays silence again rather than unfiltered audio. Load a matching

@@ -613,7 +613,7 @@
     {
       "id": "raw-pipe-split-writes",
       "label": "current-behavior",
-      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
+      "evidence": "docs/use/command-line.md#raw-streams",
       "description": "RAW float32 stdin delivered in 7-byte writes, splitting samples.",
       "files": {
         "ir.wav": {"rate": 48000, "format": "pcm16", "channels": [[8192, 4096, -2048]]},
@@ -666,7 +666,7 @@
     {
       "id": "list-cycle",
       "label": "current-behavior",
-      "evidence": "docs/use/other-programs.md#what-convolver-accepts",
+      "evidence": "docs/use/configuration.md#paths-and-configuration-lists",
       "description": "Lists that include each other are rejected.",
       "files": {"a.txt": {"text": "b.txt\n"}, "b.txt": {"text": "a.txt\n"}},
       "filter": "a.txt",
