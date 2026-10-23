@@ -26,6 +26,7 @@ Convolver applies that response continuously to every input sample.
 | Find the implementation or change it safely | [Implementation map](project-structure.md), then [contributing](../CONTRIBUTING.md) |
 | Understand what the tests establish | [Testing](testing.md) |
 | Choose an FFT backend or reproduce measurements | [FFT guide](fft-backends.md) |
+| See what is ready to use, what is still unproven and what blocks the next release | [Release readiness](release-readiness.md) |
 | Find open work or suggest an improvement | [TODO](../TODO.md) |
 | Understand version numbers and tags | [Source versioning](versioning.md) |
 | Edit these documents | [Documentation maintenance](documentation.md) |
@@ -46,6 +47,7 @@ Convolver applies that response continuously to every input sample.
 | [Equalizer APO export](equalizer-apo.md) | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, silence for devices no filter fits, installation and troubleshooting |
 | [Plug-in identities and channel layouts](plugin-identities.md) | Permanent IDs for every format, what forks must change, discrete and named layouts, old presets |
 | [Plug-in distribution](plugins/index.md) | Preview archives and installers: [build](plugins/build.md), [install](plugins/install.md), [first use](plugins/quickstart.md), [host testing](plugins/hosts.md), [troubleshooting](plugins/troubleshooting.md) |
+| [Release readiness](release-readiness.md) | What users can run now at each evidence level, user journeys, next-milestone blockers, compatibility guarantees |
 | [Preview release record](releases/developer-preview.md) | Candidate matrix, evidence and remaining production gates |
 | [CMake package guide](cmake-package.md) | Using the libraries from another CMake project; presets |
 | [FFT guide](fft-backends.md) | Backend choice, numerical contract, dated benchmarks |

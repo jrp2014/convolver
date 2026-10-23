@@ -6,6 +6,10 @@ Documentation and source cross-check dated **20 October 2026**, baseline
 an exhaustive new code audit. See [VERSION](VERSION) for the package version and
 [documentation review findings](docs/archive/reviews/2026-10-20-documentation-review.md) for this update.
 
+For what users can run now, the evidence for it and what blocks the next
+release, see [release readiness](docs/release-readiness.md); this page maps
+implemented behaviour to its source and checks.
+
 New readers should start with the [README](README.md) or
 [documentation index](docs/README.md). Contributors and agents should use the
 [implementation map](docs/project-structure.md) and [repository rules](AGENTS.md).
