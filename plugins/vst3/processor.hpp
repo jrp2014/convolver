@@ -21,7 +21,7 @@ inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0]
                                            identity::vst3_controller_class_id[2],
                                            identity::vst3_controller_class_id[3]);
 inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
-// HostProcessor's block: the fixed delay between input and output.
+// HostProcessor's block, passed to it: the fixed delay between input and output.
 inline constexpr Steinberg::uint32 latency_samples = 256;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
 inline constexpr int min_bus_channels = identity::min_channels;
@@ -99,6 +99,8 @@ class Controller final : public Steinberg::Vst::EditController {
                                                         Steinberg::Vst::ParamValue&) override;
     // The controller keeps no state of its own; hosts call these on every save
     // and load, so they succeed rather than report kNotImplemented (VST3-8).
+    // Hosts therefore save an empty controller state: any controller state
+    // added later must accept an empty stream.
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override {
         return Steinberg::kResultOk;
     }

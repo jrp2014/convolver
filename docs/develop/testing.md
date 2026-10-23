@@ -320,7 +320,14 @@ comparisons; since VST3-7 the adapter lists no known deviations.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
-and adds automation patterns. The validator, the adapter tests and the plug-in
+and adds automation patterns. The validator does not create three tests that
+its suite contains: Check Tail processing, Process Input Overwriting and
+Parameter Function Name. Patched in by hand during the
+[VST3 audit](../review-2026-10/vst3-api-audit-2026-10-23.md), the last two
+pass; since VST3-8 Check Tail fails only on FFT rounding residue just after
+the reported tail (up to 1.9e-7 for ±1 noise, against its absolute 1e-7
+limit, about −134 dB), not on a cut tail. `vst3.adapter` checks the tail with
+a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 

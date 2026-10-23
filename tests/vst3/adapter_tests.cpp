@@ -713,7 +713,7 @@ void tail_measured_at_output() {
                 after = std::max({after, std::abs(out_left[i]), std::abs(out_right[i])});
         }
     }
-    require(std::abs(last - 1.f) < 1e-5, "the tail ends before the filter's last tap");
+    require(std::abs(last - 1.f) < 1e-5, "the reported tail does not end at the filter's last tap");
     require(after < 1e-6, "output continues after the reported tail");
     p.setProcessing(false);
     p.setActive(false);
@@ -746,6 +746,8 @@ void controller_conversions() {
             "a fraction accepted");
     require(c.getParamValueByString(bypass_id, other, value) != kResultOk,
             "unrelated text accepted");
+    require(c.getParamValueByString(bypass_id, nullptr, value) == kInvalidArgument,
+            "no text accepted");
     MemoryStream state;
     require(c.getState(&state) == kResultOk, "controller getState");
     int64 size = -1;

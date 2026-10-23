@@ -26,8 +26,14 @@ findings became VST3-9, VST3-10 and release-checklist items.
 Built the plug-in on Linux (Clang, Release, Ooura) and ran the SDK validator
 with three Steinberg tests that exist in the SDK's test suite but are not
 created by `validator.cpp`: Check Tail processing, Process Input Overwriting
-and Parameter Function Name. All 52 tests passed. A small program then drove
-`Processor` directly to see what the tail test had missed.
+and Parameter Function Name. All 52 tests passed on `main`. A small program
+then drove `Processor` directly to see what the tail test had missed.
+
+After the VST3-8 fixes (same day), Check Tail no longer passes without testing
+anything, and fails on float FFT rounding residue: up to 1.9e-7 just after the
+reported tail for ±1 noise (about −134 dB), against the test's absolute 1e-7
+limit. The tail itself is not cut; `vst3.adapter` checks it with a 1e-6
+margin.
 
 ## Findings
 

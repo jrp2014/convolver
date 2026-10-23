@@ -123,8 +123,8 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
         if (state) {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or layout brings it back.
-            auto next = std::make_unique<HostProcessor>(filter_.activate(layout()),
-                                                        processSetup.maxSamplesPerBlock);
+            auto next = std::make_unique<HostProcessor>(
+                filter_.activate(layout()), processSetup.maxSamplesPerBlock, latency_samples);
             tail_.store(static_cast<uint32>(next->tail_frames()));
             next->set_bypass(bypass_.load());
             next->reset();
@@ -301,7 +301,9 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     return result;
 }
 tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, ParamValue& value) {
-    if (id == bypass_id && string) {
+    if (!string)
+        return kInvalidArgument;
+    if (id == bypass_id) {
         // Case-insensitive ASCII comparison of the host's UTF-16 text.
         auto is = [string](const char* word) {
             std::size_t i = 0;
