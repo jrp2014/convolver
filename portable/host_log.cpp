@@ -132,11 +132,13 @@ std::filesystem::path host_log_path() {
 void host_log(const char* format, const std::string& message, bool problem) noexcept {
     if (message.empty())
         return;
-#ifdef __APPLE__
+#ifndef __APPLE__
+    static_cast<void>(problem); // Only the unified log has levels.
+#else
     if (problem)
         os_log_error(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
     else
-        os_log_info(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
+        os_log(OS_LOG_DEFAULT, "Convolver %{public}s: %{public}s", format, message.c_str());
 #endif
     try {
         // One writer at a time within the process; each line is one write.

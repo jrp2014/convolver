@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -652,6 +653,159 @@ void failure_records() {
     p.setActive(false);
     p.terminate();
 }
+// DIAG-1: the Status parameter shows each failure in one line, and the
+// Convolver log holds the full explanation.
+void status_and_log() {
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    const auto log_path = std::filesystem::temp_directory_path() / "convolver-vst3-status.log";
+    std::filesystem::remove(log_path);
+    const char* earlier = std::getenv("CONVOLVER_LOG"); // CTest's, restored below.
+    const std::string restore = earlier ? earlier : "";
+#ifdef _WIN32
+    _putenv_s("CONVOLVER_LOG", log_path.string().c_str());
+#else
+    setenv("CONVOLVER_LOG", log_path.c_str(), 1);
+#endif
+    const auto log_text = [&] {
+        std::ifstream in(log_path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    };
+    HostApplication context;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk,
+            "status initialize");
+    ParameterInfo info{};
+    require(c.getParameterCount() == 2 && c.getParameterInfo(1, info) == kResultOk &&
+                info.id == status_id && (info.flags & ParameterInfo::kIsReadOnly) &&
+                (info.flags & ParameterInfo::kIsList) &&
+                !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 3,
+            "Status parameter not read-only list");
+    // The text the host shows for the parameter's current value.
+    const auto shown = [&] {
+        String128 text{};
+        require(c.getParamStringByValue(status_id, c.getParamNormalized(status_id), text) ==
+                    kResultOk,
+                "status text");
+        std::string ascii;
+        for (int i = 0; text[i]; ++i)
+            ascii += static_cast<char>(text[i]);
+        return ascii;
+    };
+    const auto status = [&] {
+        return static_cast<convolver::HostStatus>(
+            std::lround(c.getParameterObject(status_id)->toPlain(c.getParamNormalized(status_id))));
+    };
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "status connect");
+    require(shown() == "No filter loaded. Load a Convolver preset." &&
+                status() == convolver::HostStatus::no_filter,
+            "status before activation");
+    // Other values read as their names (a host asking how a value would read).
+    String128 name{};
+    require(c.getParamStringByValue(status_id, 0, name) == kResultOk && name[0] == 'P' &&
+                name[1] == 'l',
+            "status value names");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "status buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 64, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "status activate");
+    require(contains(shown(), "audio passes unchanged") && contains(log_text(), "VST3 #") &&
+                contains(log_text(), ": Started at 48000 Hz, 2 in, 2 out, blocks of up to 64 "
+                                     "frames. No filter, so audio passes unchanged."),
+            "empty start not shown or logged");
+    const auto stream = [](const convolver::HostState& s) {
+        auto m = std::make_unique<MemoryStream>();
+        require(write_state(m.get(), s), "encode status state");
+        m->seek(0, IBStream::kIBSeekSet, nullptr);
+        return m;
+    };
+    convolver::HostState good;
+    good.configuration =
+        convolver::Configuration{48000, 2, 2, 0, {}, {}, {{{.5f}, {{0, 1}}, {{1, 1}}}}};
+    auto wrong = good;
+    wrong.configuration->sample_rate = 44100;
+    // A wrong-rate preset as the first load: silence, said in the window and
+    // explained in the log.
+    require(p.setState(stream(wrong).get()) == kResultFalse, "status wrong rate accepted");
+    require(shown() == "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details "
+                       "in the Convolver log." &&
+                status() == convolver::HostStatus::load_failed,
+            "failed first load not shown");
+    require(contains(log_text(), "Filter not loaded, so Convolver plays silence. The filter was "
+                                 "made for 44100 Hz, but the host runs at 48000 Hz. Convolver "
+                                 "does not resample"),
+            "failed first load not logged");
+    require(p.setState(stream(good).get()) == kResultOk &&
+                shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
+                status() == convolver::HostStatus::playing &&
+                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out.\n"),
+            "good load not shown or logged");
+    // Wrong preset while a filter plays: the filter keeps playing, and both say so.
+    require(
+        p.setState(stream(wrong).get()) == kResultFalse &&
+            contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
+            contains(log_text(), "Filter not loaded; the previous filter is kept."),
+        "refused replacement not shown or logged");
+    MemoryStream damaged;
+    const std::array<unsigned char, 16> junk{12, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    damaged.write(const_cast<unsigned char*>(junk.data()), 16, nullptr);
+    damaged.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&damaged) == kResultFalse &&
+                contains(shown(), "the preset or saved state could not be read") &&
+                contains(log_text(), "The saved state could not be read"),
+            "damaged state not shown or logged");
+    // Restarted at another rate: silence until the rate is put back.
+    require(p.setState(stream(good).get()) == kResultOk, "status good again");
+    require(p.setActive(false) == kResultOk, "status deactivate");
+    setup.sampleRate = 44100;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "status activate at 44.1 kHz");
+    require(contains(shown(), "Silent: the filter is for 48000 Hz, the host runs at 44100 Hz") &&
+                contains(log_text(), "Started at 44100 Hz, 2 in, 2 out, blocks of up to 64 "
+                                     "frames. The saved filter does not suit the host"),
+            "mismatch at activation not shown or logged");
+    // Restarting the same way again does not repeat the line.
+    const auto before = log_text();
+    require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
+                log_text() == before,
+            "repeated start logged again");
+    // State restored before the host is known (a project opening): not checked yet.
+    Processor q;
+    Controller d;
+    require(q.initialize(&context) == kResultOk && d.initialize(&context) == kResultOk &&
+                q.connect(&d) == kResultOk && d.connect(&q) == kResultOk,
+            "second status instance");
+    require(q.setState(stream(wrong).get()) == kResultOk, "unchecked state refused");
+    String128 text{};
+    d.getParamStringByValue(status_id, d.getParamNormalized(status_id), text);
+    require(text[0] == 'F' && d.status_text() ==
+                                  "Filter loaded: 44100 Hz, 2 in, 2 out; checked when the "
+                                  "host starts it.",
+            "unchecked state not shown");
+    q.disconnect(&d);
+    d.disconnect(&q);
+    q.terminate();
+    d.terminate();
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    p.terminate();
+    c.terminate();
+#ifdef _WIN32
+    _putenv_s("CONVOLVER_LOG", restore.c_str());
+#else
+    if (earlier)
+        setenv("CONVOLVER_LOG", restore.c_str(), 1);
+    else
+        unsetenv("CONVOLVER_LOG");
+#endif
+    std::filesystem::remove(log_path);
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
@@ -662,6 +816,7 @@ int run(const std::filesystem::path& preset_path) {
         restart_mid_transition();
         failed_first_loads();
         failure_records();
+        status_and_log();
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");
