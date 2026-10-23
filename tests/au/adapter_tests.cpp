@@ -419,7 +419,17 @@ void bypass_property() {
     require(!unit.bypass(), "a new unit is bypassed");
     unit.set_bypass(true);
     require(unit.bypass(), "bypass does not read back");
-    require(unit.saved().bypass, "bypass is not saved");
+    // The host owns bypass in Audio Units: ClassInfo does not record it, and
+    // restoring a preset (even one whose state says bypassed) leaves it alone.
+    require(!unit.saved().bypass, "bypass was saved in ClassInfo");
+    auto bypassed = state_of(stereo(48000));
+    bypassed.bypass = true;
+    unit.set_bypass(false);
+    check(unit.load(bypassed), "load a state that says bypassed");
+    require(!unit.bypass(), "restoring a preset switched bypass on");
+    unit.set_bypass(true);
+    check(unit.load(state_of(stereo(48000))), "load a state that says not bypassed");
+    require(unit.bypass(), "restoring a preset switched bypass off");
     unit.set_bypass(false);
     check(unit.initialize(), "initialization");
     // Filtered and dry signals are crossfaded with weights that sum to one, so

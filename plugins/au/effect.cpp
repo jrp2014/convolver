@@ -302,7 +302,9 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
             if (host_)
                 host_->collect();
         }
-        state.bypass = bypass_.load();
+        // Bypass stays out of ClassInfo: in Audio Units the host owns
+        // kAudioUnitProperty_BypassEffect and restores it itself (owner's
+        // decision, 23 October 2026: follow each format's convention).
         bytes = encode_host_state(state);
     } catch (...) {
         return kAudioUnitErr_InvalidPropertyValue;
@@ -374,7 +376,6 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     }
 
     bool accepted = false;
-    const bool was_bypassed = bypass_.load();
     std::string message;
     {
         std::lock_guard lock(control_);
@@ -382,7 +383,8 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         // Initialized, a prepared replacement is published to the audio thread;
         // uninitialized, the next initialization installs the filter.
         const auto host = known_layout();
-        const bool bypass = next.bypass;
+        // A bypass flag in the state (from another format's preset) is
+        // ignored: the host owns bypass, as SaveState explains.
         try {
             filter_.load(std::move(next), host, [&](const Configuration& c) {
                 if (host_)
@@ -392,7 +394,6 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
                 tail_.store(host_->tail_frames());
             else
                 tail_.store(filter_.filter() ? configuration_tail_frames(*filter_.filter()) : 0);
-            bypass_.store(bypass);
             accepted = true;
         } catch (...) {
             // A failed first load plays silence rather than the unfiltered input.
@@ -416,8 +417,6 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         log_error(message);
         return kAudioUnitErr_InvalidPropertyValue;
     }
-    if (bypass_.load() != was_bypassed)
-        PropertyChanged(kAudioUnitProperty_BypassEffect, kAudioUnitScope_Global, 0);
     log_error(message); // A restored failed load says why it plays silence.
     // The preset name and element names, as AUBase restores them. Its "data"
     // (parameter values) is left out: this unit has no parameters, and AUBase

@@ -331,6 +331,13 @@ on during bypass, so switching back does not lose history.
 `set_bypass` follows the rule; the PLUG-2 `bypass` case checks it. An adapter
 must not use its format's own pass-through bypass (see the AU design).
 
+Whether saved state records bypass follows each format's convention (owner's
+decision, 23 October 2026). VST3 saves its bypass parameter with the
+component state, as the SDK's examples do. In LV2 (the `enabled` port) and
+Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
+bypass itself, so those adapters do not record it and ignore the flag in a
+state from another format.
+
 ### Channel layouts and old presets
 
 PLUG-4's list currently names channel *counts*. A count does not say what the
