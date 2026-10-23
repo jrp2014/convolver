@@ -1190,8 +1190,8 @@ void refused_first_loads(host::World& world, const fs::path& work) {
                   !decode_host_state(p->save().bytes).failed,
               label + "status load failed; the working filter is saved");
     }
-    // A refusal that races a worker load publishing its filter: the load
-    // that was accepted plays, whatever the order.
+    // A refusal after a worker load has published its filter, before audio
+    // has heard it: the accepted load plays and is saved.
     {
         const std::string label = "refusal while the first file is published: ";
         auto p = worker_instance(world, Worker::threaded);
@@ -1212,6 +1212,27 @@ void refused_first_loads(host::World& world, const fs::path& work) {
             near(play_constant(*p, 4096).back(), .25f) &&
                 same(decode_host_state(p->save().bytes).configuration, load_configuration(files.a)),
             label + "A plays and is saved");
+    }
+    // A refusal while a first filter loaded by the worker plays: it keeps
+    // playing. This checks that the worker clears `unfiltered` before it
+    // publishes (found by mutation in the independent review of PR #55).
+    {
+        const std::string label = "refusal after a worker-loaded first file: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        play_constant(*p, 1024);
+        p->set_filter(files.a.string());
+        settle(*p);
+        play_constant(*p, 1024);
+        p->scheduling_fails = true;
+        p->set_filter(files.b.string());
+        const auto out = play_constant(*p, 4096);
+        check(std::all_of(out.begin(), out.end(), [](float v) { return near(v, .25f); }),
+              label + "A keeps playing");
+        check(
+            p->status == as_float(Status::load_failed) &&
+                same(decode_host_state(p->save().bytes).configuration, load_configuration(files.a)),
+            label + "status load failed; A is saved");
     }
 }
 

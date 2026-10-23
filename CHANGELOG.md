@@ -28,6 +28,9 @@ Until 1.0 the C++ API may change between minor versions.
   now links libsndfile. For adapters, `HostProcessor::prepare()` and
   `publish()` split `replace()` in two, and `SupersededRequest` abandons an
   overtaken request.
+- `HostProcessor::mute()`, an audio-thread call: the current filter ramps to
+  silence over 64 samples until the next published filter fades in. The LV2
+  adapter uses it when `run()` refuses a first filter file.
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the

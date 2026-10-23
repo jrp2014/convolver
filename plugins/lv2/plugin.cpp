@@ -128,9 +128,10 @@ struct Instance {
     // True while the processor plays what an instance without a filter plays
     // (identity for equal counts), so a first load that run() refuses must
     // mute it at once (HostProcessor::mute) rather than wait for the next
-    // control call. The control side sets it whenever it installs something,
-    // and clears it before publishing a filter, so run() never mutes a filter
-    // it has already started playing.
+    // control call. Set at activation and after a successful restore, and
+    // cleared before the worker publishes a filter, so run() never mutes a
+    // filter it has already started playing. It can be left true only while
+    // silence plays (a failed first load), where muting changes nothing.
     std::atomic<bool> unfiltered{true};
 
     // Audio side: run() and work_response(), and restore(), which never
@@ -389,6 +390,10 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     if (r.generation < newest())
         return Outcome::superseded; // Rapid loads coalesce to the newest.
     const HostRequest request{HostFilterSource::file, path, r.generation};
+    // Copied before anything is published, so recording what plays below
+    // cannot run out of memory. Running out here, like the copy above, leaves
+    // work() to answer with nothing recorded or changed.
+    std::string kept_path = path;
     const bool was_failed = p.filter.failed();
     const auto failed = [&] {
         p.handled = std::max(p.handled, r.generation);
@@ -422,11 +427,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
         p.filter.reject(why.kind, std::move(why.message), request);
         return failed();
     }
-    // Copied before anything is published, so recording what plays below
-    // cannot run out of memory.
-    std::string kept_path;
     try {
-        kept_path = path;
         p.filter.load(
             HostState{std::move(next)}, p.layout,
             [&](const Configuration& c) {
@@ -842,7 +843,8 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             p.host->replace(c);
     };
     // The path that plays if a load succeeds, copied before anything is
-    // published so that recording it cannot run out of memory.
+    // published so that recording it cannot run out of memory. Running out
+    // here, as in read_path(), returns an error with nothing changed.
     std::string kept_path = path.value_or("");
     bool loaded = false;
     if (!embedded && !saved_path) {

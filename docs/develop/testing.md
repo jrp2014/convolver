@@ -106,7 +106,10 @@ ctest --test-dir build -N
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard;
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
-  activations until a later request succeeds.
+  activations until a later request succeeds; `mute()` (its 64-frame ramp,
+  bypass, reset, a crossfade, and a replacement fading in from silence); and
+  allocation failure at every step of `HostFilter::load`, checking that what
+  plays is what is saved.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
