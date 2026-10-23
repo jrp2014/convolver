@@ -220,7 +220,7 @@ add one line under it per merged pull request:
 When the item is complete, move lasting behaviour into the owning guide and
 any owner's decision into the [decisions log](../project/decisions.md). Then
 replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
-its ID and title, the date, the pull request and a link to the page that now
+its ID and title, the date, the pull request if there was one, and a link to the page that now
 describes it. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
 is used but never defined.

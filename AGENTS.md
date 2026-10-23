@@ -89,8 +89,9 @@ Full rules: [source versioning](docs/develop/versioning.md).
 - `VERSION` is the one `MAJOR.MINOR.PATCH` source for the CMake package, CLI and
   plug-ins; never copy it elsewhere. Leave `VERSION` and tags alone in ordinary
   changes: after a push to `main`, **Version source changes** bumps PATCH and
-  tags `vX.Y.Z`. Edit `VERSION` only for a deliberate minor or major step, and
-  never move a published tag.
+  tags `vX.Y.Z`. Edit `VERSION` only for a deliberate minor or major step (an
+  incompatible API change before 1.0 needs a minor step), and never move a
+  published tag.
 - Do not change plug-in IDs or state-format versions to match a package
   version. The version helper creates commits and tags even without `--push`,
   so it is **not a dry run**; test versioning with

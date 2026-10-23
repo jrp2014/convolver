@@ -14,6 +14,11 @@ import sys
 
 # Dated records and preserved copies: never rewritten, so not held to these rules.
 RECORDS = ('historical/', 'docs/historical/', 'docs/archive/', 'docs/review-2026-10/')
+# Maintained pages under docs/ live in one of these reader folders.
+READER_FOLDERS = ('docs/use/', 'docs/develop/', 'docs/project/')
+# Pages whose backticked repository paths must exist.
+PATH_SOURCES = ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md',
+                'docs/develop/workflow.md')
 
 # What may sit at the top of the repository. Add to this list deliberately,
 # and describe the new entry in the README's repository table.
@@ -155,12 +160,6 @@ def path_like(token):
     if '/' not in token and '.' not in first:
         return None
     return token
-
-
-# Pages whose backticked repository paths must exist.
-PATH_SOURCES = ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md',
-                'docs/develop/workflow.md')
-READER_FOLDERS = ('docs/use/', 'docs/develop/', 'docs/project/')
 
 
 def check_agent_paths(root, files, errors):

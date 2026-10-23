@@ -25,7 +25,7 @@ been tested yet ([status](docs/project/status.md)).
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
-| Build it, embed it or change it | [Build from source](docs/develop/build.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
+| Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |
 | See what is ready, decided or planned | [Status](docs/project/status.md), [decisions](docs/project/decisions.md), [TODO](TODO.md), [changelog](CHANGELOG.md) |
 

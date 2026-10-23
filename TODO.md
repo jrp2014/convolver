@@ -22,7 +22,9 @@ claim, and its description holds the handoff note. Record progress here as the
 [workflow guide](docs/develop/workflow.md#recording-progress-in-todo) describes,
 and confirm the current source first: other work may already have done part of
 it. Compatibility takes priority over speed. Do not change the historical
-archive to implement a portable feature.
+archive to implement a portable feature. External links identify starting
+points, not endorsements or a completed licence or performance assessment;
+verify the exact release again when implementing an item.
 
 ## Execution priorities
 
@@ -532,6 +534,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
+- [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
+  [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
@@ -548,9 +552,3 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,
   with the reset follow-up in PR #40; [adapter contract](docs/develop/plugin-contract.md).
-- [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
-  [LV2 tests](docs/develop/testing.md#lv2-tests).
-
-External links identify starting points, not endorsements or a completed licence
-or performance assessment; verify the exact release again when implementing an
-item.
