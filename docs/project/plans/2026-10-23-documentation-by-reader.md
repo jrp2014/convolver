@@ -17,8 +17,8 @@ instructions, so that separate skills are not needed.
 reference or background) and follows the
 [writing rules](../../develop/documentation.md#writing-rules). Four pull requests,
 one per step. Step 1 (`docs/develop/`) was done in the pull request that added
-this plan, step 2 (`docs/use/`) in the next and step 3 (`docs/project/`) in
-the one after. Dated records do not move.
+this plan, and steps 2 (`docs/use/`), 3 (`docs/project/`) and 4 (front pages
+and checks) in one pull request each after it. Dated records do not move.
 
 ## What was wrong
 
@@ -101,7 +101,7 @@ paths, and records are never edited.
    decisions recorded in TODO, plans and guides, `develop/releasing.md` from the
    release record, then history and plans. `check_repository.py` checks plans
    under `docs/project/plans/`.
-4. **Front doors and checks:** a README of about 80 lines, a shorter
+4. **Done: front doors and checks:** a README of about 80 lines, a shorter
    `AGENTS.md` that links instead of copying, TODO with open work only, and a
    repository check that every maintained page sits in a reader folder. Make
    `check_repository.py` fail when a file whose paths it checks is missing,

@@ -78,46 +78,32 @@ plus Ooura configurations described in [testing](docs/develop/testing.md).
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
   Portable sources must also pass the `.clang-tidy` checks (commands in
   `CONTRIBUTING.md`).
-- `python3 scripts/check_repository.py` must pass: TODO IDs defined, every
-  maintained page indexed, plans dated and current, paths in this file real,
-  SPDX lines, and the top-level layout. Lint CI runs it through pre-commit.
+- `python3 scripts/check_repository.py` must pass (pre-commit runs it; the
+  list of checks is in the [workflow guide](docs/develop/workflow.md#automated-checks)).
 - Do not claim something builds or passes unless you ran it.
 
 ## Versioning
 
-- `VERSION` is the single `MAJOR.MINOR.PATCH` source for the portable CMake
-  package, CLI and VST3 bundle. Do not hardcode copies elsewhere. Historical
-  Windows resource versions and `convolver*` tags have separate histories.
-- For ordinary changes, leave `VERSION` and tags alone. After a push to `main`,
-  **Version source changes** increments PATCH, commits `VERSION` and atomically
-  publishes an annotated `vX.Y.Z` tag. Feature branches and PRs do not create tags.
-  Concurrent pushes may be grouped into one version; repeat runs are no-ops.
-- `SOURCE_PATHS` in `scripts/version_source.py` defines what counts: sources,
-  tests, CMake files, scripts and workflows. Changes confined to `docs/` or
-  top-level Markdown files (including this file) do not bump the version.
-- For an intentional minor/major milestone, edit `VERSION` in that change and
-  reset the lower components (for example, `0.3.0`). The workflow honours the
-  higher number. Before 1.0, API incompatibilities belong in minor versions;
-  preserve the package's matching-minor compatibility policy. Record noteworthy
-  changes in `CHANGELOG.md`; do not change plug-in IDs or state-format versions
-  merely to match a package version.
-- On `main`, use `git pull --ff-only` after the bot's version commit; fetch tags
-  when looking up versions. Never move or overwrite published tags. CLI/VST3
-  build identifiers append the Git revision and `.dirty` for uncommitted files;
-  numeric package/bundle versions remain `MAJOR.MINOR.PATCH`.
-- Source tags identify revisions, not passing CI or production binary releases.
-  Test versioning with `python3 tests/versioning_tests.py`. For workflow recovery,
-  follow [the versioning guide](docs/develop/versioning.md): the helper creates commits
-  and tags even without `--push`, so it is **not a dry run**.
+Full rules: [source versioning](docs/develop/versioning.md).
+
+- `VERSION` is the one `MAJOR.MINOR.PATCH` source for the CMake package, CLI and
+  plug-ins; never copy it elsewhere. Leave `VERSION` and tags alone in ordinary
+  changes: after a push to `main`, **Version source changes** bumps PATCH and
+  tags `vX.Y.Z`. Edit `VERSION` only for a deliberate minor or major step (an
+  incompatible API change before 1.0 needs a minor step), and never move a
+  published tag.
+- Do not change plug-in IDs or state-format versions to match a package
+  version. The version helper creates commits and tags even without `--push`,
+  so it is **not a dry run**; test versioning with
+  `python3 tests/versioning_tests.py`.
 
 ## Rules
 
-- Documentation: follow [page ownership and maintenance](docs/develop/documentation.md).
-  Use [the implementation map](docs/develop/architecture.md) to find symbols,
-  invariants and tests. Update the owning guide when behavior changes; keep open
-  work and documented limitations in [TODO.md](TODO.md). Run the documentation
-  checks in `CONTRIBUTING.md` and distinguish actual test results from configured
-  CI coverage. Preserve dated evidence and historical originals.
+- Documentation: follow the [documentation guide](docs/develop/documentation.md)
+  (readers, kinds of page, writing rules, which page owns each topic). Update
+  the owning page when behaviour changes; keep open work and documented
+  limitations in [TODO.md](TODO.md). Distinguish tests you ran from configured
+  CI coverage, and preserve dated evidence and historical originals.
 
 - Real-time path: `Engine::process` and everything it calls must not allocate,
   lock or do I/O (`engine_tests.cpp` checks allocation). Preparation, FFTW

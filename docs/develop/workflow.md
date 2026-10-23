@@ -217,10 +217,13 @@ add one line under it per merged pull request:
   2→6 and the lifecycle cases remain.
 ```
 
-When the item is complete, tick it, say when and where (for example
-"Done 22 October 2026 (PR #31)") with the evidence, and move lasting
-behaviour into the owning guide. The [repository checks](#automated-checks)
-reject a TODO ID that is used but never defined.
+When the item is complete, move lasting behaviour into the owning guide and
+any owner's decision into the [decisions log](../project/decisions.md). Then
+replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
+its ID and title, the date, the pull request if there was one, and a link to the page that now
+describes it. TODO keeps open work only; the one-line entry keeps the ID
+defined, and the [repository checks](#automated-checks) reject a TODO ID that
+is used but never defined.
 
 ## Automated checks
 
@@ -228,11 +231,13 @@ reject a TODO ID that is used but never defined.
 
 - every TODO ID mentioned in the maintained documentation is defined in TODO,
   and no ID is defined twice;
-- every maintained page under `docs/` is listed in the [index](../README.md);
+- every maintained page under `docs/` is listed in the [index](../README.md)
+  and sits in a reader folder (`use/`, `develop/` or `project/`);
 - every open plan in [`project/plans/`](../project/plans/) has a dated file name, and every
   archived plan is listed in the [archive index](../archive/plans/README.md);
 - repository paths named in `AGENTS.md`, `CONTRIBUTING.md`, the
-  [implementation map](architecture.md) and this page exist;
+  [implementation map](architecture.md) and this page exist, and so do those
+  four pages;
 - new source, script and maintained documentation files carry an SPDX licence
   line;
 - only known folders and files sit at the top level of the repository, and

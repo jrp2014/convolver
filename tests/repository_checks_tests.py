@@ -19,8 +19,13 @@ BASE = {
     'README.md': SPDX_MD + '# Home\nSee PLUG-2.\n',
     'TODO.md': TODO,
     'AGENTS.md': SPDX_MD + '# Rules\nRead `docs/README.md`.\n',
-    'docs/README.md': SPDX_MD + '# Index\n[Guide](guide.md)\n[Plan](project/plans/2026-10-21-formats.md)\n',
-    'docs/guide.md': SPDX_MD + '# Guide\nPLUG-1 is done; LV2-1 is next.\n',
+    'CONTRIBUTING.md': SPDX_MD + '# Contributing\n',
+    'docs/README.md': SPDX_MD + ('# Index\n[Guide](use/guide.md)\n[Map](develop/architecture.md)\n'
+                                 '[Workflow](develop/workflow.md)\n'
+                                 '[Plan](project/plans/2026-10-21-formats.md)\n'),
+    'docs/use/guide.md': SPDX_MD + '# Guide\nPLUG-1 is done; LV2-1 is next.\n',
+    'docs/develop/architecture.md': SPDX_MD + '# Map\nSee `portable/engine.cpp`.\n',
+    'docs/develop/workflow.md': SPDX_MD + '# Workflow\n',
     'docs/project/plans/2026-10-21-formats.md': SPDX_MD + '# Plan\nServes PLUG-2.\n',
     'portable/engine.cpp': SPDX_CPP,
 }
@@ -51,9 +56,9 @@ class RepositoryChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_undefined_and_duplicate_todo_ids(self):
-        self.assertBroken(self.run_check({'docs/guide.md': SPDX_MD + 'See PLUG-9 and UTF-8.\n'}),
-                          'docs/guide.md:2: PLUG-9 is not defined')
-        result = self.run_check({'docs/guide.md': SPDX_MD + 'See PLUG-9 and UTF-8.\n'})
+        self.assertBroken(self.run_check({'docs/use/guide.md': SPDX_MD + 'See PLUG-9 and UTF-8.\n'}),
+                          'docs/use/guide.md:2: PLUG-9 is not defined')
+        result = self.run_check({'docs/use/guide.md': SPDX_MD + 'See PLUG-9 and UTF-8.\n'})
         self.assertNotIn('UTF-8', result.stderr)
         self.assertBroken(self.run_check({'TODO.md': TODO + '- [ ] **PLUG-2 — Again.**\n'}),
                           'PLUG-2 is defined more than once')
@@ -84,6 +89,17 @@ class RepositoryChecks(unittest.TestCase):
         self.assertBroken(self.run_check({'AGENTS.md': SPDX_MD + 'Edit `portable/missing.cpp` and `portable/*.cpp`.\n'}),
                           'AGENTS.md:2: `portable/missing.cpp` does not exist')
         result = self.run_check({'AGENTS.md': SPDX_MD + 'Edit `portable/*.cpp` or `plugins/<format>/`, run `ctest -L x`.\n'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_missing_path_source_is_reported(self):
+        self.assertBroken(self.run_check(remove=('docs/develop/workflow.md',)),
+                          'docs/develop/workflow.md: missing; its repository paths cannot be checked')
+
+    def test_maintained_pages_sit_in_reader_folders(self):
+        index = BASE['docs/README.md'] + '[Loose](loose.md)\n'
+        self.assertBroken(self.run_check({'docs/loose.md': SPDX_MD + '# Loose\n', 'docs/README.md': index}),
+                          'docs/loose.md: maintained pages belong in a reader folder')
+        result = self.run_check({'docs/archive/old.md': '# Old record\n'})
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_spdx_required_on_sources_but_not_vendored_code(self):
