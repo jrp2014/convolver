@@ -90,6 +90,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
+  Progress (22 October 2026): REAPER and Carla are the suggested first hosts
+  (jrp to try); the SDK sample hosts were evaluated and not added to CI
+  ([host qualification](docs/plugins/hosts.md#steinbergs-sdk-hosts)).
 - [ ] **HOST-2 — Additional formats and UI.** LV2 and AU are now first
   priorities alongside VST3 (see [plug-ins](#plug-ins-vst3-lv2-and-au) below).
   CLAP only on request: every CLAP host found also loads VST3. A filter-loading
@@ -219,6 +222,12 @@ Shared groundwork, done once so the three streams stay independent:
   the draft signing scripts are kept in history at `f4519022c` (the last commit of
   the merged `codex/plugin-distribution` branch): `git show
   f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
+  Progress 22 October 2026 (PR #38): preview packages ship `convolver-preset`
+  and `convolver-equalizer-apo` on every platform, and not the older
+  `convolver-vst3-preset` (owner's decisions, 22 October 2026), with the
+  presets and Equalizer APO guides;
+  `release.stage`, `package_smoke.py` and `verify_artifact.py` require and run
+  both tools.
 - [x] **PLUG-6 — Pin format dependencies.** Done 22 October 2026 (PR #31).
   AudioUnitSDK 1.4.0 (`bd98b31`) and the `lv2` 1.18.10 headers (`0bcde33`) are
   pinned by commit and archive SHA-256 in `packaging/release-policy.json`, each
@@ -261,6 +270,10 @@ decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
   failed first load records it (host state version 2, flag 4, written only
   then), so reopening stays silent. See
   [loading filters in the VST3 guide](docs/vst3.md#loading-filters).
+  Follow-up from jrp's review of 0.4.19: a reset during a crossfade now ends
+  it, so a filter loaded before audio resumes is installed directly (tests:
+  `native.host` reset during warm-up and crossfade, `vst3.adapter`
+  stop/restart mid-transition); the preset guide states VST3's reporting limits.
 
 LV2 (Linux first; also PipeWire system audio):
 

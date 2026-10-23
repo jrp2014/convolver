@@ -365,8 +365,9 @@ as committed regression inputs after investigating them.
 
 The read-only candidate workflow builds native preview archives on Windows x64,
 Linux x64 and both macOS architectures. It checks runtime dependency closure,
-source inventories, final ZIP relocation, executable quickstart examples and
-real SDK validation. Windows also compiles a fixture installer and exercises
+source inventories, final ZIP relocation, the packaged guide's executable
+examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
+copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
 the supplied source with networking disabled. See the
 [qualification record](releases/developer-preview.md) for external gates.

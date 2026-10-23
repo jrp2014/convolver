@@ -1,15 +1,19 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Optional distribution, separate from the C++ library package and exports.
-if(NOT TARGET convolver_vst3_preset)
-    message(FATAL_ERROR "CONVOLVER_PACKAGE_PLUGINS requires VST3 and I/O")
+# The package ships the shared tools (PLUG-3 presets, HOST-4 Equalizer APO export),
+# which are built with the CLI. convolver-vst3-preset stays a source-build alias.
+if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_preset_tool OR NOT TARGET convolver_equalizer_apo)
+    message(FATAL_ERROR "CONVOLVER_PACKAGE_PLUGINS requires VST3, I/O and the CLI tools "
+        "(CONVOLVER_BUILD_VST3, CONVOLVER_BUILD_IO and CONVOLVER_BUILD_CLI)")
 endif()
+set(convolver_packaged_tools convolver_preset_tool convolver_equalizer_apo)
 find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
 get_target_property(convolver_bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
 if(APPLE)
     # TARGET_BUNDLE_DIR follows the actual configuration under Ninja Multi-Config too.
     set(convolver_bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
 endif()
-set_target_properties(convolver_vst3 convolver_vst3_preset PROPERTIES
+set_target_properties(convolver_vst3 ${convolver_packaged_tools} PROPERTIES
     SKIP_BUILD_RPATH TRUE INSTALL_RPATH "" INSTALL_RPATH_USE_LINK_PATH FALSE)
 set(CONVOLVER_DISTRIBUTION_LICENSE_DIR "" CACHE PATH "Notices produced by build_dependencies.py")
 if(CONVOLVER_DISTRIBUTION_LICENSE_DIR)
@@ -36,18 +40,36 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/release-build-info-$<CONFIG>.json" CON
 "{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_dirty\": ${source_dirty},\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
 # The SDK supplies the whole bundle path, including configuration expressions.
 install(DIRECTORY "${convolver_bundle}" DESTINATION VST3 COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
-install(TARGETS convolver_vst3_preset RUNTIME DESTINATION bin COMPONENT PluginDistribution)
+install(TARGETS ${convolver_packaged_tools} RUNTIME DESTINATION bin COMPONENT PluginDistribution)
 set(examples_dir "${CMAKE_CURRENT_BINARY_DIR}/plugin-presets/$<CONFIG>")
 add_custom_command(OUTPUT "${examples_dir}/examples.json"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/release/generate_examples.py"
-        --output "${examples_dir}" --converter "$<TARGET_FILE:convolver_vst3_preset>"
-    DEPENDS convolver_vst3_preset "${PROJECT_SOURCE_DIR}/scripts/release/generate_examples.py"
+        --output "${examples_dir}" --converter "$<TARGET_FILE:convolver_preset_tool>"
+    DEPENDS convolver_preset_tool "${PROJECT_SOURCE_DIR}/scripts/release/generate_examples.py"
         "${PROJECT_SOURCE_DIR}/tests/plugins/fixtures.py"
     VERBATIM)
 add_custom_target(convolver_plugin_examples ALL DEPENDS "${examples_dir}/examples.json")
 install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/examples/plugin-presets/README.md" DESTINATION presets COMPONENT PluginDistribution)
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/plugins" DESTINATION docs COMPONENT PluginDistribution)
+# The guides that own the shipped tools, with links to unshipped pages pointing
+# at the source repository's copy at the packaged commit.
+set(packaged_guides docs/presets.md docs/equalizer-apo.md)
+set(guides_dir "${CMAKE_CURRENT_BINARY_DIR}/packaged-docs")
+set(guide_sources)
+foreach(guide IN LISTS packaged_guides)
+    list(APPEND guide_sources "${PROJECT_SOURCE_DIR}/${guide}")
+endforeach()
+add_custom_command(OUTPUT "${guides_dir}.stamp"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${guides_dir}"
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
+        --source "${PROJECT_SOURCE_DIR}" --output "${guides_dir}" --version "${PROJECT_VERSION}"
+        --revision "${source_commit}" --stamp "${guides_dir}.stamp" --packaged-dir docs/plugins
+        ${packaged_guides}
+    DEPENDS ${guide_sources} "${PROJECT_SOURCE_DIR}/scripts/release/package_docs.py"
+    VERBATIM)
+add_custom_target(convolver_packaged_guides ALL DEPENDS "${guides_dir}.stamp")
+install(DIRECTORY "${guides_dir}/" DESTINATION docs COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/COPYING" DESTINATION licenses RENAME Convolver.txt COMPONENT PluginDistribution)
 if(fft_backend STREQUAL "OOURA")
     # The vendored Ooura FFT's notice and provenance, which quote its licence.
@@ -58,7 +80,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)
 # Relocation is mandatory for release archives, tested with actual SDK tools.
 if(CONVOLVER_BUILD_TESTS)
-    foreach(release_test IN ITEMS manifest source artifact installer gate)
+    foreach(release_test IN ITEMS manifest source artifact installer gate docs)
         add_test(NAME release.${release_test} COMMAND "${Python3_EXECUTABLE}"
             "${PROJECT_SOURCE_DIR}/tests/release/${release_test}_tests.py")
     endforeach()

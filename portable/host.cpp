@@ -270,12 +270,18 @@ struct HostProcessor::Impl {
     }
     void reset() noexcept {
         started = false;
+        // A reset breaks the stream, so a transition in progress has nothing
+        // left to fade: the newer filter plays at once, and a filter published
+        // before the next audio is installed directly. The older filter is only
+        // linked here; the control thread deletes it.
+        if (previous) {
+            retire(previous);
+            previous = nullptr;
+        }
         current->engine.reset();
-        if (previous)
-            previous->engine.reset();
         std::fill(dry.begin(), dry.end(), 0.f);
         dry_position = 0;
-        warm = previous ? block : 0;
+        warm = 0;
         fade = 0;
         dry_mix = bypass ? 1.f : 0.f;
     }
