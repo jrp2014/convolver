@@ -223,7 +223,15 @@ that does not fit ([when a filter does not fit](#when-a-filter-does-not-fit)):
 the status shows Load failed, the log explains what is wrong and what to
 change, and a working filter keeps playing and is still the one saved. A host
 without a worker thread cannot load files: the status shows Load failed at
-once and the log says why; presets and saved sessions still work there.
+once and the log says why; presets and saved sessions still work there. If no
+filter was playing, the plug-in falls silent at once, as for any first filter
+that cannot be used.
+
+**Resetting.** A host that restores a state or preset holding none of
+Convolver's settings (only control values, or nothing at all) resets the
+plug-in, as LV2 requires: the filter and its file are dropped, any failure is
+cleared, a file still loading is abandoned, and the plug-in plays as if no
+filter had been loaded.
 
 **Saved sessions.** The session saves the whole filter, as for a preset, and
 also the path of the file it came from (made relative to the session folder

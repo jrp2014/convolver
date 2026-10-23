@@ -9,6 +9,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace convolver {
 namespace {
@@ -201,6 +202,13 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     request = numbered(std::move(request));
     auto& next = state.configuration;
     const Configuration* carried = next ? &*next : nullptr;
+    // Everything that is kept is built before `install` publishes anything, so
+    // that running out of memory rejects the request with the previous state
+    // whole, and nothing after publication can throw: what plays and what is
+    // saved never part (jrp's review of 0.4.30). Without the host's
+    // configuration, activation checks the speakers.
+    std::string notice;
+    std::optional<HostFailure> saved_failure;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable, "A failed load cannot hold a filter.",
@@ -212,23 +220,31 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                        "; this plug-in supports 1 to " + std::to_string(max_channels_) +
                        " channels on each side.",
                    request, carried);
-        if (host) {
-            if (next) {
-                if (auto m = mismatch(*next, *host))
-                    refuse(m->kind, std::move(m->why), request, carried);
-            }
-            if (install) {
-                const auto unfiltered =
-                    next ? Configuration{} : unfiltered_configuration(*host, state.failed);
-                try {
-                    install(next ? *next : unfiltered);
-                } catch (const SupersededRequest&) {
-                    throw; // Abandoned: nothing recorded or changed.
-                } catch (const std::exception& e) {
-                    refuse(HostFailureKind::preparation,
-                           std::string("The filter could not be prepared: ") + e.what(), request,
-                           carried);
-                }
+        if (host && next) {
+            if (auto m = mismatch(*next, *host))
+                refuse(m->kind, std::move(m->why), request, carried);
+            notice = speaker_notice(*next, *host);
+        }
+        if (state.failed) {
+            HostFailure f;
+            f.kind = HostFailureKind::saved_failure;
+            f.request = request;
+            f.silent = true;
+            f.message = "A filter failed to load before this state was saved, so Convolver plays "
+                        "silence. Load a filter made for the host's sample rate and channels.";
+            saved_failure = std::move(f);
+        }
+        if (host && install) {
+            const auto unfiltered =
+                next ? Configuration{} : unfiltered_configuration(*host, state.failed);
+            try {
+                install(next ? *next : unfiltered);
+            } catch (const SupersededRequest&) {
+                throw; // Abandoned: nothing recorded or changed.
+            } catch (const std::exception& e) {
+                refuse(HostFailureKind::preparation,
+                       std::string("The filter could not be prepared: ") + e.what(), request,
+                       carried);
             }
         }
     } catch (const Refused&) {
@@ -239,20 +255,11 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
         // Out of memory building a message, or a non-standard exception.
         refuse(HostFailureKind::preparation, "The filter could not be prepared.", request, carried);
     }
-    // Build what is kept before changing anything, so running out of memory
-    // leaves the previous state whole. Without the host's configuration,
-    // activation checks the speakers.
-    auto notice = host && next ? speaker_notice(*next, *host) : std::string();
-    std::optional<HostFailure> saved_failure;
-    if (state.failed) {
-        HostFailure f;
-        f.kind = HostFailureKind::saved_failure;
-        f.request = request;
-        f.silent = true;
-        f.message = "A filter failed to load before this state was saved, so Convolver plays "
-                    "silence. Load a filter made for the host's sample rate and channels.";
-        saved_failure = std::move(f);
-    }
+    // The commit, which cannot throw.
+    static_assert(std::is_nothrow_move_assignable_v<std::optional<Configuration>> &&
+                  std::is_nothrow_move_assignable_v<HostRequest> &&
+                  std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
+                  std::is_nothrow_move_assignable_v<std::string>);
     filter_ = std::move(next);
     failed_ = state.failed;
     accepted_ = std::move(request);
@@ -322,6 +329,11 @@ struct HostProcessor::Impl {
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     float dry_mix = 0;
+    // mute(): the current filter's level ramps to 0; the level of the filter
+    // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
+    // an unmuted filter's output is unchanged.
+    float level = 1, previous_level = 1;
+    bool muted = false, previous_muted = false;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
@@ -386,6 +398,9 @@ struct HostProcessor::Impl {
             previous = nullptr;
         }
         current->engine.reset();
+        level = muted ? 0.f : 1.f;
+        previous_level = 1;
+        previous_muted = false;
         std::fill(dry.begin(), dry.end(), 0.f);
         dry_position = 0;
         warm = 0;
@@ -403,6 +418,8 @@ struct HostProcessor::Impl {
             if (auto next = pending.exchange(nullptr, std::memory_order_acq_rel)) {
                 if (started) {
                     previous = current;
+                    previous_level = level;
+                    previous_muted = muted;
                     warm = block;
                     fade = 0;
                 } else {
@@ -411,6 +428,8 @@ struct HostProcessor::Impl {
                     retire(current);
                 }
                 current = next;
+                level = 1;
+                muted = false;
             }
         }
         started = true;
@@ -448,6 +467,10 @@ struct HostProcessor::Impl {
                 }
             }
             dry_mix = std::clamp(dry_mix + (bypass ? 1.f / 64 : -1.f / 64), 0.f, 1.f);
+            if (muted)
+                level = std::max(0.f, level - 1.f / 64);
+            if (previous_muted)
+                previous_level = std::max(0.f, previous_level - 1.f / 64);
             for (std::size_t c = 0; c < outputs; ++c) {
                 // Bypass passes input c to output c when the counts are equal. With
                 // unequal counts it plays silence on every output (owner's decision,
@@ -457,9 +480,9 @@ struct HostProcessor::Impl {
                 auto& delayed = dry[dry_position * outputs + c];
                 float dry_value = delayed;
                 delayed = inputs == outputs ? input[t * inputs + c] : 0.f;
-                double value = wet[index];
+                double value = level * static_cast<double>(wet[index]);
                 if (previous)
-                    value = (1.0 - blend) * old_wet[index] + blend * value;
+                    value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
                 value = (1.0 - dry_mix) * value + dry_mix * dry_value;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {
                     value = 0;
@@ -476,6 +499,8 @@ struct HostProcessor::Impl {
         if (previous && !warm && fade == 256) {
             retire(previous);
             previous = nullptr;
+            previous_level = 1;
+            previous_muted = false;
         }
         return true;
     }
@@ -517,6 +542,9 @@ void HostProcessor::reset() noexcept {
 }
 void HostProcessor::set_bypass(bool value) noexcept {
     impl_->bypass = value;
+}
+void HostProcessor::mute() noexcept {
+    impl_->muted = true;
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;

@@ -52,7 +52,7 @@ boundary and C++20 in the core.
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Now, shared | **PLUG-7:** lifecycle sequences | Checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. |
-| 1. In parallel | **VST3** (HOST-1), **LV2-3 and LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
+| 1. In parallel | **VST3** (HOST-1), **LV2-3 and LV2-4**, **AU-2 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
 | 2. Next milestone | jrp's conditions: **REL-2** journeys demonstrated and **REL-3** an independent user with an exact **PLUG-5** preview package (the third, the reset fix, is done). Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 3. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8); it decides how to show them. |
@@ -233,6 +233,20 @@ Shared work, done once for all three formats:
   through each adapter in the PLUG-2 harness. LV2-2 extends it with
   outstanding worker loads (a request arriving during preparation, a stale
   completion, teardown with work outstanding).
+  Derive every expectation from the [shared adapter contract](docs/develop/plugin-contract.md)
+  and the host format's own specification, citing the clause, never from the
+  implementation: jrp's review of 0.4.30 found an LV2 empty-state restore
+  that a test and the lifecycle model both expected to change nothing, where
+  the LV2 state specification requires a reset to defaults. After every
+  operation compare four observable outcomes with the model: the audible
+  filter (including silence at once when the audio thread itself refuses a
+  load), the saved filter, the reported path and the failure record. Include
+  allocation failure at each step of a load, as `native.host`
+  (`allocation_failures`) does since PR #55, and operations each format
+  defines (LV2: an empty state map, no worker, a full worker queue; VST3 and
+  AU: state before the host is configured). Progress (23 October 2026,
+  PR #55): those three cases are fixed and covered by fixed regressions; the
+  enumerated sequences remain.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -254,23 +268,6 @@ LV2 (Linux first; also PipeWire system audio):
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
-- [ ] **AU-1 — Adapter and test.** `plugins/au/` on Apple's AudioUnitSDK:
-  PLUG-4 channel configurations, latency and tail reported in **seconds**
-  (`frames / sample rate`), and bypass stored atomically by the property
-  setter and applied with `HostProcessor::set_bypass` in `Render`, rather than
-  `AUEffectBase`'s pass-through (which skips the delayed dry path
-  and ramp and handles N→M poorly). Tests using PLUG-2, plus bypass, tails,
-  silence flags and 2→6. Licence (owner's decision, 21 October 2026): the AU
-  component is distributed under GPL-3.0-or-later because AudioUnitSDK is
-  Apache-2.0, which is compatible with GPLv3 but not GPLv2; ship its notices
-  (see the [plan](docs/project/plans/2026-10-21-plugin-formats.md#au-licence)).
-  Progress (22 October 2026, PR #44, with AU-2): `plugins/au/` builds
-  `Convolver.component` (`-DCONVOLVER_BUILD_AU=ON`); `au.harness` (PLUG-2),
-  `au.adapter` and `au.bundle` run in the [Audio Unit workflow](.github/workflows/au.yml)
-  with `auval -strict` ([plug-in guide](docs/use/plugins.md)). Nothing else remains in
-  AU-1 once PR #44 is reviewed and merged; the ThreadSanitizer run belongs to AU-3.
-  PR #49: bypass is left to the host and not saved in `ClassInfo` (owner's
-  decision, 23 October 2026: follow each format's convention).
 - [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
   from PLUG-3 load through the host's preset menu. Progress (22 October 2026,
   PR #44): ClassInfo holds the encoded state under `convolver-state`; the
@@ -494,6 +491,9 @@ with compatibility tests; linked IDs point to open work above.
 Finished items, listed so their IDs stay defined. What each delivered is
 described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 
+- [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
+  follow-up in PR #49; [plug-in guide](docs/use/plugins.md),
+  [Audio Unit licence](docs/use/plugins.md#audio-unit-licence).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

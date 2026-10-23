@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <new>
@@ -14,9 +15,15 @@
 #include <vector>
 
 thread_local bool audio_thread = false;
+// Allocations allowed before the next one fails; negative means no limit.
+thread_local long allocations_left = -1;
 void* operator new(std::size_t n) {
     if (audio_thread)
         std::abort();
+    if (allocations_left == 0)
+        throw std::bad_alloc();
+    if (allocations_left > 0)
+        --allocations_left;
     if (auto p = std::malloc(n ? n : 1))
         return p;
     throw std::bad_alloc();
@@ -680,6 +687,144 @@ void unequal_bypass() {
                 require(out[o][i] == 0, "unequal bypass must play silence");
     }
 }
+// mute(), the audio thread's own silence: the current filter ramps to 0 over
+// 64 frames and stays silent until a published filter takes over and fades in
+// from silence. Bypass still passes the dry signal; a reset keeps the silence.
+void muting() {
+    std::array<float, 512> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    const auto run = [&](HostProcessor& host, std::size_t frames) {
+        audio_thread = true;
+        const bool ok = host.process(in, out, frames);
+        audio_thread = false;
+        require(ok, "process rejected");
+    };
+    const auto silent_from = [&](std::size_t from, std::size_t frames) {
+        for (std::size_t i = from; i < frames; ++i)
+            if (output[i] != 0)
+                return false;
+        return true;
+    };
+    HostProcessor host(mono(1), 512, 8);
+    run(host, 64);
+    require(std::abs(output[63] - 1.25f) < 1e-5, "steady output before muting");
+    audio_thread = true;
+    host.mute();
+    audio_thread = false;
+    run(host, 128);
+    for (std::size_t i = 0; i < 64; ++i)
+        require(std::abs(output[i] - 1.25f * (1 - static_cast<float>(i + 1) / 64)) < 1e-5,
+                "mute does not ramp over 64 frames");
+    require(silent_from(63, 128), "muted output not exactly silent");
+    host.set_bypass(true);
+    run(host, 256);
+    require(std::abs(output[255] - 1) < 1e-6, "bypass while muted does not pass the input");
+    host.set_bypass(false);
+    run(host, 256);
+    require(silent_from(64, 256), "muted again after bypass");
+    audio_thread = true;
+    host.reset();
+    audio_thread = false;
+    run(host, 64);
+    require(silent_from(0, 64), "a reset ended the silence");
+    run(host, 64);
+    // A replacement warms up while the muted filter plays (silence), then fades in.
+    host.replace(mono(2));
+    run(host, 512);
+    require(silent_from(0, 8), "replacement after mute: warm-up not silent");
+    bool rising = true;
+    for (std::size_t i = 9; i < 264; ++i)
+        rising = rising && output[i] >= output[i - 1] - 1e-6f && output[i] <= 2.25f + 1e-5f;
+    require(rising && std::abs(output[511] - 2.25f) < 1e-5,
+            "replacement after mute does not fade in from silence");
+    host.collect();
+    // Muted during a crossfade: the old filter fades out, the new is silent.
+    HostProcessor fading(mono(1), 512, 8);
+    run(fading, 64);
+    fading.replace(mono(2));
+    run(fading, 16);
+    audio_thread = true;
+    fading.mute();
+    audio_thread = false;
+    run(fading, 512);
+    require(silent_from(300, 512), "mute during a crossfade not silent at its end");
+    fading.collect();
+    // After a reset, a published filter is installed directly and plays.
+    audio_thread = true;
+    fading.reset();
+    audio_thread = false;
+    fading.replace(mono(3));
+    run(fading, 64);
+    for (std::size_t i = 0; i < 64; ++i)
+        require(std::abs(output[i] - (i < 8    ? 0.f
+                                      : i == 8 ? 3.f
+                                               : 3.25f)) < 1e-5,
+                "filter after a muted reset not installed directly");
+    fading.collect();
+}
+// A load is a transaction: whichever allocation runs out of memory, what
+// plays (the last configuration `install` published) is what the filter
+// saves, and a rejected load leaves the previous state whole. Found in jrp's
+// review of 0.4.30: a restored failed state published silence, then building
+// its message threw, so the host kept saving the old filter.
+void allocation_failures() {
+    const HostLayout host{48000, 2, 6, 0x3, 0x633}; // Speakers that differ from the mask.
+    const auto filter = [](float gain) {
+        return Configuration{48000, 2, 6, 0x3F, {}, {}, {{{gain}, {{0, 1}}, {{0, 1}}}}};
+    };
+    // What a configuration plays, told apart by its first coefficient.
+    const auto sound = [](const Configuration& c) { return c.paths.at(0).impulse.at(0); };
+    const auto saved_sound = [&](const HostFilter& f) {
+        return f.filter() ? sound(*f.filter()) : sound(unfiltered_configuration(host, f.failed()));
+    };
+    HostState failed;
+    failed.failed = true;
+    struct Case {
+        const char* name;
+        std::optional<HostState> before; // Loaded first, without limits.
+        HostState next;
+    };
+    const Case cases[] = {
+        {"first filter", std::nullopt, HostState{filter(2)}},
+        {"replacement with a speaker notice", HostState{filter(.5f)}, HostState{filter(2)}},
+        {"saved failed load over a filter", HostState{filter(.5f)}, failed},
+        {"empty state over a filter", HostState{filter(.5f)}, HostState{}},
+    };
+    for (const auto& c : cases) {
+        bool done = false;
+        for (long limit = 0; !done; ++limit) {
+            require(limit < 10000, "load never succeeded under the allocation limit");
+            HostFilter f(8);
+            float audible = sound(unfiltered_configuration(host, false));
+            const std::function<void(const Configuration&)> install =
+                [&](const Configuration& next) { audible = sound(next); };
+            if (c.before)
+                f.load(*c.before, host, install);
+            const float before = audible;
+            auto next = c.next;
+            const std::optional<HostLayout> layout = host;
+            allocations_left = limit;
+            try {
+                f.load(std::move(next), layout, install);
+                done = true;
+            } catch (const std::exception&) {
+            }
+            allocations_left = -1;
+            const auto what =
+                std::string(c.name) + " with " + std::to_string(limit) + " allocations: ";
+            require(audible == saved_sound(f), (what + "what plays is not what is saved").c_str());
+            if (!done)
+                require(audible == before && f.filter().has_value() == c.before.has_value(),
+                        (what + "a rejected load changed the previous state").c_str());
+        }
+    }
+    // The notice is kept with the filter it describes.
+    HostFilter f(8);
+    f.load(HostState{filter(2)}, host, [](const Configuration&) {});
+    require(!f.notice().empty(), "speaker notice not kept");
+}
 int main() {
     try {
         numeric<float>();
@@ -694,6 +839,8 @@ int main() {
         failure_reasons();
         speaker_notices();
         unequal_bypass();
+        muting();
+        allocation_failures();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

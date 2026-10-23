@@ -67,14 +67,16 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Selection | First matching list entry; relative paths beside their owner; no implicit resampling or guessed drive mapping | `config.cpp`, `native.inspection`, `compatibility.corpus` |
 | Errors | Expected input errors become located diagnostics; resource exhaustion propagates; all-entry validation can continue | `native.inspection_cli`, `native.limits` |
 | Integer output | Seeded draw order and per-channel shaping state are independent of caller chunking | `native.io`, `native.cli` |
-| State | Bounded transactional decoding; no partial application of invalid state | `native.state`, `vst3.adapter`, `lv2.adapter` |
+| State | Bounded transactional decoding; no partial application of invalid state. `HostFilter::load` builds everything it keeps before its install callback publishes, so what plays is what is saved even when memory runs out | `native.state`, `native.host` (`allocation_failures`), `vst3.adapter`, `lv2.adapter` |
 | Failure reasons | Every failed request, and every reason an instance plays silence, is kept as a `HostFailure` on the control side; never touched by the audio thread; a request overtaken by a newer one (`SupersededRequest`) records nothing | `native.host` (`failure_reasons`), `vst3.adapter` (`failure_records`), `lv2.adapter`, `au.adapter` |
 | Identities and old presets | Released plug-in identities never change; version-1 state loads on any arrangement with matching counts | `identities`, `vst3.identities`, `vst3.adapter` (`version1_presets`) |
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
 
 The host thread contract is in [`host.hpp`](../../include/convolver/host.hpp): one
-audio thread calls `process`, `reset` and `set_bypass`; control calls are serialized.
-Only `replace` and `collect` may overlap audio processing. Construction,
+audio thread calls `process`, `reset`, `set_bypass` and `mute`; control calls are
+serialized. Only `replace`, `prepare`, `publish` and `collect` may overlap audio
+processing (`prepare` and `publish` are `replace` in two steps, for an adapter
+that checks for a newer request in between). Construction,
 reconfiguration and destruction require stopped audio. Replaced engines are
 retired on the control side so FFT destruction cannot enter the callback.
 The [plug-in adapter contract](plugin-contract.md#replacement-and-threads) records adapter transition timing.

@@ -106,7 +106,10 @@ ctest --test-dir build -N
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard;
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
-  activations until a later request succeeds.
+  activations until a later request succeeds; `mute()` (its 64-frame ramp,
+  bypass, reset, a crossfade, and a replacement fading in from silence); and
+  allocation failure at every step of `HostFilter::load`, checking that what
+  plays is what is saved.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
@@ -394,7 +397,12 @@ AU-4.
   teardown with work queued; state with a path (mapped, PipeWire's bare value,
   an unusable embedded copy, lilv's own state files); and lifecycle
   sequences, one scripted and several seeded (loads, file loads, failed
-  loads, audio, bypass, reset, reopening a saved session). A small model checks the saved state, status, latency and
+  loads, audio, bypass, reset, reopening a saved session, an empty state
+  map). Cases taken from the shared contract and the LV2 specification
+  rather than from the implementation: a first file refused by `run()` is
+  silent within 64 frames with no control call, and an empty state map resets
+  to an empty instance (over a filter, a file, a failure, and with loads
+  outstanding). A small model checks the saved state, status, latency and
   failure record after every step, and the exact output at every reset and at
   the end; the transitions during audio (crossfades, a rejection while
   playing) are the harness's cases.
