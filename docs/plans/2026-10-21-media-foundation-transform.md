@@ -426,4 +426,5 @@ DirectShow hosts. What changes:
   Check in the Legacy player.
 - **Per-user registration:** we found no per-user equivalent of `MFTRegister`.
   Verify before promising non-administrator installs.
-- **Speaker masks** share the open VST3-1 decision. Settle it once for both adapters.
+- **Speaker masks** follow the VST3-1 decision (owner, 23 October 2026): compare the
+  filter's output mask with the device's and warn, never reject.

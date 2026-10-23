@@ -107,6 +107,8 @@ if(CONVOLVER_BUILD_NATIVE)
     add_library(Convolver::host ALIAS convolver_host)
     set_target_properties(convolver_host PROPERTIES EXPORT_NAME host POSITION_INDEPENDENT_CODE ON)
     target_link_libraries(convolver_host PUBLIC Convolver::core)
+    # The speaker table of plugins/identities.json (PLUG-4), used by speaker_notice.
+    target_include_directories(convolver_host PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     set(native_targets convolver_core convolver_host)
     # PLUG-3: preset files for every plug-in format, without any plug-in SDK.
     # Private to this build (not installed); adapters and the preset tool link it.

@@ -344,7 +344,8 @@ channel mask only; it records no input layout. Compatibility rules:
 Per format:
 
 - **VST3:** discrete accepts any `SpeakerArrangement` with N channels; a named
-  layout must match the arrangement (VST3-1).
+  layout must match the arrangement (VST3-1). Version-1 output masks are
+  compared and give a notice only (implemented 22 October 2026).
 - **AU:** `kAudioUnitProperty_SupportedNumChannels` gives counts only, so it
   cannot carry layout checks on its own. Named layouts need
   `kAudioUnitProperty_AudioChannelLayout` and
@@ -833,6 +834,10 @@ the LV2 plug-in serve FFmpeg too.
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
   unequal counts.
+- Whether to enforce named layouts or offer VST3 buses above 8 channels
+  (VST3-1). **Decided 23 October 2026 (owner):** neither for now. A filter's
+  output mask is compared with the host's arrangement and gives a notice only;
+  no host state version 3; buses stay at 1 to 8 channels. Revisit on request.
 - What bypass plays with unequal channel counts ([bypass](#bypass)).
   **Decided 22 October 2026 (owner):** silence on every output, including a
   1→2 filter that forks one input; equal counts keep input *c* to output *c*.

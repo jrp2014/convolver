@@ -19,6 +19,12 @@ Until 1.0 the C++ API may change between minor versions.
   first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
+- `speaker_notice` and `HostFilter::notice()` (VST3-1) compare the speakers a
+  filter's outputs are labelled for (the `.cfg` channel mask) with the host's
+  output speakers, now carried in `HostLayout`, and explain which outputs
+  land on which speakers. Advice only: nothing is rejected, and channels stay
+  routed by bus index. The VST3 adapter passes its speaker arrangements to it;
+  it has no way to show the notice yet.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
   list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate
@@ -124,6 +130,16 @@ Until 1.0 the C++ API may change between minor versions.
   applies the IR to every channel. Missing IRs, out-of-range IR or route
   channels, IR sample-rate mismatches and `-` without RAW options also get
   fuller explanations.
+
+### Fixed
+
+- A filter loaded while the host had stopped processing in the middle of a
+  crossfade now plays from the first resumed sample. Before, `HostProcessor`
+  kept the interrupted transition after `reset()`, so the old filter went on
+  playing until that crossfade finished (jrp's review of 0.4.19 measured 1.004
+  where 3 was expected). Any reset now ends the transition and the newer filter
+  plays at once; that includes the internal recovery reset after non-finite
+  output, which used to bring the old filter back and repeat the crossfade.
 
 ## [0.4.0] - 2026-10-19
 
