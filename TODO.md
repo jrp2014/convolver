@@ -120,9 +120,13 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
   VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
-  Progress (22 October 2026): REAPER and Carla are the suggested first hosts
-  (jrp to try); the SDK sample hosts were evaluated and not added to CI
-  ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
+  Progress (22 October 2026): the SDK sample hosts were evaluated and not
+  added to CI ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
+  Progress (23 October 2026): jrp's first hosts, on his Mac, are REAPER and
+  Audacity for VST3 (owner's decision, 23 October 2026, replacing REAPER and
+  Carla); each has a step-by-step
+  [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host).
+  Not yet run.
 - [ ] **HOST-2 — Additional formats and UI.** LV2 and AU are now first
   priorities alongside VST3 (see [plug-ins](#plug-ins-vst3-lv2-and-au) below).
   CLAP only on request: every CLAP host found also loads VST3. A filter-loading
@@ -276,7 +280,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
-  SoundSource, Live, REAPER and FL Studio results.
+  SoundSource, Live, REAPER and FL Studio results. Progress (23 October 2026):
+  GarageBand is jrp's first Audio Unit host (owner's decision, 23 October 2026),
+  with a [smoke test](docs/develop/host-testing.md#garageband-audio-unit)
+  limited to 44.1 kHz stereo. Not yet run.
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
@@ -326,7 +333,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   made by that exact release, in its own folder with its own runner (for
   example `tests/upgrade/VERSION/`, apart from the `.cfg` corpus in
   `tests/compatibility/`, since the guarantees differ): its example presets in
-  every format it ships, a saved REAPER or Carla project containing Convolver,
+  every format it ships, a saved REAPER project containing Convolver,
   the input and the expected audio rendered by that release, with the package
   SHA-256 and how each file was made. CI cannot open the host project, so the
   test takes the plug-in state chunk out of it and restores that through each

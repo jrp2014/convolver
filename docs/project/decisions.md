@@ -31,7 +31,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 21 October 2026 | Windows-native adapters (Media Foundation, APO) are parked | [Media Foundation plan](plans/2026-10-21-media-foundation-transform.md) |
 | 22 October 2026 | System-wide filtering on Windows goes through Equalizer APO: an export from `.cfg`, with no Windows audio code of our own | [Equalizer APO export](../use/equalizer-apo.md) |
 | 22 October 2026 | Next milestone: an independent user installs and uses an exact preview package by following the documentation | [Status](status.md#next-milestone-an-independent-user-runs-a-preview), [guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md) |
-| 22 October 2026 | REAPER and Carla are the suggested first named hosts; jrp will try them | [Host testing](../develop/host-testing.md#suggested-first-hosts) |
+| 22 October 2026 | REAPER and Carla are the suggested first named hosts; jrp will try them (replaced 23 October 2026) | [Host testing](../develop/host-testing.md#first-hosts) |
+| 23 October 2026 | jrp's first named hosts, on his Mac: REAPER and Audacity for VST3, GarageBand for the Audio Unit (a smoke test only). Replaces REAPER and Carla | [Host testing](../develop/host-testing.md#first-hosts) |
 
 ## Releases
 

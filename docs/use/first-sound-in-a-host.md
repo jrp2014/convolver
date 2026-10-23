@@ -7,10 +7,13 @@ what you hear, then make a preset from your own filter.
 
 **In short:** load Convolver on a mono or stereo track, load the matching
 `identity` preset (you should hear no change), then the `echo` preset (you
-should hear a quiet echo). Save and reopen the project to check that the filter
+should hear it quieter, with a slight change of tone). Save and reopen the project to check that the filter
 is kept.
 
-You need a plug-in host: a DAW such as REAPER, or a plug-in rack such as Carla.
+You need a plug-in host that loads VST3: a DAW such as REAPER, an audio
+editor such as Audacity (version 4 or later), or a plug-in rack such as Carla.
+GarageBand and Logic load only Audio Units, which preview packages do not
+contain yet ([install](install.md)).
 Installing a plug-in does not add filtering to an ordinary music player or to
 everything the computer plays. For that on Windows, see the
 [Equalizer APO export](equalizer-apo.md).
@@ -27,10 +30,13 @@ from, and `impulse.wav`.
    the host shows a generic panel with a bypass switch.
 3. From the host's preset menu ("Load Preset…" or its preset browser), load
    `presets/identity-RATE-LAYOUT/filter.vstpreset` for your rate and layout.
+   Audacity's preset menu cannot open a `.vstpreset` file;
+   [plug-in presets](presets.md#load-it-in-a-host) says where to put it instead.
 4. Play quiet audio and watch the meters. Identity leaves the sound unchanged,
    apart from a delay of 256 samples that most hosts make up for.
 5. Load the matching `echo` preset. Its filter is half the input at once plus a
-   quarter of it 257 samples later. Convolver does not lower the level for you,
+   quarter of it 257 samples (about 5 ms) later, too soon to hear as a
+   separate repeat. Convolver does not lower the level for you,
    so leave headroom with your own filters.
 6. Switch the host's bypass on and off. Save the project, close it and reopen
    it: the filter is back. Presets carry the filter inside them, so the

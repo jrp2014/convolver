@@ -7,39 +7,45 @@ For anyone testing Convolver's plug-ins or exports in a real host: what to
 record, the smoke test for a preview, and the full qualification for a
 production release. Automated tests are in [testing](testing.md).
 
-**In short:** no named DAW is qualified yet. REAPER and Carla are the first
-hosts to test. An unsigned preview needs the smoke test; a signed production
-release needs the full qualification. Every report records the exact package,
-host, system and settings.
+**In short:** no named DAW is qualified yet. jrp's first hosts, on his Mac,
+are REAPER and Audacity for the VST3 plug-in and GarageBand for the Audio
+Unit; each has a [step-by-step smoke test](#smoke-test-in-each-first-host)
+below. An unsigned preview needs the smoke test; a signed production release
+needs the full qualification. Every report records the exact package, host,
+system and settings.
+
+Contents: [first hosts](#first-hosts) ·
+[Steinberg's SDK hosts](#steinbergs-sdk-hosts) · [every report](#every-report) ·
+[smoke test](#smoke-test-for-an-unsigned-preview) ·
+[smoke test in each first host](#smoke-test-in-each-first-host) ·
+[production qualification](#production-qualification) ·
+[Equalizer APO on a real device](#equalizer-apo-on-a-real-device)
 
 No named DAW is currently qualified for portable Convolver. Automated SDK
 validation, standalone adapter tests and manual DAW tests are different evidence.
-REAPER and Carla are the suggested first hosts (see below). Ableton Live and
-Cubase need available licences/testers; no compatibility claim is inferred.
+Ableton Live, Cubase and Logic need available licences/testers; no
+compatibility claim is inferred.
 
 There are two levels of testing. An **unsigned preview** needs the smoke test
 below. A **signed production release** needs the full qualification procedure.
 Both gates are set out in the
 [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#unsigned-previews-and-production).
 
-## Suggested first hosts
+## First hosts
 
-Both are free to try and run on Windows, macOS and Linux, so one person can
-cover all three platforms without buying a licence.
+jrp tests on his Mac with these three (owner's decision, 23 October 2026; it
+replaces REAPER and Carla, suggested on 22 October). Together they cover a full
+DAW, the audio editor many users already have, and Apple's own Audio Unit host.
+Host facts were checked on 23 October 2026.
 
-- **[REAPER](https://www.reaper.fm/download.php)** (Cockos): a full DAW with a
-  free, fully functional evaluation period. It loads VST3, LV2 and (on macOS)
-  AU, so it can test each Convolver format as it arrives. It saves projects
-  with plug-in state, renders offline and shows CPU use. It is the closest of
-  the free options to how most users will run Convolver.
-- **[Carla](https://kx.studio/Applications:Carla)** (falkTX, free and open
-  source): a plug-in host and rack rather than a DAW. Version 2.5 or later loads
-  VST3, LV2 and (on macOS) AU, so the same session can compare the formats. It
-  runs on JACK or the platform's own audio system and saves its rack,
-  including plug-in state, as a project file.
+| Host | Format tested | Cost | What it adds | Limits for this test |
+| --- | --- | --- | --- | --- |
+| [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
+| [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track. The Apple silicon build loads only arm64 plug-ins |
+| GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, and GarageBand offers only the stereo version of an effect, so only the `44100-stereo` presets apply. Preview packages hold no Audio Unit yet, so build it from source |
 
-Use the [smoke test](#smoke-test-for-an-unsigned-preview) below in each, and
-record results under the TODO item HOST-1.
+Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
+[TODO](../../TODO.md), with the details in [every report](#every-report).
 
 ## Steinberg's SDK hosts
 
@@ -85,11 +91,137 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    its quarantine removal on macOS for this bundle only. Never disable security
    system-wide.
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
-   stereo. Check that the identity and echo examples sound as expected.
+   stereo, where the host offers both ([first hosts](#first-hosts)). Check that the identity and echo examples sound as expected.
 3. Save the project, close and reopen it, and check that the filter is restored.
 4. Try a preset with the wrong rate or channel count while a working filter is
    running. The working filter must keep running, and the host should show an
    error. Record what the host displays.
+
+## Smoke test in each first host
+
+These follow the [smoke test](#smoke-test-for-an-unsigned-preview) above with
+the menus of each host. Menu names can change between host versions; record
+what you actually chose. Play quiet audio and keep the volume low.
+
+### Prepare the Mac
+
+Do this once. Run the commands in the extracted preview package folder,
+except the Audio Unit build, which runs in a source checkout.
+
+1. Download the preview for your Mac's processor (`macos-arm64` on Apple
+   silicon, `macos-x86_64` on Intel), check its SHA-256, and install
+   `Convolver.vst3` as the [install guide](../use/install.md) says, clearing
+   the quarantine for this bundle only.
+2. For GarageBand, build the Audio Unit ([Audio Unit build](build.md#audio-unit)),
+   copy `build-au/plugins/au/Convolver.component` to
+   `~/Library/Audio/Plug-Ins/Components/` and check it:
+
+   ```sh
+   killall -9 AudioComponentRegistrar 2>/dev/null || true
+   auval -v aufx Conv CONV
+   ```
+
+   The last line must say `AU VALIDATION SUCCEEDED`. Then make the two
+   GarageBand presets from the package's VST3 examples, so they appear in the
+   unit's preset menu:
+
+   ```sh
+   mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
+   for kind in identity echo; do
+     ./bin/convolver-preset "presets/$kind-44100-stereo/filter.vstpreset" \
+       ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-stereo.aupreset
+   done
+   ```
+
+3. For Audacity, copy the stereo VST3 examples into the system VST3 preset
+   folder, each under its own name (Audacity names a preset after its file,
+   and every example file is called `filter.vstpreset`):
+
+   ```sh
+   sudo mkdir -p /Library/Audio/Presets/Convolver/Convolver
+   for d in presets/*-stereo; do
+     sudo cp "$d/filter.vstpreset" "/Library/Audio/Presets/Convolver/Convolver/$(basename "$d").vstpreset"
+   done
+   ```
+
+   Remove that folder after testing (`sudo rm -r /Library/Audio/Presets/Convolver`).
+4. Have a stereo test file at 44.1 kHz and one at 48 kHz, with clear
+   transients (a click track or spoken word).
+
+### REAPER (VST3)
+
+1. Open REAPER's *Settings* (*Preferences* in older versions) › *Plug-ins ›
+   VST*, check that the VST3 path includes
+   `~/Library/Audio/Plug-Ins/VST3`, and rescan. Convolver should be listed as a
+   VST3 effect from the vendor Convolver.
+2. Set *File › Project settings* to 48000 Hz and the audio device to 48 kHz.
+   Import the 48 kHz test file onto a track.
+3. Open the track's FX window and add Convolver. With no preset loaded it
+   passes stereo audio unchanged.
+4. From the **+** button beside the FX window's preset menu, import
+   `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
+   preset files). Play: the sound is unchanged. Import
+   `presets/echo-48000-stereo/filter.vstpreset`: the level drops and the tone
+   changes slightly. (Its echo comes 257 samples, about 5 ms, after the direct
+   sound, too soon to hear as a separate repeat.)
+5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
+   The sound switches between filtered and unfiltered; note any click.
+6. Render the project (*File › Render*, offline) to a WAV and check that it
+   holds the echo, starting in time with the source rather than 256 samples
+   late.
+7. Save the project, quit REAPER, reopen the project and play: the echo is
+   still there.
+8. While the echo plays, import `presets/identity-44100-stereo/filter.vstpreset`.
+   The echo keeps playing. Record what REAPER shows, if anything.
+
+### Audacity (VST3)
+
+1. Use the Audacity build for your Mac's processor. On start, Audacity offers
+   to validate new plug-ins: accept. Otherwise use *Effect › Plugin manager ›
+   Rescan plugins*. Convolver should be listed with the VST3 effects.
+2. In a new project, import the 48 kHz stereo file and check that the project
+   rate is 48000 Hz.
+3. Open the track's real-time effects (the track's **Effects** button, or
+   **E**) and add Convolver. In its preset menu choose `identity-48000-stereo`
+   (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
+   Play: unchanged. Choose `echo-48000-stereo`: quieter and slightly
+   coloured, as in REAPER.
+4. Switch the effect off and on with its power button while playing; note
+   any click.
+5. Save the project, quit, reopen and play: the echo is still there.
+6. Remove the real-time effect. Select a few seconds, choose Convolver from the
+   **Effect** menu with the `echo-48000-stereo` preset, and apply it. Zoom in on
+   a transient: the result starts where the original did (Audacity removes the
+   reported 256-sample delay by default). Undo.
+7. Add the effect again with the echo preset, play, and choose
+   `identity-44100-stereo`. The echo keeps playing. Record what Audacity
+   shows.
+8. Record what a mono track does with a stereo preset; Audacity asks the
+   plug-in for two channels even there, so no particular result is expected.
+
+### GarageBand (Audio Unit)
+
+1. Turn on *GarageBand › Settings › Audio/MIDI › Enable Audio Units* and
+   restart GarageBand if it asks.
+2. Create an empty project with an audio track, and drag the 44.1 kHz stereo
+   file onto it (GarageBand projects always run at 44.1 kHz).
+3. Show Smart Controls (**B**) and open the **Plug-ins** area. Click an empty
+   plug-in slot and choose *Audio Units › Convolver › Convolver*. Click the
+   middle of the slot to open its window. With no preset loaded it passes the
+   audio unchanged.
+4. From the window's preset menu choose `identity-44100-stereo`, then
+   `echo-44100-stereo`, and listen as in REAPER.
+5. Switch the plug-in off and on with the slot's power button while playing;
+   note any click. GarageBand, not Convolver, saves whether the plug-in is off.
+6. Save the project, quit, reopen and play: the echo is still there.
+7. Export the song (*Share › Export Song to Disk*) and check that the file holds
+   the echo.
+8. Build a 48 kHz preset with `./bin/convolver-preset
+   presets/echo-48000-stereo/filter.vstpreset
+   ~/Library/Audio/Presets/Convolver/Convolver/echo-48000-stereo.aupreset`
+   and choose it while the 44.1 kHz echo plays. The echo keeps playing. Record
+   what GarageBand shows; the reason is in the Console application (search
+   for "Convolver").
 
 ## Production qualification
 
