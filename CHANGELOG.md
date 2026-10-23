@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
+  bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
+  2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
+  `convolver-preset` and from saved sessions; bypass, 256-frame latency
+  reporting and a status port; rejected loads are explained in the host's log.
+  A filter file parameter and worker-thread loading follow in LV2-2. See the
+  [LV2 guide](docs/lv2.md).
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
   `convolver/host.hpp`: the control side of the shared plug-in adapter
   contract (which filter a load replaces, what is saved and what plays), for
