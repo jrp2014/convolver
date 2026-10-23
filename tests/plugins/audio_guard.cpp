@@ -3,7 +3,20 @@
 #include <atomic>
 #include <cstdlib>
 #include <new>
-#if defined(__linux__)
+// Linux counts locks by defining pthread_mutex_lock, except under
+// ThreadSanitizer, which needs its own definition to see the locks.
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define CONVOLVER_GUARD_TSAN 1
+#endif
+#endif
+#if defined(__SANITIZE_THREAD__)
+#define CONVOLVER_GUARD_TSAN 1
+#endif
+#if defined(__linux__) && !defined(CONVOLVER_GUARD_TSAN)
+#define CONVOLVER_GUARD_LOCKS 1
+#endif
+#if defined(CONVOLVER_GUARD_LOCKS)
 #include <dlfcn.h>
 #include <pthread.h>
 #endif
@@ -24,7 +37,7 @@ Counts take() noexcept {
     return c;
 }
 bool counts_locks() noexcept {
-#if defined(__linux__)
+#if defined(CONVOLVER_GUARD_LOCKS)
     return true;
 #else
     return false;
@@ -85,7 +98,7 @@ void operator delete[](void* p, std::size_t) noexcept {
     ::operator delete(p);
 }
 
-#if defined(__linux__)
+#if defined(CONVOLVER_GUARD_LOCKS)
 namespace {
 using Lock = int (*)(pthread_mutex_t*);
 // Constant-initialized, so the first lock needs no guarded static.

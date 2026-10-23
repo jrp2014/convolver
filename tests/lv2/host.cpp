@@ -16,6 +16,18 @@
 #include <lv2/patch/patch.h>
 #include <stdexcept>
 
+// PLUG-7's lifecycle test counts what the plug-in's audio-thread calls
+// allocate or lock (tests/plugins/audio_guard.hpp); the other LV2 tests do not
+// link the guard.
+#if defined(CONVOLVER_AUDIO_GUARD)
+#include "../plugins/audio_guard.hpp"
+#define AUDIO_GUARD_SCOPE const convolver::plugin_test::audio_guard::Scope audio_guard_scope
+#define AUDIO_GUARD_PAUSE const convolver::plugin_test::audio_guard::Pause audio_guard_pause
+#else
+#define AUDIO_GUARD_SCOPE static_cast<void>(0)
+#define AUDIO_GUARD_PAUSE static_cast<void>(0)
+#endif
+
 namespace convolver::lv2_test {
 std::string state_uri() {
     return presets::lv2_state_uri();
@@ -231,7 +243,8 @@ LV2_Worker_Status Plugin::schedule(LV2_Worker_Schedule_Handle handle, std::uint3
     auto& h = *static_cast<Plugin*>(handle);
     if (h.scheduling_fails)
         return LV2_WORKER_ERR_NO_SPACE;
-    if (h.mode_ == Worker::threaded) {
+    if (h.mode_ == Worker::threaded || h.mode_ == Worker::deferred) {
+        AUDIO_GUARD_PAUSE; // The host's queue, not the plug-in's audio code.
         const auto* bytes = static_cast<const std::byte*>(data);
         {
             std::lock_guard lock(h.work_mutex_);
@@ -240,6 +253,7 @@ LV2_Worker_Status Plugin::schedule(LV2_Worker_Schedule_Handle handle, std::uint3
         h.work_changed_.notify_all();
         return LV2_WORKER_SUCCESS;
     }
+    AUDIO_GUARD_PAUSE; // Free-wheeling: work() is not real-time.
     return h.worker_->work(lilv_instance_get_handle(h.instance_), respond, &h, size, data);
 }
 LV2_Worker_Status Plugin::respond(LV2_Worker_Respond_Handle handle, std::uint32_t size,
@@ -261,14 +275,37 @@ void Plugin::deliver_responses() {
         ready.swap(responses_);
     }
     for (auto& r : ready) {
-        worker_->work_response(lilv_instance_get_handle(instance_),
-                               static_cast<std::uint32_t>(r.size()), r.data());
+        {
+            AUDIO_GUARD_SCOPE; // work_response() is the audio thread.
+            worker_->work_response(lilv_instance_get_handle(instance_),
+                                   static_cast<std::uint32_t>(r.size()), r.data());
+        }
         ++delivered_;
     }
 }
 void Plugin::wait_for_worker() {
     std::unique_lock lock(work_mutex_);
     work_changed_.wait(lock, [&] { return jobs_.empty() && !busy_; });
+}
+std::size_t Plugin::run_deferred_work(std::size_t count) {
+    std::size_t ran = 0;
+    for (; ran < count; ++ran) {
+        std::vector<std::byte> job;
+        {
+            std::lock_guard lock(work_mutex_);
+            if (jobs_.empty())
+                break;
+            job = std::move(jobs_.front());
+            jobs_.pop_front();
+        }
+        worker_->work(lilv_instance_get_handle(instance_), respond, this,
+                      static_cast<std::uint32_t>(job.size()), job.data());
+    }
+    return ran;
+}
+std::size_t Plugin::queued_work() {
+    std::lock_guard lock(work_mutex_);
+    return jobs_.size();
 }
 
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
@@ -394,7 +431,10 @@ void Plugin::run(std::span<const float* const> in, std::span<float* const> out,
     for (std::size_t c = 0; c < out.size(); ++c)
         lilv_instance_connect_port(instance_, outputs_[c], out[c]);
     write_messages();
-    lilv_instance_run(instance_, frames);
+    {
+        AUDIO_GUARD_SCOPE;
+        lilv_instance_run(instance_, frames);
+    }
     read_notifications();
     if (worker_)
         deliver_responses();
@@ -405,7 +445,10 @@ void Plugin::run_empty() {
     for (std::size_t c = 0; c < outputs_.size(); ++c)
         lilv_instance_connect_port(instance_, outputs_[c], &scratch_[inputs_.size() + c]);
     write_messages();
-    lilv_instance_run(instance_, 0);
+    {
+        AUDIO_GUARD_SCOPE;
+        lilv_instance_run(instance_, 0);
+    }
     read_notifications();
     if (worker_)
         deliver_responses();

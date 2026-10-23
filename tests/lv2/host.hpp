@@ -91,6 +91,7 @@ enum class Worker {
     threaded,    // A worker thread; answers are delivered after the next run().
     synchronous, // Free-wheeling: work() runs inside schedule_work, answers after run().
     immediate,   // As synchronous, but answers are delivered at once, inside run().
+    deferred,    // Requests wait until run_deferred_work(); answers after the next run().
 };
 
 struct Features {
@@ -175,6 +176,11 @@ class Plugin {
     bool scheduling_fails = false;
     // Threaded worker: waits until the queue is empty and work() has returned.
     void wait_for_worker();
+    // Deferred worker: calls work() on this thread for up to `count` queued
+    // requests, oldest first, as a host's worker thread would when it gets
+    // round to them. Returns how many it ran.
+    std::size_t run_deferred_work(std::size_t count = ~std::size_t(0));
+    std::size_t queued_work();
     // Pauses the next work() call to reach `point`, through the plug-in's
     // test hook; wait_until_paused() returns once it has, resume() lets it go.
     void pause_at(lv2::WorkerPoint point);

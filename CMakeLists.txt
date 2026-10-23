@@ -36,12 +36,15 @@ option(CONVOLVER_BUILD_AU "Build the optional Audio Unit adapter (macOS; require
 option(CONVOLVER_BUILD_NATIVE "Build the portable FFT/libsndfile core and CLI" ON)
 option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
 # PLUG-7: lifecycle sequences are enumerated up to this many operations after
-# each start. Sanitizers make each sequence about ten times slower, so their
-# builds enumerate one fewer (docs/develop/testing.md#lifecycle-sequences-plug-7).
+# each start; LV2, with its worker operations, has about twice as many to
+# choose from. Sanitizers make each sequence ten to twenty times slower, so
+# their builds enumerate one fewer (docs/develop/testing.md#lifecycle-sequences-plug-7).
 if(CONVOLVER_SANITIZERS)
     set(CONVOLVER_LIFECYCLE_LENGTH 3)
+    set(CONVOLVER_LV2_LIFECYCLE_LENGTH 2)
 else()
     set(CONVOLVER_LIFECYCLE_LENGTH 4)
+    set(CONVOLVER_LV2_LIFECYCLE_LENGTH 3)
 endif()
 option(CONVOLVER_BUILD_IO "Build the libsndfile/configuration adapter" ON)
 option(CONVOLVER_BUILD_CLI "Build the command-line renderer" ${CONVOLVER_BUILD_IO})

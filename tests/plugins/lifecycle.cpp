@@ -392,8 +392,9 @@ class Runner {
         audio_guard::take();
         {
             audio_guard::Scope audio;
-            auto* p = new int(1);
-            delete p;
+            // Called directly: a new-expression's allocation may be elided.
+            void* p = ::operator new(16);
+            ::operator delete(p);
             std::mutex mutex;
             const std::lock_guard lock(mutex);
         }
@@ -720,6 +721,8 @@ Filters make_filters(const Host& host) {
     a.sample_rate = host.sample_rate;
     a.input_channels = host.inputs;
     a.output_channels = host.outputs;
+    a.input_delays.assign(host.inputs, 0); // As a .cfg file loads (LV2's file holds A).
+    a.output_delays.assign(host.outputs, 0);
     // One path per output, from input (output mod inputs), five taps each and
     // all different; with two or more inputs, the last input also reaches
     // output 0 at half gain.
