@@ -1,17 +1,22 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# The LV2 bundle (LV2-1): BUILD/lv2/convolver.lv2/ holds the plug-in library,
+# The LV2 bundle (LV2-1, LV2-2): BUILD/lv2/convolver.lv2/ holds the plug-in library,
 # manifest.ttl and convolver.ttl, generated from plugins/identities.json.
 # Point LV2_PATH at BUILD/lv2 to try it in a host.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(CONVOLVER_LV2 REQUIRED IMPORTED_TARGET lv2>=1.18)
 find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
+if(NOT TARGET Convolver::io)
+    message(FATAL_ERROR "The LV2 plug-in loads filter files, so it needs CONVOLVER_BUILD_IO "
+        "(libsndfile)")
+endif()
 
 set(lv2_bundle_dir "${PROJECT_BINARY_DIR}/lv2/${CONVOLVER_ID_LV2_BUNDLE}")
 set(lv2_binary "convolver${CMAKE_SHARED_MODULE_SUFFIX}")
 add_library(convolver_lv2 MODULE plugin.cpp)
 target_include_directories(convolver_lv2 PRIVATE "${PROJECT_SOURCE_DIR}/portable"
     "${Convolver_BINARY_DIR}/generated")
-target_link_libraries(convolver_lv2 PRIVATE Convolver::host convolver_presets PkgConfig::CONVOLVER_LV2)
+target_link_libraries(convolver_lv2 PRIVATE Convolver::host Convolver::io convolver_presets
+    PkgConfig::CONVOLVER_LV2)
 target_compile_features(convolver_lv2 PRIVATE cxx_std_20)
 # "$<1:...>" keeps multi-configuration generators from adding a subfolder.
 set_target_properties(convolver_lv2 PROPERTIES PREFIX "" OUTPUT_NAME convolver

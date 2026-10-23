@@ -133,7 +133,8 @@ if(CONVOLVER_BUILD_NATIVE)
         add_library(convolver_io STATIC portable/io.cpp portable/config.cpp portable/config_parse.cpp
             portable/inspection.cpp)
         add_library(Convolver::io ALIAS convolver_io)
-        set_target_properties(convolver_io PROPERTIES EXPORT_NAME io)
+        # Position independent: the LV2 plug-in links it.
+        set_target_properties(convolver_io PROPERTIES EXPORT_NAME io POSITION_INDEPENDENT_CODE ON)
         target_include_directories(convolver_io PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)

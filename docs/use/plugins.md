@@ -13,8 +13,9 @@ does not fit. Installing is in [install](install.md); making presets is in
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
-- There is no window of its own. You choose a filter by loading a preset, and
-  the host saves the filter inside your project.
+- There is no window of its own. You choose a filter by loading a preset (in
+  LV2 also by choosing a file), and the host saves the filter inside your
+  project.
 - Latency is always 256 samples, and the host makes up for it.
 - A filter that does not fit the host's sample rate or channel counts never
   lets unfiltered audio through: a first filter that does not fit plays
@@ -27,6 +28,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 [latency and tail](#latency-and-tail) · [bypass](#bypass) ·
 [replacing a filter](#replacing-a-filter) · [audio](#audio) ·
 [LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
+[LV2 filter files](#lv2-filter-files) ·
 [identities](#identities) · [Audio Unit licence](#audio-unit-licence)
 
 ## Formats
@@ -37,6 +39,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | How to get it | Preview package, or build | Build from source | Build from source |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
+| Choose a `.cfg` or IR file directly | No | No | [Yes](#lv2-filter-files) |
 | Where a refused load is explained | Nowhere yet: the host only sees the refusal | The host gets an error; the reason is in the macOS Console | The host's log, and a status output |
 | Tail reported to the host | Yes | Yes, in seconds | No |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
@@ -74,6 +77,9 @@ original WAV and `.cfg` files are moved or deleted.
 The filter is prepared away from the audio, then installed. A preset loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
+
+In LV2 you can also choose the `.cfg` file, list or impulse response itself,
+with the host's file chooser ([LV2 filter files](#lv2-filter-files)).
 
 ## When a filter does not fit
 
@@ -177,13 +183,61 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 64-sample fade) |
 | 1 | `latency` | Control output | 256 samples |
-| 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed |
+| 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed, 3 Loading |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |
+| then | `control` | Atom input | The host sets or asks for the filter file |
+| last | `notify` | Atom output | Names the file that plays |
 
-The plug-in needs the host's `urid:map` feature. It writes messages through
-the host's log, or to standard error if the host has none. Hosts that cannot
-hand it a feature list (such as lilv's `lv2apply`) cannot load it.
+Load failed stays shown until a filter loads successfully, also after the
+host reactivates the plug-in; Loading is shown while the newest file choice
+is being loaded.
+
+The plug-in needs the host's `urid:map` feature, and the host's worker thread
+to load files. It writes messages through the host's log, or to standard
+error if the host has none. Hosts that cannot hand it a feature list (such as
+lilv's `lv2apply`) cannot load it.
+
+## LV2 filter files
+
+The LV2 plug-in has one parameter, **Filter**
+(`https://github.com/jrp2014/convolver/lv2#filter`, a path). Hosts that show
+LV2 file parameters, such as Ardour and Jalv, give it a file chooser: choose
+the `.cfg` file, list or impulse response you would pass to the
+[command-line tool](command-line.md). The file is read for the plug-in's
+sample rate and channel counts, so a list chooses its entry exactly as the
+command-line tool does, and nothing is resampled.
+
+The file is loaded on the host's worker thread, so audio carries on
+meanwhile: the status port shows Loading, then Running once the new filter
+plays (fading in, or starting at once if no audio has played yet). If you
+choose several files quickly, only the newest is loaded; one that was still
+being loaded when you chose another is never heard, and if it fails, its
+failure is not reported either. The plug-in tells the host which file plays,
+so the chooser shows the right file after a failed load and when the session
+is reopened.
+
+A file that cannot be used (missing, unreadable, another sample rate, other
+channel counts, or a path longer than 4096 bytes) is refused like a preset
+that does not fit ([when a filter does not fit](#when-a-filter-does-not-fit)):
+the status shows Load failed, the log explains what is wrong and what to
+change, and a working filter keeps playing and is still the one saved. A host
+without a worker thread cannot load files: the status shows Load failed at
+once and the log says why; presets and saved sessions still work there.
+
+**Saved sessions.** The session saves the whole filter, as for a preset, and
+also the path of the file it came from (made relative to the session folder
+when the host supports that, so the folder can move). Reopening uses the saved
+filter, so the session sounds the same after the file changes or disappears;
+only if the saved filter cannot be used does it load the file again.
+
+**PipeWire.** PipeWire's `filter-chain` can start the plug-in with a file
+path alone, which is how to use Convolver for room correction of all system
+audio on Linux:
+
+```text
+config = { "https://github.com/jrp2014/convolver/lv2#filter" = "/home/me/room/room.cfg" }
+```
 
 ## Identities
 

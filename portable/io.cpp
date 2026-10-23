@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <fstream>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <sndfile.h>
 #include <stdexcept>
@@ -222,6 +223,19 @@ SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
     return sf_open(path.c_str(), mode, &info);
 #endif
 }
+// libsndfile writes the last open failure, and some of its open steps, to
+// globals, so opens are serialized together with reading that failure:
+// LV2 instances load filter files on several worker threads at once. Other
+// code in the same process that uses libsndfile is beyond this lock.
+SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& info,
+                       const std::string& action) {
+    static std::mutex opening;
+    const std::lock_guard lock(opening);
+    SNDFILE* file = open(path, mode, info);
+    if (!file)
+        throw error(action + " " + path.string(), nullptr);
+    return file;
+}
 struct Handle {
     SNDFILE* file = nullptr;
     ~Handle() {
@@ -427,9 +441,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         return;
     }
 #endif
-    impl_->handle.file = open(path, SFM_READ, sf);
-    if (!impl_->handle.file)
-        throw error("cannot open audio input " + path.string(), nullptr);
+    impl_->handle.file = open_or_throw(path, SFM_READ, sf, "cannot open audio input");
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
     try {
         validate(impl_->info);
@@ -573,9 +585,7 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
         sf.format = (sf.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
     if (!sf_format_check(&sf))
         throw std::invalid_argument("unsupported audio output format");
-    impl_->handle.file = open(path, SFM_WRITE, sf);
-    if (!impl_->handle.file)
-        throw error("cannot open audio output " + path.string(), nullptr);
+    impl_->handle.file = open_or_throw(path, SFM_WRITE, sf, "cannot open audio output");
     sf_command(impl_->handle.file, SFC_SET_CLIPPING, nullptr, SF_TRUE);
     if (impl_->speakers) {
         // Channels take the set bits in increasing order, as WAVE requires.

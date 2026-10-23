@@ -196,7 +196,9 @@ Consult the [native workflow](../../.github/workflows/regression.yml) and
 file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
 workflow installs the
 [pinned format tools](build.md#pinned-format-dependencies) and checks
-them on LV2's example plug-ins until the LV2 adapter adds its bundle. The
+them on LV2's example plug-ins, then builds Convolver's bundle and runs the
+LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
+`lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
 it ([Audio Unit tests](#audio-unit-tests)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
@@ -382,17 +384,27 @@ AU-4.
   refusals; the status port, log messages, saved state and failure record after
   good and bad loads (the record through an unadvertised extension that exists
   for the tests only); presets written by `convolver-preset` and lilv's own
-  state round trip; long `run()` calls; and lifecycle sequences, one scripted
-  and several seeded (loads, failed loads, audio, bypass, reset, reopening a
-  saved session). A small model checks the saved state, status, latency and
+  state round trip; long `run()` calls; filter files through the worker, run
+  on a thread, synchronously (as when a host free-wheels) and with answers
+  delivered inside `run()`, without a worker, and with scheduling that fails;
+  failed files of every kind; rapid choices; the two preparation-window cases,
+  with `work()` paused (through a second test-only extension) after
+  preparation and after its last check while a newer request arrives, and a
+  failed read overtaken the same way; restore with an answer outstanding;
+  teardown with work queued; state with a path (mapped, PipeWire's bare value,
+  an unusable embedded copy, lilv's own state files); and lifecycle
+  sequences, one scripted and several seeded (loads, file loads, failed
+  loads, audio, bypass, reset, reopening a saved session). A small model checks the saved state, status, latency and
   failure record after every step, and the exact output at every reset and at
   the end; the transitions during audio (crossfades, a rejection while
   playing) are the harness's cases.
 - `lv2.exports` and `lv2.fft_symbols`: the library exports only
   `lv2_descriptor` and does not use a shared FFTW.
 
-The [LV2 workflow](../../.github/workflows/lv2.yml) also runs `lv2lint` on every
-plug-in in the bundle, with the [pinned packages](build.md#pinned-format-dependencies).
+The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
+UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
+and runs `lv2lint` on every plug-in in the bundle, with the
+[pinned packages](build.md#pinned-format-dependencies).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
 Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
 than reporting the refusal).

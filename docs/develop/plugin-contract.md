@@ -211,7 +211,10 @@ session, and reactivation recomputes it.
 `Convolver::host` exports `HostProcessor`, `HostFilter` and the state codec
 without SDK or file I/O dependencies ([`host.hpp`](../../include/convolver/host.hpp)).
 Prepare, replace, collect and destruct calls must be serialized on the control
-side. One audio thread calls process, reset and set_bypass. Destruction and
+side. `replace()` is `prepare()` then `publish()`; an adapter that must check
+for a newer request between the two (LV2's worker) calls them itself, and an
+install callback that throws `SupersededRequest` abandons the request without
+changing the filter or its failure record. One audio thread calls process, reset and set_bypass. Destruction and
 reconfiguration require audio to have stopped. Reset clears history without
 allocation, but its work scales with prepared storage. Filter preparation can
 be expensive; neither FFT planning nor file access belongs in a callback.
@@ -305,10 +308,23 @@ How each adapter meets the contract where its format differs:
   port, which the host saves, so the adapter's state does not record bypass and
   ignores a bypass flag in another format's preset. Activation is LV2's reset:
   it starts a fresh processor with the current filter, no history and its exact
-  tail. `run()` does not allocate, lock or do I/O; state restore, save,
-  activation and cleanup share a lock that `run()` never takes, and the plug-in
-  does not declare `state:threadSafeRestore`. It needs `urid:map`, logs through
+  tail. `run()` and the worker's answers (`work_response()`) do not allocate,
+  lock or do I/O; a file choice on the `filter` parameter reaches the worker as
+  a request numbered by generation, which is also its failure record's request
+  number. The worker's `work()`, state restore and save, activation and
+  cleanup share a lock that `run()` never takes, and the plug-in does not
+  declare `state:threadSafeRestore`. `work()` stops before recording anything
+  for a request a newer one has overtaken: after reading the file, and again
+  after `HostProcessor::prepare()`, just before `publish()`. The status port
+  follows the newest request (3, Loading, while it is outstanding); the path
+  it reports and saves follows the installed filter. The full rules are in
+  the plan's
+  [worker and state lifecycle](../project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  It needs `urid:map`, uses `work:schedule` to load files, logs through
   `log:log` (otherwise standard error), and reads `bufsz:maxBlockLength` from
   `options` when given; without it, or for longer `run()` calls, it processes in
-  pieces of at most 4096 frames with the same output. The `status` port's value
-  3 (Loading) is reserved for LV2-2's file parameter.
+  pieces of at most 4096 frames with the same output. It reads filter files
+  with libsndfile, whose error reporting is shared by the whole process, so
+  Convolver opens one file at a time; that lock does not cover the host or
+  other plug-ins using libsndfile at the same moment, which at worst report
+  each other's error message.

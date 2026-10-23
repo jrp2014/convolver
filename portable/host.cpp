@@ -151,6 +151,10 @@ const std::string& HostFilter::error() const noexcept {
     return f ? f->message : none;
 }
 
+std::uint64_t HostFilter::next_request() noexcept {
+    return ++requests_;
+}
+
 HostRequest HostFilter::numbered(HostRequest request) {
     request.number = request.number ? request.number : requests_ + 1;
     requests_ = std::max(requests_, request.number);
@@ -218,6 +222,8 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                     next ? Configuration{} : unfiltered_configuration(*host, state.failed);
                 try {
                     install(next ? *next : unfiltered);
+                } catch (const SupersededRequest&) {
+                    throw; // Abandoned: nothing recorded or changed.
                 } catch (const std::exception& e) {
                     refuse(HostFailureKind::preparation,
                            std::string("The filter could not be prepared: ") + e.what(), request,
@@ -227,6 +233,8 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
         }
     } catch (const Refused&) {
         throw; // Recorded above.
+    } catch (const SupersededRequest&) {
+        throw;
     } catch (...) {
         // Out of memory building a message, or a non-standard exception.
         refuse(HostFailureKind::preparation, "The filter could not be prepared.", request, carried);
@@ -251,10 +259,6 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     load_failure_ = std::move(saved_failure);
     activation_failure_.reset();
     notice_ = std::move(notice);
-}
-
-std::uint64_t HostFilter::next_request() noexcept {
-    return ++requests_;
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {
@@ -348,14 +352,19 @@ struct HostProcessor::Impl {
             item = next;
         }
     }
-    void replace(const Configuration& c) {
+    std::unique_ptr<Prepared> prepare(const Configuration& c) const {
         if (c.sample_rate != rate || c.input_channels != inputs || c.output_channels != outputs)
             throw std::invalid_argument("replacement must preserve sample rate and channels");
-        auto prepared = std::make_unique<Prepared>(c, block);
+        return std::make_unique<Prepared>(c, block);
+    }
+    void publish(std::unique_ptr<Prepared> prepared) noexcept {
         collect();
         // Conservative tail never shrinks during a session, including transitions.
         tail.store(std::max(tail.load(), prepared->engine.tail_frames()));
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
+    }
+    void replace(const Configuration& c) {
+        publish(prepare(c));
     }
     // The audio producer only links; the control consumer owns deletion.
     // Collection must never hold up adoption of another pending filter.
@@ -476,6 +485,29 @@ HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::s
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);
+}
+struct HostProcessor::Replacement::Data {
+    const Impl* owner = nullptr;
+    std::unique_ptr<Impl::Prepared> prepared;
+};
+HostProcessor::Replacement::Replacement(std::unique_ptr<Data> data) noexcept
+    : data_(std::move(data)) {}
+HostProcessor::Replacement::Replacement(Replacement&&) noexcept = default;
+HostProcessor::Replacement& HostProcessor::Replacement::operator=(Replacement&&) noexcept = default;
+HostProcessor::Replacement::~Replacement() = default;
+HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const {
+    auto prepared = impl_->prepare(c);
+    // Member by member: Apple Clang lacks parenthesized aggregate initialization.
+    auto data = std::make_unique<Replacement::Data>();
+    data->owner = impl_.get();
+    data->prepared = std::move(prepared);
+    return Replacement(std::move(data));
+}
+void HostProcessor::publish(Replacement&& r) noexcept {
+    // A Replacement from another processor, or one already published, is ignored.
+    if (r.data_ && r.data_->owner == impl_.get() && r.data_->prepared)
+        impl_->publish(std::move(r.data_->prepared));
+    r.data_.reset();
 }
 void HostProcessor::collect() noexcept {
     impl_->collect();

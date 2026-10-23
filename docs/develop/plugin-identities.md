@@ -39,6 +39,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load (owner's decision, 22 October 2026); everything else is still written as version 1 |
 | AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). Owner's decision, 22 October 2026 |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. Owner's decision, 22 October 2026 |
+| LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). Owner's decision, 23 October 2026 |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
 **Status (22 October 2026):** no release has used these identities yet. The

@@ -5,7 +5,8 @@
 # policy build LV2's example plug-ins, lilv loads and runs one on a shared
 # fixture, and lv2lint checks it. Then it builds Convolver's bundle against the
 # pinned packages, runs the LV2 tests (lilv-hosted PLUG-2 harness and adapter
-# tests) under ASan and UBSan and lv2lints every plug-in. LV2-3 adds pluginval.
+# tests) under ASan and UBSan, the adapter tests again under ThreadSanitizer
+# (LV2-2's worker), and lv2lints every plug-in. LV2-3 adds pluginval.
 # (lv2apply cannot host Convolver: it offers no features, and Convolver needs
 # urid:map for its state.)
 name: LV2
@@ -136,6 +137,21 @@ jobs:
           cmake --build build-lv2-asan --parallel
           ctest --test-dir build-lv2-asan --output-on-failure --parallel 2 \
             -R '^(examples\.first_use|lv2\..*)$'
+      # The worker's races (LV2-2): the adapter tests again under
+      # ThreadSanitizer. The runner's address-space randomisation is reduced
+      # first, because ThreadSanitizer cannot map its shadow memory with the
+      # kernel's default on this image.
+      - name: Convolver's LV2 adapter tests (Debug, ThreadSanitizer)
+        env:
+          TSAN_OPTIONS: halt_on_error=1
+        run: |
+          sudo sysctl vm.mmap_rnd_bits=28
+          cmake -S . -B build-lv2-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_LEGACY_TESTS=OFF \
+            -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
+            -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
+          cmake --build build-lv2-tsan --parallel --target convolver_lv2_adapter convolver_preset_tool
+          ctest --test-dir build-lv2-tsan --output-on-failure -R '^lv2\.adapter$'
       # lv2lint is not a sanitizer build, so it needs a plain one.
       - name: Convolver's LV2 bundle (Release)
         run: |

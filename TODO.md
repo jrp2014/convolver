@@ -52,7 +52,7 @@ boundary and C++20 in the core.
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Now, shared | **PLUG-7:** lifecycle sequences | Checks `HostFilter`, `HostProcessor` and VST3 against a small reference model, then each new adapter. |
-| 1. In parallel | **VST3** (HOST-1), **LV2-2 to LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
+| 1. In parallel | **VST3** (HOST-1), **LV2-3 and LV2-4**, **AU-1 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
 | 2. Next milestone | jrp's conditions: **REL-2** journeys demonstrated and **REL-3** an independent user with an exact **PLUG-5** preview package (the third, the reset fix, is done). Proposed with them: **PLUG-7**, a **HOST-1** smoke test | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated (owner's decision, 23 October 2026). |
 | 3. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8); it decides how to show them. |
@@ -231,28 +231,6 @@ Shared work, done once for all three formats:
 
 LV2 (Linux first; also PipeWire system audio):
 
-- [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
-  chooser), worker-thread preparation, state with the embedded filter and mapped
-  path, and PipeWire-style restore from a bare path string. Follow the
-  [worker and state lifecycle](docs/project/plans/2026-10-21-plugin-formats.md#lv2-adapter-design):
-  one adapter lock for all `HostProcessor` control calls that `run()` never
-  takes; requests passed as copied worker payloads with a generation number,
-  skipped if already stale after loading and checked again after the
-  replacement is prepared, just before publication (needs a
-  prepare-then-publish step in `HostProcessor`), so a stale completion never
-  wins; status follows the newest request and the reported path follows the
-  installed filter, with regression tests for a request that arrives during
-  preparation or just before publication; no
-  `state:threadSafeRestore` at first; initial restoration installs directly;
-  rapid loads coalesce to the newest; defined handling of scheduling
-  failure, saving during a load, synchronous (free-wheel) work and teardown
-  with work outstanding, each with a test.
-  Progress (22 October 2026, PR #43): restoring the embedded state (presets and
-  sessions) works, prepared in `restore()`; the path parameter, worker, mapped
-  path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
-  sequences with outstanding worker loads. Record file and worker failures as
-  PLUG-8 records (`filter_file`, request numbers from
-  `HostFilter::next_request()` used as the generation).
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -521,6 +499,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
+- [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;
+  [loading a filter](docs/use/plugins.md#loading-a-filter), [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
