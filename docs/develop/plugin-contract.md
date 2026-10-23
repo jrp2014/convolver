@@ -220,8 +220,9 @@ callback, and nothing after the callback publishes can throw, so running out
 of memory never leaves one filter playing while another is saved. One audio
 thread calls process, reset, set_bypass and mute. `mute()` is for a failure
 found on the audio thread itself: the current filter ramps to silence over 64
-samples and stays silent until the next published filter takes over and fades
-in from silence; bypass still passes the dry signal. Destruction and
+samples and stays silent until a filter published after the mute takes over
+and fades in from silence; one published before it but not yet picked up by
+the audio thread is silenced too. Bypass still passes the dry signal. Destruction and
 reconfiguration require audio to have stopped. Reset clears history without
 allocation, but its work scales with prepared storage. Filter preparation can
 be expensive; neither FFT planning nor file access belongs in a callback.
