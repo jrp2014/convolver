@@ -94,5 +94,5 @@ in the repository; this log is their first written record.
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 18 October 2026 | In repository documents the owner is called jrp | [Documentation guide](../develop/documentation.md#writing-rules) |
-| 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](plans/2026-10-23-documentation-by-reader.md) |
-| 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](plans/2026-10-23-documentation-by-reader.md#decisions) |
+| 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md) |
+| 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md#decisions) |

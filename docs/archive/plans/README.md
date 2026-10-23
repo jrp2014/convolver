@@ -2,7 +2,8 @@
 # Archived plans
 
 These design and implementation plans are finished: the work they describe is on
-`main`. They were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026 and kept
+`main`. The first ones were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026;
+later plans move here when their work is merged. All are kept
 as records of what was intended, decided and measured at the time. Use the
 [current documentation](../../README.md) for how Convolver behaves now.
 
@@ -16,6 +17,7 @@ tracked in [TODO](../../../TODO.md).
 | [Independent core and CMake package](2026-10-18-cmake-package-core.md) | Exported `Convolver::core` and `Convolver::io`, presets, relocatable package consumer tests | `82cf94b` | [Library guide](../../develop/library.md) |
 | [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [How the plug-ins behave](../../use/plugins.md) |
 | [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Other programs](../../use/other-programs.md) |
+| [Documentation by reader](2026-10-23-documentation-by-reader.md) | Maintained pages sorted into `docs/use/`, `docs/develop/` and `docs/project/`; status page, decisions log, shorter front pages and the reader-folder check | PRs #47, #51, #52, #53 (last merged in `41d1d3a`) | [Documentation guide](../../develop/documentation.md) |
 
 ## How completion was checked
 
