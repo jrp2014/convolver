@@ -133,11 +133,38 @@ jobs:
             vcpkg-v1-${{ runner.os }}-${{ runner.arch }}-x64-windows--
       - name: Install native dependencies
         run: vcpkg install 'fftw3[core,sse2,avx,avx2]:x64-windows' 'libsndfile[core]:x64-windows'
+      # HOST-4: Equalizer APO's own Benchmark.exe runs the exported configurations.
+      # The installer is unpacked, not run, so no audio driver is changed; only
+      # the registry value naming the configuration folder is set.
+      - name: Unpack Equalizer APO
+        env:
+          EQUALIZER_APO_VERSION: 1.4.2
+          EQUALIZER_APO_SHA256: 7403be7427bbe1936a40dded082829b6e217fc4f5990fee5cba501f0ae055afa
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'equalizer-apo'
+          $installer = Join-Path $env:RUNNER_TEMP 'EqualizerAPO-x64.exe'
+          $version = $env:EQUALIZER_APO_VERSION
+          $url = "https://sourceforge.net/projects/equalizerapo/files/$version/EqualizerAPO-x64-$version.exe/download"
+          curl.exe -fsSL --retry 3 -o $installer $url
+          if ($LASTEXITCODE -ne 0) { throw "Cannot download Equalizer APO from $url" }
+          $digest = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+          if ($digest -ne $env:EQUALIZER_APO_SHA256) { throw "Unexpected Equalizer APO checksum $digest" }
+          7z x -y "-o$directory" $installer | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot unpack the Equalizer APO installer' }
+          $config = Join-Path $env:RUNNER_TEMP 'equalizer-apo-config'
+          New-Item -ItemType Directory -Force -Path $config | Out-Null
+          New-Item -Force -Path 'HKLM:\SOFTWARE\EqualizerAPO' | Out-Null
+          Set-ItemProperty -Path 'HKLM:\SOFTWARE\EqualizerAPO' -Name ConfigPath -Value $config
+          Set-ItemProperty -Path 'HKLM:\SOFTWARE\EqualizerAPO' -Name EnableTrace -Value 'false'
+          "EQUALIZER_APO_BENCHMARK=$(Join-Path $directory 'Benchmark.exe')" >> $env:GITHUB_ENV
+          "EQUALIZER_APO_CONFIG=$config" >> $env:GITHUB_ENV
       - name: Configure MSVC
         run: >-
           cmake -S . -B build -A x64
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows -DCONVOLVER_LEGACY_TESTS=OFF
+          "-DCONVOLVER_EQUALIZER_APO_BENCHMARK=$env:EQUALIZER_APO_BENCHMARK"
+          "-DCONVOLVER_EQUALIZER_APO_CONFIG=$env:EQUALIZER_APO_CONFIG"
       - name: Build
         run: cmake --build build --config Release --parallel 2
       - name: Test native libraries and CLI

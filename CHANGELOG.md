@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
+  bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
+  2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
+  `convolver-preset` and from saved sessions; bypass, 256-frame latency
+  reporting and a status port; rejected loads are explained in the host's log.
+  A filter file parameter and worker-thread loading follow in LV2-2. See the
+  [LV2 guide](docs/lv2.md).
 - `HostFilter`, `HostLayout` and `unfiltered_configuration` in
   `convolver/host.hpp`: the control side of the shared plug-in adapter
   contract (which filter a load replaces, what is saved and what plays), for
@@ -30,8 +37,8 @@ Until 1.0 the C++ API may change between minor versions.
   can apply the filter to everything a device plays. The device's sample rate
   and channel count choose the list entry (on a device with more channels,
   the largest entry that fits); a device that no entry fits, and device
-  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO, not yet in Equalizer
-  APO itself.
+  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO and, on Windows CI, in
+  Equalizer APO 1.4.2's own filter code through its `Benchmark.exe`.
 
 - `convolver-preset` (PLUG-3) makes self-contained presets for VST3
   (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`

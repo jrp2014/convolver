@@ -65,7 +65,7 @@ boundary and C++20 in the core.
 | 5. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication | First releases are unsigned previews on macOS and Windows (owner's decision, 21 October 2026), published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 6. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the order-3 streams (VST3-1, VST3-7, LV2-1 to LV2-4, AU-1 to AU-4) and PLUG-3 are implemented, so every surface that can report an error exists. With PLUG-8 done it mostly decides how to show reasons already kept. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
-| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) needs a check in Equalizer APO itself. PERF-1 keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
+| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. FFT-1 is complete. |
 
@@ -163,10 +163,12 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   an Equalizer APO configuration ([guide](docs/equalizer-apo.md)), chosen by
   the device's sample rate and channel count, silent when nothing fits.
   `export.equalizer_apo` checks it against a model of Equalizer APO 1.4.2 and
-  the double-precision oracle. Still open: run the first-use exports and a list
-  in Equalizer APO itself on Windows (its `Benchmark.exe` processes a WAV file
-  with the installed configuration, which might also allow a Windows CI job),
-  and record the version and results in the guide.
+  the double-precision oracle. On Windows CI, `export.equalizer_apo.runtime`
+  runs the same cases in Equalizer APO 1.4.2's `Benchmark.exe` (its own filter
+  code, without the audio service). Still open: the manual check on a real
+  Windows device in the [guide](docs/equalizer-apo.md#how-it-is-tested)
+  (device rate and channel count reach the configuration; exclusive mode
+  bypasses it), done by anyone with a Windows computer, with the result recorded there.
 - [ ] **DIAG-1 — Review how diagnostics reach the user.** Do this once the
   current plug-in plans are implemented (see the
   [execution priorities](#execution-priorities)). For every failure a user can
@@ -371,8 +373,16 @@ decision, 22 October 2026). VST3 follows it since VST3-7; the shared parts are
 
 LV2 (Linux first; also PipeWire system audio):
 
-- [ ] **LV2-1 — Adapter and headless test.** `plugins/lv2/`: audio, latency and
-  bypass ports; a `lilv` test using PLUG-2.
+- [x] **LV2-1 — Adapter and headless test.** `plugins/lv2/`: audio, latency and
+  bypass ports; a `lilv` test using PLUG-2. Done 22 October 2026 (PR #43): one
+  bundle with a plug-in URI per PLUG-4 layout, generated from the registry;
+  `enabled`, latency and status ports; filters through state (the
+  `convolver-preset` property), with the control lock and failure rules of the
+  [LV2 design](docs/plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+  `lv2.harness` passes every PLUG-2 case (restore-before-setup and tail checks
+  skipped: LV2 has neither); `lv2.adapter` covers ports, status, log messages,
+  presets, lilv state and seeded lifecycle sequences; `lv2lint` runs on every
+  plug-in in CI ([LV2 guide](docs/lv2.md)).
 - [ ] **LV2-2 — Loading filters.** `atom:Path` filter parameter (host file
   chooser), worker-thread preparation, state with the embedded filter and mapped
   path, and PipeWire-style restore from a bare path string. Follow the
@@ -389,12 +399,25 @@ LV2 (Linux first; also PipeWire system audio):
   rapid loads coalesce to the newest; defined handling of scheduling
   failure, saving during a load, synchronous (free-wheel) work and teardown
   with work outstanding, each with a test.
+  Progress (22 October 2026, PR #43): restoring the embedded state (presets and
+  sessions) works, prepared in `restore()`; the path parameter, worker, mapped
+  path and PipeWire's bare path remain. Extend `lv2.adapter`'s lifecycle
+  sequences with outstanding worker loads.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
+  Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
+  CI came with LV2-1; pluginval and named layouts remain.
 - [ ] **LV2-4 — User guide and host matrix.** `docs/lv2.md` with a PipeWire
   configuration; Ardour, REAPER, Carla, Qtractor and PipeWire results.
 - [ ] **LV2-5 — Release bundles.** Linux tarball, then distro packages; macOS and
   Windows bundles under PLUG-5.
+  Before the first release, jrp decides how `VERSION` maps to
+  `lv2:minorVersion` and `lv2:microVersion` (today MINOR and PATCH, set by
+  `plugins/lv2/generate_ttl.py`). LV2 treats an odd minor or micro as a
+  development version and minor 0 as experimental, has no major, and lilv
+  loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
+  lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
+  with minor even and non-zero and micro even for releases.
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
@@ -633,6 +656,7 @@ with compatibility tests; linked IDs point to open work above.
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/cmake-package.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/versioning.md), [testing](docs/testing.md) |
 | Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/testing.md#validation-limits-and-release-work) |
+| Equalizer APO 1.4.2 (x86/x64) convolution drops up to three bins just below half the sample rate when a block is not a multiple of four frames | Upstream behaviour, inaudible (about 22 kHz at 44.1 kHz); the export does not work around it. The runtime test uses 480-frame blocks. | [Equalizer APO guide](docs/equalizer-apo.md#how-it-is-tested) |
 | Historical Windows applications are not built or host-tested by portable CI | Old PCM32, shaping, CMD tail and host-negotiation gaps remain historical; fix only proven defects, without implying modern host support. | [Historical coverage](docs/testing.md#historical-coverage) |
 
 ## Documentation maintenance

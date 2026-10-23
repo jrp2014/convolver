@@ -136,8 +136,17 @@ ctest --test-dir build-native -N
   a `config.txt` are covered, and other sample rates and devices over 32
   channels must be silent. It also checks that existing folders and folder
   names too long for Equalizer APO are refused, that file names cannot add
-  commands, and that failed exports leave nothing. The model is not Equalizer APO itself; running the export there
-  is open as HOST-4. See the [guide](equalizer-apo.md#how-it-is-tested).
+  commands, and that failed exports leave nothing. See the
+  [guide](equalizer-apo.md#how-it-is-tested).
+
+- `export.equalizer_apo.runtime` (Windows CI, or a Windows build configured
+  with `CONVOLVER_EQUALIZER_APO_BENCHMARK` and `CONVOLVER_EQUALIZER_APO_CONFIG`
+  on a computer whose devices do not use Equalizer APO):
+  the same cases also run in Equalizer APO 1.4.2's `Benchmark.exe`, which
+  applies a `config.txt` to a WAV file with Equalizer APO's own filter code.
+  The output must match the oracle within half a 16-bit step (its rounding) plus 1e-5, because
+  `Benchmark.exe` writes 16-bit files, and silence must be exactly zero. A real audio device and exclusive-mode
+  bypass are checked by hand (steps in the guide).
 
 The optional [VST3 build](vst3.md) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
@@ -189,7 +198,8 @@ workflow reports newer releases of those pins; it tests nothing in Convolver.
 Every plug-in adapter is held to the same rules by one harness,
 [`tests/plugins/harness.hpp`](../tests/plugins/harness.hpp). Each format's test
 implements its small `Adapter` interface by driving the format's own host API
-(today only VST3, in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp));
+(VST3 in [`tests/vst3/harness_tests.cpp`](../tests/vst3/harness_tests.cpp), LV2 hosted
+by lilv in [`tests/lv2/harness_tests.cpp`](../tests/lv2/harness_tests.cpp));
 the harness owns the cases and the criteria.
 
 **Fixtures.** The [first-use examples](../examples/first-use/README.md) are the
@@ -254,8 +264,17 @@ hosts call `setupProcessing` with placeholder values before restoring state).
 The harness prints the worst error against the oracle; 1.8e-7 with Ooura on
 Linux on 22 October 2026.
 
-`vst3.harness` needs the VST3 build, the CLI and the native targets; CTest runs
-`examples.first_use` first. A new format adds a driver beside its other tests
+LV2 lists none either. Its two restore-before-setup cases are skipped (LV2
+knows its rate and channels from instantiation), and the tail checks are
+skipped because LV2 core cannot report a tail: its driver's
+`Adapter::reports_tail()` returns false, and every other check of those cases,
+the audio included, still runs. LV2 has no separate reset, so the driver's
+reset is deactivate and activate, and it reads the latency port after a
+zero-frame `run()`, as hosts do before audio. The [LV2 guide](lv2.md#tests)
+lists its other tests.
+
+`vst3.harness` and `lv2.harness` need their plug-in builds, the CLI and the
+native targets; CTest runs `examples.first_use` first. A new format adds a driver beside its other tests
 and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 [`plugins/vst3/CMakeLists.txt`](../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
