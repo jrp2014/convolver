@@ -117,6 +117,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
+  VST3 plug-in and GarageBand for the Audio Unit, each with a step-by-step
+  [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host)
+  (HOST-1, AU-4); they replace REAPER and Carla. The
+  [presets guide](docs/use/presets.md#load-it-in-a-host) now says where
+  Audacity 4 finds `.vstpreset` files, since its preset menu cannot import
+  them.
 - Documentation for contributors and coding agents moved into `docs/develop/`
   (DOC-4, first step): one [build page](docs/develop/build.md) for every build,
   the [plug-in adapter contract](docs/develop/plugin-contract.md) taken out of
