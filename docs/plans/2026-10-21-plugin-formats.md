@@ -457,8 +457,8 @@ separate:
 
 The next milestone (TODO, "Execution priorities") adds an independent user
 following the REL-2 journeys from the first preview's exact files (REL-3).
-Whether that happens before upload or after publication is a proposal for jrp
-(see REL-3).
+It happens with the chosen candidate run's files before they are uploaded
+(owner's decision, 23 October 2026; see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:

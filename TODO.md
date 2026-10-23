@@ -127,11 +127,10 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
-  machine, using only the documentation. Proposal for jrp: the tester uses the
-  chosen candidate run's files before they are uploaded, so the pre-release
-  can describe what was demonstrated; the alternative is to publish first,
-  labelled unverified, and update the release notes (never the assets)
-  afterwards. Record who (a name or "independent
+  machine, using only the documentation. The tester uses the chosen
+  candidate run's files before they are uploaded, so the pre-release can
+  describe what was demonstrated (owner's decision, 23 October 2026); the
+  tester is still to be chosen. Record who (a name or "independent
   tester"), the package hash, OS, host and version, and for each step whether
   it worked, where they hesitated and what they could not do without help.
   Fix the guides or the product for each finding and repeat the affected
