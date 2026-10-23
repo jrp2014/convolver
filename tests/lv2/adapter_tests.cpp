@@ -974,6 +974,37 @@ void worker_loads(host::World& world, const fs::path& work) {
         }
     }
     {
+        // A fails to read, but B was requested meanwhile: A's failure is never
+        // recorded, so it neither silences the empty instance nor is logged.
+        const std::string label = "A's read fails after B is requested: ";
+        auto p = worker_instance(world, Worker::threaded);
+        p->activate();
+        p->pause_at(WorkerPoint::read);
+        p->set_filter(files.missing.string());
+        p->run_empty();
+        p->wait_until_paused();
+        p->pause_at(WorkerPoint::prepared);
+        p->set_filter(b);
+        auto out = play_constant(*p, 512);
+        p->resume();            // A is superseded before anything is recorded.
+        p->wait_until_paused(); // B, after its preparation.
+        auto more = play_constant(*p, 512);
+        out.insert(out.end(), more.begin(), more.end());
+        // (After the first block, which fades in from activation.)
+        check(std::all_of(out.begin() + 256, out.end(), [](float v) { return near(v, 1.f); }) &&
+                  p->status == as_float(Status::loading),
+              label + "the empty instance passes audio through while B loads");
+        p->resume();
+        settle(*p);
+        bool logged = false;
+        for (const auto& m : p->log.messages)
+            logged = logged || m.text.find(files.missing.filename().string()) != std::string::npos;
+        check(!logged && !p->failure(), label + "A's failure is neither logged nor recorded");
+        check(near(play_constant(*p, 4096).back(), .75f) &&
+                  p->status == as_float(Status::running) && reported(*p) == b,
+              label + "B plays");
+    }
+    {
         const std::string label = "scheduling failure for B while A is paused after its check: ";
         auto p = with_original();
         p->pause_at(WorkerPoint::checked);

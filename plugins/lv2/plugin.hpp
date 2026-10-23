@@ -51,14 +51,15 @@ struct TestFailureAccess {
     // the same compiler and standard library (the tests are).
     void (*read)(void* instance, void* context, void (*receive)(void*, const HostFailure*));
 };
-// Also for the tests only: pauses inside the worker, at the two points where
-// a newer request can overtake a load (docs/plans/2026-10-21-plugin-formats.md
+// Also for the tests only: pauses inside the worker, at the points where a
+// newer request can overtake a load (docs/plans/2026-10-21-plugin-formats.md
 // #lv2-adapter-design). work() calls `pause(context, point)` under the control
 // lock, so the caller must not make control calls until it returns.
 inline constexpr const char* test_worker_uri = "urn:convolver:lv2-test:worker";
 enum class WorkerPoint : int {
     prepared = 1, // The new filter is prepared; the final generation check is next.
     checked = 2,  // The final check passed; publication is next.
+    read = 3,     // The file was read (or failed to read); nothing is recorded yet.
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.

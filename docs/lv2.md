@@ -81,8 +81,8 @@ Loading happens on the host's worker thread (the LV2 worker extension), so
 audio carries on meanwhile: the status port shows Loading, then Running once
 the new filter plays (crossfading from the old one, or installed directly if
 no audio has run yet). If you choose several files quickly, only the newest
-is loaded, and a file that was being prepared when a newer choice arrived is
-never heard. The plug-in tells the host which file plays (a `patch:Set` on
+is loaded, and a file that was being read or prepared when a newer choice
+arrived is never heard; if it fails, its failure is not reported either. The plug-in tells the host which file plays (a `patch:Set` on
 its notify port, and in answer to `patch:Get`), so the chooser shows the
 right file after a failed load and after the session is reopened.
 
@@ -188,6 +188,11 @@ frames, with the same output.
   `state:threadSafeRestore`, so hosts do not restore state while audio runs.
   The full rules, and why each request is numbered, are in the plan's
   [worker and state lifecycle](plans/2026-10-21-plugin-formats.md#lv2-adapter-design).
+- **libsndfile:** the plug-in reads filter files with libsndfile, whose error
+  reporting is shared by everything in the process, so Convolver opens one
+  file at a time. That lock does not cover the host or other plug-ins using
+  libsndfile at the same moment; at worst one of them reports the other's
+  error message.
 
 ## Tests
 
@@ -206,7 +211,8 @@ frames, with the same output.
   delivered inside `run()`, without a worker, and with scheduling that fails;
   failed files of every kind; rapid choices; the two preparation-window
   cases, with `work()` paused (through a second test-only extension) after
-  preparation and after its last check while a newer request arrives; restore
+  preparation and after its last check while a newer request arrives, and a
+  failed read overtaken the same way; restore
   with an answer outstanding; teardown with work queued; state with a path
   (mapped, PipeWire's bare value, an unusable embedded copy, lilv's own state
   files); and lifecycle sequences, one scripted and several

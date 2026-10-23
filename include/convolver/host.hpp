@@ -79,7 +79,9 @@ struct HostRequest {
     // Numbers requests in order, so a later request's outcome is never
     // mistaken for this one's. 0 asks HostFilter to number it. An adapter
     // that numbers requests itself (LV2's generations, counted on the audio
-    // thread) numbers all of them, each larger than every earlier one.
+    // thread) numbers all of them, each larger than every earlier one. An
+    // adapter that needs one number before it calls load() takes it from
+    // HostFilter::next_request(), so numbers never repeat.
     // A failure at activation carries the accepted filter's request, which is
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
@@ -97,7 +99,8 @@ struct HostFailure {
 };
 
 // Thrown by a HostFilter::load install callback to abandon a request that a
-// newer one has overtaken: load() rethrows it and changes nothing.
+// newer one has overtaken: load() rethrows it and changes neither the filter
+// nor the failure, though the request's number is used up.
 class SupersededRequest : public std::exception {
   public:
     const char* what() const noexcept override {
@@ -137,6 +140,9 @@ class HostFilter {
     const std::optional<HostFailure>& rejection() const noexcept {
         return load_failure_;
     }
+    // Reserves the next request number, for a request numbered before load().
+    // The in-tree adapters do not use it (LV2 numbers every request itself).
+    std::uint64_t next_request() noexcept;
     // A possible problem that does not stop the accepted filter playing, from
     // the last check against the host (speaker_notice); empty if none. It
     // describes the host as of the last load() with a host or activate(); an

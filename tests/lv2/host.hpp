@@ -218,7 +218,6 @@ class Plugin {
     bool busy_ = false, stopping_ = false;
     std::mutex response_mutex_;
     std::deque<std::vector<std::byte>> responses_;
-    bool in_run_ = false;
     // The pause hook's state.
     std::mutex pause_mutex_;
     std::condition_variable pause_changed_;

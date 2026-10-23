@@ -339,25 +339,32 @@ void activate(LV2_Handle handle) {
 
 // --- Loading a filter file ------------------------------------------------------
 
+// Why a filter file could not be used, to record under its request.
+struct ReadFailure {
+    HostFailureKind kind = HostFailureKind::filter_file;
+    std::string message;
+};
+
 // Loads `path` for this instance's rate and channels, so a list chooses its
-// entry as in the CLI. Records any failure under `request` and returns none.
-std::optional<Configuration> read_filter_file(Instance& p, const std::string& path,
-                                              const HostRequest& request) {
+// entry as in the CLI. On failure, fills `failure` and returns none; the
+// caller records it, unless a newer request has overtaken this one.
+std::optional<Configuration> read_filter_file(const Instance& p, const std::string& path,
+                                              ReadFailure& failure) {
     try {
         return load_configuration(
             path, ConfigurationSelection{p.layout.sample_rate, p.layout.inputs, p.layout.outputs});
     } catch (const std::exception& e) {
         // Readable, but made for another rate or other channels? Then the
-        // record's kind says so; the message already explains.
-        auto kind = HostFailureKind::filter_file;
+        // record's kind says so; the message already explains. (A file that
+        // fails for another reason as well is classified by rate or channels.)
+        failure.kind = HostFailureKind::filter_file;
         try {
             const auto any = load_configuration(path);
-            kind = any.sample_rate != p.layout.sample_rate ? HostFailureKind::sample_rate
-                                                           : HostFailureKind::channels;
+            failure.kind = any.sample_rate != p.layout.sample_rate ? HostFailureKind::sample_rate
+                                                                   : HostFailureKind::channels;
         } catch (...) {
         }
-        p.filter.reject(kind, "The filter file \"" + path + "\" could not be used: " + e.what(),
-                        request);
+        failure.message = "The filter file \"" + path + "\" could not be used: " + e.what();
     }
     return std::nullopt;
 }
@@ -368,7 +375,8 @@ void pause_at(const Instance& p, WorkerPoint point) {
 }
 
 // work()'s part under the lock: the three steps of the plan's "stale requests".
-Outcome load_request(Instance& p, const Request& r, const std::string& path) {
+// `damaged`: the host passed a request whose length does not match.
+Outcome load_request(Instance& p, const Request& r, const std::string& path, bool damaged) {
     const auto newest = [&] { return p.requested.load(std::memory_order_acquire); };
     if (r.generation < newest())
         return Outcome::superseded; // Rapid loads coalesce to the newest.
@@ -381,6 +389,14 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path) {
         p.log_rejection();
         return Outcome::failed;
     };
+    if (damaged) {
+        p.filter.reject(HostFailureKind::filter_file,
+                        "The host damaged the filter request on its way to its worker thread, so "
+                        "the file was not loaded. Choose the file again; if this repeats, report "
+                        "it to the host's developers.",
+                        request);
+        return failed();
+    }
     if (r.too_long) {
         p.filter.reject(HostFailureKind::filter_file,
                         "The filter file's path is longer than " + std::to_string(max_path_bytes) +
@@ -388,12 +404,16 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path) {
                         request);
         return failed();
     }
-    auto next = read_filter_file(p, path, request);
-    if (!next)
-        return failed();
-    // 1. Already overtaken: stop before FFT planning.
+    ReadFailure why;
+    auto next = read_filter_file(p, path, why);
+    pause_at(p, WorkerPoint::read);
+    // 1. Already overtaken: stop before recording a failure or FFT planning.
     if (r.generation < newest())
         return Outcome::superseded;
+    if (!next) {
+        p.filter.reject(why.kind, std::move(why.message), request);
+        return failed();
+    }
     try {
         p.filter.load(
             HostState{std::move(next)}, p.layout,
@@ -403,14 +423,21 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path) {
                         throw SupersededRequest();
                     return;
                 }
-                auto prepared = p.host->prepare(c);
+                std::optional<HostProcessor::Replacement> prepared;
+                try {
+                    prepared.emplace(p.host->prepare(c));
+                } catch (...) { // Out of memory: no failure for an overtaken request.
+                    if (r.generation != newest())
+                        throw SupersededRequest();
+                    throw;
+                }
                 pause_at(p, WorkerPoint::prepared);
                 // 2. The last check, after preparation.
                 if (r.generation != newest())
                     throw SupersededRequest();
                 pause_at(p, WorkerPoint::checked);
                 // 3. Publish.
-                p.host->publish(std::move(prepared));
+                p.host->publish(std::move(*prepared));
             },
             request);
     } catch (const SupersededRequest&) {
@@ -432,19 +459,22 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
     if (size < sizeof r)
         return LV2_WORKER_ERR_UNKNOWN;
     std::memcpy(&r, data, sizeof r);
-    if (size - sizeof r != r.length || r.length > max_path_bytes)
-        return LV2_WORKER_ERR_UNKNOWN;
+    // A damaged request is still answered, as a failure, so the status does
+    // not stay at Loading.
+    const bool damaged = size - sizeof r != r.length || r.length > max_path_bytes;
     // If memory runs out, the answer still goes back, without a path.
     Response answer;
     answer.generation = r.generation;
     std::vector<std::byte> reply;
     try {
-        const std::string path(static_cast<const char*>(data) + sizeof r, r.length);
+        const std::string path =
+            damaged ? std::string()
+                    : std::string(static_cast<const char*>(data) + sizeof r, r.length);
         std::lock_guard lock(p.control);
         if (p.closing)
             return LV2_WORKER_SUCCESS;
         p.record_dropped();
-        answer.outcome = load_request(p, r, path);
+        answer.outcome = load_request(p, r, path, damaged);
         if (p.host)
             p.host->collect();
         answer.installed = p.installed;
@@ -625,7 +655,9 @@ void deactivate(LV2_Handle handle) {
 void cleanup(LV2_Handle handle) {
     auto* p = static_cast<Instance*>(handle);
     try {
-        // Lets a save() or work() in progress finish first.
+        // Lets a save() or work() already in progress finish first. LV2
+        // requires the host to stop calling work() before cleanup(): one
+        // that starts after this returns finds the instance freed.
         std::lock_guard lock(p->control);
         p->closing = true;
         p->stopping.store(true, std::memory_order_relaxed);
@@ -809,12 +841,15 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         if (embedded)
             p.log_rejection();
         const HostRequest from_file{HostFilterSource::file, *path, generation};
-        if (auto next = read_filter_file(p, *path, from_file)) {
+        ReadFailure why;
+        if (auto next = read_filter_file(p, *path, why)) {
             try {
                 p.filter.load(HostState{std::move(next)}, p.layout, install, from_file);
                 loaded = true;
             } catch (...) {
             }
+        } else {
+            p.filter.reject(why.kind, std::move(why.message), from_file);
         }
     }
     if (loaded) {

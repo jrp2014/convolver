@@ -151,6 +151,10 @@ const std::string& HostFilter::error() const noexcept {
     return f ? f->message : none;
 }
 
+std::uint64_t HostFilter::next_request() noexcept {
+    return ++requests_;
+}
+
 HostRequest HostFilter::numbered(HostRequest request) {
     request.number = request.number ? request.number : requests_ + 1;
     requests_ = std::max(requests_, request.number);

@@ -27,7 +27,7 @@ Until 1.0 the C++ API may change between minor versions.
   restores too, as PipeWire's `filter-chain` `config` passes it. The plug-in
   now links libsndfile. For adapters, `HostProcessor::prepare()` and
   `publish()` split `replace()` in two, and `SupersededRequest` abandons an
-  overtaken request; `HostFilter::next_request()` is gone.
+  overtaken request.
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the

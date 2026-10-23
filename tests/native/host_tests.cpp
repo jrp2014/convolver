@@ -525,7 +525,15 @@ void failure_reasons() {
             "a supplied request number was not kept");
     early.reject("damaged");
     require(early.failure()->request.number == 13, "numbering does not continue after 12");
-    // A request abandoned by its install callback leaves no trace.
+    // A number reserved before load() is never reused.
+    const auto reserved = early.next_request();
+    require(reserved == 14, "next_request does not continue the numbering");
+    early.reject(Kind::filter_file, "missing", {HostFilterSource::file, "/r.cfg", reserved});
+    require(early.failure()->request.number == 14, "a reserved number was not kept");
+    early.reject("damaged");
+    require(early.failure()->request.number == 15, "a reserved number was reused");
+    // A request abandoned by its install callback changes neither the filter
+    // nor the failure (its number is used up all the same).
     const auto before = *early.failure();
     bool abandoned = false;
     try {
@@ -535,7 +543,7 @@ void failure_reasons() {
     } catch (const SupersededRequest&) {
         abandoned = true;
     }
-    require(abandoned && early.failure()->request.number == 13 &&
+    require(abandoned && early.failure()->request.number == 15 &&
                 early.failure()->message == before.message && !early.filter(),
             "a superseded request changed the filter or its failure");
     early.load(HostState{}, std::nullopt); // An empty instance succeeds.
