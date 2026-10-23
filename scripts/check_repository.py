@@ -111,6 +111,15 @@ def check_docs_index(root, files, errors):
                           'or the plans list so readers can find it')
 
 
+def check_reader_folders(files, errors):
+    for name in maintained_markdown(files):
+        if name.startswith('docs/') and name != 'docs/README.md' \
+                and not name.startswith(READER_FOLDERS):
+            errors.append(f'{name}: maintained pages belong in a reader folder (docs/use/, '
+                          'docs/develop/ or docs/project/); dated records go in docs/archive/. '
+                          'See docs/develop/documentation.md#readers-and-folders')
+
+
 def check_plans(root, files, defined, errors):
     for name in files:
         if name.startswith('docs/project/plans/') and name.endswith('.md'):
@@ -148,10 +157,18 @@ def path_like(token):
     return token
 
 
+# Pages whose backticked repository paths must exist.
+PATH_SOURCES = ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md',
+                'docs/develop/workflow.md')
+READER_FOLDERS = ('docs/use/', 'docs/develop/', 'docs/project/')
+
+
 def check_agent_paths(root, files, errors):
     tracked_top = {name.split('/', 1)[0] for name in files}
-    for source in ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md', 'docs/develop/workflow.md'):
+    for source in PATH_SOURCES:
         if not (root / source).exists():
+            errors.append(f'{source}: missing; its repository paths cannot be checked. Restore it, '
+                          'or update PATH_SOURCES in scripts/check_repository.py if it moved')
             continue
         for number, line in enumerate(read(root, source).splitlines(), 1):
             for match in CODE_SPAN.finditer(line):
@@ -203,6 +220,7 @@ def check(root):
     errors = []
     defined = check_todo_ids(root, files, errors)
     check_docs_index(root, files, errors)
+    check_reader_folders(files, errors)
     check_plans(root, files, defined, errors)
     check_agent_paths(root, files, errors)
     check_spdx(root, files, errors)

@@ -17,9 +17,9 @@ For anyone, person or coding agent, who writes or changes documentation.
 - Developer pages double as agent instructions, so repository skills and
   `AGENTS.md` point at them instead of repeating them.
 
-The move into reader folders is under way (DOC-4, [plan](../project/plans/2026-10-23-documentation-by-reader.md)):
-all three folders exist; the last step shortens the front pages and checks that
-every maintained page sits in a reader folder.
+The pages were sorted into these folders on 23 October 2026 (DOC-4,
+[plan](../project/plans/2026-10-23-documentation-by-reader.md)), and the
+repository checks keep new pages in them.
 
 Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 [writing rules](#writing-rules) · [pages agents follow](#pages-agents-follow) ·
@@ -208,3 +208,7 @@ not a complete Markdown renderer: it does not validate external URLs, detect
 undefined reference labels, or verify commands and source claims. Review those
 separately; extend the checker with a regression test if maintained guides need
 additional Markdown syntax. DOC-2 in [TODO](../../TODO.md) tracks remaining automation.
+
+The [repository checks](workflow.md#automated-checks) add the structural rules:
+every maintained page is listed in the [index](../README.md) and sits in a
+reader folder, and every TODO ID a page mentions is defined.

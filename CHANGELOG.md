@@ -133,6 +133,12 @@ Until 1.0 the C++ API may change between minor versions.
   page that explains each. Releasing is a [developer guide](docs/develop/releasing.md),
   and the 18 October release record and the old review are archived. History,
   the convolverPipe page and open plans are in `docs/project/`.
+- Shorter front pages (DOC-4, last step): the [README](README.md) is a start
+  page with one example, `AGENTS.md` links to the guides instead of repeating
+  them, and [TODO](TODO.md) holds open work, with finished items reduced to one
+  line each under "Done". `check_repository.py` now requires every maintained
+  page to sit in a reader folder, and fails when a page whose paths it checks
+  is missing.
 - Preview packages (PLUG-5) ship `convolver-preset` and
   `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
   guides in `docs/`, instead of `convolver-vst3-preset` (still built from
