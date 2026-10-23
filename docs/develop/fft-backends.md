@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # FFT backends and measurements
 
-[Documentation index](../README.md) · [Concepts](../concepts.md) · [Open FFT work](../../TODO.md#fft-libraries-and-performance)
+[Documentation index](../README.md) · [Concepts](../use/concepts.md) · [Open FFT work](../../TODO.md#fft-libraries-and-performance)
 
 **In short:**
 
@@ -36,7 +36,7 @@ Contents: [selection and contract](#selection-and-contract),
 | Accelerate | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
 | Ooura | Built into portable source | None | Prepared tables; estimate mode only |
 
-See [build commands](build.md#fft-backend) and [FFTW plan tuning](../portable-core.md#fftw-plan-tuning). Primary references:
+See [build commands](build.md#fft-backend) and [FFTW plan tuning](../use/command-line.md#fftw-plan-tuning). Primary references:
 [FFTW manual](https://fftw.org/fftw3_doc/),
 [Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp), and
 [Ooura packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html).
@@ -239,7 +239,7 @@ These numbers precede the new public planning API; the temporary measured build
 also passed the native engine oracle. They are a planning experiment, not a
 benchmark of wisdom loading or patient planning. Saved wisdom support is now
 tested independently through fresh CLI processes, and FFT/engine oracles run
-estimate, measure and patient plans. See [the tuning workflow](../portable-core.md#fftw-plan-tuning).
+estimate, measure and patient plans. See [the tuning workflow](../use/command-line.md#fftw-plan-tuning).
 
 ## FFTW tuning on x86-64 and split spectra
 
@@ -455,7 +455,7 @@ NEON is not new in FFTW 3.3.11: earlier releases already support it. Version
 3.3.11 adds Apple ARM cycle counters and SVE support, among other changes; NEON
 is the SIMD backend enabled in this Mac's verified build. See the
 [official release notes](https://fftw.org/release-notes.html). Rendering defaults to
-`FFTW_ESTIMATE`; [offline measured planning and persisted wisdom](../portable-core.md#fftw-plan-tuning)
+`FFTW_ESTIMATE`; [offline measured planning and persisted wisdom](../use/command-line.md#fftw-plan-tuning)
 are now available explicitly.
 
 The benchmark dependency was built from the official source archive with the
@@ -518,7 +518,7 @@ python3 tests/native/benchmark_backends.py build-fftw/convolver_benchmark build-
 
 Repeat correctness tests in separate Debug build directories with
 `-DCONVOLVER_SANITIZERS=ON`. Never benchmark sanitizer builds. Native baseline
-sources and dependency archive hashes are recorded in [the portable guide](../portable-core.md).
+sources and dependency archive hashes are recorded in [the portable guide](../use/command-line.md).
 
 For Ooura, configure another directory with `-DCONVOLVER_FFT_BACKEND=OOURA`
 and pass that CLI/benchmark as one side of the same pairwise comparison.

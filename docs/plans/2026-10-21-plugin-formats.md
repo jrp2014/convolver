@@ -164,7 +164,7 @@ plumbing) is small, and the existing VST3 adapter is about 500 lines over
 The LV2 adapter therefore uses the `lv2` headers (C, ISC, Ubuntu 24.04 ships
 1.18.10) and, for tests only, `lilv` (0.24.22) to load it as a host would.
 PLUG-6 pinned these versions (22 October 2026); see
-[pinned format dependencies](../plugins/build.md#pinned-format-dependencies).
+[pinned format dependencies](../develop/build.md#pinned-format-dependencies).
 
 Apache-2.0, AudioUnitSDK's licence, is compatible with GPLv3 but not with
 GPLv2. That affects how the AU component may be distributed; see
@@ -180,10 +180,10 @@ behaviour identical:
 | --- | --- | --- |
 | PLUG-1 | A safe FFT backend for every plug-in build (see [FFT backend](#lv2-adapter-design) below). **Done 21 October 2026.** | Affects the existing VST3 build already |
 | PLUG-2 | One adapter test harness, specified under [shared test harness](#shared-test-harness-plug-2): the independent convolution oracle, CLI equivalence, fixed tolerances and lifecycle cases | Each format's tests then only drive its own host API |
-| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
+| PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../use/presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
 | PLUG-4 | One list of supported channel layouts, with [channel meaning](../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
-| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../plugins/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
+| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
 
 After that the streams are separate and can be worked on at the same time, by
 different people or threads:
@@ -284,7 +284,7 @@ separate:
 | | Unsigned preview | Signed production release |
 | --- | --- | --- |
 | Signing | macOS: ad-hoc signature, documented quarantine removal. Windows: unsigned, SmartScreen warning | Developer ID, notarization, Authenticode with timestamps |
-| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../plugins/hosts.md) procedure, clean machines, upgrades, and upgrade tests against files kept from earlier releases (COMPAT-1) |
+| Testing | All CI gates, including validators and PLUG-2; a smoke test in at least one host per format | The full [host qualification](../develop/host-testing.md) procedure, clean machines, upgrades, and upgrade tests against files kept from earlier releases (COMPAT-1) |
 | Label | "unsigned developer preview" in the release title and guide | Ordinary release |
 | `production_enabled` | stays false | true only after every production gate |
 
@@ -657,7 +657,7 @@ are described in TODO. The streams then run side by side:
 | 1 | VST3-1: speaker arrangements and the PLUG-4 layouts | LV2-1: adapter with ports, `run()`, latency and bypass; headless `lilv` test against PLUG-2 | AU-1: adapter with channel configurations, latency and tail in seconds, and explicit bypass; test against PLUG-2 |
 | 2 | Preset tool moved to PLUG-3 | LV2-2: file parameter, worker loading, state (embedded and path), PipeWire-style restore | AU-2: ClassInfo state and `.aupreset` loading |
 | 3 | pluginval (exists) on PLUG-2 fixtures | LV2-3: generated layouts, `lv2lint` and pluginval in CI | AU-3: `auval` and pluginval in macOS CI |
-| 4 | HOST-1 host matrix | LV2-4: user guide (`docs/lv2.md`) with PipeWire example; host matrix | AU-4: user guide (`docs/au.md`); Logic, GarageBand, SoundSource, Live, REAPER |
+| 4 | HOST-1 host matrix | LV2-4: user guide (LV2 in `docs/use/plugins.md` and `install.md`) with PipeWire example; host matrix | AU-4: user guide (the Audio Unit in `docs/use/plugins.md` and `install.md`); Logic, GarageBand, SoundSource, Live, REAPER |
 | 5 | Unsigned preview under PLUG-5 | LV2-5: release bundles (Linux, then macOS/Windows), unsigned previews first | AU-5: unsigned preview component under PLUG-5; Developer ID signing and notarization later, at the production gate |
 
 FFMPEG-1 (testing the pipe in CI) stays cheap and useful. FFMPEG-2 to FFMPEG-5

@@ -97,12 +97,17 @@ class RepositoryChecks(unittest.TestCase):
                           'notes.txt: not an expected top-level entry')
         self.assertBroken(self.run_check({'plugins/lv2/plugin.cpp': SPDX_CPP}),
                           'plugins/lv2/: adapter has no tests in tests/lv2/',
-                          'adapter has no user guide at docs/lv2.md')
+                          'adapter is not described in docs/use/plugins.md')
+        plugins_page = {'docs/use/plugins.md': SPDX_MD + '# Plug-ins\n| VST3 |\n',
+                        'docs/README.md': BASE['docs/README.md'] + '[Plug-ins](use/plugins.md)\n'}
+        self.assertBroken(self.run_check({'plugins/lv2/plugin.cpp': SPDX_CPP,
+                                          'tests/lv2/host_test.cpp': SPDX_CPP, **plugins_page}),
+                          'plugins/lv2/: adapter is not described in docs/use/plugins.md')
         result = self.run_check({
             'plugins/lv2/plugin.cpp': SPDX_CPP,
             'tests/lv2/host_test.cpp': SPDX_CPP,
-            'docs/lv2.md': SPDX_MD + '# LV2\n',
-            'docs/README.md': BASE['docs/README.md'] + '[LV2](lv2.md)\n',
+            'docs/use/plugins.md': SPDX_MD + '# Plug-ins\n| VST3 | LV2 |\n',
+            'docs/README.md': plugins_page['docs/README.md'],
         })
         self.assertEqual(result.returncode, 0, result.stderr)
 

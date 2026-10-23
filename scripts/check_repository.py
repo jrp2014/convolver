@@ -192,8 +192,10 @@ def check_layout(root, files, errors):
     for adapter in adapters:
         if not any(name.startswith(f'tests/{adapter}/') for name in files):
             errors.append(f'plugins/{adapter}/: adapter has no tests in tests/{adapter}/')
-        if f'docs/{adapter}.md' not in files:
-            errors.append(f'plugins/{adapter}/: adapter has no user guide at docs/{adapter}.md')
+        guide = 'docs/use/plugins.md'
+        if guide not in files or not re.search(rf'\b{re.escape(adapter)}\b', read(root, guide), re.I):
+            errors.append(f'plugins/{adapter}/: adapter is not described in {guide}; add it to the '
+                          f'formats table there (the page must name {adapter.upper()})')
 
 
 def check(root):

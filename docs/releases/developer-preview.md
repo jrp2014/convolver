@@ -111,5 +111,5 @@ separate. Publication is a manual step owned by jrp:
 4. Never replace or edit an asset after publication; a fix gets a new version.
 
 Before publishing, run the smoke test in the
-[host qualification guide](../plugins/hosts.md#smoke-test-for-an-unsigned-preview)
+[host qualification guide](../develop/host-testing.md#smoke-test-for-an-unsigned-preview)
 in at least one host. `production_enabled` stays false.

@@ -90,7 +90,7 @@ Convolver Release build with Clang and FFTW, one run each, so indicative only):
 | **E. Native C port inside libavfilter** | Rewrite the engine and `.cfg` parser in C | Every FFmpeg build | Rejected: duplicates `afir`, needs relicensing, loses our tests |
 
 **A. Pipe.** The CLI already streams little-endian float (see
-[RAW streams](../portable-core.md#raw-streams)). Tested here with a
+[RAW streams](../use/command-line.md#raw-streams)). Tested here with a
 true-stereo `.cfg` and a 5 s video. The command below now selects the first
 audio and video tracks explicitly; the original measurement used a single
 audio/video pair:
@@ -114,7 +114,7 @@ Select one audio track (`0:a:1` selects the second); `0:a` would select every
 track for a pipe that carries only one stream. The example omits other tracks,
 subtitles and attachments. Audio restarts at time zero, so check sync for
 sources whose audio starts late. It is one process per stream and cannot switch
-filters mid-stream. [The maintained pipe guide](../portable-core.md#with-ffmpeg)
+filters mid-stream. [The maintained pipe guide](../use/command-line.md#with-ffmpeg)
 owns the user instructions; FFMPEG-1 must test multiple tracks and unequal counts.
 
 **B. LV2 through `lv2`.** FFmpeg's `lv2` filter (`af_lv2.c`) sets only numeric

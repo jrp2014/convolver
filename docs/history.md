@@ -133,7 +133,7 @@ to 8 channels. What remains only in the historical code is the Windows media
 player integration (WMP and DirectShow), the VST 2 build and double-precision
 output formats. The bundled 2005–2006 sample configurations predate the 3.0
 format or use absolute paths, so they need editing before the portable reader
-accepts them; see [bundled samples](configuration-compatibility.md#bundled-historical-samples).
+accepts them; see [bundled samples](use/other-programs.md#configurations-from-the-old-windows-convolver).
 
 ## Downstream use
 
@@ -154,7 +154,7 @@ These are dated findings, not a survey of every current release. The
 [inspection script](review-2026-10/inspect_downstream.py) can recheck artifacts,
 but upstream downloads change and are not a normal offline CI dependency.
 Compare actual source and tests before importing any downstream fix.
-[Configuration compatibility](configuration-compatibility.md) owns the current
+[Other programs](use/other-programs.md) owns the current
 format-adoption matrix and its evidence limits.
 
 ## Documentation snapshots

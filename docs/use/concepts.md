@@ -1,7 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Audio and processing concepts
 
-[Documentation index](README.md)
+[Using Convolver](README.md)
+
+For anyone who wants to understand the terms the other pages use: what a
+filter does to audio, latency, tails, and files versus live streams.
 
 ## What goes in and what comes out
 
@@ -34,7 +37,7 @@ they are not automatically normalized.
 | FFT | Fast Fourier transform; used to calculate long convolutions efficiently |
 | FFT plan | Prepared data or a selected algorithm for a transform of a particular size |
 | FFTW wisdom | FFTW's saved plan information; useful for avoiding measured planning at startup |
-| Latency | Delay introduced by processing: B frames in the core, 256 in the VST3 adapter |
+| Latency | Delay introduced by processing: B frames in the command-line tool before it trims them, 256 in the plug-ins |
 | Tail | FIR and routing-delay output that can remain after input ends; excludes processing latency |
 | PCM | Pulse-code modulation; the CLI's PCM format names refer to integer samples, such as 16-bit or 24-bit WAV |
 | Dither | Low-level noise added before integer rounding to reduce signal-dependent quantization distortion |
@@ -51,11 +54,10 @@ The CLI's normal file render removes the initial processing delay and writes the
 complete tail. The output therefore lines up with the input but can be longer.
 `--keep-latency` retains the initial delay. An empty input produces no audio frames.
 
-The C++ `Engine::process` and VST3 adapter produce one output frame for every
-input frame. They keep history between calls, even when callback lengths change.
-An engine must not be recreated for each callback: doing so discards that history.
-To finish an offline stream through the core API, feed silence for
-`latency_frames() + tail_frames()` after its last input.
+The plug-ins, and the C++ library's engine, produce one output frame for every
+input frame. They keep history between calls, even when the host's buffer
+length changes. To let the tail play out at the end of a stream, keep feeding
+silence for the latency plus the tail.
 
 The CLI can also read and write raw float audio through pipes. The producer and
 consumer must agree on rate, channel count and sample representation, and own any
@@ -71,7 +73,7 @@ Convolver does not resample or design a replacement IR automatically.
 Floating-point samples normally use -1 to +1 as full scale, but a float WAV can
 store larger finite values. Filters and summed routes can raise the level.
 Integer output clips values outside its representable range. Use explicit gain
-and inspect the result; dither is not a limiter. The [CLI reference](portable-core.md#gain-and-attenuation)
+and inspect the result; dither is not a limiter. The [command-line reference](command-line.md#gain-and-attenuation)
 explains fixed gain and the two automatic attenuation estimates.
 
 ## How long filters are calculated
@@ -81,6 +83,6 @@ and combines them with a history of transformed input blocks. It converts the
 result back to samples and adds the part overlapping the next block. This is
 **uniform partitioned overlap-add**.
 
-The [implementation map](develop/architecture.md#processing-data-flow) shows where
-those steps live. The [FFT guide](develop/fft-backends.md) explains transform scaling,
-backend choices and dated performance measurements.
+For developers, the [implementation map](../develop/architecture.md#processing-data-flow)
+shows where those steps live, and the [FFT guide](../develop/fft-backends.md)
+explains transform scaling, backend choices and performance measurements.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // convolver-equalizer-apo: write a Convolver filter as an Equalizer APO
-// configuration, for system-wide playback on Windows. See docs/equalizer-apo.md.
+// configuration, for system-wide playback on Windows. See docs/use/equalizer-apo.md.
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
@@ -32,7 +32,7 @@ constexpr const char* usage =
     "channels) is silenced, not played unfiltered.\n"
     "Copy the folder into Equalizer APO's config folder and add a line such as\n"
     "  Include: NEW_FOLDER\\convolver.txt\n"
-    "to its config.txt. See docs/equalizer-apo.md.\n";
+    "to its config.txt. See docs/use/equalizer-apo.md.\n";
 
 std::string utf8(const fs::path& path) {
     const auto text = path.u8string();
@@ -143,7 +143,7 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                           << " has one channel, so on a stereo device only the left channel\n"
                              "plays (filtered) and the right is silent. To filter both, export a "
                              ".cfg\nthat applies the impulse response to each channel; "
-                             "docs/equalizer-apo.md shows one.\n";
+                             "docs/use/equalizer-apo.md shows one.\n";
         std::cout << "To use it: copy the folder into Equalizer APO's config folder (usually\n"
                      "C:\\Program Files\\EqualizerAPO\\config), add the line\n"
                      "  Include: "

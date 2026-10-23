@@ -5,7 +5,7 @@
 
 This page documents a **historical** Windows tool kept in `historical/`. For
 streaming with the current portable CLI, see
-[RAW streams](portable-core.md#raw-streams).
+[RAW streams](use/command-line.md#raw-streams).
 
 `convolverPipe` filters interleaved audio from standard input and writes the
 convolved audio to standard output. It uses the same engine and filter/config

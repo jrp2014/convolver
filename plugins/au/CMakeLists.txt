@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.20)
 set(CONVOLVER_AU_SDK "" CACHE PATH "AudioUnitSDK 1.4.0 source directory (packaging/release-policy.json)")
 if(NOT EXISTS "${CONVOLVER_AU_SDK}/include/AudioUnitSDK/AUBase.h")
     message(FATAL_ERROR "Set CONVOLVER_AU_SDK to the pinned AudioUnitSDK 1.4.0; "
-        "scripts/release/sources.py --fetch ... audiounitsdk unpacks it (docs/plugins/build.md)")
+        "scripts/release/sources.py --fetch ... audiounitsdk unpacks it (docs/develop/build.md)")
 endif()
 if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     # AudioUnitSDK supports macOS 11 and later.

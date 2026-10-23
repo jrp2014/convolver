@@ -39,7 +39,7 @@ configuration is read before rendering with it:
 ```
 
 The `.cfg` files are commented line by line; the
-[configuration reference](../../docs/configuration.md) explains every field. The
+[configuration reference](../../docs/use/configuration.md) explains every field. The
 crossover's bands are deliberately simple near-Gaussian filters that add back
 to the original signal: they show routing, not a crossover ready for real
 speakers.

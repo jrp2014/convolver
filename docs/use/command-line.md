@@ -1,12 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Portable core and CLI
+# Command-line reference
 
-[Documentation index](README.md) · [Concepts](concepts.md) · [Configuration format](configuration.md)
+[Using Convolver](README.md) · [Concepts](concepts.md) · [Configuration files](configuration.md)
 
-This is the detailed reference for building and using the CLI and C++ core.
-For a first render, use the [quick start](../README.md#build-and-try-it).
-The active implementation is C++20 with FFTW, Apple Accelerate or built-in Ooura;
-file I/O uses libsndfile. It does not depend on the old Windows applications.
+For anyone filtering files or streams with `convolver`: every option, output
+format and check. New to it? Start with [your first filter](first-filter.md).
+To build it, see [build from source](../develop/build.md).
 
 **In short:**
 
@@ -19,85 +18,27 @@ file I/O uses libsndfile. It does not depend on the old Windows applications.
   `no-clip` (worst-case filter bound). Neither estimate is a limiter.
 - `--inspect` and `--validate` explain what a configuration resolves to without
   rendering; `--json` gives a machine-readable report.
-- The FFT backend is chosen when building. FFTW builds can save tuned plans
-  ("wisdom") with `--tune-fft` and reuse them with `--fft-wisdom`.
+- FFTW builds can save tuned FFT plans ("wisdom") with `--tune-fft` and reuse
+  them with `--fft-wisdom`.
 
 Contents:
 
-- [Build](#build) and [FFTW plan tuning](#fftw-plan-tuning)
 - [File rendering](#file-rendering): [gain](#gain-and-attenuation),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
   [speaker labels](#speaker-labels), [output safety](#output-safety)
-- [RAW streams](#raw-streams)
+- [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
-- [Library API](#engine-api) and [resource limits](#resource-limits)
+- [FFTW plan tuning](#fftw-plan-tuning)
 
-## Build
-
-Every build recipe, including Windows, the FFT backend choice and the CMake
-options, is in [build from source](develop/build.md). The short
-version, from the repository root:
-
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
-
-The examples below assume the `convolver` executable is in `build/`.
-`./build/convolver --version` names the FFT backend it was built with.
-
-### FFTW plan tuning
-
-An optimized FFTW build supplies SIMD routines; measured planning selects among
-them for the transform size actually used. Run this once on the target machine
-with a Release binary and little competing CPU activity:
-
-```sh
-./build/convolver --tune-fft machine-b256.fftw --block-size 256
-./build/convolver --filter room.cfg --input music.wav --output corrected.wav \
-  --block-size 256 --fft-wisdom machine-b256.fftw
-```
-
-Tuning needs no input audio or IR. It prepares both transforms using `patient`
-planning by default; `--fft-plan measure` searches less extensively and
-`--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
-longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
-seconds and keeps the best plan found by then. For example,
-`--fft-plan patient --fft-time-limit 30` gives each plan a 30-second budget. A search the limit
-cuts short may not be stored as reusable wisdom for that mode; tune without a
-limit when the wisdom is for `--fft-wisdom`. The wisdom
-destination must be a **new file**; existing files and aliases are never replaced.
-Use a different filename when retuning, then replace an older cache deliberately.
-
-Normal rendering defaults to `estimate`, or accepts
-`--fft-plan measure|patient|exhaustive` (optionally with `--fft-time-limit`) to
-time plans during startup. `--fft-wisdom FILE` imports native single-precision
-FFTW wisdom and requires matching plans, with no silent measured fallback. A
-missing size or insufficient planning rigor fails before opening the audio
-output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
-patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
-
-Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
-Retune after changing them; loading successfully is **not** proof that old wisdom
-is optimal for a different CPU. The native wisdom format performs FFTW's own
-compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
-and does not guarantee a globally optimal plan. This step does not choose B or
-change B-frame latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
-See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
-
-Library callers can pass `FftOptions` to `Engine`, or call `tune_fft`, then
-`export_fft_wisdom`/`import_fft_wisdom`. Core APIs use strings, with file handling
-kept in the CLI. Wisdom is global to the FFTW library in the process. Convolver
-serializes its own planning, destruction and wisdom access; applications making
-other FFTW planner calls must coordinate those too. All preparation belongs
-outside the audio callback.
+The examples assume `convolver` is on your `PATH`; from a source build, use
+`./build/convolver`. `convolver --version` names the FFT library it was built
+with, and `convolver --help` lists every option.
 
 ## File rendering
 
 ```sh
-./build/convolver --filter room.cfg --input music.wav --output corrected.wav
-./build/convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
+convolver --filter room.cfg --input music.wav --output corrected.wav
+convolver --filter impulse.wav --input music.wav --output corrected.wav --block-size 128 --gain-db -6 --output-format wav-pcm24
 ```
 
 The filter may be an IR sound file, a [configuration](configuration.md), or a configuration
@@ -134,26 +75,23 @@ positive values amplify. Two offline estimates are also available:
 
 Both report the chosen gain on stderr and may take time before rendering. The
 bound applies to ideal linear filtering, not input above full scale or additional
-quantizer noise. Floating-point error, dither, noise shaping and the asymmetric
-positive integer endpoint need headroom if clipping must be strictly avoided;
-see **GAIN-1** in [TODO](../TODO.md). Neither option is a limiter.
-The API is `estimate_attenuation` in [engine.hpp](../include/convolver/engine.hpp);
-[attenuation.cpp](../portable/attenuation.cpp) and the engine oracle tests define
-and exercise the calculation. The noise estimate retains the older engine's
-"optimum attenuation" method.
+quantizer noise. Floating-point error, dither, noise shaping and the largest
+positive integer value (one step short of full scale) need a little more
+headroom if clipping must be strictly avoided. Neither option is a limiter.
+The noise estimate is the old Windows Convolver's "optimum attenuation"
+method.
 
 ### Integer formats, dither and noise shaping
 
 Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
 `wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
 
-Every integer format is quantized by Convolver's own `Quantizer`, not libsndfile:
-with B significant bits, each sample is scaled by 2^(B-1), offset by the dither
-(in LSBs) and the noise-shaping feedback, rounded to the nearest integer (ties
-toward +infinity) and clipped to [-2^(B-1), 2^(B-1) - 1]. PCM16 output is
-unchanged from 0.3 (`Pcm16Quantizer` is now the 16-bit case). PCM24 and PCM32
-used libsndfile's conversion before 0.4; they now follow the same rule, which
-can differ from it by at most one LSB.
+Convolver converts to every integer format itself: with B significant bits,
+each sample is scaled by 2^(B-1), offset by the dither (in LSBs, least
+significant bits) and the noise-shaping feedback, rounded to the nearest
+integer (ties toward +infinity) and clipped to [-2^(B-1), 2^(B-1) - 1]. PCM24
+and PCM32 output before version 0.4 used libsndfile's conversion, which can
+differ by at most one LSB.
 
 Dither is off by default. `--dither` selects `none` (default), `triangular`
 (independent TPDF, error power 1/4 LSB² at every signal level),
@@ -172,23 +110,13 @@ before rounding, so the error spectrum is the rounding error filtered by
 The coefficients are fixed; their audible effect depends on sample rate and
 playback conditions. The fed-back error is taken before
 clipping, so overload cannot make a shaper run away (the historical code could
-wrap). The coefficients are in [io.hpp](../include/convolver/io.hpp). Shaping works with or
-without dither; use it with dither.
+wrap). Shaping works with or without dither; use it with dither.
 
 `--valid-bits N` quantizes to N significant bits (8 up to the container size)
 and stores them left-justified with the low bits zero, in a
 WAVE_FORMAT_EXTENSIBLE header that declares N as `wValidBitsPerSample`, for
 example 20 valid bits in `wav-pcm24` or 24 in `wav-pcm32`, as the historical
 engine offered. Dither and shaping then act at that resolution.
-
-The library's `AudioWriter` defaults to plain rounding; pass `QuantizationOptions`
-to enable dither, shaping or valid bits. The tests check rounding/clipping
-endpoints for 8 to 32 bits, reproducibility, chunk independence, measured
-dither error mean, variance and correlation, that each shaper's output error
-equals a bounded rounding residual through the historical coefficients, that its
-measured error spectrum follows 1 - Σ c_k z^-k within 15%, recovery after
-clipping, and exact stored samples and header fields for every container and
-valid-bit combination.
 
 ### Speaker labels
 
@@ -198,7 +126,7 @@ also require an extensible header, independently of labels.
 channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE header:
 
 ```sh
-./build/convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
+convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map config
 ```
 
 - The mask uses the WAVE speaker bits (`0x1` front left, `0x2` front right,
@@ -214,11 +142,8 @@ channel mask (the fourth header value) by writing a WAVE_FORMAT_EXTENSIBLE heade
   the CLI says so on stderr and writes the plain header.
 - `raw-float` output has no header, so it cannot be combined with the flag.
 - After writing, the CLI reads the finished header back and fails if the labels
-  are not exactly the requested mask, so a libsndfile that cannot write them is
-  reported rather than silently ignored.
-
-The library equivalent is `AudioWriter(path, info, format, {}, OutputMetadata{mask})`;
-the default `OutputMetadata{}` keeps the plain header.
+  are not exactly the requested mask, so a sound-file library that cannot write
+  them is reported rather than silently ignored.
 
 ### Output safety
 
@@ -235,7 +160,7 @@ Standard streams use explicitly described little-endian IEEE float32, interleave
 by frame. No WAV header needs rewriting on a non-seekable pipe:
 
 ```sh
-producer | ./build/convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
+producer | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
 ```
 
 `--raw-input RATE CHANNELS` also works on a RAW file. The output rate and channel
@@ -278,8 +203,8 @@ ensure its assumed channel order matches the configuration's routes.
 
 The new audio keeps the filter tail, so it can run past the video; add
 `-shortest` to cut it. It starts at time zero, so check sync for files whose
-audio starts late. A built-in FFmpeg filter is planned, not implemented: see the
-[FFmpeg filter plan](plans/2026-10-21-ffmpeg-filter.md).
+audio starts late. FFmpeg has no built-in Convolver filter; this pipe is the way
+to use the two together.
 
 Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
 validation, because libsndfile can otherwise silently accept truncation. Other
@@ -315,7 +240,7 @@ convolver --inspect room.cfg --syntax-only --json
   latency, tail and storage fields are null, and the result says so.
 - `--profile portable-paths` adds warnings for references that work here but
   will not survive copying to another machine; the default profile is
-  `convolver`. See [profiles](configuration-compatibility.md#profiles).
+  `convolver`. See [profiles](other-programs.md#check-that-a-configuration-will-travel).
 - `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
   validation fails. Diagnostics are also printed to stderr.
 - `convolver --inspect --help` lists every inspection option.
@@ -334,77 +259,53 @@ buffers; it is not total process memory. Diagnostics carry a stable `code`,
 severity, message, file, line, column and the chain of enclosing list entries.
 Resolved paths are machine-specific; source spellings are kept as written.
 
-[Configuration compatibility](configuration-compatibility.md) lists what the corpus
-verifies, the `portable-paths` profile's warnings and what is known about other
-programs that read the format.
+[Other programs](other-programs.md) lists the `portable-paths` profile's
+warnings and what is known about other programs that read the format. The same
+report is available to C++ programs ([library guide](../develop/library.md#inspecting-configurations)).
 
-The same report is available to C++ code through `convolver::inspect_configuration`
-in `convolver/inspection.hpp` (`Convolver::io`), and the core's
-`convolver::analyze_configuration` returns latency, tail, FFT length, accounted
-storage and partitions for an in-memory `Configuration`.
+## FFTW plan tuning
 
-## Compatibility and library API
+This applies only to builds that use FFTW (`convolver --version` says which).
+An optimized FFTW build supplies SIMD routines; measured planning selects among
+them for the transform size actually used. Run this once on the target machine
+with a Release binary and little competing CPU activity:
 
-The [configuration reference](configuration.md) owns the text grammar, path rules,
-route encoding and list-selection semantics. The [compatibility matrix](configuration-compatibility.md)
-records tested fixtures and the limits of claims about other programs.
+```sh
+convolver --tune-fft machine-b256.fftw --block-size 256
+convolver --filter room.cfg --input music.wav --output corrected.wav \
+  --block-size 256 --fft-wisdom machine-b256.fftw
+```
 
-### Engine API
+Tuning needs no input audio or IR. It prepares both transforms using `patient`
+planning by default; `--fft-plan measure` searches less extensively and
+`--fft-plan exhaustive` tries every algorithm FFTW has, which can take much
+longer for large blocks. `--fft-time-limit S` bounds each plan's search to S
+seconds and keeps the best plan found by then. For example,
+`--fft-plan patient --fft-time-limit 30` gives each plan a 30-second budget. A search the limit
+cuts short may not be stored as reusable wisdom for that mode; tune without a
+limit when the wisdom is for `--fft-wisdom`. The wisdom
+destination must be a **new file**; existing files and aliases are never replaced.
+Use a different filename when retuning, then replace an older cache deliberately.
 
-[engine.hpp](../include/convolver/engine.hpp) exposes Configuration, FilterPath, Route and Engine.
-Construction prepares FFT plans and all processing buffers. `process` takes
-interleaved float spans and any frame count, producing the same number of output
-frames. Empty input means silence for drain. Input/output spans must not overlap;
-there is no in-place mode. `latency_frames()` and `tail_frames()` are separate;
-feed their sum as silence after the final nonempty input to drain fully.
-`reset()` clears history and delays. Instances have separate state; an individual
-instance must not be processed/reset concurrently.
+Normal rendering defaults to `estimate`, or accepts
+`--fft-plan measure|patient|exhaustive` (optionally with `--fft-time-limit`) to
+time plans during startup. `--fft-wisdom FILE` imports native single-precision
+FFTW wisdom and requires matching plans, with no silent measured fallback. A
+missing size or insufficient planning rigor fails before opening the audio
+output. Wisdom of one rigor satisfies requests of lower rigor (exhaustive covers
+patient, patient covers measure and estimate), not higher. CLI wisdom input is limited to 1 MiB.
 
-This implementation uses uniform partitioned overlap-add with input-spectrum
-history, as described in [the implementation map](develop/architecture.md#processing-data-flow). All three backends expose the same spectrum layout and
-scaling; 1/N normalization is applied once when preparing IR spectra. The first
-backend measurements are recorded in [the FFT guide](develop/fft-backends.md).
+Keep wisdom with the CPU, FFTW build, precision and block size it was tuned for.
+Retune after changing them; loading successfully is **not** proof that old wisdom
+is optimal for a different CPU. The native wisdom format performs FFTW's own
+compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
+and does not guarantee a globally optimal plan. This step does not choose B or
+change B-frame latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
+See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
 
-Prepared processing/reset performs no C++ heap allocation; a test guards that
-contract. This is not a hard real-time guarantee or instrumentation of every
-possible library/system allocation. FFTW planning/destruction is serialized between
-these engine instances, outside processing. Accelerate owns an independent setup
-per instance. Other FFTW users in the same process
-must coordinate their planning too, which is why plug-in builds default to Ooura
-or Accelerate ([plug-in builds](develop/fft-backends.md#plug-in-builds)).
+## Limits
 
-### Resource limits
-
-Resource limits are deliberate: 1..256 channels, 1..768000 Hz, B up to 1048576,
-4096 paths/routes, and about 1 GiB of prepared float-equivalent storage. Core IRs
-and individual delays are bounded to 67108864 frames. The importer additionally
-limits each text file to 1 MiB and all text read per operation to 16 MiB, list nesting to 16, visited entries to 4096, total decoded IR
-samples to 64 Mi, and each delay to 16 Mi frames. Invalid dimensions, arithmetic
-overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
-the CLI's output check; library callers choose their own output policy.
-
-## Verification and dated dependency record
-
-The native tests link actual production translation units and actual libraries:
-independent double time-domain convolution, seeded matrices/delays, awkward IR
-lengths/block sizes, chunk invariance, reset, tails, file round trips, full-width
-PCM32 endpoints, legacy parsing and actual RAW descriptors/subprocess pipelines.
-Fault tests cover source overwrite protection, truncation, fragmented pipes,
-write failure and WAV-header finalization. Existing historical tests and archived
-website integrity checks remain enabled on supported Clang hosts.
-
-The following sources describe the earlier October 2026 local test setup,
-not dependency pins for every current build:
-
-- FFTW 3.3.11, archive SHA256
-  `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.
-- libsndfile 1.2.2, archive SHA256
-  `3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e`;
-  optional external codecs disabled for this local test installation.
-
-FFTW's 3.3.11 CMake sources still set their reported version to 3.3.10. That
-local verification used the official configure/make build of that source archive,
-which reports 3.3.11. Convolver itself is built with CMake in both cases.
-See [test coverage](develop/testing.md) and [TODO limitations](../TODO.md#documented-limitations)
-for the boundaries of the current checks. Current LLVM/SDK/library results must
-be tied to the revision actually tested.
+Up to 256 channels, sample rates up to 768 kHz and block sizes up to 1048576
+frames. A configuration has at most 4096 paths, each delay at most 16777216 frames,
+and all its IRs together at most 67108864 samples; the [library guide](../develop/library.md#resource-limits) has
+the complete list. What Convolver does not do is in [limits](limits.md).

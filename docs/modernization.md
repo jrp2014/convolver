@@ -65,6 +65,6 @@ lineage. Historical applications remain preserved; their constraints should not
 become requirements for the portable build. Older plans and measurements retain
 their original scope and dates.
 
-The [plug-in distribution guide](plugins/index.md) describes pinned, unsigned
+The [plug-in distribution guide](use/README.md) describes pinned, unsigned
 preview packaging and source builds. Signing, clean installation and named-host
 qualification remain gates in the [release record](releases/developer-preview.md).

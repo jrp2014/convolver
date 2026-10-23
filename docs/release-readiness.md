@@ -40,15 +40,15 @@ documentation alone.
 
 | Feature | Implemented | Automatically tested | Named host | Published |
 | --- | --- | --- | --- | --- |
-| Command-line renderer `convolver` ([reference](portable-core.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | No; build from source. The first preview will ship it (PLUG-5) |
-| Configuration inspection and validation ([compatibility](configuration-compatibility.md)) | Yes | Yes: parser tests, a corpus of example configurations, and replay of inputs found by fuzzing | Other readers of `.cfg` not checked (CFG-1) | No |
-| Preset tool `convolver-preset` ([guide](presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | No; in the preview package since PR #38, not yet published |
-| Equalizer APO export ([guide](equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | No; in the preview package since PR #38, not yet published |
-| VST3 plug-in ([guide](vst3.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Carla suggested) | No; preview candidates are CI artifacts only |
-| LV2 plug-in ([guide](lv2.md)) | Yes: adapter and layouts (LV2-1); loading filters from a file is LV2-2 | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
+| Command-line renderer `convolver` ([reference](use/command-line.md)) | Yes | Yes: "Native and historical tests" workflow on Linux (Clang, GCC), macOS (FFTW, Accelerate) and Windows (MSVC); direct double-precision oracle | Not applicable | No; build from source. The first preview will ship it (PLUG-5) |
+| Configuration inspection and validation ([compatibility](use/other-programs.md)) | Yes | Yes: parser tests, a corpus of example configurations, and replay of inputs found by fuzzing | Other readers of `.cfg` not checked (CFG-1) | No |
+| Preset tool `convolver-preset` ([guide](use/presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | No; in the preview package since PR #38, not yet published |
+| Equalizer APO export ([guide](use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | No; in the preview package since PR #38, not yet published |
+| VST3 plug-in ([guide](use/plugins.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Carla suggested) | No; preview candidates are CI artifacts only |
+| LV2 plug-in ([guide](use/plugins.md)) | Yes: adapter and layouts (LV2-1); loading filters from a file is LV2-2 | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
 | AU plug-in | In development (AU-1, AU-2) | Planned through the shared harness and `auval` | None | No; joins a later preview |
 | C++ libraries ([CMake package](develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
-| FFmpeg pipe ([example](portable-core.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
+| FFmpeg pipe ([example](use/command-line.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
 Fixed defect: a reset during a filter transition delayed the next filter
 (found in jrp's review of 0.4.19; fixed on 23 October 2026 by the VST3-7
@@ -72,7 +72,7 @@ not fit its input instead of saving and presets.
 
 Recovering from a wrong preset is the weakest step today: VST3 keeps the
 working filter but reports the rejection only as `kResultFalse`, so the host
-may show nothing ([loading filters](vst3.md#loading-filters)). PLUG-8 (done)
+may show nothing ([loading filters](use/plugins.md#loading-a-filter)). PLUG-8 (done)
 keeps the reason; DIAG-1 decides where it is shown.
 
 ## Next milestone: an independent user runs a preview
@@ -107,7 +107,7 @@ any of them is an owner's decision.
 
 | Guarantee | What is promised | Owning guide | Checked by |
 | --- | --- | --- | --- |
-| `.cfg` and list syntax | Existing files keep loading with the same routes, gains, delays, paths and list selection; syntax changes need a recorded decision | [Configuration](configuration.md), [compatibility](configuration-compatibility.md) | Compatibility corpus, parser and fuzz replay |
-| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading; version 2 only marks a failed first load | [Presets](presets.md#compatibility), [presets without a layout](develop/plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; files from releases are COMPAT-1 |
+| `.cfg` and list syntax | Existing files keep loading with the same routes, gains, delays, paths and list selection; syntax changes need a recorded decision | [Configuration](use/configuration.md), [compatibility](use/other-programs.md) | Compatibility corpus, parser and fuzz replay |
+| Serialized plug-in state and presets | Every version-1 preset whose rate and counts fit keeps loading; version 2 only marks a failed first load | [Presets](use/presets.md#old-and-new-versions), [presets without a layout](develop/plugin-identities.md#presets-without-a-layout) | `native.state` (literal version-1 and version-2 bytes), `vst3.adapter` (`version1_presets`), `plugins.presets`; files from releases are COMPAT-1 |
 | Plug-in identity | VST3 class IDs, AU codes, LV2 URIs and bundle IDs never change after release | [Identities](develop/plugin-identities.md) | `identities` (frozen values), `vst3.identities` |
 | C++ API and CMake package | Before 1.0, incompatible changes only in a new minor version; consumers require a matching minor version | [Versioning](develop/versioning.md#minor-and-major-versions), [package guide](develop/library.md) | Installed and source-tree consumer tests |
