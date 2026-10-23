@@ -572,6 +572,9 @@ class Runner {
             const bool mutes = refused && m.active && !m.bypass && !m.filter;
             driver_.choose_file(op == Op::file_missing ? f.missing_file : f.a_file, refused);
             if (mutes) {
+                // The contract's ramp is 64 frames; the margin covers a
+                // crossfade from an earlier filter that may still be running,
+                // which the model does not track.
                 const auto length = ramp + transition + 512;
                 const auto out = render(m, noise(length, m.host.inputs), length);
                 const auto from = (ramp + transition) * m.host.outputs;

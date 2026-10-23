@@ -564,6 +564,9 @@ void HostProcessor::mute() noexcept {
     mute(publications());
 }
 void HostProcessor::mute(std::uint64_t through) noexcept {
+    // A filter published after `through` is already playing: nothing to mute.
+    if (impl_->current && impl_->current->number > through)
+        return;
     impl_->muted = true;
     impl_->muted_through = std::max(impl_->muted_through, through);
 }

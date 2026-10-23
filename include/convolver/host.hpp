@@ -254,7 +254,8 @@ class HostProcessor {
     // The same for publications up to `through`, a count publications()
     // returned. An adapter that decides to mute from a flag its control side
     // clears before publishing reads the count first, then the flag, so a
-    // filter published after the flag was cleared is never silenced.
+    // filter published after the flag was cleared is never silenced. A count
+    // older than the filter already playing does nothing.
     void mute(std::uint64_t through) noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.

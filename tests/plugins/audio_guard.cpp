@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "audio_guard.hpp"
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <new>
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
 // Linux counts locks by defining pthread_mutex_lock, except under
 // ThreadSanitizer, which needs its own definition to see the locks.
 #if defined(__has_feature)
@@ -123,6 +127,54 @@ void operator delete(void* p, std::size_t) noexcept {
 }
 void operator delete[](void* p, std::size_t) noexcept {
     ::operator delete(p);
+}
+// Aligned forms (the Accelerate FFT's buffers, for example).
+void* operator new(std::size_t n, std::align_val_t a) {
+    guard::note_allocation();
+    if (!guard::allocation_allowed())
+        throw std::bad_alloc();
+    const auto alignment = std::max(static_cast<std::size_t>(a), sizeof(void*));
+    void* p = nullptr;
+#if defined(_WIN32)
+    p = _aligned_malloc(n ? n : 1, alignment);
+#else
+    if (posix_memalign(&p, alignment, n ? n : 1) != 0)
+        p = nullptr;
+#endif
+    if (!p)
+        throw std::bad_alloc();
+    return p;
+}
+void* operator new[](std::size_t n, std::align_val_t a) {
+    return ::operator new(n, a);
+}
+void* operator new(std::size_t n, std::align_val_t a, const std::nothrow_t&) noexcept {
+    try {
+        return ::operator new(n, a);
+    } catch (...) {
+        return nullptr;
+    }
+}
+void* operator new[](std::size_t n, std::align_val_t a, const std::nothrow_t&) noexcept {
+    return ::operator new(n, a, std::nothrow);
+}
+void operator delete(void* p, std::align_val_t) noexcept {
+    if (p)
+        guard::note_allocation();
+#if defined(_WIN32)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
+void operator delete[](void* p, std::align_val_t a) noexcept {
+    ::operator delete(p, a);
+}
+void operator delete(void* p, std::size_t, std::align_val_t a) noexcept {
+    ::operator delete(p, a);
+}
+void operator delete[](void* p, std::size_t, std::align_val_t a) noexcept {
+    ::operator delete(p, a);
 }
 
 #if defined(CONVOLVER_GUARD_LOCKS)

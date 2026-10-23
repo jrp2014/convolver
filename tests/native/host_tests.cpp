@@ -796,6 +796,13 @@ void muting() {
     run(counted, 512);
     require(seen == 0 && counted.publications() == 1 && std::abs(output[511] - 2.25f) < 1e-5,
             "mute(through) silenced a later publication");
+    // ... including one the audio thread has already picked up.
+    audio_thread = true;
+    counted.mute(seen);
+    audio_thread = false;
+    run(counted, 512);
+    require(std::abs(output[511] - 2.25f) < 1e-5,
+            "mute(through) silenced a playing filter published after the count");
     counted.collect();
 }
 // A load is a transaction: whichever allocation runs out of memory, what

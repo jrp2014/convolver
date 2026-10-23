@@ -218,7 +218,8 @@ changing the filter or its failure record. `HostFilter::load` builds
 everything it keeps (messages, the speaker notice) before calling the install
 callback, and nothing after the callback publishes can throw, so running out
 of memory never leaves one filter playing while another is saved. One audio
-thread calls process, reset, set_bypass and mute. `mute()` is for a failure
+thread calls process, reset, set_bypass and mute, and reads publications.
+`mute()` is for a failure
 found on the audio thread itself: the current filter ramps to silence over 64
 samples and stays silent until a filter published after the mute takes over
 and fades in from silence; one published before it but not yet picked up by

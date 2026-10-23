@@ -313,10 +313,12 @@ data and one function per operation, each rule citing the contract clause or
 the format's specification it comes from, never the implementation.
 
 **Sequences.** Each format's driver says which operations it supports. The
-runner enumerates every allowed sequence up to a length after each of three
-starts (a negotiated empty instance, one created before the host negotiated
-anything, and one already playing filter A), then runs fixed sequences (the
-defects found so far) and eight seeded sequences of 40 operations. Every
+runner enumerates every allowed sequence up to a length after each start:
+a negotiated empty instance, one already playing filter A, and one created
+before the host negotiated anything (LV2, which fixes the rate and channels at
+instantiation, starts instead with filter A's file queued for the worker).
+Then it runs fixed sequences (the defects found so far) and eight seeded
+sequences of 40 operations. Every
 sequence starts on a new instance.
 
 **Checks.** After the last operation of an enumerated sequence, and after every
@@ -333,11 +335,14 @@ operation of a fixed or seeded one, it compares with the model:
   Every prefix of an enumerated sequence is enumerated too, so this covers the
   audible filter after every operation without listening in between, which
   would change the sequence;
-- that no audio-thread call allocates, frees or (on Linux) locks a mutex.
+- that no audio-thread call allocates or frees through `operator new` and
+  `delete` (aligned forms included) or, on Linux, locks with
+  `pthread_mutex_lock`.
   [`tests/plugins/audio_guard.hpp`](../../tests/plugins/audio_guard.hpp)
-  replaces `operator new` and `pthread_mutex_lock` in the test executable and
-  checks at start that it sees allocations and locks, including the LV2
-  plug-in library's own (linked with `ENABLE_EXPORTS`).
+  replaces them in the test executable and checks at start that it sees
+  allocations and locks, including the LV2 plug-in library's own (linked
+  with `ENABLE_EXPORTS`). It does not see `malloc`, `fftwf_malloc`, try-locks
+  or read-write locks.
 
 **Running out of memory.** As `native.host` does for `HostFilter` alone
 (`allocation_failures`), fixed sequences load filter B with the plug-in's
@@ -345,8 +350,10 @@ allocations failing from the first onwards, then from the second, and so on
 until it loads (`state-B-starved`), and again with only one allocation failing
 each time (`state-B-shortage`). After each failed attempt the saved filter
 must be unchanged and, while active, what plays must still be what the model
-expects. Every driver except Audio Units' fails only allocations made inside
-the plug-in's own call; Core Foundation's do not go through `operator new`.
+expects. Only allocations made during the plug-in's own call fail: for Audio
+Units that call goes through the Audio Unit SDK's dispatch, whose C++
+allocations fail too, while Core Foundation's never do (they do not go
+through `operator new`).
 These are fixed sequences only, at the start of a session, as a replacement,
 while inactive and before the host is configured, because each one restores
 the state some fifty times.
@@ -367,8 +374,8 @@ after each start: 4, or 3 in sanitizer builds, where a sequence is ten to
 twenty times slower. LV2, with about twice as many operations, uses one fewer
 (`CONVOLVER_LV2_LIFECYCLE_LENGTH`). Each executable also takes the length as
 its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
-no sanitizers) enumerated 31,162 sequences per layout, for both layouts in
-about 30 seconds.
+no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
+fixed and seeded), for both layouts in about 30 seconds.
 
 ## Plug-in format tests
 
