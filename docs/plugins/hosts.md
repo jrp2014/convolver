@@ -85,7 +85,7 @@ Keep private audio out of reports. Use the supplied synthetic examples.
 
 1. Download through the actual user-facing route, retaining quarantine metadata.
    Install the signed package and scan without disabling security. Check
-   converter operation too.
+   `convolver-preset` operation too.
 2. Check identity and echo output at 44.1/48/96 kHz, mono/stereo, variable blocks,
    long-tail silence, stop/start/seek and offline/bounce rendering. Align numerical
    comparison by 256 samples; use an independent time-domain convolution reference.

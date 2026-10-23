@@ -11,7 +11,7 @@
   <choice id="vst3" title="Convolver VST3" description="Install the plug-in for all users.">
     <pkg-ref id="io.github.jrp2014.convolver.pkg.vst3"/>
   </choice>
-  <choice id="tools" title="Preset converter and examples" description="Install tools and documentation in Application Support.">
+  <choice id="tools" title="Command-line tools, examples and guides" description="Install tools and documentation in Application Support.">
     <pkg-ref id="io.github.jrp2014.convolver.pkg.tools"/>
   </choice>
   <pkg-ref id="io.github.jrp2014.convolver.pkg.vst3">Convolver-vst3.pkg</pkg-ref>

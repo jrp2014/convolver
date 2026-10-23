@@ -279,6 +279,12 @@ Shared groundwork, done once so the three streams stay independent:
   the draft signing scripts are kept in history at `f4519022c` (the last commit of
   the merged `codex/plugin-distribution` branch): `git show
   f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
+  Progress 22 October 2026 (PR #38): preview packages ship `convolver-preset`
+  and `convolver-equalizer-apo` on every platform, and not the older
+  `convolver-vst3-preset` (owner's decisions, 22 October 2026), with the
+  presets and Equalizer APO guides;
+  `release.stage`, `package_smoke.py` and `verify_artifact.py` require and run
+  both tools.
 - [x] **PLUG-6 — Pin format dependencies.** Done 22 October 2026 (PR #31).
   AudioUnitSDK 1.4.0 (`bd98b31`) and the `lv2` 1.18.10 headers (`0bcde33`) are
   pinned by commit and archive SHA-256 in `packaging/release-policy.json`, each
