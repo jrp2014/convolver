@@ -26,8 +26,8 @@ ctest --preset release-vst3
 Plug-in builds need no FFT library: the default backend is the built-in Ooura FFT
 on Linux and Windows and Accelerate on macOS, because a plug-in must not share an
 FFTW planner with its host. Override it with `-DCONVOLVER_FFT_BACKEND=FFTW` (or
-`OOURA`, `ACCELERATE`) if you need to; CMake warns for FFTW. The converter
-requires libsndfile, so on Linux provide its development library.
+`OOURA`, `ACCELERATE`) if you need to; CMake warns for FFTW. The tools in `bin/`
+require libsndfile, so on Linux provide its development library.
 These development libraries do not establish a portable binary release.
 
 On Windows run in a Visual Studio developer terminal. For the optional vcpkg
@@ -155,7 +155,7 @@ libraries and the dynamic MSVC runtime consistently.
 `build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
 assembles **committed** source and the pinned dependency archives. Then
 `python tests/release/source_build.py --archive build/Convolver-source.tar.gz`
-rebuilds dependencies, core, converter, SDK and external consumers from a fresh
+rebuilds dependencies, core, tools, SDK and external consumers from a fresh
 extraction without fetching. Its `--backend` defaults to `AUTO`, as above.
 
 On a Mac that rejects ad-hoc bundles, set `-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF`

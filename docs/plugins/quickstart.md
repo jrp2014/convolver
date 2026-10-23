@@ -19,10 +19,10 @@ From the extracted package directory, create a new preset (the output must not e
 <!-- executable-example -->
 
 ```sh
-./bin/convolver-vst3-preset presets/echo-48000-stereo/impulse.wav room.vstpreset
+./bin/convolver-preset presets/echo-48000-stereo/impulse.wav room.vstpreset
 ```
 
-In PowerShell use `./bin/convolver-vst3-preset.exe` with the same two arguments.
+In PowerShell use `./bin/convolver-preset.exe` with the same two arguments.
 A supported legacy `.cfg` or configuration-list file can replace the WAV argument.
 A list selects its first matching entry with unspecified rate/layout; use an
 individual configuration when you need a particular alternative. The plug-in

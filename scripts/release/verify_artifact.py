@@ -116,8 +116,11 @@ def inspect(root, candidate, policy):
             magic = stream.read(4)
         if magic in magics or magic[:2] == b'MZ':
             records[path.relative_to(root).as_posix()] = inspect_binary(path, candidate, policy)
-    if not any(name.startswith('VST3/Convolver.vst3/') for name in records) or not any(name.startswith('bin/convolver-vst3-preset') for name in records):
-        raise ValueError('missing native plug-in or converter binary')
+    if not any(name.startswith('VST3/Convolver.vst3/') for name in records):
+        raise ValueError('missing native plug-in binary')
+    for tool in ('bin/convolver-preset', 'bin/convolver-equalizer-apo'):
+        if tool not in records and tool + '.exe' not in records:
+            raise ValueError('missing tool binary: ' + tool)
     return records
 
 
@@ -161,7 +164,7 @@ def main():
         if build['configuration'] != 'Release' or re.search(r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.I):
             raise ValueError('nonportable release build flags or configuration')
         notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
-        for required in ('licenses/Convolver.txt', 'licenses/DEPENDENCIES.json', 'licenses/libsndfile.txt', *notices, 'licenses/vst3sdk.txt', 'docs/plugins/quickstart.md', 'presets/examples.json', 'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json', 'VERSION.txt'):
+        for required in ('licenses/Convolver.txt', 'licenses/DEPENDENCIES.json', 'licenses/libsndfile.txt', *notices, 'licenses/vst3sdk.txt', 'docs/plugins/quickstart.md', 'docs/presets.md', 'docs/equalizer-apo.md', 'presets/examples.json', 'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json', 'VERSION.txt'):
             if not (root / required).is_file():
                 raise ValueError(f'missing release content: {required}')
         manifest = dict(schema=1, version=policy['version'], platform=args.platform, source_commit=build['source_commit'],

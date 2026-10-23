@@ -31,6 +31,7 @@ if(CONVOLVER_BUILD_TESTS)
 endif()
 option(CONVOLVER_PACKAGE_PLUGINS "Stage VST3/tools/examples for distribution" OFF)
 option(CONVOLVER_BUILD_VST3 "Build the optional VST3 adapter (requires SDK)" OFF)
+option(CONVOLVER_BUILD_LV2 "Build the optional LV2 adapter (requires the lv2 headers; tests need lilv)" OFF)
 option(CONVOLVER_BUILD_AU "Build the optional Audio Unit adapter (macOS; requires AudioUnitSDK)" OFF)
 option(CONVOLVER_BUILD_NATIVE "Build the portable FFT/libsndfile core and CLI" ON)
 option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
@@ -46,6 +47,11 @@ if(CONVOLVER_BUILD_IO AND CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux)$" AND
     set(legacy_default ON)
 endif()
 option(CONVOLVER_LEGACY_TESTS "Run Clang extraction regression harnesses" ${legacy_default})
+# HOST-4: run the Equalizer APO export through Equalizer APO itself (Windows).
+# Its Benchmark.exe reads config.txt from the folder in the registry value
+# HKLM\SOFTWARE\EqualizerAPO\ConfigPath; set both to a folder made for the test.
+set(CONVOLVER_EQUALIZER_APO_BENCHMARK "" CACHE FILEPATH "Optional Equalizer APO Benchmark.exe for export.equalizer_apo.runtime")
+set(CONVOLVER_EQUALIZER_APO_CONFIG "" CACHE PATH "Empty folder that Equalizer APO's ConfigPath registry value names")
 
 if(CONVOLVER_BUILD_NATIVE)
     if(CONVOLVER_BUILD_CLI AND NOT CONVOLVER_BUILD_IO)
@@ -61,7 +67,7 @@ if(CONVOLVER_BUILD_NATIVE)
     set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW ACCELERATE OOURA)
     string(TOUPPER "${CONVOLVER_FFT_BACKEND}" fft_backend)
     set(convolver_plugin_build OFF)
-    if(CONVOLVER_BUILD_VST3 OR CONVOLVER_BUILD_AU)
+    if(CONVOLVER_BUILD_VST3 OR CONVOLVER_BUILD_LV2 OR CONVOLVER_BUILD_AU)
         set(convolver_plugin_build ON)
     endif()
     if(fft_backend STREQUAL "AUTO")
@@ -112,6 +118,8 @@ if(CONVOLVER_BUILD_NATIVE)
     add_library(Convolver::host ALIAS convolver_host)
     set_target_properties(convolver_host PROPERTIES EXPORT_NAME host POSITION_INDEPENDENT_CODE ON)
     target_link_libraries(convolver_host PUBLIC Convolver::core)
+    # The speaker table of plugins/identities.json (PLUG-4), used by speaker_notice.
+    target_include_directories(convolver_host PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     set(native_targets convolver_core convolver_host)
     # PLUG-3: preset files for every plug-in format, without any plug-in SDK.
     # Private to this build (not installed); adapters and the preset tool link it.
@@ -323,6 +331,19 @@ if(CONVOLVER_BUILD_TESTS)
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/equalizer_apo_tests.py"
             "$<TARGET_FILE:convolver_equalizer_apo>")
         set_tests_properties(export.equalizer_apo PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 300)
+        if(CONVOLVER_EQUALIZER_APO_BENCHMARK OR CONVOLVER_EQUALIZER_APO_CONFIG)
+            if(NOT WIN32 OR NOT CONVOLVER_EQUALIZER_APO_BENCHMARK OR NOT CONVOLVER_EQUALIZER_APO_CONFIG)
+                message(FATAL_ERROR "export.equalizer_apo.runtime runs on Windows and needs both "
+                    "CONVOLVER_EQUALIZER_APO_BENCHMARK (Benchmark.exe) and CONVOLVER_EQUALIZER_APO_CONFIG "
+                    "(the folder Equalizer APO's ConfigPath registry value names).")
+            endif()
+            add_test(NAME export.equalizer_apo.runtime COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+                "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/equalizer_apo_tests.py"
+                "$<TARGET_FILE:convolver_equalizer_apo>"
+                --benchmark "${CONVOLVER_EQUALIZER_APO_BENCHMARK}" --config "${CONVOLVER_EQUALIZER_APO_CONFIG}")
+            set_tests_properties(export.equalizer_apo.runtime PROPERTIES
+                LABELS "native;real-libraries;cli;equalizer-apo" TIMEOUT 600)
+        endif()
         add_test(NAME compatibility.corpus COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/compatibility/run_corpus.py"
             "$<TARGET_FILE:convolver_cli>")
@@ -396,6 +417,13 @@ if(CONVOLVER_BUILD_VST3)
         message(FATAL_ERROR "VST3 requires the portable core")
     endif()
     add_subdirectory(plugins/vst3)
+endif()
+
+if(CONVOLVER_BUILD_LV2)
+    if(NOT CONVOLVER_BUILD_NATIVE)
+        message(FATAL_ERROR "LV2 requires the portable core")
+    endif()
+    add_subdirectory(plugins/lv2)
 endif()
 
 if(CONVOLVER_BUILD_AU)

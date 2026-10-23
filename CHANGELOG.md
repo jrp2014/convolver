@@ -12,6 +12,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
+  bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
+  2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
+  `convolver-preset` and from saved sessions; bypass, 256-frame latency
+  reporting and a status port; rejected loads are explained in the host's log.
+  A filter file parameter and worker-thread loading follow in LV2-2. See the
+  [LV2 guide](docs/lv2.md).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
@@ -28,13 +35,19 @@ Until 1.0 the C++ API may change between minor versions.
   first load (encoded as host state version 2). `HostProcessor::replace` now installs a filter
   directly, without warm-up or crossfade, when no audio has been processed
   since construction or `reset()`.
+- `speaker_notice` and `HostFilter::notice()` (VST3-1) compare the speakers a
+  filter's outputs are labelled for (the `.cfg` channel mask) with the host's
+  output speakers, now carried in `HostLayout`, and explain which outputs
+  land on which speakers. Advice only: nothing is rejected, and channels stay
+  routed by bus index. The VST3 adapter passes its speaker arrangements to it;
+  it has no way to show the notice yet.
 - `convolver-equalizer-apo` (HOST-4) exports an IR, `.cfg` or configuration
   list as an [Equalizer APO](docs/equalizer-apo.md) configuration, so Windows
   can apply the filter to everything a device plays. The device's sample rate
   and channel count choose the list entry (on a device with more channels,
   the largest entry that fits); a device that no entry fits, and device
-  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO, not yet in Equalizer
-  APO itself.
+  channels a filter does not use, are silenced rather than played unfiltered. Checked against a model of Equalizer APO and, on Windows CI, in
+  Equalizer APO 1.4.2's own filter code through its `Benchmark.exe`.
 
 - `convolver-preset` (PLUG-3) makes self-contained presets for VST3
   (`.vstpreset`), Audio Units (`.aupreset`) and LV2 (`NAME.preset.lv2`
@@ -83,6 +96,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Preview packages (PLUG-5) ship `convolver-preset` and
+  `convolver-equalizer-apo` in `bin/`, with the presets and Equalizer APO
+  guides in `docs/`, instead of `convolver-vst3-preset` (still built from
+  source, for existing scripts). The example presets are made with
+  `convolver-preset` (byte-identical). Release checks run both tools from a
+  relocated package.
 - The VST3 plug-in follows the shared adapter contract (VST3-7). With no preset
   loaded and different input and output counts (for example a 2→6 crossover)
   it plays silence instead of passing input *c* to output *c*. Once the plug-in has
@@ -127,6 +146,16 @@ Until 1.0 the C++ API may change between minor versions.
   applies the IR to every channel. Missing IRs, out-of-range IR or route
   channels, IR sample-rate mismatches and `-` without RAW options also get
   fuller explanations.
+
+### Fixed
+
+- A filter loaded while the host had stopped processing in the middle of a
+  crossfade now plays from the first resumed sample. Before, `HostProcessor`
+  kept the interrupted transition after `reset()`, so the old filter went on
+  playing until that crossfade finished (jrp's review of 0.4.19 measured 1.004
+  where 3 was expected). Any reset now ends the transition and the newer filter
+  plays at once; that includes the internal recovery reset after non-finite
+  output, which used to bring the old filter back and repeat the crossfade.
 
 ## [0.4.0] - 2026-10-19
 

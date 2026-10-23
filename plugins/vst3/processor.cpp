@@ -30,6 +30,10 @@ bool transfer(IBStream* stream, void* data, std::size_t size, bool writing) {
     return true;
 }
 } // namespace
+std::uint32_t wav_speakers(SpeakerArrangement arrangement) noexcept {
+    constexpr SpeakerArrangement shared = (SpeakerArrangement(1) << 18) - 1;
+    return arrangement & ~shared ? 0 : static_cast<std::uint32_t>(arrangement);
+}
 HostState read_state(IBStream* stream) {
     std::array<std::byte, 4> header{};
     if (!transfer(stream, header.data(), 4, false))
@@ -74,6 +78,8 @@ tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 n
     if (result == kResultOk) {
         inputs_ = inputs;
         outputs_ = outputs;
+        input_arrangement_ = in[0];
+        output_arrangement_ = out[0];
     }
     return result;
 }
@@ -91,7 +97,8 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
 }
 HostLayout Processor::layout() const {
     return {static_cast<int>(processSetup.sampleRate), static_cast<std::size_t>(inputs_),
-            static_cast<std::size_t>(outputs_)};
+            static_cast<std::size_t>(outputs_), wav_speakers(input_arrangement_),
+            wav_speakers(output_arrangement_)};
 }
 // The host's configuration is known once the plug-in has been activated with
 // it, and stays known while the rate and buses are unchanged. setupProcessing
@@ -173,6 +180,10 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
             tail_.store(0);
         return kResultFalse;
     }
+}
+std::string Processor::notice() {
+    std::lock_guard lock(control_);
+    return filter_.notice();
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     std::lock_guard lock(control_);

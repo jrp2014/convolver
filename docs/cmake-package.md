@@ -137,6 +137,7 @@ also exercises Accelerate. CI results belong to the specific tested commit.
 ## Optional plug-in distributions
 
 The `release-vst3` preset enables the separate `PluginDistribution` installation
-component. It stages the SDK bundle, converter, presets, notices and user guide;
+component. It stages the SDK bundle, `convolver-preset`, `convolver-equalizer-apo`, presets,
+notices and user guide (with the presets and Equalizer APO guides);
 it does not replace the C++ library exports above. See the
 [pinned source recipe](plugins/build.md) and [preview qualification record](releases/developer-preview.md).
