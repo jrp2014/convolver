@@ -25,12 +25,35 @@ namespace convolver::plugin_test::audio_guard {
 namespace {
 thread_local int open = 0, paused = 0;
 thread_local Counts counted;
+// Allocations left before the next fails; negative: no limit.
+thread_local long budget = -1;
+thread_local bool fail_once = false;
 bool watching() noexcept {
     return open > 0 && paused == 0;
 }
 } // namespace
 void note_allocation() noexcept;
 void note_lock() noexcept;
+bool allocation_allowed() noexcept;
+Starve::Starve(std::size_t allowed, bool once) noexcept {
+    budget = static_cast<long>(allowed);
+    fail_once = once;
+}
+Starve::~Starve() {
+    budget = -1;
+}
+bool allocation_allowed() noexcept {
+    if (paused) // Host code the plug-in calls back.
+        return true;
+    if (budget == 0) {
+        if (fail_once)
+            budget = -1;
+        return false;
+    }
+    if (budget > 0)
+        --budget;
+    return true;
+}
 Counts take() noexcept {
     const auto c = counted;
     counted = {};
@@ -69,6 +92,8 @@ namespace guard = convolver::plugin_test::audio_guard;
 
 void* operator new(std::size_t n) {
     guard::note_allocation();
+    if (!guard::allocation_allowed())
+        throw std::bad_alloc();
     if (auto p = std::malloc(n ? n : 1))
         return p;
     throw std::bad_alloc();
@@ -78,6 +103,8 @@ void* operator new[](std::size_t n) {
 }
 void* operator new(std::size_t n, const std::nothrow_t&) noexcept {
     guard::note_allocation();
+    if (!guard::allocation_allowed())
+        return nullptr;
     return std::malloc(n ? n : 1);
 }
 void* operator new[](std::size_t n, const std::nothrow_t&) noexcept {

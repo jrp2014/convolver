@@ -20,13 +20,15 @@ constexpr std::size_t transition = 512; // Warm-up and crossfade, 256 frames eac
 constexpr std::size_t ramp = 64;        // Bypass and mute ramps.
 constexpr double tolerance = 1e-5;      // PLUG-2's tolerance against the oracle.
 
-constexpr std::array<std::pair<Op, const char*>, 22> names{{
+constexpr std::array<std::pair<Op, const char*>, 24> names{{
     {Op::state_a, "state-A"},
     {Op::state_b, "state-B"},
     {Op::state_other_rate, "state-other-rate"},
     {Op::state_malformed, "state-malformed"},
     {Op::state_empty, "state-empty"},
     {Op::state_failed, "state-failed"},
+    {Op::state_b_starved, "state-B-starved"},
+    {Op::state_b_shortage, "state-B-shortage"},
     {Op::play, "play"},
     {Op::bypass, "bypass"},
     {Op::reset, "reset"},
@@ -111,6 +113,9 @@ struct Model {
     std::optional<Failure> load_failure, activation_failure;
     // LV2: requests queued for the worker, oldest first.
     std::vector<Job> jobs;
+    // After a load that ran out of memory the drivers' request numbers are
+    // not predictable (each attempt is a request).
+    bool numbers_unknown = false;
 };
 
 struct Context {
@@ -210,6 +215,11 @@ void apply(const Context& x, Model& m, Op op) {
         return restore(x, m, Which::a, false, false);
     case Op::state_b:
         return restore(x, m, Which::b, false, false);
+    case Op::state_b_starved:
+    case Op::state_b_shortage:
+        restore(x, m, Which::b, false, false);
+        m.numbers_unknown = true;
+        return;
     case Op::state_other_rate:
         return restore(x, m, Which::other_rate, false, false);
     case Op::state_malformed:
@@ -300,6 +310,10 @@ void apply(const Context& x, Model& m, Op op) {
     }
 }
 
+// Loads under an allocation limit, kept out of the enumeration for time.
+bool starving(Op op) {
+    return op == Op::state_b_starved || op == Op::state_b_shortage;
+}
 bool supports(const Format& format, Op op) {
     return op == Op::listen || std::find(format.operations.begin(), format.operations.end(), op) !=
                                    format.operations.end();
@@ -514,6 +528,9 @@ class Runner {
                                              ", expected the other");
             return;
         }
+        case Op::state_b_starved:
+        case Op::state_b_shortage:
+            return starved(x, m, op);
         case Op::play:
             // Long enough to finish a ramp, short enough to stop inside a
             // replacement's crossfade (256 frames of warm-up, then 256).
@@ -578,6 +595,48 @@ class Runner {
             m.rendered = true;
     }
 
+    // Contract, host layer: "running out of memory never leaves one filter
+    // playing while another is saved"; replacement: a rejected request leaves
+    // the previous state unchanged. B is loaded with each allocation in turn
+    // failing until it loads. After every failed attempt the saved filter is
+    // unchanged and, while active, what plays is still what the model
+    // expects; then B is in place as for state-B.
+    void starved(const Context& x, Model& m, Op op) {
+        HostState s;
+        s.configuration = filters_.b;
+        const auto bytes = encode_host_state(s);
+        const auto filter_of = [](HostState h) {
+            h.bypass = false;
+            h.failed = false;
+            return encode_host_state(h);
+        };
+        const auto before = filter_of(driver_.saved());
+        for (std::size_t allowed = 0;; ++allowed) {
+            if (allowed == 100000)
+                throw std::logic_error("B never loaded under the allocation limit");
+            const auto accepted =
+                driver_.restore_starved(bytes, allowed, op == Op::state_b_shortage);
+            if (!accepted)
+                throw std::logic_error("this driver cannot fail allocations");
+            if (*accepted) {
+                expect(allowed > 0, "the allocation limit never applied");
+                break;
+            }
+            const auto saved = driver_.saved();
+            expect(filter_of(saved) == before, "a load that ran out of memory after " +
+                                                   std::to_string(allowed) +
+                                                   " allocations changed the saved filter");
+            // A failed first load plays silence once its failure is recorded;
+            // recording it needs memory too, so it may not be.
+            if (saved.failed && !m.failed)
+                reject(m, HostFailureKind::preparation, ++m.requests);
+            m.numbers_unknown = true;
+            if (m.active)
+                listen(x, m);
+        }
+        apply(x, m, op);
+    }
+
     // The control side: what is saved, the failure record, LV2's path and
     // status. A host saving at any moment is ordinary.
     void check(Model& m) {
@@ -599,9 +658,9 @@ class Runner {
         const auto failure = driver_.failure();
         const auto& want = m.activation_failure ? m.activation_failure : m.load_failure;
         expect(failure.has_value() == want.has_value() &&
-                   (!failure ||
-                    (failure->kind == want->kind && failure->request.number == want->request &&
-                     failure->silent == want->silent)),
+                   (!failure || (failure->kind == want->kind &&
+                                 (m.numbers_unknown || failure->request.number == want->request) &&
+                                 failure->silent == want->silent)),
                "failure record is " + describe(failure) + ", expected " + describe(want));
         if (format_.path) {
             const auto path = driver_.saved_path();
@@ -792,6 +851,13 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
         // A fixed sequence that negotiates with `setup` starts unconfigured.
         const bool configured = std::find(ops.begin(), ops.end(), Op::setup) == ops.end();
         one(configured, ops, 0);
+        // Each load that runs out of memory also runs with a passing shortage.
+        if (std::find(ops.begin(), ops.end(), Op::state_b_starved) != ops.end()) {
+            auto shortage = ops;
+            std::replace(shortage.begin(), shortage.end(), Op::state_b_starved,
+                         Op::state_b_shortage);
+            one(configured, shortage, 0);
+        }
     }
     // Every allowed sequence up to options.length after each start, each on a
     // new instance and checked at its end. The model is replayed to know
@@ -812,7 +878,7 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
             if (ops.size() == fixed + options.length)
                 return;
             for (const auto& [op, n] : names) {
-                if (op == Op::listen || !allowed(x, now, op))
+                if (op == Op::listen || starving(op) || !allowed(x, now, op))
                     continue;
                 Model next = now;
                 apply(x, next, op);
@@ -832,7 +898,7 @@ std::size_t run(Driver& driver, const Filters& filters, const Options& options) 
         while (ops.size() < options.seeded_length) {
             std::vector<Op> choices;
             for (const auto& [op, n] : names)
-                if (allowed(x, m, op))
+                if (!starving(op) && allowed(x, m, op))
                     choices.push_back(op);
             const auto op =
                 choices[std::uniform_int_distribution<std::size_t>(0, choices.size() - 1)(random)];

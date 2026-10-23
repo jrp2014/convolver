@@ -32,6 +32,8 @@ class Reference final : public lc::Driver {
                         Op::state_malformed,
                         Op::state_empty,
                         Op::state_failed,
+                        Op::state_b_starved,
+                        Op::state_b_shortage,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -85,6 +87,11 @@ class Reference final : public lc::Driver {
                 processor_->replace(unfiltered_configuration(layout(), true));
             return false;
         }
+    }
+    std::optional<bool> restore_starved(std::span<const std::byte> bytes, std::size_t allowed,
+                                        bool once) override {
+        guard::Starve starve(allowed, once);
+        return restore(bytes);
     }
     bool start() override {
         processor_ = std::make_unique<HostProcessor>(filter_->activate(layout()), max_block());
@@ -162,6 +169,12 @@ int main(int argc, char** argv) {
                  "start state-A play state-B play reset state-A listen",
                  // 0.4.30: a failed first load must play silence.
                  "start state-other-rate listen play state-A listen",
+                 // Out of memory at each allocation of a load: first, as a
+                 // replacement, inactive, and before the host is configured.
+                 "start state-B-starved listen",
+                 "start state-A play state-B-starved listen",
+                 "state-A state-B-starved start listen",
+                 "state-B-starved setup start listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

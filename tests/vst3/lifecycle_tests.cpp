@@ -11,6 +11,7 @@
 #include <array>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 using namespace Steinberg;
@@ -41,6 +42,8 @@ class Vst3 final : public lc::Driver {
                         Op::state_malformed,
                         Op::state_empty,
                         Op::state_failed,
+                        Op::state_b_starved,
+                        Op::state_b_shortage,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -92,7 +95,18 @@ class Vst3 final : public lc::Driver {
         stream.write(const_cast<std::byte*>(bytes.data()), static_cast<int32>(bytes.size()),
                      &written);
         stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        if (starve_) {
+            guard::Starve starve(starve_->first, starve_->second);
+            return processor_->setState(&stream) == kResultOk;
+        }
         return processor_->setState(&stream) == kResultOk;
+    }
+    std::optional<bool> restore_starved(std::span<const std::byte> bytes, std::size_t allowed,
+                                        bool once) override {
+        starve_ = std::pair(allowed, once);
+        const bool accepted = restore(bytes);
+        starve_.reset();
+        return accepted;
     }
     bool start() override {
         if (processor_->setActive(true) != kResultOk)
@@ -186,6 +200,7 @@ class Vst3 final : public lc::Driver {
     std::unique_ptr<convolver::vst3::Processor> processor_;
     std::size_t inputs_ = 2, outputs_ = 2;
     bool active_ = false;
+    std::optional<std::pair<std::size_t, bool>> starve_; // For restore_starved.
 };
 } // namespace
 
@@ -199,6 +214,12 @@ int main(int argc, char** argv) {
         for (const char* s : {
                  "state-other-rate setup start listen stop rate start listen",
                  "state-A setup rate start listen stop rate start listen reopen listen",
+                 // Out of memory at each allocation of setState: a first
+                 // load, a replacement, inactive and before setupProcessing.
+                 "start state-B-starved listen",
+                 "start state-A play state-B-starved listen",
+                 "state-A state-B-starved start listen",
+                 "state-B-starved setup start listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

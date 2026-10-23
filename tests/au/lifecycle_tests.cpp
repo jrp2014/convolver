@@ -8,7 +8,9 @@
 #include "plugins/lifecycle.hpp"
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
+#include <utility>
 
 using namespace convolver;
 namespace lc = convolver::plugin_test::lifecycle;
@@ -32,6 +34,8 @@ class AudioUnitDriver final : public lc::Driver {
                         Op::state_malformed,
                         Op::state_empty,
                         Op::state_failed,
+                        Op::state_b_starved,
+                        Op::state_b_shortage,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -72,6 +76,14 @@ class AudioUnitDriver final : public lc::Driver {
         unit_.reset();
     }
     bool restore(std::span<const std::byte> bytes) override {
+        return restore(bytes, std::nullopt);
+    }
+    std::optional<bool> restore_starved(std::span<const std::byte> bytes, std::size_t allowed,
+                                        bool once) override {
+        return restore(bytes, std::pair(allowed, once));
+    }
+    bool restore(std::span<const std::byte> bytes,
+                 std::optional<std::pair<std::size_t, bool>> starve) {
         // A Convolver ClassInfo dictionary holding these bytes as its state.
         const auto base = host::class_info(HostState{});
         const auto dict =
@@ -83,7 +95,14 @@ class AudioUnitDriver final : public lc::Driver {
         CFDictionarySetValue(dict, key, data);
         CFRelease(key);
         CFRelease(data);
-        const auto status = unit_->restore(dict);
+        OSStatus status = noErr;
+        if (starve) {
+            // Only the unit's own C++ allocations fail; Core Foundation's
+            // do not go through operator new.
+            guard::Starve limit(starve->first, starve->second);
+            status = unit_->restore(dict);
+        } else
+            status = unit_->restore(dict);
         CFRelease(dict);
         return status == noErr;
     }
@@ -151,6 +170,12 @@ int main(int argc, char** argv) {
         for (const char* s : {
                  "state-other-rate setup start listen stop rate start listen",
                  "setup start stop state-other-rate start listen",
+                 // Out of memory at each allocation of a restore: a first
+                 // load, a replacement, uninitialized, before the formats.
+                 "start state-B-starved listen",
+                 "start state-A play state-B-starved listen",
+                 "state-A state-B-starved start listen",
+                 "state-B-starved setup start listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

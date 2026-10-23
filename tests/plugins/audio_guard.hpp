@@ -36,4 +36,15 @@ class Pause {
     Pause(const Pause&) = delete;
     Pause& operator=(const Pause&) = delete;
 };
+// While open, this thread's allocations after the first `allowed` fail with
+// std::bad_alloc (nothrow forms return null), as when memory runs out; with
+// `once`, only the next one fails and memory then returns. A Pause exempts
+// host code, as it does from counting.
+class Starve {
+  public:
+    explicit Starve(std::size_t allowed, bool once = false) noexcept;
+    ~Starve();
+    Starve(const Starve&) = delete;
+    Starve& operator=(const Starve&) = delete;
+};
 } // namespace convolver::plugin_test::audio_guard

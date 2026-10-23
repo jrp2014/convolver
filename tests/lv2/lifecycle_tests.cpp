@@ -6,7 +6,7 @@
 // filter parameter and queued for the host's worker (which this host runs only
 // when a sequence says so, so requests can be outstanding across any other
 // operation, teardown included), a host that cannot queue work, a request
-// that overtakes one the worker is reading, and a host with no worker.
+// that overtakes one the worker is preparing, and a host with no worker.
 #include "../plugins/audio_guard.hpp"
 #include "../plugins/lifecycle.hpp"
 #include "convolver/io.hpp"
@@ -101,6 +101,8 @@ class Lv2 final : public lc::Driver {
                         Op::state_malformed,
                         Op::state_empty,
                         Op::state_failed,
+                        Op::state_b_starved,
+                        Op::state_b_shortage,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -130,6 +132,13 @@ class Lv2 final : public lc::Driver {
     }
     bool restore(std::span<const std::byte> bytes) override {
         return plugin_->restore(bytes, world_.urids().map(LV2_ATOM__Chunk)) == LV2_STATE_SUCCESS;
+    }
+    std::optional<bool> restore_starved(std::span<const std::byte> bytes, std::size_t allowed,
+                                        bool once) override {
+        plugin_->starve_restore = std::pair(allowed, once);
+        const auto status = plugin_->restore(bytes, world_.urids().map(LV2_ATOM__Chunk));
+        plugin_->starve_restore.reset();
+        return status == LV2_STATE_SUCCESS;
     }
     bool restore_empty_map() override {
         return plugin_->restore_empty() == LV2_STATE_SUCCESS;
@@ -189,6 +198,7 @@ class Lv2 final : public lc::Driver {
     }
     void choose_file(const fs::path& path, bool refused) override {
         plugin_->scheduling_fails = refused;
+        queued_ = path;
         plugin_->set_filter(path.string());
         plugin_->run_empty();
         plugin_->scheduling_fails = false;
@@ -197,9 +207,13 @@ class Lv2 final : public lc::Driver {
         plugin_->run_deferred_work();
     }
     void overtake(const fs::path& path) override {
-        // The worker reads the queued request on its own thread and pauses
-        // once it has read the file; meanwhile run() receives a new request.
-        plugin_->pause_at(lv2::WorkerPoint::read);
+        // The worker takes the queued request on its own thread and pauses
+        // once it has prepared the filter, before its final check for a newer
+        // request (or, for a missing file, once it has failed to read it);
+        // meanwhile run() receives a new request.
+        plugin_->pause_at(fs::exists(queued_) ? lv2::WorkerPoint::prepared
+                                              : lv2::WorkerPoint::read);
+        queued_ = path;
         std::thread worker([&] { plugin_->run_deferred_work(1); });
         plugin_->wait_until_paused();
         plugin_->set_filter(path.string());
@@ -241,6 +255,7 @@ class Lv2 final : public lc::Driver {
     }
     host::World& world_;
     host::Worker worker_;
+    fs::path queued_; // The file of the newest request sent to the worker.
     lc::Host host_{48000, 2, 2};
     std::unique_ptr<host::Plugin> plugin_;
 };
@@ -259,9 +274,15 @@ int main(int argc, char** argv) {
         // Found by these sequences: a refused first load right after an empty
         // state was restored while active played the unfiltered input
         // (HostProcessor adopted the empty instance's identity after mute()).
-        for (const char* s : {"start state-A play state-empty file-refused listen",
-                              "start state-A play empty-map file-refused listen",
-                              "start file-A state-empty file-refused listen"})
+        for (const char* s :
+             {"start state-A play state-empty file-refused listen",
+              "start state-A play empty-map file-refused listen",
+              "start file-A state-empty file-refused listen",
+              // Out of memory at each allocation of a state
+              // restore: first load, replacement, inactive,
+              // and over a filter file.
+              "start state-B-starved listen", "start state-A play state-B-starved listen",
+              "state-A state-B-starved start listen", "start file-A state-B-starved listen"})
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;
         for (const lc::Host h : {lc::Host{48000, 2, 2}, lc::Host{48000, 1, 2}}) {

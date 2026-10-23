@@ -47,6 +47,10 @@ enum class Op {
     state_malformed,  // Bytes that are not host state.
     state_empty,      // Host state with no filter: an empty instance.
     state_failed,     // A saved failed first load (state version 2).
+    state_b_starved,  // B, first with memory running out at each allocation
+                      // in turn; fixed sequences only (request numbers are
+                      // not followed afterwards).
+    state_b_shortage, // B, first with one allocation failing, each in turn.
     // What a host does.
     play,   // Some audio, in uneven callbacks; may leave a transition running.
     bypass, // Toggle bypass.
@@ -125,6 +129,13 @@ class Driver {
     // Encoded host state through the format's own state mechanism; true if
     // the instance accepted it. Bypass in the state is false.
     virtual bool restore(std::span<const std::byte>) = 0;
+    // restore() with allocations failing in the plug-in's own call after the
+    // first `allowed` (all, or only the next with `once`; audio_guard::Starve);
+    // nothing if the driver cannot do that.
+    virtual std::optional<bool> restore_starved(std::span<const std::byte>, std::size_t /*allowed*/,
+                                                bool /*once*/) {
+        return std::nullopt;
+    }
     virtual bool start() = 0;
     virtual void stop() = 0;
     // One callback; inputs and outputs are planar. False: a processing error.

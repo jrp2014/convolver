@@ -23,9 +23,12 @@
 #include "../plugins/audio_guard.hpp"
 #define AUDIO_GUARD_SCOPE const convolver::plugin_test::audio_guard::Scope audio_guard_scope
 #define AUDIO_GUARD_PAUSE const convolver::plugin_test::audio_guard::Pause audio_guard_pause
+#define AUDIO_GUARD_STARVE(allowed, once)                                                          \
+    const convolver::plugin_test::audio_guard::Starve audio_guard_starve(allowed, once)
 #else
 #define AUDIO_GUARD_SCOPE static_cast<void>(0)
 #define AUDIO_GUARD_PAUSE static_cast<void>(0)
+#define AUDIO_GUARD_STARVE(allowed, once) static_cast<void>(0)
 #endif
 
 namespace convolver::lv2_test {
@@ -468,12 +471,14 @@ char* copy(const std::string& text) {
     return result;
 }
 char* abstract_path(LV2_State_Map_Path_Handle handle, const char* absolute) {
+    AUDIO_GUARD_PAUSE; // The host's own memory.
     const auto& m = *static_cast<const PathMapping*>(handle);
     const auto relative = std::filesystem::path(absolute).lexically_relative(m.folder);
     const bool inside = !relative.empty() && *relative.begin() != "..";
     return copy(inside ? relative.string() : absolute);
 }
 char* absolute_path(LV2_State_Map_Path_Handle handle, const char* abstract) {
+    AUDIO_GUARD_PAUSE;
     const auto& m = *static_cast<const PathMapping*>(handle);
     const std::filesystem::path path(abstract);
     return copy(path.is_absolute() ? path.string() : (m.folder / path).string());
@@ -512,6 +517,12 @@ LV2_State_Status Plugin::restore(const std::vector<Property>& properties) {
     const LV2_Feature map_feature{LV2_STATE__mapPath, &map};
     const LV2_Feature free_feature{LV2_STATE__freePath, &free};
     const LV2_Feature* with_paths[] = {&map_feature, &free_feature, nullptr};
+    if (starve_restore) {
+        AUDIO_GUARD_STARVE(starve_restore->first, starve_restore->second);
+        return state_->restore(lilv_instance_get_handle(instance_), retrieve,
+                               const_cast<std::vector<Property>*>(&properties), 0,
+                               state_folder_.empty() ? nullptr : with_paths);
+    }
     return state_->restore(lilv_instance_get_handle(instance_), retrieve,
                            const_cast<std::vector<Property>*>(&properties), 0,
                            state_folder_.empty() ? nullptr : with_paths);

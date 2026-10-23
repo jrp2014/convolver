@@ -25,6 +25,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace convolver::lv2_test {
@@ -147,6 +148,9 @@ class Plugin {
     // and state:freePath are passed, mapping paths inside the folder to
     // relative ones.
     LV2_State_Status restore(const std::vector<Property>&);
+    // With CONVOLVER_AUDIO_GUARD: the plug-in's restore() runs with
+    // audio_guard::Starve(first, second).
+    std::optional<std::pair<std::size_t, bool>> starve_restore;
     struct Saved {
         LV2_State_Status status = LV2_STATE_SUCCESS;
         std::vector<std::byte> bytes; // Under <base>state.
