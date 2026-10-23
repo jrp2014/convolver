@@ -108,6 +108,7 @@ OSStatus Effect::Initialize() {
     if (!identity::unequal_counts && in.mChannelsPerFrame != out.mChannelsPerFrame)
         return kAudioUnitErr_FormatNotSupported;
     std::string message;
+    bool started = false;
     {
         std::lock_guard lock(control_);
         try {
@@ -123,17 +124,31 @@ OSStatus Effect::Initialize() {
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
-            message = filter_.error();
+            // Why it plays silence, if it does. A rejected replacement's
+            // reason (the working filter plays) was logged when it happened.
+            if (const auto& f = filter_.failure(); f && f->silent)
+                message = f->message;
+            started = true;
         } catch (const std::exception& e) {
-            log_error(std::string("Initialization failed: ") + e.what());
-            return kAudioUnitErr_FailedInitialization;
+            message = activation_failed(e.what());
         } catch (...) {
-            return kAudioUnitErr_FailedInitialization;
+            message = activation_failed("the processor could not be built.");
         }
     }
     log_error(message);
+    if (!started)
+        return kAudioUnitErr_FailedInitialization;
     timing_changed();
     return noErr;
+}
+
+std::string Effect::activation_failed(const char* why) noexcept {
+    try {
+        filter_.fail_activation(why);
+        return filter_.error();
+    } catch (...) { // Out of memory for the message: nothing more to keep.
+        return {};
+    }
 }
 
 // An initialization binds the formats only once audio has rendered with it.
@@ -161,6 +176,11 @@ OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
         writable = true;
         return noErr;
     }
+    if (scope == kAudioUnitScope_Global && id == test_failure_property) {
+        size = sizeof(TestFailure);
+        writable = false;
+        return noErr;
+    }
     return AUBase::GetPropertyInfo(id, scope, element, size, writable);
 }
 
@@ -169,6 +189,23 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
     if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
         const UInt32 value = bypass_.load() ? 1 : 0;
         std::memcpy(data, &value, sizeof value);
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == test_failure_property) {
+        TestFailure t;
+        std::lock_guard lock(control_);
+        if (const auto& f = filter_.failure()) {
+            t.present = 1;
+            t.kind = static_cast<UInt32>(f->kind);
+            t.source = static_cast<UInt32>(f->request.source);
+            t.silent = f->silent ? 1 : 0;
+            t.request = f->request.number;
+            t.sample_rate = f->sample_rate;
+            t.inputs = static_cast<UInt32>(f->inputs);
+            t.outputs = static_cast<UInt32>(f->outputs);
+            f->message.copy(t.message, sizeof t.message - 1);
+        }
+        std::memcpy(data, &t, sizeof t);
         return noErr;
     }
     return AUBase::GetProperty(id, scope, element, data);
@@ -275,10 +312,10 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     return noErr;
 }
 
-void Effect::reject(const std::string& why) {
+void Effect::reject(HostFailureKind kind, const std::string& why) {
     std::lock_guard lock(control_);
     const bool was_failed = filter_.failed();
-    filter_.reject(why);
+    filter_.reject(kind, why);
     // An empty instance that fails its first load plays silence, not identity.
     if (host_ && filter_.failed() && !was_failed) {
         try {
@@ -292,7 +329,8 @@ void Effect::reject(const std::string& why) {
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
-        reject("The saved state is not an Audio Unit preset dictionary.");
+        reject(HostFailureKind::state_unreadable,
+               "The saved state is not an Audio Unit preset dictionary.");
         log_error(error());
         return kAudioUnitErr_InvalidPropertyValue;
     }
@@ -312,8 +350,14 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             throw std::invalid_argument("The saved filter is larger than the 64 MB limit.");
         next = decode_host_state(
             std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
+    } catch (const NewerHostState& e) {
+        reject(HostFailureKind::state_newer,
+               std::string("The saved state could not be read: ") + e.what());
+        log_error(error());
+        return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
-        reject(std::string("The saved state could not be read: ") + e.what());
+        reject(HostFailureKind::state_unreadable,
+               std::string("The saved state could not be read: ") + e.what());
         log_error(error());
         return kAudioUnitErr_InvalidPropertyValue;
     }
