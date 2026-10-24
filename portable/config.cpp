@@ -352,31 +352,16 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
     return cfg;
 }
 
-namespace {
-bool raw_filter_extension(const std::filesystem::path& path) {
+bool raw_filter_name(const std::filesystem::path& path) {
     auto extension = path.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension == ".pcm" || extension == ".raw";
 }
-
-// Whether a file starts like a container libsndfile reads. A .pcm or .raw
-// filter with such a header was always read through its header, so it still is.
-bool has_audio_header(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    char magic[4]{};
-    if (!file.read(magic, sizeof magic))
-        return false;
-    const std::string_view head(magic, sizeof magic);
-    for (const std::string_view known :
-         {"RIFF", "RIFX", "RF64", "BW64", "riff", "FORM", "caff", "fLaC", "OggS"})
-        if (head == known)
-            return true;
-    return false;
-}
-} // namespace
+// sound_file_header decides whether the content is a sound file, so a .pcm or
+// .raw file with a header is read through that header, as it always was.
 bool raw_filter(const std::filesystem::path& resolved) {
-    return raw_filter_extension(resolved) && !has_audio_header(resolved);
+    return raw_filter_name(resolved) && !sound_file_header(resolved);
 }
 
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
@@ -388,6 +373,14 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         const auto resolved = resolve_reference(doc.source, path.ir);
         std::optional<AudioReader> ir;
         const bool raw = raw_filter(resolved);
+        // Appended to errors about a file whose name says raw but whose content
+        // was read as a sound file, so the user knows why.
+        const std::string read_as_sound =
+            !raw && raw_filter_name(resolved)
+                ? " (the name ends like a raw filter's, but the content starts like a sound "
+                  "file, so Convolver read it as one; if it is headerless samples that happen "
+                  "to look like a header, convert it to WAV, for example with SoX)"
+                : "";
         try {
             if (raw)
                 ir.emplace(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding);
@@ -406,7 +399,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
                 throw ConfigurationError("missing-asset", path.ir.location,
-                                         "filter '" + path.ir.spelling + "': " + e.what());
+                                         "filter '" + path.ir.spelling + "': " + e.what() +
+                                             read_as_sound);
             // Includes a bare "-": standard input cannot be a filter.
             throw ConfigurationError(
                 "missing-asset", path.ir.location,
@@ -423,7 +417,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                          std::to_string(cfg.sample_rate) +
                                          " Hz configuration). Every IR a configuration names "
                                          "must have the sample rate on its first line; "
-                                         "Convolver never resamples IRs");
+                                         "Convolver never resamples IRs" +
+                                         read_as_sound);
         // read_impulses targets the last path, so decode into a single path and
         // transfer only its coefficients after all routing has been validated.
         std::vector<FilterPath> decoded(1);
