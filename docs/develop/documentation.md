@@ -133,7 +133,7 @@ can act on it without a separate copy of the rules:
 | System-wide filtering on Windows | [Equalizer APO export](../use/equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
 | Plug-in downloads and release gates | [Install](../use/install.md), [releasing](releasing.md), [build from source](build.md#pinned-preview-recipe), [host testing](host-testing.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
 | Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |
-| jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to | "Owner's decision" lines in TODO and the guides |
+| jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to; no other page carries decision notes or their dates | TODO, the guides and pull requests that describe the work |
 | Dependency choices | [Implementation map](architecture.md#dependency-choices) | `CMakeLists.txt`, the release policy |
 | FFT selection and performance evidence | [FFT guide](fft-backends.md) | Adapter contract; dated measurement artifacts |
 | Verification | [Testing](testing.md) | CMake registrations, workflow matrix, actual run results |

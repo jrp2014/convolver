@@ -10,10 +10,10 @@ explains it and owns the details.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date. Developer and project pages may add
-"(owner's decision, *date*)" where the work is described; user pages in
-`docs/use/` never do, and a change users will notice goes in the
-[changelog](../../CHANGELOG.md) instead. Changing a decision is a new decision: add a row
+jrp decides, record it here with its date. This log is the only place for
+decision notes and their dates: other pages state what was decided as plain
+fact and may link here, and a change users will notice also goes in the
+[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -107,3 +107,4 @@ were recorded in the repository; this log is their first written record.
 | 18 October 2026 | In repository documents the owner is called jrp | [Documentation guide](../develop/documentation.md#writing-rules) |
 | 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md) |
 | 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md#decisions) |
+| 24 October 2026 | Decision notes and their dates appear only in this log, not as "(owner's decision, *date*)" on other pages | [Workflow](../develop/workflow.md#while-working) |

@@ -16,7 +16,7 @@ and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
 The [shared adapter contract](#shared-adapter-contract) below applies to every
 format and takes precedence over a per-format section that seems to disagree.
 
-**Priority (owner's decision, 21 October 2026):** develop VST3, LV2 and AU in
+**Priority:** develop VST3, LV2 and AU in
 parallel, as equal first priorities. The FFmpeg filter and a Windows-native
 adapter (Media Foundation, APO) are parked: FFmpeg because maintaining a
 patched FFmpeg source tree adds uncomfortable coupling, Windows because it needs
@@ -277,7 +277,7 @@ their own copies.
 
 ## Unsigned previews and production
 
-The first releases are unsigned previews (owner's decision, 21 October 2026).
+The first releases are unsigned previews.
 Signing must not become a hidden prerequisite for them. The two gates are
 separate:
 
@@ -291,7 +291,7 @@ separate:
 The next milestone (TODO, "Execution priorities") adds an independent user
 following the REL-2 journeys from the first preview's exact files (REL-3).
 It happens with the chosen candidate run's files before they are uploaded
-(owner's decision, 23 October 2026; see REL-3).
+(see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:
@@ -314,7 +314,7 @@ never changed after release (like the VST3 class IDs). State keys and the
 parameter URI live under the same base.
 
 **Channels.** LV2 ports are fixed in the `.ttl`, so each channel layout is a
-separate plug-in URI generated from one template (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4,
+separate plug-in URI generated from one template: 1→1, 2→2, 1→2, 2→4,
 2→6, 2→8, 6→6 and 8→8, all discrete, within the VST3 adapter's 1–8 limit.
 Named layouts (port groups and designations) are added per the
 [layout rules](../../develop/plugin-identities.md#channel-layouts). A configuration whose counts
