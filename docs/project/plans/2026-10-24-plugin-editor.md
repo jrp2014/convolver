@@ -1,63 +1,70 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Plug-in editor plan: a window for loading and debugging filters
+# Plug-in editor plan: a window to configure, load and debug
 
 Status: written on 24 October 2026 against Convolver `80ac07a` (0.4.45), at
 jrp's request ("I think that doing that would be helpful, not least for
-debugging"). Nothing here is implemented. The framework is decided: native
-views ([decisions](../decisions.md#direction)); scope and order wait for
-jrp's choices in [decisions for jrp](#decisions-for-jrp). Open work is
-tracked as PLUG-9, VST3-3, VST3-11 to VST3-13, AU-6 and LV2-6 in
+debugging"), and revised the same day after jrp asked that the window
+configure the plug-in as the old Convolver did, modernised in line with what
+the engine can do now. Nothing here is implemented. The framework is decided:
+native views ([decisions](../decisions.md#direction)); the settings, their
+saved form, scope and order wait for jrp's choices in
+[decisions for jrp](#decisions-for-jrp). Open work is tracked as PLUG-9,
+PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6 and LV2-7 in
 [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
 The rules every adapter follows stay in the
 [plug-in adapter contract](../../develop/plugin-contract.md); where this plan
 and the contract seem to disagree, the contract wins until a change to it is
 decided and merged in its own pull request.
 
-For jrp, deciding whether and how to build the editor, and for whoever then
-implements one of its phases.
+For jrp, deciding how to build the editor and what it configures, and for
+whoever then implements one of its phases.
 
 **In short:**
 
-- **What the window is for.** One small window, the same in every format,
-  that shows what the instance is doing and why: the Status value and the
-  full explanation of any failure or fault (what failed, why, what to
-  change), what is loaded and how the host started it (rates, channels,
-  paths, filter length, latency, tail, FFT library and CPU kernels), and
-  where the Convolver log is, with buttons to copy a diagnostic report and to
-  show the log file. It also lets the user choose a filter (`.cfg`, list or
-  sound file), which loads exactly the state `convolver-preset` would write
-  for the host's rate and channels, and switch Bypass. It adds no
-  sound-changing controls.
-- **Framework: native views, no framework** (decided). One AppKit view
-  on macOS serves VST3 and the Audio Unit (and an LV2 Cocoa UI later); a
-  Win32 view serves VST3 on Windows; Linux comes last, with its toolkit
-  decided then. Native controls give screen readers, keyboard use, dark mode
-  and scaling without work of our own, and AppKit and Win32 have outlived
-  every plug-in GUI framework. VSTGUI (BSD-3-Clause, Steinberg) and DPF
-  (ISC) were weighed: VSTGUI has no accessibility support and adds a shipped
-  dependency, and DPF's editor cannot be used without replacing our three
-  adapters with DPF's own. JUCE stays excluded for its licence.
+- **What the window is for.** One window, the same in every format, that
+  configures the plug-in as the old Convolver's windows did and explains what
+  it is doing. Configure: the filter (`.cfg`, list or sound file, chosen,
+  dropped on the window or picked from recent files, and reloaded when the
+  file changes), the level (gain, with the old "optimum attenuation" estimate
+  and the no-clip bound as one-click modes), the latency (the modern form of
+  the old partitions setting) and, if wanted, the wet/dry mix of the old
+  wrapper's "Effect level". Explain: the Status and the full explanation of
+  any failure or fault, what is loaded and how the host started it, an output
+  peak and clip count, the processing load, and the Convolver log, with Copy
+  diagnostics for reports.
+- **Modernised, not copied.** Settings that the engine made obsolete go: FFTW
+  "tuning rigour" (plug-ins use Ooura or Accelerate, which need no planning),
+  and dither and noise shaping (plug-ins hand floating-point audio to the
+  host, which quantizes). The rest become host parameters, so they also work
+  from hosts' generic controls, automation and presets, even before the
+  window exists.
+- **Framework: native views, no framework** (decided). One AppKit view on
+  macOS serves VST3 and the Audio Unit (and an LV2 Cocoa UI later); a Win32
+  view serves VST3 on Windows; Linux comes last, with its toolkit decided
+  then. Native controls give screen readers, keyboard use, dark mode and
+  scaling without work of our own.
 - **Threads.** The window talks only to the controller side (the VST3 edit
-  controller, AU properties, LV2 UI messages), never to the processor or the
-  audio thread. It reads a report the control side builds, and asks for a
-  file load the same way a host restores state; the audio thread only ever
-  plays what it was handed, as today.
-- **Shared first, windows second.** The first phase (PLUG-9, VST3-3, then
-  AU-6's properties) needs no window at all: a shared report and a
-  load-from-file path, tested headlessly through the existing harnesses. The
-  macOS window (VST3-11, reused by the Audio Unit) follows, because jrp's test
-  hosts (REAPER, Audacity, GarageBand) are on his Mac; Windows (VST3-12),
-  Linux (VST3-13) and an LV2 UI (LV2-6) after that.
-- **Testing.** Everything the window shows is built and formatted by shared
-  code that the existing headless tests check per failure kind. The windows
-  themselves are opened in CI by Steinberg's `editorhost` (under `xvfb-run`
-  on Linux), by pluginval's GUI tests (dropping `--skip-gui-tests`), by
-  `auval`'s custom-view check, and by a small test per platform that walks
-  the window's accessibility tree.
+  controller, AU properties and parameters, LV2 UI messages), never to the
+  processor or the audio thread. Settings travel as ordinary host
+  parameters; filter loads as requests handled like a state restore; gain
+  estimates on a worker; meters as counters the audio thread updates without
+  locking.
+- **Settings first, windows second.** Phase 1 needs no window: the shared
+  report and load path (PLUG-9) and the settings in the host layer, state and
+  preset tool (PLUG-10), then per format (VST3-3 and VST3-4, AU-7, LV2-7),
+  all usable from generic host controls and tested headlessly. The macOS
+  window (VST3-11, reused by the Audio Unit in AU-6) follows, because jrp's
+  test hosts are on his Mac; Windows (VST3-12), Linux (VST3-13) and an LV2 UI
+  (LV2-6) after that.
+- **Testing.** Gain, mix and latency pass the double-precision oracle tests
+  like any DSP change; everything the window shows is built by shared code
+  that the existing headless tests check per failure kind; the windows are
+  opened in CI by `editorhost`, pluginval's GUI tests, `auval` and an
+  accessibility-tree test per platform.
 
 Contents: [what the window does](#what-the-window-does) ·
-[the 2006 VST2 window](#the-2006-vst2-window) ·
-[framework choice](#framework-choice) ·
+[what the old Convolver configured](#what-the-old-convolver-configured) ·
+[settings](#settings) · [framework choice](#framework-choice) ·
 [how the window connects](#how-the-window-connects) ·
 [threads](#threads) · [per format](#per-format) ·
 [accessibility](#accessibility) · [testing](#testing) ·
@@ -66,78 +73,95 @@ Contents: [what the window does](#what-the-window-does) ·
 
 ## What the window does
 
-The window exists first to explain, and second to load. jrp wants
-diagnostics that explain generously
-([decisions](../decisions.md#diagnostics)), and today the full explanation
-of a failure is only in the Convolver log, a file most users never open, while
-the host shows at most the Status parameter's one line of 127 characters
-([status and log](../../develop/plugin-contract.md#status-and-log)). The
-window shows the full text where the user is already looking.
+The window configures first and explains always. Configuring is what the old
+Convolver's windows were for; explaining is what jrp asked for in debugging,
+and diagnostics that explain generously ([decisions](../decisions.md#diagnostics)):
+today the full explanation of a failure is only in the Convolver log, while
+the host shows at most the Status parameter's one line
+([status and log](../../develop/plugin-contract.md#status-and-log)).
 
-A sketch (sizes and wording to be settled in VST3-11):
+A sketch, top to bottom in reading and Tab order (sizes and wording to be
+settled in VST3-11):
 
 ```text
 +- Convolver 0.5.0  -  VST3 #2 in REAPER --------------------------------+
-| Load failed: the filter is for 44100 Hz, the host runs at 48000 Hz.    |
+| (*) Playing: room.cfg, entry for 48000 Hz, 2 in -> 2 out               |
+|     On a failure or fault this banner says what failed, why and what   |
+|     to change, in full.                                                |
 |                                                                        |
-| Request 3 (room.cfg) was refused, and the previous filter keeps         |
-| playing. The configuration has entries for 44100 Hz only. Make or       |
-| choose a filter for 48000 Hz, or set the project to 44100 Hz.           |
+| Filter    [ room.cfg                     v ] [Choose...]  [Reload]     |
+|           [x] Reload when the file changes      or drop a file here    |
 |                                                                        |
-| Filter   [Choose filter...]  [Reload]   /Users/jrp/filters/room.cfg    |
-| ---------------------------------------------------------------------- |
-| Host       48000 Hz, 2 in -> 2 out (stereo), blocks up to 512 frames   |
-| Filter     48000 Hz, 2 in -> 2 out, 2 paths, longest 65536 taps (1.4 s)|
-| Latency    256 frames (5.3 ms)    Tail 65792 frames (1.4 s)             |
-| Processing Accelerate, CPU kernels: baseline                           |
-| Log        ~/Library/Logs/Convolver/Convolver.log                       |
+| Level     Gain [ -31.5 ] dB    ( ) Set  (*) Estimate  ( ) No clipping  |
+|           Estimate -31.5 dB, no-clipping bound -70.2 dB                |
+|           Output peak -3.2 dBFS, no samples above full scale [Reset]   |
+|           Mix [====================|] 100 % wet                        |
+|                                                                        |
+| Latency   [ 256 frames (5.3 ms) v ]    Load: 3 % of each callback      |
+|                                                                        |
+| > Details: host, filter paths, tail, FFT library, CPU kernels, log     |
 |                                                                        |
 | [Copy diagnostics]  [Show log file]                         [ ] Bypass |
 +------------------------------------------------------------------------+
 ```
 
-Every part of it, and where its content comes from:
-
-| Part | Shows or does | Source (all on the control side) |
+| Part | Shows or does | Source (all on the control side unless stated) |
 | --- | --- | --- |
 | Title line | Version, format, instance tag (`VST3 #2`, as in the log) and host program, so a screenshot or copied report identifies the instance | `execution_line()` parts, the adapter's log tag |
-| Status | The `HostStatus` name and `host_status()`'s line, then the full message: `HostFilter::failure()`, the speaker notice (`notice()`), and `fault_message()` for faults, each with its request number | `HostFilter`, `HostProcessor::faults()` through `observe()` |
-| Instance not started | When the status is Not checked yet, a sentence saying the host has not started this instance at a rate and layout, and that some hosts (Audacity's real-time effects) show a separate copy in the window: trust the copy whose log says `Started at` | `host_status()`, the known host layout |
-| Filter | Where the accepted filter came from: the file chosen in this session, or "saved project or preset" (state holds no path); the request number. **Choose filter...** opens the system's file dialog; **Reload** reads the same file again, for someone editing a filter between tries | `HostFilter::accepted()`, `HostRequest` |
-| Host | Rate, channel counts, speaker arrangement, largest block | The adapter's known `HostLayout` and setup |
-| Filter details | Rate, counts, number of paths, longest filter in taps and seconds, delays, and the path list (input to output, gain), shortened when long | The accepted `Configuration` |
-| Latency and tail | 256 frames and their duration at the host rate; the tail the adapter reports | `HostProcessor::latency_frames()`, `tail_frames()` |
-| Processing | FFT library and version, CPU kernels | `fft_backend_name()`, `fft_backend_version()`, `cpu_kernels_name()` |
-| Gain (optional) | Estimated and worst-case peak gain on request, as the 2006 window showed after every load; a button rather than at every load, because the estimate costs a convolution of noise | `estimate_attenuation()` |
-| Log | The log path, or why it cannot be written (`host_log_written()`); **Show log file** reveals it in Finder, Explorer or the file manager; **Copy diagnostics** puts the whole report and this instance's recent log lines on the clipboard, ready to paste into a report or to Claude | `host_log_path()`, the report text |
-| Bypass | The host's Bypass parameter (VST3) or bypass property (AU), changed through the host so automation and undo see it | The format's own bypass |
-
-The window adds no control that changes the sound. A gain or dry/wet control
-is VST3-4's question, and the block size (latency) is PERF-2's.
+| Status banner | The `HostStatus` name, an icon and the one-line summary; below it, the full message: `HostFilter::failure()`, the speaker notice, and `fault_message()` for faults, with request numbers. Selectable text. When the status is Not checked yet, it says that the host has not started this instance and that some hosts (Audacity's real-time effects) show a separate copy in the window | `HostFilter`, `host_status()`, `observe()` |
+| Filter | The accepted filter's file (or "from the saved project or preset", since state holds no path), with the list entry chosen and why for a list. **Choose...** opens the system file dialog; a file can also be dropped on the window or picked from the recent-files menu. **Reload** reads the file again; **Reload when the file changes** does it automatically while the window is open, for someone refining a filter in DRC, REW or a spreadsheet. Configuration warnings (`inspect_configuration` diagnostics, such as paths that will not travel) are listed under it | `HostFilter::accepted()`, `inspect_configuration()` |
+| Level | Gain in dB, typed or with a fine slider, in one of three modes that are the CLI's `--gain-db` choices: **Set** (a fixed value), **Estimate** (the old "Calculate optimum attenuation", recomputed for every filter loaded) and **No clipping** (the guaranteed bound, the old "Peak gain"). Both computed values are always shown. An output peak and a count of samples above full scale since the last reset show whether the gain is right while music plays | [Settings](#settings) |
+| Mix | Wet/dry balance, the old wrapper's "Effect level (%)", with the dry signal delayed by the latency so they line up; disabled with a note when input and output counts differ, as bypass then plays silence | [Settings](#settings) |
+| Latency | A menu of block sizes in frames and milliseconds at the host rate, the modern form of the old partitions setting (smaller is less delay, more processor load), with the measured load per callback beside it | [Settings](#settings) |
+| Details (collapsible) | Host rate, channels, speakers and largest block; filter rate, counts, paths (input to output, gain, delay) and longest filter in taps and seconds; tail; FFT library and version; CPU kernels; the log path or why it cannot be written | `HostLayout`, the accepted `Configuration`, `HostProcessor`, `fft_backend_name()`, `cpu_kernels_name()`, `host_log_path()` |
+| Copy diagnostics, Show log file | The whole report and this instance's recent log lines as plain text on the clipboard, ready to paste into a report or to Claude; the log revealed in Finder, Explorer or the file manager | `report_text()`, the log |
+| Bypass | The host's bypass (VST3 parameter, AU property, LV2 `enabled` port), changed through the host so automation and undo see it | The format's own bypass |
 
 **Copy diagnostics** is the debugging feature: one plain-text block, the same
 in every format and system, made by one shared function, with the version,
-format, host, status, full messages, request history of this instance, host
-and filter details, FFT backend and kernels, and the last lines this instance
-wrote to the log. Its wording reuses the log's sentences, so a report pasted
-from the window and a log file never disagree.
+format, host, status, full messages, settings, request history of this
+instance, host and filter details, FFT backend and kernels, meters, and the
+last lines this instance wrote to the log. Its wording reuses the log's
+sentences, so a report pasted from the window and a log file never disagree.
 
-## The 2006 VST2 window
+**Look.** One column, the system font and the system's own controls,
+following light and dark appearance, with group labels down the left as in
+the sketch; no bitmaps or custom skins. The status banner uses the system's
+accent and warning colours with an icon and the status word, so colour is
+never the only signal. The window resizes, and the full message wraps rather
+than being cut off.
 
-`historical/convolverVST/convolverVSTEditor.cpp` (VSTGUI 3 over VST 2.4,
-bitmaps from a third-party control set, revision of 27 June 2006) offered, top
-to bottom:
+## What the old Convolver configured
 
-| 2006 control | What it did | Keep? |
+The old windows are preserved in the [archived website](../../historical/convolver-4.4/README.md),
+which matched the live convolver.sourceforge.net pages on 17 October 2026:
+the VST2 window (`images/vst.ht1.jpg` on the [VST page](../../historical/convolver-4.4/vst.html)),
+the Windows Media Player, DirectShow filter and wrapper property pages of
+versions 2.3 to 4.4 (`images/index.2.jpg`, `images/usage.2.jpg`,
+`images/using_13.jpg` and `images/using_18.jpg`, explained on the
+[usage page](../../historical/convolver-4.4/usage.html)), and the 2006
+source in `historical/convolverVST/convolverVSTEditor.cpp`. They are
+inspiration, not a specification: each old control is kept only where it
+still serves a user, in a form that fits today's engine and hosts. Every
+setting they offered, and what it becomes:
+
+| Old setting (where) | What it did | Now |
 | --- | --- | --- |
-| "Filter/config:" button and path label | `ConvolverVST::SelectFilter()` opened the host's VST2 file selector (`CFileSelector`) for a sound file or `.cfg` and rebuilt the convolution | **Keep**: Choose filter, with the path shown (truncated in the middle, as `kPathText` did), plus Reload |
-| Status text | Before a load, help text with the website, an e-mail address and a credit for the control bitmaps; after a load, `ChannelPaths::DisplayChannelPaths()`: path count, "Stereo to 5.1"-style channels, rate, taps, lag in taps and seconds, estimated and peak gain | **Keep** the summary (now the filter details and optional gain) and a help line; link to the GitHub issues and the troubleshooting guide instead of the retired address |
-| Attenuation slider and display (parameter 0, dB) | Output attenuation | **Drop**: no gain parameter exists; VST3-4 decides |
-| Partitions slider and display (parameter 1; 0 = overlap-save) | Chose the partitioning and so the latency | **Drop**: the latency is fixed at 256 frames; PERF-2 decides any change |
-| "Tuning rigour" menu (parameter 2) | FFTW planning effort | **Drop**: plug-in builds use Ooura or Accelerate, which have no planning (PLUG-1) |
-| System-modal message boxes (`warn`, `abort`) | Every error and warning, including "Reload ConvolverVST" when the channel count changed | **Drop**: errors appear in the window and the log; nothing blocks the host |
+| **Filter/config**, **Get config or IR** (all) | Chose a sound file or `.cfg`; the path shown truncated in the middle | **Kept and extended:** the same, plus lists choosing their entry by the host's rate and channels, drag and drop, recent files, Reload and reload on change, and configuration warnings |
+| Filter description line (all) | "2 Paths (Stereo to Stereo direct) 44.1kHz 50544 taps Lag: 25272 taps 0.57s Estimated gain: 30dB Peak gain: 70dB" | **Kept:** the status banner and Details, with the gains shown under Level |
+| **Attenuation (dB)**, ±200 in the VST2 plug-in, ±1000 in the property pages (all) | Scaled the input by 10^(dB/20); negative to avoid clipping, positive to amplify | **Kept as Gain**, the same sign and meaning as the CLI's `--gain-db` |
+| **Calculate optimum attenuation** button (property pages); estimated and peak gain in the description (VST2) | Ran the noise estimate; the peak gain was a guaranteed but "extremely conservative" bound | **Modernised:** the Estimate and No clipping modes, recomputed automatically for each filter, seeded so the estimate is the same every time (the old one varied), plus an output peak and clip count so the user sees the result |
+| **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, if jrp wants it ([decisions](#decisions-for-jrp)), with the dry path latency-aligned |
+| **Partitions** / **No of partitions** (all) | Traded latency against processor load and cache use; 0 meant plain overlap-save | **Modernised as Latency:** the engine always uses uniform partitions of B frames, so the choice is B itself, shown as delay in milliseconds, with the measured load beside it instead of the old advice to time "Calculate optimum attenuation" or run `perftest` |
+| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped:** the plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which need no planning; the window shows the FFT library and CPU kernels instead. The CLI keeps FFTW tuning |
+| **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** they exchange floating-point audio with the host, which does any quantizing. The CLI keeps both |
+| Version and `http://convolver.sf.net` (property pages); help text with an e-mail address (VST2) | Identification and help | **Kept:** version in the title; links to the user guide and the GitHub issues instead of the retired address |
+| OK, Cancel, Apply, Help (property pages) | Dialog buttons | **Dropped:** a plug-in window applies changes at once, as hosts expect, and the host's undo covers parameters |
+| System-modal message boxes (all) | Every error and warning | **Replaced** by the status banner and the log |
+| Preset menu, PRESET and RANDOM (above the VST2 window) | The host's own controls, not Convolver's | Host presets keep working; `convolver-preset` makes them |
 
-Lessons from its implementation, which the threading rules below avoid:
+Lessons from the 2006 VST2 implementation, which the threading rules below
+avoid:
 
 - `SelectFilter()` took `m_Convolution.lock`, the lock `processBase()` takes
   on the audio thread for every block, **before** opening the file selector,
@@ -153,9 +177,103 @@ Lessons from its implementation, which the threading rules below avoid:
   (`D:\Projects\convolver\VSTinterface\...`, in `convolverVST.rc`) and are not
   in the repository; their licence is unknown, so none are reused.
 
-The parameter numbers 0 to 2 stay free in the VST3 plug-in
-([identities](../decisions.md#identities-and-file-formats)), so VST3-6 can
-still map old projects; the editor does not use them.
+## Settings
+
+Each setting is a host parameter in every format, so it works in generic
+host controls, automation and host presets before and without the window.
+The defaults leave today's sound unchanged: gain 0 dB in Set mode, mix 100%
+wet, latency 256 frames. Every saved project and preset made before the
+settings existed therefore keeps sounding the same.
+
+**Gain** (PLUG-10, VST3-4, AU-7, LV2-7).
+
+- Applied by `HostProcessor` to the filtered output, after convolution and
+  before the mix, with the 64-sample ramp that bypass uses, so automation and
+  typing a new value never click. Not applied to the dry path, which stays the
+  untouched input.
+- Mode **Set** uses the typed value. **Estimate** and **No clipping** use
+  `estimate_attenuation()`'s `noise_attenuation_db` and
+  `worst_case_attenuation_db` for the filter being loaded, computed during
+  preparation, off the audio thread, so the new filter arrives with its gain
+  and the crossfade covers the change. The estimate convolves at least ten
+  filter lengths of noise; PERF-3 measures what that adds to a load.
+- Parameter values: VST2's parameter 0 was "Attenuation" in dB, mapped
+  linearly from 0 to 1 onto -200 to +200 dB (`float2dB` in
+  `historical/convolverVST/convolverVST.cpp`), which is the same meaning as
+  `--gain-db`. Using VST3 parameter ID 0 with exactly that mapping lets
+  VST3-6 carry old automation and VST2 project values over; the window's
+  typed field and fine slider make the coarse range usable. The alternative is
+  a new ID with a narrower range (for example -100 to +24 dB). jrp chooses.
+
+**Output peak and clip count** (PLUG-10). The audio thread keeps, per
+instance, the largest output magnitude and the number of samples above full
+scale since the last reset, as atomic counters written without locking or
+allocating, like the fault counts. The control side reads them for the
+window, the report and Copy diagnostics. They are meters, not parameters, and
+are not saved.
+
+**Mix** (PLUG-10, optional). Wet/dry from 0 to 100%, applied after the gain
+with the latency-aligned dry signal that bypass already computes, ramped like
+bypass. With unequal input and output counts there is no dry signal (the
+[bypass rule](../../develop/plugin-contract.md#bypass)), so the mix stays at
+100% and the window says why. In VST3 it carries `kDryWetMix` through
+`IParameterFunctionName`, which VST3-4 already proposed, so hosts can find it.
+
+**Latency** (PLUG-10, VST3-4, AU-7, LV2-7).
+
+- The block size B that `HostProcessor` already accepts, chosen from powers
+  of two from 64 to 4096 frames (the current 256 stays the default). The
+  window shows each choice as frames and milliseconds at the host's rate.
+  Smaller B means less delay and more processor load, as fewer partitions
+  meant in the old windows; larger B the opposite. Nonuniform partitions,
+  which would give low latency and low load together, stay PERF-2.
+- Changing it builds a new processor on the control side (as activation
+  does) and tells the host: VST3 `restartComponent(kLatencyChanged)`, AU
+  property-change notifications for `kAudioUnitProperty_Latency` and the
+  tail, and LV2's latency port. Hosts may restart processing to compensate,
+  so the change is not automatable and plays a short gap; the window says so.
+- **Load**, beside it: the audio thread times each callback with the
+  monotonic clock (no lock, no allocation) and keeps the 99th-percentile and
+  largest share of the callback period in a small fixed histogram, which the
+  control side reads. This replaces the old advice to time a calculation or
+  run `perftest`, and is the evidence PERF-3 asks for, measured in the user's
+  own host.
+
+**Where settings are saved.**
+
+- VST3 saves its parameters in the component state, as it does Bypass. The
+  host state codec gains the three settings in a new version (3), written only
+  when a setting differs from its default, so every state that does not use
+  them is still written as version 1 and older builds keep reading it, as the
+  [host state rules](../../develop/plugin-contract.md#host-state) require.
+- Audio Units save parameters themselves in `ClassInfo`; the adapter only
+  ignores the settings' values in a state from another format, as it does
+  for bypass, unless jrp prefers presets to carry them across formats.
+- LV2 adds control input ports, which hosts save. Adding ports changes the
+  plug-in's interface; the old ports keep their indices and symbols, and
+  hosts restore older sessions with the new ports at their defaults. To check
+  with Ardour, Carla and PipeWire `filter-chain` in LV2-7.
+- `convolver-preset` gains `--gain-db` (with `auto` and `no-clip`) and
+  `--block-size`, the CLI's own options with the same meanings, and `--mix`
+  if Mix is chosen, so presets can carry the settings.
+
+**Filter conveniences** (VST3-11, AU-6; the shared parts in PLUG-9).
+
+- Drag and drop of a filter file onto the window.
+- Recent files, kept per user in a small text file beside the Convolver log,
+  not in the project, so they are shared by every host and instance. A new
+  file Convolver writes; jrp decides.
+- Reload when the file changes, while the window is open: the window checks
+  the file's modification time once a second on its own timer and asks for a
+  reload, which crossfades as any replacement does. For a `.cfg`, the files
+  it names are checked too.
+- For a list, the entries with the one chosen and why the others were not,
+  from the selection steps that `inspect_configuration()` already records.
+
+**A further idea, not proposed for now:** an A/B comparison that holds two
+filters and switches between them with the existing crossfade, for comparing
+room corrections. It needs two prepared filters in memory and a rule for
+which one is saved, so it waits for a request.
 
 ## Framework choice
 
@@ -164,12 +282,12 @@ jrp asked for stability and longevity over features
 [plug-in formats plan](2026-10-21-plugin-formats.md#development-frameworks)
 chose each format's own headers over a framework, naming DPF as the fallback
 "if a shared editor across formats is ever needed". The window is small
-(about a dozen controls, mostly text), so the question is which costs less to
+(about twenty standard controls), so the question is which costs less to
 keep working for twenty years: three thin native views, or one toolkit.
 
 | Option | Licence | Formats and systems | Accessibility | Longevity and fit | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| **Native views** behind the format's own interface: `IPlugView` (VST3), an `AUCocoaUIBase` view factory (AU), the LV2 UI extension | Ours (GPL-2.0-or-later); no new dependency | AppKit `NSView` on macOS, shared by VST3 (`kPlatformTypeNSView`), the AU's Cocoa view and an LV2 `ui:CocoaUI`; Win32 `HWND` for VST3 and LV2 `ui:WindowsUI`; Linux X11 needs its own decision (below) | Standard AppKit and Win32 controls are exposed to VoiceOver and to UI Automation (NVDA, JAWS, Narrator) by the systems themselves | AppKit and Win32 are the oldest stable GUI interfaces on their systems; the code depends on nothing that can be abandoned. Costs one view per system (estimate 400 to 700 lines each), but the content is shared code | **Recommended** |
+| **Native views** behind the format's own interface: `IPlugView` (VST3), an `AUCocoaUIBase` view factory (AU), the LV2 UI extension | Ours (GPL-2.0-or-later); no new dependency | AppKit `NSView` on macOS, shared by VST3 (`kPlatformTypeNSView`), the AU's Cocoa view and an LV2 `ui:CocoaUI`; Win32 `HWND` for VST3 and LV2 `ui:WindowsUI`; Linux X11 needs its own decision (below) | Standard AppKit and Win32 controls are exposed to VoiceOver and to UI Automation (NVDA, JAWS, Narrator) by the systems themselves | AppKit and Win32 are the oldest stable GUI interfaces on their systems; the code depends on nothing that can be abandoned. Costs one view per system (estimate 400 to 700 lines each), but the content is shared code | **Chosen** |
 | VSTGUI 4.15 (Steinberg) | BSD-3-Clause ([Debian copyright file](https://metadata.ftp-master.debian.org/changelogs/main/v/vst3sdk/stable_copyright)) | Windows, macOS, Linux X11 (preliminary Wayland in 4.15, [3.8.0 notes](https://forums.steinberg.net/t/vst-3-8-0-sdk-released/1011988)); a VST3 editor class and WYSIWYG UI descriptions. Usable inside an AU Cocoa view or an LV2 UI only with glue of our own | None: "there is currently no support for accessibility in VSTGUI" (its maintainer, [November 2021](https://forums.steinberg.net/t/accessibility-with-vstgui/751087)); custom-drawn controls are invisible to screen readers | Maintained by Steinberg since 2003, released with the SDK we already pin, but a fifth SDK submodule (`vstgui4`) and a shipped dependency (with Linux libraries such as cairo, xcb and fontconfig, to be confirmed). Follows Steinberg's priorities | Second choice, mainly for Linux |
 | DPF (DISTRHO Plugin Framework) | ISC; its own VST3 and AU code, which does not use Steinberg's SDK ([licensing](https://github.com/DISTRHO/DPF/blob/main/LICENSING.md)) | LV2, VST2, VST3, CLAP, AU, standalone; one UI class for all, drawn by its DGL widget library through pugl | None for its drawn widgets | Active, largely one maintainer. Its UI is tied to its plug-in wrapper: using DPF's editor means replacing our VST3, AU and LV2 adapters with DPF's (or maintaining a fork), redoing the contract, PLUG-7 lifecycle tests, Status parameter, LV2 worker and state handling, and first proving it keeps our permanent class IDs, AU codes, LV2 URIs and state formats | Not recommended: the shared part the fallback was meant for can be our own code |
 | pugl (window embedding) plus a drawing library | ISC, plus the drawing library's | All three formats and systems from one code base | None | Small and stable, but we would write every widget and still a file dialog per system | Not recommended |
@@ -203,7 +321,8 @@ be settled; `HostReport` here), built under the adapter's control lock from
 counts, the execution facts and the log state. It holds the status, the status
 line, the full failure, notice and fault messages with request numbers, the
 accepted request (source and path), host and filter details, the log path and
-whether it is written. Two shared functions go with it:
+whether it is written, and the settings with their computed gains and the
+meters. Two shared functions go with it:
 
 - `report_fields()`: the report as a flat list of named values, which each
   format sends in its own way (VST3 message attributes, an AU property
@@ -238,6 +357,11 @@ shared function so both use one code path.
   the path for display across sessions would be a saved-format change
   (VST3's controller state, which is empty today, or an extra AU `ClassInfo`
   key): see [decisions](#decisions-for-jrp).
+- **Settings are parameters.** The window changes gain, mode, mix and
+  latency as any generic host control would (VST3 `beginEdit`,
+  `performEdit`, `endEdit`; AU `AUParameterSet` with gesture events; LV2
+  port writes), so host automation, undo and presets see every change, and
+  the processor learns of it the way it already learns of Bypass.
 - **The host is told the project changed**: VST3 `IComponentHandler2::setDirty`
   (and the existing `restartComponent(kParamValuesChanged)` for the Status
   text); AU a property-change notification for `kAudioUnitProperty_ClassInfo`;
@@ -245,8 +369,11 @@ shared function so both use one code path.
 
 ## Threads
 
-The audio thread is untouched: it plays what `HostProcessor` was handed and
-signals faults as it does now. The rules for the window:
+The audio thread plays what `HostProcessor` was handed and signals faults as
+it does now. Its only new work is applying the gain and mix with ramps and
+updating the meters, all without locking, allocating or doing I/O, as the
+[real-time rule](../../develop/architecture.md#invariants-to-preserve)
+requires. The rules for the window:
 
 1. **The window runs on the host's UI thread and talks to the controller
    side only.** In VST3 the view holds the `Controller` (or a narrow interface
@@ -276,6 +403,14 @@ signals faults as it does now. The rules for the window:
    never holds the control lock at all.
 5. **Clipboard, log reading and "show file" run on the UI thread** and read at
    most the last 64 KiB of the log; they never write it.
+6. **Gain estimates run with filter preparation**, off the audio thread; a
+   latency change builds the new processor on the control side, as
+   activation does. Neither runs in a parameter callback that a host may call
+   from the audio thread (the 2006 plug-in rebuilt its convolution there).
+7. **Meters are read, never written, by the control side:** the audio thread
+   updates the output peak, clip count and callback timings as relaxed atomic
+   values, and a reset from the window is a request the audio thread acts on
+   at its next callback.
 
 ## Per format
 
@@ -293,8 +428,14 @@ signals faults as it does now. The rules for the window:
 - Messages: `ConvolverStatus` gains the report's fields (or a new
   `ConvolverReport` message carries them); a new `ConvolverLoad` message
   carries a UTF-8 path from controller to processor. The processor's
-  `notify()` loads it as `setState` does. Bypass is edited through the
-  controller (`beginEdit`, `performEdit`, `endEdit` on parameter 1000).
+  `notify()` loads it as `setState` does. Bypass (parameter 1000) and the
+  settings are edited through the controller (`beginEdit`, `performEdit`,
+  `endEdit`).
+- Parameters (VST3-4): Gain (ID 0 with the 2006 mapping, or a new ID), Gain
+  mode (a list: Set, Estimate, No clipping), Mix (`kDryWetMix`, if chosen)
+  and Latency (a list, not automatable), with IDs from 1002 recorded in
+  `plugins/identities.json` and frozen by `tests/identities_tests.py` like
+  1000 and 1001.
 - `editorhost` stops being useless: it currently exits with "EditController
   does not provide its own editor"
   ([host testing](../../develop/host-testing.md#steinbergs-sdk-hosts)).
@@ -316,6 +457,9 @@ signals faults as it does now. The rules for the window:
   property-change event whenever it changes, and a writable load request (a
   `CFString` path). The view listens with an `AUEventListener` on the main
   run loop for the report, the Status parameter (1001) and bypass.
+- Parameters (AU-7): the same settings as global Audio Unit parameters, with
+  IDs recorded beside Status (1001) in `plugins/identities.json`; Latency is
+  indexed and not automatable.
 - **Sandboxed hosts** (GarageBand): the system file dialog grants the host
   access to the chosen file only. A `.cfg` names other files, which the
   sandbox may refuse, so the message for an unreadable filter file inside a
@@ -325,7 +469,11 @@ signals faults as it does now. The rules for the window:
 - The Audio Unit's licence (GPL-3.0-or-later with the AudioUnitSDK's notices)
   covers the shared view code, which stays GPL-2.0-or-later.
 
-**LV2 (LV2-6, optional).**
+**LV2 (LV2-7 for the settings, LV2-6 for the window, optional).**
+
+- Settings (LV2-7): control input ports for gain, gain mode, mix and latency,
+  with port symbols jrp names, after the existing ports; changing latency
+  updates the latency output port.
 
 - Generic host UIs already give LV2 users a file chooser (the `filter`
   parameter) and the status port, so LV2 needs the window least.
@@ -351,6 +499,9 @@ Acceptance criteria for every window phase:
   Return on buttons, the file dialog reachable without a mouse. Hosts route
   keys differently (REAPER has "send all keyboard input to plug-in"; VST3
   hosts may use `IPlugView::onKeyDown`), so the host smoke tests check it.
+- Every slider has a typed number field beside it, the gain modes are radio
+  buttons, and the meters and load are text, not only bars, so each value is
+  read and set exactly from the keyboard and by screen readers.
 - Status is never shown by colour alone: the status word is always written,
   and colours follow the system's appearance (dark mode, high contrast,
   increased contrast) because the controls are native.
@@ -370,6 +521,10 @@ display, in the existing CTest targets and CI jobs:
 
 | What | How | Where |
 | --- | --- | --- |
+| Gain, mix and latency | The double-precision oracle tests in `tests/native/engine_tests.cpp` and the host comparisons run with gains, mixes and each block size, reporting the worst error relative to the output peak; ramps checked sample by sample; defaults bit-identical to today's output | `native.engine`, `native.host`, the PLUG-2 harness |
+| Saved settings | State version 3 round trip; states with default settings still written as version 1, byte-identical to today's; `convolver-preset --gain-db`, `--block-size` and `--mix` write what the plug-ins read; AU and LV2 restore older sessions with defaults | `native.state`, `plugins.presets`, each format's adapter tests |
+| Latency changes | Changing latency while active: the reported latency and tail follow, the format's change notification is sent, no audio-thread allocation (the audio guard), and the PLUG-7 sequences with a latency change between steps | `vst3.lifecycle`, `au.lifecycle`, `lv2.lifecycle` |
+| Meters | Peak, clip count and timings from known signals; allocation-free under the audio guard; reset requests | `native.host` |
 | Report content and text | Table-driven: one case per `HostFailureKind`, notice, fault kind, Not checked yet, and log not writable, each checking `report_fields()` and `report_text()`; this can share the table DIAG-1 proposes for every surface | `native.host` |
 | Load from a file equals the preset tool | For a WAV, a `.cfg` and a list, the state after a load from the window's path equals `convolver-preset`'s output byte for byte, and a refused file keeps the previous filter (PLUG-2 comparison of the audio) | `plugins.presets`, the PLUG-2 harness |
 | VST3 messaging | Through the existing controller and processor in the test harness: `ConvolverLoad` loads, refuses with the right reason, calls `setDirty`, and the controller's report copy follows every load, activation and fault | `vst3.adapter`, `vst3.lifecycle` |
@@ -386,8 +541,8 @@ measured is checked in VST3-12's first CI run. The host smoke tests in
 [host testing](../../develop/host-testing.md#smoke-test-in-each-first-host)
 gain steps for the window in REAPER, Audacity (including its separate
 real-time copy) and GarageBand: open it, load a wrong-rate filter and read
-the message, reload, copy diagnostics, show the log, and read it with
-VoiceOver.
+the message, reload, change gain mode and latency and confirm the host
+compensates, copy diagnostics, show the log, and read it with VoiceOver.
 
 ## Phases and TODO items
 
@@ -396,13 +551,17 @@ Each phase is its own pull request, follows the
 
 | Phase | Item | Delivers | Depends on |
 | --- | --- | --- | --- |
-| 1. Shared, no window | **PLUG-9** | `HostReport`, `report_fields()`, `report_text()`, and the preset tool's file-to-state step as a shared function; headless tests | jrp's choice of framework does not matter yet |
+| 1. Shared, no window | **PLUG-9** | `HostReport`, `report_fields()`, `report_text()`, and the preset tool's file-to-state step as a shared function; headless tests | Nothing |
+| 1 | **PLUG-10** | Gain (three modes), mix and latency in `HostProcessor` with ramps; meters; host state version 3; `convolver-preset` options; oracle and state tests; a contract change in its own pull request first | jrp's choices on settings |
 | 1 | **VST3-3** | Controller report copy, `ConvolverLoad`, `setDirty`, Bypass edits from the controller; headless tests. No `createView` yet | PLUG-9 |
+| 1 | **VST3-4** | The settings as VST3 parameters, saved in the component state, with latency changes reported to the host | PLUG-10 |
+| 1 | **AU-7** | The settings as Audio Unit parameters, with latency and tail notifications | PLUG-10 |
 | 1 | **AU-6** (first half) | Report and load properties with change events; headless tests | PLUG-9 |
-| 2. macOS window | **VST3-11** | The AppKit view and its VST3 `IPlugView`; `editorhost`, pluginval GUI tests and the accessibility test on macOS CI; smoke steps in REAPER and Audacity; user guide section | VST3-3, framework decision |
+| 2. macOS window | **VST3-11** | The AppKit view and its VST3 `IPlugView`, with drag and drop, recent files and reload on change; `editorhost`, pluginval GUI tests and the accessibility test on macOS CI; smoke steps in REAPER and Audacity; user guide section | VST3-3, VST3-4 |
 | 2 | **AU-6** (second half) | The Cocoa view factory over the same view, versioned class names; `auval` view check; GarageBand smoke steps, sandbox check | AU-6 first half, VST3-11 |
 | 3. Windows window | **VST3-12** | The Win32 view, content scaling, keyboard navigation, Windows CI view test | VST3-11 |
 | 4. Linux | **VST3-13** | Toolkit decision, then the X11 view with `IRunLoop`, or a recorded decision not to have one | VST3-12, HOST-1 evidence |
+| 1 | **LV2-7** | The settings as LV2 control ports, with older sessions checked in named hosts | PLUG-10 |
 | 5. LV2 (optional) | **LV2-6** | Report atoms (new URIs named by jrp), then an LV2 UI reusing the views | VST3-11/12, a need shown by Linux users |
 
 Documentation as the phases land: the window in
@@ -416,8 +575,9 @@ change, in its own pull request, before VST3-3); the new folder for view code
 [testing](../../develop/testing.md).
 
 The editor does not block the next milestone, an independent user running
-the first preview; phase 1 can land before it and makes the log and Status
-text no worse. Whether a preview waits for the macOS window is jrp's call.
+the first preview. Phase 1 changes the sound only when a user changes a
+setting, so it can land before or after the preview; whether a preview waits
+for the settings or the macOS window is jrp's call.
 
 ## Risks and open questions
 
@@ -439,12 +599,24 @@ text no worse. Whether a preview waits for the macOS window is jrp's call.
   process (for example under Rosetta) pass properties between processes;
   custom properties with Core Foundation values should survive that, which
   AU-6 checks in a host that does it.
+- **Latency changes in hosts.** Hosts differ in how they react to a latency
+  change (some restart processing, some recompensate only at the next
+  playback start, some ignore it until the project is reopened). HOST-1
+  records what each named host does, and the window's note says what to
+  expect.
+- **The Estimate takes time.** Ten filter lengths of noise for a long
+  6-channel filter can add a noticeable part of a second to each load; PERF-3
+  measures it. If it is too slow, it can run after the load on a worker,
+  with the gain ramped to the new value when it is ready.
+- **Gain and old projects.** With the gain at parameter 0, a VST3-6 migration
+  could carry an old project's attenuation over; with a new ID it cannot. No
+  promise is made either way until VST3-6 defines a requirement.
 - **Key handling and focus** differ by host; the smoke tests check that typing
   in the window does not trigger the host's shortcuts and vice versa.
 
 ## Decisions for jrp
 
-Recommended answers first. None of these blocks phase 1.
+Recommended answers first. None of these blocks PLUG-9.
 
 1. **Framework (decided):** native views (AppKit, Win32), no framework, with
    the content in shared code, rather than VSTGUI for every system (one code
@@ -452,18 +624,30 @@ Recommended answers first. None of these blocks phase 1.
    adapters). This replaces the formats plan's "DPF is the fallback for a
    shared editor": the shared part is our own report code
    ([decisions](../decisions.md#direction)). Linux stays open for VST3-13.
-2. **Order:** macOS first (VST3 and the Audio Unit share the view, and jrp's
-   hosts are on his Mac), then Windows, then decide Linux; LV2's UI only if
-   Linux users ask.
-3. **Contents:** the window explains and loads (status and full messages,
-   active configuration, copy diagnostics, show log, choose and reload a
-   filter, bypass), with no sound-changing controls; the 2006 attenuation,
-   partitions and planning controls are not brought back.
-4. **The chosen path:** shown for the current session and written to the log,
+2. **Settings:** Gain with the Set, Estimate and No clipping modes, Latency,
+   and meters, as host parameters in every format, defaults leaving today's
+   sound unchanged; tuning rigour and dither are not brought back. Mix
+   (the old "Effect level"): recommended, as it costs little once the
+   latency-aligned dry path exists, but it is the setting a room-correction
+   user needs least.
+3. **Gain parameter:** VST3 ID 0 with the 2006 mapping (-200 to +200 dB),
+   keeping VST3-6's migration possible (recommended), or a new ID with a
+   narrower range.
+4. **Saved form:** VST3 host state version 3, written only when a setting is
+   not at its default; Audio Unit and LV2 settings saved by the host as
+   parameters and ports; `convolver-preset` gains `--gain-db`,
+   `--block-size` (and `--mix`). New parameter IDs and LV2 port symbols are
+   jrp's to approve when PLUG-10 proposes them.
+5. **Conveniences:** drag and drop, recent files (a small per-user file beside
+   the log) and reload when the file changes (recommended, all three).
+6. **Order:** settings first (PLUG-9, PLUG-10, then each format), then the
+   macOS window shared by VST3 and the Audio Unit, then Windows, then decide
+   Linux; LV2's UI only if Linux users ask.
+7. **The chosen path:** shown for the current session and written to the log,
    not saved with the project. Saving it for display would add VST3 controller
    state and an AU `ClassInfo` key, a format change.
-5. **Accessibility:** the criteria above (screen reader names and order,
-   keyboard use, no colour-only status) are acceptance criteria for each
-   window phase, checked with VoiceOver in REAPER.
-6. **Previews:** phase 1 lands when ready; the first preview does not wait for
-   the macOS window.
+8. **Accessibility:** the criteria above (screen reader names and order,
+   keyboard use, typed fields beside sliders, no colour-only status) are
+   acceptance criteria for each window phase, checked with VoiceOver in REAPER.
+9. **Previews:** the first preview does not wait for the settings or the
+   window.

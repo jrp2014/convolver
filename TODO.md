@@ -148,9 +148,11 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   editor only for an identified need, then for all formats at once. Write
   adapters against the formats' own headers, not a framework.
   Progress (24 October 2026): jrp asked for an editor window, "not least for
-  debugging"; the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md) proposes native views over shared
-  report code, in phases PLUG-9, VST3-3, VST3-11 to VST3-13, AU-6 and LV2-6,
-  with decisions for jrp.
+  debugging", and that it configure the plug-in as the old Convolver did,
+  as inspiration rather than a copy; the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md) proposes native
+  views (decided) over shared report code, with gain, latency and mix as host
+  parameters, in phases PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13,
+  AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -264,6 +266,16 @@ Shared work, done once for all three formats:
   file-to-state step as a shared function, so a load from the window gives
   state byte-identical to `convolver-preset`'s. Table-driven tests per
   failure kind in `native.host`; the contract change in its own pull request.
+- [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
+  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
+  with three modes (a set value, the noise estimate and the no-clip bound of
+  `estimate_attenuation()`, computed during preparation), an optional
+  latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
+  default 256), with 64-sample ramps; output peak, clip count and callback
+  load as audio-thread counters; host state version 3 written only for
+  non-default settings; `convolver-preset --gain-db`, `--block-size` (and
+  `--mix`). Defaults leave the sound unchanged. Oracle tests with the worst
+  error relative to the peak; the contract change in its own pull request.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -288,6 +300,11 @@ LV2 (Linux first; also PipeWire system audio):
   `work()` and written allocation-free by `run()` (new property URIs for jrp
   to name), then an LV2 UI reusing the macOS and Windows views
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+- [ ] **LV2-7 — Settings as control ports.** PLUG-10's gain, gain mode, mix
+  and latency as control input ports after the existing ones, the latency
+  port following the chosen block size; port symbols for jrp to approve;
+  older sessions restored with defaults in Ardour, Carla and PipeWire
+  `filter-chain`.
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
@@ -314,6 +331,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (`kAudioUnitProperty_CocoaUI`) over the VST3-11 view, with class names that
   carry the version; `auval` lists the view; GarageBand smoke steps, including
   a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+- [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
+  mode, mix and latency as global parameters (IDs beside Status 1001 in
+  `plugins/identities.json`), latency indexed and not automatable, with
+  latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
 
 ## FFmpeg integration
 
@@ -444,11 +465,14 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `vst3.lifecycle`. `IDataExchangeHandler` could feed meters later. Plug-in
   snapshots for host browsers (`smtg_target_add_plugin_snapshots`) need the
   window first.
-- [ ] **VST3-4 — Mix, gain and low-latency parameters.** Consider dry/wet and
-  output-gain parameters, tagged with `IParameterFunctionName` (`kDryWetMix`) so
-  hosts can find them. A `kLowLatencyMode` switch only makes sense if PERF-2
-  provides a lower-latency mode; changing latency then needs
-  `restartComponent(kLatencyChanged)` and tests in hosts that compensate it.
+- [ ] **VST3-4 — Gain, mix and latency parameters.** PLUG-10's settings as
+  VST3 parameters ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)): Gain (ID 0
+  with the 2006 VST2 mapping, or a new ID: jrp decides), Gain mode, Mix
+  tagged `kDryWetMix` through `IParameterFunctionName`, and Latency (not
+  automatable), saved in the component state, with
+  `restartComponent(kLatencyChanged)` when latency changes and tests in hosts
+  that compensate it. A `kLowLatencyMode` switch only makes sense if PERF-2
+  provides a lower-latency mode.
 - [ ] **VST3-5 — Progress for slow filter preparation.** `setState` prepares the
   filter synchronously on the host's thread. Measure the worst case (PERF-3) for long,
   multichannel filters (including FFTW planning) and, if hosts stall noticeably,
