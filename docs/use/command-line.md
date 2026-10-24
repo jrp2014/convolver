@@ -110,9 +110,10 @@ FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg
 
 ### FLAC and Ogg
 
-The [preview packages](install.md#unsigned-previews) contain a libsndfile built
+The [preview packages](install.md#what-a-preview-package-contains) contain a libsndfile built
 without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
-and will stay that way, to keep the packages free of extra dependencies. So
+and will stay that way, to keep the packages free of extra dependencies
+(owner's decision, 24 October 2026). So
 packaged copies of Convolver, the command line and the plug-ins alike, cannot
 read FLAC or Ogg files (input or IR) or write FLAC. `convolver --version` says
 whether the libsndfile in use has FLAC (`libsndfile ... (no FLAC output)`

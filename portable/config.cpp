@@ -590,6 +590,8 @@ Configuration load_configuration(const std::filesystem::path& path,
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
         selection.input_channels > 256 || selection.output_channels > 256)
         throw std::invalid_argument("expected audio properties out of range");
+    if (selection.raw_filter_encoding.sample == SampleType::pcm8)
+        throw std::invalid_argument("raw filters have no 8-bit sample type");
     if (path == "-")
         throw std::invalid_argument("configuration must be a file");
     std::optional<Configuration> selected;

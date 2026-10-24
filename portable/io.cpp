@@ -581,7 +581,11 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
                 throw std::runtime_error(std::string(e.what()) + " (this is " + codec +
                                          ", but this Convolver's libsndfile was built without "
                                          "FLAC and Ogg; convert it to WAV first, for example "
-                                         "with 'flac --decode' or SoX, or build Convolver "
+                                         "with " +
+                                         (std::string_view(codec) == "a FLAC file"
+                                              ? "'flac --decode', SoX or FFmpeg"
+                                              : "oggdec, SoX or FFmpeg") +
+                                         ", or build Convolver "
                                          "against a libsndfile that has them: see 'FLAC and "
                                          "Ogg' in the command-line guide)");
         throw;

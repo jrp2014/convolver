@@ -239,6 +239,10 @@ def container_tests(d):
         fake=d/'ct-fake.flac'; fake.write_bytes(b'fLaC'+bytes(64))
         p=call(['--filter',ir,'--input',fake,'--output',d/'ct-fake.wav'],ok=False)
         assert b'built without FLAC' in p.stderr and b'flac --decode' in p.stderr, p.stderr
+        ogg=d/'ct-fake.ogg'; ogg.write_bytes(b'OggS'+bytes(64))
+        p=call(['--filter',ir,'--input',ogg,'--output',d/'ct-fake.wav'],ok=False)
+        assert b'an Ogg file' in p.stderr and b'oggdec' in p.stderr, p.stderr
+        assert b'flac --decode' not in p.stderr, p.stderr
         (d/'ct-fake.cfg').write_text('48000 1 1 0\n0\n0\nct-fake.flac\n0\n0\n0\n')
         p=call(['--filter',d/'ct-fake.cfg','--input',d/'ct.aiff','--output',d/'ct-fake.wav'],
                ok=False)

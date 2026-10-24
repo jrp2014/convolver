@@ -614,8 +614,9 @@ int run_inspection(int argc, char** argv) {
                 const auto name = value();
                 const auto parsed = parse_raw_encoding(name);
                 if (!parsed)
-                    throw Usage("--raw-filter-format must be s16le, s24le, s32le, f32le or "
-                                "f64le, or the same ending in be");
+                    throw Usage("unsupported raw filter format: " + name +
+                                " (use s16le, s24le, s32le, f32le or f64le, or the same with "
+                                "be for big-endian)");
                 options.raw_filter_encoding = *parsed;
             } else if (option == "--profile") {
                 const auto name = value();

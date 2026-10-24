@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <set>
 #include <stdexcept>
@@ -326,6 +327,22 @@ void run(const fs::path& dir) {
             damaged = std::string(e.what()).find("f64le") != std::string::npos;
         }
         require(damaged, "a raw filter that does not fit the chosen type names the type");
+        // Raw filters have no 8-bit type; the option is refused up front.
+        ConfigurationSelection pcm8;
+        pcm8.raw_filter_encoding = {SampleType::pcm8, false};
+        InspectionOptions pcm8_inspect;
+        pcm8_inspect.raw_filter_encoding = pcm8.raw_filter_encoding;
+        for (const auto& call : std::vector<std::function<void()>>{
+                 [&] { load_configuration(dir / "s24.cfg", pcm8); },
+                 [&] { inspect_configuration(dir / "s24.cfg", pcm8_inspect); }}) {
+            bool refused = false;
+            try {
+                call();
+            } catch (const std::invalid_argument& e) {
+                refused = std::string(e.what()) == "raw filters have no 8-bit sample type";
+            }
+            require(refused, "an 8-bit raw filter type is refused");
+        }
         require(parse_raw_encoding("s24be") == RawEncoding{SampleType::pcm24, true} &&
                     !parse_raw_encoding("u8") && raw_encoding_name({}) == "f32le" &&
                     raw_encoding_name({SampleType::pcm16, true}) == "s16be",

@@ -458,6 +458,8 @@ InspectionReport inspect_configuration(const std::filesystem::path& path,
     if (options.expected_rate < 0 || options.expected_rate > 768000 ||
         options.expected_inputs > 256 || options.expected_outputs > 256)
         throw std::invalid_argument("expected audio properties out of range");
+    if (options.raw_filter_encoding.sample == SampleType::pcm8)
+        throw std::invalid_argument("raw filters have no 8-bit sample type");
     if (!options.block_frames || options.block_frames > (1u << 20))
         throw std::invalid_argument("block frames must be between 1 and 1048576");
     if (options.all_configurations &&

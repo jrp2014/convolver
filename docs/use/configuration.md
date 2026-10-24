@@ -102,13 +102,13 @@ match them. See [speaker labels](command-line.md#speaker-labels).
 
 An IR file can be any sound file libsndfile reads, such as WAV, RF64, W64,
 AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
-[preview packages](install.md#unsigned-previews) read no FLAC or Ogg files;
+[preview packages](install.md#what-a-preview-package-contains) read no FLAC or Ogg files;
 [FLAC and Ogg](command-line.md#flac-and-ogg) says how to work around that.
 
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
 unless the file starts with a sound-file header (a WAV named `.pcm` is still
 read as WAV). A raw filter is a headerless file of mono samples. Convolver reads
-it as little-endian 32-bit float (`f32le`), the type
+it as little-endian 32-bit float (`f32le`; owner's decision, 24 October 2026), the type
 [DRC](https://drc-fir.sourceforge.net/) and BruteFIR write by default, and says
 so: rendering prints a line such as
 `convolver: raw filter 'left.pcm' read as mono f32le at 48000 Hz`, and
@@ -117,8 +117,9 @@ so: rendering prints a line such as
 For raw filters in another sample type, give the command line
 `--raw-filter-format` with one of the [RAW stream](command-line.md#raw-streams)
 names, for example `--raw-filter-format s24le` or `f64le`; `--inspect` takes it
-too. It applies to every raw filter in the configuration. The plug-ins have no
-such setting and always read `f32le`, so for them convert raw filters in other
+too. It applies to every raw filter in the configuration. The plug-ins and
+`convolver-preset` have no such setting and always read `f32le` (the preset
+tool says so for each raw filter), so for them convert raw filters in other
 types to WAV first, for example
 `sox -t raw -r 48000 -c 1 -e signed -b 24 -L left.pcm left.wav`.
 

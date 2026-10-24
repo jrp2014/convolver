@@ -51,6 +51,7 @@ struct RawEncoding {
 // The names ffmpeg and sox use: s16le, s24le, s32le, f32le, f64le, or the same
 // ending in be. parse_raw_encoding returns nothing for any other name.
 std::optional<RawEncoding> parse_raw_encoding(std::string_view) noexcept;
+// Throws std::invalid_argument for pcm8, which raw streams do not have.
 std::string raw_encoding_name(RawEncoding);
 
 // Integer quantization, shared by every integer output format. With B
