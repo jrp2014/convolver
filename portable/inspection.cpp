@@ -209,13 +209,15 @@ class Inspector {
                 verify(result, std::move(cfg));
             } else {
                 auto cfg = detail::configuration_graph(l.document->configuration);
-                const auto decoded = detail::decode_impulses(*l.document, cfg, budget_);
+                const auto decoded = detail::decode_impulses(*l.document, cfg, budget_,
+                                                             options_.raw_filter_encoding);
                 for (std::size_t i = 0; i < decoded.size(); ++i) {
                     auto& f = result.paths[i];
                     f.resolved = decoded[i].resolved;
                     f.ir_sample_rate = decoded[i].info.sample_rate;
                     f.ir_file_channels = decoded[i].info.channels;
                     f.ir_frames = decoded[i].frames;
+                    f.raw_encoding = decoded[i].raw;
                 }
                 verify(result, std::move(cfg));
             }
@@ -354,8 +356,9 @@ class Inspector {
             for (const auto& p : doc.configuration.paths)
                 if (raw_filter_reference(doc.source, p.ir))
                     add({"raw-filter", DiagnosticSeverity::warning,
-                         "'" + p.ir.spelling +
-                             "' is a raw filter; Convolver reads it as mono float32, but other "
+                         "'" + p.ir.spelling + "' is a raw filter; Convolver reads it as mono " +
+                             raw_encoding_name(options_.raw_filter_encoding) +
+                             ", but other "
                              "programs that read .cfg files expect sound files such as WAV",
                          position(p.ir.location), chain(c)});
     }

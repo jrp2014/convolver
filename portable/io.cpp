@@ -16,6 +16,7 @@
 #include <sndfile.h>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <system_error>
 #include <utility>
@@ -287,6 +288,21 @@ bool supported(OutputEncoding e) noexcept {
         return true;
     }
 }
+namespace {
+// The codec of a FLAC or Ogg file, judged by its first bytes, or null.
+const char* compressed_codec(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    char magic[4]{};
+    if (!file.read(magic, sizeof magic))
+        return nullptr;
+    const std::string_view head(magic, sizeof magic);
+    if (head == "fLaC")
+        return "a FLAC file";
+    if (head == "OggS")
+        return "an Ogg file";
+    return nullptr;
+}
+} // namespace
 bool available(Container container) noexcept {
     // libsndfile lists only the containers it was built with; a build without
     // its external libraries has no FLAC, although sf_format_check accepts it.
@@ -555,7 +571,21 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
         return;
     }
 #endif
-    impl_->handle.file = open_or_throw(path, SFM_READ, sf, "cannot open audio input");
+    try {
+        impl_->handle.file = open_or_throw(path, SFM_READ, sf, "cannot open audio input");
+    } catch (const std::runtime_error& e) {
+        // A libsndfile without its codec libraries only says the format is
+        // unimplemented; say which codec is missing and what to do instead.
+        if (!raw && path != "-" && !available(Container::flac))
+            if (const auto codec = compressed_codec(path))
+                throw std::runtime_error(std::string(e.what()) + " (this is " + codec +
+                                         ", but this Convolver's libsndfile was built without "
+                                         "FLAC and Ogg; convert it to WAV first, for example "
+                                         "with 'flac --decode' or SoX, or build Convolver "
+                                         "against a libsndfile that has them: see 'FLAC and "
+                                         "Ogg' in the command-line guide)");
+        throw;
+    }
     if (raw) {
         impl_->info = *raw;
         if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
@@ -844,6 +874,42 @@ void AudioWriter::close() {
     if (impl_->container_bits && declared->valid_bits != impl_->valid_bits)
         throw std::runtime_error("audio output " + impl_->path.string() +
                                  " was written without the requested valid bits");
+}
+std::optional<RawEncoding> parse_raw_encoding(std::string_view name) noexcept {
+    if (name.size() != 5 || (name.substr(3) != "le" && name.substr(3) != "be"))
+        return std::nullopt;
+    constexpr std::pair<std::string_view, SampleType> samples[]{{"s16", SampleType::pcm16},
+                                                                {"s24", SampleType::pcm24},
+                                                                {"s32", SampleType::pcm32},
+                                                                {"f32", SampleType::float32},
+                                                                {"f64", SampleType::float64}};
+    for (const auto& [text, value] : samples)
+        if (name.substr(0, 3) == text)
+            return RawEncoding{value, name.substr(3) == "be"};
+    return std::nullopt;
+}
+std::string raw_encoding_name(RawEncoding encoding) {
+    std::string name;
+    switch (encoding.sample) {
+    case SampleType::pcm16:
+        name = "s16";
+        break;
+    case SampleType::pcm24:
+        name = "s24";
+        break;
+    case SampleType::pcm32:
+        name = "s32";
+        break;
+    case SampleType::float32:
+        name = "f32";
+        break;
+    case SampleType::float64:
+        name = "f64";
+        break;
+    default:
+        throw std::invalid_argument("raw streams have no 8-bit sample type");
+    }
+    return name + (encoding.big_endian ? "be" : "le");
 }
 const char* sndfile_version() noexcept {
     return sf_version_string();

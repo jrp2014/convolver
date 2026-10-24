@@ -297,13 +297,47 @@ void run(const fs::path& dir) {
         const auto flagged = inspect_configuration(dir / "raw.cfg", portable);
         require(flagged.valid && has_code(flagged, "raw-filter"),
                 "portable-paths warns that other readers expect sound files");
+        require(f.raw_encoding == RawEncoding{},
+                "inspection reports the raw filter's assumed sample type (f32le)");
+        // Another sample type can be chosen: big-endian 24-bit integers here.
+        raw_bytes("s24.pcm", {0x40, 0, 0, 0xc0, 0, 0}); // 0.5, -0.5
+        text_file(dir / "s24.cfg", "44100 1 1 0\n0\n0\ns24.pcm\n0\n0\n0\n");
+        ConfigurationSelection s24;
+        s24.raw_filter_encoding = {SampleType::pcm24, true};
+        std::vector<std::filesystem::path> raws;
+        const auto s24_loaded = load_configuration(dir / "s24.cfg", s24, nullptr, &raws);
+        require(s24_loaded.paths.at(0).impulse == std::vector<float>{.5f, -.5f} &&
+                    raws.size() == 1 && raws[0].filename() == "s24.pcm",
+                "a raw filter in another sample type, and the list of raw filters read");
+        InspectionOptions s24_inspect;
+        s24_inspect.raw_filter_encoding = s24.raw_filter_encoding;
+        const auto s24_report = inspect_configuration(dir / "s24.cfg", s24_inspect);
+        require(s24_report.valid && s24_report.configurations.at(0).paths.at(0).ir_frames == 2 &&
+                    s24_report.configurations.at(0).paths.at(0).raw_encoding ==
+                        s24.raw_filter_encoding,
+                "inspection reads a raw filter with the chosen sample type");
+        // Six bytes are not whole float64 samples: damaged, and the message says why.
+        ConfigurationSelection f64;
+        f64.raw_filter_encoding = {SampleType::float64, false};
+        bool damaged = false;
+        try {
+            load_configuration(dir / "s24.cfg", f64);
+        } catch (const std::exception& e) {
+            damaged = std::string(e.what()).find("f64le") != std::string::npos;
+        }
+        require(damaged, "a raw filter that does not fit the chosen type names the type");
+        require(parse_raw_encoding("s24be") == RawEncoding{SampleType::pcm24, true} &&
+                    !parse_raw_encoding("u8") && raw_encoding_name({}) == "f32le" &&
+                    raw_encoding_name({SampleType::pcm16, true}) == "s16be",
+                "raw encoding names");
         // A WAV named .pcm keeps reading through its header, without the warning.
         wave(dir / "wav.pcm", 44100, 2, {.5f, 1, .25f, 1});
         text_file(dir / "wavpcm.cfg", "44100 1 1 0\n0\n0\nwav.pcm\n0\n0\n0\n");
         const auto named = inspect_configuration(dir / "wavpcm.cfg", portable);
         require(named.valid && !has_code(named, "raw-filter") &&
                     named.configurations.at(0).paths.at(0).ir_frames == 2 &&
-                    named.configurations.at(0).paths.at(0).ir_file_channels == 2,
+                    named.configurations.at(0).paths.at(0).ir_file_channels == 2 &&
+                    !named.configurations.at(0).paths.at(0).raw_encoding,
                 "a WAV named .pcm is read as WAV");
     }
     // Profiles: portable-paths adds warnings only; it never changes validity of errors.
@@ -378,7 +412,7 @@ void run(const fs::path& dir) {
          {"absent.cfg", "two.txt",   "bad.cfg",     "unrelated.cfg", "list.txt",  "cyclic.txt",
           "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",       "drive.txt", "outer.txt",
           "sub.txt",    "dash.cfg",  "drc.pcm",     "cut.RAW",       "raw.cfg",   "cut.cfg",
-          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg"})
+          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg",  "s24.pcm",       "s24.cfg"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

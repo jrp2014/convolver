@@ -6,6 +6,8 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace convolver {
@@ -46,6 +48,10 @@ struct RawEncoding {
     bool big_endian = false;
     friend bool operator==(const RawEncoding&, const RawEncoding&) = default;
 };
+// The names ffmpeg and sox use: s16le, s24le, s32le, f32le, f64le, or the same
+// ending in be. parse_raw_encoding returns nothing for any other name.
+std::optional<RawEncoding> parse_raw_encoding(std::string_view) noexcept;
+std::string raw_encoding_name(RawEncoding);
 
 // Integer quantization, shared by every integer output format. With B
 // significant (valid) bits, samples are scaled by 2^(B-1), offset by the dither
@@ -170,12 +176,20 @@ class AudioWriter {
 struct ConfigurationSelection {
     int sample_rate = 0;
     std::size_t input_channels = 0, output_channels = 0;
+    // How headerless .pcm and .raw filters in a .cfg are stored. They are always
+    // mono at the configuration's rate; the default, little-endian float32, is
+    // what DRC and BruteFIR write.
+    RawEncoding raw_filter_encoding{};
 };
+
 // IR audio file, legacy .cfg, or configuration list. A list selects the first
 // entry matching every specified property. A sound file has as many outputs as
 // inputs.
+// raw_filters receives the selected configuration's IR files that were read as
+// headerless raw filters, with selection.raw_filter_encoding.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
-                                 std::vector<std::filesystem::path>* source_paths = nullptr);
+                                 std::vector<std::filesystem::path>* source_paths = nullptr,
+                                 std::vector<std::filesystem::path>* raw_filters = nullptr);
 Configuration load_configuration(const std::filesystem::path&, int expected_rate = 0,
                                  std::size_t expected_inputs = 0,
                                  std::vector<std::filesystem::path>* source_paths = nullptr);

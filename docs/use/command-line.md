@@ -106,10 +106,48 @@ rejected before any file is created. Speaker labels (`--speaker-map`) and
 WAVE_FORMAT_EXTENSIBLE carries them here. Standard output (`--output -`)
 needs a `raw-` format, since no file header can be completed on a pipe.
 
-FLAC output needs a libsndfile built with FLAC. Linux distributions and
-Homebrew ship one; the [preview packages](install.md#unsigned-previews) do not
-yet (TODO IO-6). `convolver --version` says which you have, and without FLAC a
-`flac-` format is refused before any file is created.
+FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg).
+
+### FLAC and Ogg
+
+The [preview packages](install.md#unsigned-previews) contain a libsndfile built
+without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
+and will stay that way, to keep the packages free of extra dependencies. So
+packaged copies of Convolver, the command line and the plug-ins alike, cannot
+read FLAC or Ogg files (input or IR) or write FLAC. `convolver --version` says
+whether the libsndfile in use has FLAC (`libsndfile ... (no FLAC output)`
+otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
+refused with a message before any file is created.
+
+To work with FLAC anyway, do one of these:
+
+- **Convert at the edges.** Decode FLAC to WAV first and encode the result
+  afterwards, with the reference [`flac`](https://xiph.org/flac/) tool, SoX or
+  FFmpeg:
+
+  ```sh
+  flac --decode music.flac -o music.wav
+  convolver --filter room.cfg --input music.wav --output corrected.wav --output-format wav-pcm24
+  flac --best corrected.wav -o corrected.flac
+  ```
+
+  Or stream through a pipe, so no intermediate files are written (the `-ar`
+  and `-ac` values must match the configuration, as in
+  [RAW streams](#raw-streams)):
+
+  ```sh
+  ffmpeg -i music.flac -f f32le -ar 48000 -ac 2 - \
+    | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float \
+    | ffmpeg -f f32le -ar 48000 -ac 2 -i - -c:a flac -sample_fmt s32 corrected.flac
+  ```
+
+  FIR filters in FLAC are converted once with `flac --decode`; the plug-ins
+  need this too.
+- **Build Convolver against a libsndfile that has FLAC.** The libsndfile
+  packages of Linux distributions (`libsndfile1-dev` on Debian and Ubuntu),
+  Homebrew (`libsndfile`) and vcpkg (`libsndfile` with its default features)
+  include FLAC and Ogg. [Build from source](../develop/build.md) with one of
+  them, then check that `convolver --version` no longer says `no FLAC output`.
 
 ### Integer formats, dither and noise shaping
 
@@ -197,6 +235,10 @@ given with `--raw-input`; its sample type is little-endian 32-bit float unless
 ```sh
 producer | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
 ```
+
+Headerless `.pcm` and `.raw` filters in a configuration are a separate
+choice, `--raw-filter-format`, with the same names; see
+[filter files](configuration.md#filter-files).
 
 `--raw-format` needs `--raw-input`, since a file with a header states its own
 sample type. It takes the names FFmpeg and SoX use: `f32le` (default), `f64le`,

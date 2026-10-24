@@ -69,6 +69,10 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
                       Read headerless samples with explicit metadata
   --raw-format F       Sample type of --raw-input: f32le (default), f64le,
                       s16le, s24le, s32le, or the same ending in be
+  --raw-filter-format F
+                      Sample type of headerless .pcm/.raw filters in a .cfg:
+                      f32le (default, as DRC and BruteFIR write them) or any
+                      --raw-format name; they are always mono
   --help              Show this help
   --version           Show Convolver, source, FFT backend and libsndfile versions
 FILE may be '-' for stdin/stdout; standard streams must be raw (--raw-input,
@@ -113,21 +117,6 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
     if (!container || !sample || !convolver::supported(result))
         return std::nullopt;
     return result;
-}
-// s16le ... f64be, the names ffmpeg and sox use.
-std::optional<convolver::RawEncoding> parse_raw_format(std::string_view name) {
-    using convolver::SampleType;
-    if (name.size() != 5 || (name.substr(3) != "le" && name.substr(3) != "be"))
-        return std::nullopt;
-    constexpr std::pair<std::string_view, SampleType> samples[]{{"s16", SampleType::pcm16},
-                                                                {"s24", SampleType::pcm24},
-                                                                {"s32", SampleType::pcm32},
-                                                                {"f32", SampleType::float32},
-                                                                {"f64", SampleType::float64}};
-    for (const auto& [text, value] : samples)
-        if (name.substr(0, 3) == text)
-            return convolver::RawEncoding{value, name.substr(3) == "be"};
-    return std::nullopt;
 }
 std::filesystem::path utf8_path(const std::string& text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
@@ -196,7 +185,7 @@ int run(int argc, char** argv) {
         bool explicit_plan = false, audio_options = false;
         std::optional<convolver::RawSpec> raw;
         convolver::OutputEncoding format;
-        convolver::RawEncoding raw_encoding;
+        convolver::RawEncoding raw_encoding, raw_filter_encoding;
         std::optional<convolver::Dither> dither;
         std::uint64_t dither_seed = 0;
         convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
@@ -278,13 +267,22 @@ int run(int argc, char** argv) {
             } else if (option == "--raw-format") {
                 audio_options = true;
                 const auto name = value();
-                const auto parsed = parse_raw_format(name);
+                const auto parsed = convolver::parse_raw_encoding(name);
                 if (!parsed)
                     throw std::invalid_argument("unsupported raw format: " + name +
                                                 " (use s16le, s24le, s32le, f32le or f64le, or "
                                                 "the same with be for big-endian)");
                 raw_encoding = *parsed;
                 raw_format = true;
+            } else if (option == "--raw-filter-format") {
+                audio_options = true;
+                const auto name = value();
+                const auto parsed = convolver::parse_raw_encoding(name);
+                if (!parsed)
+                    throw std::invalid_argument("unsupported raw filter format: " + name +
+                                                " (use s16le, s24le, s32le, f32le or f64le, or "
+                                                "the same with be for big-endian)");
+                raw_filter_encoding = *parsed;
             } else if (option == "--gain-db") {
                 audio_options = true;
                 auto text = value();
@@ -418,11 +416,20 @@ int run(int argc, char** argv) {
         }
         convolver::AudioReader reader(input, raw, raw_encoding);
         const auto info = reader.info();
-        std::vector<std::filesystem::path> dependencies;
+        std::vector<std::filesystem::path> dependencies, raw_filters;
         const auto config = convolver::load_configuration(
             filter,
-            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels},
-            &dependencies);
+            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels,
+                                              raw_filter_encoding},
+            &dependencies, &raw_filters);
+        // A raw filter's sample type is an assumption, so say which one was used.
+        for (const auto& raw_filter : raw_filters) {
+            const auto name = raw_filter.filename().u8string();
+            std::cerr << "convolver: raw filter '" << std::string(name.begin(), name.end())
+                      << "' read as mono " << convolver::raw_encoding_name(raw_filter_encoding)
+                      << " at " << config.sample_rate
+                      << " Hz (choose another sample type with --raw-filter-format)\n";
+        }
         for (const auto& source : dependencies)
             if (same_file(source, output))
                 throw std::invalid_argument(

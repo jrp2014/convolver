@@ -234,16 +234,37 @@ def container_tests(d):
     # A non-raw stream on stdout names the raw formats.
     p=call(base+['--output','-','--output-format','aiff-pcm16'],ok=False,data=raw)
     assert b'raw output format' in p.stderr, p.stderr
+    # Without FLAC, a FLAC input or IR says what is missing and what to do.
+    if b'no FLAC output' in call(['--version']).stdout:
+        fake=d/'ct-fake.flac'; fake.write_bytes(b'fLaC'+bytes(64))
+        p=call(['--filter',ir,'--input',fake,'--output',d/'ct-fake.wav'],ok=False)
+        assert b'built without FLAC' in p.stderr and b'flac --decode' in p.stderr, p.stderr
+        (d/'ct-fake.cfg').write_text('48000 1 1 0\n0\n0\nct-fake.flac\n0\n0\n0\n')
+        p=call(['--filter',d/'ct-fake.cfg','--input',d/'ct.aiff','--output',d/'ct-fake.wav'],
+               ok=False)
+        assert b'built without FLAC' in p.stderr and b'looked for' not in p.stderr, p.stderr
     # A DRC-style .pcm filter in a configuration.
     (d/'ct.pcm').write_bytes(struct.pack('<2f',.5,.25))
     cfg=d/'ct-raw.cfg'; cfg.write_text('48000 1 1 0\n0\n0\nct.pcm\n0\n0\n0\n')
     p=call(['--filter',cfg,'--raw-input','48000','1','--input','-','--output','-',
             '--output-format','raw-float'],data=raw)
     near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    # The assumed sample type is reported, and --raw-filter-format changes it.
+    assert b"raw filter 'ct.pcm' read as mono f32le at 48000 Hz" in p.stderr, p.stderr
+    assert b'--raw-filter-format' in p.stderr, p.stderr
+    (d/'ct.pcm').write_bytes(struct.pack('<2h',16384,8192))
+    p=call(['--filter',cfg,'--raw-filter-format','s16le','--raw-input','48000','1','--input','-',
+            '--output','-','--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    assert b'read as mono s16le' in p.stderr, p.stderr
+    p=call(['--filter',cfg,'--raw-filter-format','s16','--raw-input','48000','1','--input','-',
+            '--output','-','--output-format','raw-float'],ok=False,data=raw)
+    assert b'unsupported raw filter format' in p.stderr, p.stderr
     # A WAV that happens to be named .pcm is still read through its header.
     pcm(d/'ct.pcm',[16384,8192]); p=call(['--filter',cfg,'--raw-input','48000','1','--input','-',
                                           '--output','-','--output-format','raw-float'],data=raw)
     near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    assert b'raw filter' not in p.stderr, p.stderr
 
 def main():
     call(['--help'])

@@ -101,17 +101,32 @@ match them. See [speaker labels](command-line.md#speaker-labels).
 ## Filter files
 
 An IR file can be any sound file libsndfile reads, such as WAV, RF64, W64,
-AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's.
+AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
+[preview packages](install.md#unsigned-previews) read no FLAC or Ogg files;
+[FLAC and Ogg](command-line.md#flac-and-ogg) says how to work around that.
 
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
 unless the file starts with a sound-file header (a WAV named `.pcm` is still
-read as WAV). A raw filter is a headerless file of mono little-endian 32-bit float samples, as
-[DRC](https://drc-fir.sourceforge.net/) and BruteFIR setups usually write them.
+read as WAV). A raw filter is a headerless file of mono samples. Convolver reads
+it as little-endian 32-bit float (`f32le`), the type
+[DRC](https://drc-fir.sourceforge.net/) and BruteFIR write by default, and says
+so: rendering prints a line such as
+`convolver: raw filter 'left.pcm' read as mono f32le at 48000 Hz`, and
+`--inspect` shows `raw mono f32le` beside the path (`raw_format` in JSON).
+
+For raw filters in another sample type, give the command line
+`--raw-filter-format` with one of the [RAW stream](command-line.md#raw-streams)
+names, for example `--raw-filter-format s24le` or `f64le`; `--inspect` takes it
+too. It applies to every raw filter in the configuration. The plug-ins have no
+such setting and always read `f32le`, so for them convert raw filters in other
+types to WAV first, for example
+`sox -t raw -r 48000 -c 1 -e signed -b 24 -L left.pcm left.wav`.
+
 Raw filters have no header to state a sample rate, so they take the
 configuration's rate; their IR channel must be `0`. A raw file whose size is
-not a whole number of samples is reported as damaged. Convert raw files in
-other sample types to WAV first. Other programs that read `.cfg` files expect
-sound files, so `--inspect --profile portable-paths` warns about raw filters
+not a whole number of samples of the chosen type is reported as damaged, and the
+message names the type. Other programs that read `.cfg` files expect sound
+files, so `--inspect --profile portable-paths` warns about raw filters
 (`raw-filter`).
 
 ## Route numbers combine a channel and a gain
