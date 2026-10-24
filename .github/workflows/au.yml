@@ -76,7 +76,9 @@ jobs:
       - name: Build the component, CLI and tests
         run: cmake --build build-au --parallel 3
       - name: Core, CLI, AU adapter and PLUG-2 harness
-        run: ctest --test-dir build-au --output-on-failure --parallel 3
+        # The repository checks and package consumers run in the native jobs
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
+        run: ctest --test-dir build-au --output-on-failure --parallel 3 -LE 'repository|consumer'
       - name: Install for this user
         run: |
           components="$HOME/Library/Audio/Plug-Ins/Components"

@@ -70,7 +70,10 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     run(configure)
     run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', '2'])
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
-    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2'])
+    # The CMake development package is not shipped: its consumers run in the native
+    # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
+    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2',
+         '-LE', 'consumer'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     if nsis:

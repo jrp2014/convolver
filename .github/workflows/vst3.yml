@@ -34,13 +34,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
-        # the FFTW job keeps the explicit override working.
-        fft: [AUTO]
+        # the FFTW job keeps the explicit override working. The core
+        # suite runs here only where no other job builds the same
+        # compiler, flags and backend: on Linux and macOS the native and
+        # Audio Unit jobs do, so those run the VST3 tests alone
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
         include:
           - os: ubuntu-latest
+            fft: AUTO
+            tests: -L vst3
+          - os: ubuntu-latest
             fft: FFTW
+            tests: -L vst3
+          - os: macos-latest
+            fft: AUTO
+            tests: -L vst3
+          - os: windows-latest
+            fft: AUTO
+            tests: -LE 'repository|consumer'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -146,5 +158,5 @@ jobs:
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
         run: cmake --build build-vst3 --config Release --parallel 2
-      - name: Core, host, preset, VST3 validator and pluginval
-        run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2
+      - name: VST3 validator, pluginval and the VST3 tests
+        run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2 ${{ matrix.tests }}

@@ -225,7 +225,8 @@ LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it ([Audio Unit tests](#audio-unit-tests)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
+it ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
+entry: see [which configurations run which tests](#which-configurations-run-which-tests). The weekly [Dependency updates](../../.github/workflows/updates.yml)
 workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
@@ -784,6 +785,28 @@ No status check is required on `main` at present. If one is made required,
 require a job that always reports: a skipped matrix job shows under its
 unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
 forever on a documentation-only pull request.
+
+### Which configurations run which tests
+
+A local build runs every CTest entry. CI runs each kind of test only where
+something that can change its result differs from every other job: the
+compiler or its version, build type and flags, architecture, FFT backend,
+sanitizer, CMake generator, linked libraries or the package's shape
+(owner's decision, 24 October 2026). Plug-in builds compile the core exactly
+as native builds do, so a plug-in job whose compiler, flags and backend match
+another job runs only its own format's tests. The CTest labels select them.
+
+| Tests | Run in | Not run in |
+| --- | --- | --- |
+| `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
+| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit, the release candidates and the offline rebuild (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (matches native g++ Release with FFTW and with Ooura) and VST3 on macOS (matches the Audio Unit job) |
+| Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
+
+CTest still runs a fixture's setup when a selected test needs it, so
+`ctest -L vst3` runs `examples.first_use` before `vst3.harness`. A new CI
+configuration starts from this table: add it where it changes a result, and
+give a new build-independent check the `repository` label.
 
 ### Compiler cache
 

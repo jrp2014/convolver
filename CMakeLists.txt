@@ -376,11 +376,11 @@ if(CONVOLVER_BUILD_TESTS)
             add_test(NAME versioning COMMAND "${CMAKE_COMMAND}" -E env
                 "CONVOLVER_TEST_CMAKE=${CMAKE_COMMAND}" "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/versioning_tests.py")
-            set_tests_properties(versioning PROPERTIES LABELS "build;versioning" TIMEOUT 120)
+            set_tests_properties(versioning PROPERTIES LABELS "build;versioning;repository" TIMEOUT 120)
         endif()
         add_test(NAME identities COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/identities_tests.py")
-        set_tests_properties(identities PROPERTIES LABELS "build;identities")
+        set_tests_properties(identities PROPERTIES LABELS "build;identities;repository")
         add_test(NAME native.cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
@@ -428,6 +428,9 @@ if(CONVOLVER_BUILD_TESTS)
         set_tests_properties(examples.fixtures examples.first_use PROPERTIES
             LABELS "examples;real-libraries;cli" TIMEOUT 120)
         set_tests_properties(examples.first_use PROPERTIES FIXTURES_SETUP first_use_renders)
+        # Checks of the repository that no build option changes (CI runs them in
+        # one configuration per OS: docs/develop/testing.md#which-configurations-run-which-tests).
+        set_tests_properties(examples.fixtures PROPERTIES LABELS "examples;repository")
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)
@@ -465,7 +468,7 @@ if(CONVOLVER_BUILD_TESTS)
     if(CONVOLVER_DOCUMENTATION_TESTS)
         add_test(NAME documentation COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/documentation_regressions.py")
-        set_tests_properties(documentation PROPERTIES LABELS "docs;provenance" TIMEOUT 30)
+        set_tests_properties(documentation PROPERTIES LABELS "docs;provenance;repository" TIMEOUT 30)
     endif()
     if(CONVOLVER_BUILD_NATIVE AND CONVOLVER_PACKAGE_TESTS)
         configure_file(tests/consumer/cache.cmake.in consumer-cache.cmake @ONLY)
@@ -482,7 +485,8 @@ if(CONVOLVER_BUILD_TESTS)
         foreach(step IN ITEMS install LISTS consumer_cases)
             add_test(NAME packaging.consumer.${step} COMMAND "${CMAKE_COMMAND}" "-DCONFIG=$<CONFIG>"
                 "-DSTEP=${step}" -P "${CMAKE_CURRENT_BINARY_DIR}/consumer-verification.cmake")
-            set_tests_properties(packaging.consumer.${step} PROPERTIES LABELS "packaging;real-libraries" TIMEOUT 180)
+            set_tests_properties(packaging.consumer.${step} PROPERTIES LABELS "packaging;consumer;real-libraries"
+                TIMEOUT 180)
         endforeach()
         set_tests_properties(packaging.consumer.install PROPERTIES FIXTURES_SETUP consumer_package)
         list(TRANSFORM consumer_cases PREPEND packaging.consumer.)
