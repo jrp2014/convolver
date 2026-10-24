@@ -8,6 +8,8 @@ for every change and is not gated. A change is one of three kinds:
 
 - documentation: Markdown anywhere and everything under docs/, unless listed
   below. Lint (pre-commit, including the link and repository checks) covers it.
+  So nothing under docs/ may be built: benchmark programs live in
+  tests/native/benchmarks/ and only their dated results in docs/benchmarks/.
 - packaged documentation: pages copied into the preview packages. These also
   need the candidate workflow, which runs the packaged guide's examples.
 - everything else, including documentation that a build test reads or runs.

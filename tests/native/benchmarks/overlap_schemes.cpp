@@ -5,7 +5,7 @@
 //        (convolver/convolution/convolution.cpp, doPartitionedConvolution)
 // Both use the same FFTW plans (N = 2B, FFTW_MEASURE) and the same split
 // real/imaginary multiply-accumulate loop, so only the scheme differs.
-// Run with docs/benchmarks/src/run_overlap_schemes.sh.
+// Run with tests/native/benchmarks/run_overlap_schemes.sh.
 #include <algorithm>
 #include <chrono>
 #include <cmath>

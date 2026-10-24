@@ -3,7 +3,7 @@
 # Compare two builds of convolver_callback_benchmark over the costly moments
 # (startup, reset, live replacement), warmed processing and configuration
 # loading, alternating the builds in each round.
-# Usage: sh docs/benchmarks/src/callback_scenarios.sh BEFORE AFTER [ROUNDS] > results.csv
+# Usage: sh tests/native/benchmarks/callback_scenarios.sh BEFORE AFTER [ROUNDS] > results.csv
 # BEFORE and AFTER are convolver_callback_benchmark executables from Release
 # builds with -DCONVOLVER_BUILD_BENCHMARKS=ON. Each run takes 2 s; three rounds
 # take about 15 minutes. Workload: 65,536-tap paths, a 6x6 matrix (36 paths) at

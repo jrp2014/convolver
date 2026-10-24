@@ -261,7 +261,7 @@ measured. The M5 Max figures above predate the split-spectrum change below.
 
 ### Where the time goes
 
-[`src/fft_breakdown.cpp`](../benchmarks/src/fft_breakdown.cpp) times one path's
+[`fft_breakdown.cpp`](../../tests/native/benchmarks/fft_breakdown.cpp) times one path's
 forward FFT, partition multiply-accumulate and inverse FFT separately
 ([raw data](../benchmarks/2026-10-18-x86-fftw-builds.csv)). With the AVX2 build and
 MEASURE plans, the two FFTs are about 50% of per-block work for a 256-frame IR
@@ -314,7 +314,7 @@ pairs. Each partition's multiply-accumulate then needed shuffles on x86. Spectra
 are now stored per partition as all real parts followed by all imaginary parts;
 the forward spectrum is split once per block and the sum is re-interleaved once
 before the inverse FFT. Arithmetic per bin is unchanged.
-[`src/spectrum_layout.cpp`](../benchmarks/src/spectrum_layout.cpp) measured the
+[`spectrum_layout.cpp`](../../tests/native/benchmarks/spectrum_layout.cpp) measured the
 multiply-accumulate alone at 1.4–1.8× faster with identical results
 ([raw data](../benchmarks/2026-10-18-x86-mac-layout.csv)).
 
@@ -406,7 +406,7 @@ and bookkeeping. Overlap-save reads and writes back P output spectra. Overlap-ad
 reads P history spectra into a single accumulator, and pads its input with zeros
 and adds the overlap afterwards.
 
-[`src/overlap_schemes.cpp`](../benchmarks/src/overlap_schemes.cpp) times both on one
+[`overlap_schemes.cpp`](../../tests/native/benchmarks/overlap_schemes.cpp) times both on one
 path with the same FFTW MEASURE plans and the same split-spectrum MAC loop, so
 only the scheme differs. Both agree with a direct double-precision convolution
 to within 1e-5. Measured 19 October 2026 on a 4-vCPU Intel Xeon cloud VM at
@@ -462,7 +462,7 @@ workloads use B = 256 at 48 kHz, the plug-in and CLI default. Raw data:
 different VM; see [AVX2 kernels](#avx2-kernels-chosen-at-run-time)).
 
 Both kernel tables were made with
-[`compiler_flags.py`](../benchmarks/src/compiler_flags.py) and
+[`compiler_flags.py`](../../tests/native/benchmarks/compiler_flags.py) and
 `convolver_benchmark` as committed, and their CSVs are the script's output (the
 commands are under [Reproduce](#compiler-flags-1)). The flag table, the FFT shares
 and the PGO and per-file builds came first, from a one-off harness that ran the
@@ -691,7 +691,7 @@ the AVX2+FMA kernels: Release builds of `main` at `0269064` (before) and of
 PR #70 (after), alternated in each of three rounds of 2 s per run; the tables
 give medians. It is a shared virtual machine: treat differences under about
 10% as noise. [Raw data](../benchmarks/2026-10-24-x86-startup-reset-load.csv),
-made with [`callback_scenarios.sh`](../benchmarks/src/callback_scenarios.sh)
+made with [`callback_scenarios.sh`](../../tests/native/benchmarks/callback_scenarios.sh)
 and `convolver_callback_benchmark`.
 
 The workload is the one in jrp's performance review of `0269064`: 65,536-tap
@@ -759,14 +759,19 @@ time is parsing, path resolution and copying each path's channel.
 
 ## Reproduce
 
+The benchmark programs and scripts are in
+[`tests/native/benchmarks/`](../../tests/native/benchmarks/), where the
+formatting checks cover them, and the dated results stay in
+[`docs/benchmarks/`](../benchmarks/).
+
 ### Overlap-add and overlap-save
 
 Needs a C++20 compiler and single-precision FFTW (`brew install fftw` on macOS,
 `apt-get install libfftw3-dev` on Ubuntu); no CMake build is required:
 
 ```sh
-sh docs/benchmarks/src/run_overlap_schemes.sh > overlap.csv   # about 1 minute
-sh docs/benchmarks/src/run_overlap_schemes.sh --quick         # about 10 s, no 1M-tap cases
+sh tests/native/benchmarks/run_overlap_schemes.sh > overlap.csv   # about 1 minute
+sh tests/native/benchmarks/run_overlap_schemes.sh --quick         # about 10 s, no 1M-tap cases
 ```
 
 The script finds FFTW with `pkg-config` or Homebrew, compiles with `-O3 -DNDEBUG`
@@ -826,13 +831,13 @@ durable installation. Convolver's tests passed against that temporary build;
 
 ### Compiler flags
 
-[`src/compiler_flags.py`](../benchmarks/src/compiler_flags.py) builds the core
+[`compiler_flags.py`](../../tests/native/benchmarks/compiler_flags.py) builds the core
 and benchmark once per flag set and alternates them over the room-correction
 cases. The first kernel table came from this, once per compiler and FFT
 library (`|baseline` builds without the AVX2 kernels):
 
 ```sh
-python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA --cpu 2 \
+python3 tests/native/benchmarks/compiler_flags.py --compiler clang++ --backend OOURA --cpu 2 \
     --variant 'O3=-O3 -DNDEBUG' --variant 'O3-baseline=-O3 -DNDEBUG|baseline' \
     --variant 'O3-v3-fma=-O3 -march=x86-64-v3 -DNDEBUG|baseline' \
     --work /tmp/convolver-flags --output kernels.csv
@@ -843,7 +848,7 @@ exported to a folder (`|source=` builds another source tree):
 
 ```sh
 git archive 356a707 | (mkdir -p /tmp/nofma && tar -x -C /tmp/nofma)
-python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA --cpu 1 \
+python3 tests/native/benchmarks/compiler_flags.py --compiler clang++ --backend OOURA --cpu 1 \
     --rounds 15 --seconds 0.5 \
     --variant 'O3-baseline=-O3 -DNDEBUG|baseline' \
     --variant 'O3-avx2-nofma=-O3 -DNDEBUG|source=/tmp/nofma' --variant 'O3=-O3 -DNDEBUG' \
@@ -864,7 +869,7 @@ Build `main` and the change to compare as Release builds with
 tree), then:
 
 ```sh
-sh docs/benchmarks/src/callback_scenarios.sh before/convolver_callback_benchmark \
+sh tests/native/benchmarks/callback_scenarios.sh before/convolver_callback_benchmark \
     after/convolver_callback_benchmark 3 > startup-reset-load.csv   # about 15 minutes
 ```
 
