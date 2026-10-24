@@ -176,8 +176,6 @@ struct Instance {
         }
         return totals.total();
     }
-    // After an accepted load or a new processor: Fault shows again only for
-    // later faults.
     // Why the newest request failed, or the saved failure it restored.
     void log_rejection() {
         if (const auto& r = filter.rejection())

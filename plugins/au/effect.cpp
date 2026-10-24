@@ -515,10 +515,9 @@ std::string Effect::reject(HostFailureKind kind, const std::string& why) {
     // An empty instance that fails its first load plays silence, not identity.
     if (host_ && filter_.failed() && !was_failed) {
         try {
-            host_->replace(filter_.activate(layout()));
-            // The same processor counts on: observe from its totals
-            // (explained above), not from 0 as activate() assumes.
-            static_cast<void>(filter_.observe(host_->faults()));
+            // The filter is empty, so this is what activate() would give,
+            // without restarting the fault count of a processor that counts on.
+            host_->replace(unfiltered_configuration(layout(), true));
         } catch (...) {
         }
     }
@@ -604,10 +603,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             // A failed first load plays silence rather than the unfiltered input.
             if (host_ && filter_.failed() && !was_failed) {
                 try {
-                    host_->replace(filter_.activate(layout()));
-                    // The same processor counts on: observe from its totals
-                    // (explained already above), not from 0 as activate() assumes.
-                    static_cast<void>(filter_.observe(host_->faults()));
+                    // The filter is empty, so this is what activate() would give,
+                    // without restarting the fault count of a processor that counts on.
+                    host_->replace(unfiltered_configuration(layout(), true));
                 } catch (...) {
                 }
             }

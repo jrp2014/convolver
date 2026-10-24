@@ -939,7 +939,9 @@ void processing_faults() {
     f.load(HostState{loud}, layout);
     require(host_status(f, layout).status == HostStatus::playing, "playing before observing");
     const auto fresh = f.observe(host.faults());
-    require(fresh.output_overflow == 1 && f.faults().output_overflow == 1, "observe");
+    require(fresh.current.output_overflow == 1 && !fresh.earlier.any() &&
+                f.faults().output_overflow == 1,
+            "observe");
     auto line = host_status(f, layout);
     require(line.status == HostStatus::fault &&
                 line.text == "Fault: output too large, silenced and the filter restarted. Details "
@@ -952,7 +954,8 @@ void processing_faults() {
                 message.find("Lower the level") != std::string::npos &&
                 message.find("invalid samples") == std::string::npos,
             "overflow message");
-    require(fault_message({}).empty(), "message without faults");
+    require(fault_message(HostFaults{}).empty() && fault_message(HostFaultReport{}).empty(),
+            "message without faults");
     // Latched: nothing new to log, and the status stays until a load or start.
     require(!f.observe(host.faults()).any() && host_status(f, layout).status == HostStatus::fault,
             "fault not latched");
@@ -969,7 +972,7 @@ void processing_faults() {
     static_cast<void>(f.activate(layout));
     HostFaults restarted;
     restarted.rejected_input = 1;
-    require(f.observe(restarted).rejected_input == 1 &&
+    require(f.observe(restarted).current.rejected_input == 1 &&
                 host_status(f, layout).text.find("invalid input samples") != std::string::npos,
             "counts after activation");
     HostFaults every{3, 2, 1, 1};
@@ -1015,9 +1018,15 @@ void processing_faults() {
         {}, &p);
     play(0.f);
     const auto window = h.observe(p.faults());
-    require(window.rejected_input == 1 && !h.faults().any() &&
+    require(window.earlier.rejected_input == 1 && !window.current.any() && !h.faults().any() &&
                 host_status(h, layout).status == HostStatus::playing,
             "a fault counted while the replacement was prepared is shown against it");
+    // Its log text must not claim the status shows it.
+    const auto earlier = fault_message(window);
+    require(earlier.find("does not show these") != std::string::npos &&
+                earlier.find("status shows Fault") == std::string::npos &&
+                earlier.find("invalid samples") != std::string::npos,
+            "earlier faults explained as shown");
     require(!p.faults_since_clear() && !p.fault_to_signal(),
             "the audio side measures from the same snapshot");
     // The new filter's own fault: shown, and signalled once per clear.
@@ -1026,7 +1035,7 @@ void processing_faults() {
     p.fault_signalled();
     play(nan);
     require(!p.fault_to_signal(), "Fault signalled twice");
-    require(h.observe(p.faults()).rejected_input == 2 &&
+    require(h.observe(p.faults()).current.rejected_input == 2 &&
                 host_status(h, layout).status == HostStatus::fault,
             "new faults not shown");
     // A load failure comes first, on the audio side too.
@@ -1044,6 +1053,45 @@ void processing_faults() {
     p.hold_fault_signal(h.failure_shown());
     play(nan);
     require(p.fault_to_signal(), "signal not released after an accepted load");
+    // An accepted load that restores a saved failure holds the signal itself,
+    // before the adapter updates its status.
+    HostState saved_failure;
+    saved_failure.failed = true;
+    h.load(saved_failure, layout, {}, {}, &p);
+    play(nan);
+    require(h.failure_shown() && !p.fault_to_signal(), "saved failure not held at load");
+
+    // The adapters' failed first load: an empty instance's processor plays on
+    // with silence. Every fault is explained once: before the request, while
+    // the rejected filter was prepared, and after.
+    HostFilter empty(8);
+    HostProcessor q(empty.activate(layout), 64, 8);
+    const auto play_q = [&](float first) {
+        buffer.fill(0.f);
+        buffer[0] = first;
+        audio_thread = true;
+        static_cast<void>(q.process(pin, pout, 64));
+        audio_thread = false;
+    };
+    play_q(nan);
+    auto explained = empty.observe(q.faults()).current.rejected_input;
+    try {
+        empty.load(
+            HostState{mono()}, layout,
+            [&](const Configuration&) {
+                play_q(nan);
+                throw std::runtime_error("out of memory");
+            },
+            {}, &q);
+    } catch (const std::invalid_argument&) {
+    }
+    require(empty.failed(), "failed first load");
+    q.replace(unfiltered_configuration(layout, true)); // As the VST3 and AU adapters do.
+    play_q(nan);
+    const auto after = empty.observe(q.faults());
+    explained += after.current.rejected_input + after.earlier.rejected_input;
+    require(explained == 3 && q.faults().rejected_input == 3,
+            "a fault while a failed first load was prepared is lost from the log");
 }
 // A file name of this process's own, so that concurrent runs never share it.
 std::filesystem::path private_temp(const char* name) {

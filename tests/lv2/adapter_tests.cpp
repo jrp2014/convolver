@@ -977,8 +977,10 @@ void worker_loads(host::World& world, const fs::path& work) {
         settle(*p);
         check(p->status == as_float(Status::running) && reported(*p) == a,
               "a fault while the replacement was prepared shows as Fault against it");
-        check(p->log.contains(LV2_LOG__Error, "invalid samples"),
-              "a fault while the replacement was prepared is not explained");
+        check(p->log.contains(LV2_LOG__Error, "invalid samples") &&
+                  p->log.contains(LV2_LOG__Error, "does not show these") &&
+                  !p->log.contains(LV2_LOG__Error, "status shows Fault"),
+              "a fault while the replacement was prepared is not explained as earlier");
     }
     const auto never_a = [](const std::vector<float>& out) {
         return std::all_of(out.begin(), out.end(), [](float v) { return v > .5f - 1e-5f; });

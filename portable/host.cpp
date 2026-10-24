@@ -292,6 +292,9 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     // (jrp's review of 0.4.43). They are still explained by the next observe().
     faults_ = {};
     if (counting) {
+        // Held first, so the audio side never shows Fault over a restored
+        // load failure, even before the adapter updates its status.
+        counting->hold_fault_signal(failure_shown());
         const auto snapshot = counting->clear_faults();
         unshown_ += since(snapshot, observed_);
         observed_ = snapshot;
@@ -350,19 +353,20 @@ std::string times(std::uint64_t n) {
 }
 } // namespace
 
-HostFaults HostFilter::observe(const HostFaults& totals) noexcept {
-    const auto fresh = since(totals, observed_);
+HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
+    HostFaultReport report;
+    report.current = since(totals, observed_);
     observed_ = totals;
-    faults_ += fresh;
-    auto explained = unshown_; // Counted before the accepted load: explained, not shown.
+    faults_ += report.current;
+    report.earlier = unshown_; // Counted before the accepted load: explained, not shown.
     unshown_ = {};
-    return explained += fresh;
+    return report;
 }
 
-std::string fault_message(const HostFaults& f) {
-    if (!f.any())
-        return {};
-    std::string text = "While audio played, Convolver met a problem in it.";
+namespace {
+// One sentence per kind of fault, each starting with a space.
+std::string fault_details(const HostFaults& f) {
+    std::string text;
     if (f.output_overflow)
         text += " The output became too large to represent (" + times(f.output_overflow) +
                 "), because the input level or the filter's gain is extreme, so Convolver "
@@ -382,8 +386,28 @@ std::string fault_message(const HostFaults& f) {
         text += " The host passed more frames or channels than it had set up (" +
                 times(f.invalid_call) +
                 "), so Convolver refused those calls. Report this to the host's developers.";
-    return text + " The status shows Fault until a filter is loaded again or the host restarts "
-                  "the plug-in.";
+    return text;
+}
+} // namespace
+
+std::string fault_message(const HostFaults& f) {
+    if (!f.any())
+        return {};
+    return "While audio played, Convolver met a problem in it." + fault_details(f) +
+           " The status shows Fault until a filter is loaded again or the host restarts the "
+           "plug-in.";
+}
+
+std::string fault_message(const HostFaultReport& r) {
+    std::string text;
+    if (r.earlier.any())
+        text = "While the filter now playing was being loaded, the audio before it met a "
+               "problem." +
+               fault_details(r.earlier) +
+               " The new filter starts afresh, so the status does not show these.";
+    if (r.current.any())
+        text += (text.empty() ? "" : " ") + fault_message(r.current);
+    return text;
 }
 
 namespace {

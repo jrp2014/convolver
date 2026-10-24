@@ -204,12 +204,17 @@ format.
   filter, takes one snapshot of the counts (`HostProcessor::clear_faults()`)
   as both the audio thread's new baseline and the point `observe()` counts
   from. Faults from before the snapshot, the preparation window included, are
-  still returned by the next `observe()` for the log, but no longer shown as
+  still returned by the next `observe()` (as `earlier`, logged with their own
+  ending saying the status does not show them), but no longer shown as
   Fault, and the audio thread signals only faults after it
   (`faults_since_clear()`, `fault_to_signal()`, `fault_signalled()`, once per
-  baseline). Adapters call `hold_fault_signal(failure_shown())` after every
-  load, rejection and activation, so the audio thread never publishes Fault
-  over Load failed. The audio
+  baseline). The audio thread never publishes Fault over Load failed: an
+  accepted load sets `hold_fault_signal(failure_shown())` before the
+  snapshot, and VST3 and the Audio Unit set it again after every rejection
+  and activation; LV2's status port puts Load failed first itself. When an
+  empty instance's first load fails, VST3 and the Audio Unit switch the
+  processor that plays to silence (`unfiltered_configuration`) without
+  `activate()`, which would restart the fault count. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends

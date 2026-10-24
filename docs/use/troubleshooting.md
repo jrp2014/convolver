@@ -49,9 +49,11 @@ differs and what to change. The LV2 plug-in shows Load failed on its `status`
 output and writes the reason to the host's log.
 
 If Status shows **Fault**, the audio itself went wrong while it played: the
-output became too large (lower the input level or the filter's gain), or the
-host sent invalid samples (check the plug-ins before Convolver). The log says
-which, and how often. Fault clears when a filter loads or the host restarts
+output became too large (lower the input level or the filter's gain), the
+host sent invalid samples (check the plug-ins before Convolver), an Audio
+Unit host passed buffers that do not match its setup (report it to the
+host's developers), or the filter failed while playing (a Convolver bug:
+report it with the log). The log says which, and how often. Fault clears when a filter loads or the host restarts
 the plug-in, for example when the sample rate changes.
 
 ## Filters and configurations

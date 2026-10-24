@@ -141,6 +141,19 @@ struct HostFaults {
 // What happened, why and what to change, for the log: one sentence per kind
 // of fault. Empty when there are none.
 std::string fault_message(const HostFaults&);
+// What HostFilter::observe() found. `current`: faults met by the filter that
+// plays now, which faults() (and so the status) shows. `earlier`: faults
+// counted before an accepted load replaced the filter they met, while the new
+// one was prepared; logged, but never shown.
+struct HostFaultReport {
+    HostFaults current, earlier;
+    bool any() const noexcept {
+        return current.any() || earlier.any();
+    }
+};
+// The log text for both parts, each with its own ending, so the log never
+// says the status shows Fault for faults it does not show.
+std::string fault_message(const HostFaultReport&);
 
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
@@ -243,8 +256,8 @@ class HostFilter {
     // again for a new processor, so call this before discarding the old one,
     // and before load(): an accepted load clears faults(). Faults counted
     // between the last call and an accepted load (while it was prepared) are
-    // returned too, for the log, but not added to faults().
-    HostFaults observe(const HostFaults& totals) noexcept;
+    // returned as `earlier`, for the log, and not added to faults().
+    HostFaultReport observe(const HostFaults& totals) noexcept;
 
   private:
     HostRequest numbered(HostRequest);
