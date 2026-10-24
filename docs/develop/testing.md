@@ -193,7 +193,9 @@ copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json
 [`plugins/identities.json`](../../plugins/identities.json), and that each VST3
 speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
-queries, silent-input tails, automation offsets and failed state restore rollback.
+queries, a tail that ends exactly at the reported length (latency included),
+input flagged silent that is still read, the Bypass parameter's text
+conversions, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 [pluginval](#pluginval), a host that does not share
@@ -334,7 +336,14 @@ comparisons; since VST3-7 the adapter lists no known deviations.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
-and adds automation patterns. The validator, the adapter tests and the plug-in
+and adds automation patterns. The validator does not create three tests that
+its suite contains: Check Tail processing, Process Input Overwriting and
+Parameter Function Name. Patched in by hand during the
+[VST3 audit](../review-2026-10/vst3-api-audit-2026-10-23.md), the last two
+pass; since VST3-8 Check Tail fails only on FFT rounding residue just after
+the reported tail (up to 1.9e-7 for ±1 noise, against its absolute 1e-7
+limit, about −134 dB), not on a cut tail. `vst3.adapter` checks the tail with
+a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 

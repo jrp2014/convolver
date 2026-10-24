@@ -253,6 +253,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (VST3-8, from the [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)):
+  the reported tail now includes the 256-sample latency, so a host that stops
+  or suspends the plug-in after its tail no longer cuts the last 256 samples
+  (an instance with no filter used to report 0). Input that the host flags as
+  silent is still read, so a host that flags audio by mistake no longer
+  silences it. The Bypass parameter accepts its own "Off" and "On" text (and 0
+  or 1) and refuses other text on every platform, and
+  the controller's state calls succeed instead of reporting "not
+  implemented". The filtered sound is unchanged.
 - A filter loaded while the host had stopped processing in the middle of a
   crossfade now plays from the first resumed sample. Before, `HostProcessor`
   kept the interrupted transition after `reset()`, so the old filter went on
