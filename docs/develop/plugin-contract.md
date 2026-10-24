@@ -198,7 +198,18 @@ format.
   from any thread. On the control side, `HostFilter::observe()` takes them and
   returns the new ones, which adapters log with `fault_message()`;
   `HostFilter::faults()` keeps them until an accepted load or `activate()`,
-  and `host_status()` shows them as Fault unless a load failure is shown. The audio
+  and `host_status()` shows them as Fault unless a load failure is shown.
+  One baseline serves both sides (jrp's review of 0.4.43): an adapter passes
+  its `HostProcessor` to `HostFilter::load()`, which, when it accepts the
+  filter, takes one snapshot of the counts (`HostProcessor::clear_faults()`)
+  as both the audio thread's new baseline and the point `observe()` counts
+  from. Faults from before the snapshot, the preparation window included, are
+  still returned by the next `observe()` for the log, but no longer shown as
+  Fault, and the audio thread signals only faults after it
+  (`faults_since_clear()`, `fault_to_signal()`, `fault_signalled()`, once per
+  baseline). Adapters call `hold_fault_signal(failure_shown())` after every
+  load, rejection and activation, so the audio thread never publishes Fault
+  over Load failed. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends

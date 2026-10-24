@@ -42,9 +42,17 @@ cannot be used ([when a filter does not fit](plugins.md#when-a-filter-does-not-f
 | The project was saved after its first preset failed | Load a matching preset |
 | Bypass is on with different input and output counts | Switch bypass off |
 
-The Audio Unit writes the reason to the macOS Console (search for
-"Convolver"); the LV2 plug-in writes it to the host's log and shows Load failed
-on its `status` output. The VST3 plug-in cannot show a reason yet.
+To see why, read the plug-in's **Status** parameter in the host's generic
+plug-in window or parameter list (VST3 and Audio Unit), then the
+[Convolver log](plugins.md#status-and-the-convolver-log), which says what
+differs and what to change. The LV2 plug-in shows Load failed on its `status`
+output and writes the reason to the host's log.
+
+If Status shows **Fault**, the audio itself went wrong while it played: the
+output became too large (lower the input level or the filter's gain), or the
+host sent invalid samples (check the plug-ins before Convolver). The log says
+which, and how often. Fault clears when a filter loads or the host restarts
+the plug-in, for example when the sample rate changes.
 
 ## Filters and configurations
 
@@ -72,7 +80,7 @@ See [Equalizer APO troubleshooting](equalizer-apo.md#troubleshooting).
 
 Report the package's SHA-256 checksum, the system and its version, the
 processor, the host and its version, the sample rate, channel layout and buffer
-size, any error message or log, and the smallest example that shows the
-problem. Use the bundled synthetic examples where you can, and keep private
+size, any error message, the [Convolver log](plugins.md#status-and-the-convolver-log)
+(or the host's log for LV2), and the smallest example that shows the problem. Use the bundled synthetic examples where you can, and keep private
 audio and session files out of the report. Keep levels low when trying
 unfamiliar IRs.

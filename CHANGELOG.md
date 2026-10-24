@@ -308,6 +308,20 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins: after a filter loaded, a processing fault from before it (for
+  example from the audio played while the new filter was being prepared) could
+  turn the Status back to Fault at the next status check, though the new
+  filter played cleanly. An accepted load now takes one snapshot of the fault
+  counts for both the audio thread and the control side: earlier faults are
+  still logged, but no longer shown or signalled. Found in jrp's review of
+  0.4.43.
+- Audio Unit: the audio thread could set Status to Fault while a load failure
+  was showing, hiding Load failed until the next status check. Load failed
+  now stays ahead of Fault on the audio thread too, as in VST3 and LV2. Found
+  in jrp's review of 0.4.43.
+- The plug-in and troubleshooting guides said the VST3 cannot show why a load
+  failed and that the speaker check's note cannot be shown. Both now point to
+  the Status parameter and the Convolver log. Found in jrp's review of 0.4.43.
 - A filter named `.pcm` or `.raw` that is a sound file with a header (Sun/NeXT
   AU, for example) was read as raw samples, header included, because only some
   headers were recognised. Now such a filter is read through its header when
