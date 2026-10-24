@@ -557,6 +557,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   absolute error came from, so a new, louder test (PERF-5's
   `history_validity`, peak 7.6) no longer looks like a tenfold loss of
   accuracy; [native tests](docs/develop/testing.md#native-production-tests).
+- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
+  an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
+  `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
