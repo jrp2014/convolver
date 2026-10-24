@@ -88,11 +88,15 @@ if __name__ == '__main__':
         if not args.fetch:
             parser.error('--latest downloads the archives; add --fetch')
         try:
-            records = resolve.resolve(policy, args.cache.resolve())
+            # Only what this build uses, so an unused host cannot fail it.
+            records = resolve.resolve(policy, args.cache.resolve(),
+                                      used_dependencies(policy, args.formats, args.backend))
         except resolve.ResolveError as error:
             sys.exit(f'error: {error}')
     else:
         records = resolve.load_records(args.lock)
     resolve.report(resolve.markdown(records))
+    used = used_dependencies(policy, args.formats, args.backend)
+    policy = dict(policy, dependencies={name: rule for name, rule in policy['dependencies'].items() if name in used})
     build(with_records(policy, records), args.cache, args.work, args.cmake, args.fetch, args.architecture,
           args.backend, args.formats)

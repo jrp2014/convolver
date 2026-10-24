@@ -335,13 +335,18 @@ releases, and where its archive is downloaded.
 | VST3 SDK (`vst3sdk` and its `base`, `cmake`, `pluginterfaces` and `public.sdk` submodules) | `vst3sdk` tags `v3.8.1_build_84` and so on; the submodule commits are the ones that tag records | VST3 builds, preview packages | Job summary, source and artifact manifests, Convolver log |
 | `lv2` headers | `lv2` tags | LV2 builds | Job summary, source manifest |
 | AudioUnitSDK | `AudioUnitSDK-` tags | AU builds | Job summary, source manifest, Convolver log |
-| FFTW | `fftw3` tags; the archive from fftw.org | FFTW builds (none of the preview packages) | Job summary, source manifest |
-| libsndfile | `libsndfile` tags; the release archive | Every build with I/O, preview packages | Job summary, source and artifact manifests, `convolver --version` |
+| FFTW | `fftw3` tags; the archive from fftw.org | Source builds with the FFTW backend (none of the preview packages) | Job summary, source manifest |
+| libsndfile | `libsndfile` tags; the release archive, checked against the digest GitHub publishes | Preview packages and their candidates | Job summary, source and artifact manifests, `convolver --version` |
 | NSIS | `kichik/nsis` tags (`v313` is 3.13); the archive from SourceForge | The Windows installer | Job summary, candidate record |
 | pluginval | `Tracktion/pluginval` tags, pre-releases included (2.0 is still in beta) | VST3 validation, later LV2 and AU | Job summary |
 | `lv2lint` | Its own Git host; when that does not answer, the newest version FreeBSD's ports list | LV2 validation | Job summary |
 | `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates | LV2 tests | Job summary |
 | `auval` | Ships with macOS on the `macos-15` image | AU validation | Each run logs the macOS and Xcode versions |
+
+The other CI jobs (native, VST3, LV2 and regression) take FFTW and libsndfile
+from the runner's package manager (apt, Homebrew or vcpkg) at its newest
+version, as a source build would. Their versions appear only in the job logs
+and in `convolver --version`, not in a manifest.
 
 Pre-releases are skipped except where the policy allows them (pluginval). For
 each dependency a build records the version, the tag, the commit the tag

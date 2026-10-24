@@ -163,7 +163,11 @@ def build(archive, identifier, work, output, cmake, nsis=None):
                   dependencies={name: {key: dep[key] for key in ('version', 'revision', 'sha256')}
                                 for name, dep in policy['dependencies'].items()})
     if nsis_version:
-        record['installer_compiler'] = 'NSIS ' + nsis_version
+        record['installer_compiler'] = {'reported': 'NSIS ' + nsis_version}
+        # fetch_nsis.py's record: release, URL and checksum of the archive.
+        fetched = nsis.parent.parent / 'nsis.json'
+        if fetched.is_file():
+            record['installer_compiler'].update(json.loads(fetched.read_text(encoding='utf-8')))
     (output / (identifier + '-candidate.json')).write_text(json.dumps(dict(schema=1, version=policy['version'], source_commit=manifest['source_commit'], assets=assets, platform=record), indent=2) + '\n')
 
 

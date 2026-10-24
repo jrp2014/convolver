@@ -122,7 +122,7 @@ class ResolveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             return resolve.resolve(policy or self.policy, Path(temporary), names, wanted,
                                    lister=kwargs.get('lister', lister), links=kwargs.get('links', links),
-                                   fetcher=fake_fetcher)
+                                   fetcher=fake_fetcher, digest=kwargs.get('digest', lambda *_: None))
 
     def test_every_dependency_resolves_to_its_newest_release(self):
         records = self.resolve()
@@ -147,6 +147,23 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(set(records), {'audiounitsdk'})
         self.assertEqual((records['audiounitsdk']['version'], records['audiounitsdk']['chosen']),
                          ('1.3.0', 'requested (1.3.0)'))
+
+    def test_release_asset_checked_against_github(self):
+        published = {}
+
+        def github(repository, tag, asset):
+            published['asked'] = (repository, tag, asset)
+            return digest(f'https://github.com/libsndfile/libsndfile/releases/download/{tag}/{asset}')
+        records = self.resolve({'libsndfile'}, digest=github)
+        self.assertEqual(published['asked'], ('libsndfile/libsndfile', '1.2.2', 'libsndfile-1.2.2.tar.xz'))
+        self.assertEqual(records['libsndfile']['checked_against'], 'the digest GitHub publishes for the asset')
+        self.assertIn('no published checksum', self.resolve({'lv2'})['lv2']['checked_against'])
+        with self.assertRaisesRegex(resolve.ResolveError, 'but GitHub publishes ' + '0' * 64):
+            self.resolve({'libsndfile'}, digest=lambda *_: '0' * 64)
+
+    def test_a_submodule_follows_its_sdk(self):
+        with self.assertRaisesRegex(resolve.ResolveError, "submodule follows its SDK; choose vst3sdk's version"):
+            self.resolve({'vst3-base'}, {'vst3-base': '3.8.0'})
 
     def test_a_submodule_brings_its_sdk(self):
         self.assertEqual(set(self.resolve({'vst3-base'})), {'vst3sdk', 'vst3-base'})

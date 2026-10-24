@@ -87,6 +87,11 @@ jobs:
             "-Dlv2dir=$RUNNER_TEMP/lv2-bundles" "--prefix=$RUNNER_TEMP/lv2-prefix"
           ninja -C "$RUNNER_TEMP/lv2-build" install
           echo "LV2_PATH=$RUNNER_TEMP/lv2-bundles" >> "$GITHUB_ENV"
+          # Convolver's bundle below compiles against these headers too, not
+          # the lv2-dev package that lilv brings.
+          pc=$(find "$RUNNER_TEMP/lv2-prefix" -name lv2.pc -print -quit)
+          test -n "$pc"
+          echo "PKG_CONFIG_PATH=$(dirname "$pc")${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
       - name: lilv hosts a plug-in on a shared fixture
         run: |
           lv2ls
@@ -136,6 +141,7 @@ jobs:
       # lv2lint is not a sanitizer build, so it needs a plain one.
       - name: Convolver's LV2 bundle (Release)
         run: |
+          echo "lv2 headers: $(pkg-config --modversion lv2) from $(pkg-config --variable=includedir lv2)"
           cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_BUILD_TESTS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake --build build-lv2 --parallel --target convolver_lv2
@@ -153,6 +159,9 @@ jobs:
           for uri in $uris; do
             env -u LV2_PATH lv2lint -I "$bundle" "$uri"
           done
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python scripts/release/resolve.py explain-failure
 
   # The sanitizer builds need only the packages, not the tools job's
   # example plug-ins or lv2lint, so they run beside it. Each builds just the

@@ -27,7 +27,7 @@ more thought before any work starts.
 - **Three formats, three parallel streams.** Each adapter depends only on
   `Convolver::host`, so they can proceed independently once a little shared
   groundwork (FFT safety, a common test harness, one preset tool, one layout
-  and identity list, pinned format dependencies) is in place. All three follow
+  and identity list, recorded format dependencies) is in place. All three follow
   one [contract](#shared-adapter-contract) for failed loads, initial
   restoration and channel layouts. See [parallel development](#parallel-development).
 - **LV2** is the native plug-in format on Linux: Ardour, Qtractor, Carla,
@@ -163,8 +163,9 @@ plumbing) is small, and the existing VST3 adapter is about 500 lines over
 
 The LV2 adapter therefore uses the `lv2` headers (C, ISC, Ubuntu 24.04 ships
 1.18.10) and, for tests only, `lilv` (0.24.22) to load it as a host would.
-PLUG-6 pinned these versions (22 October 2026); see
-[pinned format dependencies](../../develop/build.md#supporting-libraries).
+PLUG-6 pinned these versions (22 October 2026); CI-6 replaced the pins with
+the newest releases, recorded per build; see
+[supporting libraries](../../develop/build.md#supporting-libraries).
 
 Apache-2.0, AudioUnitSDK's licence, is compatible with GPLv3 but not with
 GPLv2. That affects how the AU component may be distributed; see
@@ -650,7 +651,7 @@ the AUv2 entry points against Apple's system headers without AudioUnitSDK.
 
 ## Build and distribution
 
-- CMake option `CONVOLVER_BUILD_LV2` (off by default), needing only the pinned
+- CMake option `CONVOLVER_BUILD_LV2` (off by default), needing only the
   `lv2` headers (PLUG-6, done); `lilv` only when tests are on. The `.ttl` files are
   generated from `VERSION` and the layout list. Neither LV2 nor AU builds need
   the VST3 SDK, and the shared preset tool (PLUG-3) builds without it.

@@ -56,7 +56,7 @@ def _link_source(member, regular):
 
 
 def extract(archive, destination):
-    """Pinned source archives contain regular files and directories, plus
+    """Dependency source archives contain regular files and directories, plus
     symlinks to regular files in the same archive (lv2 has one), which are
     written as copies so nothing can point outside the destination. Each
     path may occur once."""
@@ -160,7 +160,10 @@ def main(argv=None):
         print(f'error: {error}', file=sys.stderr)
         return 1
     if args.record:
-        args.record.write_text(json.dumps(resolve.lock(records), indent=2) + '\n', encoding='utf-8')
+        resolved_at = None
+        if args.lock:  # Keep when the records were made, not when they were copied.
+            resolved_at = json.loads(args.lock.read_text(encoding='utf-8')).get('resolved_at')
+        args.record.write_text(json.dumps(resolve.lock(records, resolved_at), indent=2) + '\n', encoding='utf-8')
     resolve.report(resolve.markdown(records))
     for name in sorted(args.names):
         print(f"{name} {records[name]['version']}: {args.destination / records[name]['directory']}")

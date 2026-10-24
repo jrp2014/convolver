@@ -111,25 +111,40 @@ def expand(rules, names):
     return expanded
 
 
-def _record(rule, version, tag, revision, chosen, cache, fetcher):
+def _record(rule, version, tag, revision, chosen, cache, fetcher, digest):
     url = rule['url'].format(version=version, tag=tag, revision=revision)
     archive = fetch_archive(url, cache, rule['archive'], fetcher)
+    actual = sha256(archive)
+    against = 'nothing (no published checksum)'
+    if rule.get('github_release'):
+        published = digest(rule['github_release'], tag, posixpath.basename(urllib.parse.urlsplit(url).path))
+        if published and published != actual:
+            archive.unlink()
+            raise ValueError(f'{url} has checksum {actual}, but GitHub publishes {published} for it')
+        if published:
+            against = 'the digest GitHub publishes for the asset'
     record = {key: rule[key] for key in RULE_FIELDS if key in rule}
-    record.update(version=version, tag=tag, revision=revision, url=url, sha256=sha256(archive), chosen=chosen)
+    record.update(version=version, tag=tag, revision=revision, url=url, sha256=actual, chosen=chosen,
+                  checked_against=against)
     return record
 
 
 def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, links=upstream.gitlinks,
-            fetcher=download):
+            fetcher=download, digest=None):
     """Records for the named dependencies (all by default), each the newest
     release, or the version `wanted` names for it; every archive is fetched
     into cache. Raises ResolveError naming every dependency that failed."""
     rules = policy['dependencies']
     wanted = dict(wanted or {})
     names = expand(rules, names if names is not None else rules)
+    digest = digest or _published_digest
     unknown = set(wanted) - names
     if unknown:
         raise ResolveError(f'--version names dependencies that are not being resolved: {sorted(unknown)}')
+    submodules = sorted(name for name in wanted if 'submodule_of' in rules[name])
+    if submodules:
+        raise ResolveError(f'--version cannot choose {", ".join(submodules)}: a submodule follows its SDK; '
+                           f'choose {rules[submodules[0]]["submodule_of"]}\'s version instead')
     records, errors = {}, []
     parents = {}
     for name in sorted(n for n in names if 'submodule_of' not in rules[n]):
@@ -139,7 +154,7 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
                                                      wanted.get(name))
             chosen = f'requested ({version})' if name in wanted else 'newest release'
             parents[name] = (version, tag, chosen)
-            records[name] = _record(rule, version, tag, revision, chosen, cache, fetcher)
+            records[name] = _record(rule, version, tag, revision, chosen, cache, fetcher, digest)
         except (OSError, RuntimeError, ValueError) as error:
             errors.append(f'{name}: {error}')
     for parent in sorted({rules[n]['submodule_of'] for n in names if 'submodule_of' in rules[n]}):
@@ -164,7 +179,7 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
                     raise ValueError(f'{parent} {tag} takes {path} from {found or "nowhere"}, '
                                      f'not {rule["upstream"]}; update the release policy')
                 records[name] = _record(rule, version, tag, commits[path], f'{chosen}, from {parent} {tag}',
-                                        cache, fetcher)
+                                        cache, fetcher, digest)
             except (OSError, RuntimeError, ValueError) as error:
                 errors.append(f'{name}: {error}')
     if errors:
@@ -198,7 +213,8 @@ def markdown(records, heading='Dependencies used'):
     for name in sorted(records):
         record = records[name]
         lines.append(f'| [{name}]({record["url"]}) | {record["version"]} | `{record.get("tag", "-")}` | '
-                     f'`{record.get("revision", "-")}` | `{record["sha256"]}` | {record.get("chosen", "recorded")} |')
+                     f'`{record.get("revision", "-")}` | `{record["sha256"]}` | {record.get("chosen", "recorded")}'
+                     f'{"; matches GitHub digest" if record.get("checked_against", "").startswith("the digest") else ""} |')
     return '\n'.join(lines) + '\n'
 
 

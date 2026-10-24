@@ -60,7 +60,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs, pinned dependencies and the preview recipe |
+| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs, supporting libraries and the preview recipe |
 | [Library guide](develop/library.md) | How-to | Using the libraries from another CMake project; the engine API and resource limits |
 | [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
 | [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state, preset files |

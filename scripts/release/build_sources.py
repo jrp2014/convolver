@@ -32,6 +32,8 @@ def assemble(policy_path, cache, output, fetch=False, revision='HEAD', lock=None
     if output.exists():
         raise ValueError('source archive output already exists')
     if lock:
+        if wanted:
+            raise ValueError('--version chooses releases to resolve; with --lock the records decide')
         records = resolve.load_records(lock)
         resolved_at = json.loads(Path(lock).read_text(encoding='utf-8')).get('resolved_at', 'not recorded')
     else:

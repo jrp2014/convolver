@@ -97,6 +97,7 @@
     "libsndfile": {
       "upstream": "https://github.com/libsndfile/libsndfile",
       "tag_prefix": "",
+      "github_release": "libsndfile/libsndfile",
       "url": "https://github.com/libsndfile/libsndfile/releases/download/{version}/libsndfile-{version}.tar.xz",
       "archive": "libsndfile.tar.xz",
       "directory": "libsndfile",

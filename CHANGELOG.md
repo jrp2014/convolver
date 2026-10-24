@@ -125,7 +125,7 @@ Until 1.0 the C++ API may change between minor versions.
   record, what is audible and that audio-thread calls neither allocate nor
   lock ([testing](docs/develop/testing.md#lifecycle-sequences-plug-7)).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
-  (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
+  (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the newest
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
   host's preset menu. 1 to 8 channels per side (counts may differ), latency and
   tail reported in seconds, bypass with the same 64-sample ramp and delayed dry
@@ -199,7 +199,7 @@ Until 1.0 the C++ API may change between minor versions.
   renders that load real filters through the host and match a direct
   convolution. Optional locally via `-DCONVOLVER_PLUGINVAL`.
 - The SDK validator also runs in extensive mode (`vst3.validator.extensive`).
-- Unsigned VST3 preview distributions: pinned dependencies and corresponding
+- Unsigned VST3 preview distributions: recorded dependencies and corresponding
   source, relocatable archives with synthetic presets, unsigned installer
   templates, and a read-only candidate workflow on Windows, Linux and both macOS
   architectures (`-DCONVOLVER_PACKAGE_PLUGINS=ON`, preset `release-vst3`).
