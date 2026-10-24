@@ -16,6 +16,8 @@ as:
 A filter is a multichannel impulse-response (IR) sound file, or a Convolver
 **`.cfg`** file describing filters and routes. Roon, JRiver and Audiolense use
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
+Coming from the old Windows Convolver? Your `.cfg` files come across with a few
+edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
 Convolver is a developer preview: packages are unsigned and no named DAW has
 been tested yet ([status](docs/project/status.md)).
 

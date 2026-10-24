@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!--
+Source of social-preview.png, the image GitHub shows when a link to the
+repository is shared. Update the text when the formats or platforms change,
+render it at 1280 x 640, and upload the PNG in the repository's Settings,
+General, Social preview (only jrp can). To render with headless Chromium:
+
+  chromium --headless --hide-scrollbars --window-size=1280,640 \
+    --screenshot=.github/social-preview.png .github/social-preview.html
+
+See docs/develop/releasing.md#after-publishing-make-it-findable.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Convolver social preview</title>
+<style>
+  html, body { margin: 0; }
+  body {
+    width: 1280px; height: 640px; overflow: hidden; position: relative;
+    background: #0f1720; color: #e8eef4;
+    font-family: "DejaVu Sans", Helvetica, Arial, sans-serif;
+  }
+  .text { position: absolute; left: 80px; right: 80px; top: 70px; }
+  h1 { font-size: 104px; margin: 0; letter-spacing: -2px; font-weight: 700; }
+  .tagline { font-size: 40px; margin-top: 14px; color: #cfe3f2; line-height: 1.25; }
+  .formats { font-size: 28px; margin-top: 26px; color: #8fb3cc; }
+  .cfg { font-size: 26px; margin-top: 10px; color: #8fb3cc; }
+  .licence {
+    position: absolute; right: 80px; top: 84px; font-size: 22px; color: #6f8ea6;
+    border: 2px solid #34506a; border-radius: 8px; padding: 6px 14px;
+  }
+  svg { position: absolute; left: 80px; bottom: 40px; }
+</style>
+</head>
+<body>
+<div class="text">
+  <h1>Convolver</h1>
+  <div class="tagline">Multichannel FIR filters for room correction<br>and crossovers</div>
+  <div class="formats">VST3 · Audio Unit · LV2 · command line · C++ library</div>
+  <div class="cfg">Reads the Convolver .cfg format, also used by Roon, JRiver and Audiolense</div>
+</div>
+<div class="licence">open source · GPL</div>
+<svg width="1120" height="150" viewBox="0 0 1120 150">
+  <line x1="0" y1="75" x2="1120" y2="75" stroke="#24384b" stroke-width="2"/>
+  <polyline id="impulse" fill="none" stroke="#4fb3ff" stroke-width="4" stroke-linejoin="round"/>
+</svg>
+<script>
+  // A stylised impulse response: a spike followed by a decaying ring.
+  const width = 1120, height = 150, points = [];
+  for (let x = 0; x <= width; x += 2) {
+    const t = x / width - 0.18;
+    const y = t < 0 ? 0 : Math.exp(-t * 9) * Math.cos(t * 90);
+    points.push(`${x},${(height / 2 - y * height * 0.46).toFixed(1)}`);
+  }
+  document.getElementById('impulse').setAttribute('points', points.join(' '));
+</script>
+</body>
+</html>
