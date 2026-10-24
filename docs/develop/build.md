@@ -186,6 +186,7 @@ does, before producing a reproducible binary.
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark` |
+| `CONVOLVER_AVX2_KERNELS` | ON when targeting x86-64 | Also compile the multiply-accumulate kernels for AVX2 with FMA and use them on CPUs that have both; output then differs from the baseline kernels by float rounding only, below -120 dBFS ([measurements](fft-backends.md#compiler-flags-and-avx2-kernels)) |
 | `BUILD_TESTING` | ON at top level | Master test switch |
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
 | `CONVOLVER_PACKAGE_TESTS` | ON | Installed, relocated and source-tree C++ consumer tests |

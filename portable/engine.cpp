@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
 #include "fft.hpp"
+#include "kernels.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -10,11 +11,6 @@
 
 namespace convolver {
 namespace {
-#if defined(_MSC_VER)
-#define CONVOLVER_RESTRICT __restrict
-#else
-#define CONVOLVER_RESTRICT __restrict__
-#endif
 // Bound both dimensions and total prepared storage before any large allocation.
 constexpr std::size_t max_channels = 256, max_block = 1U << 20, max_samples = 1U << 26;
 constexpr std::size_t max_paths = 4096, max_routes = 4096, max_storage = 1U << 28;
@@ -45,34 +41,6 @@ struct Delay {
 };
 std::size_t delay_at(const std::vector<std::size_t>& delays, std::size_t channel) {
     return delays.empty() ? 0 : delays[channel];
-}
-// Prepared spectra are stored split per partition: bins real parts, then bins
-// imaginary parts. Split storage lets the multiply-accumulate vectorize with plain
-// loads on SSE/AVX and NEON instead of shuffling interleaved complex pairs.
-void deinterleave(const float* CONVOLVER_RESTRICT from, float* CONVOLVER_RESTRICT to,
-                  std::size_t bins, float scale) noexcept {
-    for (std::size_t j = 0; j < bins; ++j) {
-        to[j] = from[2 * j] * scale;
-        to[bins + j] = from[2 * j + 1] * scale;
-    }
-}
-void multiply(float* CONVOLVER_RESTRICT re, float* CONVOLVER_RESTRICT im,
-              const float* CONVOLVER_RESTRICT x, const float* CONVOLVER_RESTRICT h,
-              std::size_t bins) noexcept {
-    const float *xr = x, *xi = x + bins, *hr = h, *hi = h + bins;
-    for (std::size_t j = 0; j < bins; ++j) {
-        re[j] = xr[j] * hr[j] - xi[j] * hi[j];
-        im[j] = xr[j] * hi[j] + xi[j] * hr[j];
-    }
-}
-void multiply_accumulate(float* CONVOLVER_RESTRICT re, float* CONVOLVER_RESTRICT im,
-                         const float* CONVOLVER_RESTRICT x, const float* CONVOLVER_RESTRICT h,
-                         std::size_t bins) noexcept {
-    const float *xr = x, *xi = x + bins, *hr = h, *hi = h + bins;
-    for (std::size_t j = 0; j < bins; ++j) {
-        re[j] += xr[j] * hr[j] - xi[j] * hi[j];
-        im[j] += xr[j] * hi[j] + xi[j] * hr[j];
-    }
 }
 // Shared by validation, tail queries, analysis and Engine construction so the
 // accounting formulas exist once. No FFT planning or spectral allocation here.
@@ -193,6 +161,7 @@ struct Engine::Impl {
     std::vector<Path> paths;
     detail::RealFft fft;
     float *time, *frequency, *sum;
+    const detail::Kernels& k = detail::kernels();
     Impl(const Configuration& c, std::size_t b, const ConfigurationAnalysis& v, FftOptions options)
         : inputs(c.input_channels), outputs(c.output_channels), block(b), tail(v.tail_frames),
           n(detail::fft_size(b)), bins(n / 2 + 1), input_block(inputs * b),
@@ -220,7 +189,7 @@ struct Engine::Impl {
                 const auto count = std::min(b, source.impulse.size() - p * b);
                 std::copy_n(source.impulse.data() + p * b, count, time);
                 fft.forward();
-                deinterleave(frequency, path.filters.data() + p * 2 * bins, bins, normalization);
+                k.deinterleave(frequency, path.filters.data() + p * 2 * bins, bins, normalization);
             }
         }
         for (auto& mix : mixes)
@@ -236,7 +205,7 @@ struct Engine::Impl {
                 for (std::size_t t = 0; t < block; ++t)
                     time[t] += input_block[t * inputs + route.channel] * route.gain;
             fft.forward();
-            deinterleave(frequency, mix.history.data() + mix.head * stride, bins, 1.f);
+            k.deinterleave(frequency, mix.history.data() + mix.head * stride, bins, 1.f);
         }
         // Paths keep their configured order, so output accumulation order is unchanged.
         for (auto& path : paths) {
@@ -244,16 +213,9 @@ struct Engine::Impl {
             // Spectra are in history, so frequency is the split accumulator.
             float* re = frequency;
             float* im = frequency + bins;
-            multiply(re, im, mix.history.data() + mix.head * stride, path.filters.data(), bins);
-            for (std::size_t p = 1; p < path.partitions; ++p) {
-                const auto history = (mix.head + mix.partitions - p) % mix.partitions;
-                multiply_accumulate(re, im, mix.history.data() + history * stride,
-                                    path.filters.data() + p * stride, bins);
-            }
-            for (std::size_t j = 0; j < bins; ++j) {
-                sum[2 * j] = re[j];
-                sum[2 * j + 1] = im[j];
-            }
+            k.accumulate(re, im, mix.history.data(), mix.head, mix.partitions, path.filters.data(),
+                         path.partitions, bins);
+            k.interleave(re, im, sum, bins);
             fft.inverse();
             for (std::size_t t = 0; t < block; ++t) {
                 const float value = time[t] + path.overlap[t];

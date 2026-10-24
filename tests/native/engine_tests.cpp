@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
+#include "kernels.hpp"
 #include "oracle.hpp"
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -365,16 +368,151 @@ void attenuation() {
     rejects([&] { estimate_attenuation(dirac, 0, 0); });
     rejects([&] { estimate_attenuation(Configuration{}); });
 }
+// PERF-4: the AVX2 set uses fused multiply-add (owner's decision, 24 October
+// 2026), so it may round differently from the baseline set, but each set must
+// stay within the standard floating-point error bound of the exact result:
+// |computed - exact| <= (terms + 2) * eps * (sum of |terms|), checked in double
+// over odd lengths (vector remainders) and values with a wide range of exponents.
+// The layout functions do no arithmetic beyond one scaling, so they must still
+// agree bit for bit (signed zeros and NaN payloads included).
+bool same(const std::vector<float>& a, const std::vector<float>& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float p, float q) {
+        return std::bit_cast<std::uint32_t>(p) == std::bit_cast<std::uint32_t>(q);
+    });
+}
+// Exact (double) real and imaginary sums and the sums of absolute terms, per bin.
+struct Exact {
+    std::vector<double> re, im, re_size, im_size;
+    std::size_t terms = 0;
+    explicit Exact(std::size_t bins) : re(bins), im(bins), re_size(bins), im_size(bins) {}
+    void add(const float* x, const float* h, std::size_t bins) {
+        for (std::size_t j = 0; j < bins; ++j) {
+            const double xr = x[j], xi = x[bins + j], hr = h[j], hi = h[bins + j];
+            re[j] += xr * hr - xi * hi;
+            im[j] += xr * hi + xi * hr;
+            re_size[j] += std::abs(xr * hr) + std::abs(xi * hi);
+            im_size[j] += std::abs(xr * hi) + std::abs(xi * hr);
+        }
+        terms += 2;
+    }
+};
+void within_bound(const std::vector<float>& actual, const Exact& e, const char* message) {
+    const auto bins = e.re.size();
+    const double eps = std::numeric_limits<float>::epsilon() / 2, k = double(e.terms + 2) * eps;
+    for (std::size_t j = 0; j < bins; ++j) {
+        // The absolute part covers products that are subnormal in float.
+        const double slack = double(e.terms) * std::numeric_limits<float>::denorm_min();
+        require(std::abs(actual[j] - e.re[j]) <= k * e.re_size[j] + slack &&
+                    std::abs(actual[bins + j] - e.im[j]) <= k * e.im_size[j] + slack,
+                message);
+    }
+}
+void kernels_agree() {
+    const auto& fast = detail::kernels();
+    const auto& base = detail::baseline_kernels();
+    std::mt19937 random(7);
+    std::uniform_real_distribution<float> value(-1, 1);
+    std::uniform_int_distribution<int> exponent(-40, 40);
+    std::size_t fused_differs = 0;
+    for (std::size_t bins : {std::size_t(1), std::size_t(3), std::size_t(7), std::size_t(8),
+                             std::size_t(9), std::size_t(17), std::size_t(33), std::size_t(257),
+                             std::size_t(513), std::size_t(1025)}) {
+        std::vector<float> x(2 * bins), h(2 * bins), interleaved(2 * bins);
+        for (auto* v : {&x, &h, &interleaved})
+            for (auto& f : *v)
+                f = std::ldexp(value(random), exponent(random));
+        std::vector<float> a(2 * bins), b(2 * bins);
+        fast.deinterleave(interleaved.data(), a.data(), bins, 0.37f);
+        base.deinterleave(interleaved.data(), b.data(), bins, 0.37f);
+        require(same(a, b), "deinterleave kernels differ");
+        fast.interleave(x.data(), x.data() + bins, a.data(), bins);
+        base.interleave(x.data(), x.data() + bins, b.data(), bins);
+        require(same(a, b), "interleave kernels differ");
+        Exact exact(bins);
+        exact.add(x.data(), h.data(), bins);
+        fast.multiply(a.data(), a.data() + bins, x.data(), h.data(), bins);
+        base.multiply(b.data(), b.data() + bins, x.data(), h.data(), bins);
+        within_bound(a, exact, "multiply kernel (selected set) outside the error bound");
+        within_bound(b, exact, "multiply kernel (baseline) outside the error bound");
+        for (int repeat = 0; repeat < 8; ++repeat) {
+            fast.multiply_accumulate(a.data(), a.data() + bins, x.data(), h.data(), bins);
+            base.multiply_accumulate(b.data(), b.data() + bins, x.data(), h.data(), bins);
+            exact.add(x.data(), h.data(), bins);
+        }
+        within_bound(a, exact, "multiply-accumulate (selected set) outside the error bound");
+        within_bound(b, exact, "multiply-accumulate (baseline) outside the error bound");
+        fused_differs += same(a, b) ? 0 : 1;
+        // A ring of five spectra, starting at each slot, summed over three partitions.
+        std::vector<float> ring(5 * 2 * bins), filters(3 * 2 * bins);
+        for (auto* v : {&ring, &filters})
+            for (auto& f : *v)
+                f = std::ldexp(value(random), exponent(random));
+        for (std::size_t head = 0; head < 5; ++head) {
+            fast.accumulate(a.data(), a.data() + bins, ring.data(), head, 5, filters.data(), 3,
+                            bins);
+            base.accumulate(b.data(), b.data() + bins, ring.data(), head, 5, filters.data(), 3,
+                            bins);
+            Exact sum(bins);
+            for (std::size_t p = 0; p < 3; ++p)
+                sum.add(ring.data() + ((head + 5 - p) % 5) * 2 * bins,
+                        filters.data() + p * 2 * bins, bins);
+            within_bound(a, sum, "partition accumulation (selected set) outside the error bound");
+            within_bound(b, sum, "partition accumulation (baseline) outside the error bound");
+        }
+    }
+    // The bound must not be vacuous: with FMA some results do differ.
+    if (std::string(fast.name) != base.name)
+        require(fused_differs > 0, "FMA kernels gave the baseline's results bit for bit");
+    // A whole engine with long, shared and cross-routed paths renders within
+    // float rounding of the baseline set (native.kernel_divergence measures
+    // room-correction workloads; the oracle cases above check both sets).
+    Configuration c{48000, 2, 3, 0, {0, 5}, {0, 0, 3}, {}};
+    std::mt19937 fill(11);
+    for (std::size_t p = 0; p < 4; ++p) {
+        FilterPath path;
+        path.impulse.resize(3000 + 517 * p);
+        for (auto& f : path.impulse)
+            f = value(fill) * 0.1f;
+        path.inputs = {{p % 2, 1}, {(p + 1) % 2, 0.25f}};
+        path.outputs = {{p % 3, 0.5f + 0.25f * float(p)}};
+        c.paths.push_back(std::move(path));
+    }
+    std::vector<float> in(2 * 9000);
+    for (auto& f : in)
+        f = value(fill);
+    std::vector<float> outputs[2];
+    for (int pass = 0; pass < 2; ++pass) {
+        detail::force_baseline_kernels(pass == 1);
+        Engine engine(c, 128);
+        outputs[pass] = run(engine, in, 9000 + 128 + tail(c), {128, 77, 300});
+    }
+    detail::force_baseline_kernels(false);
+    float peak = 0, difference = 0;
+    for (std::size_t i = 0; i < outputs[0].size(); ++i) {
+        peak = std::max(peak, std::abs(outputs[1][i]));
+        difference = std::max(difference, std::abs(outputs[0][i] - outputs[1][i]));
+    }
+    require(difference <= 1e-6f * peak, "engine output differs between kernel sets by more "
+                                        "than float rounding");
+}
 } // namespace
 int main() {
     try {
-        cases();
+        // Oracle checks with the kernels this CPU selects, then with the baseline set.
+        const auto* selected = detail::kernels().name;
+        for (bool baseline : {false, true}) {
+            detail::force_baseline_kernels(baseline);
+            cases();
+            shared_input_mixes();
+        }
+        detail::force_baseline_kernels(false);
+        kernels_agree();
         attenuation();
-        shared_input_mixes();
         invalid();
         no_processing_allocation();
-        std::cout << "native engine tests passed (" << fft_backend_name()
-                  << "; worst absolute error against the double oracle " << worst_error << ")\n";
+        std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
+                  << " kernels; worst absolute error against the double oracle " << worst_error
+                  << ")\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

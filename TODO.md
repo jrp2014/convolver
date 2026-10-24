@@ -340,8 +340,8 @@ means a patched FFmpeg build with `--enable-gpl`.
   test takes the plug-in state chunk out of it and restores that through each
   adapter; the project itself is kept for reopening by hand in the host. Later
   builds must load every retained file and reproduce the expected audio after
-  the reported latency: bit-identical when the FFT backend and block size are
-  unchanged, otherwise within the PLUG-2 oracle tolerance (1e-5 absolute). Never regenerate a retained file; a deliberate
+  the reported latency: bit-identical when the FFT backend, block size and
+  kernel set (AVX2+FMA or baseline, PERF-4) are unchanged, otherwise within the PLUG-2 oracle tolerance (1e-5 absolute). Never regenerate a retained file; a deliberate
   incompatibility is an owner's decision recorded beside it. The literal
   version-1 and version-2 state bytes in `native.state` stay as the first
   fixtures. Add the capture step to the
@@ -463,6 +463,10 @@ so the preset file path is not needed).
   65536-tap stereo filter at B = 256 took about 0.6 µs per frame (about 3% of
   one core at 48 kHz) and B = 1024 was about 3.5 times cheaper; a 6×6 matrix of
   16384-tap filters (36 paths) took about 2.9 µs per frame (about 14%).
+  PERF-4 measured compiler flags on x86-64 Linux only; rerun the
+  room-correction cases of `convolver_benchmark` (cases 10 to 18) on Apple
+  Silicon (AppleClang, Accelerate) and Windows (MSVC, Ooura) before choosing
+  flags for those builds.
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** Prototype
   only for a demonstrated long-filter/latency bottleneck. If PERF-3 shows the
   plug-ins need less CPU, first consider letting the user choose a larger block
@@ -550,6 +554,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;
   [loading a filter](docs/use/plugins.md#loading-a-filter), [LV2 tests](docs/develop/testing.md#lv2-tests).
+- [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026,
+  PR #61: run-time AVX2+FMA kernels, with FMA by owner's decision (24 October
+  2026) and a divergence test; [compiler flags and AVX2 kernels](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
