@@ -557,6 +557,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   absolute error came from, so a new, louder test (PERF-5's
   `history_validity`, peak 7.6) no longer looks like a tenfold loss of
   accuracy; [native tests](docs/develop/testing.md#native-production-tests).
+- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
+  an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
+  `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
 - [x] **CI-6 — Keep supporting libraries on their newest releases.** 24
   October 2026, PR #77, by jrp's decision: builds resolve the newest release of
   each SDK, library and tool instead of a pin, and record version, commit and
