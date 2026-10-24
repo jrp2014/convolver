@@ -277,7 +277,7 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/utility_tests.cpp LIBRARIES Convolver::core Threads::Threads)
         if(CONVOLVER_BUILD_IO)
             convolver_native_test(native.io convolver_io_tests
-                SOURCES tests/native/io_tests.cpp LIBRARIES convolver_io SndFile::sndfile)
+                SOURCES tests/native/io_tests.cpp LIBRARIES convolver_io SndFile::sndfile Threads::Threads)
             convolver_native_test(native.config_parse convolver_config_parse_tests
                 SOURCES tests/native/config_parse_tests.cpp LIBRARIES convolver_io)
             convolver_native_test(native.inspection convolver_inspection_tests

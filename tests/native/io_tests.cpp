@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -15,6 +16,7 @@
 #include <sndfile.h>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 #ifndef _WIN32
@@ -954,6 +956,88 @@ void sound_file_header_tests(const fs::path& dir) {
                              "sync.raw", "mpc.raw", "bw.raw", "unknown.raw"})
         fs::remove(dir / name);
 }
+// PERF-6: paths of one configuration that name the same file share one decode.
+// Each path still gets its own channel, errors keep their locations, and the
+// decoded-sample limit charges every reference as before (limits_tests).
+void shared_filter_files(const fs::path& dir) {
+    auto message = [](const fs::path& p) -> std::string {
+        try {
+            load_configuration(p);
+        } catch (const std::exception& e) {
+            return e.what();
+        }
+        throw std::runtime_error("expected configuration rejection");
+    };
+    // Frame f of channel c holds 10 c + f.
+    std::vector<float> three;
+    for (std::size_t f = 0; f < 5; ++f)
+        for (std::size_t c = 0; c < 3; ++c)
+            three.push_back(float(10 * c + f));
+    wave(dir / "three.wav", 48000, 3, three);
+    wave(dir / "other.wav", 48000, 1, {.5f, .25f});
+    // Channel 2 twice (copied, then moved), channel 0 once and channel 1 never.
+    text_file(dir / "shared.cfg", "48000 1 4 0\n0\n0 0 0 0\n"
+                                  "three.wav\n2\n0\n0\n"
+                                  "other.wav\n0\n0\n1\n"
+                                  "three.wav\n0\n0\n2\n"
+                                  "./three.wav\n2\n0\n3\n");
+    const auto shared = load_configuration(dir / "shared.cfg");
+    const std::vector<std::vector<float>> expected{
+        {20, 21, 22, 23, 24}, {.5f, .25f}, {0, 1, 2, 3, 4}, {20, 21, 22, 23, 24}};
+    require(shared.paths.size() == 4, "shared file: path count");
+    for (std::size_t i = 0; i < 4; ++i)
+        require(shared.paths[i].impulse == expected[i], "shared file: each path's channel");
+    // A later path naming a channel the file lacks fails at its own line.
+    text_file(dir / "shared-range.cfg", "48000 1 2 0\n0\n0 0\n"
+                                        "three.wav\n1\n0\n0\n"
+                                        "three.wav\n3\n0\n1\n");
+    const auto range = message(dir / "shared-range.cfg");
+    require(range.find("shared-range.cfg:9:1: filter channel 3 out of range (the IR file has 3 "
+                       "channels") != std::string::npos,
+            "shared file: a later out-of-range channel is located at its path");
+#ifndef _WIN32
+    // A named pipe can be read only once, so it shows whether the loader opens
+    // a file again for each path. Two paths name one pipe, read as a raw filter.
+    const auto pipe = dir / "shared.raw";
+    require(mkfifo(pipe.c_str(), 0600) == 0, "mkfifo");
+    text_file(dir / "shared-pipe.cfg",
+              "48000 2 2 0\n0 0\n0 0\nshared.raw\n0\n0\n0\nshared.raw\n0\n1\n1\n");
+    auto pending =
+        std::async(std::launch::async, [&] { return load_configuration(dir / "shared-pipe.cfg"); });
+    // Write once, as soon as the loader opens the pipe.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    int writer = -1;
+    while (writer < 0 && std::chrono::steady_clock::now() < deadline) {
+        writer = open(pipe.c_str(), O_WRONLY | O_NONBLOCK);
+        if (writer < 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    require(writer >= 0, "shared pipe: the loader never opened it");
+    const std::array<float, 3> taps{.5f, -.25f, .125f};
+    require(write(writer, taps.data(), sizeof taps) == static_cast<ssize_t>(sizeof taps),
+            "shared pipe: write");
+    close(writer);
+    if (pending.wait_for(std::chrono::seconds(20)) != std::future_status::ready) {
+        // The loader opened the pipe again: release it, as often as it reopens,
+        // so the test fails instead of hanging.
+        while (pending.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready) {
+            const int again = open(pipe.c_str(), O_WRONLY | O_NONBLOCK);
+            if (again >= 0)
+                close(again);
+        }
+        require(false, "shared pipe: the loader opened the file once per path");
+    }
+    const auto piped = pending.get();
+    const std::vector<float> want(taps.begin(), taps.end());
+    require(piped.paths.size() == 2 && piped.paths[0].impulse == want &&
+                piped.paths[1].impulse == want,
+            "shared pipe: both paths get the samples");
+    fs::remove(pipe);
+#endif
+    for (const auto* name :
+         {"three.wav", "other.wav", "shared.cfg", "shared-range.cfg", "shared-pipe.cfg"})
+        fs::remove(dir / name);
+}
 void run(const fs::path& dir) {
     container_tests(dir);
     raw_encoding_tests(dir);
@@ -1338,6 +1422,7 @@ int main() {
         run(dir);
         speaker_tests(dir);
         sound_file_header_tests(dir);
+        shared_filter_files(dir);
         fs::remove_all(dir);
         std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {

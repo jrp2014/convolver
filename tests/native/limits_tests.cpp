@@ -239,6 +239,13 @@ void run(const fs::path& dir) {
         const auto report = inspect_configuration(dir / "halves.txt", all);
         require(report.valid && report.configurations.size() == 2,
                 "the decode budget applies per validated entry");
+        // One configuration naming the file twice decodes it once (PERF-6) but
+        // charges both references, so it is still rejected, at the second.
+        text_file(dir / "twice.cfg",
+                  "48000 2 2 0\n0 0\n0 0\nhalf.wav\n0\n0\n0\nhalf.wav\n0\n1\n1\n");
+        require(contains(rejection([&] { load_configuration(dir / "twice.cfg"); }, "twice.cfg"),
+                         "twice.cfg:8:1: decoded impulse data exceeds 64 Mi samples"),
+                "a file named twice is charged twice");
         fs::remove(dir / "half.wav");
     }
     // At most 256 diagnostics, then one truncation marker.
