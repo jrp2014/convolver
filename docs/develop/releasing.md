@@ -13,10 +13,13 @@ cannot publish anything. Publishing a preview is a manual step owned by jrp:
 run the workflow on a tag, check the files against their checksums and attach
 them unchanged to a GitHub pre-release. Production releases stay disabled
 (`production_enabled` is false) until signing, clean installation and
-named-host qualification are done. Nothing has been published yet.
+named-host qualification are done. Nothing has been published yet. After
+publishing, jrp tells the people who already use the `.cfg` format where to
+find it.
 
 Contents: [candidates](#candidates) ·
 [publishing an unsigned preview](#publishing-an-unsigned-preview) ·
+[after publishing](#after-publishing-make-it-findable) ·
 [production gates](#production-gates) ·
 [licences and corresponding source](#licences-and-corresponding-source)
 
@@ -78,6 +81,35 @@ jrp, and has not been done yet:
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
 warns), as jrp decided on 21 October 2026.
+
+## After publishing: make it findable
+
+People who already use the `.cfg` format find Convolver through search, the
+old SourceForge site and the forums where room correction is discussed. After
+each preview is published, jrp does the following; each step needs repository
+settings or jrp's own accounts:
+
+1. In the [README](../../README.md), point a Download line at the latest
+   release. With the first preview, also add build-status, licence and
+   latest-release badges.
+2. Check that the repository description, topics, Website field and
+   [social preview](../../.github/social-preview.html) still list the formats
+   and platforms the project offers; regenerate and upload the image if not.
+3. Add a link to the release to the old [SourceForge project](https://sourceforge.net/projects/convolver/)
+   files, keeping the 4.4 Windows download available for Windows Media Player
+   users. Uploading the packages there instead is redistribution, so the
+   source bundle goes with them ([licences](#licences-and-corresponding-source)).
+4. Update the [KVR Audio listing](https://www.kvraudio.com/product/convolver_by_convolver_sf_net)
+   (formats, platforms, version) and post the release in KVR's news.
+5. For the first preview, and later for a preview that adds a format, post
+   once in each community where `.cfg` users ask questions: Roon
+   Community (DSP), AV Nirvana (REW and Audiolense), JRiver Interact, diyAudio
+   (PC Based), Audio Science Review and Hydrogenaudio.
+6. Once a release includes LV2, propose it to
+   [awesome-linuxaudio](https://gitlab.com/nodiscc/awesome-linuxaudio).
+7. Once CFG-1 has tested Roon, ask Roon to link the repository from its
+   [convolution help page](https://help.roonlabs.com/portal/en/kb/articles/dsp-engine-convolution),
+   which links only to the old site's format pages.
 
 ## Production gates
 
