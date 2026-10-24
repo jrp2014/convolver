@@ -35,6 +35,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: cloud-setup-tests
+        name: Cloud tooling setup tests
+        entry: python tests/cloud_setup_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: documentation-links
         name: Maintained documentation links and anchors
         entry: python scripts/check_doc_links.py

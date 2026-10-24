@@ -42,19 +42,20 @@ install_lint_hook() {
       return 0
     fi
   fi
-  # Upgrade analysis independently of the distribution's compiler/runtime packages.
-  if ! "${venv}/bin/python" -m pip install -q --upgrade clang-format clang-tidy; then
-    echo "Could not update the Clang tools; do not claim latest-tool validation." >&2
-    return 0
-  fi
-  "${venv}/bin/clang-format" --version
-  "${venv}/bin/clang-tidy" --version
-  # Refresh cached hook environments only when the formatter release changes.
-  local formatter_version
-  formatter_version=$("${venv}/bin/clang-format" --version)
-  if [ ! -f "${venv}/formatter-version" ] || [ "$(cat "${venv}/formatter-version")" != "$formatter_version" ]; then
-    "${venv}/bin/pre-commit" clean || return 0
-    printf '%s\n' "$formatter_version" > "${venv}/formatter-version"
+  # Upgrade tools without letting a download failure disable the commit hook.
+  if "${venv}/bin/python" -m pip install -q --upgrade clang-format clang-tidy; then
+    "${venv}/bin/clang-format" --version
+    "${venv}/bin/clang-tidy" --version
+    # Refresh cached hook environments only when the formatter release changes.
+    local formatter_version
+    formatter_version=$("${venv}/bin/clang-format" --version)
+    if [ ! -f "${venv}/formatter-version" ] || [ "$(cat "${venv}/formatter-version")" != "$formatter_version" ]; then
+      if "${venv}/bin/pre-commit" clean; then
+        printf '%s\n' "$formatter_version" > "${venv}/formatter-version"
+      fi
+    fi
+  else
+    echo "Could not update the Clang tools; retaining cached hooks, not latest-tool validation." >&2
   fi
   cd "$(dirname "$0")/../.." || return 0
   if ! "${venv}/bin/pre-commit" install >/dev/null; then
