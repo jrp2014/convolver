@@ -16,6 +16,11 @@
 #endif
 
 namespace convolver::detail {
+#if defined(CONVOLVER_EXPERIMENT_VDSP_MAC)
+namespace vdsp {
+const Kernels& kernel_set() noexcept;
+}
+#endif
 namespace {
 std::atomic<bool> baseline_forced{false};
 }
@@ -54,7 +59,9 @@ const Kernels& baseline_kernels() noexcept {
 const Kernels& kernels() noexcept {
     if (baseline_forced.load(std::memory_order_relaxed))
         return baseline_kernels();
-#if defined(CONVOLVER_USE_AVX2_KERNELS)
+#if defined(CONVOLVER_EXPERIMENT_VDSP_MAC)
+    return vdsp::kernel_set();
+#elif defined(CONVOLVER_USE_AVX2_KERNELS)
     static const Kernels& chosen = cpu_has_avx2_fma() ? avx2::kernel_set() : baseline_kernels();
     return chosen;
 #else

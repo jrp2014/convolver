@@ -61,10 +61,12 @@ int main(int argc, char** argv) {
             std::cout << std::size(cases) << '\n';
             return 0;
         }
-        if (argc != 3)
-            throw std::invalid_argument("usage: convolver_benchmark CASE SECONDS (CASE=0.." +
-                                        std::to_string(std::size(cases) - 1) +
-                                        "), or convolver_benchmark --count");
+        if (argc == 4 && std::string(argv[3]) == "--baseline")
+            convolver::detail::force_baseline_kernels(true);
+        else if (argc != 3)
+            throw std::invalid_argument(
+                "usage: convolver_benchmark CASE SECONDS [--baseline] (CASE=0.." +
+                std::to_string(std::size(cases) - 1) + "), or convolver_benchmark --count");
         const auto index = std::stoul(argv[1]);
         const auto seconds = std::stod(argv[2]);
         if (index >= std::size(cases) || !std::isfinite(seconds) || seconds <= 0 || seconds > 60)
