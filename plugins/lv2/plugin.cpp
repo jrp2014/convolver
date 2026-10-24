@@ -576,6 +576,8 @@ void read_messages(Instance& p) {
         return;
     const auto& u = p.uris;
     LV2_ATOM_SEQUENCE_FOREACH(p.control_in, event) {
+        // LV2 events follow the fixed sequence body in the host's variable-sized buffer.
+        // NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
         if (!lv2_atom_forge_is_object_type(&p.forge, event->body.type))
             continue;
         const auto* object = reinterpret_cast<const LV2_Atom_Object*>(&event->body);
