@@ -157,12 +157,12 @@ format.
   the previous filter plays, as LV2's status port does. Before the host's
   configuration is known it is Not checked yet and names the filter's rate
   and channels. The parameter is not automatable and is not part of the host
-  state. VST3: parameter ID 1, a list parameter with `kIsReadOnly`; the
+  state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the
   processor sends the line to the controller in a `ConvolverStatus` message
   after every load, activation, connection, `setupProcessing` and
   `setBusArrangements` (outside its control lock), and the controller asks the
   host to reread its parameters (`restartComponent(kParamValuesChanged)`;
-  hosts may ignore it). Audio Unit: global parameter 0, indexed, readable
+  hosts may ignore it). Audio Unit: global parameter 1001, indexed, readable
   and not writable; the line is the current value's
   `kAudioUnitProperty_ParameterStringFromValue`, recomputed after every
   restore, initialization, cleanup and stream format change, and a

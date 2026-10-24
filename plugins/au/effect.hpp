@@ -21,7 +21,8 @@ inline constexpr UInt32 max_channels = identity::max_channels;
 // value reads (kAudioUnitProperty_ParameterStringFromValue) as the unit's
 // HostStatusLine. AUBase::SaveState writes its value with the other
 // parameters, but RestoreState ignores parameter data, so it never comes back.
-inline constexpr AudioUnitParameterID status_parameter = 0;
+// Its ID comes from plugins/identities.json; never change it.
+inline constexpr AudioUnitParameterID status_parameter = identity::au_status_parameter_id;
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which

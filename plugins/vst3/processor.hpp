@@ -22,11 +22,12 @@ inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0]
                                            identity::vst3_controller_class_id[1],
                                            identity::vst3_controller_class_id[2],
                                            identity::vst3_controller_class_id[3]);
-inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
+// Parameter IDs from plugins/identities.json; never change them.
+inline constexpr Steinberg::Vst::ParamID bypass_id = identity::vst3_bypass_parameter_id;
 // DIAG-1: read-only, never automated or saved. Its value is a HostStatus and
 // its text the instance's HostStatusLine, which the processor sends to the
 // controller in a status_message whenever it may have changed.
-inline constexpr Steinberg::Vst::ParamID status_id = 1;
+inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_parameter_id;
 inline constexpr const char* status_message = "ConvolverStatus";
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
 inline constexpr int min_bus_channels = identity::min_channels;
