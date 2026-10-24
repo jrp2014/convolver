@@ -108,7 +108,7 @@ AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
 unless the file starts with a sound-file header (a WAV named `.pcm` is still
 read as WAV). A raw filter is a headerless file of mono samples. Convolver reads
-it as little-endian 32-bit float (`f32le`; owner's decision, 24 October 2026), the type
+it as little-endian 32-bit float (`f32le`), the type
 [DRC](https://drc-fir.sourceforge.net/) and BruteFIR write by default, and says
 so: rendering prints a line such as
 `convolver: raw filter 'left.pcm' read as mono f32le at 48000 Hz`, and
