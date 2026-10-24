@@ -877,6 +877,83 @@ void raw_encoding_tests(const fs::path& dir) {
     fs::remove(p);
     fs::remove(dir / "header.wav");
 }
+// libsndfile, not a list of signatures, decides what counts as a sound-file
+// header, so a .pcm or .raw filter that has one is still read through it.
+void sound_file_header_tests(const fs::path& dir) {
+    const auto bytes = [&](const char* name, const std::vector<unsigned char>& b) {
+        std::ofstream f(dir / name, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(b.data()), static_cast<std::streamsize>(b.size()));
+        return dir / name;
+    };
+    for (const auto container :
+         {Container::wav, Container::rf64, Container::w64, Container::aiff, Container::caf}) {
+        const auto p = dir / "headered.raw";
+        {
+            AudioWriter w(p, {48000, 1}, OutputEncoding{container, SampleType::pcm16});
+            w.write(std::vector<float>{.5f, .25f});
+            w.close();
+        }
+        require(sound_file_header(p), "every container Convolver writes has a header");
+        fs::remove(p);
+    }
+    // Sun/NeXT AU: big-endian header (magic, offset, size, float32, rate, mono).
+    const auto au =
+        bytes("sun.pcm", {'.', 's', 'n', 'd', 0,    0,    0, 24, 0, 0, 0,    4,    0, 0,
+                          0,   6,   0,   0,   0xac, 0x44, 0, 0,  0, 1, 0x3f, 0x80, 0, 0});
+    require(sound_file_header(au), "an AU file has a header libsndfile recognises");
+    // A recognised header that libsndfile cannot read still counts: it is
+    // reported as a damaged sound file, not read as samples.
+    require(
+        sound_file_header(bytes("zero-channels.raw", {'.', 's', 'n', 'd', 0, 0, 0, 0, 0, 0, 0, 0})),
+        "a damaged AU header still counts as a header");
+    require(!sound_file_header(bytes("drc.raw", {0, 0, 0, 0x3f, 0, 0, 0x80, 0x3e})),
+            "float samples have no header");
+    require(!sound_file_header(bytes("short.raw", {0, 0, 0x80})), "a 3-byte file has no header");
+    require(!sound_file_header(bytes("silence.raw", std::vector<unsigned char>(64))),
+            "zero samples have no header");
+    // Realistic raw filters (4096 small f32le samples) whose first sample
+    // happens to start like a weak libsndfile signature. libsndfile itself
+    // would claim both: the MPEG one fails to open, the MPC 2000 one opens.
+    const auto filter = [&](const char* name, std::array<unsigned char, 4> first) {
+        std::vector<unsigned char> b(first.begin(), first.end());
+        std::uint32_t state = 12345;
+        for (int i = 1; i < 4096; ++i) {
+            state = state * 1664525u + 1013904223u;
+            const float v = static_cast<float>(static_cast<std::int32_t>(state)) * 1e-12f;
+            const auto word = std::bit_cast<std::uint32_t>(v);
+            for (int k = 0; k < 4; ++k)
+                b.push_back(static_cast<unsigned char>(word >> (8 * k)));
+        }
+        return bytes(name, b);
+    };
+    // f32le 1159.875 is FF FB 90 44, a bare MPEG frame sync.
+    require(!sound_file_header(filter("sync.raw", {0xff, 0xfb, 0x90, 0x44})),
+            "a bare MPEG frame sync is not a header");
+    // f32le 1.0001222 is 01 04 80 3F, libsndfile's two-byte MPC 2000 marker.
+    require(!sound_file_header(filter("mpc.raw", {0x01, 0x04, 0x80, 0x3f})),
+            "an MPC 2000 marker is not a header");
+    // Markers libsndfile does not report: BW64, and an AU encoding it lacks.
+    require(sound_file_header(
+                bytes("bw.raw", {'B', 'W', '6', '4', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 0, 0, 0, 0})),
+            "a BW64 marker is a header");
+    require(sound_file_header(
+                bytes("unknown.raw", {'.', 's', 'n', 'd', 0,    0,    0, 24, 0, 0, 0, 4, 0, 0,
+                                      0,   99,  0,   0,   0xac, 0x44, 0, 0,  0, 1, 0, 0, 0, 0})),
+            "an AU in an encoding libsndfile lacks is a header");
+    require(!sound_file_header(dir / "absent.raw") && !sound_file_header(dir) &&
+                !sound_file_header("-"),
+            "only existing regular files are examined");
+#ifndef _WIN32
+    // A named pipe is never opened: opening it would block until a writer came.
+    const auto pipe = dir / "pipe.raw";
+    require(mkfifo(pipe.c_str(), 0600) == 0, "mkfifo");
+    require(!sound_file_header(pipe), "a named pipe is not examined");
+    fs::remove(pipe);
+#endif
+    for (const auto* name : {"sun.pcm", "zero-channels.raw", "drc.raw", "short.raw", "silence.raw",
+                             "sync.raw", "mpc.raw", "bw.raw", "unknown.raw"})
+        fs::remove(dir / name);
+}
 void run(const fs::path& dir) {
     container_tests(dir);
     raw_encoding_tests(dir);
@@ -1260,6 +1337,7 @@ int main() {
         fs::create_directory(dir);
         run(dir);
         speaker_tests(dir);
+        sound_file_header_tests(dir);
         fs::remove_all(dir);
         std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {

@@ -151,10 +151,13 @@ struct DecodedIr {
     std::size_t frames = 0;
     std::optional<RawEncoding> raw; // Present when read as a headerless raw filter.
 };
-// A filter whose name ends in .pcm or .raw (any case) is a headerless mono
-// file at the configuration's sample rate (little-endian float32 by default,
-// as DRC and BruteFIR write them), unless it starts with a sound-file header (a WAV named
-// .pcm still reads as WAV). A missing file counts as raw.
+// Whether a filter's name ends in .pcm or .raw (any case). Looks at the name only.
+bool raw_filter_name(const std::filesystem::path&);
+// A filter with such a name is a headerless mono file at the configuration's
+// sample rate (little-endian float32 by default, as DRC and BruteFIR write
+// them), unless libsndfile recognises its content as a sound file
+// (sound_file_header: a WAV or AU named .pcm still reads through its header).
+// Opens regular files to decide; a missing file or a named pipe counts as raw.
 bool raw_filter(const std::filesystem::path& resolved);
 // Decode every path's selected IR channel into cfg (from configuration_graph).
 // budget counts decoded samples across one resolution operation.

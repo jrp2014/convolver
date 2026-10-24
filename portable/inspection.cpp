@@ -352,16 +352,34 @@ class Inspector {
         for (const auto& ref : refs)
             for (auto& [code, message] : portability_problems(doc.source, ref.spelling))
                 add({code, DiagnosticSeverity::warning, message, position(ref.location), chain(c)});
-        if (doc.kind == ParsedDocument::Kind::configuration)
-            for (const auto& p : doc.configuration.paths)
-                if (raw_filter_reference(doc.source, p.ir))
-                    add({"raw-filter", DiagnosticSeverity::warning,
-                         "'" + p.ir.spelling + "' is a raw filter; Convolver reads it as mono " +
-                             raw_encoding_name(options_.raw_filter_encoding) +
-                             ", but other "
-                             "programs that read .cfg files expect sound files such as WAV",
-                         position(p.ir.location), chain(c)});
+        if (doc.kind != ParsedDocument::Kind::configuration)
+            return;
+        const auto encoding = raw_encoding_name(options_.raw_filter_encoding);
+        const std::string others =
+            "other programs that read .cfg files expect sound files such as WAV";
+        for (const auto& p : doc.configuration.paths) {
+            std::string message;
+            // Syntax-only inspection opens no filter, so the name is all it has.
+            if (options_.syntax_only) {
+                if (detail::raw_filter_name(lexical_reference(p.ir.spelling)))
+                    message = "'" + p.ir.spelling +
+                              "' is named like a raw filter (.pcm or .raw); if it has no "
+                              "sound-file header, Convolver reads it as mono " +
+                              encoding + ", but " + others +
+                              " (--syntax-only did not open it to check)";
+            } else if (raw_filter_reference(doc.source, p.ir))
+                message = "'" + p.ir.spelling + "' is a raw filter; Convolver reads it as mono " +
+                          encoding + ", but " + others;
+            if (!message.empty())
+                add({"raw-filter", DiagnosticSeverity::warning, message, position(p.ir.location),
+                     chain(c)});
+        }
     }
+    static std::filesystem::path lexical_reference(std::string spelling) {
+        std::replace(spelling.begin(), spelling.end(), '\\', '/');
+        return std::filesystem::path(std::u8string(spelling.begin(), spelling.end()));
+    }
+    // Opens the file to look for a sound-file header: not for syntax-only use.
     static bool raw_filter_reference(const std::filesystem::path& owner,
                                      const detail::ParsedReference& ref) {
         try {
@@ -371,7 +389,7 @@ class Inspector {
         }
     }
     std::vector<std::pair<std::string, std::string>>
-    portability_problems(const std::filesystem::path& owner, std::string spelling) const {
+    portability_problems(const std::filesystem::path& owner, const std::string& spelling) const {
         std::vector<std::pair<std::string, std::string>> found;
         const auto quoted = "'" + spelling + "'";
         for (const char bad : std::string_view("<>\"|?*"))
@@ -380,8 +398,7 @@ class Inspector {
                                    quoted + " contains a character Windows filenames cannot use");
                 break;
             }
-        std::replace(spelling.begin(), spelling.end(), '\\', '/');
-        const auto lexical = std::filesystem::path(std::u8string(spelling.begin(), spelling.end()));
+        const auto lexical = lexical_reference(spelling);
         if (lexical.has_root_name() || lexical.has_root_directory()) {
             found.emplace_back("absolute-reference",
                                quoted + " is an absolute path, which only resolves on this "
