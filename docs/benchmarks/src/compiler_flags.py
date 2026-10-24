@@ -13,8 +13,9 @@ repository root (about 30 minutes for the default variants and five rounds):
 
 Pin the benchmark to one core where the system allows it (--cpu 2 uses taskset
 on Linux). Nothing else should run meanwhile. Add a variant with
---variant 'NAME=FLAGS', followed by |lto for link-time optimisation and
-|baseline to build without the AVX2 kernels, for example
+--variant 'NAME=FLAGS', followed by |lto for link-time optimisation,
+|baseline to build without the AVX2 kernels and |source=DIR to build another
+source tree (an earlier commit from `git archive`, say), for example
 --variant 'O3-baseline=-O3 -DNDEBUG|baseline'.
 """
 import argparse
@@ -38,7 +39,8 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[3])
 parser.add_argument('--compiler', default='c++')
 parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE'])
-parser.add_argument('--variant', action='append', help='NAME=FLAGS[|lto][|baseline]; replaces the defaults')
+parser.add_argument('--variant', action='append',
+                    help='NAME=FLAGS[|lto][|baseline][|source=DIR]; replaces the defaults')
 parser.add_argument('--no-avx2-kernels', action='store_true', help='configure with CONVOLVER_AVX2_KERNELS=OFF')
 parser.add_argument('--cases', default='10,11,12,13,14,15,16,17,18')
 parser.add_argument('--rounds', type=int, default=5)
@@ -54,12 +56,16 @@ binaries = {}
 for spec in args.variant or DEFAULT_VARIANTS:
     name, _, rest = spec.partition('=')
     flags, *extras = rest.split('|')
+    source = args.source
+    for extra in [e for e in extras if e.startswith('source=')]:
+        source = Path(extra.partition('=')[2]).resolve()
+        extras.remove(extra)
     unknown = set(extras) - {'lto', 'baseline'}
     if unknown:
         parser.error(f'unknown variant option {sorted(unknown)[0]} in {spec}')
     avx2 = not (args.no_avx2_kernels or 'baseline' in extras)
     build = args.work / name
-    subprocess.run(['cmake', '-S', str(args.source), '-B', str(build), '-DCMAKE_BUILD_TYPE=Release',
+    subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-DCMAKE_BUILD_TYPE=Release',
                     '-DCMAKE_CXX_COMPILER=' + args.compiler, '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
                     '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
                     '-DCONVOLVER_FFT_BACKEND=' + args.backend, '-DCONVOLVER_BUILD_IO=OFF',
