@@ -506,10 +506,6 @@ so the preset file path is not needed).
   and analysis pins with the latest stable packaged releases. Refresh CI caches
   when the formatter release changes, keep local and cloud instructions aligned,
   and validate formatting and analysis in CI. Local installation is deferred.
-- [ ] **CI-5 — No actions on a deprecated Node.js.** GitHub forces Node 20
-  actions onto Node 24 with a warning: `ilammy/msvc-dev-cmd` (release
-  candidates) and `hendrikmuhs/ccache-action@v1`. Replace or move each to a
-  release for the current Node.js and confirm the warnings are gone in CI.
 
 ## Documented limitations
 
@@ -555,6 +551,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   LV2 sanitizer stages as parallel jobs building only their targets,
   one CTest entry per package consumer, a parallel offline rebuild, ccache on
   Linux and macOS, and each kind of test run only where it can change; [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
+- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
+  an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
+  `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
