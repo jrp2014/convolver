@@ -281,6 +281,9 @@ jobs:
         continue-on-error: true
         run: |
           prefix="$RUNNER_TEMP/upstream-prefix"
+          # Each library is found by the ones built after it, and by Convolver.
+          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          export LD_LIBRARY_PATH="$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           for name in lv2 zix serd sord sratom lilv; do
             source=$(sed -n "s/^$name=//p" "$RUNNER_TEMP/upstream.env")
             options=(-Ddocs=disabled -Dtests=disabled)
@@ -289,8 +292,8 @@ jobs:
               --buildtype=release "${options[@]}"
             ninja -C "$RUNNER_TEMP/upstream-build/$name" install
           done
-          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$prefix/lib" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
       - name: Convolver's LV2 tests against them
         id: tests
         if: steps.libraries.outcome == 'success'
