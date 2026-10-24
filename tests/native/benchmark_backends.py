@@ -17,9 +17,10 @@ parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
 if args.rounds < 3 or args.seconds <= 0:
     parser.error('use at least three rounds and positive duration')
+count = int(subprocess.run([str(args.fftw.resolve()), '--count'], capture_output=True, text=True, check=True).stdout)
 rows = []
 for repeat in range(args.rounds):
-    for case in range(10):
+    for case in range(count):
         binaries = [args.fftw.resolve(), args.other.resolve()]
         if (repeat+case) % 2:
             binaries.reverse()
