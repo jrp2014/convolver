@@ -147,6 +147,10 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   CLAP only on request: every CLAP host found also loads VST3. A filter-loading
   editor only for an identified need, then for all formats at once. Write
   adapters against the formats' own headers, not a framework.
+  Progress (24 October 2026): jrp asked for an editor window, "not least for
+  debugging"; the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md) proposes native views over shared
+  report code, in phases PLUG-9, VST3-3, VST3-11 to VST3-13, AU-6 and LV2-6,
+  with decisions for jrp.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -250,6 +254,16 @@ Shared work, done once for all three formats:
   packages, and the VST Compatible logo where they require it
   ([VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)); jrp
   to approve the wording.
+- [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
+  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
+  report value in `Convolver::host` built on the control side (status, full
+  failure, notice and fault messages with request numbers, host and filter
+  details, latency and tail, FFT backend and kernels, log path and state),
+  `report_fields()` for each format's transport and `report_text()` for the
+  window and Copy diagnostics, worded like the log; and the preset tool's
+  file-to-state step as a shared function, so a load from the window gives
+  state byte-identical to `convolver-preset`'s. Table-driven tests per
+  failure kind in `native.host`; the contract change in its own pull request.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -268,6 +282,12 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases.
+- [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
+  need: generic UIs already offer the `filter` file chooser and the status
+  port. The report as `patch:Set` atoms on the notify port, prepared in
+  `work()` and written allocation-free by `run()` (new property URIs for jrp
+  to name), then an LV2 UI reusing the macOS and Windows views
+  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
@@ -288,6 +308,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
+- [ ] **AU-6 — Editor window.** Custom properties (IDs from 64000) for the
+  PLUG-9 report and a load request, with property-change events and a
+  `ClassInfo` change after a load; then a Cocoa view factory
+  (`kAudioUnitProperty_CocoaUI`) over the VST3-11 view, with class names that
+  carry the version; `auval` lists the view; GarageBand smoke steps, including
+  a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
 
 ## FFmpeg integration
 
@@ -408,13 +434,16 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   parameter), for example the entries of a configuration list, possibly chosen
   automatically by host rate and layout. Hosts can then switch filters in generic
   UIs and automation. Changes reuse the existing crossfading replacement.
-- [ ] **VST3-3 — Editor and controller-processor messaging.** A filter-loading
-  editor (HOST-2) needs `IPlugView` (VSTGUI 4.15 or native), content scaling
-  (`IPlugViewContentScaleSupport`), Linux X11/Wayland (preview in 3.8), and
-  `IConnectionPoint`/`IMessage` to pass a chosen file or prepared filter to the
-  processor off the audio thread. `IDataExchangeHandler` could feed meters.
-  Plug-in snapshots for host browsers (`smtg_target_add_plugin_snapshots`)
-  need an editor first.
+- [ ] **VST3-3 — Editor messaging between controller and processor.** Phase 1
+  of the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), with no
+  window yet: the processor sends the PLUG-9 report with the Status line, the
+  controller keeps a copy for a view; a `ConvolverLoad` message carries a
+  chosen path to the processor, which loads it as `setState` does
+  (`HostFilterSource::file`) and the controller calls `setDirty`; Bypass edits
+  go through the controller. Headless tests in `vst3.adapter` and
+  `vst3.lifecycle`. `IDataExchangeHandler` could feed meters later. Plug-in
+  snapshots for host browsers (`smtg_target_add_plugin_snapshots`) need the
+  window first.
 - [ ] **VST3-4 — Mix, gain and low-latency parameters.** Consider dry/wet and
   output-gain parameters, tagged with `IParameterFunctionName` (`kDryWetMix`) so
   hosts can find them. A `kLowLatencyMode` switch only makes sense if PERF-2
@@ -434,6 +463,20 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   a failed plug-in. Accept any finite rate in range and play silence with the
   reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
   small tolerance counts as a match.
+- [ ] **VST3-11 — Editor window on macOS.** An AppKit view behind `IPlugView`
+  (`kPlatformTypeNSView`), shared later with AU-6: status and full messages,
+  active configuration, choose and reload a filter, copy diagnostics, show the
+  log, bypass. Opened in CI by `editorhost` and pluginval's GUI tests, with an
+  accessibility test of names, roles and text; smoke steps in REAPER and
+  Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)). Waits for jrp's framework
+  choice.
+- [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
+  (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
+  navigation; checked with NVDA or Narrator.
+- [ ] **VST3-13 — Editor window on Linux.** Decide first between a small X11
+  view (xcb and cairo, through the host's `IRunLoop`), VSTGUI for Linux only,
+  or no Linux window (LV2's generic UIs and the Status parameter cover it),
+  using HOST-1 evidence ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
