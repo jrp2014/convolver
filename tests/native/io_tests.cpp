@@ -1310,11 +1310,11 @@ void run(const fs::path& dir) {
         w.write(x);
         const int readonly = open(p.c_str(), O_RDONLY);
         require(readonly >= 0, "open close-error fixture");
-        struct stat target {};
+        struct stat target{};
         require(fstat(readonly, &target) == 0, "stat close-error fixture");
         int writer_fd = -1;
         for (int fd = 3; fd < 256; ++fd) {
-            struct stat candidate {};
+            struct stat candidate{};
             const int flags = fcntl(fd, F_GETFL);
             if (fd != readonly && flags >= 0 && (flags & O_ACCMODE) != O_RDONLY &&
                 fstat(fd, &candidate) == 0 && candidate.st_dev == target.st_dev &&

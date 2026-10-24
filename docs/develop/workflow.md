@@ -248,8 +248,8 @@ is used but never defined.
   [how the plug-ins behave](../use/plugins.md).
 
 `scripts/check_format.py` finds the C++ sources to format, so a new adapter
-folder is covered without editing a file list. pre-commit runs it with a pinned
-clang-format 18 and lint CI fails on any formatting difference, so run
+folder is covered without editing a file list. pre-commit runs it with the latest stable packaged
+clang-format and lint CI fails on any formatting difference, so run
 `pre-commit run --all-files` before every push, not only before review. Extend these checks, with a
 regression test in `tests/repository_checks_tests.py`, when a new rule should
 hold everywhere.

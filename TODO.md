@@ -488,6 +488,13 @@ so the preset file path is not needed).
   and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
   benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
 
+## Developer tooling
+
+- [ ] **CI-3 — Latest stable Clang tools.** Replace the version-18 formatting
+  and analysis pins with the latest stable packaged releases. Refresh CI caches
+  when the formatter release changes, keep local and cloud instructions aligned,
+  and validate formatting and analysis in CI. Local installation is deferred.
+
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate

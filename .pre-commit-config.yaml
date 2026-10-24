@@ -21,14 +21,26 @@ repos:
   - repo: local
     hooks:
       - id: clang-format
-        name: C++ formatting (clang-format 18, reformats in place)
+        name: C++ formatting (latest stable clang-format, reformats in place)
         entry: python scripts/check_format.py --fix
         language: python
         additional_dependencies:
-          - clang-format==18.1.8
+          - clang-format
         pass_filenames: false
         files: >-
           (\.(h|hpp|cpp|mm)|^\.clang-format(-ignore)?|^scripts/check_format\.(py|sh)|^\.pre-commit-config\.yaml)$
+      - id: format-tool-tests
+        name: Stable formatter discovery tests
+        entry: python tests/format_tools_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: cloud-setup-tests
+        name: Cloud tooling setup tests
+        entry: python tests/cloud_setup_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: documentation-links
         name: Maintained documentation links and anchors
         entry: python scripts/check_doc_links.py

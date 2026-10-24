@@ -62,7 +62,8 @@ ctest --test-dir build --output-on-failure --parallel 4
 The default build needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and
 libsndfile. Accelerate (Apple only) or built-in Ooura can replace FFTW; see
 [backend selection](docs/develop/fft-backends.md). On Ubuntu:
-`apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev clang-format-18 clang-tidy-18`.
+`apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev`.
+Install the latest stable packaged Clang tools as in `CONTRIBUTING.md`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
 CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg),
 plus Ooura configurations described in [testing](docs/develop/testing.md).
@@ -73,7 +74,7 @@ plus Ooura configurations described in [testing](docs/develop/testing.md).
   `historical/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
 - Run `pre-commit run --all-files` before **every** push, draft commits
-  included. It formats the portable C++ with clang-format 18 (also
+  included. It formats the portable C++ with the latest stable clang-format (also
   `python3 scripts/check_format.py --fix`) and runs the other lint checks;
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
   Portable sources must also pass the `.clang-tidy` checks (commands in

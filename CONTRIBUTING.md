@@ -22,37 +22,51 @@ routing and file-protection behavior unless the change explicitly revises them.
 
 ## Formatting and analysis
 
-The portable code uses `.clang-format` with LLVM clang-format **18**. Formatting
-is part of the [lint checks](#lint-checks): `pre-commit run` reformats C++ files
-in place with a pinned clang-format 18, and the lint CI job fails if that
-changes anything. `scripts/check_format.py` finds the modern C++ sources by
-location (`include/`, `portable/`, `plugins/`, `tests/`), so new adapters and
-test folders are covered automatically. It skips vendored code and the
-regression harnesses:
+Use the **latest stable packaged releases** of clang-format and clang-tidy
+(owner's decision, 24 October 2026). Development builds and release candidates
+are not the default. The standalone packages on
+[PyPI](https://pypi.org/project/clang-format/) avoid requiring a complete LLVM
+installation. A package can lag an upstream LLVM patch release; use the newest
+stable package available and report its version.
+
+The `.clang-format` file defines the style. The pre-commit hook installs the
+latest stable formatter when its environment is created and reformats portable
+C++ in place. CI resolves the current stable package before restoring its cache,
+so a new release gets a new environment. Refresh a local hook environment when
+updating the tools:
 
 ```sh
-pre-commit run clang-format --all-files   # reformat, with the pinned version
-python3 scripts/check_format.py           # check only
-python3 scripts/check_format.py --fix     # reformat in place
+pre-commit clean
+pre-commit run clang-format --all-files
 ```
 
-Run one of these before every push, including early draft commits.
-`scripts/check_format.sh` still works and runs the same script. The checker
-uses `CLANG_FORMAT` if set; otherwise the clang-format installed beside its
-Python (pre-commit's pinned 18.1.8), then `clang-format-18`, then
-`clang-format`, taking the first that reports version 18. It stops with
-installation advice if none does, because other major versions lay out the same
-code differently. macOS has no `clang-format-18` by default; use the pre-commit
-command, or `python3 -m pip install clang-format==18.1.8` in the lint
-environment below. `--fix` exits with status 1 when it changed a file.
-Historical directories are also excluded by `.clang-format-ignore`. Formatting
-changes should be distinguishable from behavior changes in review.
+Run `pre-commit run --all-files` before every push. A formatter update can change
+layout; commit mechanical reformatting separately from behaviour changes.
+Historical and vendored sources remain excluded. CI uploads a `lint-fixes`
+patch when lint leaves changes, so formatting can also be reviewed and applied
+without installing Clang locally.
+
+For manual checks, install or upgrade the standalone tools in the lint
+virtual environment below, then activate it:
+
+```sh
+python -m pip install --upgrade clang-format clang-tidy
+clang-format --version
+clang-tidy --version
+python scripts/check_format.py
+```
+
+The checker honours `CLANG_FORMAT` when set. Otherwise it uses the formatter
+beside its Python interpreter (the pre-commit environment), then `clang-format`
+on PATH. It rejects development-version suffixes and prints the selected version;
+it does not install software or query the network. Installation and CI choose
+the latest release, rather than a hard-coded major-version test in the checker.
 
 Presets export `compile_commands.json`. Run the correctness-oriented checks in
 `.clang-tidy` against the translation units present in that build:
 
 ```sh
-clang-tidy-18 -p build/presets/release portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/state.cpp portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp
+clang-tidy -p build/presets/release portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/state.cpp portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp
 ```
 
 Replace `fft_fftw.cpp` with `fft_accelerate.cpp` or `fft_ooura.cpp` for the
@@ -60,9 +74,26 @@ corresponding backend. In a build with `-DCONVOLVER_BUILD_LV2=ON`, add
 `plugins/lv2/plugin.cpp` (the [LV2 workflow](.github/workflows/lv2.yml) checks
 it). Match
 the analyzer to the compiler/SDK headers: older analyzers may not parse newer
-Apple SDKs. CI uses the Linux clang-tidy 18 toolchain. Fix real diagnostics rather
-than adding blanket suppressions. These tools are development dependencies;
+Apple SDKs. CI upgrades the standalone clang-tidy package before each analysis
+run and prints its version. Fix real diagnostics rather than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
+
+### When a new Clang release turns CI red
+
+Because the tools are not pinned, a new release can fail CI on code that
+nobody changed. That is accepted (owner's decision, 24 October 2026); handle
+it by which tool failed:
+
+- **clang-format** changes layout only, never behaviour. Apply the
+  `lint-fixes` patch from the failed Lint run, or run `pre-commit clean` and
+  `pre-commit run clang-format --all-files`, and commit the result on its own
+  as `style: apply clang-format X.Y.Z layout`. Do not change `.clang-format`
+  to keep the old layout unless jrp asks.
+- **clang-tidy** adds or sharpens checks, and `.clang-tidy` treats every
+  warning as an error, so a new failure usually points at real code. Fix the
+  code in its own commit and say what the diagnostic found. If a diagnostic is
+  a false positive, suppress that one line with `// NOLINT(check-name)` and a
+  reason; do not turn the check off.
 
 ## Lint checks
 
@@ -80,14 +111,16 @@ On Windows, create the environment with `py -3.12 -m venv .venv-lint` and
 activate it in PowerShell with `.venv-lint\Scripts\Activate.ps1`, then run the
 same pip and pre-commit commands. Run `pre-commit install` once so the checks,
 formatting included, run on staged files before each commit. The first run
-downloads the pinned tools; subsequent runs reuse their isolated environments.
+downloads the tools; subsequent runs reuse their isolated environments.
+Refresh the formatter environment as described above when upgrading.
 
-The configuration runs clang-format 18 on the portable C++ sources (see
+The configuration runs the latest stable packaged clang-format on the portable C++ sources (see
 [formatting](#formatting-and-analysis)), ShellCheck, markdownlint-cli2, strict
 yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
 workflows. Hooks that fix files, such as clang-format, report "files were
 modified by this hook"; review and stage the changes, then run again. Claude
-Code cloud sessions install the Git hook automatically
+Code cloud sessions update their Clang tools in `~/.cache/convolver-lint/bin/`,
+refresh the formatter hook environment and install the Git hook automatically
 (`.claude/hooks/session-start.sh`), so their commits run these checks.
 Historical source, recovered documentation and archived review evidence are
 excluded. Markdown allows soft-wrapped prose and repeated subheadings under
@@ -142,7 +175,7 @@ To verify caching, compare two successful runs of the same workflow revision:
 the first should save a cache and the next should restore it. For vcpkg, also check
 the install log for restored packages rather than relying only on the Actions
 cache hit. Branch caches are scoped by GitHub, so the first run on `main` may be
-cold after testing a feature branch. Bump the `v1` key prefix to discard a cache
+cold after testing a feature branch. Bump a cache key prefix to discard a cache
 generation if needed; an unavailable cache must only affect build time.
 
 ## Scope and versions

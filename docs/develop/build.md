@@ -49,7 +49,10 @@ Contents: [choose a build](#choose-a-build) ·
 | Windows | vcpkg; see [Windows](#windows) |
 
 Contributors on Ubuntu also need the tools the checks use:
-`sudo apt-get install libclang-rt-18-dev clang-format-18 clang-tidy-18`.
+`sudo apt-get install libclang-rt-18-dev` for the default Clang 18 compiler.
+Match the runtime package to your compiler if it differs. Install the latest
+stable formatting and analysis tools using the
+[contributor instructions](../../CONTRIBUTING.md#formatting-and-analysis).
 Claude Code cloud sessions install all of these through
 `.claude/hooks/session-start.sh`; add any new build or test dependency there
 and to the CI workflow in the same pull request.
