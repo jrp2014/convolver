@@ -69,9 +69,6 @@ int log_vprintf(LV2_Log_Handle handle, LV2_URID type, const char* format, va_lis
     auto& log = *static_cast<Log*>(handle);
     // Convolver's messages are a few hundred bytes; longer ones are cut.
     std::array<char, 8192> text{};
-    // The analyzer cannot see that the caller started `args` (it is a
-    // parameter, as in vprintf itself): a known false positive.
-    // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
     const int length = std::vsnprintf(text.data(), text.size(), format, args);
     const char* name = log.urids ? log.urids->unmap(type) : nullptr;
     log.messages.push_back({name ? name : "", text.data()});
@@ -387,7 +384,19 @@ void Plugin::read_notifications() {
     const auto* sequence = reinterpret_cast<const LV2_Atom_Sequence*>(notify_.data());
     if (sequence->atom.type != u.map(LV2_ATOM__Sequence))
         throw std::runtime_error("the notify port does not hold a sequence after run()");
-    LV2_ATOM_SEQUENCE_FOREACH(sequence, event) {
+    // Walk the events by byte offset rather than with LV2_ATOM_SEQUENCE_FOREACH,
+    // which steps past the sequence's 8-byte body field (clang-analyzer-security.ArrayBound).
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(notify_.data());
+    const std::size_t end = sizeof(LV2_Atom) + sequence->atom.size;
+    if (end > notify_.size() * sizeof(std::uint64_t))
+        throw std::runtime_error("the notify sequence claims more bytes than its buffer");
+    for (std::size_t at = sizeof(LV2_Atom_Sequence); at < end;) {
+        if (at + sizeof(LV2_Atom_Event) > end)
+            throw std::runtime_error("the notify sequence ends inside an event header");
+        const auto* event = reinterpret_cast<const LV2_Atom_Event*>(bytes + at);
+        if (at + sizeof(LV2_Atom_Event) + event->body.size > end)
+            throw std::runtime_error("a notify event runs past the end of its sequence");
+        at += sizeof(LV2_Atom_Event) + lv2_atom_pad_size(event->body.size);
         const auto* object = reinterpret_cast<const LV2_Atom_Object*>(&event->body);
         if (event->body.type != u.map(LV2_ATOM__Object) ||
             object->body.otype != u.map(LV2_PATCH__Set))
