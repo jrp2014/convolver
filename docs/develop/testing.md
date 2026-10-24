@@ -59,7 +59,11 @@ misses all of that.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
-  nonfinite data and a C++ heap-allocation guard during processing/reset. The
+  nonfinite data and a C++ heap-allocation guard during processing/reset.
+  Resets at five points of the history ring's cycle, at B = 1, 5, 64, 255 and
+  257 with callback sizes unrelated to B, must match the oracle and a fresh
+  engine bit for bit, which fails if a reset leaves stale history in use
+  (PERF-5). The
   oracle cases run with the processing kernels the CPU selects (AVX2+FMA on
   most x86-64 machines) and again with the baseline set. A separate case checks
   each set's multiply-accumulate against the standard floating-point error bound
@@ -89,6 +93,9 @@ misses all of that.
   historical coefficients and that its measured error spectrum follows
   1 - Σ c_k z^-k within 15%, recovery after clipping, and the exact stored
   samples and header fields for every container and valid-bit combination.
+  Paths that name one file get their own channels from a single decode, and a
+  named pipe, which can be read only once, shows that the file is opened once
+  (PERF-6).
 - `native.config_parse`: the private configuration parser on its own: physical
   line/column locations after BOM, comments, blank lines and CRLF, original
   tokens with effective signed-zero/fractional routes and truncated delays, list
@@ -119,7 +126,8 @@ misses all of that.
   levels, 4096 list visits, 16 MiB of configuration text per resolution (shared
   sublists counted per read), 16 Mi frames per delay and 64 Mi delay frames in
   total, 64 Mi decoded IR samples (an oversized file is rejected from its header
-  without decoding), 256 diagnostics plus a truncation marker, and 64 MiB of host
+  without decoding; a file named by two paths counts twice, although it is
+  decoded once), 256 diagnostics plus a truncation marker, and 64 MiB of host
   state.
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
@@ -137,7 +145,9 @@ misses all of that.
   activations until a later request succeeds; `mute()` (its 64-frame ramp,
   bypass, reset, a crossfade, and a replacement fading in from silence); and
   allocation failure at every step of `HostFilter::load`, checking that what
-  plays is what is saved.
+  plays is what is saved. A live replacement and a reset, at B = 257, 255 and
+  64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
+  oracle of the input from that moment on (PERF-5).
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
@@ -419,7 +429,8 @@ is in [how the plug-ins behave](../use/plugins.md).
 
 Tests cover direct numerical results, planar and in-place float and double
 buffers, callback sizes crossing partition boundaries, silence and tails,
-bypass automation, reset, concurrent replacement, C++ allocation and
+output silence flags with 32- and 64-bit buffers (set exactly when a call left
+a channel all zero, so never during a tail; VST3-10), bypass automation, reset, concurrent replacement, C++ allocation and
 deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2

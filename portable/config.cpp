@@ -6,53 +6,59 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace convolver::detail {
 namespace {
-void read_impulses(AudioReader& reader, std::vector<FilterPath>& paths,
-                   std::optional<std::size_t> selected, std::size_t& budget,
-                   const SourceLocation& where) {
-    const auto channels = reader.info().channels;
-    if (selected && *selected >= channels)
+void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLocation& where) {
+    if (selected >= channels)
         throw ConfigurationError(
             "ir-channel", where,
-            "filter channel " + std::to_string(*selected) + " out of range (the IR file has " +
+            "filter channel " + std::to_string(selected) + " out of range (the IR file has " +
                 std::to_string(channels) + (channels == 1 ? " channel" : " channels") +
                 ", numbered from 0, so use " +
                 (channels == 1 ? std::string("0") : "0 to " + std::to_string(channels - 1)) + ")");
+}
+[[noreturn]] void decoded_limit(const SourceLocation& where) {
+    throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+}
+// Decodes a whole file into the channels whose target is set (one target per
+// file channel) and returns its frame count. Every decoded sample counts
+// against budget, used or not.
+std::size_t read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& targets,
+                          std::size_t& budget, const SourceLocation& where) {
+    const auto channels = reader.info().channels;
     // Reject oversized files before allocating for their samples.
     if (const auto declared = reader.declared_frames()) {
         if (*declared > (max_decoded_samples - budget) / channels)
-            throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
-        if (selected)
-            paths.back().impulse.reserve(*declared);
-        else
-            for (auto& p : paths)
-                p.impulse.reserve(*declared);
+            decoded_limit(where);
+        for (auto* target : targets)
+            if (target)
+                target->reserve(*declared);
     }
     std::vector<float> buffer(4096 * channels);
+    std::size_t total = 0;
     while (const auto frames = reader.read(buffer)) {
         const auto samples = frames * channels;
         if (samples > max_decoded_samples - budget)
-            throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+            decoded_limit(where);
         budget += samples;
-        if (selected) {
-            for (std::size_t f = 0; f < frames; ++f)
-                paths.back().impulse.push_back(buffer[f * channels + *selected]);
-        } else {
-            for (std::size_t c = 0; c < channels; ++c)
+        total += frames;
+        for (std::size_t c = 0; c < channels; ++c)
+            if (auto* target = targets[c])
                 for (std::size_t f = 0; f < frames; ++f)
-                    paths[c].impulse.push_back(buffer[f * channels + c]);
-        }
+                    target->push_back(buffer[f * channels + c]);
     }
     reader.close();
-    if (paths.back().impulse.empty())
+    if (total == 0)
         throw ConfigurationError("empty-ir", where, "empty impulse response");
+    return total;
 }
 std::filesystem::path utf8_path(const std::string& text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
@@ -364,13 +370,53 @@ bool raw_filter(const std::filesystem::path& resolved) {
     return raw_filter_name(resolved) && !sound_file_header(resolved);
 }
 
+namespace {
+// A filter file decoded once for every path of one configuration that names it
+// (PERF-6). Its channels are handed to the paths only after every path has
+// passed its checks, so nothing is copied for a configuration that fails.
+struct DecodedFile {
+    AudioInfo info{};
+    std::optional<std::size_t> declared;
+    std::size_t frames = 0;
+    bool raw = false;
+    std::vector<std::vector<float>> channels; // Empty for channels no path names.
+    std::vector<std::size_t> uses;            // Paths that take each channel.
+};
+} // namespace
+
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
                                        std::size_t& budget, RawEncoding raw_encoding) {
     std::vector<DecodedIr> result;
     const auto& parsed = doc.configuration;
+    // The paths naming each file. A reference that cannot be resolved names
+    // none, and fails with its own diagnostic when its turn comes.
+    std::map<std::filesystem::path, std::vector<std::size_t>> named;
+    for (std::size_t i = 0; i < parsed.paths.size(); ++i) {
+        try {
+            named[resolve_reference(doc.source, parsed.paths[i].ir)].push_back(i);
+        } catch (const ConfigurationError&) {
+        }
+    }
+    std::map<std::filesystem::path, DecodedFile> files;
+    std::vector<DecodedFile*> sources(parsed.paths.size()); // Each path's file.
     for (std::size_t i = 0; i < parsed.paths.size(); ++i) {
         const auto& path = parsed.paths[i];
         const auto resolved = resolve_reference(doc.source, path.ir);
+        if (const auto found = files.find(resolved); found != files.end()) {
+            // Checked and charged as if the file were decoded again, so the
+            // limits, and the configurations they reject, stay as they were.
+            auto& file = found->second;
+            const auto channels = file.info.channels;
+            check_ir_channel(path.ir_channel, channels, path.channel_location);
+            if ((file.declared && *file.declared > (max_decoded_samples - budget) / channels) ||
+                file.frames > (max_decoded_samples - budget) / channels)
+                decoded_limit(path.ir.location);
+            budget += file.frames * channels;
+            sources[i] = &file;
+            result.push_back({resolved, file.info, file.frames,
+                              file.raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
+            continue;
+        }
         std::optional<AudioReader> ir;
         const bool raw = raw_filter(resolved);
         // Appended to errors about a file whose name says raw but whose content
@@ -419,22 +465,41 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                          "must have the sample rate on its first line; "
                                          "Convolver never resamples IRs" +
                                          read_as_sound);
-        // read_impulses targets the last path, so decode into a single path and
-        // transfer only its coefficients after all routing has been validated.
-        std::vector<FilterPath> decoded(1);
+        check_ir_channel(path.ir_channel, info.channels, path.channel_location);
+        // Decode every channel that this and later paths name, so the file is
+        // read once. A later path naming a channel the file lacks fails when
+        // its turn comes, as before.
+        DecodedFile file{info, ir->declared_frames(), 0, raw, {}, {}};
+        file.channels.resize(info.channels);
+        file.uses.resize(info.channels);
+        for (const auto j : named[resolved])
+            if (parsed.paths[j].ir_channel < info.channels)
+                ++file.uses[parsed.paths[j].ir_channel];
+        file.uses[path.ir_channel] = std::max<std::size_t>(file.uses[path.ir_channel], 1);
+        std::vector<std::vector<float>*> targets(info.channels);
+        for (std::size_t c = 0; c < info.channels; ++c)
+            if (file.uses[c])
+                targets[c] = &file.channels[c];
         try {
-            read_impulses(*ir, decoded, path.ir_channel, budget,
-                          path.ir_channel < info.channels ? path.ir.location
-                                                          : path.channel_location);
+            file.frames = read_channels(*ir, targets, budget, path.ir.location);
         } catch (const ConfigurationError&) {
             throw;
         } catch (const std::runtime_error& e) {
             throw ConfigurationError("damaged-asset", path.ir.location,
                                      "filter '" + path.ir.spelling + "': " + e.what());
         }
-        result.push_back({resolved, info, decoded.front().impulse.size(),
+        result.push_back({resolved, info, file.frames,
                           raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
-        cfg.paths[i].impulse = std::move(decoded.front().impulse);
+        sources[i] = &files.emplace(resolved, std::move(file)).first->second;
+    }
+    // Every path passed: copy each channel to its paths, the last taking it.
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        auto& file = *sources[i];
+        const auto channel = parsed.paths[i].ir_channel;
+        auto& samples = file.channels[channel];
+        cfg.paths[i].impulse = file.uses[channel] > 1 ? samples : std::exchange(samples, {});
+        if (file.uses[channel])
+            --file.uses[channel];
     }
     return result;
 }
@@ -453,7 +518,10 @@ Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
         cfg.paths[c].outputs.push_back({c, 1});
     }
     try {
-        read_impulses(audio, cfg.paths, {}, budget, where);
+        std::vector<std::vector<float>*> targets;
+        for (auto& p : cfg.paths)
+            targets.push_back(&p.impulse);
+        read_channels(audio, targets, budget, where);
     } catch (const ConfigurationError&) {
         throw;
     } catch (const std::runtime_error& e) {

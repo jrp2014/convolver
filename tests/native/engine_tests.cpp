@@ -13,6 +13,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 // The processing and reset contract forbids C++ heap allocation. FFTW plans
@@ -222,6 +223,57 @@ void shared_input_mixes() {
             if (std::abs(together[i] - separate[i]) > 1e-6 * (1 + std::abs(separate[i])))
                 throw std::runtime_error("shared mix differs from separate paths at " +
                                          std::to_string(i));
+    }
+}
+// PERF-5: a path multiplies only the input history written since construction
+// or reset. Reset invalidates the history without clearing it, so stale spectra
+// stay in the ring. Check, for awkward partition sizes and host callback sizes
+// unrelated to them, that output during the first blocks, after a reset at
+// several points of the ring's cycle, and with members of one input mix of
+// different lengths (a ring longer than some paths), matches the oracle and is
+// bit-identical to a fresh engine given the same input.
+void history_validity() {
+    std::mt19937 random(0x417e5);
+    std::uniform_real_distribution<float> sample(-.6f, .6f);
+    for (const std::size_t b :
+         {std::size_t(1), std::size_t(5), std::size_t(64), std::size_t(255), std::size_t(257)}) {
+        Configuration c{48000, 2, 3, 0, {0, 3}, {2, 0, 1}, {}};
+        // Two paths share input 0's mix with 5 and 2 partitions; one has its own.
+        for (const auto [channel, partitions] :
+             {std::pair{std::size_t(0), std::size_t(5)}, std::pair{std::size_t(1), std::size_t(3)},
+              std::pair{std::size_t(0), std::size_t(2)}}) {
+            FilterPath p;
+            p.impulse.resize((partitions - 1) * b + 1 + random() % b);
+            for (auto& x : p.impulse)
+                x = sample(random);
+            p.inputs = {{channel, 1}};
+            p.outputs = {{random() % 3, sample(random)}, {random() % 3, sample(random)}};
+            c.paths.push_back(std::move(p));
+        }
+        std::vector<float> in((7 * b + 11) * c.input_channels);
+        for (auto& x : in)
+            x = sample(random);
+        const auto expected = oracle(c, in, b);
+        const auto frames = expected.size() / c.output_channels;
+        Engine fresh(c, b);
+        const auto reference = run(fresh, in, frames, {frames});
+        close(reference, expected);
+        // Reset after 1 to 9 blocks: before, at and after the 5-slot ring fills
+        // and wraps, and part-way through a block.
+        for (const std::size_t before : {b, 2 * b + 1, 5 * b, 6 * b + b / 2, 9 * b}) {
+            for (const auto& chunks :
+                 {std::vector<std::size_t>{64}, std::vector<std::size_t>{1, 63, 65, 100},
+                  std::vector<std::size_t>{1000}}) {
+                Engine engine(c, b);
+                std::vector<float> noise(before * c.input_channels);
+                for (auto& x : noise)
+                    x = sample(random);
+                run(engine, noise, before, chunks);
+                engine.reset();
+                const auto after = run(engine, in, frames, chunks);
+                require(after == reference, "reset output differs from a fresh engine");
+            }
+        }
     }
 }
 void no_processing_allocation() {
@@ -507,6 +559,7 @@ int main() {
             detail::force_baseline_kernels(baseline);
             cases();
             shared_input_mixes();
+            history_validity();
         }
         detail::force_baseline_kernels(false);
         kernels_agree();

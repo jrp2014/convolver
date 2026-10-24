@@ -243,6 +243,13 @@ if(CONVOLVER_BUILD_NATIVE)
         target_include_directories(convolver_mac_benchmark PRIVATE portable)
         target_link_libraries(convolver_mac_benchmark PRIVATE convolver_core)
         list(APPEND native_targets convolver_benchmark convolver_mac_benchmark)
+        if(CONVOLVER_BUILD_IO)
+            # Startup, reset, replacement and loading at a host callback size (PERF-5).
+            add_executable(convolver_callback_benchmark tests/native/callback_benchmark.cpp)
+            target_include_directories(convolver_callback_benchmark PRIVATE portable)
+            target_link_libraries(convolver_callback_benchmark PRIVATE convolver_core convolver_host Convolver::io)
+            list(APPEND native_targets convolver_callback_benchmark)
+        endif()
     endif()
     if(CONVOLVER_BUILD_TESTS)
         # Every native test executable is registered here (the Python-driven
@@ -287,7 +294,7 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/utility_tests.cpp LIBRARIES Convolver::core Threads::Threads)
         if(CONVOLVER_BUILD_IO)
             convolver_native_test(native.io convolver_io_tests
-                SOURCES tests/native/io_tests.cpp LIBRARIES convolver_io SndFile::sndfile)
+                SOURCES tests/native/io_tests.cpp LIBRARIES convolver_io SndFile::sndfile Threads::Threads)
             convolver_native_test(native.config_parse convolver_config_parse_tests
                 SOURCES tests/native/config_parse_tests.cpp LIBRARIES convolver_io)
             convolver_native_test(native.inspection convolver_inspection_tests

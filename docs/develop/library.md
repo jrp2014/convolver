@@ -130,7 +130,8 @@ Resource limits are deliberate: 1..256 channels, 1..768000 Hz, B up to 1048576,
 4096 paths/routes, and about 1 GiB of prepared float-equivalent storage. Core IRs
 and individual delays are bounded to 67108864 frames. The importer additionally
 limits each text file to 1 MiB and all text read per operation to 16 MiB, list nesting to 16, visited entries to 4096, total decoded IR
-samples to 64 Mi, and each delay to 16 Mi frames. Invalid dimensions, arithmetic
+samples to 64 Mi (a file named by several paths counts once per path, although
+it is decoded once), and each delay to 16 Mi frames. Invalid dimensions, arithmetic
 overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
 the CLI's output check; library callers choose their own output policy.
 

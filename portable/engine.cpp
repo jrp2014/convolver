@@ -144,6 +144,15 @@ struct Engine::Impl {
     struct Mix {
         std::vector<Route> routes;
         std::size_t partitions = 0, head = 0; // History ring covers the longest member path.
+        // Spectra written since construction or reset, at most the ring size.
+        // The partitions beyond them would meet the silence before the first
+        // block, so a path multiplies only the valid ones. The products skipped
+        // are zeros, and the output sum discards the sign of a zero, so the
+        // output is bit-identical to visiting every partition (PERF-5). That
+        // assumes finite filter spectra: with an infinite one (a finite IR
+        // whose transform overflows), 0 x inf would have made the first blocks
+        // NaN; now the NaN comes when audio reaches that partition.
+        std::size_t valid = 0;
         std::vector<float> history;
     };
     struct Path {
@@ -180,7 +189,7 @@ struct Engine::Impl {
             while (m < mixes.size() && !same_mix(mixes[m].routes, source.inputs))
                 ++m;
             if (m == mixes.size())
-                mixes.push_back({source.inputs, 0, 0, {}});
+                mixes.push_back({source.inputs, 0, 0, 0, {}});
             paths.emplace_back(source, m, b, bins);
             auto& path = paths.back();
             mixes[m].partitions = std::max(mixes[m].partitions, path.partitions);
@@ -206,6 +215,8 @@ struct Engine::Impl {
                     time[t] += input_block[t * inputs + route.channel] * route.gain;
             fft.forward();
             k.deinterleave(frequency, mix.history.data() + mix.head * stride, bins, 1.f);
+            if (mix.valid < mix.partitions)
+                ++mix.valid;
         }
         // Paths keep their configured order, so output accumulation order is unchanged.
         for (auto& path : paths) {
@@ -214,7 +225,7 @@ struct Engine::Impl {
             float* re = frequency;
             float* im = frequency + bins;
             k.accumulate(re, im, mix.history.data(), mix.head, mix.partitions, path.filters.data(),
-                         path.partitions, bins);
+                         std::min(path.partitions, mix.valid), bins);
             k.interleave(re, im, sum, bins);
             fft.inverse();
             for (std::size_t t = 0; t < block; ++t) {
@@ -236,9 +247,11 @@ struct Engine::Impl {
             d.reset();
         for (auto& d : output_delays)
             d.reset();
+        // Invalidating the history instead of clearing it keeps the cost of a
+        // reset independent of the filter length.
         for (auto& m : mixes) {
             m.head = 0;
-            std::fill(m.history.begin(), m.history.end(), 0.f);
+            m.valid = 0;
         }
         for (auto& p : paths)
             std::fill(p.overlap.begin(), p.overlap.end(), 0.f);

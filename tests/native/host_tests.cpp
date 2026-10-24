@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
 #include "host_log.hpp"
+#include "oracle.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -19,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 thread_local bool audio_thread = false;
@@ -1186,6 +1188,80 @@ void status_lines() {
     std::filesystem::remove_all(folder);
 }
 
+// PERF-5 acceptance: a live replacement and a reset, at partition sizes that
+// are not powers of two and host callback sizes unrelated to them, match the
+// double-precision oracle. The new filter's engine starts with empty history
+// when the audio thread adopts it, and a reset invalidates the stale history,
+// so both follow the oracle of the input from that frame on (after the warm-up
+// and crossfade for a replacement).
+void costly_moments_against_oracle() {
+    std::mt19937 random(0xc0571);
+    std::uniform_real_distribution<float> sample(-.5f, .5f);
+    auto filter = [&](std::size_t b) {
+        Configuration c{48000, 2, 2, 0, {}, {}, {}};
+        for (const auto [in, out] : {std::pair{0, 0}, std::pair{1, 1}, std::pair{0, 1}}) {
+            FilterPath p;
+            p.impulse.resize(3 * b + 1 + random() % b);
+            for (auto& x : p.impulse)
+                x = sample(random);
+            p.inputs = {{std::size_t(in), 1}};
+            p.outputs = {{std::size_t(out), sample(random)}};
+            c.paths.push_back(std::move(p));
+        }
+        return c;
+    };
+    for (const auto [b, callback] : {std::pair{std::size_t(257), std::size_t(64)},
+                                     std::pair{std::size_t(257), std::size_t(1000)},
+                                     std::pair{std::size_t(255), std::size_t(1)},
+                                     std::pair{std::size_t(64), std::size_t(100)}}) {
+        const auto first = filter(b), second = filter(b);
+        HostProcessor host(first, callback, b);
+        // Interleaved input and output of every frame processed so far.
+        std::vector<float> input, output;
+        std::vector<float> in_block(2 * callback), out_block(2 * callback);
+        auto play = [&](std::size_t frames, bool silent) {
+            for (std::size_t done = 0; done < frames; done += callback) {
+                std::array<const float*, 2> in{in_block.data(), in_block.data() + callback};
+                std::array<float*, 2> out{out_block.data(), out_block.data() + callback};
+                for (auto& x : in_block)
+                    x = silent ? 0.f : sample(random);
+                require(host.process(in, out, callback), "host refused a callback");
+                for (std::size_t t = 0; t < callback; ++t)
+                    for (std::size_t c = 0; c < 2; ++c) {
+                        input.push_back(in[c][t]);
+                        output.push_back(out[c][t]);
+                    }
+            }
+        };
+        // The oracle of the input from frame `start`, compared from frame `from`.
+        auto check = [&](const Configuration& c, std::size_t start, std::size_t from,
+                         const char* message) {
+            const std::vector<float> after(input.begin() + std::ptrdiff_t(2 * start), input.end());
+            const auto expected = test::oracle(c, after, b);
+            for (std::size_t i = 2 * from; i < output.size() - 2 * start && i < expected.size();
+                 ++i)
+                if (std::abs(output[2 * start + i] - expected[i]) >
+                    2e-5 * (1 + std::abs(expected[i])))
+                    throw std::runtime_error(std::string(message) + " at sample " +
+                                             std::to_string(i) + " (block " + std::to_string(b) +
+                                             ", callback " + std::to_string(callback) + ")");
+        };
+        play(4 * b + 17, false);
+        host.replace(second);
+        const auto adopted = input.size() / 2;
+        play(5 * b, false);
+        play(5 * b + 512, true);
+        host.collect();
+        // Warm-up (one block) and the 256-frame crossfade.
+        check(second, adopted, b + 256, "replacement differs from the oracle");
+        play(3 * b + 5, false); // The history must hold audio when it is reset.
+        host.reset();
+        const auto reset = input.size() / 2;
+        play(2 * b + 3, false);
+        play(5 * b + 512, true);
+        check(second, reset, 0, "output after reset differs from the oracle");
+    }
+}
 int main() {
     try {
         numeric<float>();
@@ -1204,6 +1280,7 @@ int main() {
         allocation_failures();
         status_lines();
         processing_faults();
+        costly_moments_against_oracle();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

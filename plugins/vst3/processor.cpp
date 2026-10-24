@@ -417,7 +417,6 @@ template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 co
                     out[c] = bus.channelBuffers64[c] + start;
             }
         }
-        bus.silenceFlags = 0; // Do not propagate input silence across a convolution tail.
     }
     host_->set_bypass(bypass_.load());
     return host_->process(std::span(in).first(inputs_), std::span(out).first(outputs_), count);
@@ -428,6 +427,8 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         return kInvalidArgument;
     if (d.numSamples && (!host_ || canProcessSampleSize(d.symbolicSampleSize) != kResultOk))
         return kInvalidArgument;
+    if (d.numOutputs && d.outputs)
+        d.outputs[0].silenceFlags = 0; // Set again below once the output is known.
     auto render = [&](int32 first, int32 count) {
         if (!count)
             return true;
@@ -454,8 +455,33 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
         }
     }
     const bool rendered = render(position, d.numSamples - position);
+    if (rendered)
+        mark_silence(d);
     signal_faults(d);
     return rendered ? kResultOk : kInvalidArgument;
+}
+// VST3-10: flag each output channel that this call left all zero, so a host
+// can skip work downstream. Input flags are never copied: a filter's tail and
+// the latency outlast silent input, so an output is flagged only once it has
+// drained. Bypass and a muted filter keep running the convolution, so the
+// history stays current while the flags are set.
+void Processor::mark_silence(ProcessData& d) noexcept {
+    if (!d.numOutputs || !d.outputs)
+        return;
+    auto& bus = d.outputs[0];
+    if (!d.numSamples || bus.numChannels != outputs_ || !getAudioOutput(0)->isActive())
+        return;
+    const auto silent = [&](const auto* channel) {
+        return channel &&
+               std::all_of(channel, channel + d.numSamples, [](auto v) { return v == 0; });
+    };
+    for (int c = 0; c < outputs_ && c < 64; ++c) {
+        const bool zero = d.symbolicSampleSize == kSample32
+                              ? bus.channelBuffers32 && silent(bus.channelBuffers32[c])
+                              : bus.channelBuffers64 && silent(bus.channelBuffers64[c]);
+        if (zero)
+            bus.silenceFlags |= uint64(1) << c;
+    }
 }
 // DIAG-1: a new processing fault shows at once in hosts that pass output
 // parameter changes on, without logging or allocating here: Status becomes

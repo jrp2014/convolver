@@ -160,7 +160,9 @@ bool raw_filter_name(const std::filesystem::path&);
 // Opens regular files to decide; a missing file or a named pipe counts as raw.
 bool raw_filter(const std::filesystem::path& resolved);
 // Decode every path's selected IR channel into cfg (from configuration_graph).
-// budget counts decoded samples across one resolution operation.
+// Each file is opened and decoded once, however many paths name it (PERF-6).
+// budget counts decoded samples across one resolution operation, charging
+// every path as if its file were decoded for it alone.
 std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg,
                                        std::size_t& budget, RawEncoding raw_encoding = {});
 // A sound file used directly: diagonal routing, decoded coefficients.
