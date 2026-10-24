@@ -18,6 +18,7 @@
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
+#include <utility>
 #include <vector>
 #ifdef _WIN32
 #define NOMINMAX
@@ -46,11 +47,15 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
                       bound (input within full scale, no dither or shaping
                       headroom); the chosen value is reported on stderr
   --keep-latency       Keep the leading block of algorithmic latency
-  --output-format F   wav-float (default), wav-pcm8, wav-pcm16, wav-pcm24,
-                      wav-pcm32, raw-float (little-endian IEEE float32)
+  --output-format F   CONTAINER-TYPE, default wav-float. Containers: wav, rf64,
+                      w64, aiff, caf (rf64, w64 and caf have no 4 GiB limit),
+                      flac (lossless; pcm8, pcm16, pcm24 only; needs a
+                      libsndfile with FLAC) and raw
+                      (headerless little-endian; no pcm8). Types: pcm8,
+                      pcm16, pcm24, pcm32, float, double. Example: flac-pcm24
   --speaker-map config
                       Label WAV output channels with the configuration's channel
-                      mask (WAVE_FORMAT_EXTENSIBLE). Not with raw-float.
+                      mask (WAVE_FORMAT_EXTENSIBLE). wav- formats only.
   --dither D           Integer PCM only: none (default), triangular,
                       triangular-highpass or rectangular
   --dither-seed N      Dither generator seed (default 0); output is reproducible
@@ -61,10 +66,17 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --output-channels N  From a configuration list, select the first entry with N
                       output channels (as well as the input rate and channels)
   --raw-input RATE CHANNELS
-                      Read little-endian IEEE float32 with explicit metadata
+                      Read headerless samples with explicit metadata
+  --raw-format F       Sample type of --raw-input: f32le (default), f64le,
+                      s16le, s24le, s32le, or the same ending in be
+  --raw-filter-format F
+                      Sample type of headerless .pcm/.raw filters in a .cfg:
+                      f32le (default, as DRC and BruteFIR write them) or any
+                      --raw-format name; they are always mono
   --help              Show this help
   --version           Show Convolver, source, FFT backend and libsndfile versions
-FILE may be '-' for stdin/stdout; standard streams require RAW float format.
+FILE may be '-' for stdin/stdout; standard streams must be raw (--raw-input,
+a raw- output format).
 Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
 --keep-latency is used. Sample-rate/channel mismatches are errors; no resampling.
 )";
@@ -74,6 +86,37 @@ std::size_t count(std::string_view s) {
     if (error != std::errc{} || end != s.data() + s.size() || n == 0)
         throw std::invalid_argument("expected a positive integer: " + std::string(s));
     return n;
+}
+// CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
+std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
+    using convolver::Container;
+    using convolver::SampleType;
+    const auto dash = name.find('-');
+    if (dash == std::string_view::npos)
+        return std::nullopt;
+    constexpr std::pair<std::string_view, Container> containers[]{
+        {"wav", Container::wav},   {"rf64", Container::rf64}, {"w64", Container::w64},
+        {"aiff", Container::aiff}, {"caf", Container::caf},   {"flac", Container::flac},
+        {"raw", Container::raw}};
+    constexpr std::pair<std::string_view, SampleType> samples[]{
+        {"pcm8", SampleType::pcm8},     {"pcm16", SampleType::pcm16},
+        {"pcm24", SampleType::pcm24},   {"pcm32", SampleType::pcm32},
+        {"float", SampleType::float32}, {"double", SampleType::float64}};
+    convolver::OutputEncoding result;
+    bool container = false, sample = false;
+    for (const auto& [text, value] : containers)
+        if (name.substr(0, dash) == text) {
+            result.container = value;
+            container = true;
+        }
+    for (const auto& [text, value] : samples)
+        if (name.substr(dash + 1) == text) {
+            result.sample = value;
+            sample = true;
+        }
+    if (!container || !sample || !convolver::supported(result))
+        return std::nullopt;
+    return result;
 }
 std::filesystem::path utf8_path(const std::string& text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
@@ -141,7 +184,8 @@ int run(int argc, char** argv) {
         convolver::FftOptions fft_options;
         bool explicit_plan = false, audio_options = false;
         std::optional<convolver::RawSpec> raw;
-        convolver::OutputFormat format = convolver::OutputFormat::wav_float;
+        convolver::OutputEncoding format;
+        convolver::RawEncoding raw_encoding, raw_filter_encoding;
         std::optional<convolver::Dither> dither;
         std::uint64_t dither_seed = 0;
         convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
@@ -149,7 +193,7 @@ int run(int argc, char** argv) {
         std::size_t block = 256, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
-        bool keep = false, speaker_map = false;
+        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -165,7 +209,10 @@ int run(int argc, char** argv) {
                 std::cout << "Convolver portable " << CONVOLVER_VERSION_STRING
                           << "\nFFT backend: " << convolver::fft_backend_name() << " / "
                           << convolver::fft_backend_version() << '\n'
-                          << convolver::sndfile_version() << '\n';
+                          << convolver::sndfile_version()
+                          << (convolver::available(convolver::Container::flac)
+                                  ? " (FLAC output available)\n"
+                                  : " (no FLAC output: built without FLAC)\n");
                 return 0;
             }
             if (option == "--filter")
@@ -217,6 +264,26 @@ int run(int argc, char** argv) {
                 if (rate > 768000 || channels > 256)
                     throw std::invalid_argument("RAW metadata exceeds supported limits");
                 raw = convolver::RawSpec{static_cast<int>(rate), channels};
+            } else if (option == "--raw-format") {
+                audio_options = true;
+                const auto name = value();
+                const auto parsed = convolver::parse_raw_encoding(name);
+                if (!parsed)
+                    throw std::invalid_argument("unsupported raw format: " + name +
+                                                " (use s16le, s24le, s32le, f32le or f64le, or "
+                                                "the same with be for big-endian)");
+                raw_encoding = *parsed;
+                raw_format = true;
+            } else if (option == "--raw-filter-format") {
+                audio_options = true;
+                const auto name = value();
+                const auto parsed = convolver::parse_raw_encoding(name);
+                if (!parsed)
+                    throw std::invalid_argument("unsupported raw filter format: " + name +
+                                                " (use s16le, s24le, s32le, f32le or f64le, or "
+                                                "the same with be for big-endian)");
+                raw_filter_encoding = *parsed;
+                raw_filter_format = true;
             } else if (option == "--gain-db") {
                 audio_options = true;
                 auto text = value();
@@ -240,20 +307,18 @@ int run(int argc, char** argv) {
             } else if (option == "--output-format") {
                 audio_options = true;
                 const auto name = value();
-                if (name == "wav-float")
-                    format = convolver::OutputFormat::wav_float;
-                else if (name == "wav-pcm8")
-                    format = convolver::OutputFormat::wav_pcm8;
-                else if (name == "wav-pcm16")
-                    format = convolver::OutputFormat::wav_pcm16;
-                else if (name == "wav-pcm24")
-                    format = convolver::OutputFormat::wav_pcm24;
-                else if (name == "wav-pcm32")
-                    format = convolver::OutputFormat::wav_pcm32;
-                else if (name == "raw-float")
-                    format = convolver::OutputFormat::raw_float;
-                else
-                    throw std::invalid_argument("unsupported output format: " + name);
+                const auto parsed = parse_output_format(name);
+                if (!parsed)
+                    throw std::invalid_argument(
+                        "unsupported output format: " + name +
+                        " (use CONTAINER-TYPE: wav, rf64, w64, aiff, caf or raw with pcm16, "
+                        "pcm24, pcm32, float or double, wav/rf64/w64/aiff/caf also pcm8; "
+                        "flac with pcm8, pcm16 or pcm24)");
+                if (!convolver::available(parsed->container))
+                    throw std::invalid_argument(
+                        "this build of Convolver cannot write FLAC: its libsndfile was built "
+                        "without FLAC support. Choose another container, such as wav or rf64");
+                format = *parsed;
             } else if (option == "--dither") {
                 audio_options = true;
                 const auto name = value();
@@ -300,9 +365,13 @@ int run(int argc, char** argv) {
             } else
                 throw std::invalid_argument("unknown option: " + option);
         }
-        if (speaker_map && format == convolver::OutputFormat::raw_float)
-            throw std::invalid_argument("--speaker-map needs WAV output; raw-float has no header");
-        const auto bits = convolver::container_bits(format);
+        if (speaker_map && format.container != convolver::Container::wav)
+            throw std::invalid_argument(
+                "--speaker-map needs a wav- output format; other containers carry no "
+                "speaker labels yet");
+        if (raw_format && !raw)
+            throw std::invalid_argument("--raw-format needs --raw-input RATE CHANNELS");
+        const auto bits = convolver::container_bits(format.sample);
         if (!bits && dither && *dither != convolver::Dither::none)
             throw std::invalid_argument("--dither applies only to integer PCM output");
         if (!bits && shaping != convolver::NoiseShaping::none)
@@ -346,13 +415,37 @@ int run(int argc, char** argv) {
             convolver::import_fft_wisdom(read_wisdom(wisdom));
             fft_options.wisdom_only = true;
         }
-        convolver::AudioReader reader(input, raw);
+        convolver::AudioReader reader(input, raw, raw_encoding);
         const auto info = reader.info();
-        std::vector<std::filesystem::path> dependencies;
+        std::vector<std::filesystem::path> dependencies, raw_filters;
         const auto config = convolver::load_configuration(
             filter,
-            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels},
-            &dependencies);
+            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels,
+                                              raw_filter_encoding},
+            &dependencies, &raw_filters);
+        // A raw filter's sample type is an assumption, so say which one was used.
+        // Names are relative to the configuration's folder, so two filters with
+        // the same file name in different folders can be told apart.
+        for (const auto& raw_filter : raw_filters) {
+            std::error_code ec;
+            auto shown = std::filesystem::relative(
+                raw_filter,
+                filter.parent_path().empty() ? std::filesystem::path(".") : filter.parent_path(),
+                ec);
+            if (ec || shown.empty())
+                shown = raw_filter;
+            const auto name = shown.generic_u8string();
+            std::cerr << "convolver: raw filter '" << std::string(name.begin(), name.end())
+                      << "' read as mono " << convolver::raw_encoding_name(raw_filter_encoding)
+                      << " at " << config.sample_rate << " Hz"
+                      << (raw_filter_format ? ""
+                                            : " (choose another sample type with "
+                                              "--raw-filter-format)")
+                      << '\n';
+        }
+        if (raw_filter_format && raw_filters.empty())
+            std::cerr << "convolver: --raw-filter-format has no effect: the configuration "
+                         "has no headerless .pcm or .raw filters\n";
         for (const auto& source : dependencies)
             if (same_file(source, output))
                 throw std::invalid_argument(
