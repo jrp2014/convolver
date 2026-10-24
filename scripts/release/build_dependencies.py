@@ -1,12 +1,17 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Build pinned, static baseline libraries and materialize the SDK, explicitly."""
+"""Build static baseline libraries and materialize the SDK from resolved sources, explicitly.
+
+The policy passed in carries resolved records (contract.with_records): the
+exact releases resolve.py chose, or a source manifest recorded."""
 import argparse
 import json
 from pathlib import Path
 import platform
 import shutil
 import subprocess
-from contract import PLUGIN_FORMATS, load_policy, used_dependencies
+import sys
+from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
+import resolve
 from sources import unpack_dependencies
 
 
@@ -40,7 +45,8 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
         subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
         subprocess.run([cmake, '--build', str(output), '--config', 'Release', '--parallel', '2'], check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
-    inventory = {name: {key: value for key, value in dep.items() if key in ('version', 'sha256', 'license', 'revision')}
+    inventory = {name: {key: value for key, value in dep.items()
+                        if key in ('version', 'tag', 'revision', 'url', 'sha256', 'license')}
                  for name, dep in policy['dependencies'].items() if name in used}
     licenses = work / 'licenses'
     licenses.mkdir(exist_ok=True)
@@ -66,7 +72,10 @@ if __name__ == '__main__':
     parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
     parser.add_argument('--cache', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True)
-    parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing pinned archives')
+    parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing archives')
+    which = parser.add_mutually_exclusive_group(required=True)
+    which.add_argument('--latest', action='store_true', help='Resolve each to its newest release (needs --fetch)')
+    which.add_argument('--lock', type=Path, help='A lock file or source manifest to rebuild exactly')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--architecture', choices=['arm64', 'x86_64'])
     parser.add_argument('--backend', choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'], default='AUTO',
@@ -74,5 +83,16 @@ if __name__ == '__main__':
     parser.add_argument('--formats', nargs='+', choices=sorted(PLUGIN_FORMATS), default=['vst3'],
                         help='Plug-in formats of the build that follows; only their SDKs are unpacked')
     args = parser.parse_args()
-    build(load_policy(args.policy), args.cache, args.work, args.cmake, args.fetch, args.architecture, args.backend,
-          args.formats)
+    policy = load_policy(args.policy)
+    if args.latest:
+        if not args.fetch:
+            parser.error('--latest downloads the archives; add --fetch')
+        try:
+            records = resolve.resolve(policy, args.cache.resolve())
+        except resolve.ResolveError as error:
+            sys.exit(f'error: {error}')
+    else:
+        records = resolve.load_records(args.lock)
+    resolve.report(resolve.markdown(records))
+    build(with_records(policy, records), args.cache, args.work, args.cmake, args.fetch, args.architecture,
+          args.backend, args.formats)

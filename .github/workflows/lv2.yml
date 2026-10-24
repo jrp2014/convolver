@@ -1,13 +1,14 @@
 ---
 # SPDX-License-Identifier: GPL-2.0-or-later
-# LV2 build and test tools, pinned (PLUG-6), and Convolver's LV2 plug-ins
-# (LV2-1). Three jobs run side by side. The first proves the pins: the lv2
-# headers from the release policy build LV2's example plug-ins, lilv loads and
+# LV2 build and test tools, each the newest release (CI-6), and Convolver's
+# LV2 plug-ins (LV2-1). Three jobs run side by side. The first proves the
+# tools: the newest lv2 headers build LV2's example plug-ins, lilv loads and
 # runs one on a shared fixture, and lv2lint checks it; it then builds
 # Convolver's Release bundle and lv2lints every plug-in. The other two build
-# against the same pinned packages and run the LV2 tests (lilv-hosted PLUG-2
+# against the same packages and run the LV2 tests (lilv-hosted PLUG-2
 # harness and adapter tests) under ASan and UBSan, and the adapter tests again
-# under ThreadSanitizer (LV2-2's worker). LV2-3 adds pluginval.
+# under ThreadSanitizer (LV2-2's worker). LV2-3 adds pluginval. Each job
+# records the versions it used in its summary.
 # (lv2apply cannot host Convolver: it offers no features, and Convolver needs
 # urid:map for its state.)
 name: LV2
@@ -19,23 +20,21 @@ name: LV2
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Each Monday, so that a new upstream release of a tool or library shows up
+  # within a week even when nothing here changes (CI-6).
+  schedule:
+    - cron: '23 6 * * 1'
 
 permissions:
   contents: read
 
-# The pinned packages, shared by every job. A fixed image label is used: the
-# apt versions are Ubuntu 24.04's release pocket, which never changes; lilv's
-# libraries (serd, sord, sratom, zix) are pinned too, so noble-updates cannot
-# move them.
+# lilv and its libraries (serd, sord, sratom, zix) and the lv2 headers come
+# from the runner image's Ubuntu packages, the newest that Ubuntu 24.04 and its
+# updates offer; each job lists the versions it installed.
 env:
-  LV2_DEB: 1.18.10-2build1
-  LILV_DEB: 0.24.22-1build1
-  SERD_DEB: 0.32.2-1
-  SORD_DEB: 0.16.16-2build1
-  SRATOM_DEB: 0.6.16-1build1
-  ZIX_DEB: 0.4.2-2build1
-  LV2LINT_VERSION: 0.16.2
-  LV2LINT_SHA256: b23810571f2e18d3d6714c0acc65210a1a5fcd78fff03f1c820553a5c1c45cf4
+  LV2_PACKAGES: >-
+    lv2-dev liblilv-dev liblilv-0-0 lilv-utils libserd-dev libserd-0-0 libsord-dev libsord-0-0
+    libsratom-dev libsratom-0-0 libzix-dev libzix-0-0
 
 # A new commit on a pull request cancels the run for the commit it replaces.
 # Pushes to main and manual runs each get a group of their own.
@@ -60,30 +59,28 @@ jobs:
   tools:
     needs: scope
     if: needs.scope.outputs.build == 'true'
-    name: Pinned tools and Release bundle
+    name: Newest tools and Release bundle
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Pinned lilv and lv2 packages
+      - name: lilv and lv2 packages
         run: |
+          read -ra packages <<< "$LV2_PACKAGES"
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
-            "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
-            "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
+          sudo apt-get install -y --no-install-recommends "${packages[@]}" \
             meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
-          dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
-      - name: Pinned lv2 source (release policy)
+          python scripts/release/resolve.py packages "${packages[@]}"
+      - name: Newest lv2 source
         run: >-
-          python scripts/release/sources.py --fetch
+          python scripts/release/sources.py --latest --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" lv2
       # plugins=auto skips examples whose libraries are missing (eg-sampler
       # needs libsamplerate); the next step fails if eg-amp was not built.
-      - name: Build LV2's example plug-ins against the pinned headers
+      - name: Build LV2's example plug-ins against the newest headers
         run: |
           meson setup "$RUNNER_TEMP/lv2-build" "$RUNNER_TEMP/sources/lv2" \
             -Dplugins=auto -Ddocs=disabled -Dtests=disabled \
@@ -104,27 +101,14 @@ jobs:
           print(f'eg-amp at 0 dB, worst difference from its input: {error}')
           sys.exit(error != 0.0)
           EOF
-      - name: Pinned lv2lint
+      # The newest lv2lint release. Its own host first, then FreeBSD's
+      # distfile caches; when its host does not answer, the newest version
+      # FreeBSD's ports know is used, and the summary says so.
+      - name: Newest lv2lint
         run: |
-          archive="$RUNNER_TEMP/lv2lint-$LV2LINT_VERSION.tar.xz"
-          # Upstream first, then FreeBSD's distfile caches (plain HTTP on the
-          # main name, whose certificate does not match); the checksum, which
-          # is FreeBSD's, decides whichever answers.
-          for url in \
-            "https://git.open-music-kontrollers.ch/~hp/lv2lint/snapshot/lv2lint-$LV2LINT_VERSION.tar.xz" \
-            "https://distcache.us-east.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
-            "https://distcache.eu.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz" \
-            "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-$LV2LINT_VERSION.tar.xz"; do
-            if curl -fsSL --retry 3 -o "$archive" "$url"; then
-              if echo "$LV2LINT_SHA256  $archive" | sha256sum --check --strict; then
-                echo "lv2lint $LV2LINT_VERSION from $url"
-                break
-              fi
-              sha256sum "$archive"
-            fi
-            rm -f "$archive"
-          done
-          test -f "$archive" || { echo "No lv2lint $LV2LINT_VERSION archive matched the pinned checksum" >&2; exit 1; }
+          python scripts/release/resolve.py tool lv2lint --cache "$RUNNER_TEMP/lv2lint-download" \
+            --github-output "$RUNNER_TEMP/lv2lint.env"
+          archive=$(sed -n 's/^archive=//p' "$RUNNER_TEMP/lv2lint.env")
           mkdir "$RUNNER_TEMP/lv2lint"
           tar -xJf "$archive" -C "$RUNNER_TEMP/lv2lint" --strip-components=1
           meson setup "$RUNNER_TEMP/lv2lint-build" "$RUNNER_TEMP/lv2lint" --buildtype=release
@@ -132,7 +116,7 @@ jobs:
           sudo ninja -C "$RUNNER_TEMP/lv2lint-build" install
       - name: lv2lint checks a plug-in
         # eg-amp lacks lv2:minorVersion and lv2:microVersion, which lv2lint
-        # 0.16.2 reports as failures. Expect exactly those, so a broken or
+        # (0.16.2 when this was written) reports as failures. Expect exactly those, so a broken or
         # changed lv2lint is noticed; Convolver's bundle must pass outright.
         run: |
           set +e
@@ -168,7 +152,7 @@ jobs:
             env -u LV2_PATH lv2lint -I "$bundle" "$uri"
           done
 
-  # The sanitizer builds need only the pinned packages, not the tools job's
+  # The sanitizer builds need only the packages, not the tools job's
   # example plug-ins or lv2lint, so they run beside it. Each builds just the
   # targets its tests run.
   sanitizers:
@@ -205,17 +189,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      # The same packages as the tools job: keep the two lists alike.
-      - name: Pinned lilv and lv2 packages
+      # The same packages as the tools job.
+      - name: lilv and lv2 packages
         run: |
+          read -ra packages <<< "$LV2_PACKAGES"
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
-            "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
-            "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
+          sudo apt-get install -y --no-install-recommends "${packages[@]}" \
             meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
-          dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
+          python scripts/release/resolve.py packages "${packages[@]}"
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
@@ -238,6 +220,9 @@ jobs:
         run: >-
           ctest --test-dir build-lv2 --output-on-failure --output-junit junit.xml --parallel 2
           -R '${{ matrix.tests }}'
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python scripts/release/resolve.py explain-failure
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence

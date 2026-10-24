@@ -171,12 +171,11 @@ Until 1.0 the C++ API may change between minor versions.
   it. `convolver-vst3-preset` is now the same tool under its old name, with the
   same arguments and byte-identical output. See [plug-in presets](docs/use/presets.md).
 
-- Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
-  `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
-  test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI
-  workflows. A weekly Dependency updates workflow reports newer upstream
-  releases of every pin and keeps one tracking issue current. See
-  [pinned format dependencies](docs/develop/build.md#pinned-format-dependencies).
+- Plug-in format dependencies (PLUG-6): AudioUnitSDK and the `lv2` headers
+  in the release policy, and the test tools `lilv` and `lv2lint` in new LV2
+  and Audio Unit CI workflows. Builds now take the newest release of each
+  (CI-6, below). See
+  [supporting libraries](docs/develop/build.md#supporting-libraries).
 
 - First-use examples in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
@@ -213,6 +212,19 @@ Until 1.0 the C++ API may change between minor versions.
   opening regular files only.
 
 ### Changed
+
+- Builds use the newest release of every supporting library and tool instead
+  of pinned versions (CI-6), so security and bug fixes arrive without a pin
+  being moved: the VST3 SDK, `lv2`, AudioUnitSDK, FFTW, libsndfile, NSIS for
+  the Windows installer (now 3.13, was 3.11), pluginval, `lv2lint` and the
+  `lilv` packages. Each build records exactly what it used (version, commit
+  and archive checksum) in its job summary, the source bundle's
+  `source-manifest.json` and the package's `artifact-manifest.json` and
+  `licenses/DEPENDENCIES.json`, and a recorded build can be repeated with
+  `sources.py --lock`. The VST3 and Audio Unit plug-ins name their SDK in the
+  Convolver log. The VST3, LV2, Audio Unit and candidate workflows also run
+  every Monday, replacing the weekly Dependency updates check. See
+  [supporting libraries](docs/develop/build.md#supporting-libraries).
 
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
   VST3 plug-in and GarageBand for the Audio Unit, each with a step-by-step

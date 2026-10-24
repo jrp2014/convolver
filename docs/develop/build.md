@@ -25,8 +25,8 @@ Contents: [choose a build](#choose-a-build) ·
 [sanitizer build](#sanitizer-build-for-changes) · [presets](#cmake-presets) ·
 [FFT backend](#fft-backend) · [Windows](#windows) · [options](#build-options) ·
 [targets and installing](#targets-and-installing) · [plug-ins](#plug-ins) ·
-[pinned format dependencies](#pinned-format-dependencies) ·
-[pinned preview recipe](#pinned-preview-recipe) ·
+[supporting libraries](#supporting-libraries) ·
+[preview recipe](#preview-recipe) ·
 [when a build fails](#when-a-build-fails)
 
 ## Choose a build
@@ -38,7 +38,7 @@ Contents: [choose a build](#choose-a-build) ·
 | Only the C++ libraries, for your own program | [Library guide](library.md#core-only-build) |
 | No FFT library at all | Add `-DCONVOLVER_FFT_BACKEND=OOURA` ([FFT backend](#fft-backend)) |
 | A VST3, Audio Unit or LV2 plug-in | [Plug-ins](#plug-ins) |
-| The exact recipe used for preview packages | [Pinned preview recipe](#pinned-preview-recipe) |
+| The exact recipe used for preview packages | [Preview recipe](#preview-recipe) |
 
 ## Dependencies
 
@@ -167,8 +167,8 @@ folder. Plug-in builds on Windows use static libraries with the dynamic MSVC
 runtime ([VST3](#vst3)). Use a fresh build folder when changing triplets.
 
 Package-manager versions change over time; `--version` records the ones
-linked. Pin dependencies, as the [preview recipe](#pinned-preview-recipe)
-does, before producing a reproducible binary.
+linked. The [preview recipe](#preview-recipe) builds its libraries from
+source and records exactly which releases it used.
 
 ## Build options
 
@@ -183,7 +183,7 @@ does, before producing a reproducible binary.
 | `CONVOLVER_VST3_RUNTIME_VALIDATION` | ON | Run the SDK tools that load the bundle; turn off where local policy rejects ad-hoc-signed code |
 | `CONVOLVER_PLUGINVAL`, `CONVOLVER_PLUGINVAL_ARGS` | empty | Optional pluginval executable and extra options for the host-compatibility tests |
 | `CONVOLVER_BUILD_AU` | OFF | Audio Unit adapter (macOS); see [Audio Unit](#audio-unit) |
-| `CONVOLVER_AU_SDK` | empty | AudioUnitSDK 1.4.0 source folder |
+| `CONVOLVER_AU_SDK` | empty | AudioUnitSDK source folder |
 | `CONVOLVER_BUILD_LV2` | OFF | LV2 adapter; see [LV2](#lv2) |
 | `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution |
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
@@ -232,19 +232,20 @@ alone never needs one. In every plug-in build:
 - the result is a developer build: not signed, notarized or packaged. Installing
   it for a host is in [install](../use/install.md#where-each-plug-in-goes).
 
-Every SDK and test tool is pinned by commit and checksum; the table, and how to
-move a pin, are in [pinned format dependencies](#pinned-format-dependencies).
+Builds use the newest release of each SDK and test tool and record which
+([supporting libraries](#supporting-libraries)).
 
 ### VST3
 
-Needs CMake 3.25 or later and the Steinberg VST3 SDK 3.8.1 build 84 (commit
-`3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96`, which the CI workflow pins):
+Needs CMake 3.25 or later and the newest Steinberg VST3 SDK release with four
+of its submodules, which `sources.py` fetches, checks and unpacks (the
+summary it prints names the release):
 
 ```sh
-git clone --branch v3.8.1_build_84 --depth 1 https://github.com/steinbergmedia/vst3sdk.git /path/to/vst3sdk
-git -C /path/to/vst3sdk submodule update --init --depth 1 base cmake pluginterfaces public.sdk
+python3 scripts/release/sources.py --latest --fetch --cache build/downloads \
+  --destination build/sources vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
 cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release \
-  -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK=/path/to/vst3sdk
+  -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK="$PWD/build/sources/vst3sdk"
 cmake --build build-vst3 --config Release --parallel 2
 ctest --test-dir build-vst3 -C Release --output-on-failure
 ```
@@ -268,7 +269,10 @@ cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON `
 An FFTW override on Windows needs static FFTW too
 (`fftw3:x64-windows-static-md`). A core-only plug-in build can turn I/O and the
 CLI off; the preset tools are then omitted. The `release-vst3` preset is the
-packaged variant; its recipe is the [pinned preview recipe](#pinned-preview-recipe).
+packaged variant; its recipe is the [preview recipe](#preview-recipe). A Git
+checkout of the SDK works too: clone the newest `v3.*` tag of
+`https://github.com/steinbergmedia/vst3sdk` and run
+`git submodule update --init --depth 1 base cmake pluginterfaces public.sdk`.
 
 macOS may refuse to load ad-hoc-signed developer bundles. Use a developer
 signing or approval workflow, or set `-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF`
@@ -277,12 +281,12 @@ disable system security checks.
 
 ### Audio Unit
 
-Needs macOS 11 or later, CMake 3.20+, Xcode's command-line tools (C++23, for
-AudioUnitSDK 1.4.0) and the pinned AudioUnitSDK. Fetch and unpack it, then
-configure with it:
+Needs macOS 11 or later, CMake 3.20+, Xcode's command-line tools (C++23, which
+AudioUnitSDK has needed since 1.4.0) and the newest AudioUnitSDK release. Fetch
+and unpack it, then configure with it:
 
 ```sh
-python3 scripts/release/sources.py --fetch --cache build/downloads \
+python3 scripts/release/sources.py --latest --fetch --cache build/downloads \
   --destination build/sources audiounitsdk
 cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_AU=ON \
   -DCONVOLVER_AU_SDK="$PWD/build/sources/AudioUnitSDK"
@@ -292,8 +296,8 @@ ctest --test-dir build-au --output-on-failure
 
 The component is `build-au/plugins/au/Convolver.component`. It links no FFT
 library (Accelerate is part of macOS); libsndfile is used only by the tools and
-tests. The AU target builds as C++23 because AudioUnitSDK 1.4.0 needs it; the
-core and other formats stay C++20.
+tests. The AU target builds as C++23 because AudioUnitSDK needs it; the core
+and other formats stay C++20.
 
 ### LV2
 
@@ -316,68 +320,98 @@ source ([identities](plugin-identities.md)). The library exports only
 `lv2_descriptor`, so it cannot clash with a VST3 build or another version in the
 same host.
 
-## Pinned format dependencies
+## Supporting libraries
 
-Every plug-in format's SDK is pinned by commit and archive SHA-256 in
-`packaging/release-policy.json`, and every test tool by version and checksum in
-CI (PLUG-6), so a build or a validator result can be repeated. The workflows
-are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml`:
+Builds use the **newest release** of every SDK, library and tool they depend
+on, not a pinned one, so security and bug fixes arrive without anyone moving a
+pin. In exchange, every build records exactly what it used, and a recorded
+build can be repeated exactly. The release policy
+([`packaging/release-policy.json`](../../packaging/release-policy.json)) says
+only where each dependency comes from: its Git repository, how its tags name
+releases, and where its archive is downloaded.
 
-| Dependency | Pin | Used by | Where pinned |
+| Dependency | Newest release taken from | Used by | Recorded in |
 | --- | --- | --- | --- |
-| VST3 SDK (`vst3sdk` and four submodules) | 3.8.1 build 84, commit `3cdf9ca` | VST3 builds | Release policy; the VST3 workflow checks out the same commit |
-| `lv2` headers | 1.18.10, commit `0bcde33` | LV2 builds | Release policy |
-| AudioUnitSDK | 1.4.0, commit `bd98b31` | AU builds | Release policy |
-| `lilv` (test host) and its libraries | Ubuntu 24.04 packages by exact version (`0.24.22-1build1`; serd, sord, sratom, zix too) | LV2 tests | LV2 workflow |
-| `lv2lint` | 0.16.2, archive SHA-256 | LV2 validation | LV2 workflow |
-| pluginval | v2.0.0-beta3, archive SHA-256 per platform | VST3 validation, later LV2 and AU | VST3 workflow |
-| `auval` | ships with macOS; the image label is `macos-15`, and each run logs the macOS and Xcode versions | AU validation | Audio Unit workflow |
+| VST3 SDK (`vst3sdk` and its `base`, `cmake`, `pluginterfaces` and `public.sdk` submodules) | `vst3sdk` tags `v3.8.1_build_84` and so on; the submodule commits are the ones that tag records | VST3 builds, preview packages | Job summary, source and artifact manifests, Convolver log |
+| `lv2` headers | `lv2` tags | LV2 builds | Job summary, source manifest |
+| AudioUnitSDK | `AudioUnitSDK-` tags | AU builds | Job summary, source manifest, Convolver log |
+| FFTW | `fftw3` tags; the archive from fftw.org | FFTW builds (none of the preview packages) | Job summary, source manifest |
+| libsndfile | `libsndfile` tags; the release archive | Every build with I/O, preview packages | Job summary, source and artifact manifests, `convolver --version` |
+| NSIS | `kichik/nsis` tags (`v313` is 3.13); the archive from SourceForge | The Windows installer | Job summary, candidate record |
+| pluginval | `Tracktion/pluginval` tags, pre-releases included (2.0 is still in beta) | VST3 validation, later LV2 and AU | Job summary |
+| `lv2lint` | Its own Git host; when that does not answer, the newest version FreeBSD's ports list | LV2 validation | Job summary |
+| `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates | LV2 tests | Job summary |
+| `auval` | Ships with macOS on the `macos-15` image | AU validation | Each run logs the macOS and Xcode versions |
 
-AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds
-as C++23 while the core and the other formats stay C++20. jrp chose 1.4.0 over
-the C++20 1.3.0. Its licence is Apache-2.0, which is why the
-AU component is distributed under GPL-3.0-or-later
-([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
+Pre-releases are skipped except where the policy allows them (pluginval). For
+each dependency a build records the version, the tag, the commit the tag
+points at and the SHA-256 of the archive it downloaded:
+
+- every CI job lists them in its summary;
+- the corresponding source bundle's `source-manifest.json` holds the full
+  records, and the bundle carries the archives themselves;
+- each preview package's `artifact-manifest.json` and
+  `licenses/DEPENDENCIES.json` list the ones it was built with;
+- the Convolver log's session line names the plug-in SDK, for example
+  "built with VST3 SDK 3.8.1_build_84, commit 3cdf9ca5d1f5"
+  ([status and the Convolver log](../use/plugins.md#status-and-the-convolver-log)).
+  CMake reads it from the `.convolver-source.json` that `sources.py` leaves in
+  each SDK it unpacks, or from `git describe` in an SDK checkout.
+
+`scripts/release/resolve.py` finds the newest releases (with `git ls-remote`,
+so no API token is needed) and `scripts/release/sources.py` fetches, checks and
+unpacks them. To get the newest SDKs yourself:
+
+```sh
+python3 scripts/release/sources.py --latest --fetch --cache build/downloads \
+  --destination build/sources lv2 audiounitsdk
+```
+
+`--version audiounitsdk=1.3.0` takes another release instead of the newest,
+and `--record lock.json` writes the records to a file. To repeat a recorded
+build exactly, pass the records back with `--lock`: a lock file, or the
+`source-manifest.json` of a source bundle. The archives are then fetched by
+their recorded URL and refused if their checksum differs:
+
+```sh
+python3 scripts/release/sources.py --lock source-manifest.json --fetch \
+  --cache build/downloads --destination build/sources vst3sdk vst3-base vst3-cmake \
+  vst3-pluginterfaces vst3-public-sdk
+```
 
 Each SDK entry in the policy lists the plug-in `formats` that use it.
 `build_dependencies.py --formats vst3 lv2 au` unpacks those formats' SDKs and
 ships their notices; the default is `vst3`, the only format in preview
 packages. An artifact manifest lists only the dependencies its build used,
-while the corresponding source bundle carries every pinned archive (about
-0.4 MB more for lv2 and AudioUnitSDK), so one bundle serves every format. To
-fetch, verify and unpack chosen pins on their own:
+while the corresponding source bundle carries every dependency's archive (about
+0.4 MB more for lv2 and AudioUnitSDK), so one bundle serves every format.
 
-```sh
-python3 scripts/release/sources.py --fetch --cache build/downloads \
-  --destination build/sources lv2 audiounitsdk
-```
+The VST3, LV2, Audio Unit and candidate workflows also run every Monday, so a
+new upstream release is built and tested within a week even when nothing in
+Convolver changes. GitHub Actions versions are updated by Dependabot instead.
 
-To move a pin, change the policy entry (or the workflow) in its own pull
-request and say why. A GitHub archive's checksum can be computed without
-downloading it, from a clone at that commit:
-`git archive --format=tar --prefix=REPO-COMMIT/ COMMIT | gzip -n | sha256sum`
-(for example `--prefix=lv2-0bcde338…/`); the `sources` job of the candidate
-workflow downloads every pinned archive and fails on a mismatch.
+### When a new release breaks the build
 
-The Dependency updates workflow (`.github/workflows/updates.yml`) looks for
-newer releases every Monday. `scripts/release/check_updates.py` reads each pin
-above except `auval`, which comes with macOS (plus FFTW and libsndfile from the
-release policy), lists the upstream tags and reports which pins have a newer
-release. The VST3 SDK is checked by the `vst3sdk` tag, whose commit fixes its
-four submodules. The check also flags a policy pin whose tag no longer points
-at the pinned commit, and a VST3 workflow checkout that differs from the
-policy. On `main`, one open issue titled "Newer versions of pinned
-dependencies" carries the report; it gets a comment when the findings change
-and is closed when every pin is current. If the repository has issues turned
-off, the run fails instead when something needs attention. An upstream host
-that does not answer after three tries is a warning in the run, not a reason
-to open the issue. `lilv` is listed for information only, because its version
-follows the `ubuntu-24.04` image. The check moves nothing: each update is its
-own pull request. Run it locally with
-`python3 scripts/release/check_updates.py`. GitHub Actions versions are
-updated by Dependabot instead.
+Because builds follow upstream, a new release can turn CI red with no change
+in Convolver; a scheduled Monday run is usually where it shows first. Each
+failed job ends with a note saying how to tell. Compare the versions in its
+summary with the last green run's. To confirm a suspect, build with the
+previous release (`--version NAME=OLD_VERSION`, as above), then change
+Convolver to work with the new release in a pull request. Nothing pins the old
+release in the meantime: a new SDK release that needs code changes keeps CI red
+until that pull request is merged. AudioUnitSDK is the likeliest: 1.4.0 needed
+C++23 (for `std::expected`), so the AU target builds as C++23 while the core
+and the other formats stay C++20. Its licence is Apache-2.0, which is why the
+AU component is distributed under GPL-3.0-or-later
+([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
 
-## Pinned preview recipe
+If an upstream host does not answer, the job fails and names the host; run it
+again later. `lv2lint`'s small host has a fallback (FreeBSD's ports list and
+distfile caches), and the summary says when it was used. When an upstream
+project moves or renames its repository or tags, update its entry in the
+release policy.
+
+## Preview recipe
 
 Preview packages are built this way. It needs CMake 3.25 or later and Ninja (or
 a Visual Studio generator). The recipe builds static libsndfile (built-in
@@ -388,7 +422,7 @@ commands work in a Unix shell or a Visual Studio developer terminal with Python
 and CMake on `PATH` (use one line per command in PowerShell):
 
 ```sh
-python3 scripts/release/build_dependencies.py --cache build/downloads --work build/deps --fetch
+python3 scripts/release/build_dependencies.py --latest --cache build/downloads --work build/deps --fetch
 cmake --preset release-vst3 -DCONVOLVER_VST3_SDK="$PWD/build/deps/sources/vst3sdk" \
   -DCMAKE_PREFIX_PATH="$PWD/build/deps/prefix" \
   -DCONVOLVER_DISTRIBUTION_LICENSE_DIR="$PWD/build/deps/licenses"
@@ -398,18 +432,23 @@ cmake --install build/presets/release-vst3 --config Release --prefix stage --com
 ```
 
 On macOS add `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`. Use `$PWD` in PowerShell or
-absolute paths in cmd. `--fetch` explicitly permits network acquisition;
-omitting it requires the already supplied, hash-checked sources. No optional CPU
+absolute paths in cmd. `--latest` takes the newest release of each library
+and `--fetch` explicitly permits downloading them; `--lock FILE` instead
+builds the releases a lock file or source manifest records, and without
+`--fetch` they must already be in the cache, where their checksums are
+checked. No optional CPU
 instruction set is enabled in an FFTW build. Windows uses static libraries and
 the dynamic MSVC runtime consistently. The staged package ships `docs/use/` as
 its guide (`scripts/release/package_docs.py` points links to other pages at
 the source repository at the packaged commit).
 
-`build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
-assembles **committed** source and the pinned dependency archives. Then
+`build_sources.py --latest --fetch --cache build/downloads --output build/Convolver-source.tar.gz`
+assembles **committed** source and the archives of each dependency's newest
+release, and records them in its `source-manifest.json` (`--lock` assembles
+recorded ones again). Then
 `python3 tests/release/source_build.py --archive build/Convolver-source.tar.gz`
 rebuilds dependencies, core, tools and SDK from a fresh extraction without
-fetching, and runs their tests (the CMake package consumers, which nothing
+fetching, using exactly the releases its manifest records, and runs their tests (the CMake package consumers, which nothing
 shipped uses, run in native CI instead). Its `--backend` defaults to `AUTO`, as above;
 `--sdk`, `--prefix` and `--backend` also check a fresh build against an SDK and
 dependencies you supply. A failed validator remains a release blocker.

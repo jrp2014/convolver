@@ -3,10 +3,11 @@
 # AudioUnitSDK (Apache-2.0). The built component is distributed under
 # GPL-3.0-or-later (owner's decision, 21 October 2026); see NOTICE.txt.
 cmake_minimum_required(VERSION 3.20)
-set(CONVOLVER_AU_SDK "" CACHE PATH "AudioUnitSDK 1.4.0 source directory (packaging/release-policy.json)")
+set(CONVOLVER_AU_SDK "" CACHE PATH "AudioUnitSDK source directory, the newest release (docs/develop/build.md)")
 if(NOT EXISTS "${CONVOLVER_AU_SDK}/include/AudioUnitSDK/AUBase.h")
-    message(FATAL_ERROR "Set CONVOLVER_AU_SDK to the pinned AudioUnitSDK 1.4.0; "
-        "scripts/release/sources.py --fetch ... audiounitsdk unpacks it (docs/develop/build.md)")
+    message(FATAL_ERROR "Set CONVOLVER_AU_SDK to an AudioUnitSDK source directory; "
+        "scripts/release/sources.py --latest --fetch ... audiounitsdk unpacks the newest release "
+        "(docs/develop/build.md#supporting-libraries)")
 endif()
 if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     # AudioUnitSDK supports macOS 11 and later.
@@ -23,6 +24,10 @@ set_target_properties(convolver_ausdk PROPERTIES CXX_EXTENSIONS OFF POSITION_IND
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 target_link_libraries(convolver_ausdk PUBLIC "-framework AudioToolbox" "-framework CoreAudio"
     "-framework CoreFoundation" "-framework CoreMIDI")
+
+# The exact SDK, for the Convolver log (CI-6).
+include("${PROJECT_SOURCE_DIR}/cmake/ConvolverSdkDescription.cmake")
+convolver_sdk_description("AudioUnitSDK" "${CONVOLVER_AU_SDK}")
 
 # The adapter itself, shared by the component and its tests.
 add_library(convolver_au_adapter STATIC effect.cpp)

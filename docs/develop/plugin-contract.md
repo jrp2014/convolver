@@ -180,7 +180,10 @@ format.
   Control thread only. Loads and rejections are numbered by request
   (`loaded_line()`, `rejected_line()`: `Request 3: ...`), every line names the
   process ID, and the process's first line is `execution_line()`: version,
-  FFT backend and its version, CPU kernels, process and host program. A line
+  FFT backend and its version, CPU kernels, the format SDK the adapter was
+  built with (`set_host_log_sdk()`, from the build's `CONVOLVER_SDK_DESCRIPTION`;
+  [supporting libraries](build.md#supporting-libraries)), process and host
+  program. A line
   the file does not take goes to standard error (and `OutputDebugString` on
   Windows), after one line saying why, and `host_log_written()` turns false;
   the file gets the execution line with its first written line. An empty

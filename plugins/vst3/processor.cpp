@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "processor.hpp"
 #include "bytes.hpp"
+#include "convolver_sdk.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
@@ -62,6 +63,7 @@ std::string next_tag() {
 }
 } // namespace
 Processor::Processor() : tag_(next_tag()) {
+    set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
     setControllerClass(controller_id);
 }
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {

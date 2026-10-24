@@ -1,39 +1,48 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Explicit hash-verified source acquisition and safe archive extraction.
 
-Run directly to fetch, verify and unpack chosen pins, for example the LV2
-headers or AudioUnitSDK in CI:
-python3 scripts/release/sources.py --fetch --cache DIR --destination DIR lv2
+Run directly to fetch, verify and unpack chosen dependencies, for example the
+LV2 headers or AudioUnitSDK in CI. --latest resolves each to its newest
+release (resolve.py) and records what it used; --lock rebuilds exactly the
+sources a lock file or source manifest records:
+
+python3 scripts/release/sources.py --latest --fetch --cache DIR --destination DIR lv2
+python3 scripts/release/sources.py --lock source-manifest.json --fetch --cache DIR --destination DIR lv2
+
+Each unpacked directory gets a .convolver-source.json with its record, which
+the plug-in builds read to name the SDK they were built with.
 """
 import argparse
+import json
 from pathlib import Path, PurePosixPath
 import posixpath
 import shutil
+import sys
 import tarfile
 import tempfile
-import urllib.request
-from contract import load_policy, sha256
+from contract import load_policy, sha256, with_records
+import resolve
+
+
+STAMP = '.convolver-source.json'
 
 
 def verify(path, dependency):
-    if sha256(path) != dependency['sha256']:
-        raise ValueError(f'source hash mismatch: {Path(path).name}')
+    actual = sha256(path)
+    if actual != dependency['sha256']:
+        raise ValueError(f'source hash mismatch: {Path(path).name} is {actual}, but the record says '
+                         f'{dependency["sha256"]} ({dependency.get("url", "no URL recorded")})')
 
 
 def acquire(dependency, cache, fetch=False):
+    """The recorded archive from cache, downloaded first when fetch allows;
+    its checksum must match the record."""
     path = cache / dependency['archive']
-    if not path.is_file():
+    if not path.is_file() or (fetch and sha256(path) != dependency['sha256']):
         if not fetch:
-            raise ValueError(f'missing pinned source archive: {path.name}; use --fetch explicitly')
-        cache.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=cache, delete=False) as temporary:
-            temp = Path(temporary.name)
-        try:
-            urllib.request.urlretrieve(dependency['url'], temp)
-            verify(temp, dependency)
-            temp.replace(path)
-        finally:
-            temp.unlink(missing_ok=True)
+            raise ValueError(f'missing source archive: {path.name}; use --fetch explicitly')
+        path.unlink(missing_ok=True)
+        resolve.fetch_archive(dependency['url'], cache, dependency['archive'])
     verify(path, dependency)
     return path
 
@@ -84,7 +93,8 @@ def extract(archive, destination):
 
 
 def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
-    """Unpack every pinned dependency, or only those in names."""
+    """Unpack every dependency the policy's resolved records name, or only
+    those in names (see contract.with_records)."""
     if names is not None and not set(names) <= set(policy['dependencies']):
         raise ValueError(f'unknown dependencies: {sorted(set(names) - set(policy["dependencies"]))}')
     # Parent SDK before its submodules; never trust an old extracted tree.
@@ -93,10 +103,11 @@ def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
     for name, dependency in ordered:
         archive = acquire(dependency, cache, fetch)
         target = destination / dependency['directory']
-        stamp = target / '.convolver-source-sha256'
+        stamp = target / STAMP
         if stamp.exists():
-            if stamp.read_text().strip() != dependency['sha256']:
-                raise ValueError(f'{name}: stale extracted sources; use a fresh work directory')
+            if json.loads(stamp.read_text(encoding='utf-8')).get('sha256') != dependency['sha256']:
+                raise ValueError(f'{name}: {target} holds other sources than the record; use a fresh '
+                                 'work directory')
             continue
         if target.exists() and any(target.iterdir()):
             raise ValueError(f'{name}: unverified nonempty source directory')
@@ -107,19 +118,58 @@ def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
             if len(roots) != 1 or not roots[0].is_dir():
                 raise ValueError(f'{name}: archive must have one top-level directory')
             shutil.copytree(roots[0], target, dirs_exist_ok=True)
-        stamp.write_text(dependency['sha256'] + '\n')
+        stamp.write_text(json.dumps(dict(dependency, name=name), indent=2) + '\n', encoding='utf-8')
 
 
-if __name__ == '__main__':
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
     parser.add_argument('--cache', type=Path, required=True, help='Directory of downloaded archives')
     parser.add_argument('--destination', type=Path, required=True, help='Directory to unpack into')
-    parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing pinned archives')
+    parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing archives')
+    which = parser.add_mutually_exclusive_group(required=True)
+    which.add_argument('--latest', action='store_true', help='Resolve each to its newest release (needs --fetch)')
+    which.add_argument('--lock', type=Path, help='A lock file or source manifest to rebuild exactly')
+    parser.add_argument('--version', action='append', metavar='NAME=VERSION',
+                        help='With --latest: use this release instead of the newest (repeatable)')
+    parser.add_argument('--record', type=Path, help='Also write the records used to this lock file')
+    parser.add_argument('--github-output', type=Path,
+                        help='Append NAME=DIRECTORY (with forward slashes) for each named dependency here')
     parser.add_argument('names', nargs='+', help='Dependency names from the policy, such as lv2 or audiounitsdk')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     policy = load_policy(args.policy)
-    args.destination.mkdir(parents=True, exist_ok=True)
-    unpack_dependencies(policy, args.cache.resolve(), args.destination.resolve(), args.fetch, set(args.names))
-    for name in args.names:
-        print(f"{name} {policy['dependencies'][name]['version']}: {args.destination / policy['dependencies'][name]['directory']}")
+    cache = args.cache.resolve()
+    try:
+        if args.latest:
+            if not args.fetch:
+                parser.error('--latest downloads the archives; add --fetch')
+            records = resolve.resolve(policy, cache, set(args.names), resolve.parse_wanted(args.version))
+        else:
+            if args.version:
+                parser.error('--version needs --latest')
+            records = resolve.load_records(args.lock)
+        names = resolve.expand(policy['dependencies'], set(args.names))
+        records = {name: records[name] for name in names if name in records}
+        missing = names - set(records)
+        if missing:
+            raise ValueError(f'{args.lock} has no record for {sorted(missing)}')
+        resolved = with_records(dict(policy, dependencies={n: policy['dependencies'][n] for n in names}), records)
+        args.destination.mkdir(parents=True, exist_ok=True)
+        unpack_dependencies(resolved, cache, args.destination.resolve(), args.fetch, set(names))
+    except ValueError as error:
+        print(f'error: {error}', file=sys.stderr)
+        return 1
+    if args.record:
+        args.record.write_text(json.dumps(resolve.lock(records), indent=2) + '\n', encoding='utf-8')
+    resolve.report(resolve.markdown(records))
+    for name in sorted(args.names):
+        print(f"{name} {records[name]['version']}: {args.destination / records[name]['directory']}")
+    if args.github_output:
+        with args.github_output.open('a', encoding='utf-8') as output:
+            for name in sorted(args.names):
+                output.write(f"{name}={(args.destination.resolve() / records[name]['directory']).as_posix()}\n")
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -506,13 +506,6 @@ so the preset file path is not needed).
   and analysis pins with the latest stable packaged releases. Refresh CI caches
   when the formatter release changes, keep local and cloud instructions aligned,
   and validate formatting and analysis in CI. Local installation is deferred.
-- [ ] **CI-6 — Keep supporting libraries on their newest releases.** Builds
-  resolve the newest release of each SDK, library and test tool (VST3 SDK,
-  lv2, AudioUnitSDK, FFTW, libsndfile, NSIS, pluginval, lv2lint, the lilv
-  packages) instead of a pinned one, and record exactly what they used
-  (version, commit, SHA-256) in the source and artifact manifests, the job
-  summary and, for VST3 and AU, the Convolver log. A recorded manifest still
-  rebuilds a release exactly.
 
 ## Documented limitations
 
@@ -564,6 +557,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   absolute error came from, so a new, louder test (PERF-5's
   `history_validity`, peak 7.6) no longer looks like a tenfold loss of
   accuracy; [native tests](docs/develop/testing.md#native-production-tests).
+- [x] **CI-6 — Keep supporting libraries on their newest releases.** 24
+  October 2026, PR #77, by jrp's decision: builds resolve the newest release of
+  each SDK, library and tool instead of a pin, and record version, commit and
+  checksum in the job summary, source and artifact manifests and, for VST3 and
+  AU, the Convolver log; `sources.py --lock` repeats a recorded build;
+  [supporting libraries](docs/develop/build.md#supporting-libraries).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
@@ -606,7 +605,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PLUG-4 — Layouts and identities.** 22 October 2026, PR #27;
   [plug-in identities](docs/develop/plugin-identities.md).
 - [x] **PLUG-6 — Pin format dependencies.** 22 October 2026, PR #31;
-  [pinned format dependencies](docs/develop/build.md#pinned-format-dependencies).
+  [supporting libraries](docs/develop/build.md#supporting-libraries); replaced by CI-6.
 - [x] **PLUG-7 — Lifecycle sequence tests.** 23 October 2026, PR #58;
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;

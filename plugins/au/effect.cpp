@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "effect.hpp"
+#include "convolver_sdk.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
@@ -86,6 +87,7 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
 
 Effect::Effect(AudioComponentInstance instance)
     : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt)), tag_(next_tag()) {
+    set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
     // Not UseIndexedParameters: that numbers parameters from 0, and Status is
     // 1001 (plugins/identities.json), so the parameter map is used instead.
     Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));

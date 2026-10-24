@@ -100,7 +100,8 @@ were recorded in the repository; this log is their first written record.
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 21 October 2026 | The Audio Unit is built with Apple's AudioUnitSDK and distributed under GPL-3.0-or-later with its Apache-2.0 notices; everything else stays GPL-2.0-or-later | [Audio Unit licence](../use/plugins.md#audio-unit-licence) |
-| 22 October 2026 | AudioUnitSDK 1.4.0, so the AU target builds as C++23 while everything else stays C++20 | [Build from source](../develop/build.md#pinned-format-dependencies) |
+| 22 October 2026 | AudioUnitSDK 1.4.0, so the AU target builds as C++23 while everything else stays C++20 (the pin is replaced by CI-6, 24 October 2026; the C++23 choice stands) | [Build from source](../develop/build.md#when-a-new-release-breaks-the-build) |
+| 24 October 2026 | Supporting libraries and tools (VST3 SDK, lv2, AudioUnitSDK, FFTW, libsndfile, NSIS, pluginval, lv2lint, lilv) follow their newest releases instead of pins, for security and bug fixes, provided every build records exactly what it used (version, commit, checksum) in its summary and manifests, and a recorded build can be repeated exactly (CI-6). CI going red on a new upstream release is accepted; Convolver is then changed to work with it. Replaces the pins of PLUG-6 (22 October 2026) | [Supporting libraries](../develop/build.md#supporting-libraries), [when a new release breaks the build](../develop/build.md#when-a-new-release-breaks-the-build) |
 | 24 October 2026 | The preview packages do not ship libFLAC, libogg, libvorbis or libopus (IO-6), so they neither read FLAC or Ogg nor write FLAC; the limitation and the workarounds (convert, or build against a libsndfile that has them) are documented | [FLAC and Ogg](../use/command-line.md#flac-and-ogg) |
 
 ## Documentation

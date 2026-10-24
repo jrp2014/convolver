@@ -7,7 +7,7 @@ import platform
 import re
 import subprocess
 import tarfile
-from contract import load_policy, platform_policy, sha256, used_dependencies
+from contract import load_policy, platform_policy, sha256, used_dependencies, with_records
 
 
 def check_dependencies(system, dependencies, policy):
@@ -50,7 +50,7 @@ def verify_files(root, expected):
             raise ValueError(f'file hash mismatch: {name}')
 
 
-def source_record(archive):
+def source_manifest(archive):
     if not archive.is_file():
         raise ValueError('matching corresponding-source archive is required')
     with tarfile.open(archive) as tar:
@@ -59,7 +59,19 @@ def source_record(archive):
             source = json.load(stream)
     if not re.fullmatch(r'[0-9a-f]{40}', source.get('source_commit', '')):
         raise ValueError('invalid source archive commit')
+    return source
+
+
+def source_record(archive):
+    source = source_manifest(archive)
     return dict(name=archive.name, sha256=sha256(archive), source_commit=source['source_commit'], version=source['version'])
+
+
+def used_records(policy, archive, backend):
+    """The exact dependency releases (CI-6) this build used, from the source archive."""
+    resolved = with_records(policy, source_manifest(archive)['dependencies'])
+    used = used_dependencies(resolved, ('vst3',), backend)
+    return {name: dep for name, dep in resolved['dependencies'].items() if name in used}
 
 
 def output(command):
@@ -169,8 +181,8 @@ def main():
                 raise ValueError(f'missing release content: {required}')
         manifest = dict(schema=1, version=policy['version'], platform=args.platform, source_commit=build['source_commit'],
                         backend=candidate['backend'], channel='developer-preview', source=source, build=build,
-                        build_os=platform.platform(), dependencies={name: dep for name, dep in policy['dependencies'].items()
-                                                   if name in used_dependencies(policy, ('vst3',), candidate['backend'])},
+                        build_os=platform.platform(), dependencies=used_records(policy, args.source_archive,
+                                                                                candidate['backend']),
                         binaries=inspect(root, candidate, policy),
                         files=inventory(root))
         args.manifest.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')

@@ -32,7 +32,7 @@ Contents: [readers](#readers-and-folders) · [kinds of page](#kinds-of-page) ·
 
 | Folder | Reader | What they want | Keep out |
 | --- | --- | --- | --- |
-| `docs/use/` | Someone applying filters with the command-line tool, in a plug-in host, or system-wide on Windows. Shipped in preview packages. | Install, load a filter, hear it, fix a problem | Build recipes, SDK pins, internals, TODO IDs, test evidence |
+| `docs/use/` | Someone applying filters with the command-line tool, in a plug-in host, or system-wide on Windows. Shipped in preview packages. | Install, load a filter, hear it, fix a problem | Build recipes, SDK versions, internals, TODO IDs, test evidence |
 | `docs/develop/` | Someone building from source, embedding the library, packaging a fork or changing Convolver, including coding agents | Build, find the code, know the rules and contracts, prove a change | User hand-holding, history |
 | `docs/project/` | jrp, and anyone asking where Convolver is going and why | Status, direction, open plans, decisions, history | Instructions |
 | `docs/archive/` | Anyone checking what was true or decided at a date | Dated reviews, completed plans, release records | Anything current; records are never edited, but the index pages in it (such as `archive/plans/README.md`) are maintained |
@@ -131,7 +131,7 @@ can act on it without a separate copy of the rules:
 | Plug-in identities and channel layouts | [Plug-in identities](plugin-identities.md) | `plugins/identities.json`, `tests/identities_tests.py`, `vst3.identities` |
 | Plug-in presets and the preset tool | [Plug-in presets](../use/presets.md); file formats in the [contract](plugin-contract.md#preset-files) | `portable/presets.*`, `portable/preset_main.cpp`, `native.presets`, `plugins.presets`, `vst3.preset_format` |
 | System-wide filtering on Windows | [Equalizer APO export](../use/equalizer-apo.md) | `portable/equalizer_apo*.cpp`, `export.equalizer_apo` and its model of Equalizer APO |
-| Plug-in downloads and release gates | [Install](../use/install.md), [releasing](releasing.md), [build from source](build.md#pinned-preview-recipe), [host testing](host-testing.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
+| Plug-in downloads and release gates | [Install](../use/install.md), [releasing](releasing.md), [build from source](build.md#preview-recipe), [host testing](host-testing.md) | `packaging/release-policy.json`, `scripts/release/`, `tests/release/`, candidate workflow |
 | Status, evidence levels and direction | [Status](../project/status.md) | TODO, open pull requests, GitHub releases, host records |
 | jrp's decisions | [Decisions](../project/decisions.md), with the details on the page each row links to; other pages state decisions as plain fact ([rule](workflow.md#while-working)) | TODO, the guides and pull requests that describe the work |
 | Dependency choices | [Implementation map](architecture.md#dependency-choices) | `CMakeLists.txt`, the release policy |

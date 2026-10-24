@@ -498,7 +498,7 @@ That is why the flags used to build the FFT library matter little here: building
 Ooura's code alone for AVX2 changed nothing measurable (0.96–1.03×), while
 building only `engine.cpp` for AVX2 gave the whole AVX2 gain. For FFTW, a SIMD
 build is still worth having for short filters ([above](#fftw-build-and-planner-findings)).
-The pinned preview recipe builds FFTW without SIMD, but no preview package uses
+The preview recipe builds FFTW without SIMD, but no preview package uses
 FFTW; enable FFTW's SSE2/AVX/AVX2 (chosen at run time by FFTW) if one ever does.
 
 ### Compiler flags

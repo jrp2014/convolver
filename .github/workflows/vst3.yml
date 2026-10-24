@@ -8,6 +8,10 @@ name: VST3 compatibility
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Each Monday, so that a new upstream release of an SDK or tool shows up
+  # within a week even when nothing here changes (CI-6).
+  schedule:
+    - cron: '23 6 * * 1'
 permissions:
   contents: read
 # A new commit on a pull request cancels the run for the commit it replaces.
@@ -58,18 +62,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
-        with:
-          repository: steinbergmedia/vst3sdk
-          ref: 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96  # SDK 3.8.1 build 84
-          path: build-sdk
-          submodules: false
-      - name: SDK dependencies
-        working-directory: build-sdk
-        run: git submodule update --init --depth 1 base cmake pluginterfaces public.sdk
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      # CI-6: the newest SDK release and its four submodules, recorded in the
+      # job summary (version, tag, commits and archive checksums).
+      - name: Newest VST3 SDK
+        id: sdk
+        shell: bash
+        run: >-
+          python scripts/release/sources.py --latest --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources"
+          --github-output "$GITHUB_OUTPUT"
+          vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
       - name: Linux libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev xvfb libasound2t64
@@ -104,28 +109,22 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
-      - name: Download pluginval
+      # CI-6: the newest pluginval 2 release; the summary records its version
+      # and checksum, checked against GitHub's published digest where there is one.
+      - name: Newest pluginval
         shell: bash
         env:
-          PLUGINVAL_TAG: v2.0.0-beta3
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           case "$RUNNER_OS" in
-            Linux) archive=pluginval_Linux.zip; executable=pluginval
-              sha=2e23d311c8c2664457b11be8f6cf4ed29cfdc08765c71c43934a1ed3360f118f ;;
-            macOS) archive=pluginval_macOS.zip; executable=pluginval.app/Contents/MacOS/pluginval
-              sha=d13c260110e9a1d375e9130e79d20439dcdc9f7d0cfcad74a29197dd78d84ac3 ;;
-            Windows) archive=pluginval_Windows.zip; executable=pluginval.exe
-              sha=da158e918b60430c6a5223cd99cc2e746bda604e583258c400898caf4e95c523 ;;
+            Linux) executable=pluginval ;;
+            macOS) executable=pluginval.app/Contents/MacOS/pluginval ;;
+            Windows) executable=pluginval.exe ;;
           esac
           directory="$RUNNER_TEMP/pluginval"
-          mkdir -p "$directory"
-          curl -fsSL --retry 3 -o "$directory/$archive" \
-            "https://github.com/Tracktion/pluginval/releases/download/$PLUGINVAL_TAG/$archive"
-          python - "$directory/$archive" "$sha" <<'EOF'
-          import hashlib, sys
-          digest = hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest()
-          sys.exit(digest != sys.argv[2] and f'unexpected pluginval checksum {digest}')
-          EOF
+          python scripts/release/resolve.py tool pluginval --cache "$directory" --os "$RUNNER_OS" \
+            --github-output "$RUNNER_TEMP/pluginval.env"
+          archive=$(sed -n 's/^archive=//p' "$RUNNER_TEMP/pluginval.env")
           (cd "$directory" && unzip -q "$archive")
           echo "PLUGINVAL=$directory/$executable" >> "$GITHUB_ENV"
           # rtcheck (macOS only) flags real-time-unsafe calls during processing.
@@ -147,14 +146,14 @@ jobs:
           cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DCONVOLVER_FFT_BACKEND=${{ matrix.fft }}"
-          "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk" -DCONVOLVER_LEGACY_TESTS=OFF
+          "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}" -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
       - name: Configure Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: >-
           cmake -S . -B build-vst3 -A x64 -DCONVOLVER_BUILD_VST3=ON
-          "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk"
+          "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}"
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
@@ -164,6 +163,10 @@ jobs:
         run: >-
           ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
           --parallel 2 ${{ matrix.tests }}
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        shell: bash
+        run: python scripts/release/resolve.py explain-failure
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence

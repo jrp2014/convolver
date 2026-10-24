@@ -1,8 +1,9 @@
 ---
 # SPDX-License-Identifier: GPL-2.0-or-later
-# The Audio Unit adapter (AU-1, AU-2): built against the AudioUnitSDK pinned
-# in the release policy (PLUG-6), tested through the Audio Unit API and the
-# shared PLUG-2 harness, then installed for the user and checked by auval.
+# The Audio Unit adapter (AU-1, AU-2): built against the newest AudioUnitSDK
+# release (CI-6; its version, commit and checksum are in the job summary),
+# tested through the Audio Unit API and the shared PLUG-2 harness, then
+# installed for the user and checked by auval.
 name: Audio Unit
 
 'on':
@@ -12,6 +13,10 @@ name: Audio Unit
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Each Monday, so that a new AudioUnitSDK release shows up within a week
+  # even when nothing here changes (CI-6).
+  schedule:
+    - cron: '23 6 * * 1'
 
 permissions:
   contents: read
@@ -50,9 +55,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Pinned AudioUnitSDK (release policy)
+      - name: Newest AudioUnitSDK
         run: >-
-          python scripts/release/sources.py --fetch
+          python scripts/release/sources.py --latest --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Tools and libraries
         run: |
@@ -91,6 +96,10 @@ jobs:
           auval -a | grep -i conv || true
       - name: auval (strict)
         run: auval -strict -v aufx Conv CONV
+      # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python scripts/release/resolve.py explain-failure --suspect audiounitsdk
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence

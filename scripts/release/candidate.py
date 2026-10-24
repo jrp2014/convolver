@@ -11,8 +11,9 @@ import tarfile
 import tempfile
 import zipfile
 from build_dependencies import build as build_dependencies
-from contract import load_policy, platform_policy, sha256
+from contract import load_policy, platform_policy, sha256, with_records
 from installers import prepare
+import resolve
 from sources import extract
 from symbols import check as check_symbols
 from verify_artifact import inventory, verify_files
@@ -66,8 +67,13 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     actual = {p.relative_to(bundle).as_posix(): sha256(p) for p in bundle.rglob('*') if p.is_file() and p.name != 'source-manifest.json'}
     if actual != expected:
         raise ValueError('source archive inventory/hash mismatch')
+    if manifest.get('schema') != 2:
+        raise ValueError('source manifest schema 2 (resolved dependency records) required; build an older '
+                         'source archive with the scripts it contains')
     source = bundle / 'convolver'
-    policy = load_policy(source / 'packaging/release-policy.json')
+    # The exact releases the source archive carries (CI-6), not a fresh resolution.
+    policy = with_records(load_policy(source / 'packaging/release-policy.json'), manifest['dependencies'])
+    resolve.report(resolve.markdown(policy['dependencies'], f'Dependencies of the {identifier} candidate'))
     candidate = platform_policy(policy, identifier)
     if platform.system() != candidate['os']:
         raise ValueError('candidate must be built on its target OS')
@@ -96,10 +102,12 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     keep_symbols(build_dir, stage, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
+    nsis_version = None
     if nsis:
-        version = subprocess.check_output([str(nsis), '/VERSION'], text=True).strip()
-        if version != 'v' + policy['release_tools']['nsis']['version']:
-            raise ValueError('unexpected NSIS version')
+        # The newest NSIS release, from fetch_nsis.py; the candidate record names it.
+        nsis_version = subprocess.check_output([str(nsis), '/VERSION'], text=True).strip()
+        if not nsis_version.startswith('v3.'):
+            raise ValueError(f'unexpected NSIS version {nsis_version!r}; the installer script needs NSIS 3')
         for notice in ('COPYING', 'COPYING.txt'):
             if (nsis.parent / notice).is_file():
                 shutil.copyfile(nsis.parent / notice, stage / 'licenses/NSIS.txt')
@@ -151,7 +159,11 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     record = dict(id=identifier, artifact=zip_path.name, source_commit=manifest['source_commit'], source=source_archive.name,
                   notices=True, signed=False, notarized=False, evidence={}, automated='passed',
                   source_rebuild='passed', final_archive='passed',
-                  installers=[installer.name] if installer else [], installer_evidence={})
+                  installers=[installer.name] if installer else [], installer_evidence={},
+                  dependencies={name: {key: dep[key] for key in ('version', 'revision', 'sha256')}
+                                for name, dep in policy['dependencies'].items()})
+    if nsis_version:
+        record['installer_compiler'] = 'NSIS ' + nsis_version
     (output / (identifier + '-candidate.json')).write_text(json.dumps(dict(schema=1, version=policy['version'], source_commit=manifest['source_commit'], assets=assets, platform=record), indent=2) + '\n')
 
 
