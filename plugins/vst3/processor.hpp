@@ -96,6 +96,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::optional<HostLayout> known_layout() const;
     template <class T>
     bool segment(Steinberg::Vst::ProcessData&, Steinberg::int32, Steinberg::int32) noexcept;
+    void mark_silence(Steinberg::Vst::ProcessData&) noexcept;
     std::mutex control_;
     HostFilter filter_{max_bus_channels}; // The shared adapter contract's control side.
     std::unique_ptr<HostProcessor> host_;

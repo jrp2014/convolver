@@ -4,6 +4,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -72,7 +73,8 @@ void edge_cases() {
         require(std::abs(out_right[i] - (i == 157 || i == 257 ? 1.f : 0.f)) < 1e-5 &&
                     out_left[i] == 0,
                 "silence flags cut the tail or dropped flagged audio");
-    require(output.silenceFlags == 0, "tail marked silent");
+    // Only the left output, all zero, is flagged (VST3-10); the right holds the tail.
+    require(output.silenceFlags == 1, "tail marked silent, or silent output not marked");
     auto mismatch = saved;
     mismatch.configuration->sample_rate = 44100;
     MemoryStream wrong;
@@ -889,6 +891,119 @@ void tail_measured_at_output() {
     p.setActive(false);
     p.terminate();
 }
+// VST3-10: an output channel is flagged silent exactly when a call left it all
+// zero. Silent input (even flagged silent) does not flag the output until the
+// filter's tail and the latency have drained, and bypass keeps the convolution
+// running, so the tail of audio played while bypassed is heard after it.
+void output_silence_flags() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "silence initialize");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    convolver::HostState saved;
+    saved.configuration = convolver::Configuration{48000, 2, 2, 3, {}, {}, {}};
+    std::vector<float> taps(300, 0.f);
+    taps.front() = .5f;
+    taps.back() = 1.f;
+    saved.configuration->paths = {{taps, {{0, 1}}, {{0, 1}}}, {taps, {{1, 1}}, {{1, 1}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode silence state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore silence state");
+    // 100-frame calls: not a multiple or divisor of the 256-frame partition.
+    constexpr int frames = 100;
+    ProcessSetup setup{kRealtime, kSample32, frames, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "silence activate");
+    const auto tail = static_cast<int>(p.getTailSamples());
+    p.setProcessing(true);
+    std::array<float, frames> left{}, right{}, out_left{}, out_right{};
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = frames;
+    int frame = 0;
+    // One call with input from `signal` (frame number to value); the bypass
+    // switches at `offset` when set. Returns the output flags after checking
+    // that each flag means exactly an all-zero channel.
+    auto call = [&](auto signal, std::optional<std::pair<int, bool>> bypass = {}) {
+        for (int i = 0; i < frames; ++i)
+            left[i] = right[i] = signal(frame + i);
+        const bool zero_in = std::all_of(left.begin(), left.end(), [](float v) { return v == 0; });
+        input.silenceFlags = zero_in ? 3 : 0;
+        output.silenceFlags = 0;
+        ParameterChanges changes;
+        d.inputParameterChanges = nullptr;
+        if (bypass) {
+            int32 index = 0;
+            changes.addParameterData(bypass_id, index)
+                ->addPoint(bypass->first, bypass->second ? 1 : 0, index);
+            d.inputParameterChanges = &changes;
+        }
+        require(p.process(d) == kResultOk, "silence process");
+        for (int c = 0; c < 2; ++c) {
+            const auto* out = c ? out_right.data() : out_left.data();
+            const bool zero = std::all_of(out, out + frames, [](float v) { return v == 0; });
+            require(zero == ((output.silenceFlags >> c) & 1),
+                    "an output flag does not match whether the channel is all zero");
+        }
+        frame += frames;
+        return output.silenceFlags;
+    };
+    const int stop = 7 * frames + 13; // The input stops here; its last sample is 1.
+    auto music = [&](int n) {
+        return n < stop ? (n == stop - 1 ? 1.f : std::sin(.37f * float(n)) * .5f + .6f) : 0.f;
+    };
+    require(call(music) == 3, "the latency is silence, so it is flagged");
+    while (frame < stop + tail - frames)
+        require(call(music) == 0 || frame < latency_samples,
+                "audio or the filter's tail was flagged silent");
+    // The call holding the tail's last sample. Float rounding in the last
+    // blocks computed from the audio can leave values near 1e-8 for up to two
+    // partitions after it; from then on the output is exactly zero.
+    require(call(music) == 0, "the end of the tail was flagged silent");
+    auto drained = [&](auto signal) {
+        const int limit = frame + 2 * latency_samples + frames;
+        while (call(signal) != 3)
+            require(frame <= limit, "drained output not flagged silent");
+        for (int k = 0; k < 3; ++k)
+            require(call(signal) == 3, "silence after the tail not flagged");
+    };
+    drained(music);
+    // Bypass on while silent: the dry signal is silence too, so still flagged.
+    require(call(music, std::pair{0, true}) == 3, "bypassed silence not flagged");
+    // An impulse played during bypass, then bypass off 300 frames later: the
+    // filter's tail of that impulse (its last tap, 1, at 299 + latency) is
+    // heard, because bypass kept the convolution running.
+    const int impulse = frame + 5;
+    auto click = [&](int n) { return n == impulse ? 1.f : 0.f; };
+    float last = 0;
+    for (int k = 0; k < 8; ++k) {
+        const bool switch_off = frame <= impulse + 300 && impulse + 300 < frame + frames;
+        // Flags are checked against the content in call().
+        if (switch_off)
+            call(click, std::pair{impulse + 300 - frame, false});
+        else
+            call(click);
+        const int at = impulse + latency_samples + 299;
+        if (frame - frames <= at && at < frame)
+            last = out_left[at - (frame - frames)];
+    }
+    require(std::abs(last - 1.f) < 1e-5, "bypass did not keep the convolution history");
+    drained(click);
+    p.setProcessing(false);
+    p.setActive(false);
+    p.terminate();
+}
 // VST3-8: the Bypass text converts both ways, and the controller's own
 // state calls succeed (it keeps no state, so they store and read nothing).
 void controller_conversions() {
@@ -932,6 +1047,7 @@ int run(const std::filesystem::path& preset_path) {
         edge_cases();
         controller_conversions();
         tail_measured_at_output();
+        output_silence_flags();
         multichannel();
         version1_presets();
         speaker_arrangements();
