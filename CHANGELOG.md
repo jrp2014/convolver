@@ -13,7 +13,7 @@ Until 1.0 the C++ API may change between minor versions.
 ## [0.5.0] - 2026-10-24
 
 The series the first preview comes from. It includes the changes tagged
-automatically as 0.4.1 to 0.4.45.
+automatically as 0.4.1 to 0.4.46.
 
 ### Added
 
