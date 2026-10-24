@@ -30,25 +30,25 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | VST3 | Processor class ID | `73A81329E6484ADF9DA7D731A8C94201` | Hosts and `.vstpreset` files refer to the plug-in by this |
 | VST3 | Controller class ID | `622AD87C23664CCFB157473FBCD4A6B9` | |
 | VST3 | macOS bundle identifier | `io.github.jrp2014.convolver.vst3` | `CFBundleIdentifier` in `Convolver.vst3` |
-| VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 0 to 2 stay free: they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). Owner's decision, 24 October 2026 |
-| AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | Owner's decision, 21 October 2026 |
+| VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 0 to 2 stay free: they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). |
+| AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | |
 | AU | macOS bundle identifier | `io.github.jrp2014.convolver.au` | For `Convolver.component` (AU-1) |
-| AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. Owner's decision, 24 October 2026 |
+| AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
-| All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load (owner's decision, 22 October 2026); everything else is still written as version 1 |
-| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). Owner's decision, 22 October 2026 |
-| LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. Owner's decision, 22 October 2026 |
-| LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). Owner's decision, 23 October 2026 |
+| All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load; everything else is still written as version 1 |
+| AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). |
+| LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. |
+| LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
 **Status (22 October 2026):** no release has used these identities yet. The
-AU codes are the owner's decision of 21 October 2026. The LV2 URI scheme, the
-eight fixed layouts and the move of the macOS identifiers from `org.convolver.*`
-(a domain the project does not control) to `io.github.jrp2014.convolver.*` are
-the owner's decision of 22 October 2026. The VST3 class IDs are the ones the
+AU codes, the LV2 URI scheme, the eight fixed layouts and the move of the macOS
+identifiers from `org.convolver.*` (a domain the project does not control) to
+`io.github.jrp2014.convolver.*` are jrp's decisions, listed in the
+[decisions log](../project/decisions.md#identities-and-file-formats). The VST3 class IDs are the ones the
 adapter has always used.
 
 About the AU codes: hosts identify an Audio Unit by type, subtype and
@@ -154,7 +154,7 @@ against the SDK headers.
 **Channel counts.** VST3 (and AU, when it exists) accepts any input and output
 count from 1 to 8, and the counts may differ (2 in, 6 out for a crossover).
 LV2 plug-ins have fixed ports, so LV2 publishes one plug-in for each **fixed
-layout** in the registry (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4, 2→6, 2→8,
+layout** in the registry: 1→1, 2→2, 1→2, 2→4, 2→6, 2→8,
 6→6 and 8→8, all discrete, with ids such as `discrete-2-6`, so the 2→6 plug-in
 is `https://github.com/jrp2014/convolver/lv2#discrete-2-6`. More are added only
 on request. Layout names give counts and meaning ("2→6 discrete"), never a
@@ -184,7 +184,7 @@ channel mask, and no input layout. Hence:
   speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state
   version (3: version 2 is taken by the failed-load marker of VST3-7). jrp
-  decided against both for now (owner's decision, 23 October 2026): layouts
+  decided against both for now: layouts
   are checked with a notice only, and VST3 buses stay at 1 to 8 channels;
   either can be revisited on request. Decoders will keep reading versions 1 and 2, and
   encoders keep writing version 1 whenever nothing new is recorded, so older
@@ -228,5 +228,5 @@ copies of those. So:
   registry and the frozen copy in the test.
 - **Changing or removing** a released identity or fixed layout: don't. A host
   would treat the result as a different plug-in, and saved projects would lose
-  it. Before the first release, a change needs jrp's decision, recorded here
-  and in the pull request.
+  it. Before the first release, a change needs jrp's decision, recorded in the
+  [decisions log](../project/decisions.md#identities-and-file-formats) and in the pull request.

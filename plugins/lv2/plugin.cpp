@@ -621,7 +621,17 @@ void read_messages(Instance& p) {
     if (!p.control_in)
         return;
     const auto& u = p.uris;
-    LV2_ATOM_SEQUENCE_FOREACH(p.control_in, event) {
+    // Walk the host's buffer as bytes. The events follow the sequence header,
+    // and each must fit inside the size the host reports.
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(p.control_in);
+    const std::size_t end = sizeof(LV2_Atom) + p.control_in->atom.size;
+    std::size_t at = sizeof(LV2_Atom_Sequence);
+    while (at + sizeof(LV2_Atom_Event) <= end) {
+        const auto* event = reinterpret_cast<const LV2_Atom_Event*>(bytes + at);
+        const std::size_t body_end = at + sizeof(LV2_Atom_Event) + event->body.size;
+        if (body_end > end)
+            break;
+        at += sizeof(LV2_Atom_Event) + lv2_atom_pad_size(event->body.size);
         if (!lv2_atom_forge_is_object_type(&p.forge, event->body.type))
             continue;
         const auto* object = reinterpret_cast<const LV2_Atom_Object*>(&event->body);

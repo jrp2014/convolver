@@ -1,0 +1,115 @@
+Internal ctest changing into directory: /tmp/convolver-vdsp/sanitize
+Test project /tmp/convolver-vdsp/sanitize
+      Start  3: native.kernel_divergence
+      Start 12: native.limits
+      Start 36: packaging.consumer
+      Start  5: native.host_lifecycle
+ 1/36 Test  #3: native.kernel_divergence ...............***Failed    3.47 sec
+kernel divergence: Accelerate, vDSP against baseline, B=256
+| Workload | input gain (dB) | FMA-baseline max abs | rel. to peak | dBFS | samples differing | subnormal outputs | baseline-oracle max abs | FMA-oracle max abs | FMA-oracle rel. |
+| 64k stereo, white noise | -10.7 | 5.36e-07 | 5.43e-07 | -125.4 | 88.3% | 0.0% | 2.75e-07 | 3.99e-07 | 5.14e-07 |
+| 64k stereo, full-scale sine | -2.7 | 1.31e-06 | 1.33e-06 | -117.6 | 87.5% | 0.0% | 7.87e-07 | 1.06e-06 | 1.09e-06 |
+64k stereo, full-scale sine: FMA and baseline differ by more than 1e-6 of the peak
+
+      Start 24: compatibility.corpus
+ 2/36 Test  #5: native.host_lifecycle ..................   Passed    6.33 sec
+      Start  9: native.io
+ 3/36 Test  #9: native.io ..............................   Passed    3.03 sec
+      Start 19: native.cli
+ 4/36 Test #24: compatibility.corpus ...................   Passed    6.83 sec
+      Start 17: versioning
+ 5/36 Test #12: native.limits ..........................   Passed   10.69 sec
+      Start 28: regression.host_regressions
+ 6/36 Test #36: packaging.consumer .....................   Passed   10.70 sec
+      Start 32: regression.historical_io_regressions
+ 7/36 Test #32: regression.historical_io_regressions ...   Passed    2.05 sec
+      Start 30: regression.branch_regressions
+ 8/36 Test #19: native.cli .............................   Passed    3.55 sec
+      Start 27: regression.core_regressions
+ 9/36 Test #28: regression.host_regressions ............   Passed    2.39 sec
+      Start 21: native.inspection_cli
+10/36 Test #17: versioning .............................   Passed    3.90 sec
+      Start 34: regression.pipe_dsp_regressions
+11/36 Test #30: regression.branch_regressions ..........   Passed    1.83 sec
+      Start 33: regression.pipe_regressions
+12/36 Test #21: native.inspection_cli ..................   Passed    1.62 sec
+      Start  2: native.engine
+13/36 Test #27: regression.core_regressions ............   Passed    1.79 sec
+      Start 23: export.equalizer_apo
+14/36 Test  #2: native.engine ..........................   Passed    0.69 sec
+      Start 29: regression.gain_regressions
+15/36 Test #34: regression.pipe_dsp_regressions ........   Passed    1.24 sec
+      Start  4: native.host
+16/36 Test #23: export.equalizer_apo ...................   Passed    0.74 sec
+      Start 22: plugins.presets
+17/36 Test #33: regression.pipe_regressions ............   Passed    1.07 sec
+      Start 31: regression.historical_diagnostics
+18/36 Test  #4: native.host ............................   Passed    0.28 sec
+      Start  1: native.fft
+19/36 Test #22: plugins.presets ........................   Passed    0.46 sec
+      Start 26: examples.first_use
+20/36 Test  #1: native.fft .............................   Passed    0.19 sec
+      Start 11: native.inspection
+21/36 Test #29: regression.gain_regressions ............   Passed    0.61 sec
+      Start 20: native.fft_planning
+22/36 Test #31: regression.historical_diagnostics ......   Passed    0.39 sec
+      Start 16: fuzz.replay.ir_file
+23/36 Test #16: fuzz.replay.ir_file ....................   Passed    0.07 sec
+      Start 13: fuzz.replay.config_text
+24/36 Test #11: native.inspection ......................   Passed    0.24 sec
+      Start  7: native.presets
+25/36 Test #13: fuzz.replay.config_text ................   Passed    0.06 sec
+      Start 14: fuzz.replay.config_list
+26/36 Test #26: examples.first_use .....................   Passed    0.27 sec
+      Start 15: fuzz.replay.host_state
+27/36 Test #20: native.fft_planning ....................   Passed    0.20 sec
+      Start 10: native.config_parse
+28/36 Test #14: fuzz.replay.config_list ................   Passed    0.06 sec
+      Start  6: native.state
+29/36 Test #10: native.config_parse ....................   Passed    0.04 sec
+      Start  8: native.utilities
+30/36 Test  #8: native.utilities .......................   Passed    0.04 sec
+      Start 35: documentation
+31/36 Test  #7: native.presets .........................   Passed    0.16 sec
+      Start 25: examples.fixtures
+32/36 Test #15: fuzz.replay.host_state .................   Passed    0.15 sec
+      Start 18: identities
+33/36 Test #25: examples.fixtures ......................   Passed    0.07 sec
+34/36 Test #35: documentation ..........................   Passed    0.08 sec
+35/36 Test #18: identities .............................   Passed    0.05 sec
+36/36 Test  #6: native.state ...........................   Passed    0.16 sec
+
+97% tests passed, 1 tests failed out of 36
+
+Label Time Summary:
+branches                =   1.83 sec*proc (1 test)
+build                   =   3.95 sec*proc (2 tests)
+cli                     =  13.74 sec*proc (8 tests)
+compatibility           =   6.83 sec*proc (1 test)
+diagnostics             =   0.39 sec*proc (1 test)
+docs                    =   0.08 sec*proc (1 test)
+dsp                     =   3.03 sec*proc (2 tests)
+examples                =   0.34 sec*proc (2 tests)
+extracted-production    =  11.37 sec*proc (8 tests)
+fuzz                    =   0.34 sec*proc (4 tests)
+gain                    =   0.61 sec*proc (1 test)
+host                    =   2.39 sec*proc (1 test)
+identities              =   0.05 sec*proc (1 test)
+io                      =   3.12 sec*proc (2 tests)
+native                  =  27.97 sec*proc (15 tests)
+packaging               =  10.70 sec*proc (1 test)
+pipe                    =   2.31 sec*proc (2 tests)
+plugins                 =   0.46 sec*proc (1 test)
+provenance              =   0.08 sec*proc (1 test)
+real-libraries          =  46.29 sec*proc (20 tests)
+regression              =  11.37 sec*proc (8 tests)
+replay                  =   0.34 sec*proc (4 tests)
+sample-conversion       =   2.39 sec*proc (1 test)
+sanitizers              =  11.37 sec*proc (8 tests)
+versioning              =   3.90 sec*proc (1 test)
+
+Total Test time (real) =  16.40 sec
+
+The following tests FAILED:
+	  3 - native.kernel_divergence (Failed)
+Errors while running CTest

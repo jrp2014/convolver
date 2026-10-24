@@ -148,8 +148,7 @@ bool same_stdin(const std::filesystem::path& output) {
            input_info.nFileIndexHigh == output_info.nFileIndexHigh &&
            input_info.nFileIndexLow == output_info.nFileIndexLow;
 #else
-    struct stat input_info {
-    }, output_info{};
+    struct stat input_info{}, output_info{};
     return fstat(STDIN_FILENO, &input_info) == 0 && S_ISREG(input_info.st_mode) &&
            stat(output.c_str(), &output_info) == 0 && input_info.st_dev == output_info.st_dev &&
            input_info.st_ino == output_info.st_ino;

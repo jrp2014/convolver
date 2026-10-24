@@ -49,7 +49,10 @@ Contents: [choose a build](#choose-a-build) ·
 | Windows | vcpkg; see [Windows](#windows) |
 
 Contributors on Ubuntu also need the tools the checks use:
-`sudo apt-get install libclang-rt-18-dev clang-format-18 clang-tidy-18`.
+`sudo apt-get install libclang-rt-18-dev` for the default Clang 18 compiler.
+Match the runtime package to your compiler if it differs. Install the latest
+stable formatting and analysis tools using the
+[contributor instructions](../../CONTRIBUTING.md#formatting-and-analysis).
 Claude Code cloud sessions install all of these through
 `.claude/hooks/session-start.sh`; add any new build or test dependency there
 and to the CI workflow in the same pull request.
@@ -332,7 +335,7 @@ are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml`:
 
 AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds
 as C++23 while the core and the other formats stay C++20. jrp chose 1.4.0 over
-the C++20 1.3.0 on 22 October 2026. Its licence is Apache-2.0, which is why the
+the C++20 1.3.0. Its licence is Apache-2.0, which is why the
 AU component is distributed under GPL-3.0-or-later
 ([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
 

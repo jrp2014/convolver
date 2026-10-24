@@ -59,9 +59,8 @@ Contents: [before you start](#before-you-start) ·
   change the sound, dependencies shipped in releases, and anything published.
   Continue only on work that does not depend on the answer. Record the answer,
   with its date, in the [decisions log](../project/decisions.md) and in the pull
-  request. Developer and project pages that describe the work may add
-  "(owner's decision, 21 October 2026)"; user pages (`docs/use/`) never carry
-  decision dates. When a decision changes what users get between releases, the
+  request. The log is the only place decision notes and their dates go: other
+  pages describe what was decided as plain fact, and may link to the log. When a decision changes what users get between releases, the
   [changelog](../../CHANGELOG.md) entry says what changed.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
@@ -249,8 +248,8 @@ is used but never defined.
   [how the plug-ins behave](../use/plugins.md).
 
 `scripts/check_format.py` finds the C++ sources to format, so a new adapter
-folder is covered without editing a file list. pre-commit runs it with a pinned
-clang-format 18 and lint CI fails on any formatting difference, so run
+folder is covered without editing a file list. pre-commit runs it with the latest stable packaged
+clang-format and lint CI fails on any formatting difference, so run
 `pre-commit run --all-files` before every push, not only before review. Extend these checks, with a
 regression test in `tests/repository_checks_tests.py`, when a new rule should
 hold everywhere.

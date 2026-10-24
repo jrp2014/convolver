@@ -78,7 +78,7 @@ configuration import, sample formats, or the overlap-add scheduling algorithm.
 ### Plug-in builds
 
 With `CONVOLVER_BUILD_VST3=ON`, `AUTO` selects **Ooura** on Linux and Windows and
-**Accelerate** on macOS (owner's decision, 21 October 2026; TODO PLUG-1). A
+**Accelerate** on macOS (TODO PLUG-1). A
 plug-in runs inside a host process that may load other plug-ins, or the host
 itself, using the same FFTW. FFTW's planner is not thread-safe, and Convolver's
 planner lock only covers Convolver's own calls. Static FFTW is not enough on
@@ -339,6 +339,11 @@ now implemented ([below](#shared-forward-transforms)); inverse-transform sharing
 and non-uniform partitioning remain open as **PERF-2** in
 [TODO](../../TODO.md#fft-libraries-and-performance).
 
+The [24 October M5 Max vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
+compares these kernels with Accelerate complex multiply-add without changing
+layout. It found no substantial whole-engine gain and exceeded existing
+numerical-divergence limits; the current kernels remain the default.
+
 ### Shared forward transforms
 
 Paths whose ordered input routes are identical (same channels, same order,
@@ -566,11 +571,11 @@ otherwise the baseline set is used. Each engine takes the chosen set when it is
 built. `-DCONVOLVER_AVX2_KERNELS=OFF` leaves the AVX2 copy out;
 `convolver_benchmark` prints which set ran (`AVX2+FMA` or `baseline`).
 
-Until 24 October 2026 the AVX2 set had no FMA and gave bit-identical output to
-the baseline (the first table below). jrp then chose FMA ("add FMA, but keep
-an eye out for significant output divergences"; owner's decision, 24 October
-2026), so **output now differs between CPUs with and without AVX2+FMA at
-float-rounding level**. The accumulation stays a separate add: fusing both
+Before PERF-4 adopted FMA, the AVX2 set had no FMA and gave bit-identical
+output to the baseline (the first table below). With FMA ("add FMA, but keep an
+eye out for significant output divergences";
+[decisions log](../project/decisions.md#configuration-and-sound)), **output
+differs between CPUs with and without AVX2+FMA at float-rounding level**. The accumulation stays a separate add: fusing both
 products into the running sum (`re = fma(-xi, hi, fma(xr, hr, re))`) rounds the
 sum twice per partition, and on a 64k-tap sine render was 1.31 times the
 baseline's RMS error against the double oracle (geometric mean of 15

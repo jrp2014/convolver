@@ -91,7 +91,7 @@ jrp, and has not been done yet:
    `collect` job) and check every file against the `SHA256SUMS` file it
    contains. These are the files you will attach, unchanged. For the first
    preview, the independent walkthrough (REL-3 in [TODO](../../TODO.md)) uses
-   these same files before they are uploaded (owner's decision, 23 October 2026).
+   these same files before they are uploaded.
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
    at least one host.
 4. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
@@ -105,7 +105,7 @@ jrp, and has not been done yet:
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
-warns), as jrp decided on 21 October 2026.
+warns), as jrp decided.
 
 ## After publishing: make it findable
 

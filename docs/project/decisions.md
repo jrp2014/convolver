@@ -10,10 +10,9 @@ explains it and owns the details.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date. Developer and project pages may add
-"(owner's decision, *date*)" where the work is described; user pages in
-`docs/use/` never do, and a change users will notice goes in the
-[changelog](../../CHANGELOG.md) instead. Changing a decision is a new decision: add a row
+jrp decides, record it here with its date; no other page carries decision
+notes or their dates ([workflow](../develop/workflow.md#while-working)). A
+change users will notice also goes in the [changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -36,6 +35,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | REAPER and Carla are the suggested first named hosts; jrp will try them (replaced 23 October 2026) | [Host testing](../develop/host-testing.md#first-hosts) |
 | 23 October 2026 | jrp's first named hosts, on his Mac: REAPER and Audacity for VST3, GarageBand for the Audio Unit (a smoke test only). Replaces REAPER and Carla | [Host testing](../develop/host-testing.md#first-hosts) |
 | 23 October 2026 | The host-facing part of DIAG-1 comes before the named-host smoke tests. VST3 and AU show why they are silent in a read-only Status parameter and write the full explanation to a Convolver log file (and the macOS unified log), detailed enough to send with a report | [Adapter contract](../develop/plugin-contract.md#status-and-log), [plug-ins](../use/plugins.md#status-and-the-convolver-log) |
+| 24 October 2026 | Use the latest stable Clang formatting and analysis tools, replacing the version-18 policy. Local installation on jrp's Mac is deferred. CI going red on a new release is accepted: layout changes get a separate reformat commit, new clang-tidy findings are fixed in the code | [Contributor tooling](../../CONTRIBUTING.md#formatting-and-analysis), [new releases](../../CONTRIBUTING.md#when-a-new-clang-release-turns-ci-red) |
 
 ## Releases
 
@@ -48,6 +48,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 23 October 2026 | The independent walkthrough (REL-3) uses the chosen candidate run's exact files before they are uploaded, so the pre-release can say what was demonstrated | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 23 October 2026 | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated | [Status](status.md#user-journeys-for-the-first-preview) |
 | 24 October 2026 | CI runs each kind of test only where a configuration can change its result; plug-in jobs skip what an identical native or Audio Unit job runs, and the release candidates no longer run the CMake package consumers | [Testing](../develop/testing.md#which-configurations-run-which-tests) |
+| 24 October 2026 | REL-4's repository side: a README line for users of the old Windows Convolver, issue forms, and a social preview source, with the steps after publishing | [TODO](../../TODO.md) REL-4, [releasing](../develop/releasing.md#after-publishing-make-it-findable) |
 
 ## Plug-in behaviour
 
@@ -108,3 +109,4 @@ were recorded in the repository; this log is their first written record.
 | 18 October 2026 | In repository documents the owner is called jrp | [Documentation guide](../develop/documentation.md#writing-rules) |
 | 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md) |
 | 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md#decisions) |
+| 24 October 2026 | Decision notes and their dates appear only in this log, not as "(owner's decision, *date*)" on other pages | [Workflow](../develop/workflow.md#while-working) |

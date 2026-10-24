@@ -500,6 +500,9 @@ int main() {
     try {
         // Oracle checks with the kernels this CPU selects, then with the baseline set.
         const auto* selected = detail::kernels().name;
+#if defined(CONVOLVER_EXPERIMENT_VDSP_MAC)
+        require(std::string(selected) == "vDSP", "vDSP experiment did not select vDSP kernels");
+#endif
         for (bool baseline : {false, true}) {
             detail::force_baseline_kernels(baseline);
             cases();

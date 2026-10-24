@@ -33,8 +33,8 @@ Both gates are set out in the
 
 ## First hosts
 
-jrp tests on his Mac with these three (owner's decision, 23 October 2026; it
-replaces REAPER and Carla, suggested on 22 October). Together they cover a full
+jrp tests on his Mac with these three, in place of REAPER and Carla, which were
+suggested first. Together they cover a full
 DAW, the audio editor many users already have, and Apple's own Audio Unit host.
 Host facts were checked on 23 October 2026.
 
