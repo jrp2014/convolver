@@ -369,7 +369,7 @@ Notes for Windows CI:
 ## Distribution and signing
 
 - **Installer:** reuse the REL-1 release machinery (NSIS or MSI per the
-  [distribution plan](2026-10-18-plugin-distribution.md)). Install to
+  [distribution plan](../../archive/plans/2026-10-18-plugin-distribution.md)). Install to
   `%ProgramFiles%\Convolver\MediaFoundation\<arch>\` and register elevated.
   Uninstall unregisters before deleting. Per-user installs cannot register MFT
   categories machine-wide, so offer them only for application developers.

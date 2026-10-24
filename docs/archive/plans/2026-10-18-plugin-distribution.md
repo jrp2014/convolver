@@ -1,4 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Archived plan — superseded.** Moved on 24 October 2026 from `docs/project/plans/2026-10-18-plugin-distribution.md`. Its preview part is on `main`: Tasks 1–3, the installer templates and the candidate gates (the `codex/plugin-distribution` merge of 21 October 2026, extended since). The work it left open is now owned elsewhere: publishing and the production gates by [releasing](../../develop/releasing.md), host testing by [host testing](../../develop/host-testing.md), and the open items by REL-1, PLUG-5 and HOST-1 in [TODO](../../../TODO.md). Its spec is the [design](2026-10-18-plugin-distribution-design.md) beside it. The text below records intent at that time; its status lines and checkboxes were not updated. For current behaviour read the guides, not this plan.
+
 # Downloadable and buildable Convolver plug-ins implementation plan
 
 > **For contributors and agents:** the open work from this plan is tracked as
@@ -29,7 +32,7 @@ preview artifacts for VST3. The FFT choice is settled (PLUG-1): plug-in builds
 use Ooura on Windows and Linux and Accelerate on macOS, so the FFTW lines below
 are superseded. First releases are unsigned previews; signing (Task 4) and
 production acceptance are a later gate. LV2 and AU now share this pipeline
-(PLUG-5). The [plug-in formats plan](2026-10-21-plugin-formats.md) and
+(PLUG-5). The [plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md) and
 [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au) own the current plan; the
 dated notes and tasks below are kept as the record.
 
@@ -40,7 +43,7 @@ can proceed independently; its future APIs are not prerequisites here.
 
 **Priority revised:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
-see the [plug-in formats plan](2026-10-21-plugin-formats.md).
+see the [plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md).
 **Signing decided:** first releases are unsigned previews on
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the

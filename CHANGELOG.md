@@ -10,6 +10,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-24
+
+The series the first preview comes from. It includes the changes tagged
+automatically as 0.4.1 to 0.4.46.
+
 ### Added
 
 - Cheaper startup, reset and filter replacement (PERF-5): until the input
@@ -213,6 +218,10 @@ Until 1.0 the C++ API may change between minor versions.
   opening regular files only.
 
 ### Changed
+
+- The version is now 0.5.0. CMake consumers now request
+  `find_package(Convolver 0.5)`; the package keeps its same-minor
+  compatibility policy, so a consumer asking for 0.4 no longer finds it.
 
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
   VST3 plug-in and GarageBand for the Audio Unit, each with a step-by-step
@@ -538,7 +547,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jrp2014/convolver/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jrp2014/convolver/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jrp2014/convolver/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jrp2014/convolver/compare/v0.2.2...v0.3.0
