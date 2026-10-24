@@ -986,6 +986,64 @@ void processing_faults() {
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");
+
+    // jrp's review of 0.4.43: audio goes on while a replacement is prepared.
+    // A fault in that window is explained, but neither shown against the
+    // filter that replaces it nor signalled by the audio thread, because the
+    // accepted load clears and observes from one snapshot.
+    const auto nan = std::numeric_limits<float>::quiet_NaN();
+    HostProcessor p(mono(), 64, 8);
+    HostFilter h(8);
+    h.load(HostState{mono()}, layout, {}, {}, &p);
+    std::array<float, 64> buffer{};
+    const float* pin[] = {buffer.data()};
+    float* pout[] = {buffer.data()};
+    const auto play = [&](float first) {
+        buffer.fill(0.f);
+        buffer[0] = first;
+        audio_thread = true;
+        static_cast<void>(p.process(pin, pout, 64));
+        audio_thread = false;
+    };
+    static_cast<void>(h.observe(p.faults()));
+    h.load(
+        HostState{mono(.5f)}, layout,
+        [&](const Configuration& c) {
+            p.replace(c);
+            play(nan); // While the replacement is prepared.
+        },
+        {}, &p);
+    play(0.f);
+    const auto window = h.observe(p.faults());
+    require(window.rejected_input == 1 && !h.faults().any() &&
+                host_status(h, layout).status == HostStatus::playing,
+            "a fault counted while the replacement was prepared is shown against it");
+    require(!p.faults_since_clear() && !p.fault_to_signal(),
+            "the audio side measures from the same snapshot");
+    // The new filter's own fault: shown, and signalled once per clear.
+    play(nan);
+    require(p.faults_since_clear() && p.fault_to_signal(), "new fault not signalled");
+    p.fault_signalled();
+    play(nan);
+    require(!p.fault_to_signal(), "Fault signalled twice");
+    require(h.observe(p.faults()).rejected_input == 2 &&
+                host_status(h, layout).status == HostStatus::fault,
+            "new faults not shown");
+    // A load failure comes first, on the audio side too.
+    h.load(HostState{mono()}, layout, {}, {}, &p);
+    try {
+        h.load(HostState{mono()}, HostLayout{44100, 1, 1}, {}, {}, &p);
+    } catch (const std::invalid_argument&) {
+    }
+    require(h.failure_shown(), "failure_shown");
+    p.hold_fault_signal(h.failure_shown());
+    play(nan);
+    require(!p.fault_to_signal() && p.faults_since_clear(), "Fault signalled over Load failed");
+    h.load(HostState{mono()}, layout, {}, {}, &p);
+    require(!h.failure_shown(), "an accepted load clears failure_shown");
+    p.hold_fault_signal(h.failure_shown());
+    play(nan);
+    require(p.fault_to_signal(), "signal not released after an accepted load");
 }
 // A file name of this process's own, so that concurrent runs never share it.
 std::filesystem::path private_temp(const char* name) {

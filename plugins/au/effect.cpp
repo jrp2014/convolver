@@ -123,16 +123,12 @@ std::string Effect::observe_faults() noexcept {
     }
 }
 
-void Effect::clear_faults(bool new_processor) noexcept {
-    faults_cleared_.store(host_ ? host_->faults().total() : 0, std::memory_order_release);
-    if (new_processor)
-        faults_signalled_ = 0; // The host does not render while it initializes.
-}
-
 void Effect::update_status() noexcept {
     try {
         status_log_written_ = host_log_written();
         status_ = host_status(filter_, known_layout(), status_log_written_);
+        if (host_) // Render must not show Fault over a load failure.
+            host_->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(status_.status), true);
     } catch (...) { // Out of memory: the previous status stays.
@@ -241,7 +237,6 @@ OSStatus Effect::Initialize() {
             next->reset();
             tail_.store(next->tail_frames());
             host_ = std::move(next);
-            clear_faults(true);
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
@@ -512,26 +507,31 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     return noErr;
 }
 
-void Effect::reject(HostFailureKind kind, const std::string& why) {
+std::string Effect::reject(HostFailureKind kind, const std::string& why) {
     std::lock_guard lock(control_);
+    auto faults = observe_faults(); // Explained under the filter that played.
     const bool was_failed = filter_.failed();
     filter_.reject(kind, why);
     // An empty instance that fails its first load plays silence, not identity.
     if (host_ && filter_.failed() && !was_failed) {
         try {
             host_->replace(filter_.activate(layout()));
+            // The same processor counts on: observe from its totals
+            // (explained above), not from 0 as activate() assumes.
+            static_cast<void>(filter_.observe(host_->faults()));
         } catch (...) {
         }
     }
     if (!host_ && filter_.failed())
         tail_.store(0);
     update_status();
+    return faults;
 }
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
-        reject(HostFailureKind::state_unreadable,
-               "The saved state is not an Audio Unit preset dictionary.");
+        log_faults(reject(HostFailureKind::state_unreadable,
+                          "The saved state is not an Audio Unit preset dictionary."));
         log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
@@ -553,14 +553,14 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         next = decode_host_state(
             std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
     } catch (const NewerHostState& e) {
-        reject(HostFailureKind::state_newer,
-               std::string("The saved state could not be read: ") + e.what());
+        log_faults(reject(HostFailureKind::state_newer,
+                          std::string("The saved state could not be read: ") + e.what()));
         log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
-        reject(HostFailureKind::state_unreadable,
-               std::string("The saved state could not be read: ") + e.what());
+        log_faults(reject(HostFailureKind::state_unreadable,
+                          std::string("The saved state could not be read: ") + e.what()));
         log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
@@ -590,12 +590,14 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
                     throw;
                 }
             }
-            filter_.load(std::move(next), host, [&](const Configuration& c) {
-                if (host_)
-                    host_->replace(c);
-            });
+            filter_.load(
+                std::move(next), host,
+                [&](const Configuration& c) {
+                    if (host_)
+                        host_->replace(c);
+                },
+                {}, host_.get());
             // Nothing from here on can throw: the request is accepted.
-            clear_faults(false);
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
         } catch (...) {
@@ -603,6 +605,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             if (host_ && filter_.failed() && !was_failed) {
                 try {
                     host_->replace(filter_.activate(layout()));
+                    // The same processor counts on: observe from its totals
+                    // (explained already above), not from 0 as activate() assumes.
+                    static_cast<void>(filter_.observe(host_->faults()));
                 } catch (...) {
                 }
             }
@@ -680,12 +685,11 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     // DIAG-1: a new processing fault shows as Status Fault at once, with no
     // logging or allocation here (an existing parameter's value is an atomic
     // store); the host's next request for its text explains it.
-    const auto total = host->faults().total();
-    const auto cleared = faults_cleared_.load(std::memory_order_acquire);
-    if (total > cleared && faults_signalled_ <= cleared) {
+    // Not over a load failure, which comes first (hold_fault_signal).
+    if (host->fault_to_signal()) {
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(HostStatus::fault), true);
-        faults_signalled_ = total;
+        host->fault_signalled();
     }
     AUSDK_RT_UNSAFE_END
     if (!processed)

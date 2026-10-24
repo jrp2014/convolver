@@ -182,6 +182,25 @@ void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest
 }
 
 namespace {
+// Counts only increase, except that a new processor starts again from 0.
+std::uint64_t since(std::uint64_t now, std::uint64_t before) noexcept {
+    return now >= before ? now - before : now;
+}
+HostFaults since(const HostFaults& now, const HostFaults& before) noexcept {
+    HostFaults fresh;
+    fresh.rejected_input = since(now.rejected_input, before.rejected_input);
+    fresh.output_overflow = since(now.output_overflow, before.output_overflow);
+    fresh.processing_failure = since(now.processing_failure, before.processing_failure);
+    fresh.invalid_call = since(now.invalid_call, before.invalid_call);
+    return fresh;
+}
+HostFaults& operator+=(HostFaults& a, const HostFaults& b) noexcept {
+    a.rejected_input += b.rejected_input;
+    a.output_overflow += b.output_overflow;
+    a.processing_failure += b.processing_failure;
+    a.invalid_call += b.invalid_call;
+    return a;
+}
 // A rejection load() has already recorded, told apart from any other
 // std::invalid_argument thrown while checking.
 class Refused : public std::invalid_argument {
@@ -197,8 +216,8 @@ void HostFilter::refuse(HostFailureKind kind, std::string why, const HostRequest
 }
 
 void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
-                      const std::function<void(const Configuration&)>& install,
-                      HostRequest request) {
+                      const std::function<void(const Configuration&)>& install, HostRequest request,
+                      HostProcessor* counting) {
     request = numbered(std::move(request));
     auto& next = state.configuration;
     const Configuration* carried = next ? &*next : nullptr;
@@ -266,7 +285,17 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     load_failure_ = std::move(saved_failure);
     activation_failure_.reset();
     notice_ = std::move(notice);
-    faults_ = {}; // A new filter, or a new start for the same one.
+    // A new filter, or a new start for the same one: Fault clears. One
+    // snapshot of the processor's counts is both the audio side's new
+    // baseline and the one observe() measures from, so faults counted while
+    // the filter was prepared are not shown later against the new filter
+    // (jrp's review of 0.4.43). They are still explained by the next observe().
+    faults_ = {};
+    if (counting) {
+        const auto snapshot = counting->clear_faults();
+        unshown_ += since(snapshot, observed_);
+        observed_ = snapshot;
+    }
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {
@@ -316,27 +345,18 @@ void HostFilter::fail_activation(std::string why) {
 }
 
 namespace {
-// Counts only increase, except that a new processor starts again from 0.
-std::uint64_t since(std::uint64_t now, std::uint64_t before) noexcept {
-    return now >= before ? now - before : now;
-}
 std::string times(std::uint64_t n) {
     return n == 1 ? "once" : std::to_string(n) + " times";
 }
 } // namespace
 
 HostFaults HostFilter::observe(const HostFaults& totals) noexcept {
-    HostFaults fresh;
-    fresh.rejected_input = since(totals.rejected_input, observed_.rejected_input);
-    fresh.output_overflow = since(totals.output_overflow, observed_.output_overflow);
-    fresh.processing_failure = since(totals.processing_failure, observed_.processing_failure);
-    fresh.invalid_call = since(totals.invalid_call, observed_.invalid_call);
+    const auto fresh = since(totals, observed_);
     observed_ = totals;
-    faults_.rejected_input += fresh.rejected_input;
-    faults_.output_overflow += fresh.output_overflow;
-    faults_.processing_failure += fresh.processing_failure;
-    faults_.invalid_call += fresh.invalid_call;
-    return fresh;
+    faults_ += fresh;
+    auto explained = unshown_; // Counted before the accepted load: explained, not shown.
+    unshown_ = {};
+    return explained += fresh;
 }
 
 std::string fault_message(const HostFaults& f) {
@@ -464,6 +484,16 @@ struct HostProcessor::Impl {
     // DIAG-1: HostFaults, counted by the audio thread and read anywhere.
     std::atomic<std::uint64_t> rejected_input{0}, output_overflow{0}, processing_failure{0},
         invalid_call{0};
+    // The fault total at the last clear_faults() (control writes), and at the
+    // last fault_signalled() (audio thread writes).
+    std::atomic<std::uint64_t> faults_cleared{0}, faults_signalled{0};
+    std::atomic<bool> signal_held{false};
+    std::uint64_t fault_total() const noexcept {
+        return rejected_input.load(std::memory_order_relaxed) +
+               output_overflow.load(std::memory_order_relaxed) +
+               processing_failure.load(std::memory_order_relaxed) +
+               invalid_call.load(std::memory_order_relaxed);
+    }
     static void count(std::atomic<std::uint64_t>& n) noexcept {
         // One writer (the audio thread), so a load and a store suffice.
         n.store(n.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
@@ -730,6 +760,26 @@ HostFaults HostProcessor::faults() const noexcept {
     f.processing_failure = impl_->processing_failure.load(std::memory_order_relaxed);
     f.invalid_call = impl_->invalid_call.load(std::memory_order_relaxed);
     return f;
+}
+HostFaults HostProcessor::clear_faults() noexcept {
+    const auto snapshot = faults();
+    impl_->faults_cleared.store(snapshot.total(), std::memory_order_release);
+    return snapshot;
+}
+void HostProcessor::hold_fault_signal(bool held) noexcept {
+    impl_->signal_held.store(held, std::memory_order_release);
+}
+bool HostProcessor::faults_since_clear() const noexcept {
+    return impl_->fault_total() > impl_->faults_cleared.load(std::memory_order_acquire);
+}
+bool HostProcessor::fault_to_signal() const noexcept {
+    const auto cleared = impl_->faults_cleared.load(std::memory_order_acquire);
+    return impl_->fault_total() > cleared &&
+           impl_->faults_signalled.load(std::memory_order_relaxed) <= cleared &&
+           !impl_->signal_held.load(std::memory_order_acquire);
+}
+void HostProcessor::fault_signalled() noexcept {
+    impl_->faults_signalled.store(impl_->fault_total(), std::memory_order_relaxed);
 }
 bool HostProcessor::process(std::span<const float* const> in, std::span<float* const> out,
                             std::size_t n) noexcept {

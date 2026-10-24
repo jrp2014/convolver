@@ -134,9 +134,9 @@ struct Instance {
     // filter it has already started playing. It can be left true only while
     // silence plays (a failed first load), where muting changes nothing.
     std::atomic<bool> unfiltered{true};
-    // DIAG-1: the processor's fault total when the status last cleared (an
-    // accepted load or activation), and whether a fault report is queued.
-    std::atomic<std::uint64_t> faults_cleared{0};
+    // DIAG-1: whether a fault report is queued. The baseline Fault is
+    // measured from is the processor's (HostProcessor::clear_faults(), which
+    // HostFilter::load calls on an accepted load; a new processor starts at 0).
     std::atomic<bool> fault_report_queued{false};
     // The fault total the last report covers: set by run() when it schedules
     // one and by work() when it has logged, never both at once (one report at
@@ -178,9 +178,6 @@ struct Instance {
     }
     // After an accepted load or a new processor: Fault shows again only for
     // later faults.
-    void clear_faults() {
-        faults_cleared.store(host ? host->faults().total() : 0, std::memory_order_release);
-    }
     // Why the newest request failed, or the saved failure it restored.
     void log_rejection() {
         if (const auto& r = filter.rejection())
@@ -361,7 +358,6 @@ void activate_locked(Instance& p) {
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
-    p.clear_faults();
     // A report the host dropped (some flush queued work on deactivation)
     // must not block later ones.
     p.fault_report_queued.store(false, std::memory_order_release);
@@ -489,7 +485,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
                 p.unfiltered.store(false, std::memory_order_release);
                 p.host->publish(std::move(*prepared));
             },
-            request);
+            request, p.host.get()); // run() goes on during preparation: one fault snapshot.
     } catch (const SupersededRequest&) {
         return Outcome::superseded;
     } catch (...) {
@@ -498,7 +494,6 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.installed = r.generation;
     p.installed_path = std::move(kept_path);
     p.handled = std::max(p.handled, r.generation);
-    p.clear_faults();
     p.update_status();
     return Outcome::installed;
 }
@@ -695,8 +690,7 @@ Status shown_status(const Instance& p) {
         return Status::load_failed;
     const auto shown = static_cast<Status>(p.shown.load(std::memory_order_relaxed));
     // A load failure comes first, as host_status() orders them.
-    if (shown != Status::load_failed &&
-        fault_total(p) > p.faults_cleared.load(std::memory_order_acquire))
+    if (shown != Status::load_failed && p.host && p.host->faults_since_clear())
         return Status::fault;
     return shown;
 }
@@ -707,7 +701,7 @@ Status shown_status(const Instance& p) {
 void report_faults(Instance& p) {
     const auto total = fault_total(p);
     // Only for faults no report was scheduled for yet.
-    if (!p.schedule || total <= p.faults_cleared.load(std::memory_order_acquire) ||
+    if (!p.schedule || !p.host || !p.host->faults_since_clear() ||
         total <= p.faults_reported.load(std::memory_order_relaxed) ||
         p.fault_report_queued.exchange(true, std::memory_order_acq_rel))
         return;
@@ -949,7 +943,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         // this returns to an empty instance, clears any failure and path, and
         // supersedes loads still outstanding.
         try {
-            p.filter.load(HostState{}, p.layout, install, from_state);
+            p.filter.load(HostState{}, p.layout, install, from_state, p.host.get());
             loaded = true;
         } catch (...) {
         }
@@ -959,7 +953,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             try {
                 // Bypass is the lv2:enabled port, which the host restores
                 // itself; the state's bypass flag is ignored.
-                p.filter.load(std::move(*next), p.layout, install, from_state);
+                p.filter.load(std::move(*next), p.layout, install, from_state, p.host.get());
                 loaded = true;
             } catch (...) {
                 status = LV2_STATE_ERR_UNKNOWN;
@@ -973,7 +967,8 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         ReadFailure why;
         if (auto next = read_filter_file(p, *path, why)) {
             try {
-                p.filter.load(HostState{std::move(next)}, p.layout, install, from_file);
+                p.filter.load(HostState{std::move(next)}, p.layout, install, from_file,
+                              p.host.get());
                 loaded = true;
             } catch (...) {
             }
@@ -985,7 +980,6 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.installed = generation;
         p.installed_path = std::move(kept_path);
         p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
-        p.clear_faults();
         status = LV2_STATE_SUCCESS;
     } else {
         p.silence_failed_first_load(was_failed);

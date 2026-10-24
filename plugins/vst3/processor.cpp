@@ -156,7 +156,7 @@ tresult Processor::activate(TBool state) {
             next->set_bypass(bypass_.load());
             next->reset();
             host_ = std::move(next);
-            clear_faults(true);
+            hold_fault_signal();
             activated_ = layout();
             // What plays and why: a filter restored before the host's rate
             // and buses were known may not suit them.
@@ -182,6 +182,7 @@ tresult Processor::activate(TBool state) {
 void Processor::record_activation_failure(const char* why) noexcept {
     try {
         filter_.fail_activation(why);
+        hold_fault_signal();
         log(filter_.error());
     } catch (...) { // Out of memory for the message: nothing more to keep.
     }
@@ -208,10 +209,9 @@ bool Processor::observe_faults() noexcept {
     }
     return true;
 }
-void Processor::clear_faults(bool new_processor) noexcept {
-    faults_cleared_.store(host_ ? host_->faults().total() : 0, std::memory_order_release);
-    if (new_processor)
-        faults_signalled_ = 0; // No audio runs during activation.
+void Processor::hold_fault_signal() const noexcept {
+    if (host_)
+        host_->hold_fault_signal(filter_.failure_shown());
 }
 void Processor::write_log() noexcept {
     std::vector<std::pair<std::string, bool>> lines;
@@ -283,6 +283,7 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
 }
 tresult Processor::load_state(IBStream* stream) {
     std::lock_guard lock(control_);
+    observe_faults(); // Explained under the filter that played; an accepted load clears them.
     const bool was_failed = filter_.failed();
     try {
         HostState next;
@@ -300,7 +301,6 @@ tresult Processor::load_state(IBStream* stream) {
         // While active, the host's configuration is known and a prepared
         // replacement is published; inactive, the next activation installs it.
         const auto host = host_ ? std::optional(layout()) : known_layout();
-        observe_faults(); // Explained under the filter that played; a load clears them.
         const bool bypass = next.bypass;
         // The inactive tail is worked out before anything changes: it needs
         // memory, and a request that runs out is rejected whole (PLUG-7).
@@ -313,12 +313,15 @@ tresult Processor::load_state(IBStream* stream) {
                 throw;
             }
         }
-        filter_.load(std::move(next), host, [&](const Configuration& c) {
-            if (host_)
-                host_->replace(c);
-        });
+        filter_.load(
+            std::move(next), host,
+            [&](const Configuration& c) {
+                if (host_)
+                    host_->replace(c);
+            },
+            {}, host_.get());
         // Nothing from here on can throw: the request is accepted.
-        clear_faults(false);
+        hold_fault_signal();
         tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
         bypass_.store(bypass);
         logged_.clear(); // A later failure is logged even if it repeats an earlier one.
@@ -334,11 +337,15 @@ tresult Processor::load_state(IBStream* stream) {
         if (host_ && filter_.failed() && !was_failed) {
             try {
                 host_->replace(filter_.activate(layout()));
+                // The same processor counts on: observe from its totals
+                // (explained already above), not from 0 as activate() assumes.
+                static_cast<void>(filter_.observe(host_->faults()));
             } catch (...) {
             }
         }
         if (!host_ && filter_.failed())
             tail_.store(0);
+        hold_fault_signal();
         log(rejected_line(filter_));
         return kResultFalse;
     }
@@ -487,14 +494,12 @@ void Processor::mark_silence(ProcessData& d) noexcept {
 // parameter changes on, without logging or allocating here: Status becomes
 // Fault, and the controller asks the control side to explain.
 void Processor::signal_faults(ProcessData& d) noexcept {
-    const auto total = host_ ? host_->faults().total() : 0;
-    const auto cleared = faults_cleared_.load(std::memory_order_acquire);
-    if (total <= cleared || faults_signalled_ > cleared || !d.outputParameterChanges)
+    if (!host_ || !d.outputParameterChanges || !host_->fault_to_signal())
         return;
     int32 index = 0, point = 0;
     if (auto* queue = d.outputParameterChanges->addParameterData(status_id, index);
         queue && queue->addPoint(0, normalized(HostStatus::fault), point) == kResultOk)
-        faults_signalled_ = total;
+        host_->fault_signalled();
 }
 namespace {
 void copy(const std::string& text, String128 out) {

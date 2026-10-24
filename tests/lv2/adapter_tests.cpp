@@ -958,6 +958,28 @@ void worker_loads(host::World& world, const fs::path& work) {
         play_constant(*p, 1024);
         return p;
     };
+    // jrp's review of 0.4.43: run() goes on while the worker prepares a
+    // replacement. A fault in that window is explained in the log, but not
+    // shown as Fault against the filter that replaces it.
+    {
+        auto p = with_original();
+        p->log.messages.clear();
+        p->pause_at(WorkerPoint::prepared);
+        p->set_filter(a);
+        p->run_empty();
+        p->wait_until_paused();
+        std::vector<float> invalid(2 * 256);
+        invalid[0] = std::numeric_limits<float>::quiet_NaN();
+        static_cast<void>(render(*p, invalid, 256, 256));
+        p->resume();
+        settle(*p);
+        static_cast<void>(play_constant(*p, 2048));
+        settle(*p);
+        check(p->status == as_float(Status::running) && reported(*p) == a,
+              "a fault while the replacement was prepared shows as Fault against it");
+        check(p->log.contains(LV2_LOG__Error, "invalid samples"),
+              "a fault while the replacement was prepared is not explained");
+    }
     const auto never_a = [](const std::vector<float>& out) {
         return std::all_of(out.begin(), out.end(), [](float v) { return v > .5f - 1e-5f; });
     };
