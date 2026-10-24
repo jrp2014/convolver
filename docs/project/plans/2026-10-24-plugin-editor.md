@@ -265,8 +265,8 @@ signals faults as it does now. The rules for the window:
    (slow preparation on the host's thread) applies to it unchanged.
 4. **No lock is held while a dialog is open,** and no dialog is modal for the
    host where the system allows otherwise (`NSOpenPanel` as a sheet or with a
-   completion handler; Windows' `IFileOpenDialog` is modal to the plug-in
-   window only). The 2006 window's stall cannot recur, because the window
+   completion handler; Windows' `IFileOpenDialog` is modal to its owner
+   window, as every Windows file dialog is). The 2006 window's stall cannot recur, because the window
    never holds the control lock at all.
 5. **Clipboard, log reading and "show file" run on the UI thread** and read at
    most the last 64 KiB of the log; they never write it.
@@ -351,7 +351,7 @@ Acceptance criteria for every window phase:
 - Text follows the system's text size where the platform has one, and the
   window resizes to fit rather than clipping.
 - Checked with VoiceOver on macOS and NVDA or Narrator on Windows in a named
-  host (REAPER is the DAW most blind users use, with the OSARA extension). The
+  host (REAPER, with the OSARA extension, is widely used by blind musicians). The
   CI tests below check names and roles automatically.
 - Linux drawn views cannot be reached by screen readers (AT-SPI comes from
   toolkits); if VST3-13 adds one, the documentation says so and points to
@@ -369,7 +369,7 @@ display, in the existing CTest targets and CI jobs:
 | VST3 messaging | Through the existing controller and processor in the test harness: `ConvolverLoad` loads, refuses with the right reason, calls `setDirty`, and the controller's report copy follows every load, activation and fault | `vst3.adapter`, `vst3.lifecycle` |
 | AU properties | Report and load properties through `AudioUnitGetProperty`/`SetProperty`, with property-change events, under the same failure cases | `au.adapter` |
 | LV2 atoms | The lilv test host reads the report atoms after loads and refusals; `run()` stays allocation-free under the audio guard | `lv2.adapter` |
-| View opens and closes | Steinberg's `editorhost` (Linux under `xvfb-run`; built from the pinned SDK with its hosting examples) and pluginval without `--skip-gui-tests`, which opens the editor, also while processing | `vst3.pluginval`, a new `vst3.editorhost` |
+| View opens and closes | Steinberg's `editorhost` (Linux under `xvfb-run`; built from the pinned SDK with its hosting examples, which on Linux need GTK 3 and gtkmm 3 in CI only) and pluginval without `--skip-gui-tests`, which opens the editor, also while processing | `vst3.pluginval`, a new `vst3.editorhost` |
 | AU view | `auval` lists the Cocoa view and checks it loads ("Cocoa Views Available") | The `auval -strict` step of the AU workflow |
 | Accessibility and content | A small test host per platform attaches the view to an off-screen window, walks the accessibility tree (`accessibilityChildren`, labels and roles on macOS; Win32 window text and `IAccessible` on Windows), checks the status text equals `report_text()`, presses Copy diagnostics and reads the clipboard, and saves a screenshot as a CI artifact for review (not compared pixel by pixel) | `vst3.editor`, `au.editor` |
 | File dialog | Not automated: tests inject the chosen path through a test hook; the real dialog is a step in the host smoke tests | [host testing](../../develop/host-testing.md) |
