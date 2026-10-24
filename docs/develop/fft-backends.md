@@ -17,9 +17,11 @@
 - An optimized (SIMD) FFTW build matters more than planner settings. Homebrew's
   FFTW on Apple Silicon and vcpkg's default port are built without SIMD.
 - Compiler flags: keep `-O3` (GCC at `-O2` is 1.8 times slower). On x86-64 the
-  multiply-accumulate also has an AVX2 version, chosen at run time, which makes
-  room-correction filters 1.2–1.4 times faster with bit-identical output. LTO,
-  PGO, unrolling and `-ffast-math` gave nothing measurable.
+  multiply-accumulate also has an AVX2 version with fused multiply-add, chosen
+  at run time, which makes room-correction filters 1.2–1.4 times faster. Its
+  output differs from the baseline code by float rounding only (below
+  -120 dBFS, no worse against the double-precision oracle). LTO, PGO,
+  unrolling and `-ffast-math` gave nothing measurable.
 
 Start with the selection table and contract. Later sections contain **dated
 measurements**, not a ranking of current libraries on every machine. The Apple
@@ -449,12 +451,14 @@ replaced; the benchmark was pinned to one core, variants ran in a shuffled order
 within each case, and the tables give medians of 5 rounds of 0.3 s each. All
 workloads use B = 256 at 48 kHz, the plug-in and CLI default. Raw data:
 [flags](../benchmarks/2026-10-24-x86-compiler-flags.csv),
-[kernels](../benchmarks/2026-10-24-x86-avx2-kernels.csv).
+[kernels without FMA](../benchmarks/2026-10-24-x86-avx2-kernels.csv),
+[kernels with FMA](../benchmarks/2026-10-24-x86-avx2-fma-kernels.csv) (a later,
+different VM; see [AVX2 kernels](#avx2-kernels-chosen-at-run-time)).
 
-The kernel table was made with
+Both kernel tables were made with
 [`compiler_flags.py`](../benchmarks/src/compiler_flags.py) and
-`convolver_benchmark` as committed, and its CSV is the script's output (the
-command is under [Reproduce](#compiler-flags-1)). The flag table, the FFT shares
+`convolver_benchmark` as committed, and their CSVs are the script's output (the
+commands are under [Reproduce](#compiler-flags-1)). The flag table, the FFT shares
 and the PGO and per-file builds came first, from a one-off harness that ran the
 same nine workload sizes and layouts and also timed the FFTs on their own; it was
 not kept. Its CSV has the columns `variant` (compiler, backend and flags),
@@ -545,23 +549,77 @@ primary workloads; above 1 is faster. "v2", "v3" and "v4" are
 So that portable binaries get the AVX2 gain, the five functions of the
 spectrum processing (`portable/kernels.inc`: split, join, multiply,
 multiply-accumulate and the per-path sum over partitions) are compiled twice on
-x86-64: once for the baseline and once with `-mavx2 -ffp-contract=off`
-(`/arch:AVX2` with MSVC, where a pragma in the file turns contraction off).
-Both copies are built without contraction even if `-march` flags are added. `kernels()` checks the CPU and operating system once, and each engine
-takes the chosen set when it is built. `-DCONVOLVER_AVX2_KERNELS=OFF` leaves the
-AVX2 copy out; `convolver_benchmark` prints which set ran.
+x86-64: once for the baseline and once with `-mavx2 -mfma -ffp-contract=off`
+(`/arch:AVX2` with MSVC, which allows FMA). In the AVX2 copy the multiply and
+multiply-accumulate use explicit FMA intrinsics, per bin
+`re += fma(xr, hr, -(xi·hi))` and `im += fma(xr, hi, xi·hr)`, in the vector
+loop and the scalar remainder alike. Neither copy is contracted implicitly,
+even if `-march` flags are added (`-ffp-contract=off`, and pragmas for clang,
+clang-cl and MSVC), so the baseline stays unfused and each set's results
+depend only on the CPU's set, not on the compiler: GCC 13 and Clang 18 gave
+identical divergence figures below. `kernels()` checks once that the CPU has
+AVX2 and FMA and that the operating system saves the 256-bit registers;
+otherwise the baseline set is used. Each engine takes the chosen set when it is
+built. `-DCONVOLVER_AVX2_KERNELS=OFF` leaves the AVX2 copy out;
+`convolver_benchmark` prints which set ran (`AVX2+FMA` or `baseline`).
 
-The AVX2 set gives **bit-identical** output to the baseline: there is no FMA, and
-each frequency bin is computed on its own, so wider vectors do not reorder any
-arithmetic. The samples of a 65,536-tap stereo render were identical between Clang and GCC,
-with and without the AVX2 kernels, for Ooura and for FFTW. `native.engine`
-compares the two sets bit for bit, function by function on random values of
-every magnitude and through a whole engine with delays and mixed routes; it
-also runs the oracle cases with each set, which checks both against the
-double-precision oracle within the usual tolerance.
+Until 24 October 2026 the AVX2 set had no FMA and gave bit-identical output to
+the baseline (the first table below). jrp then chose FMA ("add FMA, but keep
+an eye out for significant output divergences"; owner's decision, 24 October
+2026), so **output now differs between CPUs with and without AVX2+FMA at
+float-rounding level**. The accumulation stays a separate add: fusing both
+products into the running sum (`re = fma(-xi, hi, fma(xr, hr, re))`) rounds the
+sum twice per partition, and on a 64k-tap sine render was 1.31 times the
+baseline's RMS error against the double oracle (geometric mean of 15
+frequencies, worst 1.67); the form used is 1.00.
 
-Speedup of the AVX2 kernels over the same `-O3` build without them
-(`-DCONVOLVER_AVX2_KERNELS=OFF`), median of 5 rounds; above 1 is faster:
+#### Divergence
+
+`native.kernel_divergence` renders each workload with both sets at B = 256 and
+compares them sample by sample, and both with a direct double-precision
+convolution at 256 frames per output where the whole filter is engaged. The
+filters are synthetic room corrections (a central peak in decaying noise) or,
+for the crossover, Blackman-windowed bands at 10–250–2500–24k Hz. The input is
+scaled so that the full-level signal's output peaks at -0.1 dBFS; the quiet
+inputs are that level less 120 dB, or 1e-36 of it (output near `FLT_MIN`).
+Measured 24 October 2026 with the Ooura FFT, Release builds, GCC 13.3 and
+Clang 18.1.3 giving identical figures; "relative" is to the output's peak, dBFS
+to full scale (1.0):
+
+| Workload | FMA vs baseline, max abs | relative | dBFS | baseline vs oracle | FMA vs oracle |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 64k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 2.8e-7 | 2.6e-7 |
+| 64k stereo, full-scale 997 Hz sine | 4.8e-7 | 4.8e-7 | -126.4 | 8.1e-7 | 8.7e-7 |
+| 64k stereo, noise at -120 dB | 1.5e-13 | 1.5e-7 | -256.5 | 2.2e-13 | 2.2e-13 |
+| 64k stereo, noise near `FLT_MIN` | 0 | 0 | | 1.2e-42 | 1.2e-42 |
+| 64k 2→6 crossover, white noise | 2.4e-7 | 2.4e-7 | -132.5 | 3.6e-7 | 3.6e-7 |
+| 128k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.0e-7 | 3.5e-7 |
+| 256k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.6e-7 | 3.9e-7 |
+| 512k stereo, white noise | 2.1e-7 | 2.1e-7 | -133.6 | 4.4e-7 | 4.6e-7 |
+| 512k stereo, full-scale sine | 7.5e-7 | 7.5e-7 | -122.6 | 2.4e-6 | 2.4e-6 |
+
+The two sets differ by 1.8e-7 to 7.5e-7 of the output's peak (3 to 12 float
+rounding steps of the largest samples), the same size as each set's own error
+against the oracle, and at most -122.6 dBFS. That is 1.5 to 6 steps of 24-bit output
+(a 24-bit step is 2^-23 ≈ 1.2e-7 of full scale, -138.5 dBFS), so 24-bit
+renders can differ in their lowest bits between CPUs with and without
+AVX2+FMA; 16-bit output (step 3.1e-5) differs only where a sample lies that
+close to a rounding boundary. It is below the noise of any converter, so not
+audible. For scale, changing the block size from 256 to 512 with the baseline
+set changes a 64k sine render by as much (up to 1.5e-6 at some frequencies,
+-116.5 dBFS). The test fails if the sets differ by more than 1e-6 of the peak
+or -120 dBFS, if either leaves the oracle tolerance, or if the FMA set's
+oracle error exceeds 1.5 times the baseline's; those limits are not to be
+widened without investigating the cause. In Debug builds it runs the 64k
+workloads only. `native.engine` also checks every kernel against the standard
+floating-point error bound of a double-precision sum, on random values of
+every magnitude.
+
+#### Speed
+
+Speedup of the AVX2 kernels **without FMA** (the set before 24 October) over
+the same `-O3` build without them (`-DCONVOLVER_AVX2_KERNELS=OFF`), median of
+5 rounds, on the 4-vCPU VM described above; above 1 is faster:
 
 | | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 32k crossover | 16k crossover | 4k stereo | 512k reverb |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -576,14 +634,36 @@ geometric mean. Without the kernels a 64k stereo filter took 410–475 ns per
 frame (about 2.0–2.3% of one core at 48 kHz) and a 64k 2→6 crossover
 1090–1380 ns (about 5–7%). The 99th percentile block time fell by similar
 amounts (Clang, Ooura: 184 to 150 µs for 64k stereo, 419 to 360 µs for the 64k
-crossover).
+crossover). The same runs built the whole engine for v3 with FMA and without
+the kernels: 1.42, 1.32, 1.42 and 1.34 times the baseline (same order), no
+faster than the kernels with FFTW and 7–10% faster with Ooura.
 
-The same runs built the whole engine for v3 with FMA and without the kernels.
-That was 1.42, 1.32, 1.42 and 1.34 times the baseline (same order as above): no
-faster than the kernels with FFTW, and 7–10% faster with Ooura. The difference
-is FMA, which the kernels leave out to keep the output the same on every CPU;
-the earlier harness found the same (v3 without FMA for the whole engine matched
-the kernels with Ooura, 1.23–1.24×).
+Speedup **with FMA** (the kernels as now), measured on 24 October 2026 on a
+different, smaller VM: 2 vCPUs of an Intel Xeon at 2.70 GHz (AVX2, FMA and
+AVX-512), 7 GiB, Ubuntu 24.04, the same compilers, the Ooura FFT only (FFTW was
+not installed there), another session sharing the machine. Three builds ran in
+a shuffled order per case, pinned to one core, 15 rounds of 0.5 s: without the
+kernels, with the earlier AVX2 kernels without FMA (commit 356a707) and with
+the AVX2+FMA kernels. Speedup over the build without the kernels, median of
+the 15 rounds:
+
+| | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 32k crossover | 16k crossover | 4k stereo | 512k reverb |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Clang, Ooura, AVX2 | 1.08 | 1.36 | 1.33 | 1.35 | 1.28 | 1.31 | 1.08 | 1.02 | 1.19 |
+| Clang, Ooura, AVX2+FMA | 1.10 | 1.47 | 1.27 | 1.44 | 1.34 | 1.32 | 1.09 | 1.03 | 1.39 |
+| GCC, Ooura, AVX2 | 1.10 | 1.33 | 1.47 | 1.44 | 1.44 | 1.26 | 1.08 | 1.01 | 1.36 |
+| GCC, Ooura, AVX2+FMA | 1.16 | 1.43 | 1.62 | 1.52 | 1.51 | 1.33 | 1.13 | 1.04 | 1.43 |
+
+Over the six primary workloads that is 1.32 (Clang) and 1.42 (GCC) for
+AVX2+FMA, against 1.28 and 1.33 without FMA on the same machine: FMA itself is
+worth 1.03 (Clang) and 1.06 (GCC), consistent with the 2–7% the whole-engine v3
+builds showed on the first VM. The 99th percentile block time with Clang went
+from 139 µs (no kernels) through 107 (AVX2) to 103 µs (AVX2+FMA) for 64k
+stereo, and from 396 through 317 to 302 µs for the 64k crossover. FMA with FFTW
+was not re-measured; on the first VM the whole-engine v3 build with FMA was no
+faster than the kernels without it there. The two VMs' absolute times and
+per-case speedups differ (the second machine's baseline was faster for 32k,
+slower for 64k), so compare ratios within one table only.
 
 Not measured here: Apple Silicon (AppleClang, Accelerate), where Clang's
 default target is already the M1 and NEON is always used, and MSVC on Windows.
@@ -660,8 +740,8 @@ durable installation. Convolver's tests passed against that temporary build;
 
 [`src/compiler_flags.py`](../benchmarks/src/compiler_flags.py) builds the core
 and benchmark once per flag set and alternates them over the room-correction
-cases. The kernel table came from this, once per compiler and FFT library
-(`|baseline` builds without the AVX2 kernels):
+cases. The first kernel table came from this, once per compiler and FFT
+library (`|baseline` builds without the AVX2 kernels):
 
 ```sh
 python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA --cpu 2 \
@@ -669,6 +749,21 @@ python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA
     --variant 'O3-v3-fma=-O3 -march=x86-64-v3 -DNDEBUG|baseline' \
     --work /tmp/convolver-flags --output kernels.csv
 ```
+
+The FMA table came from this, once per compiler, with the commit before FMA
+exported to a folder (`|source=` builds another source tree):
+
+```sh
+git archive 356a707 | (mkdir -p /tmp/nofma && tar -x -C /tmp/nofma)
+python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA --cpu 1 \
+    --rounds 15 --seconds 0.5 \
+    --variant 'O3-baseline=-O3 -DNDEBUG|baseline' \
+    --variant 'O3-avx2-nofma=-O3 -DNDEBUG|source=/tmp/nofma' --variant 'O3=-O3 -DNDEBUG' \
+    --work /tmp/convolver-fma --output fma-kernels.csv
+```
+
+The divergence table is the output of `native.kernel_divergence` in a Release
+build (`ctest -R kernel_divergence -V`, or run `convolver_kernel_divergence_tests`).
 
 Without `--variant` it builds `-O2`, `-O3`, LTO, v3 and v3 without FMA.
 

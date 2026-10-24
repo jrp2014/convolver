@@ -70,13 +70,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Configuration and sound
 
-These two were decided in conversation with jrp before decisions were recorded
-in the repository; this log is their first written record.
+The two from 18 October were decided in conversation with jrp before decisions
+were recorded in the repository; this log is their first written record.
 
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 18 October 2026 | Dither is off unless requested | [Command-line reference](../use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | 18 October 2026 | `.cfg` paths are not translated or guessed between systems. Relative paths may use `\`; drive, UNC and `\`-rooted paths are rejected on macOS and Linux with a message saying to make them relative | [Other programs](../use/other-programs.md) |
+| 24 October 2026 | The x86-64 AVX2 kernels use fused multiply-add ("add FMA, but keep an eye out for significant output divergences"). Output may differ between CPUs with and without AVX2+FMA at float-rounding level; `native.kernel_divergence` fails on anything larger (1e-6 of the peak, -120 dBFS, or a worse oracle error). The baseline kernels stay unfused | [AVX2 kernels](../develop/fft-backends.md#avx2-kernels-chosen-at-run-time) (PERF-4) |
 
 ## Diagnostics
 

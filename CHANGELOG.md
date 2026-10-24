@@ -14,14 +14,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 - Faster processing on x86-64 (PERF-4): the partition multiply-accumulate,
   which takes 85-99% of the time for room-correction filters, is also compiled
-  for AVX2 and used on CPUs that have it (most Intel and AMD CPUs since
-  2013-2015).
-  Release binaries still run on any x86-64 CPU, and the output is bit-identical
-  to the baseline code, so renders do not depend on the CPU. Measured 1.2-1.4
-  times faster for 32k-128k-tap stereo and 2→6 crossover filters at B = 256
-  (1.2 with the Ooura FFT the plug-ins use, 1.4 with FFTW) ([measurements](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels)).
-  `-DCONVOLVER_AVX2_KERNELS=OFF` leaves them out. `convolver_benchmark` gained
-  room-correction cases and reports which kernels ran.
+  for AVX2 with fused multiply-add (FMA) and used on CPUs that have both (most
+  Intel and AMD CPUs since 2013-2015). Release binaries still run on any x86-64
+  CPU. Measured 1.2-1.4 times faster for 32k-128k-tap stereo and 2→6 crossover
+  filters at B = 256 (1.32 with Clang and 1.42 with GCC using the Ooura FFT the
+  plug-ins use, of which FMA gives 3-6%) ([measurements](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels)).
+  **Numerical effect:** output on CPUs with AVX2+FMA differs from other CPUs by
+  float rounding only: at most 7.5e-7 of the peak (-122.6 dBFS) on 64k-512k
+  filters, so 24-bit renders may differ in their lowest bits, with no change in
+  accuracy against the double-precision reference (owner's decision,
+  24 October 2026). A new test, `native.kernel_divergence`, fails on anything
+  larger. `-DCONVOLVER_AVX2_KERNELS=OFF` leaves the AVX2 kernels out.
+  `convolver_benchmark` gained room-correction cases and reports which kernels
+  ran.
 
 - An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
   bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,

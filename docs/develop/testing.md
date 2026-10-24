@@ -51,10 +51,22 @@ ctest --test-dir build -N
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
   nonfinite data and a C++ heap-allocation guard during processing/reset. The
-  oracle cases run with the processing kernels the CPU selects (AVX2 on most
-  x86-64 machines) and again with the baseline set; a separate case requires
-  the two sets to give bit-identical results, function by function and through
-  a whole engine (PERF-4).
+  oracle cases run with the processing kernels the CPU selects (AVX2+FMA on
+  most x86-64 machines) and again with the baseline set. A separate case checks
+  each set's multiply-accumulate against the standard floating-point error bound
+  of a double-precision sum, requires the layout functions to agree bit for bit,
+  and requires a whole engine's output with the two sets to differ by at most
+  1e-6 of its peak (PERF-4).
+- `native.kernel_divergence`: the AVX2+FMA kernels against the baseline set and
+  against a direct double-precision convolution on room-correction workloads
+  at B = 256 (64k stereo with white noise, a full-scale sine, noise at
+  -120 dBFS and near `FLT_MIN`, a 64k 2→6 crossover; Release builds add
+  128k-512k filters). It prints a table and fails if the sets differ by more
+  than 1e-6 of the output's peak or -120 dBFS, if either leaves the oracle
+  tolerance, or if the FMA set's oracle error exceeds 1.5 times the
+  baseline's ([measurements](fft-backends.md#avx2-kernels-chosen-at-run-time)).
+  Do not widen these limits to make it pass: a failure is a divergence to
+  investigate (owner's decision, 24 October 2026).
 - `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
