@@ -143,7 +143,7 @@ does not start, and no filter request failed.
 
 ## Status and log
 
-Decided by jrp on 23 October 2026 (DIAG-1, brought forward before the first
+Decided by jrp (DIAG-1, brought forward before the first
 named-host smoke tests): adapters without a host log interface show why they
 are silent or refused a load in two places, with the same words in every
 format.
@@ -314,8 +314,8 @@ loading. These names are permanent, like the
   filter files were.
 
 The AU key, the LV2 state property and the bare state inside them (without the
-VST3 length prefix) are fixed by jrp's decision, in the
-[decisions log](../project/decisions.md#identities-and-file-formats).
+VST3 length prefix) were decided by jrp
+([decisions log](../project/decisions.md#identities-and-file-formats)).
 
 Compatibility rules for presets:
 

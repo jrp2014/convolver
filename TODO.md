@@ -56,7 +56,7 @@ boundary and C++20 in the core.
 | 3. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication, then **REL-4** | First releases are unsigned previews on macOS and Windows, published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
 | 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8). The plug-ins' Status parameter and Convolver log came first, before the host smoke tests; the rest of the review remains. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
-| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows; owner chose it on 22 October 2026 over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
+| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows, chosen over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
 | On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. |
 
@@ -121,7 +121,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   in the 2006 wording (GitHub API); nothing on the SourceForge project page or
   the old site pointed here, although Roon's convolution help page links to the
   old site's format pages (checked that day). Repository side
-  (jrp chose this scope on 24 October 2026): a README line for users of the
+  (jrp chose this scope): a README line for users of the
   old Windows Convolver, issue forms, the
   [social preview source](.github/social-preview.html) and the
   [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable).
@@ -148,7 +148,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   editor only for an identified need, then for all formats at once. Write
   adapters against the formats' own headers, not a framework.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
-  thought before any work starts (owner, 21 October 2026). Wrap the engine as a
+  thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
   Legacy, DirectShow players and applications that insert effects through Media
   Foundation or WinRT. First name the target users. For system-wide room
@@ -194,7 +194,7 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   parameter, the host's log or the system log) for jrp to decide, using the
   same explanatory text everywhere. jrp prefers diagnostics that explain
   generously: what failed, why, and what to change, without needing the
-  documentation (owner, 21 October 2026). Add tests that each failure produces
+  documentation. Add tests that each failure produces
   its message on each surface.
   Progress (23 October 2026, PR #57): the host-facing part was brought forward
   before the HOST-1 smoke tests. VST3 and
@@ -280,7 +280,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 ## FFmpeg integration
 
-Parked (owner, 21 October 2026): maintaining a patched FFmpeg source tree adds
+Parked: maintaining a patched FFmpeg source tree adds
 uncomfortable coupling. FFMPEG-1 is still worth doing. If this is revisited,
 prefer the pipe, a filter accepted upstream, or upstream state support in
 FFmpeg's generic `lv2` filter (it cannot pass a file path today), which would let
@@ -531,8 +531,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:
   LV2 sanitizer stages as parallel jobs building only their targets,
   one CTest entry per package consumer, a parallel offline rebuild, ccache on
-  Linux and macOS, and each kind of test run only where it can change (owner's
-  decision, 24 October 2026); [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
+  Linux and macOS, and each kind of test run only where it can change; [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

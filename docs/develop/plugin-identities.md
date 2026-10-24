@@ -31,7 +31,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | VST3 | Controller class ID | `622AD87C23664CCFB157473FBCD4A6B9` | |
 | VST3 | macOS bundle identifier | `io.github.jrp2014.convolver.vst3` | `CFBundleIdentifier` in `Convolver.vst3` |
 | VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 0 to 2 stay free: they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). |
-| AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | Fixed |
+| AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | |
 | AU | macOS bundle identifier | `io.github.jrp2014.convolver.au` | For `Convolver.component` (AU-1) |
 | AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
@@ -228,5 +228,5 @@ copies of those. So:
   registry and the frozen copy in the test.
 - **Changing or removing** a released identity or fixed layout: don't. A host
   would treat the result as a different plug-in, and saved projects would lose
-  it. Before the first release, a change needs jrp's decision, recorded here
-  and in the pull request.
+  it. Before the first release, a change needs jrp's decision, recorded in the
+  [decisions log](../project/decisions.md#identities-and-file-formats) and in the pull request.

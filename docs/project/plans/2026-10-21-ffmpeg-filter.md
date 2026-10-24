@@ -11,7 +11,7 @@ Revision note, 21 October 2026: the [documentation review](../../review-2026-10/
 corrected the pipe example's stream/channel scope, output-mask semantics and
 host FFT-option prerequisites. The measurements below retain their original scope.
 
-**Priority revised later on 21 October 2026:** the built-in filter (FFMPEG-2 to
+**Priority revised later:** the built-in filter (FFMPEG-2 to
 FFMPEG-5) is parked while VST3, LV2 and AU are developed in parallel; see the
 [plug-in formats plan](2026-10-21-plugin-formats.md). The owner does not want to
 maintain a patched FFmpeg source tree (option C below), because of the coupling

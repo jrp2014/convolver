@@ -10,10 +10,9 @@ explains it and owns the details.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date. This log is the only place for
-decision notes and their dates: other pages state what was decided as plain
-fact and may link here, and a change users will notice also goes in the
-[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
+jrp decides, record it here with its date; no other page carries decision
+notes or their dates ([workflow](../develop/workflow.md#while-working)). A
+change users will notice also goes in the [changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -48,6 +47,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 23 October 2026 | The independent walkthrough (REL-3) uses the chosen candidate run's exact files before they are uploaded, so the pre-release can say what was demonstrated | [Releasing](../develop/releasing.md#publishing-an-unsigned-preview) |
 | 23 October 2026 | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated | [Status](status.md#user-journeys-for-the-first-preview) |
 | 24 October 2026 | CI runs each kind of test only where a configuration can change its result; plug-in jobs skip what an identical native or Audio Unit job runs, and the release candidates no longer run the CMake package consumers | [Testing](../develop/testing.md#which-configurations-run-which-tests) |
+| 24 October 2026 | REL-4's repository side: a README line for users of the old Windows Convolver, issue forms, and a social preview source, with the steps after publishing | [TODO](../../TODO.md) REL-4, [releasing](../develop/releasing.md#after-publishing-make-it-findable) |
 
 ## Plug-in behaviour
 

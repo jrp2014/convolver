@@ -80,7 +80,7 @@ jrp, and has not been done yet:
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
-warns), as jrp decided on 21 October 2026.
+warns), as jrp decided.
 
 ## After publishing: make it findable
 

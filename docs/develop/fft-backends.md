@@ -571,10 +571,11 @@ otherwise the baseline set is used. Each engine takes the chosen set when it is
 built. `-DCONVOLVER_AVX2_KERNELS=OFF` leaves the AVX2 copy out;
 `convolver_benchmark` prints which set ran (`AVX2+FMA` or `baseline`).
 
-Until 24 October 2026 the AVX2 set had no FMA and gave bit-identical output to
-the baseline (the first table below). jrp then chose FMA ("add FMA, but keep
-an eye out for significant output divergences"), so **output now differs between CPUs with and without AVX2+FMA at
-float-rounding level**. The accumulation stays a separate add: fusing both
+Before PERF-4 adopted FMA, the AVX2 set had no FMA and gave bit-identical
+output to the baseline (the first table below). With FMA ("add FMA, but keep an
+eye out for significant output divergences";
+[decisions log](../project/decisions.md#configuration-and-sound)), **output
+differs between CPUs with and without AVX2+FMA at float-rounding level**. The accumulation stays a separate add: fusing both
 products into the running sum (`re = fma(-xi, hi, fma(xr, hr, re))`) rounds the
 sum twice per partition, and on a 64k-tap sine render was 1.31 times the
 baseline's RMS error against the double oracle (geometric mean of 15
