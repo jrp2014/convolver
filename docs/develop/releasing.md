@@ -92,7 +92,8 @@ Signing is not needed for a preview. Publication is a manual step owned by
 jrp, and has not been done yet:
 
 1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
-   (`vX.Y.Z`): Actions, then "Run workflow", choosing the tag, or
+   (`vX.Y.Z`; the first preview comes from a 0.5.x tag): Actions, then
+   "Run workflow", choosing the tag, or
    `gh workflow run release.yml --ref vX.Y.Z`. The version bot's tag push does
    not start it, because pushes made with the workflow token do not trigger
    other workflows. Wait for the whole run to pass.
@@ -113,7 +114,8 @@ jrp, and has not been done yet:
    Never replace or edit an asset after publication; a fix gets a new version.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
-(ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
+(ad-hoc signature, because Apple silicon will not load code with no signature
+at all; users remove the quarantine) and on Windows (SmartScreen
 warns), as jrp decided.
 
 ## After publishing: make it findable

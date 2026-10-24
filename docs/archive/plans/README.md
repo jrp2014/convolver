@@ -2,8 +2,9 @@
 # Archived plans
 
 These design and implementation plans are finished: the work they describe is on
-`main`. The first ones were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026;
-later plans move here when their work is merged. All are kept
+`main`, or, for a plan marked superseded, what it left open is now owned by a
+maintained guide and TODO. The first ones were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026;
+later plans move here when their work is merged or they are superseded. All are kept
 as records of what was intended, decided and measured at the time. Use the
 [current documentation](../../README.md) for how Convolver behaves now.
 
@@ -18,6 +19,7 @@ tracked in [TODO](../../../TODO.md).
 | [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [How the plug-ins behave](../../use/plugins.md) |
 | [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Other programs](../../use/other-programs.md) |
 | [Documentation by reader](2026-10-23-documentation-by-reader.md) | Maintained pages sorted into `docs/use/`, `docs/develop/` and `docs/project/`; status page, decisions log, shorter front pages and the reader-folder check | PRs #47, #51, #52, #53 (last merged in `41d1d3a`) | [Documentation guide](../../develop/documentation.md) |
+| [Plug-in distribution](2026-10-18-plugin-distribution.md), with its [design](2026-10-18-plugin-distribution-design.md) (superseded) | Pinned dependencies and corresponding source, staging, unsigned installers, artifact verification, promotion gates and the candidate workflow for unsigned previews; signing, clean installation, host qualification and publication moved to the guides and TODO (REL-1, PLUG-5, HOST-1) | PR #19 (`378d215`), 21 October 2026; extended to the preset tool and Equalizer APO export in PR #38 | [Releasing](../../develop/releasing.md), [host testing](../../develop/host-testing.md) |
 
 ## How completion was checked
 
@@ -44,8 +46,12 @@ longer exist now point to the page instead. Nothing else in the plans was edited
 Relative links still resolve because `docs/archive/plans/` is at the same depth
 as `docs/superpowers/plans/`, where they were written.
 
-The [plug-in distribution plan](../../plans/2026-10-18-plugin-distribution.md)
-and its [design](../../plans/2026-10-18-plugin-distribution-design.md)
-were not archived: release packaging, signing, host testing and Audio Unit work
-are open (REL-1, HOST-1, HOST-2). The 21 October 2026 FFmpeg and Media
-Foundation plans are also open.
+The plug-in distribution plan and its design were archived as superseded on
+24 October 2026: the preview pipeline they planned is merged, and their open
+tasks (signing, clean installation, named-host qualification, publication) are
+owned by [releasing](../../develop/releasing.md), [host testing](../../develop/host-testing.md)
+and REL-1, PLUG-5 and HOST-1 in TODO. Each file gained an archive notice, and
+its links to the plug-in formats plan, which stays open, now point to
+`docs/project/plans/`; nothing else changed.
+The plug-in formats plan (LV2-3 to LV2-5, AU-3 to AU-5, PLUG-5) and the parked
+FFmpeg and Media Foundation plans are still open.

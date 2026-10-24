@@ -1,4 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Archived plan — superseded.** Moved on 24 October 2026 from `docs/project/plans/2026-10-18-plugin-distribution-design.md`. The design for the [distribution plan](2026-10-18-plugin-distribution.md) beside it. Release scope, platforms and gates are now owned by [releasing](../../develop/releasing.md), the format direction by the [plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md), and open work by REL-1 and PLUG-5 in [TODO](../../../TODO.md). The text below records intent at that time; its status lines were not updated. For current behaviour read the guides, not this plan.
+
 # Convolver plug-in distribution design
 
 Status: proposed release scope, 18 October 2026. This describes future work;
@@ -10,7 +13,7 @@ artifacts are built by the merged candidate workflow; nothing is published yet.
 Plug-in builds use Ooura on Windows and Linux and Accelerate on macOS (PLUG-1),
 not FFTW as stated below. First releases are unsigned previews, and LV2 and AU
 join the same pipeline (REL-1, PLUG-5). See the
-[plug-in formats plan](2026-10-21-plugin-formats.md) for the current plan;
+[plug-in formats plan](../../project/plans/2026-10-21-plugin-formats.md) for the current plan;
 the rest of this page is the 18 October design record.
 
 ## Outcome and audience

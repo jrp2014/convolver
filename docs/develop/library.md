@@ -4,7 +4,7 @@
 [Documentation index](../README.md) · [Implementation map](architecture.md)
 
 **In short:** install Convolver (or add it with `add_subdirectory`), then
-`find_package(Convolver 0.4 REQUIRED COMPONENTS core)` and link
+`find_package(Convolver 0.5 REQUIRED COMPONENTS core)` and link
 `Convolver::core`. Add the `host` component for plug-in-style planar processing
 and `io` for sound files and configurations (needs libsndfile). The libraries are
 static development packages for the same toolchain, not a stable binary ABI.
@@ -48,7 +48,7 @@ An external application's `CMakeLists.txt` can use:
 ```cmake
 cmake_minimum_required(VERSION 3.20)
 project(MyConvolverApp LANGUAGES CXX)
-find_package(Convolver 0.4 REQUIRED COMPONENTS core)
+find_package(Convolver 0.5 REQUIRED COMPONENTS core)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE Convolver::core)
 ```
@@ -59,7 +59,7 @@ C++20 requirement and static FFT/thread link dependencies. No components means
 `core`; even a full installation does not look for libsndfile until requested:
 
 ```cmake
-find_package(Convolver 0.4 REQUIRED COMPONENTS core io)
+find_package(Convolver 0.5 REQUIRED COMPONENTS core io)
 target_link_libraries(my_app PRIVATE Convolver::core Convolver::io)
 ```
 

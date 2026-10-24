@@ -5,16 +5,17 @@ Status: written on 21 October 2026 against Convolver `75f3924` (package 0.4.3)
 and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
-[plug-in distribution plan](2026-10-18-plugin-distribution.md).
-**Current state:** PLUG-1 (the plug-in FFT backend), PLUG-2 (the
-[shared comparison harness](../../develop/testing.md#plug-in-comparisons-plug-2), with
-DOC-1's first-use fixtures) and PLUG-4 (the
-[identity and layout registry](../../develop/plugin-identities.md)) are implemented. Everything
-else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
-listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
-and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
-The [shared adapter contract](#shared-adapter-contract) below applies to every
-format and takes precedence over a per-format section that seems to disagree.
+[plug-in distribution plan](../../archive/plans/2026-10-18-plugin-distribution.md).
+**Current state (24 October 2026, `9fa13f7`, 0.4.44):** the shared
+groundwork is done (PLUG-1 to PLUG-4 and PLUG-6 to PLUG-8), and so are the
+first steps of each stream: VST3-1, VST3-7, VST3-8 and VST3-10; LV2-1 and
+LV2-2; AU-1 and AU-2. The [shared adapter contract](../../develop/plugin-contract.md)
+now lives in the developer guides; it applies to every format and takes
+precedence over a per-format section below that seems to disagree. Still open: the release pipeline for all
+three formats (PLUG-5), LV2-3 to LV2-5, AU-3 to AU-5 and the named-host tests
+(HOST-1, AU-4). The first preview holds VST3 only; LV2 and AU join later
+previews. Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
+The sections below are the plan as revised on 21 October 2026.
 
 **Priority:** develop VST3, LV2 and AU in
 parallel, as equal first priorities. The FFmpeg filter and a Windows-native

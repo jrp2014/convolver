@@ -6,15 +6,19 @@ item. This is the shared backlog, not a promise that every idea will be
 implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
-**In short:** the next milestone is an independent user running an exact
-preview package ([order of work](#execution-priorities)); [status](docs/project/status.md)
-shows what users can run now, and [decisions](docs/project/decisions.md) what
-jrp has decided. The open themes are user journeys, release qualification and
-host testing (REL, HOST), the VST3, LV2 and AU plug-ins (PLUG, VST3, LV2, AU),
-diagnostics (DIAG), documentation (DOC), files kept from releases (COMPAT), a
-parked FFmpeg filter (FFMPEG), other configuration readers (CFG), large files
-and resampling (IO), no-clip headroom (GAIN), stress testing (ROBUST), and FFT
-or performance work only where measurements justify it (FFT, PERF). The
+**In short:** the next milestone is end-to-end testing: an independent user
+running an exact preview package from the 0.5 series. The
+[order of work](#execution-priorities) gets there in four steps: finish the
+open fixes, run jrp's host smoke tests (HOST-1), put the CLI
+and the journey presets in the package while writing the user journeys
+(PLUG-5, REL-2), then the independent walkthrough (REL-3).
+[Status](docs/project/status.md) shows what users can run now and what still
+blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
+decided. Other open themes are the later LV2 and AU previews, diagnostics
+(DIAG), documentation checks (DOC), files kept from releases (COMPAT), other configuration readers (CFG),
+large files and resampling (IO), no-clip headroom (GAIN), stress testing
+(ROBUST), a parked FFmpeg filter (FFMPEG), and FFT or performance work only
+where measurements justify it (FFT, PERF). The
 [limitations table](#documented-limitations) lists current constraints.
 
 To take an item on, open a draft pull request titled with its ID; that is the
@@ -29,21 +33,18 @@ verify the exact release again when implementing an item.
 ## Execution priorities
 
 This is the order for new work, not approval to start every item. Correctness
-regressions take priority whenever discovered. Record ownership before starting
-so independent tasks do not duplicate changes.
-
-Direction: VST3, LV2 and AU are equal first
-priorities, developed in parallel after shared groundwork. The FFmpeg filter and
-Windows-native adapters are parked; CLAP and an editor wait for a request. See
-the [plug-in formats plan](docs/project/plans/2026-10-21-plugin-formats.md).
+regressions take priority whenever discovered. Claim an item with a draft pull
+request before starting so independent tasks do not duplicate changes.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
-22 October 2026): an independent user successfully installs and uses an exact
-preview package, with the lifecycle regression fixed and the advertised
-workflows demonstrated. "Ready" means the user journeys of REL-2 work, not
-that a set of items is ticked. The blockers and their evidence are listed in
-[status](docs/project/status.md#next-milestone-an-independent-user-runs-a-preview).
-Finishing a dependable product now matters more than another substantial
+22 October 2026): an independent user installs and uses an exact preview
+package, following only the documentation. This is the end-to-end test. "Ready" means the
+REL-2 journeys work, not that a set of items is ticked. The first preview is
+cut from the 0.5 series and holds the VST3 plug-in, the `convolver` CLI and the
+preset tool; LV2 and AU join later previews once their own journeys are
+demonstrated. What still blocks it, with the evidence, is in
+[status](docs/project/status.md#what-still-blocks-the-first-preview).
+Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
 behaviour (as with `HostFilter`), do not generalise host lifecycle or release
 machinery beyond the requirements in hand, and keep libsndfile at the I/O
@@ -51,20 +52,22 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. In parallel | **VST3** (HOST-1), **LV2-3 and LV2-4**, **AU-2 to AU-4** | Each stream passes the PLUG-2 comparisons and follows the [shared adapter contract](docs/develop/plugin-contract.md); LV2-2 and AU-2 load the presets `convolver-preset` writes. |
-| 2. Next milestone | jrp's conditions: **REL-2** journeys demonstrated and **REL-3** an independent user with an exact **PLUG-5** preview package (the third, the reset fix, is done). Proposed with them: a **HOST-1** smoke test (PLUG-7, the lifecycle sequences, is done) | The first preview holds VST3, the `convolver` CLI and the preset tool; LV2 and AU join later previews once their own journeys are demonstrated. |
-| 3. Release | **PLUG-5 / REL-1**, **LV2-5**, **AU-5**, **COMPAT-1** at each publication, then **REL-4** | First releases are unsigned previews on macOS and Windows, published by jrp from one candidate run; see PLUG-5. Signing is not a prerequisite for them. Developer ID signing, notarization and Authenticode remain the later production gate. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. |
-| 4. After the plug-in streams | **DIAG-1:** diagnostics review | Starts once the plug-in streams are implemented, so every surface that can report an error exists. The reasons are already kept (PLUG-8). The plug-ins' Status parameter and Convolver log came first, before the host smoke tests; the rest of the review remains. |
+| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source) at the same sitting if convenient | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 gates the first preview; AU-4 does not, since that preview holds no Audio Unit. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 4. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. Later previews | **LV2-3** to **LV2-5**, **AU-3** to **AU-5**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in PR #73, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
-| Supporting, cheap | **FFMPEG-1**, **PERF-1**, **HOST-4** | FFMPEG-1 reuses DOC-1 fixtures. HOST-4 (Equalizer APO export, system-wide on Windows, chosen over the Media Foundation transform) runs in Equalizer APO's own filter code on Windows CI; a manual check on a real device remains. PERF-1 measures 6- and 8-channel room-correction filters on named machines and keeps the throughput benchmarks reproducible; PERF-3, not PERF-1, decides whether PERF-2 is needed. |
-| Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. FFmpeg routes that avoid a patched FFmpeg are preferred; Windows-native needs more thought first. |
-| On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2** | Define the user need or measured bottleneck and acceptance tests first. |
+| Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
+| On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-DOC-2 automation and the CFG/IO/GAIN/ROBUST items remain open supporting work;
-prioritize them when a reproducible defect or a selected milestone requires them.
-This table owns the current ordering. The earlier
-[21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order),
-which put FFmpeg next, is kept as a dated record and is superseded here.
+DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
+remain open supporting work; take them up when a reproducible defect or the milestone
+needs them. This table owns the current ordering; the dated
+[21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
+is superseded.
 
 ## User experience and distribution
 
@@ -73,15 +76,16 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
   [check scope](docs/develop/documentation.md#automated-checks).
-- [ ] **REL-1 — Qualify downloadable plug-ins.** The VST3 preview pipeline from
-  `codex/plugin-distribution` was merged on 21 October 2026: pinned dependencies
-  and corresponding source, staging, unsigned installers, artifact verification,
-  promotion gates and the candidate workflow
-  ([record](docs/develop/releasing.md), [guide](docs/use/README.md)).
-  PLUG-5 extends it to LV2 and AU. Still open: track minimum OS/CPU versions,
-  dependency closure, licences/corresponding source, signing/notarization, clean
-  machine installation and immutable release assets. Start with the
-  [distribution plan](docs/project/plans/2026-10-18-plugin-distribution.md).
+- [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
+  builds unsigned packages with pinned dependencies, corresponding source,
+  staging, installers, artifact verification and promotion gates
+  ([releasing](docs/develop/releasing.md)); PLUG-5 extends it to LV2 and AU.
+  Still open, for the production gate: verified minimum OS and CPU versions,
+  dependency closure, the final licence and corresponding-source review,
+  signing and notarization, installation on clean machines, and immutable
+  release assets ([production gates](docs/develop/releasing.md#production-gates)).
+  The 18 October [distribution plan](docs/archive/plans/2026-10-18-plugin-distribution.md)
+  is archived as superseded.
 - [ ] **REL-2 — Define the first release by user journeys.** Write three
   journeys as numbered steps for a reader who has never seen the repository:
   stereo room correction and a 2→6 crossover in a plug-in host, and offline
@@ -116,37 +120,29 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   [next milestone](#execution-priorities). jrp chooses the tester.
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
-  SourceForge site, KVR and their forums. On 23 October 2026 the repository had
-  no topics, releases, website link or custom social preview, and a description
-  in the 2006 wording (GitHub API); nothing on the SourceForge project page or
-  the old site pointed here, although Roon's convolution help page links to the
-  old site's format pages (checked that day). Repository side
-  (jrp chose this scope): a README line for users of the
-  old Windows Convolver, issue forms, the
+  SourceForge site, KVR and their forums. Done on the repository side: a README
+  line for users of the old Windows Convolver, issue forms, the
   [social preview source](.github/social-preview.html) and the
-  [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable).
-  Still for jrp, now: the repository description, topics and Website field,
-  uploading the social preview, and a line pointing here at the top of the old
-  SourceForge pages and project summary. At each preview: the steps after
-  publishing.
+  [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable)
+  (PR #64). jrp set the repository description, topics, website and social
+  preview, and the SourceForge project summary now points here (24 October
+  2026); the old SourceForge website stays as it is. Remaining, at each
+  preview: the steps after publishing.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
   validation and pluginval alone do not complete this item. Steinberg's free
-  VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW.
-  Progress (22 October 2026): REAPER and Carla are the suggested first hosts
-  (jrp to try); the SDK sample hosts were evaluated and not added to CI
+  VST3PluginTestHost (Windows/macOS) is a convenient manual check without a DAW;
+  the SDK's sample hosts were evaluated and not added to CI
   ([host qualification](docs/develop/host-testing.md#steinbergs-sdk-hosts)).
-  Progress (23 October 2026, PR #56): jrp's first hosts, on his Mac, are
-  REAPER and Audacity for VST3 (replacing REAPER and
-  Carla); each has a step-by-step
-  [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host).
+  First step, before the first preview: jrp's smoke tests in REAPER and
+  Audacity on his Mac, from the latest candidate
+  ([smoke tests](docs/develop/host-testing.md#smoke-test-in-each-first-host)).
   Not yet run.
-- [ ] **HOST-2 — Additional formats and UI.** LV2 and AU are now first
-  priorities alongside VST3 (see [plug-ins](#plug-ins-vst3-lv2-and-au) below).
-  CLAP only on request: every CLAP host found also loads VST3. A filter-loading
-  editor only for an identified need, then for all formats at once. Write
-  adapters against the formats' own headers, not a framework.
+- [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
+  CLAP host found also loads VST3. A filter-loading editor only for an
+  identified need, then for all formats at once. Write adapters against the
+  formats' own headers, not a framework.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -220,36 +216,32 @@ VST3, LV2 and AU are developed in parallel. Design, host evidence and framework 
 [plug-in formats plan](docs/project/plans/2026-10-21-plugin-formats.md). Each
 adapter is written against its format's own headers over `HostProcessor` and
 follows the [shared adapter contract](docs/develop/plugin-contract.md). VST3
-work continues under VST3-2 to VST3-6, HOST-1 and REL-1.
+work continues under HOST-1, PLUG-5 and the VST3 items
+[below](#vst3-sdk-features-not-yet-used).
 
 Shared work, done once for all three formats:
 
-- [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats. Extend the
-  merged VST3 pipeline (`packaging/release-policy.json`, `scripts/release/`,
-  `.github/workflows/release.yml`) rather than writing a new one. Signing: start unsigned on macOS and Windows.
-  Mac bundles still carry an ad-hoc signature (Apple Silicon will not load
-  unsigned code) and the install guide explains removing the download
-  quarantine; Windows installers show a SmartScreen warning. Label these
-  releases as unsigned previews. The preview gate and the production gate are
-  separate, and publication is a manual step owned by jrp
-  ([releasing](docs/develop/releasing.md)). Developer ID signing with notarization
-  (shared by VST3 and AU), and Authenticode, come later as the production gate;
-  the draft signing scripts are kept in history at `f4519022c` (the last commit of
-  the merged `codex/plugin-distribution` branch): `git show
-  f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`.
-  Progress 22 October 2026 (PR #38): preview packages ship `convolver-preset`
-  and `convolver-equalizer-apo` on every platform, and not the older
-  `convolver-vst3-preset`, with the
-  presets and Equalizer APO guides;
-  `release.stage`, `package_smoke.py` and `verify_artifact.py` require and run
-  both tools. Still to add: the `convolver` CLI, which the first preview ships
-  alongside VST3 and the preset tool, with LV2 and AU in later previews.
-  Also before the first preview: Steinberg's usage guidelines ask anyone who
-  uses the word "VST" for ® on first use, the sentence "VST is a registered
-  trademark of Steinberg Media Technologies GmbH." in documentation and
-  packages, and the VST Compatible logo where they require it
-  ([VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)); jrp
-  to approve the wording.
+- [ ] **PLUG-5 — One release pipeline.** REL-1 for all three formats,
+  extending the existing pipeline (`packaging/release-policy.json`,
+  `scripts/release/`, `.github/workflows/release.yml`) rather than writing a
+  new one. Previews are unsigned on macOS (ad-hoc signature; the install guide
+  explains removing the download quarantine) and Windows (SmartScreen warns),
+  labelled as unsigned previews, and published by jrp from one candidate run
+  ([releasing](docs/develop/releasing.md)). Developer ID signing with
+  notarization (shared by VST3 and AU), and Authenticode, are the later
+  production gate; the draft signing scripts are in history at `f4519022c`
+  (`git show f4519022c:scripts/release/sign-macos.sh` and `sign-windows.ps1`).
+  Progress (22 October 2026, PR #38): packages ship `convolver-preset` and
+  `convolver-equalizer-apo` with their guides, and `release.stage`,
+  `package_smoke.py` and `verify_artifact.py` require and run both.
+  Still needed for the first preview: the `convolver` CLI in the package (run
+  by the same release tests); presets made from the stereo and 2→6 first-use
+  filters, which the REL-2 journeys load; and the VST trademark notice that
+  Steinberg's usage guidelines ask for (® on first use of "VST", the sentence
+  "VST is a registered trademark of Steinberg Media Technologies GmbH." in the
+  documentation and packages, and the VST Compatible logo where they require
+  it; [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)), with
+  wording jrp approves. LV2 and AU join later previews.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -267,24 +259,21 @@ LV2 (Linux first; also PipeWire system audio):
   development version and minor 0 as experimental, has no major, and lilv
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
-  with minor even and non-zero and micro even for releases.
+  with minor even and non-zero and micro even for releases. Mapped this way,
+  every 0.5.x build is minor 5, which LV2 reads as a development version.
 
 AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
-- [ ] **AU-2 — Loading filters.** Host state in `ClassInfo`; `.aupreset` files
-  from PLUG-3 load through the host's preset menu. Progress (22 October 2026,
-  PR #44): ClassInfo holds the encoded state under `convolver-state`; the
-  tests load `.aupreset` dictionaries from the PLUG-3 writer. Loading one from a
-  named host's preset menu is checked under AU-4.
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
-  SoundSource, Live, REAPER and FL Studio results. Progress (23 October 2026,
-  PR #56): GarageBand is jrp's first Audio Unit host,
-  with a [smoke test](docs/develop/host-testing.md#garageband-audio-unit)
-  limited to 44.1 kHz stereo. Not yet run.
+  SoundSource, Live, REAPER and FL Studio results, including loading an
+  `.aupreset` from a host's preset menu. Progress (23 October 2026, PR #56):
+  GarageBand is jrp's first Audio Unit host, with a
+  [smoke test](docs/develop/host-testing.md#garageband-audio-unit) limited to
+  44.1 kHz stereo. Not yet run.
 - [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
@@ -500,13 +489,6 @@ so the preset file path is not needed).
   live replacement and configuration loading; its first results are in
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
 
-## Developer tooling
-
-- [ ] **CI-3 — Latest stable Clang tools.** Replace the version-18 formatting
-  and analysis pins with the latest stable packaged releases. Refresh CI caches
-  when the formatter release changes, keep local and cloud instructions aligned,
-  and validate formatting and analysis in CI. Local installation is deferred.
-
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
@@ -516,7 +498,7 @@ with compatibility tests; linked IDs point to open work above.
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; evaluate layouts/editor under HOST-1/HOST-2 and VST3-1 to VST3-3. | [VST3](docs/use/plugins.md#loading-a-filter) |
+| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
@@ -545,12 +527,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
   follow-up in PR #49; [plug-in guide](docs/use/plugins.md),
   [Audio Unit licence](docs/use/plugins.md#audio-unit-licence).
+- [x] **AU-2 — Loading filters.** 23 October 2026, PR #44: host state in
+  `ClassInfo` under `convolver-state`, and `.aupreset` files from the preset
+  tool; loading one from a named host's preset menu is checked under AU-4;
+  [presets](docs/use/presets.md).
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:
   LV2 sanitizer stages as parallel jobs building only their targets,
   one CTest entry per package consumer, a parallel offline rebuild, ccache on
   Linux and macOS, and each kind of test run only where it can change; [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
+- [x] **CI-3 — Latest stable Clang tools.** 24 October 2026, PR #69:
+  formatting and analysis use the latest stable packaged Clang in CI and cloud
+  sessions; local installation on jrp's Mac is deferred;
+  [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
   2026, PR #74: `native.engine` prints the worst error relative to the output
   peak for each group of cases and kernel set, with B, and where the largest

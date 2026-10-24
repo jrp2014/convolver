@@ -143,6 +143,9 @@ These dated plans in [`project/plans/`](project/plans/) describe work that is no
 open work and the current order are tracked in
 [TODO](../TODO.md#execution-priorities). The plug-in formats plan is the
 current direction; the Media Foundation and FFmpeg plans are parked.
+[Completed and superseded plans](archive/plans/README.md) are archived,
+including the 18 October plug-in distribution plan, whose open work is now in
+[releasing](develop/releasing.md) and TODO.
 
 - [Plug-in formats: VST3, LV2 and AU](project/plans/2026-10-21-plugin-formats.md)
   (PLUG, LV2 and AU items): which hosts load VST3, AU, LV2 and CLAP, framework
@@ -155,7 +158,3 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   [Equalizer APO export](use/equalizer-apo.md) (HOST-4).
 - [FFmpeg filter](project/plans/2026-10-21-ffmpeg-filter.md) (FFMPEG-1 to
   FFMPEG-5, parked): a libavfilter filter; the pipe already works.
-- [Plug-in distribution](project/plans/2026-10-18-plugin-distribution.md) and its
-  [design](project/plans/2026-10-18-plugin-distribution-design.md) (REL-1, PLUG-5):
-  the 18 October release design. The packaging it describes is merged; signing
-  and production qualification are open.
