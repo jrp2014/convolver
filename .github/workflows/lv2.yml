@@ -102,8 +102,10 @@ jobs:
           sys.exit(error != 0.0)
           EOF
       # The newest lv2lint release. Its own host first, then FreeBSD's
-      # distfile caches; when its host does not answer, the newest version
-      # FreeBSD's ports know is used, and the summary says so.
+      # distfile cache, over plain HTTP (its HTTPS names have mismatched
+      # certificates), accepted only with the checksum FreeBSD's ports
+      # publish. When its host does not answer, the newest version FreeBSD's
+      # ports know is used, and the summary says so.
       - name: Newest lv2lint
         run: |
           python scripts/release/resolve.py tool lv2lint --cache "$RUNNER_TEMP/lv2lint-download" \

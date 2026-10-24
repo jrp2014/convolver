@@ -253,8 +253,32 @@ class ToolTests(unittest.TestCase):
             raise RuntimeError('CONNECT tunnel failed')
         record, _ = self.tool('lv2lint', lister=unreachable, fetcher=fetcher)
         self.assertEqual(record['version'], '0.16.2')
+        self.assertTrue(record['url'].startswith('https://git.open-music-kontrollers.ch/'))
         self.assertEqual(record['checked_against'], 'FreeBSD ports distinfo')
         self.assertIn('did not answer (CONNECT tunnel failed)', record['chosen'])
+
+    def test_plain_http_mirror_only_with_a_published_checksum(self):
+        good = 'http://distcache.FreeBSD.org/ports-distfiles/lv2lint-0.16.2.tar.xz'
+
+        def fetcher(url, target):
+            if url.endswith('/distinfo'):
+                Path(target).write_text(f'SHA256 (lv2lint-0.16.2.tar.xz) = {digest(good)}\n')
+            elif url.startswith('https://'):
+                raise RuntimeError(f'cannot download {url}: Not Found')
+            else:
+                fake_fetcher(url, target)
+
+        def listed(remote):
+            return listing({'0.16.2': 'a' * 40})
+        record, _ = self.tool('lv2lint', lister=listed, fetcher=fetcher)
+        self.assertEqual((record['url'], record['checked_against']), (good, 'FreeBSD ports distinfo'))
+
+        def no_distinfo(url, target):
+            if url.endswith('/distinfo'):
+                raise RuntimeError('unreachable')
+            fetcher(url, target)
+        with self.assertRaisesRegex(resolve.ResolveError, 'not HTTPS, and there is no published checksum'):
+            self.tool('lv2lint', lister=listed, fetcher=no_distinfo)
 
     def test_unknown_tool(self):
         with self.assertRaisesRegex(resolve.ResolveError, 'unknown tool'):

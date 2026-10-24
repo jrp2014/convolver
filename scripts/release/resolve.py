@@ -299,6 +299,10 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
             expected, against = published[version], 'FreeBSD ports distinfo'
     failures = []
     for url in urls:
+        if not url.startswith('https://') and not expected:
+            # A plain-HTTP mirror is trusted only through a checksum fetched over HTTPS.
+            failures.append(f'{url}: not HTTPS, and there is no published checksum to check it against')
+            continue
         try:
             path = fetch_archive(url, cache, archive_name, fetcher)
         except (OSError, RuntimeError) as error:

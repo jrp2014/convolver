@@ -220,8 +220,7 @@
       "tag_prefix": "",
       "url": "https://git.open-music-kontrollers.ch/~hp/lv2lint/snapshot/lv2lint-{version}.tar.xz",
       "mirrors": [
-        "https://distcache.us-east.FreeBSD.org/ports-distfiles/lv2lint-{version}.tar.xz",
-        "https://distcache.eu.FreeBSD.org/ports-distfiles/lv2lint-{version}.tar.xz"
+        "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-{version}.tar.xz"
       ],
       "distinfo": "https://raw.githubusercontent.com/freebsd/freebsd-ports/main/audio/lv2lint/distinfo"
     }
