@@ -174,6 +174,10 @@ Until 1.0 the C++ API may change between minor versions.
 - macOS VST3 bundles are re-sealed with an ad-hoc signature after the SDK adds
   `moduleinfo.json`, and `vst3.signature` verifies the seal.
 
+- `sound_file_header()` in `convolver/io.hpp`: whether a file's content is a
+  sound file (libsndfile recognises it, or it starts with a container marker),
+  opening regular files only.
+
 ### Changed
 
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
@@ -270,6 +274,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- A filter named `.pcm` or `.raw` that is a sound file with a header (Sun/NeXT
+  AU, for example) was read as raw samples, header included, because only some
+  headers were recognised. Now such a filter is read through its header when
+  libsndfile recognises its content or it starts like a WAV, RF64, BW64, AIFF,
+  CAF, AU, FLAC or Ogg file, and a header that cannot be read is an error that
+  says so, not raw samples. Found in jrp's review of 0.4.37.
+- `--inspect --syntax-only --profile portable-paths` opened `.pcm` and `.raw`
+  filters to look for a header, so a named pipe with such a name blocked it.
+  Syntax-only inspection now opens no filter file; its `raw-filter` warning
+  goes by the name and says it did not check. Found in jrp's review of 0.4.37.
 - LV2: after an empty state (or an empty state map) was restored while the
   plug-in was running, a filter file that `run()` refused in the same cycle (no
   worker, or a full worker queue) let the unfiltered input play until the

@@ -2,14 +2,23 @@
 // Inspection API: selection, diagnostics, null fields, and agreement with Engine.
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
+#include <bit>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <set>
 #include <stdexcept>
+#include <utility>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 using namespace convolver;
@@ -360,6 +369,103 @@ void run(const fs::path& dir) {
                     named.configurations.at(0).paths.at(0).ir_file_channels == 2 &&
                     !named.configurations.at(0).paths.at(0).raw_encoding,
                 "a WAV named .pcm is read as WAV");
+    }
+    // Headered files named .pcm or .raw keep their header's meaning, whatever
+    // the format: libsndfile decides, not a list of signatures. Syntax-only
+    // inspection opens no filter and says its raw-filter warning is assumed.
+    {
+        const auto box = dir / "headered";
+        fs::create_directory(box);
+        const auto bytes = [&](const char* name, const std::vector<unsigned char>& b) {
+            std::ofstream f(box / name, std::ios::binary);
+            f.write(reinterpret_cast<const char*>(b.data()),
+                    static_cast<std::streamsize>(b.size()));
+        };
+        // Sun/NeXT AU, mono float32 at 44100 Hz: 1, 0.5, 0.25, 0.125 (big-endian).
+        const std::vector<unsigned char> au{'.', 's', 'n',  'd',  0,    0,    0,    24, 0,    0,
+                                            0,   16,  0,    0,    0,    6,    0,    0,  0xac, 0x44,
+                                            0,   0,   0,    1,    0x3f, 0x80, 0,    0,  0x3f, 0,
+                                            0,   0,   0x3e, 0x80, 0,    0,    0x3e, 0,  0,    0};
+        InspectionOptions portable;
+        portable.profile = InspectionProfile::portable_paths;
+        for (const auto* name : {"sun.raw", "sun.PCM"}) {
+            bytes(name, au);
+            text_file(box / "sun.cfg", std::string("44100 1 1 0\n0\n0\n") + name + "\n0\n0\n0\n");
+            const auto report = inspect_configuration(box / "sun.cfg", portable);
+            const auto& f = report.configurations.at(0).paths.at(0);
+            require(report.valid && !has_code(report, "raw-filter") && f.ir_frames == 4 &&
+                        !f.raw_encoding,
+                    std::string("an AU file named ") + name + " is read through its header");
+            std::vector<std::filesystem::path> raws;
+            const auto loaded = load_configuration(box / "sun.cfg", {}, nullptr, &raws);
+            require(loaded.paths.at(0).impulse == std::vector<float>{1, .5f, .25f, .125f} &&
+                        raws.empty(),
+                    std::string("an AU file named ") + name + " keeps its coefficients");
+        }
+        // f32le 1159.875 is FF FB 90 44, a bare MPEG frame sync, and 1.0001222
+        // is 01 04 80 3F, the MPC 2000 marker: realistic raw filters starting
+        // with them are still read as samples.
+        for (const auto& [name, first] : {std::pair{"sync.raw", std::uint32_t{0x4490fbff}},
+                                          std::pair{"mpc.raw", std::uint32_t{0x3f800401}}}) {
+            std::vector<unsigned char> b;
+            for (int i = 0; i < 4096; ++i) {
+                const auto word = i == 0 ? first : std::bit_cast<std::uint32_t>(1e-6f * i);
+                for (int k = 0; k < 4; ++k)
+                    b.push_back(static_cast<unsigned char>(word >> (8 * k)));
+            }
+            bytes(name, b);
+            text_file(box / "first.cfg", std::string("44100 1 1 0\n0\n0\n") + name + "\n0\n0\n0\n");
+            const auto impulse = load_configuration(box / "first.cfg").paths.at(0).impulse;
+            require(impulse.size() == 4096 && impulse[0] == std::bit_cast<float>(first) &&
+                        impulse[1] == 1e-6f,
+                    std::string("raw samples starting like a weak signature are samples: ") + name);
+        }
+        // Markers libsndfile does not report as recognised (BW64, an AU in an
+        // encoding it lacks) still make the file a sound file: an error that
+        // explains itself, not header bytes read as coefficients.
+        bytes("bw.raw", {'B', 'W', '6', '4', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 0, 0, 0, 0});
+        bytes("unknown.raw", {'.', 's', 'n', 'd', 0,    0,    0, 24, 0, 0, 0, 4, 0, 0,
+                              0,   99,  0,   0,   0xac, 0x44, 0, 0,  0, 1, 0, 0, 0, 0});
+        // A recognised header that cannot be read is an error that explains itself.
+        bytes("broken.raw", {'.', 's', 'n', 'd', 0, 0, 0, 0, 0, 0, 0, 0});
+        for (const auto* name : {"broken.raw", "bw.raw", "unknown.raw"}) {
+            text_file(box / "broken.cfg",
+                      std::string("44100 1 1 0\n0\n0\n") + name + "\n0\n0\n0\n");
+            const auto broken = inspect_configuration(box / "broken.cfg");
+            require(!broken.valid && has_code(broken, "missing-asset") &&
+                        broken.diagnostics.at(0).message.find(
+                            "the content starts like a sound file") != std::string::npos,
+                    std::string("an unreadable header is reported, not read as samples: ") + name);
+        }
+        // Syntax-only opens no filter: the warning describes an assumption.
+        InspectionOptions syntax = portable;
+        syntax.syntax_only = true;
+        const auto assumed = inspect_configuration(box / "sun.cfg", syntax);
+        require(assumed.valid && has_code(assumed, "raw-filter") &&
+                    assumed.diagnostics.at(0).message.find("did not open it") != std::string::npos,
+                "syntax-only warns from the name and says it did not check");
+#ifndef _WIN32
+        // A named pipe called .raw must not be opened: that would block.
+        const auto pipe = box / "pipe.raw";
+        require(mkfifo(pipe.c_str(), 0600) == 0, "mkfifo");
+        text_file(box / "pipe.cfg", "44100 1 1 0\n0\n0\npipe.raw\n0\n0\n0\n");
+        auto pending = std::async(std::launch::async,
+                                  [&] { return inspect_configuration(box / "pipe.cfg", syntax); });
+        if (pending.wait_for(std::chrono::seconds(20)) != std::future_status::ready) {
+            // Release the blocked reader, as often as it opens the pipe again,
+            // so the test fails instead of hanging.
+            while (pending.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready) {
+                const int writer = open(pipe.c_str(), O_WRONLY | O_NONBLOCK);
+                if (writer >= 0)
+                    close(writer);
+            }
+            require(false, "syntax-only inspection opened a named pipe");
+        }
+        const auto piped = pending.get();
+        require(piped.valid && has_code(piped, "raw-filter"),
+                "syntax-only inspection of a pipe named .raw finishes and warns");
+#endif
+        fs::remove_all(box);
     }
     // Profiles: portable-paths adds warnings only; it never changes validity of errors.
     {
