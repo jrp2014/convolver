@@ -197,6 +197,8 @@ jobs:
             tsan: true
     env:
       TSAN_OPTIONS: halt_on_error=1
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -213,6 +215,14 @@ jobs:
             meson ninja-build pkg-config libelf-dev libsndfile1-dev
           lv2info --version
           dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: lv2-${{ matrix.tsan && 'tsan' || 'asan' }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       # ThreadSanitizer cannot map its shadow memory with the kernel's default
       # address-space randomisation on this image, so it is reduced first.
       - name: Reduce address-space randomisation

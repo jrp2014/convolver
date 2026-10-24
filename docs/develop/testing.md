@@ -516,7 +516,9 @@ AU-4.
 The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
 UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
 and runs `lv2lint` on every plug-in in the bundle, with the
-[pinned packages](build.md#pinned-format-dependencies).
+[pinned packages](build.md#pinned-format-dependencies). The three run as
+separate jobs side by side; the sanitizer jobs build only what their tests run
+(the `convolver_lv2_tests` target, or the adapter test and the preset tool).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
 Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
 than reporting the refusal).
@@ -782,3 +784,20 @@ No status check is required on `main` at present. If one is made required,
 require a job that always reports: a skipped matrix job shows under its
 unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
 forever on a documentation-only pull request.
+
+### Compiler cache
+
+The Linux and macOS jobs of the native, VST3, LV2, Audio Unit and fuzz
+workflows compile through [ccache](https://ccache.dev/), set up by
+[ccache-action](https://github.com/hendrikmuhs/ccache-action) and passed to
+CMake as the compiler launcher. ccache's own hash covers the compiler, every
+flag and every included header, so a cached object is reused only for an
+identical compilation; the cache key (workflow, job and matrix entry) only
+chooses which earlier cache to start from. Pull requests restore the cache that
+`main` saved and never save one, so the repository's 10 GB cache stays bounded
+and a pull request cannot change what `main` builds from; pushes to `main` and
+manual runs save theirs. Each job's log ends with ccache's hit statistics.
+
+The Windows jobs use the Visual Studio generator, which takes no compiler
+launcher, and the release candidates are built without a cache, from the
+corresponding source alone.

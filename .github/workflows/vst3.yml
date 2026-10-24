@@ -118,10 +118,20 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             echo "PLUGINVAL_ARGS=--rtcheck;relaxed" >> "$GITHUB_ENV"
           fi
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        if: runner.os != 'Windows'
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: vst3-${{ matrix.os }}-${{ matrix.fft }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       - name: Configure Unix
         if: runner.os != 'Windows'
         run: >-
           cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DCONVOLVER_FFT_BACKEND=${{ matrix.fft }}"
           "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk" -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
