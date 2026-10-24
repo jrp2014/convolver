@@ -28,7 +28,7 @@ def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_di
         subprocess.run(configure, check=True)
         subprocess.run([cmake, '--build', str(build), '--config', 'Release', '--parallel', '2'], check=True)
         ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
-        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure']
+        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure', '--parallel', '2']
         if exclude_validator:
             print('SDK bundle validator explicitly excluded; this is NOT release evidence.', flush=True)
         subprocess.run(command, check=True)
