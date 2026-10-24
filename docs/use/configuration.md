@@ -106,8 +106,10 @@ AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
 [FLAC and Ogg](command-line.md#flac-and-ogg) says how to work around that.
 
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
-unless the file starts with a sound-file header (a WAV named `.pcm` is still
-read as WAV). A raw filter is a headerless file of mono samples. Convolver reads
+unless libsndfile recognises the file's content as a sound file: a WAV, AIFF
+or AU file named `.pcm` is still read through its header. If the header is
+recognised but cannot be read, Convolver reports an error rather than reading
+the file as samples. A raw filter is a headerless file of mono samples. Convolver reads
 it as little-endian 32-bit float (`f32le`), the type
 [DRC](https://drc-fir.sourceforge.net/) and BruteFIR write by default, and says
 so: rendering prints a line such as
@@ -128,7 +130,8 @@ configuration's rate; their IR channel must be `0`. A raw file whose size is
 not a whole number of samples of the chosen type is reported as damaged, and the
 message names the type. Other programs that read `.cfg` files expect sound
 files, so `--inspect --profile portable-paths` warns about raw filters
-(`raw-filter`).
+(`raw-filter`). With `--syntax-only` it opens no filter file, so that warning
+goes by the name alone and says so.
 
 ## Route numbers combine a channel and a gain
 

@@ -234,10 +234,13 @@ SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
 // globals, so opens are serialized together with reading that failure:
 // LV2 instances load filter files on several worker threads at once. Other
 // code in the same process that uses libsndfile is beyond this lock.
+std::mutex& opening() {
+    static std::mutex lock;
+    return lock;
+}
 SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& info,
                        const std::string& action) {
-    static std::mutex opening;
-    const std::lock_guard lock(opening);
+    const std::lock_guard lock(opening());
     SNDFILE* file = open(path, mode, info);
     if (!file)
         throw error(action + " " + path.string(), nullptr);
@@ -303,6 +306,35 @@ const char* compressed_codec(const std::filesystem::path& path) {
     return nullptr;
 }
 } // namespace
+bool sound_file_header(const std::filesystem::path& path) {
+    // Opening anything but a regular file could block (a named pipe) or
+    // consume data that cannot be read again.
+    std::error_code ec;
+    if (path == "-" || !std::filesystem::is_regular_file(path, ec))
+        return false;
+    // libsndfile's last check matches a bare MPEG frame sync, 11 set bits that
+    // sample data has about once in five thousand files (its own source calls
+    // it "prone to false positives"). An MPEG file with an ID3v2 tag still
+    // counts: libsndfile identifies it from the tag.
+    {
+        std::ifstream file(path, std::ios::binary);
+        unsigned char head[2]{};
+        if (file.read(reinterpret_cast<char*>(head), sizeof head) && head[0] == 0xFF &&
+            (head[1] & 0xE0) == 0xE0)
+            return false;
+    }
+    SF_INFO info{};
+    const std::lock_guard lock(opening());
+    if (SNDFILE* file = open(path, SFM_READ, info)) {
+        sf_close(file);
+        return true;
+    }
+    // Any other failure (a damaged header, a codec this libsndfile lacks)
+    // means it recognised a format: the file is a sound file it cannot read.
+    // A system error (no permission, for example) says nothing about the content.
+    const int code = sf_error(nullptr);
+    return code != SF_ERR_UNRECOGNISED_FORMAT && code != SF_ERR_SYSTEM;
+}
 bool available(Container container) noexcept {
     // libsndfile lists only the containers it was built with; a build without
     // its external libraries has no FLAC, although sf_format_check accepts it.

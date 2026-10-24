@@ -231,76 +231,64 @@ if(CONVOLVER_BUILD_NATIVE)
         list(APPEND native_targets convolver_benchmark)
     endif()
     if(CONVOLVER_BUILD_TESTS)
-        add_executable(convolver_fft_tests tests/native/fft_tests.cpp)
-        target_include_directories(convolver_fft_tests PRIVATE portable)
-        target_link_libraries(convolver_fft_tests PRIVATE convolver_core)
-        add_test(NAME native.fft COMMAND convolver_fft_tests)
-        add_executable(convolver_engine_tests tests/native/engine_tests.cpp)
-        target_include_directories(convolver_engine_tests PRIVATE portable)
-        target_link_libraries(convolver_engine_tests PRIVATE convolver_core)
-        add_test(NAME native.engine COMMAND convolver_engine_tests)
-        add_executable(convolver_kernel_divergence_tests tests/native/kernel_divergence_tests.cpp)
-        target_include_directories(convolver_kernel_divergence_tests PRIVATE portable)
-        target_link_libraries(convolver_kernel_divergence_tests PRIVATE convolver_core)
-        add_test(NAME native.kernel_divergence COMMAND convolver_kernel_divergence_tests)
-        add_executable(convolver_host_tests tests/native/host_tests.cpp)
-        target_link_libraries(convolver_host_tests PRIVATE Convolver::host Threads::Threads)
-        target_include_directories(convolver_host_tests PRIVATE portable)
-        add_test(NAME native.host COMMAND convolver_host_tests)
+        # Every native test is registered here, so its executable is built by the
+        # check target and gets the shared compile, warning and sanitizer settings
+        # (applied to native_targets below), the test labels and the timeout.
+        set(test_targets "")
+        function(convolver_native_test name target)
+            cmake_parse_arguments(PARSE_ARGV 2 arg "" "" "SOURCES;LIBRARIES;ARGS;LABELS")
+            if(NOT arg_LABELS)
+                set(arg_LABELS native real-libraries)
+            endif()
+            add_executable(${target} ${arg_SOURCES})
+            target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/portable")
+            target_link_libraries(${target} PRIVATE ${arg_LIBRARIES})
+            add_test(NAME ${name} COMMAND ${target} ${arg_ARGS})
+            set_tests_properties(${name} PROPERTIES LABELS "${arg_LABELS}" TIMEOUT 120)
+            set(test_targets ${test_targets} ${target} PARENT_SCOPE)
+        endfunction()
+        convolver_native_test(native.fft convolver_fft_tests
+            SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
+        convolver_native_test(native.engine convolver_engine_tests
+            SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
+        convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
+            SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
+        convolver_native_test(native.host convolver_host_tests
+            SOURCES tests/native/host_tests.cpp LIBRARIES Convolver::host Threads::Threads)
         # PLUG-7: lifecycle sequences against the reference model.
-        add_executable(convolver_host_lifecycle_tests tests/native/host_lifecycle_tests.cpp
-            tests/plugins/lifecycle.cpp tests/plugins/audio_guard.cpp)
-        target_link_libraries(convolver_host_lifecycle_tests PRIVATE Convolver::host ${CMAKE_DL_LIBS})
-        add_test(NAME native.host_lifecycle COMMAND convolver_host_lifecycle_tests ${CONVOLVER_LIFECYCLE_LENGTH})
-        add_executable(convolver_state_tests tests/native/state_tests.cpp)
-        target_link_libraries(convolver_state_tests PRIVATE Convolver::host)
-        add_test(NAME native.state COMMAND convolver_state_tests)
-        add_executable(convolver_preset_tests tests/native/preset_tests.cpp)
-        target_link_libraries(convolver_preset_tests PRIVATE convolver_presets)
-        add_test(NAME native.presets COMMAND convolver_preset_tests)
-        add_executable(convolver_utility_tests tests/native/utility_tests.cpp)
-        target_include_directories(convolver_utility_tests PRIVATE portable)
-        target_link_libraries(convolver_utility_tests PRIVATE Convolver::core Threads::Threads)
-        add_test(NAME native.utilities COMMAND convolver_utility_tests)
-        set(native_tests native.fft native.engine native.host native.host_lifecycle native.state native.presets native.utilities)
-        set(test_targets convolver_fft_tests convolver_engine_tests convolver_host_tests
-            convolver_host_lifecycle_tests convolver_state_tests
-            convolver_preset_tests convolver_utility_tests)
+        convolver_native_test(native.host_lifecycle convolver_host_lifecycle_tests
+            SOURCES tests/native/host_lifecycle_tests.cpp tests/plugins/lifecycle.cpp
+                tests/plugins/audio_guard.cpp
+            LIBRARIES Convolver::host ${CMAKE_DL_LIBS}
+            ARGS ${CONVOLVER_LIFECYCLE_LENGTH})
+        convolver_native_test(native.state convolver_state_tests
+            SOURCES tests/native/state_tests.cpp LIBRARIES Convolver::host)
+        convolver_native_test(native.presets convolver_preset_tests
+            SOURCES tests/native/preset_tests.cpp LIBRARIES convolver_presets)
+        convolver_native_test(native.utilities convolver_utility_tests
+            SOURCES tests/native/utility_tests.cpp LIBRARIES Convolver::core Threads::Threads)
         if(CONVOLVER_BUILD_IO)
-            add_executable(convolver_io_tests tests/native/io_tests.cpp)
-            target_link_libraries(convolver_io_tests PRIVATE convolver_io SndFile::sndfile)
-            add_test(NAME native.io COMMAND convolver_io_tests)
-            add_executable(convolver_config_parse_tests tests/native/config_parse_tests.cpp)
-            target_include_directories(convolver_config_parse_tests PRIVATE portable)
-            target_link_libraries(convolver_config_parse_tests PRIVATE convolver_io)
-            add_test(NAME native.config_parse COMMAND convolver_config_parse_tests)
-            add_executable(convolver_inspection_tests tests/native/inspection_tests.cpp)
-            target_link_libraries(convolver_inspection_tests PRIVATE convolver_io)
-            add_test(NAME native.inspection COMMAND convolver_inspection_tests)
-            add_executable(convolver_limits_tests tests/native/limits_tests.cpp)
-            target_include_directories(convolver_limits_tests PRIVATE portable)
-            target_link_libraries(convolver_limits_tests PRIVATE convolver_io Convolver::host)
-            add_test(NAME native.limits COMMAND convolver_limits_tests)
-            list(APPEND native_tests native.io native.config_parse native.inspection native.limits)
-            list(APPEND test_targets convolver_io_tests convolver_config_parse_tests
-                convolver_inspection_tests convolver_limits_tests)
+            convolver_native_test(native.io convolver_io_tests
+                SOURCES tests/native/io_tests.cpp LIBRARIES convolver_io SndFile::sndfile)
+            convolver_native_test(native.config_parse convolver_config_parse_tests
+                SOURCES tests/native/config_parse_tests.cpp LIBRARIES convolver_io)
+            convolver_native_test(native.inspection convolver_inspection_tests
+                SOURCES tests/native/inspection_tests.cpp LIBRARIES convolver_io)
+            convolver_native_test(native.limits convolver_limits_tests
+                SOURCES tests/native/limits_tests.cpp LIBRARIES convolver_io Convolver::host)
         endif()
         # Replay fuzz seeds and minimized regressions deterministically, without libFuzzer.
         set(fuzz_harnesses config_text config_list host_state ir_file)
         if(CONVOLVER_BUILD_IO)
             foreach(harness IN LISTS fuzz_harnesses)
-                add_executable(convolver_fuzz_replay_${harness}
-                    tests/fuzz/fuzz_${harness}.cpp tests/fuzz/replay_main.cpp)
-                target_include_directories(convolver_fuzz_replay_${harness} PRIVATE portable)
-                target_link_libraries(convolver_fuzz_replay_${harness} PRIVATE convolver_io Convolver::host)
-                add_test(NAME fuzz.replay.${harness} COMMAND convolver_fuzz_replay_${harness}
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/seeds/${harness}"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/regressions/${harness}")
-                set_tests_properties(fuzz.replay.${harness} PROPERTIES LABELS "fuzz;replay" TIMEOUT 120)
-                list(APPEND test_targets convolver_fuzz_replay_${harness})
+                convolver_native_test(fuzz.replay.${harness} convolver_fuzz_replay_${harness}
+                    SOURCES tests/fuzz/fuzz_${harness}.cpp tests/fuzz/replay_main.cpp
+                    LIBRARIES convolver_io Convolver::host
+                    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/seeds/${harness}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/regressions/${harness}"
+                    LABELS fuzz replay)
             endforeach()
         endif()
-        set_tests_properties(${native_tests} PROPERTIES LABELS "native;real-libraries" TIMEOUT 120)
         list(APPEND native_targets ${test_targets})
     endif()
     if(CONVOLVER_BUILD_FUZZERS)

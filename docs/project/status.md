@@ -8,8 +8,8 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** status checked on 23 October 2026 against `main` at `edd08d5`
-(0.4.30). Nothing has been published yet: there are no GitHub releases, and
+**In short:** status checked on 24 October 2026 against `main` at `4e42883`
+(0.4.37). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
 and LV2 plug-ins are implemented and tested automatically; no named host has
@@ -81,6 +81,14 @@ state was restored while playing, a filter file `run()` refused in the same
 cycle still let the unfiltered input play; and VST3 and AU reported a load
 made while inactive as failed after keeping it, when memory ran out while
 working out its tail.
+
+Fixed defects from jrp's review of 0.4.37: a sound file with a header that
+Convolver did not list (Sun/NeXT AU, for example) named `.pcm` or `.raw` was
+read as raw samples, header included, while inspection called it valid;
+libsndfile now decides what has a header. Syntax-only inspection with the
+`portable-paths` profile opened such filters, so a named pipe blocked it; it
+now opens none. A new native test was missing from the `check` target and the
+sanitizer flags; every native test is now registered through one CMake helper.
 
 ## User journeys for the first preview
 
