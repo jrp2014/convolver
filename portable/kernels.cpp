@@ -24,24 +24,26 @@ namespace avx2 {
 const Kernels& kernel_set() noexcept; // kernels_avx2.cpp
 } // namespace avx2
 namespace {
-// AVX2 is usable only if the CPU has it and the operating system saves the
-// 256-bit registers. Rosetta 2 before macOS 15, for example, reports no AVX2.
-bool cpu_has_avx2() noexcept {
+// The AVX2 set needs AVX2 and FMA from the CPU, and an operating system that
+// saves the 256-bit registers. Rosetta 2 before macOS 15, for example, reports
+// no AVX2. Every CPU sold with AVX2 has FMA, but a virtual machine may hide it.
+bool cpu_has_avx2_fma() noexcept {
 #if defined(_MSC_VER)
     int info[4];
     __cpuid(info, 0);
     if (info[0] < 7)
         return false;
     __cpuid(info, 1);
-    const bool osxsave = (info[2] & (1 << 27)) != 0, avx = (info[2] & (1 << 28)) != 0;
-    if (!osxsave || !avx || (_xgetbv(0) & 6) != 6)
+    const bool fma = (info[2] & (1 << 12)) != 0, osxsave = (info[2] & (1 << 27)) != 0,
+               avx = (info[2] & (1 << 28)) != 0;
+    if (!fma || !osxsave || !avx || (_xgetbv(0) & 6) != 6)
         return false;
     __cpuidex(info, 7, 0);
     return (info[1] & (1 << 5)) != 0;
 #else
     // The compiler runtime's check includes the operating system's support.
     __builtin_cpu_init();
-    return __builtin_cpu_supports("avx2");
+    return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma");
 #endif
 }
 } // namespace
@@ -53,7 +55,7 @@ const Kernels& kernels() noexcept {
     if (baseline_forced.load(std::memory_order_relaxed))
         return baseline_kernels();
 #if defined(CONVOLVER_USE_AVX2_KERNELS)
-    static const Kernels& chosen = cpu_has_avx2() ? avx2::kernel_set() : baseline_kernels();
+    static const Kernels& chosen = cpu_has_avx2_fma() ? avx2::kernel_set() : baseline_kernels();
     return chosen;
 #else
     return baseline_kernels();

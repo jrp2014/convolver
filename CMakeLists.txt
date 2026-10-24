@@ -116,8 +116,9 @@ if(CONVOLVER_BUILD_NATIVE)
     target_compile_features(convolver_core PUBLIC cxx_std_20)
     target_link_libraries(convolver_core PRIVATE ${fft_library} Threads::Threads)
     # PERF-4: on x86-64 the multiply-accumulate kernels are also compiled for AVX2
-    # and chosen at run time (portable/kernels.cpp), so release binaries keep the
-    # x86-64 baseline. Contraction stays off so the output is identical either way.
+    # with FMA and chosen at run time (portable/kernels.cpp), so release binaries
+    # keep the x86-64 baseline. The AVX2 set fuses multiplies with explicit
+    # intrinsics; nothing is contracted implicitly (owner's decision, 24 October 2026).
     set(convolver_x86_64 OFF)
     if(APPLE AND CMAKE_OSX_ARCHITECTURES)
         if("x86_64" IN_LIST CMAKE_OSX_ARCHITECTURES)
@@ -131,22 +132,27 @@ if(CONVOLVER_BUILD_NATIVE)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|x64)$" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(convolver_x86_64 ON)
     endif()
-    option(CONVOLVER_AVX2_KERNELS "Add AVX2 processing kernels chosen at run time (x86-64)" ${convolver_x86_64})
+    option(CONVOLVER_AVX2_KERNELS "Add AVX2+FMA processing kernels chosen at run time (x86-64)" ${convolver_x86_64})
     if(CONVOLVER_AVX2_KERNELS)
         target_sources(convolver_core PRIVATE portable/kernels_avx2.cpp)
         target_compile_definitions(convolver_core PRIVATE CONVOLVER_AVX2_KERNELS)
-        # No fused multiply-add in either set, even with -march flags added by the
-        # user. MSVC and clang-cl get the contraction pragma in portable/kernels.inc.
+        # No implicit contraction in either set, even with -march flags added by the
+        # user: the baseline stays unfused and the AVX2 set fuses only where its
+        # intrinsics say. MSVC and clang-cl get the contraction pragma in
+        # portable/kernels.inc; MSVC's /arch:AVX2 already allows FMA instructions.
         if(MSVC)
             set(contract_options "")
             set(avx2_options /arch:AVX2)
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+                list(APPEND avx2_options /clang:-mfma) # clang-cl: not implied by every version
+            endif()
         elseif(APPLE AND CMAKE_OSX_ARCHITECTURES)
             # One compiler run per architecture: pass the flags to x86_64 only.
             set(contract_options -Xarch_x86_64 -ffp-contract=off)
-            set(avx2_options -Xarch_x86_64 -mavx2 ${contract_options})
+            set(avx2_options -Xarch_x86_64 -mavx2 -Xarch_x86_64 -mfma ${contract_options})
         else()
             set(contract_options -ffp-contract=off)
-            set(avx2_options -mavx2 ${contract_options})
+            set(avx2_options -mavx2 -mfma ${contract_options})
         endif()
         set_source_files_properties(portable/kernels.cpp PROPERTIES COMPILE_OPTIONS "${contract_options}")
         set_source_files_properties(portable/kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "${avx2_options}")
@@ -221,6 +227,10 @@ if(CONVOLVER_BUILD_NATIVE)
         target_include_directories(convolver_engine_tests PRIVATE portable)
         target_link_libraries(convolver_engine_tests PRIVATE convolver_core)
         add_test(NAME native.engine COMMAND convolver_engine_tests)
+        add_executable(convolver_kernel_divergence_tests tests/native/kernel_divergence_tests.cpp)
+        target_include_directories(convolver_kernel_divergence_tests PRIVATE portable)
+        target_link_libraries(convolver_kernel_divergence_tests PRIVATE convolver_core)
+        add_test(NAME native.kernel_divergence COMMAND convolver_kernel_divergence_tests)
         add_executable(convolver_host_tests tests/native/host_tests.cpp)
         target_link_libraries(convolver_host_tests PRIVATE Convolver::host Threads::Threads)
         add_test(NAME native.host COMMAND convolver_host_tests)

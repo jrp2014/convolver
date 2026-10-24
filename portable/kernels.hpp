@@ -4,10 +4,12 @@
 
 namespace convolver::detail {
 // The partition multiply-accumulate and spectrum layout loops, which take almost
-// all of the processing time for long filters. Each set is the same C++ compiled
-// for a different instruction set. Every set gives bit-identical results: the
-// AVX2 set is compiled without fused multiply-add, and each frequency bin is
-// computed on its own, so wider vectors do not change the order of operations.
+// all of the processing time for long filters. The baseline set is plain C++
+// compiled without contraction. The AVX2 set is the same code compiled for AVX2,
+// except that the multiplies use explicit fused multiply-add intrinsics: its
+// results differ from the baseline set by float rounding only (owner's decision,
+// 24 October 2026). Each frequency bin is computed on its own, so within a set
+// the results do not depend on vector width or position.
 struct Kernels {
     void (*deinterleave)(const float* from, float* to, std::size_t bins, float scale) noexcept;
     void (*interleave)(const float* re, const float* im, float* to, std::size_t bins) noexcept;
@@ -20,7 +22,7 @@ struct Kernels {
     void (*accumulate)(float* re, float* im, const float* history, std::size_t head,
                        std::size_t ring_size, const float* filters, std::size_t partitions,
                        std::size_t bins) noexcept;
-    const char* name; // "AVX2" or "baseline"
+    const char* name; // "AVX2+FMA" or "baseline"
 };
 // The fastest set this CPU and build support, chosen once. Engines take it when
 // they are constructed, so the choice never happens on the audio thread.
