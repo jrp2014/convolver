@@ -136,12 +136,12 @@ void validate_raw_stdin(std::size_t frame_bytes) {
     // On a seekable descriptor libsndfile reports a whole-frame count, which
     // can conceal trailing bytes if a read ends exactly at that frame count.
 #ifdef _WIN32
-    struct _stat64 status {};
+    struct _stat64 status{};
     if (_fstat64(0, &status) != 0 || (status.st_mode & _S_IFMT) != _S_IFREG)
         return;
     const auto position = _lseeki64(0, 0, SEEK_CUR);
 #else
-    struct stat status {};
+    struct stat status{};
     if (fstat(0, &status) != 0 || !S_ISREG(status.st_mode))
         return;
     const auto position = lseek(0, 0, SEEK_CUR);

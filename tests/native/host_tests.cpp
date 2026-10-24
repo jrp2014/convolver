@@ -268,7 +268,9 @@ void prepared_replacements() {
     input.fill(1);
     const float* in[] = {input.data()};
     float* out[] = {output.data()};
-    { auto discarded = host.prepare(mono(7)); }
+    {
+        auto discarded = host.prepare(mono(7));
+    }
     auto foreign = other.prepare(mono(6));
     host.publish(std::move(foreign));
     auto r = host.prepare(mono(2));
