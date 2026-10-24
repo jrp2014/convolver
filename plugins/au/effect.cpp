@@ -85,7 +85,8 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
 
 Effect::Effect(AudioComponentInstance instance)
     : AUBase(instance, 1, 1), status_(host_status(filter_, std::nullopt)), tag_(next_tag()) {
-    Globals()->UseIndexedParameters(1);
+    // Not UseIndexedParameters: that numbers parameters from 0, and Status is
+    // 1001 (plugins/identities.json), so the parameter map is used instead.
     Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));
 }
 
