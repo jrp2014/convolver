@@ -642,3 +642,37 @@ jobs at once across the account's repositories, and only 5 on macOS, and one
 commit starts about 18 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
+
+### Documentation-only pull requests
+
+A pull request that changes only documentation runs Lint, which has every
+documentation check: Markdown, links and anchors, the repository rules and the
+plug-in identity check. The workflows that build or package start with a short
+`scope` job on Linux, which runs [`ci_scope.py`](../../scripts/ci_scope.py) on
+the files the pull request changes; their other jobs then show as skipped.
+Pushes to `main` and manual runs always run everything, as a backstop.
+The `scope` jobs add six short Linux jobs to every commit, so a full run is
+about 24 jobs; a documentation-only commit starts 7, none on macOS, and one
+that changes a packaged page starts 13, two of them on macOS.
+
+Documentation here means Markdown files anywhere and everything under `docs/`,
+except:
+
+- pages the build's tests read, which run everything: the top-level
+  `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md`
+  (`examples.first_use` runs their commands) and the archived website with its
+  two records in `docs/review-2026-10/` (`documentation`);
+- pages copied into the preview packages, which also run the
+  [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
+  `examples/plugin-presets/README.md` and the Ooura `README.md`.
+
+When a test starts reading another page, or the packages gain one, add it to
+the lists in `ci_scope.py`. `tests/ci_scope_tests.py` (in pre-commit) checks the
+lists against the test and packaging sources and checks that every workflow
+run for pull requests, other than Lint, either starts with the `scope` job or
+filters its own paths.
+
+No status check is required on `main` at present. If one is made required,
+require a job that always reports: a skipped matrix job shows under its
+unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
+forever on a documentation-only pull request.

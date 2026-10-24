@@ -20,7 +20,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Pull requests that change only unpackaged documentation skip the candidates
+  # (scripts/ci_scope.py, docs/develop/testing.md#ci-triggers).
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.scope.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: scope
+        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+
   sources:
+    needs: scope
+    if: needs.scope.outputs.package == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
