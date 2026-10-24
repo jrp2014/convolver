@@ -2,7 +2,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 <!--
 Source of social-preview.png, the image GitHub shows when a link to the
-repository is shared. Update the text when the formats or platforms change,
+repository is shared. It lists the formats and platforms the project offers,
+including those that only come in later previews. Update the text when they change,
 render it at 1280 x 640, and upload the PNG in the repository's Settings,
 General, Social preview (only jrp can). To render with headless Chromium:
 
@@ -37,11 +38,11 @@ See docs/develop/releasing.md#after-publishing-make-it-findable.
 <body>
 <div class="text">
   <h1>Convolver</h1>
-  <div class="tagline">Multichannel FIR filters for room correction<br>and crossovers</div>
-  <div class="formats">VST3 · Audio Unit · LV2 · command line · C++ library</div>
-  <div class="cfg">Reads the Convolver .cfg format, also used by Roon, JRiver and Audiolense</div>
+  <div class="tagline">Applies multichannel FIR filters for room<br>correction and crossovers</div>
+  <div class="formats">VST3 · Audio Unit · LV2 · command line · Equalizer APO export</div>
+  <div class="cfg">Reads Convolver .cfg files; Roon, JRiver and Audiolense use variants</div>
 </div>
-<div class="licence">open source · GPL</div>
+<div class="licence">macOS · Linux · Windows · GPL</div>
 <svg width="1120" height="150" viewBox="0 0 1120 150">
   <line x1="0" y1="75" x2="1120" y2="75" stroke="#24384b" stroke-width="2"/>
   <polyline id="impulse" fill="none" stroke="#4fb3ff" stroke-width="4" stroke-linejoin="round"/>

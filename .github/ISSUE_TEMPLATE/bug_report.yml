@@ -9,8 +9,9 @@ body:
     attributes:
       value: >-
         Thank you for reporting a problem. Please keep private audio and session
-        files out of the report, and use the bundled examples in
-        `examples/first-use/` to show the problem where you can.
+        files out of the report, and use the bundled examples (the package's
+        `presets/` folder, or `examples/first-use/` in the source) to show the
+        problem where you can.
   - type: textarea
     id: what-happened
     attributes:

@@ -117,10 +117,11 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   [next milestone](#execution-priorities). jrp chooses the tester.
 - [ ] **REL-4 — Make the preview findable.** Room-correction users and the
   `.cfg` format's existing users should find Convolver from search, the old
-  SourceForge site, KVR and their forums. The 23 October 2026 review found no
-  topics, releases, website link or custom social preview, a description in
-  the 2006 wording, and nothing at SourceForge pointing here, although Roon's
-  convolution help page links to the old site's format pages. Repository side
+  SourceForge site, KVR and their forums. On 23 October 2026 the repository had
+  no topics, releases, website link or custom social preview, and a description
+  in the 2006 wording (GitHub API); nothing on the SourceForge project page or
+  the old site pointed here, although Roon's convolution help page links to the
+  old site's format pages (checked that day). Repository side
   (jrp chose this scope on 24 October 2026): a README line for users of the
   old Windows Convolver, issue forms, the
   [social preview source](.github/social-preview.html) and the

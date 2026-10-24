@@ -86,20 +86,23 @@ warns), as jrp decided on 21 October 2026.
 
 People who already use the `.cfg` format find Convolver through search, the
 old SourceForge site and the forums where room correction is discussed. After
-each preview is published, jrp (these are settings, accounts and posts only
-jrp can do):
+each preview is published, jrp does the following; each step needs repository
+settings or jrp's own accounts:
 
-1. In the [README](../../README.md), point a Download line at the release and
-   add build-status, licence and latest-release badges (first preview only).
+1. In the [README](../../README.md), point a Download line at the latest
+   release. With the first preview, also add build-status, licence and
+   latest-release badges.
 2. Check that the repository description, topics, Website field and
    [social preview](../../.github/social-preview.html) still list the formats
-   and platforms the release ships; regenerate and upload the image if not.
-3. Add the release, or a link to it, to the old [SourceForge project](https://sourceforge.net/projects/convolver/)
+   and platforms the project offers; regenerate and upload the image if not.
+3. Add a link to the release to the old [SourceForge project](https://sourceforge.net/projects/convolver/)
    files, keeping the 4.4 Windows download available for Windows Media Player
-   users.
+   users. Uploading the packages there instead is redistribution, so the
+   source bundle goes with them ([licences](#licences-and-corresponding-source)).
 4. Update the [KVR Audio listing](https://www.kvraudio.com/product/convolver_by_convolver_sf_net)
    (formats, platforms, version) and post the release in KVR's news.
-5. Announce it once in each community where `.cfg` users ask questions: Roon
+5. For the first preview, and later for a preview that adds a format, post
+   once in each community where `.cfg` users ask questions: Roon
    Community (DSP), AV Nirvana (REW and Audiolense), JRiver Interact, diyAudio
    (PC Based), Audio Science Review and Hydrogenaudio.
 6. Once a release includes LV2, propose it to
