@@ -111,6 +111,35 @@ class SupersededRequest : public std::exception {
     }
 };
 
+// DIAG-1: problems HostProcessor::process meets while it plays, counted per
+// call on the audio thread without locking or allocating, and read on the
+// control side (HostProcessor::faults), where adapters explain and log them.
+// Each count is the number of process() calls the problem affected.
+struct HostFaults {
+    // Input samples that were not finite or beyond the float range: played
+    // as silence (the call itself succeeds).
+    std::uint64_t rejected_input = 0;
+    // Output that was not finite or beyond the float range, from extreme but
+    // finite input or filter values: those samples are silenced and the
+    // filter restarts (reset) after the call, so its tail is lost.
+    std::uint64_t output_overflow = 0;
+    // The engine failed: the call is silenced, the filter restarts and
+    // process() returns false.
+    std::uint64_t processing_failure = 0;
+    // The host passed more frames or channels than were set up: the call is
+    // refused (false), its output not written.
+    std::uint64_t invalid_call = 0;
+    std::uint64_t total() const noexcept {
+        return rejected_input + output_overflow + processing_failure + invalid_call;
+    }
+    bool any() const noexcept {
+        return total() != 0;
+    }
+};
+// What happened, why and what to change, for the log: one sentence per kind
+// of fault. Empty when there are none.
+std::string fault_message(const HostFaults&);
+
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
 // filter a load replaces, which filter is saved, and what plays. It does no
@@ -142,6 +171,11 @@ class HostFilter {
     // what to log when a load is rejected.
     const std::optional<HostFailure>& rejection() const noexcept {
         return load_failure_;
+    }
+    // The request that supplied the accepted filter (or the saved failure);
+    // number 0 before any was accepted.
+    const HostRequest& accepted() const noexcept {
+        return accepted_;
     }
     // Reserves the next request number, for a request numbered before load().
     // The in-tree adapters do not use it (LV2 numbers every request itself).
@@ -185,6 +219,18 @@ class HostFilter {
     // The adapter could not build a processor for what activate() returned,
     // so it plays silence; recorded until the next activate().
     void fail_activation(std::string why);
+    // DIAG-1: processing faults since the filter that plays was accepted or
+    // the instance last started (activate()), whichever is later. host_status()
+    // shows them as HostStatus::fault after any load failure.
+    const HostFaults& faults() const noexcept {
+        return faults_;
+    }
+    // Takes the processor's counts (HostProcessor::faults(), totals since it
+    // was built) and returns the faults that no earlier call returned, for the
+    // adapter to log; they are added to faults(). activate() starts the count
+    // again for a new processor, so call this before discarding the old one,
+    // and before load(): an accepted load clears faults().
+    HostFaults observe(const HostFaults& totals) noexcept;
 
   private:
     HostRequest numbered(HostRequest);
@@ -198,6 +244,7 @@ class HostFilter {
     bool failed_ = false;
     std::optional<HostFailure> load_failure_, activation_failure_;
     std::string notice_;
+    HostFaults faults_, observed_; // Shown since the last clear; processor totals seen.
 };
 
 // DIAG-1: what a host's status display shows for an instance, for formats
@@ -209,6 +256,7 @@ enum class HostStatus {
     no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
     load_failed = 2, // The newest request failed, or the instance plays silence.
     unchecked = 3,   // A filter is accepted, but the host's configuration is not known yet.
+    fault = 4,       // HostFilter::faults(): the audio met a problem while playing.
 };
 struct HostStatusLine {
     HostStatus status = HostStatus::no_filter;
@@ -220,7 +268,10 @@ struct HostStatusLine {
 inline constexpr std::size_t max_status_text = 127; // VST3's String128, less its terminator.
 // `host` is the configuration the instance plays under, or nullopt while it
 // is not known (VST3 before activation, AU before initialization).
-HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host);
+// `log_written` false (host_log_written()) says the Convolver log could not
+// be written, instead of pointing to it.
+HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
+                           bool log_written = true);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
@@ -285,9 +336,15 @@ class HostProcessor {
     std::uint64_t publications() const noexcept;
     std::size_t latency_frames() const noexcept;
     std::size_t tail_frames() const noexcept;
+    // DIAG-1: the faults process() has counted since construction. Any thread,
+    // also while audio runs: each count is read on its own, so a snapshot
+    // taken during a call may show one count of it and not another.
+    HostFaults faults() const noexcept;
     // Missing input channels mean silence; null output channels are discarded.
     // In-place input/output is supported. Nonfinite input/output is silenced.
-    // False means invalid dimensions, with no state advance or output guarantee.
+    // False means invalid dimensions, with no state advance or output guarantee,
+    // or an engine failure, with the output silenced. Each problem is counted
+    // in faults().
     bool process(std::span<const float* const>, std::span<float* const>, std::size_t) noexcept;
     bool process(std::span<const double* const>, std::span<double* const>, std::size_t) noexcept;
 

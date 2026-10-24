@@ -27,8 +27,9 @@ Contents: [native tests](#native-production-tests),
 [lifecycle sequences](#lifecycle-sequences-plug-7),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
-[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
-and [when CI runs](#ci-triggers).
+[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns),
+[evidence from failed CI runs](#evidence-from-failed-ci-runs) and
+[when CI runs](#ci-triggers).
 
 ## Native production tests
 
@@ -753,6 +754,22 @@ Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
 qualification. Never bypass system security to turn those checks green.
+
+## Evidence from failed CI runs
+
+When a test job fails, the native, VST3, LV2 and Audio Unit workflows keep an
+artifact named `test-evidence-<job>-<index>` for 14 days (DIAG-1, jrp's review
+of 24 October 2026), collected by
+[`ci_evidence.py`](../../scripts/ci_evidence.py) from each build folder the job
+made: CTest's full output (`Testing/Temporary/LastTest.log`, which holds every
+test's output, including sanitizer reports and the failing operation
+sequences of the [lifecycle tests](#lifecycle-sequences-plug-7)), the JUnit
+report every `ctest` run writes (`--output-junit junit.xml`), the plug-in
+tests' Convolver logs, `CMakeCache.txt`, and `identity.txt` (commit, runner
+image, compiler and build type). The candidate workflow keeps its own
+`diagnostics-<platform>` artifact and the
+[debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
+its findings.
 
 ## CI triggers
 

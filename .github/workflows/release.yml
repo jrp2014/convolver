@@ -127,6 +127,13 @@ jobs:
           name: candidate-${{ matrix.platform }}
           path: build/assets/*
           if-no-files-found: error
+      # DIAG-1: the matching debugging symbols, outside the package and the
+      # preview inventory, so a crash report can be symbolicated.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: symbols-${{ matrix.platform }}
+          path: build/candidate/symbols
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

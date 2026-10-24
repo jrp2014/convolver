@@ -29,6 +29,10 @@ inline constexpr Steinberg::Vst::ParamID bypass_id = identity::vst3_bypass_param
 // controller in a status_message whenever it may have changed.
 inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_parameter_id;
 inline constexpr const char* status_message = "ConvolverStatus";
+// DIAG-1: the controller asks the processor to collect processing faults
+// when the host shows it the Fault value the audio thread wrote (an output
+// parameter change), so the log explains and the status text follows.
+inline constexpr const char* faults_message = "ConvolverFaults";
 // HostProcessor's block, passed to it: the fixed delay between input and output.
 inline constexpr Steinberg::uint32 latency_samples = 256;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
@@ -67,6 +71,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
+    // The controller's faults_message.
+    Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
     // speakers that differ from the host's arrangement; logged when it changes.
     std::string notice();
@@ -84,6 +90,15 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // file access never holds up the host's other control calls.
     void log(const std::string&, bool problem = true) noexcept;
     void write_log() noexcept;
+    // DIAG-1, under control_: takes the processor's fault counts into
+    // filter_ and queues their explanation for the log. True if there were
+    // new ones, so the status has changed.
+    bool observe_faults() noexcept;
+    // After an accepted load or a new processor, under control_: the audio
+    // thread signals Fault again only for faults after this.
+    void clear_faults(bool new_processor) noexcept;
+    // Audio thread: writes Fault to the Status parameter for new faults.
+    void signal_faults(Steinberg::Vst::ProcessData&) noexcept;
     Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
                                Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
     // Sends status() to the controller; outside control_, as the controller
@@ -102,6 +117,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::unique_ptr<HostProcessor> host_;
     std::atomic<bool> bypass_{false};
     std::atomic<Steinberg::uint32> tail_{0};
+    // The processor's fault total when the status last cleared (control
+    // writes), and the total when the audio thread last wrote Fault to the
+    // Status parameter (audio, or control while inactive).
+    std::atomic<std::uint64_t> faults_cleared_{0};
+    std::uint64_t faults_signalled_ = 0;
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
                                        output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;
@@ -138,6 +158,11 @@ class Controller final : public Steinberg::Vst::EditController {
 
     // The processor's status_message: the Status parameter's value and text.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
+    // A Status value from the host: the processor's audio thread writes
+    // Fault as an output parameter change, and the host passes it on here.
+    // The controller then asks the processor (faults_message) for the text.
+    Steinberg::tresult PLUGIN_API setParamNormalized(Steinberg::Vst::ParamID,
+                                                     Steinberg::Vst::ParamValue) override;
     // The Status parameter's current value reads as the processor's line; other
     // values (a host asking how a value would read) as their status name.
     Steinberg::tresult PLUGIN_API getParamStringByValue(Steinberg::Vst::ParamID,
@@ -153,5 +178,6 @@ class Controller final : public Steinberg::Vst::EditController {
     // than the one reading parameter text.
     std::mutex status_lock_;
     std::string status_text_;
+    int status_value_ = static_cast<int>(HostStatus::no_filter); // The status the text is for.
 };
 } // namespace convolver::vst3

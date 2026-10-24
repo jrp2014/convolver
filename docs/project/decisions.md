@@ -63,6 +63,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 23 October 2026 | VST3 speaker arrangements are checked with a notice only: no enforced layouts, no host state version 3 and no buses above 8 channels; revisit on request | [Plug-in identities](../develop/plugin-identities.md#channel-layouts) |
 | 23 October 2026 | Whether saved state records bypass follows each format's convention: VST3 saves its bypass parameter; LV2 and Audio Units leave bypass to the host and ignore the flag in restored state | [Adapter contract](../develop/plugin-contract.md#bypass) |
 | 24 October 2026 | Clarification of the audio thread's mute: silence ends only when a filter published after the mute takes over; one published before it but not yet picked up stays silent (PLUG-7, PR #58) | [Adapter contract](../develop/plugin-contract.md#replacement-and-threads) |
+| 24 October 2026 | The Status parameter (VST3, AU) and LV2 status port gain a fifth value, Fault, shown when the audio thread silenced output that overflowed, rejected invalid input or caught a processing failure while a filter was loaded, rather than still saying the filter is loaded. Each fault is explained in the Convolver log (DIAG-1) | [Adapter contract](../develop/plugin-contract.md#status-and-log) |
 
 ## Identities and file formats
 

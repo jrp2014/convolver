@@ -187,6 +187,7 @@ does, before producing a reproducible binary.
 | `CONVOLVER_BUILD_LV2` | OFF | LV2 adapter; see [LV2](#lv2) |
 | `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution |
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
+| `CONVOLVER_DEBUG_SYMBOLS` | OFF | Compile Release code with debug information and keep the packaged binaries' symbols in `symbols/` in the build folder, outside everything installed; release candidates set it ([debugging symbols](releasing.md#debugging-symbols)) |
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark`, and `convolver_callback_benchmark` when the I/O adapter is built |
 | `CONVOLVER_AVX2_KERNELS` | ON when targeting x86-64 | Also compile the multiply-accumulate kernels for AVX2 with FMA and use them on CPUs that have both; output then differs from the baseline kernels by float rounding only, below -120 dBFS ([measurements](fft-backends.md#compiler-flags-and-avx2-kernels)) |

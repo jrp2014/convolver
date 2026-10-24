@@ -8,6 +8,7 @@
 #include <AudioUnitSDK/AUBase.h>
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -98,8 +99,8 @@ class Effect final : public ausdk::AUBase {
     // Why the unit plays silence or rejected its last filter; empty if neither.
     // The same text goes to the system log when it happens.
     std::string error();
-    // Why the newest request failed (HostFilter::rejection), to log it.
-    std::string rejection();
+    // Why the newest request failed, numbered for the log (rejected_line).
+    std::string rejection_line();
     // What the Status parameter shows (DIAG-1).
     HostStatusLine status();
 
@@ -116,10 +117,19 @@ class Effect final : public ausdk::AUBase {
     // Writes to the Convolver log (host_log), skipping a repeat of the line
     // this instance wrote last, as hosts restart plug-ins often.
     void log(const std::string&, bool problem = true) noexcept;
+    // A fault explanation (observe_faults), logged even if it repeats the
+    // last line: each episode counts.
+    void log_faults(const std::string&) noexcept;
     // Recomputes the status under `control_`; notify_status() then tells
     // listeners, outside the lock, as they may call back into the unit.
     void update_status() noexcept;
     void notify_status() noexcept;
+    // DIAG-1, under `control_`: takes the processor's fault counts into
+    // filter_ and returns their explanation, to log; empty if none are new.
+    std::string observe_faults() noexcept;
+    // After an accepted load or a new processor, under `control_`: Render
+    // writes Fault to the Status parameter again only for later faults.
+    void clear_faults(bool new_processor) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
@@ -127,6 +137,11 @@ class Effect final : public ausdk::AUBase {
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
+    // The processor's fault total when the status last cleared (control
+    // writes), and the total when Render last wrote Fault (audio thread, or
+    // control while uninitialized).
+    std::atomic<std::uint64_t> faults_cleared_{0};
+    std::uint64_t faults_signalled_ = 0;
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches
@@ -135,7 +150,8 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> initialized_;
     std::atomic<bool> rendered_{false};
     std::optional<HostLayout> committed_;
-    HostStatusLine status_; // Under control_.
+    HostStatusLine status_;          // Under control_.
+    bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

@@ -139,7 +139,7 @@ def main():
         r = report(['--inspect', str(d / 'room.cfg')])
         leaf = r['configurations'][0]
         assert r['mode'] == 'inspect' and r['validation'] == 'selected'
-        assert r['convolver']['fft_backend'] and r['convolver']['sndfile_version']
+        assert r['convolver']['fft_backend'] and r['convolver']['sndfile_version'] and r['convolver']['cpu_kernels'] in ('AVX2+FMA', 'baseline')
         assert leaf['paths'][0]['inputs'] == [{'token': '-0', 'channel': 0, 'gain': -1},
                                               {'token': '1.25', 'channel': 1, 'gain': 0.25}]
         assert leaf['input_delays'][1] == {'token': '0.5', 'milliseconds': 0.5, 'frames': 24}

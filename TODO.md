@@ -200,8 +200,16 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   before the HOST-1 smoke tests. VST3 and
   AU have a read-only Status parameter and write every load, start and failure
   to the Convolver log ([status and log](docs/develop/plugin-contract.md#status-and-log)),
-  tested per failure through each adapter. Remaining: the failure-by-surface
-  table, the CLI and preset tool, and what named hosts actually show (HOST-1).
+  tested per failure through each adapter. Progress (24 October 2026, PR #68, from
+  jrp's review of 0.4.37): processing faults (rejected input, output
+  overflow, processing failure, and invalid calls from Audio Unit hosts) are counted on the audio
+  thread and shown as Status Fault, explained in the log on the control side;
+  the log names the process, numbers requests and starts with what ran (FFT
+  backend, CPU kernels); an unwritable log is said in the Status text;
+  failed CI test jobs keep their evidence, and preview candidates keep
+  matching debugging symbols.
+  Remaining: the failure-by-surface table, the CLI and preset tool, and what
+  named hosts actually show (HOST-1).
 
 ## Plug-ins: VST3, LV2 and AU
 

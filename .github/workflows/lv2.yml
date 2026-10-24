@@ -235,4 +235,19 @@ jobs:
             -DCONVOLVER_BUILD_LV2=ON ${{ matrix.configure }}
           cmake --build build-lv2 --parallel --target ${{ matrix.targets }}
       - name: Test
-        run: ctest --test-dir build-lv2 --output-on-failure --parallel 2 -R '${{ matrix.tests }}'
+        run: >-
+          ctest --test-dir build-lv2 --output-on-failure --output-junit junit.xml --parallel 2
+          -R '${{ matrix.tests }}'
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build-lv2
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore

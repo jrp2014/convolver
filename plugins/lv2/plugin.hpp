@@ -28,7 +28,10 @@ constexpr std::uint32_t notify_port(std::size_t inputs, std::size_t outputs) {
 inline constexpr std::uint32_t atom_buffer_bytes = 8192;
 
 // What the status port shows. Loading: a filter file is being loaded.
-enum class Status : int { running = 0, no_filter = 1, load_failed = 2, loading = 3 };
+// Fault (DIAG-1): the audio met a problem while playing (HostFaults), until
+// a filter is loaded again or the host activates the plug-in again; the log
+// explains.
+enum class Status : int { running = 0, no_filter = 1, load_failed = 2, loading = 3, fault = 4 };
 
 // The filter parameter (<base>filter, an atom:Path, patch:writable) and the
 // longest path it takes, in bytes without the terminating NUL. Longer paths

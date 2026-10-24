@@ -23,14 +23,31 @@ std::filesystem::path host_log_path();
 // creating the folder if needed. When the file has grown past 1 MB it is first renamed
 // with ".old" added (replacing an older one). On macOS the message also goes
 // to the unified log (Console, search for "Convolver"), as an error when
-// `problem`, otherwise as information. Never throws; a
-// message that cannot be written is dropped.
+// `problem`, otherwise as information. The first line a process writes is
+// preceded by its execution_line(), and every line names the process ID, so
+// lines from several hosts or sessions can be told apart. Never throws. A
+// line that cannot be written to the file goes to standard error instead
+// (and on Windows to the debugger output, OutputDebugString), preceded once
+// by why the file could not be written.
 void host_log(const char* format, const std::string& message, bool problem = true) noexcept;
+// DIAG-1: false once a line could not be written to the file (no folder,
+// no permission, no home folder), until a later line is. Status lines then
+// say so instead of pointing to the log. CONVOLVER_LOG set empty turns the
+// file off on purpose: lines then go only to the macOS system log, and this
+// stays true.
+bool host_log_written() noexcept;
+// What ran, for support: Convolver's version, the FFT backend and its
+// version, the CPU kernels, the process ID and the host program.
+std::string execution_line();
 // The lines every adapter logs, so that the log reads the same for each
 // format. After an accepted load: what was loaded and, for a saved failed
 // load, why it plays silence; `host_known` says whether it was checked
-// against the host yet.
+// against the host yet. Both are numbered with the request ("Request 3: "),
+// so a sequence of loads can be followed.
 std::string loaded_line(const HostFilter&, bool host_known);
+// After a rejected load: HostFilter::rejection()'s message, numbered as
+// loaded_line() numbers accepted ones ("Request 3: "); empty if there is none.
+std::string rejected_line(const HostFilter&);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full).

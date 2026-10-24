@@ -146,6 +146,7 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
 tresult Processor::activate(TBool state) {
     std::lock_guard lock(control_);
     try {
+        observe_faults(); // Before the processor that counted them goes.
         if (state) {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or layout brings it back.
@@ -155,6 +156,7 @@ tresult Processor::activate(TBool state) {
             next->set_bypass(bypass_.load());
             next->reset();
             host_ = std::move(next);
+            clear_faults(true);
             activated_ = layout();
             // What plays and why: a filter restored before the host's rate
             // and buses were known may not suit them.
@@ -193,6 +195,24 @@ void Processor::log(const std::string& message, bool problem) noexcept {
     } catch (...) { // Out of memory: the line is dropped.
     }
 }
+bool Processor::observe_faults() noexcept {
+    if (!host_)
+        return false;
+    const auto fresh = filter_.observe(host_->faults());
+    if (!fresh.any())
+        return false;
+    try {
+        logged_.clear(); // A repeat episode is logged too: the log counts them.
+        log(fault_message(fresh));
+    } catch (...) { // Out of memory for the message: the status still shows it.
+    }
+    return true;
+}
+void Processor::clear_faults(bool new_processor) noexcept {
+    faults_cleared_.store(host_ ? host_->faults().total() : 0, std::memory_order_release);
+    if (new_processor)
+        faults_signalled_ = 0; // No audio runs during activation.
+}
 void Processor::write_log() noexcept {
     std::vector<std::pair<std::string, bool>> lines;
     {
@@ -203,7 +223,8 @@ void Processor::write_log() noexcept {
         host_log(tag_.c_str(), line, problem);
 }
 HostStatusLine Processor::status_locked() const {
-    return host_status(filter_, host_ ? std::optional(layout()) : known_layout());
+    return host_status(filter_, host_ ? std::optional(layout()) : known_layout(),
+                       host_log_written());
 }
 HostStatusLine Processor::status() {
     std::lock_guard lock(control_);
@@ -233,7 +254,21 @@ tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
         send_status();
     return result;
 }
+tresult PLUGIN_API Processor::notify(IMessage* message) {
+    if (!message || !message->getMessageID() ||
+        std::string_view(message->getMessageID()) != faults_message)
+        return AudioEffect::notify(message);
+    {
+        std::lock_guard lock(control_);
+        observe_faults();
+    }
+    write_log();
+    send_status();
+    return kResultOk;
+}
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
+    // Not a place to explain faults: hosts may call this on the audio
+    // thread, where nothing may lock, allocate or write the log.
     if (state && host_) {
         host_->set_bypass(bypass_.load());
         host_->reset();
@@ -265,6 +300,7 @@ tresult Processor::load_state(IBStream* stream) {
         // While active, the host's configuration is known and a prepared
         // replacement is published; inactive, the next activation installs it.
         const auto host = host_ ? std::optional(layout()) : known_layout();
+        observe_faults(); // Explained under the filter that played; a load clears them.
         const bool bypass = next.bypass;
         // The inactive tail is worked out before anything changes: it needs
         // memory, and a request that runs out is rejected whole (PLUG-7).
@@ -282,6 +318,7 @@ tresult Processor::load_state(IBStream* stream) {
                 host_->replace(c);
         });
         // Nothing from here on can throw: the request is accepted.
+        clear_faults(false);
         tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
         bypass_.store(bypass);
         logged_.clear(); // A later failure is logged even if it repeats an earlier one.
@@ -302,8 +339,7 @@ tresult Processor::load_state(IBStream* stream) {
         }
         if (!host_ && filter_.failed())
             tail_.store(0);
-        if (const auto& r = filter_.rejection())
-            log(r->message);
+        log(rejected_line(filter_));
         return kResultFalse;
     }
 }
@@ -316,19 +352,38 @@ std::optional<HostFailure> Processor::failure() {
     return filter_.failure();
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
-    std::lock_guard lock(control_);
-    try {
-        HostState state;
-        state.configuration = filter_.filter();
-        state.bypass = bypass_.load();
-        state.failed = filter_.failed(); // Reopening stays silent (state version 2).
-        if (host_)
-            host_->collect();
-        return write_state(stream, state) ? kResultOk : kResultFalse;
-    } catch (...) {
-        return kResultFalse;
+    bool faulted = false;
+    tresult result = kResultFalse;
+    {
+        std::lock_guard lock(control_);
+        // Hosts save often (autosave too): faults are explained here as well.
+        faulted = observe_faults();
+        try {
+            HostState state;
+            state.configuration = filter_.filter();
+            state.bypass = bypass_.load();
+            state.failed = filter_.failed(); // Reopening stays silent (state version 2).
+            if (host_)
+                host_->collect();
+            result = write_state(stream, state) ? kResultOk : kResultFalse;
+        } catch (...) {
+        }
     }
+    if (faulted) {
+        write_log();
+        send_status();
+    }
+    return result;
 }
+namespace {
+// The Status parameter's values, in HostStatus order.
+constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
+                                                  "Not checked yet", "Fault"};
+static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+constexpr ParamValue normalized(HostStatus status) {
+    return static_cast<ParamValue>(status) / static_cast<ParamValue>(status_names.size() - 1);
+}
+} // namespace
 template <class T> bool Processor::segment(ProcessData& d, int32 start, int32 count) noexcept {
     std::array<const T*, max_bus_channels> in{};
     std::array<T*, max_bus_channels> out{};
@@ -393,16 +448,17 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
                     continue;
                 offset = std::clamp(offset, position, d.numSamples);
                 if (!render(position, offset - position))
-                    return kInvalidArgument;
+                    return signal_faults(d), kInvalidArgument;
                 position = offset;
                 bypass_.store(value >= .5);
             }
         }
     }
-    if (!render(position, d.numSamples - position))
-        return kInvalidArgument;
-    mark_silence(d);
-    return kResultOk;
+    const bool rendered = render(position, d.numSamples - position);
+    if (rendered)
+        mark_silence(d);
+    signal_faults(d);
+    return rendered ? kResultOk : kInvalidArgument;
 }
 // VST3-10: flag each output channel that this call left all zero, so a host
 // can skip work downstream. Input flags are never copied: a filter's tail and
@@ -427,10 +483,20 @@ void Processor::mark_silence(ProcessData& d) noexcept {
             bus.silenceFlags |= uint64(1) << c;
     }
 }
+// DIAG-1: a new processing fault shows at once in hosts that pass output
+// parameter changes on, without logging or allocating here: Status becomes
+// Fault, and the controller asks the control side to explain.
+void Processor::signal_faults(ProcessData& d) noexcept {
+    const auto total = host_ ? host_->faults().total() : 0;
+    const auto cleared = faults_cleared_.load(std::memory_order_acquire);
+    if (total <= cleared || faults_signalled_ > cleared || !d.outputParameterChanges)
+        return;
+    int32 index = 0, point = 0;
+    if (auto* queue = d.outputParameterChanges->addParameterData(status_id, index);
+        queue && queue->addPoint(0, normalized(HostStatus::fault), point) == kResultOk)
+        faults_signalled_ = total;
+}
 namespace {
-// The Status parameter's values, in HostStatus order.
-constexpr std::array<const char*, 4> status_names{"Playing", "No filter", "Load failed",
-                                                  "Not checked yet"};
 void copy(const std::string& text, String128 out) {
     std::size_t i = 0;
     for (; i < text.size() && i < 127; ++i) // ASCII (HostStatusLine), widened.
@@ -480,19 +546,39 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     {
         std::lock_guard lock(status_lock_);
         status_text_.swap(text);
+        status_value_ = static_cast<int>(status);
     }
-    setParamNormalized(status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
+    EditController::setParamNormalized(status_id,
+                                       parameter->toNormalized(static_cast<ParamValue>(status)));
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
     if (componentHandler)
         componentHandler->restartComponent(kParamValuesChanged);
     return kResultOk;
 }
+tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
+    const auto result = EditController::setParamNormalized(id, value);
+    if (id != status_id || result != kResultOk || value != normalized(HostStatus::fault))
+        return result;
+    {
+        std::lock_guard lock(status_lock_);
+        if (status_value_ == static_cast<int>(HostStatus::fault))
+            return result; // The processor has explained it already.
+    }
+    // Outside the lock: the processor answers with its status_message.
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(faults_message);
+        sendMessage(message);
+    }
+    return result;
+}
 tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
                                                      String128 string) {
     if (id == status_id && value == getParamNormalized(status_id)) {
         std::lock_guard lock(status_lock_);
-        if (!status_text_.empty()) {
+        // The text belongs to the status the processor sent last; a Fault
+        // value from the audio thread reads as its name until it explains.
+        if (!status_text_.empty() && value == normalized(static_cast<HostStatus>(status_value_))) {
             copy(status_text_, string);
             return kResultOk;
         }

@@ -69,6 +69,9 @@ AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t see
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;
 const char* fft_backend_version() noexcept;
+// The multiply-accumulate kernels engines use on this CPU, chosen once when
+// first asked: "AVX2+FMA" or "baseline". Static lifetime.
+const char* cpu_kernels_name() noexcept;
 
 // FFTW planner rigour, as the historical engine offered: estimate (no timing),
 // measure, patient and exhaustive try progressively more algorithms.
