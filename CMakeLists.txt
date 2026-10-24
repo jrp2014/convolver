@@ -229,6 +229,13 @@ if(CONVOLVER_BUILD_NATIVE)
         target_include_directories(convolver_benchmark PRIVATE portable)
         target_link_libraries(convolver_benchmark PRIVATE convolver_core)
         list(APPEND native_targets convolver_benchmark)
+        if(CONVOLVER_BUILD_IO)
+            # Startup, reset, replacement and loading at a host callback size (PERF-5).
+            add_executable(convolver_callback_benchmark tests/native/callback_benchmark.cpp)
+            target_include_directories(convolver_callback_benchmark PRIVATE portable)
+            target_link_libraries(convolver_callback_benchmark PRIVATE convolver_core convolver_host Convolver::io)
+            list(APPEND native_targets convolver_callback_benchmark)
+        endif()
     endif()
     if(CONVOLVER_BUILD_TESTS)
         # Every native test executable is registered here (the Python-driven
