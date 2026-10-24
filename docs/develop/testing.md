@@ -47,6 +47,13 @@ list the tests in your actual build rather than relying on a copied count:
 ctest --test-dir build -N
 ```
 
+Register each native test executable with `convolver_native_test` in the
+top-level `CMakeLists.txt`. It adds the executable and the CTest entry, the
+`native` and `real-libraries` labels and the timeout, and puts the executable
+in the list that receives the shared warning and sanitizer flags and that the
+`check` target builds. A test added with `add_executable` and `add_test` alone
+misses all of that.
+
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded
@@ -72,7 +79,8 @@ ctest --test-dir build -N
 - `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
-  truncation and RAW alignment. POSIX-specific tests also exercise fragmented
+  truncation, RAW alignment, and which files libsndfile recognises as sound
+  files (`sound_file_header`). POSIX-specific tests also exercise fragmented
   descriptors, borrowed descriptor ownership, broken pipes and injected WAV
   header-finalization errors. For integer output they check rounding and
   clipping endpoints for 8 to 32 bits, reproducibility and chunk independence,
@@ -90,7 +98,9 @@ ctest --test-dir build -N
   modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
 - `native.inspection`: the inspection API's selection traversal, located and
   chained diagnostics, syntax-only null fields, all-entry validation after
-  failures, and agreement of `analyze_configuration` with Engine latency/tail at
+  failures, raw filters (including AU files named `.raw` and `.pcm`, read
+  through their header, and a named pipe called `.raw` that syntax-only
+  inspection must not open), and agreement of `analyze_configuration` with Engine latency/tail at
   odd block sizes; it also checks that inspection changes no FFTW wisdom and
   creates no files.
 - `native.inspection_cli`: `--inspect`/`--validate` modes, exit codes 0/1/2,
