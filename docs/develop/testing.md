@@ -72,13 +72,16 @@ misses all of that.
   1e-6 of its peak (PERF-4).
   At the end it prints, for each group of oracle cases and each kernel set,
   the worst error relative to that case's output peak (also in float
-  epsilons, 1.19e-7), with its absolute size, the peak and B, and then the
-  largest absolute error of any case. Compare the relative figure between
-  versions: float rounding grows with the signal, so a new, louder case raises
-  the absolute figure without any loss of accuracy. On Linux with FFTW on
-  24 October 2026 the worst was 4.4e-7 of peak (3.7 epsilons), in
-  `history_validity` at B = 257, where the peak is 7.6 and the absolute error
-  3.4e-6 (CI-4).
+  epsilons, 1.19e-7), with its absolute size, the peak and B; then the
+  overall worst, and where the largest absolute error came from. Compare the
+  relative figures between versions: float rounding grows with the signal, so
+  a new, louder case raises the absolute figure without any loss of accuracy
+  (CI-4). On 24 October 2026, at the CI-4 change on top of 0.4.43 (b559c52),
+  Linux x86-64, Clang 18 Release: with FFTW, the worst was 4.4e-7 of peak
+  (3.7 epsilons) in `history_validity` at B = 257 with the AVX2+FMA kernels,
+  where the peak is 7.6 and the absolute error 3.4e-6 (3.8e-7 of peak with the
+  baseline kernels); with Ooura, 2.8e-7 of peak in `history_validity` at B = 5,
+  and the largest absolute error 1.5e-6, at peak 7.6.
 - `native.kernel_divergence`: the AVX2+FMA kernels against the baseline set and
   against a direct double-precision convolution on room-correction workloads
   at B = 256 (64k stereo with white noise, a full-scale sine, noise at

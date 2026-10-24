@@ -12,6 +12,7 @@
 #include <limits>
 #include <new>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -92,7 +93,7 @@ struct OracleError {
 };
 const char* oracle_group = "";        // The test function running, set by main.
 std::vector<OracleError> group_worst; // One entry per group and kernel set, in run order.
-double worst_absolute = 0;            // Largest |actual - oracle| of any case.
+OracleError worst_absolute;           // The case with the largest |actual - oracle|.
 void record(const std::vector<float>& actual, const std::vector<double>& expected,
             std::size_t block) {
     OracleError e{0, 0, 0, oracle_group, detail::kernels().name, block};
@@ -100,10 +101,14 @@ void record(const std::vector<float>& actual, const std::vector<double>& expecte
         e.absolute = std::max(e.absolute, std::abs(actual[i] - expected[i]));
         e.peak = std::max(e.peak, std::abs(expected[i]));
     }
-    worst_absolute = std::max(worst_absolute, e.absolute);
-    if (e.peak == 0) // Silent cases: any error is caught by the tolerance below.
+    if (e.peak > 0)
+        e.relative = e.absolute / e.peak;
+    if (e.absolute > worst_absolute.absolute || worst_absolute.group[0] == 0)
+        worst_absolute = e;
+    // Silent cases (any error is caught by the tolerance below) and the
+    // single exact case of invalid() add nothing to the relative report.
+    if (e.peak == 0 || std::string_view(e.group) == "invalid inputs")
         return;
-    e.relative = e.absolute / e.peak;
     if (group_worst.empty() || std::string_view(group_worst.back().group) != e.group ||
         std::string_view(group_worst.back().kernels) != e.kernels)
         group_worst.push_back(e);
@@ -111,24 +116,27 @@ void record(const std::vector<float>& actual, const std::vector<double>& expecte
         group_worst.back() = e;
 }
 void report_oracle_errors() {
-    const auto line = [](const std::string& label, const OracleError& e) {
-        std::cout << "  " << std::left << std::setw(29) << label << std::right
-                  << std::setprecision(3) << e.relative << " of peak ("
-                  << e.relative / std::numeric_limits<float>::epsilon() << " float epsilons); "
-                  << e.absolute << " absolute at peak " << e.peak << ", B = " << e.block << ", "
-                  << e.kernels << " kernels\n";
+    std::ostringstream out; // Keeps the formatting off std::cout.
+    const auto line = [&out](const std::string& label, const OracleError& e) {
+        out << "  " << std::left << std::setw(46) << label << std::right << std::setprecision(3)
+            << e.relative << " of peak (" << e.relative / std::numeric_limits<float>::epsilon()
+            << " float epsilons); " << e.absolute << " absolute at peak " << e.peak
+            << ", B = " << e.block << '\n';
     };
-    std::cout << "Worst error against the double oracle, relative to the case's output peak:\n";
+    const auto name = [](const OracleError& e) { return std::string(e.group) + ", " + e.kernels; };
+    out << "Worst error against the double oracle, relative to the output peak, by group of "
+           "cases and kernel set:\n";
     const OracleError* worst = nullptr;
     for (const auto& e : group_worst) {
-        line(e.group, e);
+        line(name(e), e);
         if (!worst || e.relative > worst->relative)
             worst = &e;
     }
     if (worst)
-        line("overall (" + std::string(worst->group) + ")", *worst);
-    std::cout << "  Largest absolute error of any case: " << worst_absolute
-              << " (it grows with the signal level)\n";
+        line("overall: " + name(*worst), *worst);
+    line("largest absolute: " + name(worst_absolute), worst_absolute);
+    out << "  (Absolute errors grow with the signal level; compare the relative figures.)\n";
+    std::cout << out.str();
 }
 void close(const std::vector<float>& actual, const std::vector<double>& expected,
            std::size_t block) {
@@ -618,7 +626,7 @@ int main() {
         detail::force_baseline_kernels(false);
         kernels_agree();
         attenuation();
-        oracle_group = "invalid";
+        oracle_group = "invalid inputs";
         invalid();
         no_processing_allocation();
         std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
