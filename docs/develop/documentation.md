@@ -181,7 +181,10 @@ in [`project/plans/`](../project/plans/) are design records for open work, not s
 over current code or user instructions. (Until 21 October 2026 they lived in
 `docs/superpowers/`, a name taken from an agent tool's convention.) When the code on
 `main` implements all of a plan, move it to [`archive/plans/`](../archive/plans/README.md)
-with an archive notice and a row in that index, and fix links to it. Put source
+with an archive notice and a row in that index, and fix links to it. Do the
+same, with the notice saying "superseded", when what a plan left open is owned
+by a maintained guide and TODO items, so the plan is no longer the place to
+start. Put source
 comments near non-obvious invariants; put contributor navigation here, rather
 than adding large instruction blocks to implementation files.
 
