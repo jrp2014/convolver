@@ -515,14 +515,24 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         // A bypass flag in the state (from another format's preset) is
         // ignored: the host owns bypass, as SaveState explains.
         try {
+            // The uninitialized tail is worked out before anything changes: it
+            // needs memory, and a request that runs out is rejected whole.
+            std::size_t uninitialized_tail = 0;
+            if (!host_ && next.configuration) {
+                try {
+                    uninitialized_tail = configuration_tail_frames(*next.configuration);
+                } catch (...) {
+                    filter_.reject(HostFailureKind::preparation,
+                                   "The filter could not be prepared.");
+                    throw;
+                }
+            }
             filter_.load(std::move(next), host, [&](const Configuration& c) {
                 if (host_)
                     host_->replace(c);
             });
-            if (host_)
-                tail_.store(host_->tail_frames());
-            else
-                tail_.store(filter_.filter() ? configuration_tail_frames(*filter_.filter()) : 0);
+            // Nothing from here on can throw: the request is accepted.
+            tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
         } catch (...) {
             // A failed first load plays silence rather than the unfiltered input.

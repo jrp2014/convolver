@@ -12,8 +12,10 @@ To build it, see [build from source](../develop/build.md).
 - `convolver --filter IR_OR_CFG --input IN --output OUT` renders a file. The
   output lines up with the input (processing latency removed) and keeps the
   whole filter tail. Rate and channel counts must match; nothing is resampled.
-- Output is 32-bit float WAV by default. Integer WAV (8 to 32 bits) is plainly
-  rounded unless you ask for `--dither`, `--noise-shaping` or `--valid-bits`.
+- Output is 32-bit float WAV by default. `--output-format` also writes RF64,
+  W64, AIFF, CAF, FLAC and raw files, in 8- to 32-bit integer or 32- and 64-bit
+  float. Integer output is plainly rounded unless you ask for `--dither`,
+  `--noise-shaping` or `--valid-bits`.
 - `--gain-db` takes a fixed decibel value, `auto` (noise-based estimate) or
   `no-clip` (worst-case filter bound). Neither estimate is a limiter.
 - `--inspect` and `--validate` explain what a configuration resolves to without
@@ -24,8 +26,10 @@ To build it, see [build from source](../develop/build.md).
 Contents:
 
 - [File rendering](#file-rendering): [gain](#gain-and-attenuation),
+  [output formats](#output-formats),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
-  [speaker labels](#speaker-labels), [output safety](#output-safety)
+  [speaker labels](#speaker-labels), [FLAC and Ogg](#flac-and-ogg),
+  [output safety](#output-safety)
 - [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
 - [FFTW plan tuning](#fftw-plan-tuning)
@@ -81,10 +85,77 @@ headroom if clipping must be strictly avoided. Neither option is a limiter.
 The noise estimate is the old Windows Convolver's "optimum attenuation"
 method.
 
+### Output formats
+
+`--output-format CONTAINER-TYPE` picks the file type and the sample type, for
+example `flac-pcm24` or `rf64-float`. The default is `wav-float`.
+
+| Container | Use it for | Sample types |
+| --- | --- | --- |
+| `wav` | Ordinary WAV, up to 4 GiB | `pcm8`, `pcm16`, `pcm24`, `pcm32`, `float`, `double` |
+| `rf64`, `w64` | WAV-style files larger than 4 GiB | the same |
+| `aiff` | Apple and older Mac software, up to 4 GiB | the same |
+| `caf` | Core Audio Format, no size limit | the same |
+| `flac` | Lossless compression, about half the size | `pcm8`, `pcm16`, `pcm24` |
+| `raw` | Headerless little-endian samples, for pipes | `pcm16`, `pcm24`, `pcm32`, `float`, `double` |
+
+`float` is 32-bit and `double` 64-bit IEEE floating point. 8-bit PCM is
+unsigned in `wav`, `rf64` and `w64`, as those formats define it, and signed in
+`aiff`, `caf` and `flac`. An unsupported pair, such as `flac-float`, is
+rejected before any file is created. Speaker labels (`--speaker-map`) and
+`--valid-bits` below the container size need a `wav-` format, because only
+WAVE_FORMAT_EXTENSIBLE carries them here. Standard output (`--output -`)
+needs a `raw-` format, since no file header can be completed on a pipe.
+
+FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg).
+
+### FLAC and Ogg
+
+The [preview packages](install.md#what-a-preview-package-contains) contain a libsndfile built
+without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
+and will stay that way, to keep the packages free of extra dependencies. So
+the plug-ins and the tools in a package cannot read FLAC or Ogg files (as
+input or as IRs), and the command line will be the same when packages include
+it (PLUG-5). `convolver --version` says whether the libsndfile in use has FLAC
+(it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
+refused with a message before any file is created.
+
+To work with FLAC anyway, do one of these:
+
+- **Convert at the edges.** Decode FLAC to WAV first and encode the result
+  afterwards, with the reference [`flac`](https://xiph.org/flac/) tool, SoX or
+  FFmpeg:
+
+  ```sh
+  flac --decode music.flac -o music.wav
+  convolver --filter room.cfg --input music.wav --output corrected.wav --output-format wav-pcm24
+  flac --best corrected.wav -o corrected.flac
+  ```
+
+  Or stream through a pipe, so no intermediate files are written (the `-ar`
+  and `-ac` values must match the configuration, as in
+  [RAW streams](#raw-streams)):
+
+  ```sh
+  ffmpeg -i music.flac -f f32le -ar 48000 -ac 2 - \
+    | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float \
+    | ffmpeg -f f32le -ar 48000 -ac 2 -i - -c:a flac -sample_fmt s32 corrected.flac
+  ```
+
+  FIR filters in FLAC are converted once with `flac --decode`, and the `.cfg`
+  then names the `.wav` instead of the `.flac`; the plug-ins need this too.
+- **Build Convolver against a libsndfile that has FLAC.** The libsndfile
+  packages of Linux distributions (`libsndfile1-dev` on Debian and Ubuntu),
+  Homebrew (`libsndfile`) and vcpkg (`libsndfile` with its default features)
+  include FLAC and Ogg. [Build from source](../develop/build.md) with one of
+  them (with vcpkg, install `libsndfile` rather than the `libsndfile[core]`
+  the Windows build commands use, which leaves the codecs out), then check that `convolver --version` no longer says `no FLAC output`.
+
 ### Integer formats, dither and noise shaping
 
-Outputs: `wav-float` (default), `wav-pcm8` (unsigned, as WAV defines 8-bit PCM),
-`wav-pcm16`, `wav-pcm24`, `wav-pcm32`, `raw-float`.
+Every integer sample type is quantized by Convolver in the same way, whatever
+the container; `wav-pcm8`, `wav-pcm16`, `wav-pcm24` and `wav-pcm32` are the
+examples below.
 
 Convolver converts to every integer format itself: with B significant bits,
 each sample is scaled by 2^(B-1), offset by the dither (in LSBs, least
@@ -99,7 +170,8 @@ Dither is off by default. `--dither` selects `none` (default), `triangular`
 difference of successive uniform values, same amplitude, high-pass error
 spectrum) or `rectangular`. `--dither-seed N` (default 0) seeds the generator;
 the same seed, input and channel count give byte-identical output regardless of
-buffering. Float and RAW formats reject dither, noise shaping and valid bits.
+buffering. Float and double formats reject dither, noise shaping and valid
+bits.
 
 `--noise-shaping` selects one of the historical engine's error-feedback shapers:
 `simple` (first order), `second-order`, `third-order`, `ninth-order` or
@@ -140,7 +212,8 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
   created.
 - A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
   the CLI says so on stderr and writes the plain header.
-- `raw-float` output has no header, so it cannot be combined with the flag.
+- Only `wav-` formats carry the labels; any other container stops the render
+  before the output is created (labels in other containers are TODO IO-5).
 - After writing, the CLI reads the finished header back and fails if the labels
   are not exactly the requested mask, so a sound-file library that cannot write
   them is reported rather than silently ignored.
@@ -156,11 +229,32 @@ partial after an I/O or numerical failure; writing is not transactional.
 
 ## RAW streams
 
-Standard streams use explicitly described little-endian IEEE float32, interleaved
-by frame. No WAV header needs rewriting on a non-seekable pipe:
+Standard streams carry headerless samples, interleaved by frame, so no header
+needs rewriting on a non-seekable pipe. The input's rate and channel count are
+given with `--raw-input`; its sample type is little-endian 32-bit float unless
+`--raw-format` says otherwise:
 
 ```sh
 producer | convolver --filter room.cfg --input - --raw-input 48000 2 --output - --output-format raw-float | consumer
+```
+
+Headerless `.pcm` and `.raw` filters in a configuration are a separate
+choice, `--raw-filter-format`, with the same names; see
+[filter files](configuration.md#filter-files).
+
+`--raw-format` needs `--raw-input`, since a file with a header states its own
+sample type. It takes the names FFmpeg and SoX use: `f32le` (default), `f64le`,
+`s16le`, `s24le` and `s32le`, or the same ending in `be` for big-endian.
+Integers are scaled by 2^-(bits-1), so `s16le` 16384 is 0.5. On output, the
+`raw-` formats write little-endian `pcm16`, `pcm24`, `pcm32`, `float` or
+`double` (see [output formats](#output-formats)); integer output is quantized
+and can be dithered like any other integer format. For example, 16-bit
+samples from SoX:
+
+```sh
+sox in.flac -t raw -e signed -b 16 -L - \
+  | convolver --filter room.cfg --input - --raw-input 48000 2 --raw-format s16le \
+      --output out.wav --output-format wav-pcm24
 ```
 
 `--raw-input RATE CHANNELS` also works on a RAW file. The output rate and channel
@@ -210,8 +304,9 @@ Ordinary RIFF/WAVE inputs receive extra chunk-boundary and PCM/float alignment
 validation, because libsndfile can otherwise silently accept truncation. Other
 input containers, including RF64, retain libsndfile's validation semantics; this
 is not a complete validator for every supported codec. Additional codecs depend
-on how the installed libsndfile was built. Output is currently ordinary WAV or
-RAW; use RAW for streams that can exceed WAV's 4 GiB container limit.
+on how the installed libsndfile was built. For output that can exceed 4 GiB,
+use an `rf64`, `w64`, `caf`, `flac` or `raw` format; `wav` and `aiff` stop with
+an error at their limit.
 
 ## Inspecting and validating configurations
 
@@ -242,7 +337,8 @@ convolver --inspect room.cfg --syntax-only --json
   will not survive copying to another machine; the default profile is
   `convolver`. See [profiles](other-programs.md#check-that-a-configuration-will-travel).
 - `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
-  validation fails. Diagnostics are also printed to stderr.
+  validation fails. Diagnostics are also printed to stderr. New keys may be
+  added within schema 1; removing or changing the meaning of one raises it.
 - `convolver --inspect --help` lists every inspection option.
 - Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
   `--warnings-as-errors` makes warnings fail.
@@ -251,7 +347,9 @@ A report gives, per inspected configuration, the rate, channel counts and raw
 channel mask; declared delay tokens and milliseconds beside effective frames;
 ordered routes with their source tokens and effective channel/gain (`-0` is
 channel 0, gain -1); each IR's spelling, line, resolved path, channel, rate and
-decoded length; partitions per path; latency (one block) and the FIR/delay tail
+decoded length, and for a headerless raw filter the sample type it was read as
+(`raw_format`, for example `f32le`; null for other IRs and for IRs that were
+not opened); partitions per path; latency (one block) and the FIR/delay tail
 separately; and `accounted_buffer_bytes`, the engine's prepared float buffers
 (an upper bound: paths with the same input mix share their history). That
 estimate excludes FFT plan internals, allocator overhead and file decoding

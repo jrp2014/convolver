@@ -10,8 +10,10 @@ explains it and owns the details.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date, and where the work is described as
-"(owner's decision, *date*)". Changing a decision is a new decision: add a row
+jrp decides, record it here with its date. Developer and project pages may add
+"(owner's decision, *date*)" where the work is described; user pages in
+`docs/use/` never do, and a change users will notice goes in the
+[changelog](../../CHANGELOG.md) instead. Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -58,6 +60,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | Saving after a failed first load records the failure (host state version 2), so reopening stays silent | [Adapter contract](../develop/plugin-contract.md) |
 | 23 October 2026 | VST3 speaker arrangements are checked with a notice only: no enforced layouts, no host state version 3 and no buses above 8 channels; revisit on request | [Plug-in identities](../develop/plugin-identities.md#channel-layouts) |
 | 23 October 2026 | Whether saved state records bypass follows each format's convention: VST3 saves its bypass parameter; LV2 and Audio Units leave bypass to the host and ignore the flag in restored state | [Adapter contract](../develop/plugin-contract.md#bypass) |
+| 24 October 2026 | Clarification of the audio thread's mute: silence ends only when a filter published after the mute takes over; one published before it but not yet picked up stays silent (PLUG-7, PR #58) | [Adapter contract](../develop/plugin-contract.md#replacement-and-threads) |
 
 ## Identities and file formats
 
@@ -72,13 +75,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Configuration and sound
 
-These two were decided in conversation with jrp before decisions were recorded
-in the repository; this log is their first written record.
+The first two were decided in conversation with jrp before decisions were
+recorded in the repository; this log is their first written record.
 
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 18 October 2026 | Dither is off unless requested | [Command-line reference](../use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | 18 October 2026 | `.cfg` paths are not translated or guessed between systems. Relative paths may use `\`; drive, UNC and `\`-rooted paths are rejected on macOS and Linux with a message saying to make them relative | [Other programs](../use/other-programs.md) |
+| 24 October 2026 | A headerless `.pcm` or `.raw` filter in a `.cfg` is read as mono little-endian float32 (`f32le`, what DRC and BruteFIR write) at the configuration's rate, unless it starts with a sound-file header. Convolver says which type it used, and `--raw-filter-format` chooses another; `.cfg` syntax is unchanged | [Filter files](../use/configuration.md#filter-files) |
 
 ## Diagnostics
 
@@ -92,6 +96,7 @@ in the repository; this log is their first written record.
 | --- | --- | --- |
 | 21 October 2026 | The Audio Unit is built with Apple's AudioUnitSDK and distributed under GPL-3.0-or-later with its Apache-2.0 notices; everything else stays GPL-2.0-or-later | [Audio Unit licence](../use/plugins.md#audio-unit-licence) |
 | 22 October 2026 | AudioUnitSDK 1.4.0, so the AU target builds as C++23 while everything else stays C++20 | [Build from source](../develop/build.md#pinned-format-dependencies) |
+| 24 October 2026 | The preview packages do not ship libFLAC, libogg, libvorbis or libopus (IO-6), so they neither read FLAC or Ogg nor write FLAC; the limitation and the workarounds (convert, or build against a libsndfile that has them) are documented | [FLAC and Ogg](../use/command-line.md#flac-and-ogg) |
 
 ## Documentation
 

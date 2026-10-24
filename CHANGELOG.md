@@ -20,7 +20,32 @@ Until 1.0 the C++ API may change between minor versions.
   or `~/.local/state/convolver/convolver.log`; `CONVOLVER_LOG` overrides)
   records every load, start and failure with the full explanation, ready to
   send with a report. See [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
-
+- More output formats (IO-3): `--output-format` takes `CONTAINER-TYPE`, with
+  `wav`, `rf64`, `w64`, `aiff`, `caf`, `flac` and `raw` containers and `pcm8`,
+  `pcm16`, `pcm24`, `pcm32`, `float` and `double` samples (FLAC holds 8 to 24
+  bits; raw has no 8-bit type). RF64, W64, CAF, FLAC and raw have no 4 GiB
+  limit. The existing names, such as `wav-pcm24` and `raw-float`, are
+  unchanged. In the library, `AudioWriter` also takes an `OutputEncoding`.
+  FLAC needs a libsndfile built with FLAC. The preview packages stay without
+  one (IO-6, decided): `--version` says whether it is available,
+  `available(Container)` tells the library, and without it a `flac-` format is
+  refused before any file exists; opening a FLAC or Ogg input or IR says the
+  codec is missing and how to convert or rebuild. The command-line guide's
+  **FLAC and Ogg** section describes both workarounds.
+- Raw sample types (IO-4): `--raw-format` reads `--raw-input` streams as
+  `s16`, `s24`, `s32`, `f32` or `f64`, little- or big-endian (`AudioReader`'s
+  new `RawEncoding` argument), and `raw-pcm16`, `raw-pcm24`, `raw-pcm32` and
+  `raw-double` write them.
+- Raw filters (IO-4): a configuration's filter ending in `.pcm` or `.raw`, and
+  not starting with a sound-file header, is read as mono at the configuration's
+  sample rate, as little-endian float32 (`f32le`) by default, the type DRC and
+  BruteFIR write. Rendering prints which type each raw filter was read as, and
+  `--inspect` shows it (`raw_format` in JSON). `--raw-filter-format` (render
+  and inspect) chooses another type with the `--raw-format` names; in the
+  library, `ConfigurationSelection::raw_filter_encoding` and
+  `InspectionOptions::raw_filter_encoding`, with `parse_raw_encoding()` and
+  `raw_encoding_name()`. `--profile portable-paths` warns that other `.cfg`
+  readers expect sound files (`raw-filter`).
 - An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
   bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
   2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by
@@ -40,6 +65,14 @@ Until 1.0 the C++ API may change between minor versions.
 - `HostProcessor::mute()`, an audio-thread call: the current filter ramps to
   silence over 64 samples until the next published filter fades in. The LV2
   adapter uses it when `run()` refuses a first filter file.
+  `HostProcessor::publications()` and `mute(through)` let an adapter mute
+  only what was published before it checked its own state.
+- Lifecycle sequence tests (PLUG-7): `native.host_lifecycle`,
+  `vst3.lifecycle`, `lv2.lifecycle` and `au.lifecycle` run every short
+  sequence of host operations, and long seeded ones, against a reference
+  model of the shared adapter contract, checking the saved filter, the failure
+  record, what is audible and that audio-thread calls neither allocate nor
+  lock ([testing](docs/develop/testing.md#lifecycle-sequences-plug-7)).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
   (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
@@ -220,6 +253,26 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- LV2: after an empty state (or an empty state map) was restored while the
+  plug-in was running, a filter file that `run()` refused in the same cycle (no
+  worker, or a full worker queue) let the unfiltered input play until the
+  next save or other control call, though the status said "load failed".
+  `HostProcessor::mute()` now also silences a filter published before it that
+  the audio thread had not yet picked up; only a filter published after it
+  ends the silence. Found by the PLUG-7 lifecycle sequences.
+- VST3 and AU: a filter state restored while inactive could be kept although
+  `setState` or `RestoreState` reported a failure, when memory ran out while
+  working out its tail after the load. The tail is now worked out first, so
+  the request is rejected whole. Found by the PLUG-7 lifecycle sequences.
+- VST3 (VST3-8, from the [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)):
+  the reported tail now includes the 256-sample latency, so a host that stops
+  or suspends the plug-in after its tail no longer cuts the last 256 samples
+  (an instance with no filter used to report 0). Input that the host flags as
+  silent is still read, so a host that flags audio by mistake no longer
+  silences it. The Bypass parameter accepts its own "Off" and "On" text (and 0
+  or 1) and refuses other text on every platform, and
+  the controller's state calls succeed instead of reporting "not
+  implemented". The filtered sound is unchanged.
 - A filter loaded while the host had stopped processing in the middle of a
   crossfade now plays from the first resumed sample. Before, `HostProcessor`
   kept the interrupted transition after `reset()`, so the old filter went on

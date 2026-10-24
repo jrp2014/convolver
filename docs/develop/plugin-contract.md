@@ -260,10 +260,12 @@ changing the filter or its failure record. `HostFilter::load` builds
 everything it keeps (messages, the speaker notice) before calling the install
 callback, and nothing after the callback publishes can throw, so running out
 of memory never leaves one filter playing while another is saved. One audio
-thread calls process, reset, set_bypass and mute. `mute()` is for a failure
+thread calls process, reset, set_bypass and mute, and reads publications.
+`mute()` is for a failure
 found on the audio thread itself: the current filter ramps to silence over 64
-samples and stays silent until the next published filter takes over and fades
-in from silence; bypass still passes the dry signal. Destruction and
+samples and stays silent until a filter published after the mute takes over
+and fades in from silence; one published before it but not yet picked up by
+the audio thread is silenced too. Bypass still passes the dry signal. Destruction and
 reconfiguration require audio to have stopped. Reset clears history without
 allocation, but its work scales with prepared storage. Filter preparation can
 be expensive; neither FFT planning nor file access belongs in a callback.
@@ -342,9 +344,11 @@ How each adapter meets the contract where its format differs:
   parameter and the Convolver log ([status and log](#status-and-log)) say why,
   including for a mismatch found at activation, and the log carries the
   [speaker check](../use/plugins.md#channels) notice (`HostFilter::notice()`). The adapter handles
-  variable block sizes, in-place host buffers, calls with no audio, inactive
-  channels and silence flags; 32- and 64-bit host buffers both use the float
-  engine.
+  variable block sizes, in-place host buffers, calls with no audio and inactive
+  channels; it reads input buffers even when the host flags them silent, and
+  never flags its output silent (VST3-10). `getTailSamples()` is the filter's
+  tail plus the 256-sample latency, measured at the output as Steinberg's tail
+  test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
   change notification when either changes; the tail stays at the longest
   filter used until the host reinitializes the unit. Bypass is

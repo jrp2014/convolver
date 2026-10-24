@@ -4,11 +4,13 @@
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace convolver::detail {
 namespace {
@@ -350,18 +352,61 @@ Configuration configuration_graph(const ParsedConfiguration& parsed) {
     return cfg;
 }
 
+namespace {
+bool raw_filter_extension(const std::filesystem::path& path) {
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return extension == ".pcm" || extension == ".raw";
+}
+
+// Whether a file starts like a container libsndfile reads. A .pcm or .raw
+// filter with such a header was always read through its header, so it still is.
+bool has_audio_header(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    char magic[4]{};
+    if (!file.read(magic, sizeof magic))
+        return false;
+    const std::string_view head(magic, sizeof magic);
+    for (const std::string_view known :
+         {"RIFF", "RIFX", "RF64", "BW64", "riff", "FORM", "caff", "fLaC", "OggS"})
+        if (head == known)
+            return true;
+    return false;
+}
+} // namespace
+bool raw_filter(const std::filesystem::path& resolved) {
+    return raw_filter_extension(resolved) && !has_audio_header(resolved);
+}
+
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
-                                       std::size_t& budget) {
+                                       std::size_t& budget, RawEncoding raw_encoding) {
     std::vector<DecodedIr> result;
     const auto& parsed = doc.configuration;
     for (std::size_t i = 0; i < parsed.paths.size(); ++i) {
         const auto& path = parsed.paths[i];
         const auto resolved = resolve_reference(doc.source, path.ir);
         std::optional<AudioReader> ir;
+        const bool raw = raw_filter(resolved);
         try {
-            ir.emplace(resolved);
+            if (raw)
+                ir.emplace(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding);
+            else
+                ir.emplace(resolved);
         } catch (const std::exception& e) {
             std::error_code ec; // On failure absolute() returns an empty path.
+            if (raw && std::filesystem::is_regular_file(resolved, ec))
+                throw ConfigurationError("damaged-asset", path.ir.location,
+                                         "raw filter '" + path.ir.spelling + "': " + e.what() +
+                                             " (raw filters are read as mono " +
+                                             raw_encoding_name(raw_encoding) + ")");
+            // The file is there but libsndfile cannot read it (a codec its build
+            // lacks, for example): the path hint below would mislead. The code
+            // stays missing-asset on purpose: codes are stable, and
+            // tests/compatibility/cases.json relies on this mapping.
+            if (!raw && std::filesystem::is_regular_file(resolved, ec))
+                throw ConfigurationError("missing-asset", path.ir.location,
+                                         "filter '" + path.ir.spelling + "': " + e.what());
             // Includes a bare "-": standard input cannot be a filter.
             throw ConfigurationError(
                 "missing-asset", path.ir.location,
@@ -392,7 +437,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             throw ConfigurationError("damaged-asset", path.ir.location,
                                      "filter '" + path.ir.spelling + "': " + e.what());
         }
-        result.push_back({resolved, info, decoded.front().impulse.size()});
+        result.push_back({resolved, info, decoded.front().impulse.size(),
+                          raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
         cfg.paths[i].impulse = std::move(decoded.front().impulse);
     }
     return result;
@@ -541,10 +587,15 @@ Configuration load_configuration(const std::filesystem::path& path, int expected
 }
 Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection,
-                                 std::vector<std::filesystem::path>* source_paths) {
+                                 std::vector<std::filesystem::path>* source_paths,
+                                 std::vector<std::filesystem::path>* raw_filters) {
+    if (raw_filters)
+        raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
         selection.input_channels > 256 || selection.output_channels > 256)
         throw std::invalid_argument("expected audio properties out of range");
+    if (selection.raw_filter_encoding.sample == SampleType::pcm8)
+        throw std::invalid_argument("raw filters have no 8-bit sample type");
     if (path == "-")
         throw std::invalid_argument("configuration must be a file");
     std::optional<Configuration> selected;
@@ -570,7 +621,14 @@ Configuration load_configuration(const std::filesystem::path& path,
                              selection))
             return false;
         auto cfg = detail::configuration_graph(parsed);
-        detail::decode_impulses(*leaf.document, cfg, budget);
+        const auto decoded =
+            detail::decode_impulses(*leaf.document, cfg, budget, selection.raw_filter_encoding);
+        if (raw_filters) {
+            for (const auto& ir : decoded)
+                if (ir.raw && std::find(raw_filters->begin(), raw_filters->end(), ir.resolved) ==
+                                  raw_filters->end())
+                    raw_filters->push_back(ir.resolved);
+        }
         selected = std::move(cfg);
         return true;
     };

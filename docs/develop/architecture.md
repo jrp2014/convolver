@@ -74,7 +74,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
 
 The host thread contract is in [`host.hpp`](../../include/convolver/host.hpp): one
-audio thread calls `process`, `reset`, `set_bypass` and `mute`; control calls are
+audio thread calls `process`, `reset`, `set_bypass`, `mute` and `publications`; control calls are
 serialized. Only `replace`, `prepare`, `publish` and `collect` may overlap audio
 processing (`prepare` and `publish` are `replace` in two steps, for an adapter
 that checks for a newer request in between). Construction,
@@ -98,7 +98,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
-| Host lifecycle or state | Host/state implementation, VST3, AU and LV2 adapters | `native.host`, `native.state`, host-state fuzz replay, all VST3 tests including `vst3.harness`, `ctest -L lv2`, and on macOS `au.harness` and `au.adapter` |
+| Host lifecycle or state | Host/state implementation, VST3, AU and LV2 adapters | `native.host`, `native.host_lifecycle`, `native.state`, host-state fuzz replay, all VST3 tests including `vst3.harness` and `vst3.lifecycle`, `ctest -L lv2`, and on macOS `au.harness`, `au.adapter` and `au.lifecycle` |
 | Plug-in identities or layouts | [Plug-in identities](plugin-identities.md); never change a released value | `identities` (also pre-commit), `vst3.identities`, `vst3.adapter` |
 | Preset files or the preset tool | [Presets guide](../use/presets.md); version-1 state must keep loading | `native.presets`, `plugins.presets`, and with the SDK `vst3.preset_format` and `vst3.preset` |
 | The Equalizer APO export | [Equalizer APO guide](../use/equalizer-apo.md); the model in the test must follow Equalizer APO's sources | `export.equalizer_apo`, and `export.equalizer_apo.runtime` in Equalizer APO itself on Windows CI; report their worst errors |

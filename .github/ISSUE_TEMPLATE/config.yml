@@ -1,0 +1,10 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+blank_issues_enabled: true
+contact_links:
+  - name: Using Convolver
+    url: https://github.com/jrp2014/convolver/blob/main/docs/use/README.md
+    about: Install, load a filter and hear it; most questions are answered here.
+  - name: Troubleshooting
+    url: https://github.com/jrp2014/convolver/blob/main/docs/use/troubleshooting.md
+    about: Silence, hosts that do not list Convolver, and configuration messages.

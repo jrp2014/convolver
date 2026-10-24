@@ -24,6 +24,7 @@ below. A test list is coverage information; a pass claim needs an actual run.
 
 Contents: [native tests](#native-production-tests),
 [plug-in comparisons](#plug-in-comparisons-plug-2),
+[lifecycle sequences](#lifecycle-sequences-plug-7),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
 [documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
@@ -177,7 +178,9 @@ copy of an identity. `vst3.identities` checks that the bundle's `moduleinfo.json
 [`plugins/identities.json`](../../plugins/identities.json), and that each VST3
 speaker constant in the SDK is the same bit as its WAV channel-mask bit.
 On macOS, `vst3.signature` checks the bundle's ad-hoc seal. These cover preactivation tail
-queries, silent-input tails, automation offsets and failed state restore rollback.
+queries, a tail that ends exactly at the reported length (latency included),
+input flagged silent that is still read, the Bypass parameter's text
+conversions, automation offsets and failed state restore rollback.
 `vst3.harness` runs the [PLUG-2 comparisons](#plug-in-comparisons-plug-2).
 Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 [pluginval](#pluginval), a host that does not share
@@ -300,6 +303,82 @@ and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 and host error messages are format-specific; LV2 and AU check them in their
 own tests.
 
+## Lifecycle sequences (PLUG-7)
+
+A host does many things to an instance in turn: it loads filters, plays,
+resets, bypasses, stops and starts it, changes the rate or the channels, saves
+and reopens the session. Each is tested on its own above; the defects found in
+jrp's reviews of 0.4.19 and 0.4.30 came from combinations. The runner in
+[`tests/plugins/lifecycle.hpp`](../../tests/plugins/lifecycle.hpp) holds a small
+reference model of the [shared adapter contract](plugin-contract.md): plain
+data and one function per operation, each rule citing the contract clause or
+the format's specification it comes from, never the implementation.
+
+**Sequences.** Each format's driver says which operations it supports. The
+runner enumerates every allowed sequence up to a length after each start:
+a negotiated empty instance, one already playing filter A, and one created
+before the host negotiated anything (LV2, which fixes the rate and channels at
+instantiation, starts instead with filter A's file queued for the worker).
+Then it runs fixed sequences (the defects found so far) and eight seeded
+sequences of 40 operations. Every
+sequence starts on a new instance.
+
+**Checks.** After the last operation of an enumerated sequence, and after every
+operation of a fixed or seeded one, it compares with the model:
+
+- the saved filter, the "load failed" flag and (VST3) the saved bypass;
+- the failure record: its kind, its request number and whether it is silent;
+- LV2's saved filter path and status port;
+- what is audible. A burst of noise must come out as the double-precision
+  oracle of the filter the model says plays, or as the dry input delayed by
+  the latency, or as exact silence. With no audio since the last activation or
+  reset, the filter must play from the first frame (direct installation);
+  otherwise silence is played first until every ramp and crossfade is over.
+  Every prefix of an enumerated sequence is enumerated too, so this covers the
+  audible filter after every operation without listening in between, which
+  would change the sequence;
+- that no audio-thread call allocates or frees through `operator new` and
+  `delete` (aligned forms included) or, on Linux, locks with
+  `pthread_mutex_lock`.
+  [`tests/plugins/audio_guard.hpp`](../../tests/plugins/audio_guard.hpp)
+  replaces them in the test executable and checks at start that it sees
+  allocations and locks, including the LV2 plug-in library's own (linked
+  with `ENABLE_EXPORTS`). It does not see `malloc`, `fftwf_malloc`, try-locks
+  or read-write locks.
+
+**Running out of memory.** As `native.host` does for `HostFilter` alone
+(`allocation_failures`), fixed sequences load filter B with the plug-in's
+allocations failing from the first onwards, then from the second, and so on
+until it loads (`state-B-starved`), and again with only one allocation failing
+each time (`state-B-shortage`). After each failed attempt the saved filter
+must be unchanged and, while active, what plays must still be what the model
+expects. Only allocations made during the plug-in's own call fail: for Audio
+Units that call goes through the Audio Unit SDK's dispatch, whose C++
+allocations fail too, while Core Foundation's never do (they do not go
+through `operator new`).
+These are fixed sequences only, at the start of a session, as a replacement,
+while inactive and before the host is configured, because each one restores
+the state some fifty times.
+
+A failure prints the sequence, for example
+`start state-A play state-empty file-refused listen`, and the check that
+failed; `lifecycle::parse` turns it into a fixed regression.
+
+| Test | Driver | Operations beyond loading state, playing, bypass, reset, stop, start and reopen |
+| --- | --- | --- |
+| `native.host_lifecycle` | `HostFilter` and `HostProcessor` with only what the contract asks of an adapter ([`host_lifecycle_tests.cpp`](../../tests/native/host_lifecycle_tests.cpp)) | Rate and layout changes, negotiation after restoring |
+| `vst3.lifecycle` | The processor through its SDK interfaces ([`lifecycle_tests.cpp`](../../tests/vst3/lifecycle_tests.cpp)) | The same, and bypass saved with the state |
+| `au.lifecycle` | The unit through the Audio Unit API, macOS only ([`lifecycle_tests.cpp`](../../tests/au/lifecycle_tests.cpp)) | The same; formats bind once the unit has rendered |
+| `lv2.lifecycle` | The plug-in through lilv ([`lifecycle_tests.cpp`](../../tests/lv2/lifecycle_tests.cpp)) | The empty state map; filter files queued for a worker that runs only when a sequence says, so a request can be outstanding across any other operation, teardown included; a full worker queue; a request overtaking one the worker is preparing; a host with no worker |
+
+**Length.** `CONVOLVER_LIFECYCLE_LENGTH` sets how many operations are enumerated
+after each start: 4, or 3 in sanitizer builds, where a sequence is ten to
+twenty times slower. LV2, with about twice as many operations, uses one fewer
+(`CONVOLVER_LV2_LIFECYCLE_LENGTH`). Each executable also takes the length as
+its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
+no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
+fixed and seeded), for both layouts in about 30 seconds.
+
 ## Plug-in format tests
 
 What each plug-in format's own tests cover, beyond the shared
@@ -318,7 +397,14 @@ comparisons; since VST3-7 the adapter lists no known deviations.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
-and adds automation patterns. The validator, the adapter tests and the plug-in
+and adds automation patterns. The validator does not create three tests that
+its suite contains: Check Tail processing, Process Input Overwriting and
+Parameter Function Name. Patched in by hand during the
+[VST3 audit](../review-2026-10/vst3-api-audit-2026-10-23.md), the last two
+pass; since VST3-8 Check Tail fails only on FFT rounding residue just after
+the reported tail (up to 1.9e-7 for ±1 noise, against its absolute 1e-7
+limit, about −134 dB), not on a cut tail. `vst3.adapter` checks the tail with
+a margin instead. The validator, the adapter tests and the plug-in
 all use Steinberg's SDK code, so CI also loads the bundle in an independent
 host, pluginval.
 
