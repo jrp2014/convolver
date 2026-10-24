@@ -14,7 +14,7 @@ for every change and is not gated. A change is one of three kinds:
 
 Pushes to main and manual runs always get everything, and so does a pull
 request whose changed files cannot be listed. See
-docs/develop/testing.md#ci-triggers.
+docs/develop/testing.md#documentation-only-pull-requests.
 """
 import argparse
 import os
@@ -75,7 +75,8 @@ def changed_files():
                                  check=True, capture_output=True, text=True).stdout.split()
         if len(parents) != 3:
             return None
-        output = subprocess.run(['git', 'diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'],
+        output = subprocess.run(['git', '-c', 'core.quotePath=false', 'diff', '--name-only', '--no-renames',
+                                 'HEAD^1', 'HEAD'],
                                 check=True, capture_output=True, text=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return None

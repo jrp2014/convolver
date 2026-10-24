@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   # Pull requests that change only unpackaged documentation skip the candidates
-  # (scripts/ci_scope.py, docs/develop/testing.md#ci-triggers).
+  # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
     outputs:

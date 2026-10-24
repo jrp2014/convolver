@@ -20,6 +20,7 @@ UNGATED = {'lint.yml'}  # Runs for every change, documentation included.
 # A Git hook's GIT_DIR or GIT_INDEX_FILE would point the scratch repository's
 # commands at the real one.
 CLEAN = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.M)
 GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.M)
 
 
@@ -115,6 +116,8 @@ class Workflows(unittest.TestCase):
                     self.assertIsNotNone(needs, f'{name} must need scope or another job')
                     if needs.group(1) == 'scope':
                         self.assertRegex(body, GATE, name)
+                    # A job that runs despite a skipped dependency would undo the gate.
+                    self.assertNotRegex(body, OVERRIDE, name)
 
 
 class Command(unittest.TestCase):
@@ -139,7 +142,7 @@ class Command(unittest.TestCase):
     def test_pull_request_merge_commit(self):
         def git(*args):
             subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@example.com',
-                            '-c', 'commit.gpgsign=false', *args],
+                            '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', *args],
                            cwd=repository, env=CLEAN, check=True, capture_output=True)
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -151,6 +154,7 @@ class Command(unittest.TestCase):
             git('checkout', '-q', '-b', 'topic')
             (repository / 'docs').mkdir()
             (repository / 'docs/guide.md').write_text('guide\n')
+            (repository / 'docs/guidé.md').write_text('non-ASCII name\n')
             git('add', '.')
             git('commit', '-q', '-m', 'docs')
             # Code that reached main after the branch started is not the pull request's change.
@@ -161,6 +165,7 @@ class Command(unittest.TestCase):
             written, printed = self.run_script(cwd=repository)
             self.assertEqual(written, 'build=false\npackage=false\n')
             self.assertIn('documentation docs/guide.md', printed)
+            self.assertIn('documentation docs/guidé.md', printed)
             self.assertNotIn('engine.cpp', printed)
             # Without a merge commit the changes are unknown, so everything runs.
             git('checkout', '-q', 'topic')

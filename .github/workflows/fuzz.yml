@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   # Pull requests that change only documentation skip the builds and tests
-  # (scripts/ci_scope.py, docs/develop/testing.md#ci-triggers).
+  # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
     outputs:
