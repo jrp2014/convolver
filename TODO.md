@@ -506,6 +506,13 @@ so the preset file path is not needed).
   and analysis pins with the latest stable packaged releases. Refresh CI caches
   when the formatter release changes, keep local and cloud instructions aligned,
   and validate formatting and analysis in CI. Local installation is deferred.
+- [ ] **CI-6 — Keep supporting libraries on their newest releases.** Builds
+  resolve the newest release of each SDK, library and test tool (VST3 SDK,
+  lv2, AudioUnitSDK, FFTW, libsndfile, NSIS, pluginval, lv2lint, the lilv
+  packages) instead of a pinned one, and record exactly what they used
+  (version, commit, SHA-256) in the source and artifact manifests, the job
+  summary and, for VST3 and AU, the Convolver log. A recorded manifest still
+  rebuilds a release exactly.
 
 ## Documented limitations
 
