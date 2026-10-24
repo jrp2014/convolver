@@ -208,8 +208,15 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   backend, CPU kernels); an unwritable log is said in the Status text;
   failed CI test jobs keep their evidence, and preview candidates keep
   matching debugging symbols.
-  Remaining: the failure-by-surface table, the CLI and preset tool, and what
-  named hosts actually show (HOST-1).
+  Progress (24 October 2026, PR #73, from jrp's review of 0.4.43): one fault
+  snapshot when a load is accepted, so faults from before it are logged but no
+  longer shown; Load failed stays ahead of Fault on every adapter's audio
+  thread; the user guides point to the Status parameter and the log. The
+  failure-by-surface table, CLI and preset tool included, is in the
+  [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md)
+  plan, with eight proposals for jrp.
+  Remaining: jrp's choice among those proposals, their implementation and
+  tests, and what named hosts actually show (HOST-1).
 
 ## Plug-ins: VST3, LV2 and AU
 
