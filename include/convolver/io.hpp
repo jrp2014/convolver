@@ -103,6 +103,7 @@ class Quantizer {
     // Sizes must match and hold complete frames. Results lie in the B-bit range.
     // NaN quantizes to zero; neither NaN nor infinity disturbs the shaper state.
     void quantize(std::span<const float> interleaved, std::span<std::int32_t> out) noexcept;
+    // Back to the state after construction; neither call allocates.
     void reset() noexcept;
     unsigned bits() const noexcept {
         return bits_;

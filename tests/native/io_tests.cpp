@@ -6,12 +6,14 @@
 #include <cmath>
 #include <csignal>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <new>
 #include <optional>
 #include <sndfile.h>
 #include <stdexcept>
@@ -25,6 +27,35 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+
+// Allocations allowed before the next one fails; negative means no limit.
+thread_local long allocations_left = -1;
+void* operator new(std::size_t n) {
+    if (allocations_left == 0)
+        throw std::bad_alloc();
+    if (allocations_left > 0)
+        --allocations_left;
+    if (auto p = std::malloc(n ? n : 1))
+        return p;
+    throw std::bad_alloc();
+}
+void* operator new[](std::size_t n) {
+    return ::operator new(n);
+}
+void operator delete(void* p) noexcept {
+    std::free(p);
+}
+void operator delete[](void* p) noexcept {
+    ::operator delete(p);
+}
+// Sized forms too, so library code (std::filesystem) never frees with the
+// runtime's own delete what this operator new allocated.
+void operator delete(void* p, std::size_t) noexcept {
+    ::operator delete(p);
+}
+void operator delete[](void* p, std::size_t) noexcept {
+    ::operator delete(p);
+}
 
 namespace fs = std::filesystem;
 using namespace convolver;
@@ -394,6 +425,37 @@ void dither_tests(const fs::path& dir) {
     }
     rejects([&] { Pcm16Quantizer q(0); });
     rejects([&] { Pcm16Quantizer q(1, {static_cast<Dither>(99)}); });
+}
+// reset() is noexcept, so the constructor allocates everything: out of memory
+// at any allocation of construction reaches the caller as std::bad_alloc, and
+// reset() and quantize() allocate nothing (jrp's review of 0.4.43).
+void quantizer_memory_tests() {
+    const QuantizationOptions options{Dither::triangular_highpass, 11, NoiseShaping::sony_sbm};
+    std::vector<float> x(64);
+    for (std::size_t i = 0; i < x.size(); ++i)
+        x[i] = 0.5f * std::sin(0.1f * static_cast<float>(i));
+    std::vector<std::int32_t> expected(x.size()), first(x.size()), again(x.size());
+    Quantizer(2, 24, options).quantize(x, expected);
+    bool built = false;
+    for (long allowed = 0; !built; ++allowed) {
+        require(allowed < 100, "quantizer construction ends");
+        std::optional<Quantizer> q;
+        allocations_left = allowed;
+        try {
+            q.emplace(2, 24, options);
+            built = true;
+        } catch (const std::bad_alloc&) {
+        }
+        if (built) {
+            allocations_left = 0;
+            q->quantize(x, first);
+            q->reset();
+            q->quantize(x, again);
+        }
+        allocations_left = -1;
+        require(!built || allowed > 0, "quantizer construction allocates");
+    }
+    require(first == expected && again == expected, "quantizer reset without allocation");
 }
 std::vector<std::int32_t> quantize_bits(unsigned bits, QuantizationOptions options,
                                         const std::vector<float>& x, std::size_t channels = 1) {
@@ -1423,6 +1485,7 @@ int main() {
         speaker_tests(dir);
         sound_file_header_tests(dir);
         shared_filter_files(dir);
+        quantizer_memory_tests();
         fs::remove_all(dir);
         std::cout << "native I/O tests passed\n";
     } catch (const std::exception& e) {

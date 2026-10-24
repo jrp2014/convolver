@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Build and run the overlap-add vs overlap-save benchmark against single-precision FFTW.
-# Usage: sh docs/benchmarks/src/run_overlap_schemes.sh [--quick] [> results.csv]
+# Usage: sh tests/native/benchmarks/run_overlap_schemes.sh [--quick] [> results.csv]
 # Needs a C++20 compiler and FFTW3 (macOS: brew install fftw; Ubuntu: apt-get install libfftw3-dev).
 # Set CXX or CXXFLAGS to override the compiler or flags.
 set -eu

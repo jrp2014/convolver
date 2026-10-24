@@ -207,7 +207,10 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   the log names the process, numbers requests and starts with what ran (FFT
   backend, CPU kernels); an unwritable log is said in the Status text;
   failed CI test jobs keep their evidence, and preview candidates keep
-  matching debugging symbols.
+  matching debugging symbols. Progress (24 October 2026, PR #72, from jrp's
+  review of 0.4.43): the candidate checks each kept symbol file's debugging
+  information and its identity against the packaged binary (GNU build ID,
+  Mach-O UUID, PDB GUID and age), tested by `release.symbols`.
   Progress (24 October 2026, PR #73, from jrp's review of 0.4.43): one fault
   snapshot when a load is accepted, so faults from before it are logged but no
   longer shown; Load failed stays ahead of Fault on every adapter's audio
@@ -555,6 +558,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   LV2 sanitizer stages as parallel jobs building only their targets,
   one CTest entry per package consumer, a parallel offline rebuild, ccache on
   Linux and macOS, and each kind of test run only where it can change; [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
+- [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
+  2026, PR #74: `native.engine` prints the worst error relative to the output
+  peak for each group of cases and kernel set, with B, and where the largest
+  absolute error came from, so a new, louder test (PERF-5's
+  `history_validity`, peak 7.6) no longer looks like a tenfold loss of
+  accuracy; [native tests](docs/develop/testing.md#native-production-tests).
+- [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
+  an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
+  `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
@@ -602,6 +614,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
   [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
+- [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
+  24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
+  in its constructor, so out of memory reaches the caller, and
+  `estimate_attenuation` refuses a non-finite noise response; tests in
+  `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,

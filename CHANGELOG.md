@@ -327,6 +327,20 @@ Until 1.0 the C++ API may change between minor versions.
 - The plug-in and troubleshooting guides said the VST3 cannot show why a load
   failed and that the speaker check's note cannot be shown. Both now point to
   the Status parameter and the Convolver log. Found in jrp's review of 0.4.43.
+- Out of memory while creating the integer-sample quantizer (every PCM output
+  of the CLI) ended the program instead of reporting the error, because
+  `Quantizer::reset()`, which cannot throw, allocated. The constructor now
+  allocates everything. Found in jrp's review of 0.4.43.
+- `--gain-db auto` reported 0 dB for a filter whose coefficients are so large
+  that convolving full-scale noise overflows single precision, because the
+  peak search ignored the resulting NaN. `estimate_attenuation` now refuses
+  such a filter with an explanation (`std::overflow_error`). Found in jrp's
+  review of 0.4.43.
+- Release candidates checked only the names of the kept debugging symbols, so
+  an empty `.debug` file or a `.dSYM` holding only `Info.plist` passed. Each
+  symbol file must now hold debugging information and match its packaged
+  binary by GNU build ID, Mach-O UUID or PDB signature and age. Found in jrp's
+  review of 0.4.43.
 - A filter named `.pcm` or `.raw` that is a sound file with a header (Sun/NeXT
   AU, for example) was read as raw samples, header included, because only some
   headers were recognised. Now such a filter is read through its header when

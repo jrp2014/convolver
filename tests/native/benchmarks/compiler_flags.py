@@ -8,7 +8,7 @@ variants in a shuffled order per case, and every measurement is kept in the CSV.
 Default cases are the room-correction workloads (10-18). Example, from the
 repository root (about 30 minutes for the default variants and five rounds):
 
-  python3 docs/benchmarks/src/compiler_flags.py --compiler clang++ --backend OOURA \\
+  python3 tests/native/benchmarks/compiler_flags.py --compiler clang++ --backend OOURA \\
       --work /tmp/flags --output flags.csv
 
 Pin the benchmark to one core where the system allows it (--cpu 2 uses taskset
