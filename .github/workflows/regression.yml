@@ -78,8 +78,9 @@ jobs:
       - name: Portable static analysis
         if: runner.os == 'Linux' && matrix.cxx == 'clang++'
         run: |
-          sudo apt-get install -y clang-tidy-18
-          clang-tidy-18 -p build portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp \
+          python -m pip install --upgrade clang-tidy
+          clang-tidy --version
+          clang-tidy -p build portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp \
             portable/attenuation.cpp portable/config.cpp \
             portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp \
             portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/state.cpp \

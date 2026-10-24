@@ -32,15 +32,42 @@ jobs:
         id: node
         with:
           node-version: '24'
+      - name: Install lint runner
+        run: python -m pip install pre-commit==4.5.1 packaging
+      - name: Resolve latest stable formatter for the environment cache
+        id: clang
+        run: |
+          python - <<'PYTHON'
+          import json, os
+          from packaging.version import Version
+          from urllib.request import urlopen
+          with urlopen('https://pypi.org/pypi/clang-format/json', timeout=30) as response:
+              releases = json.load(response)['releases']
+          versions = [v for v, files in releases.items()
+                      if not Version(v).is_prerelease and not Version(v).is_devrelease
+                      and any(not f.get('yanked', False) for f in files)]
+          latest = max(versions, key=Version)
+          print('Latest stable packaged clang-format:', latest)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print('version=' + latest, file=output)
+          PYTHON
       - name: Cache pre-commit environments
         uses: actions/cache@v6
         with:
           path: ~/.cache/pre-commit
           key: >-
-            ${{ format('pre-commit-v1-{0}-{1}-py{2}-node{3}-{4}',
+            ${{ format('pre-commit-v2-{0}-{1}-py{2}-node{3}-{4}-clang{5}',
             runner.os, runner.arch, steps.python.outputs.python-version, steps.node.outputs.node-version,
-            hashFiles('.pre-commit-config.yaml')) }}
-      - name: Install lint runner
-        run: python -m pip install pre-commit==4.5.1
+            hashFiles('.pre-commit-config.yaml'), steps.clang.outputs.version) }}
       - name: Formatting, shell, Markdown, YAML, workflow and repository checks
         run: pre-commit run --all-files --show-diff-on-failure
+      - name: Save lint fixes for review
+        if: failure()
+        run: git diff --binary > lint-fixes.patch
+      - name: Upload lint fixes
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lint-fixes
+          path: lint-fixes.patch
+          retention-days: 7
