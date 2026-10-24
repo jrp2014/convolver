@@ -447,6 +447,9 @@ Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions op
     scale_ = std::ldexp(1.0, static_cast<int>(bits) - 1);
     low_ = -scale_;
     high_ = scale_ - 1;
+    // All storage is allocated here, where failure can throw; reset() only refills it.
+    previous_.resize(options.dither == Dither::triangular_highpass ? channels : 0);
+    errors_.resize(channels * coefficients_.size());
     reset();
 }
 float Quantizer::uniform() noexcept {
@@ -477,10 +480,9 @@ float Quantizer::dither() noexcept {
 void Quantizer::reset() noexcept {
     state_ = options_.seed;
     channel_ = 0;
-    previous_.assign(options_.dither == Dither::triangular_highpass ? channels_ : 0, 0.f);
     for (auto& v : previous_)
         v = uniform();
-    errors_.assign(channels_ * coefficients_.size(), 0.0);
+    std::fill(errors_.begin(), errors_.end(), 0.0);
 }
 void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out) noexcept {
     const auto count = std::min(in.size(), out.size());

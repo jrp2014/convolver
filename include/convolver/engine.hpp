@@ -61,8 +61,10 @@ struct AttenuationEstimate {
     double worst_case_peak = 0;
     double worst_case_attenuation_db = 0;
 };
-// Validates like the Engine. A zero peak (silent routing) gives 0 dB. Runs the
-// convolution offline with estimate planning: not for the audio thread.
+// Validates like the Engine. A zero peak (silent routing) gives 0 dB. Throws
+// std::overflow_error when the noise response is not finite (coefficients too
+// large for single precision). Runs the convolution offline with estimate
+// planning: not for the audio thread.
 AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t seed = 0,
                                          std::size_t lengths = 10);
 

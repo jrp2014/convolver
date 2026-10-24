@@ -419,6 +419,19 @@ void attenuation() {
             "silent estimate");
     rejects([&] { estimate_attenuation(dirac, 0, 0); });
     rejects([&] { estimate_attenuation(Configuration{}); });
+    // Finite but enormous coefficients overflow single precision inside the
+    // convolution; the NaN output must be refused, not ignored by the peak
+    // search (jrp's review of 0.4.43 found a noise peak and 0 dB here).
+    auto huge = dirac;
+    std::fill(huge.paths[0].impulse.begin(), huge.paths[0].impulse.end(),
+              std::numeric_limits<float>::max());
+    bool overflowed = false;
+    try {
+        estimate_attenuation(huge);
+    } catch (const std::overflow_error&) {
+        overflowed = true;
+    }
+    require(overflowed, "non-finite noise response is refused");
 }
 // PERF-4: the AVX2 set uses fused multiply-add (owner's decision, 24 October
 // 2026), so it may round differently from the baseline set, but each set must

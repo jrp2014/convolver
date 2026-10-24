@@ -38,6 +38,8 @@ class Classification(unittest.TestCase):
             'docs/use/images/host.png': 'packaged',
             'docs/use/presets.md': 'packaged',
             'docs/benchmarks/2026-10-18-m5-max.csv': 'documentation',
+            'tests/native/benchmarks/vdsp_mac.cpp': 'code',
+            'tests/native/benchmarks/callback_scenarios.sh': 'code',
             'TODO.md': 'documentation',
             'CHANGELOG.md': 'documentation',
             'tests/fuzz/README.md': 'documentation',

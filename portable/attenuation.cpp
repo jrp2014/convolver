@@ -72,9 +72,12 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
     std::vector<float> in(chunk * c.input_channels), out(chunk * c.output_channels);
     std::uint64_t state = seed;
     double peak = 0;
+    bool finite_output = true;
     const auto scan = [&](std::size_t frames) {
-        for (std::size_t i = 0; i < frames * c.output_channels; ++i)
+        for (std::size_t i = 0; i < frames * c.output_channels; ++i) {
+            finite_output = finite_output && std::isfinite(out[i]);
             peak = std::max(peak, static_cast<double>(std::abs(out[i])));
+        }
     };
     // The historical engine used exactly ten filter lengths; a floor keeps short
     // filters from being judged on a handful of samples.
@@ -94,6 +97,14 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
         scan(frames);
         remaining -= frames;
     }
+    // std::max ignores NaN, so overflow inside the convolution (finite but enormous
+    // coefficients) is refused here rather than reported as a smaller peak. The
+    // bound below is computed in double from finite floats and cannot overflow.
+    if (!finite_output || !std::isfinite(peak))
+        throw std::overflow_error(
+            "cannot estimate the attenuation: filtering full-scale noise gave infinite or "
+            "undefined output, so the filter coefficients are too large for single-precision "
+            "processing. Check how the filter files are scaled");
     AttenuationEstimate result;
     result.noise_peak = peak;
     result.noise_attenuation_db = attenuation_db(peak);

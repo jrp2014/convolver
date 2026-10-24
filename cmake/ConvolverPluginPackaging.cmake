@@ -84,7 +84,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)
 # Relocation is mandatory for release archives, tested with actual SDK tools.
 if(CONVOLVER_BUILD_TESTS)
-    foreach(release_test IN ITEMS manifest source artifact installer gate docs)
+    foreach(release_test IN ITEMS manifest source artifact installer gate docs symbols)
         add_test(NAME release.${release_test} COMMAND "${Python3_EXECUTABLE}"
             "${PROJECT_SOURCE_DIR}/tests/release/${release_test}_tests.py")
     endforeach()
