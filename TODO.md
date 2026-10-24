@@ -506,6 +506,10 @@ so the preset file path is not needed).
   and analysis pins with the latest stable packaged releases. Refresh CI caches
   when the formatter release changes, keep local and cloud instructions aligned,
   and validate formatting and analysis in CI. Local installation is deferred.
+- [ ] **CI-5 — No actions on a deprecated Node.js.** GitHub forces Node 20
+  actions onto Node 24 with a warning: `ilammy/msvc-dev-cmd` (release
+  candidates) and `hendrikmuhs/ccache-action@v1`. Replace or move each to a
+  release for the current Node.js and confirm the warnings are gone in CI.
 
 ## Documented limitations
 
