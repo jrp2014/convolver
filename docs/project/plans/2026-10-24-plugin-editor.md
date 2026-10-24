@@ -3,8 +3,9 @@
 
 Status: written on 24 October 2026 against Convolver `80ac07a` (0.4.45), at
 jrp's request ("I think that doing that would be helpful, not least for
-debugging"). Nothing here is implemented, and the framework, scope and order
-wait for jrp's choices in [decisions for jrp](#decisions-for-jrp). Open work is
+debugging"). Nothing here is implemented. The framework is decided: native
+views ([decisions](../decisions.md#direction)); scope and order wait for
+jrp's choices in [decisions for jrp](#decisions-for-jrp). Open work is
 tracked as PLUG-9, VST3-3, VST3-11 to VST3-13, AU-6 and LV2-6 in
 [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
 The rules every adapter follows stay in the
@@ -27,7 +28,7 @@ implements one of its phases.
   sound file), which loads exactly the state `convolver-preset` would write
   for the host's rate and channels, and switch Bypass. It adds no
   sound-changing controls.
-- **Framework: native views, no framework** (recommended). One AppKit view
+- **Framework: native views, no framework** (decided). One AppKit view
   on macOS serves VST3 and the Audio Unit (and an LV2 Cocoa UI later); a
   Win32 view serves VST3 on Windows; Linux comes last, with its toolkit
   decided then. Native controls give screen readers, keyboard use, dark mode
@@ -182,9 +183,14 @@ toolkits in plug-in UIs. The realistic choices for VST3-13 are a small X11
 view drawn with xcb (and cairo for text), or VSTGUI for Linux only, or no
 Linux window: Linux users already have LV2, whose generic host UIs show a file
 chooser for the `filter` parameter and the status port, and the VST3 Status
-parameter. Neither drawn option is accessible. This plan defers the choice to
+parameter. Neither drawn option is accessible. The choice is made in
 VST3-13, after the macOS and Windows windows exist and HOST-1 shows whether
-Linux VST3 users need one.
+Linux VST3 users need one; VSTGUI for the Linux VST3 window only is the
+leading candidate, as it saves writing a third view where no accessible
+native option exists anyway. Using VSTGUI for VST3 on every system and a
+native view for the Audio Unit was considered and set aside: it means two
+different windows on the Mac, and VST3, the most used format, would lose
+screen readers.
 
 ## How the window connects
 
@@ -440,11 +446,12 @@ text no worse. Whether a preview waits for the macOS window is jrp's call.
 
 Recommended answers first. None of these blocks phase 1.
 
-1. **Framework:** native views (AppKit, Win32), no framework, with the content
-   in shared code. Alternatives: VSTGUI for every system (one code base, no
-   accessibility, a new shipped dependency), or DPF (replaces our adapters).
-   This revises the formats plan's "DPF is the fallback for a shared editor":
-   the shared part becomes our own report code.
+1. **Framework (decided):** native views (AppKit, Win32), no framework, with
+   the content in shared code, rather than VSTGUI for every system (one code
+   base, no accessibility, a new shipped dependency) or DPF (replaces our
+   adapters). This replaces the formats plan's "DPF is the fallback for a
+   shared editor": the shared part is our own report code
+   ([decisions](../decisions.md#direction)). Linux stays open for VST3-13.
 2. **Order:** macOS first (VST3 and the Audio Unit share the view, and jrp's
    hosts are on his Mac), then Windows, then decide Linux; LV2's UI only if
    Linux users ask.

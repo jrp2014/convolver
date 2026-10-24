@@ -468,15 +468,14 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   active configuration, choose and reload a filter, copy diagnostics, show the
   log, bypass. Opened in CI by `editorhost` and pluginval's GUI tests, with an
   accessibility test of names, roles and text; smoke steps in REAPER and
-  Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)). Waits for jrp's framework
-  choice.
+  Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)).
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
 - [ ] **VST3-13 — Editor window on Linux.** Decide first between a small X11
   view (xcb and cairo, through the host's `IRunLoop`), VSTGUI for Linux only,
   or no Linux window (LV2's generic UIs and the Status parameter cover it),
-  using HOST-1 evidence ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
+  using HOST-1 evidence; VSTGUI for Linux only is the leading candidate ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
