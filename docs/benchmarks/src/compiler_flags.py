@@ -13,7 +13,9 @@ repository root (about 30 minutes for the default variants and five rounds):
 
 Pin the benchmark to one core where the system allows it (--cpu 2 uses taskset
 on Linux). Nothing else should run meanwhile. Add a variant with
---variant 'NAME=FLAGS' or --variant 'NAME=FLAGS|lto'.
+--variant 'NAME=FLAGS', followed by |lto for link-time optimisation and
+|baseline to build without the AVX2 kernels, for example
+--variant 'O3-baseline=-O3 -DNDEBUG|baseline'.
 """
 import argparse
 import csv
@@ -36,7 +38,7 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[3])
 parser.add_argument('--compiler', default='c++')
 parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE'])
-parser.add_argument('--variant', action='append', help='NAME=FLAGS[|lto]; replaces the defaults')
+parser.add_argument('--variant', action='append', help='NAME=FLAGS[|lto][|baseline]; replaces the defaults')
 parser.add_argument('--no-avx2-kernels', action='store_true', help='configure with CONVOLVER_AVX2_KERNELS=OFF')
 parser.add_argument('--cases', default='10,11,12,13,14,15,16,17,18')
 parser.add_argument('--rounds', type=int, default=5)
@@ -51,15 +53,19 @@ if args.rounds < 3 or args.seconds <= 0:
 binaries = {}
 for spec in args.variant or DEFAULT_VARIANTS:
     name, _, rest = spec.partition('=')
-    flags, _, extra = rest.partition('|')
+    flags, *extras = rest.split('|')
+    unknown = set(extras) - {'lto', 'baseline'}
+    if unknown:
+        parser.error(f'unknown variant option {sorted(unknown)[0]} in {spec}')
+    avx2 = not (args.no_avx2_kernels or 'baseline' in extras)
     build = args.work / name
     subprocess.run(['cmake', '-S', str(args.source), '-B', str(build), '-DCMAKE_BUILD_TYPE=Release',
                     '-DCMAKE_CXX_COMPILER=' + args.compiler, '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
-                    '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if extra == 'lto' else 'OFF'),
+                    '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
                     '-DCONVOLVER_FFT_BACKEND=' + args.backend, '-DCONVOLVER_BUILD_IO=OFF',
                     '-DCONVOLVER_BUILD_CLI=OFF', '-DBUILD_TESTING=OFF', '-DCONVOLVER_BUILD_BENCHMARKS=ON',
                     '-DCONVOLVER_LEGACY_TESTS=OFF', '-DCONVOLVER_DOCUMENTATION_TESTS=OFF',
-                    '-DCONVOLVER_AVX2_KERNELS=' + ('OFF' if args.no_avx2_kernels else 'ON')],
+                    '-DCONVOLVER_AVX2_KERNELS=' + ('ON' if avx2 else 'OFF')],
                    check=True, stdout=subprocess.DEVNULL)
     subprocess.run(['cmake', '--build', str(build), '--target', 'convolver_benchmark', '--config', 'Release'],
                    check=True, stdout=subprocess.DEVNULL)

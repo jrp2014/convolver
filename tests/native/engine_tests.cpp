@@ -370,6 +370,12 @@ void attenuation() {
 }
 // PERF-4: every kernel set must give the baseline's results bit for bit, over
 // odd lengths (vector remainders) and values with a wide range of exponents.
+// Bit for bit, so that signed zeros and NaN payloads count too.
+bool same(const std::vector<float>& a, const std::vector<float>& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float p, float q) {
+        return std::bit_cast<std::uint32_t>(p) == std::bit_cast<std::uint32_t>(q);
+    });
+}
 void kernels_match_baseline() {
     const auto& fast = detail::kernels();
     const auto& base = detail::baseline_kernels();
@@ -383,11 +389,6 @@ void kernels_match_baseline() {
         for (auto* v : {&x, &h, &interleaved})
             for (auto& f : *v)
                 f = std::ldexp(value(random), exponent(random));
-        auto same = [](const std::vector<float>& a, const std::vector<float>& b) {
-            return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float p, float q) {
-                return std::bit_cast<std::uint32_t>(p) == std::bit_cast<std::uint32_t>(q);
-            });
-        };
         std::vector<float> a(2 * bins), b(2 * bins);
         fast.deinterleave(interleaved.data(), a.data(), bins, 0.37f);
         base.deinterleave(interleaved.data(), b.data(), bins, 0.37f);
@@ -438,7 +439,7 @@ void kernels_match_baseline() {
         outputs[pass] = run(engine, in, 9000 + 128 + tail(c), {128, 77, 300});
     }
     detail::force_baseline_kernels(false);
-    require(outputs[0] == outputs[1], "engine output depends on the kernel set");
+    require(same(outputs[0], outputs[1]), "engine output depends on the kernel set");
 }
 } // namespace
 int main() {

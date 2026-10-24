@@ -6,7 +6,8 @@
 #include "kernels.inc"
 #undef CONVOLVER_KERNEL_NAMESPACE
 #undef CONVOLVER_KERNEL_NAME
-#if defined(CONVOLVER_AVX2_KERNELS) && (defined(__x86_64__) || defined(_M_X64))
+#if defined(CONVOLVER_AVX2_KERNELS) && (defined(__x86_64__) || defined(_M_X64)) &&                 \
+    !defined(_M_ARM64EC)
 #define CONVOLVER_USE_AVX2_KERNELS 1
 #if defined(_MSC_VER)
 #include <immintrin.h>

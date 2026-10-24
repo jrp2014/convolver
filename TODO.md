@@ -465,8 +465,9 @@ so the preset file path is not needed).
   taps, stereo and 2→6 crossovers) with Clang and GCC, keeping shipped binaries
   portable and the oracle, bit-identical render and NaN tests passing. Findings
   and the run-time AVX2 kernels: [FFT guide](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
-  Open: jrp's choice between bit-identical kernels and FMA kernels (about 5%
-  faster with Ooura, output then differs between CPUs in the last bits).
+  Open: jrp's choice between bit-identical kernels and FMA kernels (7–10%
+  faster with Ooura, no faster with FFTW; output then differs between CPUs in
+  the last bits).
 
 ## Documented limitations
 

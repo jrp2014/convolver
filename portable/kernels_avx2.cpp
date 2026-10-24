@@ -5,7 +5,7 @@
 // It includes nothing with inline functions (kernels.hpp only declares); see
 // kernels.inc.
 #include "kernels.hpp"
-#if defined(__x86_64__) || defined(_M_X64)
+#if (defined(__x86_64__) || defined(_M_X64)) && !defined(_M_ARM64EC)
 #define CONVOLVER_KERNEL_NAMESPACE avx2
 #define CONVOLVER_KERNEL_NAME "AVX2"
 #include "kernels.inc"

@@ -4,6 +4,16 @@
 // a newer instruction set could be chosen by the linker for every caller.
 // Include kernels.hpp and define CONVOLVER_KERNEL_NAMESPACE and
 // CONVOLVER_KERNEL_NAME (a string literal) before including it.
+// With AVX2 kernels every set must round exactly as the baseline does, so nothing
+// may be contracted into fused multiply-add, whatever instruction set or flags the
+// file is compiled with. GCC gets -ffp-contract=off from CMakeLists.txt.
+#if defined(CONVOLVER_AVX2_KERNELS) && (defined(__x86_64__) || defined(_M_X64)) && !defined(_M_ARM64EC)
+#if defined(__clang__)
+#pragma STDC FP_CONTRACT OFF
+#elif defined(_MSC_VER)
+#pragma fp_contract(off)
+#endif
+#endif
 namespace convolver::detail::CONVOLVER_KERNEL_NAMESPACE {
 #if defined(_MSC_VER)
 #define CONVOLVER_RESTRICT __restrict

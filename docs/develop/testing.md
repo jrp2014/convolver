@@ -52,8 +52,9 @@ ctest --test-dir build -N
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
   nonfinite data and a C++ heap-allocation guard during processing/reset. The
   oracle cases run with the processing kernels the CPU selects (AVX2 on most
-  x86-64 machines) and again with the baseline set, which must give
-  bit-identical kernel and engine output (PERF-4).
+  x86-64 machines) and again with the baseline set; a separate case requires
+  the two sets to give bit-identical results, function by function and through
+  a whole engine (PERF-4).
 - `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
