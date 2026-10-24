@@ -9,13 +9,13 @@ delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 **In short:** the next milestone is end-to-end testing: an independent user
 running an exact preview package from the 0.5 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
-open edge-case fixes, run jrp's host smoke tests (HOST-1, AU-4), put the CLI
+open fixes, run jrp's host smoke tests (HOST-1), put the CLI
 and the journey presets in the package while writing the user journeys
 (PLUG-5, REL-2), then the independent walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
 blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
 decided. Other open themes are the later LV2 and AU previews, diagnostics
-(DIAG), files kept from releases (COMPAT), other configuration readers (CFG),
+(DIAG), documentation checks (DOC), files kept from releases (COMPAT), other configuration readers (CFG),
 large files and resampling (IO), no-clip headroom (GAIN), stress testing
 (ROBUST), a parked FFmpeg filter (FFMPEG), and FFT or performance work only
 where measurements justify it (FFT, PERF). The
@@ -37,8 +37,8 @@ regressions take priority whenever discovered. Claim an item with a draft pull
 request before starting so independent tasks do not duplicate changes.
 
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
-22 October 2026): end-to-end testing. An independent user installs and uses an
-exact preview package, following only the documentation. "Ready" means the
+22 October 2026): an independent user installs and uses an exact preview
+package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
 cut from the 0.5 series and holds the VST3 plug-in, the `convolver` CLI and the
 preset tool; LV2 and AU join later previews once their own journeys are
@@ -52,19 +52,19 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the edge-case fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open); the oracle error report (PR #74, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3) and **AU-4** (GarageBand, Audio Unit built from source), on jrp's Mac, from the latest candidate | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source) at the same sitting if convenient | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 gates the first preview; AU-4 does not, since that preview holds no Audio Unit. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | 4. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
-| 5. Later previews | **LV2-3** to **LV2-5**, **AU-3** and **AU-5**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| 5. Later previews | **LV2-3** to **LV2-5**, **AU-3** to **AU-5**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in PR #73, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
-| Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 and VST3-9 are edge cases a user can meet (memory running out after a failed load; a pull-down host rate). HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
-| On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2**, **CFG-2**, **IO-2**, **IO-5** | Define the user need or measured bottleneck and acceptance tests first. |
+| On request or measured need | **HOST-2** (CLAP, editor), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
-DOC-2 automation and the CFG-1, IO-1, GAIN-1 and ROBUST-1/2 items remain open
-supporting work; take them up when a reproducible defect or the milestone
+DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
+remain open supporting work; take them up when a reproducible defect or the milestone
 needs them. This table owns the current ordering; the dated
 [21 October review order](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#recommended-order)
 is superseded.
@@ -541,6 +541,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   formatting and analysis use the latest stable packaged Clang in CI and cloud
   sessions; local installation on jrp's Mac is deferred;
   [formatting and analysis](CONTRIBUTING.md#formatting-and-analysis).
+- [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
+  2026, PR #74: `native.engine` prints the worst error relative to the output
+  peak for each group of cases and kernel set, with B, and where the largest
+  absolute error came from, so a new, louder test (PERF-5's
+  `history_validity`, peak 7.6) no longer looks like a tenfold loss of
+  accuracy; [native tests](docs/develop/testing.md#native-production-tests).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

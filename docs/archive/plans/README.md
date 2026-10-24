@@ -4,7 +4,7 @@
 These design and implementation plans are finished: the work they describe is on
 `main`, or, for a plan marked superseded, what it left open is now owned by a
 maintained guide and TODO. The first ones were moved here from `docs/superpowers/` (later `docs/plans/`, now `docs/project/plans/`) on 21 October 2026;
-later plans move here when their work is merged. All are kept
+later plans move here when their work is merged or they are superseded. All are kept
 as records of what was intended, decided and measured at the time. Use the
 [current documentation](../../README.md) for how Convolver behaves now.
 
@@ -19,7 +19,7 @@ tracked in [TODO](../../../TODO.md).
 | [Host lifecycle and VST3](2026-10-18-vst3-host-lifecycle.md), with its [design](2026-10-18-vst3-host-design.md) | `HostProcessor`, versioned state codec, VST3 adapter and preset tool, SDK validator in CI | `2f44142`, `5bcbef3` | [How the plug-ins behave](../../use/plugins.md) |
 | [Configuration interoperability](2026-10-18-configuration-interoperability.md) | Compatibility corpus, shared parser, `--inspect`/`--validate`, `portable-paths` profile, limit tests and fuzzing, `--speaker-map` | PR #5 (`c1304c5`, 0.3.0), fixes in 0.3.1 | [Other programs](../../use/other-programs.md) |
 | [Documentation by reader](2026-10-23-documentation-by-reader.md) | Maintained pages sorted into `docs/use/`, `docs/develop/` and `docs/project/`; status page, decisions log, shorter front pages and the reader-folder check | PRs #47, #51, #52, #53 (last merged in `41d1d3a`) | [Documentation guide](../../develop/documentation.md) |
-| [Plug-in distribution](2026-10-18-plugin-distribution.md), with its [design](2026-10-18-plugin-distribution-design.md) (superseded) | Pinned dependencies and corresponding source, staging, unsigned installers, artifact verification, promotion gates and the candidate workflow for unsigned previews; signing, clean installation, host qualification and publication moved to the guides and TODO (REL-1, PLUG-5, HOST-1) | `codex/plugin-distribution`, merged 21 October 2026; extended to the preset tool and Equalizer APO export in PR #38 | [Releasing](../../develop/releasing.md), [host testing](../../develop/host-testing.md) |
+| [Plug-in distribution](2026-10-18-plugin-distribution.md), with its [design](2026-10-18-plugin-distribution-design.md) (superseded) | Pinned dependencies and corresponding source, staging, unsigned installers, artifact verification, promotion gates and the candidate workflow for unsigned previews; signing, clean installation, host qualification and publication moved to the guides and TODO (REL-1, PLUG-5, HOST-1) | PR #19 (`378d215`), 21 October 2026; extended to the preset tool and Equalizer APO export in PR #38 | [Releasing](../../develop/releasing.md), [host testing](../../develop/host-testing.md) |
 
 ## How completion was checked
 

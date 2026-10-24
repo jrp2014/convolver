@@ -16,9 +16,9 @@ and LV2 plug-ins are implemented and tested automatically; no named host has
 been tested and no independent user has followed the instructions. The next
 milestone is end-to-end testing: an independent user installing and using an
 exact preview package, cut from the 0.5 series. Four things
-[still block it](#what-still-blocks-the-first-preview): the open edge-case
-fixes, jrp's host smoke tests, the CLI and journey presets in the package with
-the journeys written, and a tester for the walkthrough.
+[still block it](#what-still-blocks-the-first-preview): an open diagnostics
+fix, jrp's VST3 host smoke tests, the CLI and journey presets in the package
+with the journeys written, and a tester for the walkthrough.
 
 The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
@@ -29,7 +29,7 @@ commit above current. Dated reviews stay as they were written.
 
 Contents: [evidence levels](#evidence-levels) ·
 [what users can run now](#what-users-can-run-now) ·
-[defects found in reviews](#defects-found-in-jrps-reviews) ·
+[defects found in reviews](#defects-found-in-reviews-and-lifecycle-tests) ·
 [user journeys](#user-journeys-for-the-first-preview) ·
 [next milestone](#next-milestone-an-independent-user-runs-a-preview) ·
 [what still blocks it](#what-still-blocks-the-first-preview) ·
@@ -67,21 +67,21 @@ documentation alone.
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
-## Defects found in jrp's reviews
+## Defects found in reviews and lifecycle tests
 
-Each of jrp's reviews of a `main` version found defects that the tests had
-missed. Since the 0.4.30 review, tests take their expectations from the
-shared contract and each format's specification rather than from the
-implementation (PLUG-7).
+jrp's reviews of `main` versions, and the PLUG-7 lifecycle sequences written
+after them, found defects that the earlier tests had missed. Since the 0.4.30
+review, tests take their expectations from the shared contract and each
+format's specification rather than from the implementation.
 
-| Review | What was wrong | Fixed in |
+| Found by | What was wrong | Fixed in |
 | --- | --- | --- |
-| 0.4.19 | A reset during a filter transition delayed the next filter | [PR #40](https://github.com/jrp2014/convolver/pull/40), 23 October 2026 |
-| 0.4.30 | An LV2 first load refused without a worker played unfiltered audio until the next control call; restoring an empty LV2 state map did not reset the plug-in; running out of memory in `HostFilter::load` could leave one filter playing while another was saved | [PR #55](https://github.com/jrp2014/convolver/pull/55) |
-| PLUG-7 sequences | A filter refused in the same LV2 cycle as an empty-state restore let the input play; VST3 and AU reported a load made while inactive as failed after keeping it, when memory ran out while working out its tail | [PR #58](https://github.com/jrp2014/convolver/pull/58) |
-| 0.4.37 | A sound file with an unlisted header (Sun/NeXT AU) named `.pcm` or `.raw` was read as raw samples; syntax-only inspection opened filters, so a named pipe blocked it; a native test was missing from the `check` target and the sanitizer flags. Processing faults were not shown, and the log did not say what ran | [PR #66](https://github.com/jrp2014/convolver/pull/66), [PR #68](https://github.com/jrp2014/convolver/pull/68) |
-| 0.4.43 | Kept debugging symbols were checked by name only; `Quantizer` could run out of memory where the caller could not see it; a non-finite attenuation estimate was accepted | [PR #72](https://github.com/jrp2014/convolver/pull/72) |
-| 0.4.43 | Faults counted while a replacement was prepared were shown as Fault against the new filter; Fault could overwrite Load failed; the user guides did not yet explain Status and the log | [PR #73](https://github.com/jrp2014/convolver/pull/73), open |
+| jrp, 0.4.19 | A reset during a filter transition delayed the next filter | [PR #40](https://github.com/jrp2014/convolver/pull/40), 23 October 2026 |
+| jrp, 0.4.30 | An LV2 first load refused without a worker played unfiltered audio until the next control call; restoring an empty LV2 state map did not reset the plug-in; running out of memory in `HostFilter::load` could leave one filter playing while another was saved | [PR #55](https://github.com/jrp2014/convolver/pull/55) |
+| The PLUG-7 sequences | A filter refused in the same LV2 cycle as an empty-state restore let the input play; VST3 and AU reported a load made while inactive as failed after keeping it, when memory ran out while working out its tail | [PR #58](https://github.com/jrp2014/convolver/pull/58) |
+| jrp, 0.4.37 | A sound file with an unlisted header (Sun/NeXT AU) named `.pcm` or `.raw` was read as raw samples; syntax-only inspection opened filters, so a named pipe blocked it; a native test was missing from the `check` target and the sanitizer flags. Processing faults were not shown, and the log did not say what ran | [PR #66](https://github.com/jrp2014/convolver/pull/66), [PR #68](https://github.com/jrp2014/convolver/pull/68) |
+| jrp, 0.4.43 | Kept debugging symbols were checked by name only; `Quantizer` could run out of memory where the caller could not see it; a non-finite attenuation estimate was accepted | [PR #72](https://github.com/jrp2014/convolver/pull/72) |
+| jrp, 0.4.43 | Faults counted while a replacement was prepared were shown as Fault against the new filter; Fault could overwrite Load failed; the user guides did not yet explain Status and the log | [PR #73](https://github.com/jrp2014/convolver/pull/73), open |
 
 ## User journeys for the first preview
 
@@ -121,7 +121,7 @@ The first preview is cut from a 0.5.x tag.
 | Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Done, 23 October 2026 |
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | Done ([PR #58](https://github.com/jrp2014/convolver/pull/58)); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | Symbol check and low-memory fixes merged ([PR #72](https://github.com/jrp2014/convolver/pull/72)); fault state after reloads, Load failed before Fault and the guides in [PR #73](https://github.com/jrp2014/convolver/pull/73), open |
-| Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 (and AU-4 for the Audio Unit) | Not run. Steps written for REAPER, Audacity and GarageBand on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
+| Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)); GarageBand's Audio Unit test (AU-4) can run at the same time but does not gate this preview, which holds no Audio Unit |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
@@ -139,12 +139,13 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
 24 October 2026:
 
 1. **Open fixes.** [PR #73](https://github.com/jrp2014/convolver/pull/73)
-   (DIAG-1) is in review. Merge it before the host tests, so a Fault cannot hide
+   (DIAG-1) is a draft under review. Merge it before the host tests, so a Fault cannot hide
    why a preset was refused and the guides the tester reads explain Status and
    the log. Then a "Plug-in distribution candidates" run must pass on `main`.
-2. **jrp's time on his Mac** for the HOST-1 and AU-4 smoke tests. They need
-   only the latest candidate artifact, not the CLI, so they can start once the
-   fixes are merged.
+2. **jrp's time on his Mac** for the HOST-1 smoke tests in REAPER and
+   Audacity. They need only the latest candidate artifact, not the CLI, so they
+   can start once the fix is merged. GarageBand's Audio Unit test (AU-4) can
+   run at the same sitting but does not gate this preview.
 3. **Unclaimed work:** PLUG-5's first-preview contents (the `convolver` CLI and
    presets made from the stereo and 2→6 first-use filters, in the package) and
    the REL-2 journeys. No pull request is open for either.

@@ -114,7 +114,9 @@ checklist says so:
   unless you ran it, and keep results you ran apart from what CI is
   configured to run.
 - **DSP changes:** the direct double-precision oracle tests in
-  `tests/native/engine_tests.cpp` pass; report the worst error.
+  `tests/native/engine_tests.cpp` pass; report the worst error relative to
+  the output peak, which `native.engine` prints with the group of cases, the
+  kernel set and B it came from.
 - **Plug-in changes:** the format's validator and the PLUG-2 comparisons pass,
   and pluginval where it applies ([pluginval](testing.md#pluginval)).
 - **Checks:** `pre-commit run --all-files` (formatting included) and
@@ -124,8 +126,9 @@ checklist says so:
   the [index](../README.md); user-visible changes are in the
   [CHANGELOG](../../CHANGELOG.md).
 - **TODO:** the item is ticked with its evidence, or has a `Progress` line for
-  what remains. A plan that is now fully implemented moves to
-  [`archive/plans/`](../archive/plans/README.md).
+  what remains. A plan that is now fully implemented, or superseded,
+  moves to [`archive/plans/`](../archive/plans/README.md)
+  ([rule](documentation.md#current-claims-and-dated-evidence)).
 - **Reviewed:** an [independent review](#independent-review) has been done and
   its findings answered in the pull request.
 

@@ -110,7 +110,8 @@ jrp, and has not been done yet:
    Never replace or edit an asset after publication; a fix gets a new version.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
-(ad-hoc signature; users remove the quarantine) and on Windows (SmartScreen
+(ad-hoc signature, because Apple silicon will not load code with no signature
+at all; users remove the quarantine) and on Windows (SmartScreen
 warns), as jrp decided.
 
 ## After publishing: make it findable
