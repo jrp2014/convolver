@@ -2,8 +2,10 @@
 #include "kernels.hpp"
 #include <atomic>
 #define CONVOLVER_KERNEL_NAMESPACE baseline
+#define CONVOLVER_KERNEL_NAME "baseline"
 #include "kernels.inc"
 #undef CONVOLVER_KERNEL_NAMESPACE
+#undef CONVOLVER_KERNEL_NAME
 #if defined(CONVOLVER_AVX2_KERNELS) && (defined(__x86_64__) || defined(_M_X64))
 #define CONVOLVER_USE_AVX2_KERNELS 1
 #if defined(_MSC_VER)
@@ -18,12 +20,7 @@ std::atomic<bool> baseline_forced{false};
 }
 #if defined(CONVOLVER_USE_AVX2_KERNELS)
 namespace avx2 {
-void deinterleave(const float*, float*, std::size_t, float) noexcept;
-void interleave(const float*, const float*, float*, std::size_t) noexcept;
-void multiply(float*, float*, const float*, const float*, std::size_t) noexcept;
-void multiply_accumulate(float*, float*, const float*, const float*, std::size_t) noexcept;
-void accumulate(float*, float*, const float*, std::size_t, std::size_t, const float*, std::size_t,
-                std::size_t) noexcept;
+const Kernels& kernel_set() noexcept; // kernels_avx2.cpp
 } // namespace avx2
 namespace {
 // AVX2 is usable only if the CPU has it and the operating system saves the
@@ -49,18 +46,13 @@ bool cpu_has_avx2() noexcept {
 } // namespace
 #endif
 const Kernels& baseline_kernels() noexcept {
-    static constexpr Kernels set{baseline::deinterleave, baseline::interleave,
-                                 baseline::multiply,     baseline::multiply_accumulate,
-                                 baseline::accumulate,   "baseline"};
-    return set;
+    return baseline::kernel_set();
 }
 const Kernels& kernels() noexcept {
     if (baseline_forced.load(std::memory_order_relaxed))
         return baseline_kernels();
 #if defined(CONVOLVER_USE_AVX2_KERNELS)
-    static constexpr Kernels avx2_set{avx2::deinterleave,        avx2::interleave, avx2::multiply,
-                                      avx2::multiply_accumulate, avx2::accumulate, "AVX2"};
-    static const Kernels& chosen = cpu_has_avx2() ? avx2_set : baseline_kernels();
+    static const Kernels& chosen = cpu_has_avx2() ? avx2::kernel_set() : baseline_kernels();
     return chosen;
 #else
     return baseline_kernels();

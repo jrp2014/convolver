@@ -2,7 +2,8 @@
 // Kernel bodies, compiled once per instruction set (see kernels.hpp). This file
 // must not use inline functions from headers: an out-of-line copy compiled for
 // a newer instruction set could be chosen by the linker for every caller.
-// Define CONVOLVER_KERNEL_NAMESPACE before including it.
+// Include kernels.hpp and define CONVOLVER_KERNEL_NAMESPACE and
+// CONVOLVER_KERNEL_NAME (a string literal) before including it.
 namespace convolver::detail::CONVOLVER_KERNEL_NAMESPACE {
 #if defined(_MSC_VER)
 #define CONVOLVER_RESTRICT __restrict
@@ -60,4 +61,11 @@ void accumulate(float* CONVOLVER_RESTRICT re, float* CONVOLVER_RESTRICT im,
     }
 }
 #undef CONVOLVER_RESTRICT
+// The set, for kernels.cpp. Declaring the functions there instead would not link
+// with MSVC, which puts __restrict into their mangled names.
+const Kernels& kernel_set() noexcept {
+    static constexpr Kernels set{deinterleave, interleave, multiply, multiply_accumulate, accumulate,
+                                 CONVOLVER_KERNEL_NAME};
+    return set;
+}
 } // namespace convolver::detail::CONVOLVER_KERNEL_NAMESPACE
