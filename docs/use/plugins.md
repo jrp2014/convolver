@@ -229,6 +229,9 @@ is installed at once.
 - The Audio Unit takes 32-bit float audio at a whole-number sample rate, the
   same on input and output. It marks its output silent only once the tail has
   died away.
+- The VST3 marks each output channel silent in any call that leaves it
+  silent, so hosts can skip work after it. A filter's tail is never cut short:
+  silent input does not mark the output while the tail is still sounding.
 
 ## LV2 channel layouts
 

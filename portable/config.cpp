@@ -29,9 +29,10 @@ void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLo
     throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
 }
 // Decodes a whole file into the channels whose target is set (one target per
-// file channel). Every decoded sample counts against budget, used or not.
-void read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& targets,
-                   std::size_t& budget, const SourceLocation& where) {
+// file channel) and returns its frame count. Every decoded sample counts
+// against budget, used or not.
+std::size_t read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& targets,
+                          std::size_t& budget, const SourceLocation& where) {
     const auto channels = reader.info().channels;
     // Reject oversized files before allocating for their samples.
     if (const auto declared = reader.declared_frames()) {
@@ -57,6 +58,7 @@ void read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& 
     reader.close();
     if (total == 0)
         throw ConfigurationError("empty-ir", where, "empty impulse response");
+    return total;
 }
 std::filesystem::path utf8_path(const std::string& text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
@@ -370,14 +372,15 @@ bool raw_filter(const std::filesystem::path& resolved) {
 
 namespace {
 // A filter file decoded once for every path of one configuration that names it
-// (PERF-6). Channels are kept only while a later path still needs them.
+// (PERF-6). Its channels are handed to the paths only after every path has
+// passed its checks, so nothing is copied for a configuration that fails.
 struct DecodedFile {
     AudioInfo info{};
     std::optional<std::size_t> declared;
     std::size_t frames = 0;
     bool raw = false;
     std::vector<std::vector<float>> channels; // Empty for channels no path names.
-    std::vector<std::size_t> uses;            // Paths still to take each channel.
+    std::vector<std::size_t> uses;            // Paths that take each channel.
 };
 } // namespace
 
@@ -395,6 +398,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         }
     }
     std::map<std::filesystem::path, DecodedFile> files;
+    std::vector<DecodedFile*> sources(parsed.paths.size()); // Each path's file.
     for (std::size_t i = 0; i < parsed.paths.size(); ++i) {
         const auto& path = parsed.paths[i];
         const auto resolved = resolve_reference(doc.source, path.ir);
@@ -408,10 +412,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                 file.frames > (max_decoded_samples - budget) / channels)
                 decoded_limit(path.ir.location);
             budget += file.frames * channels;
-            auto& samples = file.channels[path.ir_channel];
-            // The last path to need a channel takes its samples.
-            cfg.paths[i].impulse =
-                --file.uses[path.ir_channel] ? samples : std::exchange(samples, {});
+            sources[i] = &file;
             result.push_back({resolved, file.info, file.frames,
                               file.raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
             continue;
@@ -474,24 +475,31 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         for (const auto j : named[resolved])
             if (parsed.paths[j].ir_channel < info.channels)
                 ++file.uses[parsed.paths[j].ir_channel];
+        file.uses[path.ir_channel] = std::max<std::size_t>(file.uses[path.ir_channel], 1);
         std::vector<std::vector<float>*> targets(info.channels);
         for (std::size_t c = 0; c < info.channels; ++c)
             if (file.uses[c])
                 targets[c] = &file.channels[c];
         try {
-            read_channels(*ir, targets, budget, path.ir.location);
+            file.frames = read_channels(*ir, targets, budget, path.ir.location);
         } catch (const ConfigurationError&) {
             throw;
         } catch (const std::runtime_error& e) {
             throw ConfigurationError("damaged-asset", path.ir.location,
                                      "filter '" + path.ir.spelling + "': " + e.what());
         }
-        file.frames = file.channels[path.ir_channel].size();
-        auto& samples = file.channels[path.ir_channel];
-        cfg.paths[i].impulse = --file.uses[path.ir_channel] ? samples : std::exchange(samples, {});
         result.push_back({resolved, info, file.frames,
                           raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
-        files.emplace(resolved, std::move(file));
+        sources[i] = &files.emplace(resolved, std::move(file)).first->second;
+    }
+    // Every path passed: copy each channel to its paths, the last taking it.
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        auto& file = *sources[i];
+        const auto channel = parsed.paths[i].ir_channel;
+        auto& samples = file.channels[channel];
+        cfg.paths[i].impulse = file.uses[channel] > 1 ? samples : std::exchange(samples, {});
+        if (file.uses[channel])
+            --file.uses[channel];
     }
     return result;
 }

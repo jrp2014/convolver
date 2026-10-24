@@ -348,8 +348,9 @@ How each adapter meets the contract where its format differs:
   [speaker check](../use/plugins.md#channels) notice (`HostFilter::notice()`). The adapter handles
   variable block sizes, in-place host buffers, calls with no audio and inactive
   channels; it reads input buffers even when the host flags them silent, and
-  flags an output channel silent exactly when a call left it all zero, so only
-  once the tail and latency have drained (VST3-10). `getTailSamples()` is the filter's
+  flags an output channel silent exactly when a call left it all zero (VST3-10):
+  a tail that is still sounding is never flagged, while the latency, an output
+  no path feeds and drained output are. `getTailSamples()` is the filter's
   tail plus the 256-sample latency, measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property

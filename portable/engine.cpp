@@ -148,7 +148,10 @@ struct Engine::Impl {
         // The partitions beyond them would meet the silence before the first
         // block, so a path multiplies only the valid ones. The products skipped
         // are zeros, and the output sum discards the sign of a zero, so the
-        // output is bit-identical to visiting every partition (PERF-5).
+        // output is bit-identical to visiting every partition (PERF-5). That
+        // assumes finite filter spectra: with an infinite one (a finite IR
+        // whose transform overflows), 0 x inf would have made the first blocks
+        // NaN; now the NaN comes when audio reaches that partition.
         std::size_t valid = 0;
         std::vector<float> history;
     };

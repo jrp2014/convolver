@@ -589,5 +589,5 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   includes the latency, input silence flags not trusted, Bypass text converts
   back, controller state calls succeed; [adapter contract](docs/develop/plugin-contract.md).
 - [x] **VST3-10 — Mark silent output.** 24 October 2026, PR #70: an output
-  channel is flagged silent exactly when a call left it all zero, so once the
-  tail and latency have drained; [format notes](docs/develop/plugin-contract.md#format-notes).
+  channel is flagged silent exactly when a call left it all zero, so a tail
+  that is still sounding is never flagged; [format notes](docs/develop/plugin-contract.md#format-notes).

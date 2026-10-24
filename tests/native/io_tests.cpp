@@ -980,7 +980,7 @@ void shared_filter_files(const fs::path& dir) {
                                   "three.wav\n2\n0\n0\n"
                                   "other.wav\n0\n0\n1\n"
                                   "three.wav\n0\n0\n2\n"
-                                  "./three.wav\n2\n0\n3\n");
+                                  "three.wav\n2\n0\n3\n");
     const auto shared = load_configuration(dir / "shared.cfg");
     const std::vector<std::vector<float>> expected{
         {20, 21, 22, 23, 24}, {.5f, .25f}, {0, 1, 2, 3, 4}, {20, 21, 22, 23, 24}};

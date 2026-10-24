@@ -724,7 +724,11 @@ long enough for the history to fill again; ns/frame is their average.
 | replace | 256 | 512 | 6001 | 3014 | 1.99× | 12470 | 4983 |
 
 - **Steady processing is unchanged**, as expected: PERF-5 skips only
-  partitions that would meet the silence before the first block.
+  partitions that would meet the silence before the first block, so once the
+  history is full the only new work is one `min`. Its 99.9th percentiles
+  varied between rounds of the same build by up to 1.6 times (2.1–2.9 ms
+  before and 2.3–3.7 ms after at B = 256 with 64-frame callbacks), so their
+  differences in the table are this VM's variance.
 - **The average over the refill about halves**, because the first blocks
   after a start, reset or replacement visit few partitions and the last visit
   all of them. The slowest callbacks fall less, since the end of the refill

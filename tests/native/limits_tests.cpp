@@ -247,6 +247,17 @@ void run(const fs::path& dir) {
                          "twice.cfg:8:1: decoded impulse data exceeds 64 Mi samples"),
                 "a file named twice is charged twice");
         fs::remove(dir / "half.wav");
+        // Three references to a file of a third of the limit: the second fits
+        // in what the first decode left, so only charging each reference
+        // rejects the third, as the loader did when it decoded per reference.
+        silent_u8_wave(dir / "third.wav", max_decoded_samples / 3 + 3); // Even: no pad byte.
+        text_file(dir / "thirds.cfg", "48000 3 3 0\n0 0 0\n0 0 0\n"
+                                      "third.wav\n0\n0\n0\nthird.wav\n0\n1\n1\n"
+                                      "third.wav\n0\n2\n2\n");
+        require(contains(rejection([&] { load_configuration(dir / "thirds.cfg"); }, "thirds.cfg"),
+                         "thirds.cfg:12:1: decoded impulse data exceeds 64 Mi samples"),
+                "every reference to a shared file is charged");
+        fs::remove(dir / "third.wav");
     }
     // At most 256 diagnostics, then one truncation marker.
     {

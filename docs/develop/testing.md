@@ -425,8 +425,8 @@ is in [how the plug-ins behave](../use/plugins.md).
 
 Tests cover direct numerical results, planar and in-place float and double
 buffers, callback sizes crossing partition boundaries, silence and tails,
-output silence flags (set exactly when a channel is all zero, so not before the
-tail has drained; VST3-10), bypass automation, reset, concurrent replacement, C++ allocation and
+output silence flags with 32- and 64-bit buffers (set exactly when a call left
+a channel all zero, so never during a tail; VST3-10), bypass automation, reset, concurrent replacement, C++ allocation and
 deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2

@@ -15,7 +15,8 @@ Until 1.0 the C++ API may change between minor versions.
 - Cheaper startup, reset and filter replacement (PERF-5): until the input
   history has filled, the engine multiplies only the filter partitions that
   can meet audio, and a reset marks the history empty instead of clearing it.
-  Output is bit-identical. With 65,536-tap filters in a 6×6 matrix and
+  Output is bit-identical (for filters whose spectra are finite, which is
+  every filter that can produce finite output). With 65,536-tap filters in a 6×6 matrix and
   64-frame host calls, the calls after a start, reset or replacement cost
   about half as much on average while the history refills, and a reset itself
   takes microseconds instead of a time that grew with the filter
@@ -27,9 +28,10 @@ Until 1.0 the C++ API may change between minor versions.
   decodes the file once instead of once per path. Diagnostics and limits are
   unchanged.
 
-- The VST3 marks an output channel silent when it is, once the filter's tail
-  and the latency have passed (VST3-10), so hosts that honour the flags can
-  skip work after it. Bypass keeps the convolution running, as before.
+- The VST3 marks an output channel silent in each call that leaves it all
+  zero (VST3-10), so hosts that honour the flags can skip work after it. A
+  filter's tail that is still sounding is never marked, however silent the
+  input. Bypass keeps the convolution running, as before.
 
 - Faster processing on x86-64 (PERF-4): the partition multiply-accumulate,
   which takes 85-99% of the time for room-correction filters, is also compiled
