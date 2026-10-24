@@ -1,0 +1,24 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Question
+description: Ask how to do something with Convolver, or whether it can.
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        [Using Convolver](https://github.com/jrp2014/convolver/blob/main/docs/use/README.md)
+        and [other programs](https://github.com/jrp2014/convolver/blob/main/docs/use/other-programs.md)
+        (Roon, JRiver, Audiolense and the old Windows Convolver) may already answer it.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to do, and what you have tried.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Your setup
+      description: Operating system, and the host or player if it matters.
