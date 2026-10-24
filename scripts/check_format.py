@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Check (default) or apply (--fix) clang-format 18 on the portable C++ sources.
+"""Check (default) or apply (--fix) the latest stable clang-format on the portable C++ sources.
 
 Files are found by location, so a new adapter under plugins/ or a new test
 folder is covered without editing a list. Historical code, vendored code and
 the regression harnesses that slice historical source are excluded.
 
-pre-commit runs this with --fix and a pinned clang-format (see
+pre-commit runs this with --fix and the latest stable clang-format package (see
 .pre-commit-config.yaml), so `pre-commit run` and the lint workflow own the
 formatting check. Python rather than shell so the hook also runs on Windows.
 
@@ -21,7 +21,6 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-MAJOR = '18'
 PATHSPECS = (
     'include/*.hpp', 'include/*.h',
     'portable/*.hpp', 'portable/*.cpp', 'portable/*.h',
@@ -30,29 +29,27 @@ PATHSPECS = (
     ':!:portable/third_party/', ':!:tests/regression/',
 )
 INSTALL_HINT = """\
-Install it with 'python3 -m pip install clang-format==18.1.8' (any OS),
-'apt-get install clang-format-18' (Ubuntu) or 'brew install llvm@18' (macOS),
-or run 'pre-commit run clang-format --all-files', which installs it for you.
+Install the latest stable package with 'python3 -m pip install --upgrade clang-format',
+or run 'pre-commit clean' then 'pre-commit run clang-format --all-files'.
 Set CLANG_FORMAT to the binary if it is somewhere else."""
 
 
 def major_version(binary):
-    """Return the major version a clang-format binary reports, or None."""
+    """Return the major version of a stable clang-format binary, or None."""
     try:
         out = subprocess.run([binary, '--version'], capture_output=True, text=True,
                              check=False).stdout
     except OSError:
         return None
-    match = re.search(r'clang-format version (\d+)\.', out)
+    match = re.search(r'clang-format version (\d+)\.\d+\.\d+(?=\s|$)', out)
     return match.group(1) if match else None
 
 
 def find_clang_format():
-    """Pick clang-format 18, or exit with advice.
+    """Use an explicit stable tool or the hook environment's installed release.
 
-    CLANG_FORMAT wins when set. Otherwise the copy installed next to this
-    Python (pre-commit's pinned wheel) comes first, so the pin is what runs
-    even when a system clang-format-18 of another patch release is on PATH.
+    Tool installation owns upgrades. The hook installs the latest stable package;
+    CI keys its environment cache by that release. Discovery needs no network.
     """
     explicit = os.environ.get('CLANG_FORMAT')
     if explicit:
@@ -61,20 +58,19 @@ def find_clang_format():
         here = Path(sys.executable).parent
         candidates = [str(here / name) for name in ('clang-format', 'clang-format.exe')
                       if (here / name).is_file()]
-        candidates += [found for name in ('clang-format-18', 'clang-format')
+        candidates += [found for name in ('clang-format',)
                        if (found := shutil.which(name))]
     seen = []
     for binary in candidates:
         version = major_version(binary)
-        if version == MAJOR:
+        if version is not None:
             return binary
         seen.append(f'  {binary}: ' + (f'clang-format {version}' if version
                                          else 'could not be run, or is not clang-format'))
     if seen:
-        sys.exit('clang-format 18 is needed; other major versions lay out the same code\n'
-                 'differently, so CI would disagree. Found:\n' + '\n'.join(seen) + '\n'
+        sys.exit('A stable clang-format release is needed. Found:\n' + '\n'.join(seen) + '\n'
                  + INSTALL_HINT)
-    sys.exit('clang-format 18 was not found.\n' + INSTALL_HINT)
+    sys.exit('A stable clang-format was not found.\n' + INSTALL_HINT)
 
 
 def sources():
@@ -101,6 +97,7 @@ def main():
     args = parser.parse_args()
 
     binary = find_clang_format()
+    subprocess.run([binary, '--version'], check=True)
     files = sources()
     if not files:
         sys.exit('No C++ sources found')

@@ -489,6 +489,13 @@ so the preset file path is not needed).
   live replacement and configuration loading; its first results are in
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
 
+## Developer tooling
+
+- [ ] **CI-3 — Latest stable Clang tools.** Replace the version-18 formatting
+  and analysis pins with the latest stable packaged releases. Refresh CI caches
+  when the formatter release changes, keep local and cloud instructions aligned,
+  and validate formatting and analysis in CI. Local installation is deferred.
+
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
