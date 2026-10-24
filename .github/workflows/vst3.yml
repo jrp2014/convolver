@@ -161,4 +161,19 @@ jobs:
       - name: Build actual plugin, preset tool and SDK validator
         run: cmake --build build-vst3 --config Release --parallel 2
       - name: VST3 validator, pluginval and the VST3 tests
-        run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2 ${{ matrix.tests }}
+        run: >-
+          ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
+          --parallel 2 ${{ matrix.tests }}
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build-vst3
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore

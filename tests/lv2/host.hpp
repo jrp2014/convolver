@@ -185,6 +185,8 @@ class Plugin {
     // round to them. Returns how many it ran.
     std::size_t run_deferred_work(std::size_t count = ~std::size_t(0));
     std::size_t queued_work();
+    // Deferred worker: forgets queued requests, as hosts may on deactivation.
+    void drop_queued_work();
     // Pauses the next work() call to reach `point`, through the plug-in's
     // test hook; wait_until_paused() returns once it has, resume() lets it go.
     void pause_at(lv2::WorkerPoint point);

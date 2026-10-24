@@ -7,6 +7,7 @@ set(CONVOLVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(CONVOLVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 include(cmake/ConvolverBuildVersion.cmake)
 include(cmake/ConvolverIdentities.cmake)
+include(cmake/ConvolverDebugSymbols.cmake)
 add_custom_target(convolver_build_version
     COMMAND "${CMAKE_COMMAND}" "-DCONVOLVER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DCONVOLVER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"

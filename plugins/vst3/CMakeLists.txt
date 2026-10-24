@@ -48,7 +48,16 @@ set(public_sdk_SOURCE_DIR "${SDK_ROOT}/public.sdk")
 set(pluginterfaces_SOURCE_DIR "${SDK_ROOT}/pluginterfaces")
 smtg_detect_xcode_version()
 # SDK entry-point/package helpers are loaded by its project.
+# CONVOLVER_DEBUG_SYMBOLS on Linux: the SDK's Release strip keeps the symbols
+# (cmake/ConvolverDebugSymbols.cmake).
+if(CONVOLVER_SDK_STRIP)
+    set(convolver_strip "${CMAKE_STRIP}")
+    set(CMAKE_STRIP "${CONVOLVER_SDK_STRIP}")
+endif()
 smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST processor.cpp factory.cpp)
+if(CONVOLVER_SDK_STRIP)
+    set(CMAKE_STRIP "${convolver_strip}")
+endif()
 target_include_directories(convolver_vst3 PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
 target_link_libraries(convolver_vst3 PRIVATE Convolver::host sdk)
 add_dependencies(convolver_vst3 convolver_build_version)
@@ -196,6 +205,9 @@ if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
     endif()
 endif()
 
+# Preview candidates keep the plug-in's debugging symbols outside the bundle
+# (CONVOLVER_DEBUG_SYMBOLS), before the bundle is signed below.
+convolver_keep_symbols(convolver_vst3 SDK_STRIPPED)
 if(APPLE)
     # SDK 3.8.1 seals the bundle before moduleinfotool adds moduleinfo.json.
     # Seal the complete resources last, and verify without loading the bundle.

@@ -23,6 +23,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <lv2/atom/atom.h>
 #include <lv2/core/lv2.h>
 #include <lv2/log/log.h>
@@ -210,12 +211,13 @@ void bundle(host::World& world) {
                   lilv_port_is_a(p, port(lv2::status_port), output),
               uri + ": status is a control output");
         LilvScalePoints* points = lilv_port_get_scale_points(p, port(lv2::status_port));
-        check(points && lilv_scale_points_size(points) == 4, uri + ": four status labels");
+        check(points && lilv_scale_points_size(points) == 5, uri + ": five status labels");
         const std::pair<lv2::Status, std::string> labels[] = {
             {lv2::Status::running, "Running"},
             {lv2::Status::no_filter, "No filter"},
             {lv2::Status::load_failed, "Load failed"},
-            {lv2::Status::loading, "Loading"}};
+            {lv2::Status::loading, "Loading"},
+            {lv2::Status::fault, "Fault"}};
         for (const auto& [value, label] : labels) {
             bool found = false;
             LILV_FOREACH(scale_points, i, points) {
@@ -389,6 +391,64 @@ void status_and_log(host::World& world, const Fixture& f) {
     check(saved.type == chunk(world) && (saved.flags & LV2_STATE_IS_POD) &&
               (saved.flags & LV2_STATE_IS_PORTABLE),
           label + "saved as a portable plain chunk");
+
+    // DIAG-1, jrp's reproduction: extreme but finite input and filter values
+    // overflow the output. It is silenced, the status port shows Fault at
+    // once, and the worker explains in log:log; loading again clears it.
+    auto loud = a;
+    for (auto& path : loud.paths)
+        for (auto& v : path.impulse)
+            v = v ? std::numeric_limits<float>::max() / 4 : 0.f;
+    check(p->restore(state_of(loud), chunk(world)) == LV2_STATE_SUCCESS, label + "loud filter");
+    p->log.messages.clear();
+    std::vector<float> extreme(f.input.size());
+    for (std::size_t i = 0; i < extreme.size(); i += 7)
+        extreme[i] = std::numeric_limits<float>::max() / 4;
+    const auto overflowed = render(*p, extreme, 2000, 300);
+    check(
+        std::all_of(overflowed.begin(), overflowed.end(), [](float v) { return std::isfinite(v); }),
+        label + "overflowing output is silenced");
+    check(p->status == static_cast<float>(lv2::Status::fault), label + "overflow: status fault");
+    check(p->log.contains(LV2_LOG__Error, "too large to represent") &&
+              p->log.contains(LV2_LOG__Error, "Lower the level going into Convolver"),
+          label + "overflow: the worker explains in log:log");
+    check(!p->failure(), label + "overflow is not a load failure");
+    check(p->restore(state_of(a), chunk(world)) == LV2_STATE_SUCCESS, label + "load after fault");
+    p->run_empty();
+    check(p->status == static_cast<float>(lv2::Status::running), label + "a load clears Fault");
+    {
+        // A host whose worker gets round to requests late: however many runs
+        // fault, one fault report is queued; once it has run, clean runs
+        // queue nothing; a new fault reports again, also after a
+        // reactivation that dropped a queued report. (Invalid input, as the
+        // loud filter can overflow even on silence, depending on the FFT.)
+        host::Features late;
+        late.worker = host::Worker::deferred;
+        auto d = instance(world, a, late);
+        d->activate();
+        check(d->restore(state_of(a), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "deferred: filter");
+        std::vector<float> invalid(f.input.size());
+        for (std::size_t i = 0; i < invalid.size(); i += 301)
+            invalid[i] = std::numeric_limits<float>::quiet_NaN(); // One per run.
+        const std::vector<float> clean(f.input.size());
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->status == static_cast<float>(lv2::Status::fault) && d->queued_work() == 1,
+              label + "deferred: one fault report however many runs");
+        check(d->run_deferred_work() == 1 && d->log.contains(LV2_LOG__Error, "invalid samples"),
+              label + "deferred: the report explains");
+        static_cast<void>(render(*d, clean, 2000, 300));
+        check(d->queued_work() == 0 && d->status == static_cast<float>(lv2::Status::fault),
+              label + "deferred: clean runs schedule no more reports");
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->queued_work() == 1, label + "deferred: a new fault reports again");
+        d->deactivate();
+        d->drop_queued_work();
+        d->activate();
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->queued_work() == 1 && d->run_deferred_work() == 1,
+              label + "deferred: a fault after reactivation still reports");
+    }
 
     // Without log:log, messages go to stderr and nothing breaks.
     host::Features quiet;

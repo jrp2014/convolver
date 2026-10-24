@@ -36,7 +36,7 @@ Contents:
 
 The examples assume `convolver` is on your `PATH`; from a source build, use
 `./build/convolver`. `convolver --version` names the FFT library it was built
-with, and `convolver --help` lists every option.
+with and the CPU kernels it uses, and `convolver --help` lists every option.
 
 ## File rendering
 

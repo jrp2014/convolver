@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <random>
@@ -711,7 +712,7 @@ void status_and_log() {
     require(c.getParameterCount() == 2 && c.getParameterInfo(1, info) == kResultOk &&
                 info.id == status_id && (info.flags & ParameterInfo::kIsReadOnly) &&
                 (info.flags & ParameterInfo::kIsList) &&
-                !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 3,
+                !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 4,
             "Status parameter not read-only list");
     // The text the host shows for the parameter's current value.
     const auto shown = [&] {
@@ -789,8 +790,109 @@ void status_and_log() {
                 contains(shown(), "the preset or saved state could not be read") &&
                 contains(log_text(), "The saved state could not be read"),
             "damaged state not shown or logged");
+    // DIAG-1, jrp's reproduction: extreme but finite input and filter values
+    // overflow the output. The audio thread writes Fault to the Status
+    // parameter; the host passes it to the controller, which asks the
+    // processor to explain; the log says what happened and what to change.
+    auto loud = good;
+    loud.configuration->paths[0].impulse[0] = std::numeric_limits<float>::max() / 4;
+    require(p.setState(stream(loud).get()) == kResultOk &&
+                status() == convolver::HostStatus::playing,
+            "loud filter not loaded");
+    {
+        std::array<float, 64> left{}, right{};
+        left[0] = std::numeric_limits<float>::max() / 4;
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {left.data(), right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ParameterChanges changes(4);
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.outputParameterChanges = &changes;
+        d.numSamples = 64;
+        p.setProcessing(true);
+        // The overflow reaches the output after the 256-frame latency.
+        for (int block = 0; block < 6; ++block) {
+            left.fill(0);
+            left[0] = std::numeric_limits<float>::max() / 4;
+            require(p.process(d) == kResultOk, "overflowing block refused");
+            for (int i = 0; i < 64; ++i)
+                require(std::isfinite(left[i]) && std::isfinite(right[i]), "overflow not silenced");
+        }
+        // One Fault point, written once however many blocks overflow.
+        require(changes.getParameterCount() == 1, "Fault not written to the Status parameter");
+        auto* queue = changes.getParameterData(0);
+        int32 offset = -1;
+        ParamValue value = 0;
+        require(queue && queue->getParameterId() == status_id && queue->getPointCount() == 1 &&
+                    queue->getPoint(0, offset, value) == kResultOk && value == 1.0,
+                "Fault point");
+        require(contains(log_text(), "too large") == false, "fault logged on the audio thread");
+        // The host hands the value to the controller, which reads it as the
+        // name until the processor has explained.
+        require(c.setParamNormalized(status_id, value) == kResultOk, "host passes Fault on");
+    }
+    require(status() == convolver::HostStatus::fault &&
+                shown() == "Fault: output too large, silenced and the filter restarted. Details "
+                           "in the Convolver log.",
+            "fault not shown");
+    require(contains(log_text(), "The output became too large to represent (") &&
+                contains(log_text(), "Lower the level going into Convolver"),
+            "fault not logged");
+    // Stopping playback explains nothing: setProcessing may run on the audio
+    // thread. Nothing new is logged twice.
+    const auto count = [](const std::string& text, const char* part) {
+        std::size_t n = 0;
+        for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
+            ++n;
+        return n;
+    };
+    {
+        const auto logged = log_text();
+        p.setProcessing(false);
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk && log_text() == logged, "fault logged twice");
+    }
+    // A second episode with the same text is logged too (the Status already
+    // shows Fault, so no new point): saving explains it.
+    {
+        std::array<float, 64> left{}, right{};
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {left.data(), right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ParameterChanges changes(4);
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.outputParameterChanges = &changes;
+        d.numSamples = 64;
+        p.setProcessing(true);
+        for (int block = 0; block < 6; ++block) {
+            left.fill(0);
+            left[0] = std::numeric_limits<float>::max() / 4;
+            require(p.process(d) == kResultOk, "second overflow refused");
+        }
+        require(changes.getParameterCount() == 0, "Fault written again while shown");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk &&
+                    count(log_text(), "The output became too large to represent (") == 2,
+                "second fault episode not logged on save");
+    }
     // Restarted at another rate: silence until the rate is put back.
-    require(p.setState(stream(good).get()) == kResultOk, "status good again");
+    require(p.setState(stream(good).get()) == kResultOk &&
+                status() == convolver::HostStatus::playing,
+            "status good again");
     require(p.setActive(false) == kResultOk, "status deactivate");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,

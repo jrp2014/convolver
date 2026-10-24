@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <new>
 #include <optional>
@@ -619,7 +620,7 @@ void status_parameter() {
                                au::status_parameter, &info, &size),
           "Status parameter info");
     require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
-                info.maxValue == 3 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
+                info.maxValue == 4 && (info.flags & kAudioUnitParameterFlag_IsReadable) &&
                 !(info.flags & kAudioUnitParameterFlag_IsWritable) &&
                 (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings),
             "Status parameter not a read-only indexed parameter");
@@ -630,7 +631,7 @@ void status_parameter() {
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterValueStrings, kAudioUnitScope_Global,
                                au::status_parameter, &names, &size),
           "Status value strings");
-    require(names && CFArrayGetCount(names) == 4, "Status value strings");
+    require(names && CFArrayGetCount(names) == 5, "Status value strings");
     CFRelease(names);
     const auto value = [&] {
         AudioUnitParameterValue v = -1;
@@ -692,6 +693,37 @@ void status_parameter() {
                 CFStringCompare(request.outString, CFSTR("Playing"), 0) == kCFCompareEqualTo,
             "Status value name");
     CFRelease(request.outString);
+    // DIAG-1, jrp's reproduction: extreme but finite input and filter values
+    // overflow the output. It is silenced, Render sets Status to Fault, and
+    // the host's request for its text explains in the log.
+    auto loud = stereo(48000, 8);
+    for (auto& path : loud.paths)
+        for (auto& v : path.impulse)
+            v = std::numeric_limits<float>::max() / 4;
+    check(unit.load(state_of(loud)), "loud preset");
+    {
+        Buffers b(2, 2, 512);
+        bool silent = false;
+        for (int block = 0; block < 3; ++block) {
+            for (auto& channel : b.in)
+                channel.assign(channel.size(), std::numeric_limits<float>::max() / 4);
+            check(render(unit, b, 512, false, silent), "overflowing render");
+            for (const auto& channel : b.out)
+                for (auto v : channel)
+                    require(std::isfinite(v), "overflowing output not silenced");
+        }
+    }
+    require(value() == HostStatus::fault, "Render did not set Status to Fault");
+    require(!contains(log_text(), "too large to represent"), "fault logged while rendering");
+    require(shown() == "Fault: output too large, silenced and the filter restarted. Details in "
+                       "the Convolver log.",
+            "fault not shown: " + shown());
+    require(contains(log_text(), "The output became too large to represent (") &&
+                contains(log_text(), "Lower the level going into Convolver"),
+            "fault not logged");
+    check(unit.load(state_of(stereo(48000))), "load after a fault");
+    require(value() == HostStatus::playing && contains(shown(), "Filter loaded"),
+            "a load does not clear Fault: " + shown());
     unit.uninitialize();
     if (earlier)
         setenv("CONVOLVER_LOG", earlier->c_str(), 1);

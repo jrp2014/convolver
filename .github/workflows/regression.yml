@@ -89,7 +89,7 @@ jobs:
       - name: Build production targets and tests
         run: cmake --build build --parallel 2
       - name: Test
-        run: ctest --test-dir build --output-on-failure --parallel 2 ${{ matrix.full_tests }}
+        run: ctest --test-dir build --output-on-failure --output-junit junit.xml --parallel 2 ${{ matrix.full_tests }}
       # Formatting is checked by the lint workflow (pre-commit), not here.
       - name: Portable static analysis
         if: runner.os == 'Linux' && matrix.cxx == 'clang++'
@@ -109,7 +109,7 @@ jobs:
           cmake --preset core-only -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
           cmake --build --preset core-only
-          ctest --preset core-only
+          ctest --preset core-only --output-junit junit.xml
       - name: Configure Accelerate
         if: runner.os == 'macOS'
         run: >-
@@ -119,7 +119,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cmake --build build-accelerate --parallel 2
-          ctest --test-dir build-accelerate --output-on-failure --parallel 2 -LE repository
+          ctest --test-dir build-accelerate --output-on-failure --output-junit junit.xml --parallel 2 -LE repository
           ./build-accelerate/convolver --version
       - name: Compare FFTW and Accelerate output
         if: runner.os == 'macOS'
@@ -131,10 +131,23 @@ jobs:
             -DCONVOLVER_FFT_BACKEND=OOURA -DCONVOLVER_LEGACY_TESTS=OFF \
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
           cmake --build build-ooura --parallel 2
-          ctest --test-dir build-ooura --output-on-failure --parallel 2 -LE repository
+          ctest --test-dir build-ooura --output-on-failure --output-junit junit.xml --parallel 2 -LE repository
           ./build-ooura/convolver --version
       - name: Compare FFTW and Ooura output
         run: python tests/native/backend_equivalence.py build/convolver build-ooura/convolver
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python3 scripts/ci_evidence.py test-evidence build build/presets/core-only build-accelerate build-ooura
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore
   windows:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -203,7 +216,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel 2
       - name: Test native libraries and CLI
-        run: ctest --test-dir build -C Release --output-on-failure --parallel 2
+        run: ctest --test-dir build -C Release --output-on-failure --parallel 2 --output-junit junit.xml
       - name: Linked versions
         run: ./build/Release/convolver.exe --version
       - name: Core-only MSVC build and consumer tests
@@ -215,7 +228,7 @@ jobs:
 
           cmake --build build-core --config Release --parallel 2
 
-          ctest --test-dir build-core -C Release --output-on-failure --parallel 2
+          ctest --test-dir build-core -C Release --output-on-failure --parallel 2 --output-junit junit.xml
       - name: Core-only MSVC build with the Ooura backend
         run: >-
           cmake -S . -B build-ooura -A x64 -DCONVOLVER_FFT_BACKEND=OOURA
@@ -225,4 +238,17 @@ jobs:
 
           cmake --build build-ooura --config Release --parallel 2
 
-          ctest --test-dir build-ooura -C Release --output-on-failure --parallel 2
+          ctest --test-dir build-ooura -C Release --output-on-failure --parallel 2 --output-junit junit.xml
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build build-core build-ooura
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore

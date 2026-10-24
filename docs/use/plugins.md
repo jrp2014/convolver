@@ -143,6 +143,19 @@ example (some hosts show only the status name in the first column):
 | Load failed (silence) | `Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the Convolver log.` |
 | Load failed (previous filter kept) | `Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out. Details in the Convolver log.` |
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
+| Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
+
+**Fault** means something went wrong in the audio while it played, with or
+without a filter loaded: the output became too large to represent (an extreme
+input level or filter gain), the host sent invalid samples (not a number or
+infinite, usually from a plug-in before Convolver), or an Audio Unit host
+passed buffers that do not match its setup (a VST3 host gets an error back
+from the call instead). Convolver silences the affected audio rather than pass it on, and
+the log says what happened, how often and what to change. The status stays at
+Fault until you load a filter again or the host restarts the plug-in (stops
+and starts it, for example by changing the sample rate). Some hosts show Fault
+while playing but fill in the log line and the text only when the project is
+saved or the host restarts the plug-in.
 
 "Not checked yet" means the host has not started the plug-in at a sample rate
 and channel layout yet. Some hosts show a separate copy of the plug-in in its
@@ -157,9 +170,18 @@ your project's rate.
 **The Convolver log** is a text file with one line for each filter loaded,
 each time the host starts the plug-in (with the sample rate, channels and block
 size), and each failure, explained in full with what to change. Each line
-starts with the time, the Convolver version, the format and instance (`VST3 #2`)
-and the host program. When something does not work, send this file with
-your report.
+starts with the time, the Convolver version, the format and instance (`VST3 #2`),
+the host program and its process number. Loads and refusals are numbered
+(`Request 3:`), so you can follow a sequence of presets. The first line each
+time a host starts Convolver says what is running: the version, the FFT
+library, the CPU kernels and the process. When something does not work, send
+this file with your report.
+
+If the file cannot be written (its folder cannot be created or written to, or
+there is no home folder), the Status text ends with "The log could not be
+written." instead of pointing to it, and the lines go to the
+host's standard error output instead (and, on Windows, to the debugger output,
+which DebugView shows). On macOS they are in the system log either way.
 
 | System | Log file | Copy it to the clipboard |
 | --- | --- | --- |
@@ -178,7 +200,8 @@ log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --styl
 
 When the file passes 1 MB it is renamed with `.old` added and a new one is
 started. Setting the environment variable `CONVOLVER_LOG` to a file path
-sends the log there instead; on macOS and Linux, setting it empty turns the file off. LV2 has
+sends the log there instead; on macOS and Linux, setting it empty turns the file off (the Status text
+still points to the log; on macOS the lines are in the system log). LV2 has
 no file of its own: it writes to the host's log.
 
 ## Latency and tail
@@ -243,7 +266,7 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | --- | --- | --- | --- |
 | 0 | `enabled` | Control input | 1 processes, 0 bypasses (a 64-sample fade) |
 | 1 | `latency` | Control output | 256 samples |
-| 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed, 3 Loading |
+| 2 | `status` | Control output | 0 Running, 1 No filter, 2 Load failed, 3 Loading, 4 Fault |
 | 3… | `in_1` … `in_N` | Audio input | Input channels in order |
 | then | `out_1` … `out_M` | Audio output | Output channels in order |
 | then | `control` | Atom input | The host sets or asks for the filter file |

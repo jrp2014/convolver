@@ -149,7 +149,7 @@ are silent or refused a load in two places, with the same words in every
 format.
 
 - **A read-only Status parameter** whose value is a `HostStatus` (Playing, No
-  filter, Load failed, Not checked yet) and whose text for the current value
+  filter, Load failed, Not checked yet, Fault) and whose text for the current value
   is `host_status()`'s one line of at most 127 ASCII characters
   ([`host.hpp`](../../include/convolver/host.hpp)). The status follows
   `HostFilter::failure()`, so a refused replacement shows Load failed while
@@ -167,7 +167,8 @@ format.
   restore, initialization, cleanup and stream format change, and a
   parameter-change event is sent outside the control lock. Host writes to it
   are ignored, and the value `AUBase::SaveState` writes with the other
-  parameters is ignored on restore.
+  parameters is ignored on restore. When the log file cannot be written
+  (`host_log_written()` is false), the text says so instead of pointing to it.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size
@@ -176,11 +177,44 @@ format.
   instance number and host program. An instance skips a line identical to the
   one it wrote last, as hosts restart plug-ins often. Adapters write the file
   outside their control lock. On macOS the lines also go to the unified log.
-  Control thread only. Locations are in the
+  Control thread only. Loads and rejections are numbered by request
+  (`loaded_line()`, `rejected_line()`: `Request 3: ...`), every line names the
+  process ID, and the process's first line is `execution_line()`: version,
+  FFT backend and its version, CPU kernels, process and host program. A line
+  the file does not take goes to standard error (and `OutputDebugString` on
+  Windows), after one line saying why, and `host_log_written()` turns false;
+  the file gets the execution line with its first written line. An empty
+  `CONVOLVER_LOG` turns the file off on purpose and is not a failure. Locations are in the
   [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
   `CONVOLVER_LOG` into the build folder.
+- **Processing faults** (jrp's review of 24 October 2026). `HostProcessor`
+  counts, per `process()` call and without locking or allocating, rejected
+  input (nonfinite or out-of-range samples, played as silence), output
+  overflow (extreme but finite input or filter values: those samples are
+  silenced and the filter restarts), processing failure (the engine threw:
+  the call is silenced and returns false) and invalid calls (more frames or
+  channels than set up: refused; only the Audio Unit reaches this, as the
+  VST3 adapter refuses such calls itself and LV2's are split to fit). `HostProcessor::faults()` reads the counts
+  from any thread. On the control side, `HostFilter::observe()` takes them and
+  returns the new ones, which adapters log with `fault_message()`;
+  `HostFilter::faults()` keeps them until an accepted load or `activate()`,
+  and `host_status()` shows them as Fault unless a load failure is shown. The audio
+  thread shows a new fault at once without logging: VST3 writes Fault to the
+  Status parameter as an output parameter change, and when the host passes it
+  to the controller (`setParamNormalized`), the controller sends
+  `ConvolverFaults` and the processor explains; it also explains on
+  `getState`, `setState` and `setActive` (not `setProcessing`, which hosts
+  may call on the audio thread). Each episode is logged, even if its text
+  repeats the last line. The Audio Unit's
+  Render sets the parameter's value, and the next request for its text, save,
+  restore, initialization or cleanup explains. LV2 shows Fault on its status
+  port in the same `run()` and schedules a fault report (worker request
+  generation 0, never answered; one at a time, and only for faults no
+  report covered yet), whose `work()` logs through `log:log`; without
+  a worker, the next save, restore, activation or deactivation does.
 
-LV2 keeps its own routes (the `status` port and `log:log`) and does not write
+LV2 keeps its own routes (the `status` port, whose values are Running, No
+filter, Load failed, Loading and Fault, and `log:log`) and does not write
 the file. An editor (VST3-3, HOST-2) would show the same text.
 
 ## Initial restoration and live replacement
