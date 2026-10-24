@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
+# One step of packaging.consumer.*, chosen by -DSTEP=: "install" installs and
+# relocates the package (the fixture the installed cases share), and every
+# other value builds and tests one consumer in a directory of its own, so
+# CTest can run the cases side by side.
 function(run)
     execute_process(COMMAND ${ARGV} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
     if(NOT result EQUAL 0)
@@ -7,14 +11,19 @@ function(run)
 endfunction()
 
 set(root "@CMAKE_CURRENT_BINARY_DIR@/consumer-test")
-file(REMOVE_RECURSE "${root}")
-file(MAKE_DIRECTORY "${root}/source")
-# The installed consumer has no access to Convolver's source/header directories.
-file(COPY "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/CMakeLists.txt"
-    "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/main.cpp" DESTINATION "${root}/source")
-run("@CMAKE_COMMAND@" --install "@CMAKE_CURRENT_BINARY_DIR@" --prefix "${root}/original" --config "${CONFIG}")
-file(RENAME "${root}/original" "${root}/relocated prefix")
 set(package "${root}/relocated prefix/@package_dir@")
+if(STEP STREQUAL "install")
+    file(REMOVE_RECURSE "${root}")
+    file(MAKE_DIRECTORY "${root}/source")
+    # The installed consumer has no access to Convolver's source/header directories.
+    file(COPY "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/CMakeLists.txt"
+        "@CMAKE_CURRENT_SOURCE_DIR@/tests/consumer/main.cpp" DESTINATION "${root}/source")
+    run("@CMAKE_COMMAND@" --install "@CMAKE_CURRENT_BINARY_DIR@" --prefix "${root}/original" --config "${CONFIG}")
+    file(RENAME "${root}/original" "${root}/relocated prefix")
+    message(STATUS "Installed and relocated the package to ${root}/relocated prefix")
+    return()
+endif()
+
 set(generator_options)
 if(NOT "@CMAKE_GENERATOR_PLATFORM@" STREQUAL "")
     list(APPEND generator_options -A "@CMAKE_GENERATOR_PLATFORM@")
@@ -23,6 +32,7 @@ if(NOT "@CMAKE_GENERATOR_TOOLSET@" STREQUAL "")
     list(APPEND generator_options -T "@CMAKE_GENERATOR_TOOLSET@")
 endif()
 function(consumer name)
+    file(REMOVE_RECURSE "${root}/${name}")
     run("@CMAKE_COMMAND@" -S "${root}/source" -B "${root}/${name}"
         -G "@CMAKE_GENERATOR@" ${generator_options}
         -C "@CMAKE_CURRENT_BINARY_DIR@/consumer-cache.cmake"
@@ -30,19 +40,22 @@ function(consumer name)
     run("@CMAKE_COMMAND@" --build "${root}/${name}" --config "${CONFIG}" --parallel 2)
     run("@CMAKE_CTEST_COMMAND@" --test-dir "${root}/${name}" -C "${CONFIG}" --output-on-failure)
 endfunction()
-consumer(installed-core -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
-    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
-consumer(installed-host -DCONSUMER_HOST=ON -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
-    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
-consumer(source-core "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"
-    -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
-consumer(source-no-ctest "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@"
-    -DCONSUMER_CTEST=OFF -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON
-    -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
-if(@CONVOLVER_BUILD_IO@)
+set(no_optional -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
+if(STEP STREQUAL "installed-core")
+    consumer(installed-core ${no_optional})
+elseif(STEP STREQUAL "installed-host")
+    consumer(installed-host -DCONSUMER_HOST=ON ${no_optional})
+elseif(STEP STREQUAL "source-core")
+    consumer(source-core "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@" ${no_optional})
+elseif(STEP STREQUAL "source-no-ctest")
+    consumer(source-no-ctest "-DCONVOLVER_SOURCE_DIR=@CMAKE_CURRENT_SOURCE_DIR@" -DCONSUMER_CTEST=OFF ${no_optional})
+elseif(STEP STREQUAL "installed-io")
     consumer(installed-io -DCONSUMER_IO=ON)
-else()
+elseif(STEP STREQUAL "missing-io")
     consumer(missing-io -DMISSING_COMPONENT=io)
+elseif(STEP STREQUAL "missing-component")
+    consumer(missing-component -DMISSING_COMPONENT=nonexistent)
+else()
+    message(FATAL_ERROR "Unknown packaging.consumer step '${STEP}'")
 endif()
-consumer(missing-component -DMISSING_COMPONENT=nonexistent)
-message(STATUS "Installed core, relocated package, components and source-tree consumer passed")
+message(STATUS "Consumer ${STEP} passed")

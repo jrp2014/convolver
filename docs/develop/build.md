@@ -405,8 +405,9 @@ the source repository at the packaged commit).
 `build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
 assembles **committed** source and the pinned dependency archives. Then
 `python3 tests/release/source_build.py --archive build/Convolver-source.tar.gz`
-rebuilds dependencies, core, tools, SDK and external consumers from a fresh
-extraction without fetching. Its `--backend` defaults to `AUTO`, as above;
+rebuilds dependencies, core, tools and SDK from a fresh extraction without
+fetching, and runs their tests (the CMake package consumers, which nothing
+shipped uses, run in native CI instead). Its `--backend` defaults to `AUTO`, as above;
 `--sdk`, `--prefix` and `--backend` also check a fresh build against an SDK and
 dependencies you supply. A failed validator remains a release blocker.
 

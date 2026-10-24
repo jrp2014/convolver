@@ -41,10 +41,21 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     runs-on: ubuntu-latest
+    env:
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: fuzz-ubuntu-latest
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       - name: Configure Clang libFuzzer with ASan/UBSan
         run: >
           cmake -S . -B build-fuzz -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug

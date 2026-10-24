@@ -42,6 +42,9 @@ jobs:
     # A fixed image label. GitHub still updates its Xcode and macOS point
     # releases, so the versions are logged for each run.
     runs-on: macos-15
+    env:
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -56,6 +59,14 @@ jobs:
           sw_vers
           xcodebuild -version
           brew install libsndfile
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: au-macos-15
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       # AUTO selects Accelerate for plug-in builds on macOS; libsndfile is only
       # for the CLI and the tests' fixtures, never linked into the component.
       - name: Configure
@@ -65,7 +76,11 @@ jobs:
       - name: Build the component, CLI and tests
         run: cmake --build build-au --parallel 3
       - name: Core, CLI, AU adapter and PLUG-2 harness
-        run: ctest --test-dir build-au --output-on-failure --parallel 3 --output-junit junit.xml
+        # The repository checks and package consumers run in the native jobs
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
+        run: >-
+          ctest --test-dir build-au --output-on-failure --output-junit junit.xml --parallel 3
+          -LE 'repository|consumer'
       - name: Install for this user
         run: |
           components="$HOME/Library/Audio/Plug-Ins/Components"

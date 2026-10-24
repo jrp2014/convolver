@@ -31,16 +31,30 @@ jobs:
   vst3:
     needs: scope
     if: needs.scope.outputs.build == 'true'
+    name: vst3 (${{ matrix.os }}, ${{ matrix.fft }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
-        # the FFTW job keeps the explicit override working.
-        fft: [AUTO]
+        # the FFTW job keeps the explicit override working. The core
+        # suite runs here only where no other job builds the same
+        # compiler, flags and backend: on Linux the native g++ jobs do,
+        # so those run the VST3 tests alone. macos-latest has a newer
+        # Xcode than the Audio Unit job's macos-15, so it keeps the suite
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
         include:
           - os: ubuntu-latest
+            fft: AUTO
+            tests: -L vst3
+          - os: ubuntu-latest
             fft: FFTW
+            tests: -L vst3
+          - os: macos-latest
+            fft: AUTO
+            tests: -LE 'repository|consumer'
+          - os: windows-latest
+            fft: AUTO
+            tests: -LE 'repository|consumer'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -118,10 +132,20 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             echo "PLUGINVAL_ARGS=--rtcheck;relaxed" >> "$GITHUB_ENV"
           fi
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        if: runner.os != 'Windows'
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: vst3-${{ matrix.os }}-${{ matrix.fft }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       - name: Configure Unix
         if: runner.os != 'Windows'
         run: >-
           cmake -S . -B build-vst3 -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_VST3=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DCONVOLVER_FFT_BACKEND=${{ matrix.fft }}"
           "-DCONVOLVER_VST3_SDK=${{ github.workspace }}/build-sdk" -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
@@ -136,8 +160,10 @@ jobs:
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
         run: cmake --build build-vst3 --config Release --parallel 2
-      - name: Core, host, preset, VST3 validator and pluginval
-        run: ctest --test-dir build-vst3 -C Release --output-on-failure --parallel 2 --output-junit junit.xml
+      - name: VST3 validator, pluginval and the VST3 tests
+        run: >-
+          ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
+          --parallel 2 ${{ matrix.tests }}
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence

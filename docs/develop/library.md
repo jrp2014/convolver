@@ -188,9 +188,11 @@ Their prerequisites and commands are in [build from source](build.md#cmake-prese
 
 ## What verifies the package
 
-`packaging.consumer` uses only CMake and C++, and runs under CTest. It installs the
+The `packaging.consumer.*` tests use only CMake and C++, and run under CTest.
+`packaging.consumer.install` installs the
 current build into a temporary prefix, moves that prefix to a path containing a
-space, and builds/runs a separate application against the installed package.
+space, and each of the other tests builds/runs a separate application against the
+installed package, or the source tree, in a directory of its own.
 That application compares convolution against a direct oracle. A full package
 also exercises a real-file I/O round trip; a core-only package verifies that I/O
 cannot be requested. Unknown required and optional components, repeated lookup,

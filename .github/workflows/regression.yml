@@ -42,18 +42,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Checks of the repository itself (CTest label "repository") run in
+          # one full build per OS; see docs/develop/testing.md#which-configurations-run-which-tests.
           - os: ubuntu-latest
             cxx: clang++
             build: Debug
             sanitizers: 'ON'
+            full_tests: ''
           - os: ubuntu-latest
             cxx: g++
             build: Release
             sanitizers: 'OFF'
+            full_tests: -LE repository
           - os: macos-latest
             cxx: clang++
             build: Debug
             sanitizers: 'ON'
+            full_tests: ''
+    env:
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -65,6 +73,14 @@ jobs:
       - name: macOS dependencies
         if: runner.os == 'macOS'
         run: brew install fftw libsndfile
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: native-${{ matrix.os }}-${{ matrix.cxx }}-${{ matrix.build }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
       - name: Configure
         run: >-
           cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
@@ -73,7 +89,7 @@ jobs:
       - name: Build production targets and tests
         run: cmake --build build --parallel 2
       - name: Test
-        run: ctest --test-dir build --output-on-failure --parallel 2 --output-junit junit.xml
+        run: ctest --test-dir build --output-on-failure --output-junit junit.xml --parallel 2 ${{ matrix.full_tests }}
       # Formatting is checked by the lint workflow (pre-commit), not here.
       - name: Portable static analysis
         if: runner.os == 'Linux' && matrix.cxx == 'clang++'
@@ -102,7 +118,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cmake --build build-accelerate --parallel 2
-          ctest --test-dir build-accelerate --output-on-failure --parallel 2 --output-junit junit.xml
+          ctest --test-dir build-accelerate --output-on-failure --output-junit junit.xml --parallel 2 -LE repository
           ./build-accelerate/convolver --version
       - name: Compare FFTW and Accelerate output
         if: runner.os == 'macOS'
@@ -114,7 +130,7 @@ jobs:
             -DCONVOLVER_FFT_BACKEND=OOURA -DCONVOLVER_LEGACY_TESTS=OFF \
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
           cmake --build build-ooura --parallel 2
-          ctest --test-dir build-ooura --output-on-failure --parallel 2 --output-junit junit.xml
+          ctest --test-dir build-ooura --output-on-failure --output-junit junit.xml --parallel 2 -LE repository
           ./build-ooura/convolver --version
       - name: Compare FFTW and Ooura output
         run: python tests/native/backend_equivalence.py build/convolver build-ooura/convolver

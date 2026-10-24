@@ -1,12 +1,13 @@
 ---
 # SPDX-License-Identifier: GPL-2.0-or-later
 # LV2 build and test tools, pinned (PLUG-6), and Convolver's LV2 plug-ins
-# (LV2-1). The job first proves the pins: the lv2 headers from the release
-# policy build LV2's example plug-ins, lilv loads and runs one on a shared
-# fixture, and lv2lint checks it. Then it builds Convolver's bundle against the
-# pinned packages, runs the LV2 tests (lilv-hosted PLUG-2 harness and adapter
-# tests) under ASan and UBSan, the adapter tests again under ThreadSanitizer
-# (LV2-2's worker), and lv2lints every plug-in. LV2-3 adds pluginval.
+# (LV2-1). Three jobs run side by side. The first proves the pins: the lv2
+# headers from the release policy build LV2's example plug-ins, lilv loads and
+# runs one on a shared fixture, and lv2lint checks it; it then builds
+# Convolver's Release bundle and lv2lints every plug-in. The other two build
+# against the same pinned packages and run the LV2 tests (lilv-hosted PLUG-2
+# harness and adapter tests) under ASan and UBSan, and the adapter tests again
+# under ThreadSanitizer (LV2-2's worker). LV2-3 adds pluginval.
 # (lv2apply cannot host Convolver: it offers no features, and Convolver needs
 # urid:map for its state.)
 name: LV2
@@ -21,6 +22,20 @@ name: LV2
 
 permissions:
   contents: read
+
+# The pinned packages, shared by every job. A fixed image label is used: the
+# apt versions are Ubuntu 24.04's release pocket, which never changes; lilv's
+# libraries (serd, sord, sratom, zix) are pinned too, so noble-updates cannot
+# move them.
+env:
+  LV2_DEB: 1.18.10-2build1
+  LILV_DEB: 0.24.22-1build1
+  SERD_DEB: 0.32.2-1
+  SORD_DEB: 0.16.16-2build1
+  SRATOM_DEB: 0.6.16-1build1
+  ZIX_DEB: 0.4.2-2build1
+  LV2LINT_VERSION: 0.16.2
+  LV2LINT_SHA256: b23810571f2e18d3d6714c0acc65210a1a5fcd78fff03f1c820553a5c1c45cf4
 
 # A new commit on a pull request cancels the run for the commit it replaces.
 # Pushes to main and manual runs each get a group of their own.
@@ -42,22 +57,11 @@ jobs:
       - id: scope
         run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
 
-  lv2:
+  tools:
     needs: scope
     if: needs.scope.outputs.build == 'true'
-    # A fixed image label. The apt versions below are Ubuntu 24.04's release
-    # pocket, which never changes; lilv's libraries (serd, sord, sratom, zix)
-    # are pinned too, so noble-updates cannot move them.
+    name: Pinned tools and Release bundle
     runs-on: ubuntu-24.04
-    env:
-      LV2_DEB: 1.18.10-2build1
-      LILV_DEB: 0.24.22-1build1
-      SERD_DEB: 0.32.2-1
-      SORD_DEB: 0.16.16-2build1
-      SRATOM_DEB: 0.6.16-1build1
-      ZIX_DEB: 0.4.2-2build1
-      LV2LINT_VERSION: 0.16.2
-      LV2LINT_SHA256: b23810571f2e18d3d6714c0acc65210a1a5fcd78fff03f1c820553a5c1c45cf4
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -143,30 +147,6 @@ jobs:
             echo "Expected lv2lint to fail eg-amp on exactly: $expected (got status $status: $failures)" >&2
             exit 1
           fi
-      # The tests load the plug-in into lilv in the same process, so a
-      # sanitizer build can host a sanitizer build of the plug-in.
-      - name: Convolver's LV2 tests (Debug, ASan and UBSan)
-        run: |
-          cmake -S . -B build-lv2-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_SANITIZERS=ON
-          cmake --build build-lv2-asan --parallel
-          ctest --test-dir build-lv2-asan --output-on-failure --parallel 2 --output-junit junit.xml \
-            -R '^(examples\.first_use|lv2\..*)$'
-      # The worker's races (LV2-2): the adapter tests again under
-      # ThreadSanitizer. The runner's address-space randomisation is reduced
-      # first, because ThreadSanitizer cannot map its shadow memory with the
-      # kernel's default on this image.
-      - name: Convolver's LV2 adapter tests (Debug, ThreadSanitizer)
-        env:
-          TSAN_OPTIONS: halt_on_error=1
-        run: |
-          sudo sysctl vm.mmap_rnd_bits=28
-          cmake -S . -B build-lv2-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-            -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_LEGACY_TESTS=OFF \
-            -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
-            -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
-          cmake --build build-lv2-tsan --parallel --target convolver_lv2_adapter convolver_preset_tool
-          ctest --test-dir build-lv2-tsan --output-on-failure -R '^lv2\.adapter$' --output-junit junit.xml
       # lv2lint is not a sanitizer build, so it needs a plain one.
       - name: Convolver's LV2 bundle (Release)
         run: |
@@ -186,11 +166,82 @@ jobs:
           for uri in $uris; do
             env -u LV2_PATH lv2lint -I "$bundle" "$uri"
           done
+
+  # The sanitizer builds need only the pinned packages, not the tools job's
+  # example plug-ins or lv2lint, so they run beside it. Each builds just the
+  # targets its tests run.
+  sanitizers:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The tests load the plug-in into lilv in the same process, so a
+          # sanitizer build can host a sanitizer build of the plug-in.
+          - name: LV2 tests (Debug, ASan and UBSan)
+            configure: -DCONVOLVER_SANITIZERS=ON
+            targets: convolver_lv2_tests
+            tests: '^(examples\.first_use|lv2\..*)$'
+            tsan: false
+          # The worker's races (LV2-2): the adapter tests again under
+          # ThreadSanitizer.
+          - name: LV2 adapter tests (Debug, ThreadSanitizer)
+            configure: >-
+              -DCONVOLVER_LEGACY_TESTS=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
+            targets: convolver_lv2_adapter convolver_preset_tool
+            tests: '^lv2\.adapter$'
+            tsan: true
+    env:
+      TSAN_OPTIONS: halt_on_error=1
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      # The same packages as the tools job: keep the two lists alike.
+      - name: Pinned lilv and lv2 packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            "lv2-dev=$LV2_DEB" "liblilv-dev=$LILV_DEB" "liblilv-0-0=$LILV_DEB" "lilv-utils=$LILV_DEB" \
+            "libserd-dev=$SERD_DEB" "libserd-0-0=$SERD_DEB" "libsord-dev=$SORD_DEB" "libsord-0-0=$SORD_DEB" \
+            "libsratom-dev=$SRATOM_DEB" "libsratom-0-0=$SRATOM_DEB" "libzix-dev=$ZIX_DEB" "libzix-0-0=$ZIX_DEB" \
+            meson ninja-build pkg-config libelf-dev libsndfile1-dev
+          lv2info --version
+          dpkg-query -W lv2-dev 'liblilv*' lilv-utils 'libserd*' 'libsord*' 'libsratom*' 'libzix*'
+      # Compiler cache: pull requests restore it; main and manual runs also
+      # save it (docs/develop/testing.md#compiler-cache).
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: lv2-${{ matrix.tsan && 'tsan' || 'asan' }}
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
+      # ThreadSanitizer cannot map its shadow memory with the kernel's default
+      # address-space randomisation on this image, so it is reduced first.
+      - name: Reduce address-space randomisation
+        if: matrix.tsan
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Build
+        run: |
+          cmake -S . -B build-lv2 -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCONVOLVER_BUILD_LV2=ON ${{ matrix.configure }}
+          cmake --build build-lv2 --parallel --target ${{ matrix.targets }}
+      - name: Test
+        run: >-
+          ctest --test-dir build-lv2 --output-on-failure --output-junit junit.xml --parallel 2
+          -R '${{ matrix.tests }}'
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence
         if: failure()
-        run: python scripts/ci_evidence.py test-evidence build-lv2-asan build-lv2-tsan build-lv2
+        run: python scripts/ci_evidence.py test-evidence build-lv2
       - name: Keep test evidence
         if: failure()
         uses: actions/upload-artifact@v7
