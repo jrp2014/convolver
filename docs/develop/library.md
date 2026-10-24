@@ -163,7 +163,9 @@ FLAC can be missing; the writer then throws `std::runtime_error`).
 input ([RAW streams](../use/command-line.md#raw-streams)); the encoding is
 ignored for files with a header. `parse_raw_encoding()` and
 `raw_encoding_name()` convert between a `RawEncoding` and the names `s16le` to
-`f64be`. Headerless `.pcm` and `.raw` filters in a configuration are read with
+`f64be`. `sound_file_header()` says whether a file's content is a sound file
+(libsndfile recognises it, or it starts with a container marker), opening
+regular files only. Headerless `.pcm` and `.raw` filters in a configuration are read with
 `ConfigurationSelection::raw_filter_encoding` (`f32le` by default;
 [filter files](../use/configuration.md#filter-files)); `load_configuration`'s
 optional `raw_filters` argument lists those it read, and inspection takes the
