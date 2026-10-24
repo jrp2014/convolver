@@ -205,7 +205,9 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   overflow, processing failure, invalid calls) are counted on the audio
   thread and shown as Status Fault, explained in the log on the control side;
   the log names the process, numbers requests and starts with what ran (FFT
-  backend, CPU kernels); an unwritable log is said in the Status text.
+  backend, CPU kernels); an unwritable log is said in the Status text;
+  failed CI test jobs keep their evidence, and preview candidates keep
+  matching debugging symbols.
   Remaining: the failure-by-surface table, the CLI and preset tool, and what
   named hosts actually show (HOST-1).
 

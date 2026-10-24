@@ -37,6 +37,29 @@ def extract_zip(archive, destination):
                 target.chmod((info.external_attr >> 16) & 0o777 or 0o644)
 
 
+def keep_symbols(build_dir, symbols, identifier, commit, version):
+    """Copies the packaged binaries' debugging symbols (CONVOLVER_DEBUG_SYMBOLS)
+    to `symbols`, which the workflow keeps as its own artifact, never in the
+    package. Every packaged binary must have its symbols."""
+    kept = build_dir / 'symbols'
+    files = sorted(p for p in kept.rglob('*') if p.is_file()) if kept.is_dir() else []
+    names = {p.relative_to(kept).parts[-1] if p.suffix in ('.debug', '.pdb') else
+             next(part for part in p.relative_to(kept).parts if part.endswith('.dSYM'))
+             for p in files}
+    expected = {'Darwin': ['Convolver.dSYM', 'convolver-preset.dSYM', 'convolver-equalizer-apo.dSYM'],
+                'Windows': ['Convolver.pdb', 'convolver-preset.pdb', 'convolver-equalizer-apo.pdb'],
+                'Linux': ['Convolver.so.debug', 'convolver-preset.debug', 'convolver-equalizer-apo.debug']}
+    missing = [name for name in expected[platform.system()] if name not in names]
+    if missing:
+        raise ValueError('debugging symbols missing for: ' + ', '.join(missing) + ' (found ' +
+                         ', '.join(sorted(names)) + ')')
+    shutil.copytree(kept, symbols)
+    (symbols / 'README.txt').write_text(
+        f'Debugging symbols for the Convolver {version} preview, {identifier}, built from {commit}.\n'
+        'They match only the binaries of the same candidate run (GNU build ID, Mach-O UUID or PDB\n'
+        'signature). See docs/develop/releasing.md#debugging-symbols.\n')
+
+
 def build(archive, identifier, work, output, cmake, nsis=None):
     if work.exists() or output.exists():
         raise ValueError('candidate work/output directories must be new')
@@ -62,7 +85,9 @@ def build(archive, identifier, work, output, cmake, nsis=None):
                  '-DCONVOLVER_VST3_SDK=' + str(sdk), '-DCMAKE_PREFIX_PATH=' + str(prefix),
                  '-DCONVOLVER_DISTRIBUTION_LICENSE_DIR=' + str(deps / 'licenses'),
                  '-DCONVOLVER_FFT_BACKEND=' + candidate['backend'], '-DCONVOLVER_LEGACY_TESTS=OFF',
-                 '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0']
+                 '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0',
+                 # DIAG-1: matching debugging symbols, kept outside the package.
+                 '-DCONVOLVER_DEBUG_SYMBOLS=ON']
     if platform.system() == 'Windows':
         configure += ['-A', 'x64']
     else:
@@ -71,6 +96,7 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', '2'])
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2'])
+    keep_symbols(build_dir, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     if nsis:

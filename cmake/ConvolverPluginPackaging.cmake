@@ -7,6 +7,9 @@ if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_preset_tool OR NOT TARGET c
         "(CONVOLVER_BUILD_VST3, CONVOLVER_BUILD_IO and CONVOLVER_BUILD_CLI)")
 endif()
 set(convolver_packaged_tools convolver_preset_tool convolver_equalizer_apo)
+foreach(tool IN LISTS convolver_packaged_tools)
+    convolver_keep_symbols(${tool}) # CONVOLVER_DEBUG_SYMBOLS (the VST3 bundle's own CMakeLists keeps its).
+endforeach()
 find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
 get_target_property(convolver_bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
 if(APPLE)

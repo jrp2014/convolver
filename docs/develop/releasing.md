@@ -48,6 +48,31 @@ file hashes. The CI logs and artifact manifests are the authoritative record.
 The source bundle holds the pinned SDKs, FFTW and libsndfile sources, the build
 materials and notices, and rebuilds without fetching anything.
 
+### Debugging symbols
+
+Each candidate also uploads `symbols-<platform>`: the debugging symbols of the
+packaged binaries (the VST3 plug-in, `convolver-preset` and
+`convolver-equalizer-apo`), kept outside the package and its inventory
+(DIAG-1, jrp's review of 24 October 2026). The candidate build sets
+`CONVOLVER_DEBUG_SYMBOLS` ([build options](build.md#build-options)): Release
+code is compiled with debug information, which does not change the generated
+code, and the symbols are moved out of the binaries. `candidate.py` fails if
+any packaged binary has none.
+
+| Platform | Symbols | Matched by |
+| --- | --- | --- |
+| Linux | `<file>.debug` (`objcopy --only-keep-debug`); the binary is stripped and names it (`.gnu_debuglink`) | GNU build ID (`readelf -n`) |
+| macOS | `<file>.dSYM` (`dsymutil`); the binary is stripped of its debug map and signed again ad hoc | Mach-O UUID (`dwarfdump --uuid`) |
+| Windows | `<file>.pdb`, written there by the linker (`/DEBUG /OPT:REF /OPT:ICF`) | PDB signature (`dumpbin /headers`) |
+
+The symbols match only binaries from the same run, so keep them with every
+preview you publish (download them from the run that produced the candidate).
+To symbolicate a crash report: on macOS, put the `.dSYM` beside the report and
+use `atos -o Convolver.dSYM/Contents/Resources/DWARF/Convolver -l <load
+address> <addresses>`, or let the crash reporter find it by UUID; on Linux, use
+`gdb -s <file>.debug -e <binary>` or `eu-addr2line -e <file>.debug`; on
+Windows, add the folder to the debugger's symbol path.
+
 Which formats a package contains is decided by PLUG-5 in [TODO](../../TODO.md);
 the pins are in [`release-policy.json`](../../packaging/release-policy.json)
 and [build from source](build.md#pinned-format-dependencies).

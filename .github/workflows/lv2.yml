@@ -150,7 +150,7 @@ jobs:
           cmake -S . -B build-lv2-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
             -DCONVOLVER_BUILD_LV2=ON -DCONVOLVER_SANITIZERS=ON
           cmake --build build-lv2-asan --parallel
-          ctest --test-dir build-lv2-asan --output-on-failure --parallel 2 \
+          ctest --test-dir build-lv2-asan --output-on-failure --parallel 2 --output-junit junit.xml \
             -R '^(examples\.first_use|lv2\..*)$'
       # The worker's races (LV2-2): the adapter tests again under
       # ThreadSanitizer. The runner's address-space randomisation is reduced
@@ -166,7 +166,7 @@ jobs:
             -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread \
             -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
           cmake --build build-lv2-tsan --parallel --target convolver_lv2_adapter convolver_preset_tool
-          ctest --test-dir build-lv2-tsan --output-on-failure -R '^lv2\.adapter$'
+          ctest --test-dir build-lv2-tsan --output-on-failure -R '^lv2\.adapter$' --output-junit junit.xml
       # lv2lint is not a sanitizer build, so it needs a plain one.
       - name: Convolver's LV2 bundle (Release)
         run: |
@@ -186,3 +186,16 @@ jobs:
           for uri in $uris; do
             env -u LV2_PATH lv2lint -I "$bundle" "$uri"
           done
+      # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
+      # lifecycle reproductions included), JUnit results and build identity.
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build-lv2-asan build-lv2-tsan build-lv2
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore
