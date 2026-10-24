@@ -503,6 +503,11 @@ so the preset file path is not needed).
   and analysis pins with the latest stable packaged releases. Refresh CI caches
   when the formatter release changes, keep local and cloud instructions aligned,
   and validate formatting and analysis in CI. Local installation is deferred.
+- [ ] **CI-4 — Report the oracle error relative to the signal.** `native.engine`
+  printed only the largest absolute error of any case, so a new, louder test
+  (PERF-5's `history_validity`, peak 7.6) raised it tenfold, from 3.4e-7 to
+  3.4e-6, with no change in accuracy. Report the worst error relative to each
+  case's output peak, per group and kernel set, and name the case.
 
 ## Documented limitations
 

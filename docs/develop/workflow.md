@@ -114,7 +114,8 @@ checklist says so:
   unless you ran it, and keep results you ran apart from what CI is
   configured to run.
 - **DSP changes:** the direct double-precision oracle tests in
-  `tests/native/engine_tests.cpp` pass; report the worst error.
+  `tests/native/engine_tests.cpp` pass; report the worst error relative to
+  the output peak, which `native.engine` prints with the case it came from.
 - **Plug-in changes:** the format's validator and the PLUG-2 comparisons pass,
   and pluginval where it applies ([pluginval](testing.md#pluginval)).
 - **Checks:** `pre-commit run --all-files` (formatting included) and
