@@ -14,6 +14,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 using namespace convolver::vst3;
@@ -38,9 +39,10 @@ void edge_cases() {
     require(p.setState(&state) == kResultOk, "restore routed state");
     ProcessSetup setup{kOffline, kSample32, 512, 48000};
     require(p.setupProcessing(setup) == kResultOk, "offline setup");
-    require(p.getTailSamples() == 1, "tail unavailable before activation");
+    // The tail is measured at the output, so it includes the 256-sample latency.
+    require(p.getTailSamples() == 1 + latency_samples, "tail unavailable before activation");
     require(p.setActive(true) == kResultOk, "offline activate");
-    require(p.getTailSamples() == 1, "reported FIR tail");
+    require(p.getTailSamples() == 1 + latency_samples, "reported FIR tail");
     p.setProcessing(true);
     std::array<float, 512> left{}, right{}, out_left{}, out_right{};
     left[0] = 1;
@@ -57,12 +59,16 @@ void edge_cases() {
     d.outputs = &output;
     d.numSamples = 100;
     require(p.process(d) == kResultOk, "routed first block");
+    // Flagged silent, but the left buffer still holds its impulse: input flags
+    // are not trusted, so it is read and filtered too (VST3-8), and the first
+    // block's tail still arrives.
     input.silenceFlags = 3;
     d.numSamples = 512;
     require(p.process(d) == kResultOk, "silent input with wet tail");
     for (int i = 0; i < 512; ++i)
-        require(std::abs(out_right[i] - (i == 157 ? 1.f : 0.f)) < 1e-5 && out_left[i] == 0,
-                "silence lost tail/routing");
+        require(std::abs(out_right[i] - (i == 157 || i == 257 ? 1.f : 0.f)) < 1e-5 &&
+                    out_left[i] == 0,
+                "silence flags cut the tail or dropped flagged audio");
     require(output.silenceFlags == 0, "tail marked silent");
     auto mismatch = saved;
     mismatch.configuration->sample_rate = 44100;
@@ -108,14 +114,15 @@ void edge_cases() {
     MemoryStream longer;
     write_state(&longer, saved);
     longer.seek(0, IBStream::kIBSeekSet, nullptr);
-    require(p.setState(&longer) == kResultOk && p.getTailSamples() == 1010,
+    require(p.setState(&longer) == kResultOk && p.getTailSamples() == 1010 + latency_samples,
             "inactive replacement tail including routing delays");
     setup.sampleRate = 44100;
     require(p.setupProcessing(setup) == kResultOk, "rate change setup");
     // Shared adapter contract: a kept filter that does not suit the host plays
     // silence (not the unfiltered input), and returns once the rate is corrected.
     require(p.setActive(true) == kResultOk, "a mismatched IR rate must activate, silent");
-    require(p.getTailSamples() == 0, "silent instance reports a tail");
+    // Bypass still plays the input, delayed by the latency.
+    require(p.getTailSamples() == latency_samples, "silent instance tail is not the latency");
     p.setProcessing(true);
     ParameterChanges wet;
     index = 0;
@@ -138,7 +145,7 @@ void edge_cases() {
     p.setActive(false);
     setup.sampleRate = 48000;
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
-                p.getTailSamples() == 1010,
+                p.getTailSamples() == 1010 + latency_samples,
             "corrected rate does not bring the filter back");
     p.setActive(false);
     p.terminate();
@@ -207,7 +214,7 @@ void multichannel() {
     p.setActive(false);
     require(p.setBusArrangements(&octo, 1, &octo, 1) == kResultOk, "8x8 after 2x6");
     // The 2x6 preset does not suit 8x8 buses: silence, and the preset is kept.
-    require(p.setActive(true) == kResultOk && p.getTailSamples() == 0,
+    require(p.setActive(true) == kResultOk && p.getTailSamples() == latency_samples,
             "2x6 preset on 8x8 buses must activate, silent");
     MemoryStream kept;
     require(p.getState(&kept) == kResultOk, "state snapshot on 8x8 buses");
@@ -652,9 +659,109 @@ void failure_records() {
     p.setActive(false);
     p.terminate();
 }
+// VST3-8: the reported tail is measured at the output, as Steinberg's tail
+// test does: the last input sample's last tap arrives at sample tail - 1 after
+// the input stops, and only rounding residue follows.
+void tail_measured_at_output() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "tail initialize");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    convolver::HostState saved;
+    saved.configuration = convolver::Configuration{48000, 2, 2, 3, {}, {}, {}};
+    std::vector<float> taps(300, 0.f);
+    taps.front() = .5f;
+    taps.back() = 1.f;
+    saved.configuration->paths = {{taps, {{0, 1}}, {{0, 1}}}, {taps, {{1, 1}}, {{1, 1}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode tail state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore tail state");
+    ProcessSetup setup{kRealtime, kSample32, 64, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "tail activate");
+    const auto tail = p.getTailSamples();
+    require(tail == 299 + latency_samples, "tail is not the filter's tail plus the latency");
+    p.setProcessing(true);
+    std::array<float, 64> left{}, right{}, out_left{}, out_right{};
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 64;
+    const int stop = 11 * 64; // The input stops here; the last input sample is 1.
+    float last = 0, after = 0;
+    for (int b = 0; b < 40; ++b) {
+        for (int i = 0; i < 64; ++i) {
+            const int n = b * 64 + i;
+            left[i] = right[i] = n < stop ? (n == stop - 1 ? 1.f : std::sin(.37f * n)) : 0.f;
+        }
+        require(p.process(d) == kResultOk, "tail process");
+        for (int i = 0; i < 64; ++i) {
+            const auto since = b * 64 + i - stop;
+            if (since == static_cast<int>(tail) - 1)
+                last = out_left[i];
+            if (since >= static_cast<int>(tail))
+                after = std::max({after, std::abs(out_left[i]), std::abs(out_right[i])});
+        }
+    }
+    require(std::abs(last - 1.f) < 1e-5, "the reported tail does not end at the filter's last tap");
+    require(after < 1e-6, "output continues after the reported tail");
+    p.setProcessing(false);
+    p.setActive(false);
+    p.terminate();
+}
+// VST3-8: the Bypass text converts both ways, and the controller's own
+// state calls succeed (it keeps no state, so they store and read nothing).
+void controller_conversions() {
+    HostApplication context;
+    Controller c;
+    require(c.initialize(&context) == kResultOk, "controller initialize");
+    for (ParamValue v : {0.0, 1.0}) {
+        String128 text{};
+        require(c.getParamStringByValue(bypass_id, v, text) == kResultOk, "bypass text");
+        ParamValue back = -1;
+        require(c.getParamValueByString(bypass_id, text, back) == kResultOk && back == v,
+                "bypass text does not convert back");
+    }
+    String128 upper{'O', 'N', 0}, number{'0', 0}, other{'m', 'a', 'y', 'b', 'e', 0};
+    ParamValue value = -1;
+    require(c.getParamValueByString(bypass_id, upper, value) == kResultOk && value == 1,
+            "ON not accepted");
+    require(c.getParamValueByString(bypass_id, number, value) == kResultOk && value == 0,
+            "0 not accepted");
+    String128 one{'1', 0}, fraction{'0', '.', '5', 0};
+    require(c.getParamValueByString(bypass_id, one, value) == kResultOk && value == 1,
+            "1 not accepted");
+    // The SDK's own conversion reads any text as 0 on macOS.
+    require(c.getParamValueByString(bypass_id, fraction, value) != kResultOk,
+            "a fraction accepted");
+    require(c.getParamValueByString(bypass_id, other, value) != kResultOk,
+            "unrelated text accepted");
+    require(c.getParamValueByString(bypass_id, nullptr, value) == kInvalidArgument,
+            "no text accepted");
+    MemoryStream state;
+    require(c.getState(&state) == kResultOk, "controller getState");
+    int64 size = -1;
+    state.tell(&size);
+    require(size == 0, "controller wrote state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(c.setState(&state) == kResultOk, "controller setState");
+    c.terminate();
+}
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
+        controller_conversions();
+        tail_measured_at_output();
         multichannel();
         version1_presets();
         speaker_arrangements();

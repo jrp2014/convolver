@@ -120,7 +120,11 @@ class Vst3 final : public test::Adapter {
         return processor_->getLatencySamples();
     }
     std::size_t tail_frames() override {
-        return processor_->getTailSamples();
+        // VST3 measures the tail at the output (latency included, VST3-8); the
+        // harness compares the filter's own tail, as for the other formats.
+        const auto tail = processor_->getTailSamples();
+        check(tail >= processor_->getLatencySamples(), "tail shorter than the latency");
+        return tail - processor_->getLatencySamples();
     }
     std::optional<convolver::Configuration> saved() override {
         MemoryStream stream;
