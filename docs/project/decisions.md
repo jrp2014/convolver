@@ -71,13 +71,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Configuration and sound
 
-These two were decided in conversation with jrp before decisions were recorded
-in the repository; this log is their first written record.
+The first two were decided in conversation with jrp before decisions were
+recorded in the repository; this log is their first written record.
 
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 18 October 2026 | Dither is off unless requested | [Command-line reference](../use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | 18 October 2026 | `.cfg` paths are not translated or guessed between systems. Relative paths may use `\`; drive, UNC and `\`-rooted paths are rejected on macOS and Linux with a message saying to make them relative | [Other programs](../use/other-programs.md) |
+| 24 October 2026 | A headerless `.pcm` or `.raw` filter in a `.cfg` is read as mono little-endian float32 (`f32le`, what DRC and BruteFIR write) at the configuration's rate, unless it starts with a sound-file header. Convolver says which type it used, and `--raw-filter-format` chooses another; `.cfg` syntax is unchanged | [Filter files](../use/configuration.md#filter-files) |
 
 ## Diagnostics
 
@@ -91,6 +92,7 @@ in the repository; this log is their first written record.
 | --- | --- | --- |
 | 21 October 2026 | The Audio Unit is built with Apple's AudioUnitSDK and distributed under GPL-3.0-or-later with its Apache-2.0 notices; everything else stays GPL-2.0-or-later | [Audio Unit licence](../use/plugins.md#audio-unit-licence) |
 | 22 October 2026 | AudioUnitSDK 1.4.0, so the AU target builds as C++23 while everything else stays C++20 | [Build from source](../develop/build.md#pinned-format-dependencies) |
+| 24 October 2026 | The preview packages do not ship libFLAC, libogg, libvorbis or libopus (IO-6), so they neither read FLAC or Ogg nor write FLAC; the limitation and the workarounds (convert, or build against a libsndfile that has them) are documented | [FLAC and Ogg](../use/command-line.md#flac-and-ogg) |
 
 ## Documentation
 

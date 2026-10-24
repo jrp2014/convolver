@@ -2,6 +2,7 @@
 // Configuration inspection and validation without rendering (Convolver::io).
 #pragma once
 #include "convolver/engine.hpp"
+#include "convolver/io.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -22,6 +23,7 @@ struct InspectionOptions {
     bool syntax_only = false;         // One configuration text; IRs are not opened.
     bool all_configurations = false;  // Validate every list leaf; no selectors allowed.
     InspectionProfile profile = InspectionProfile::convolver;
+    RawEncoding raw_filter_encoding{}; // As ConfigurationSelection::raw_filter_encoding.
 };
 // Physical 1-based line and byte column; zero means unknown or the whole file.
 struct SourcePosition {
@@ -55,6 +57,7 @@ struct InspectedFilterPath {
     std::optional<int> ir_sample_rate;
     std::optional<std::size_t> ir_file_channels, ir_frames, partitions;
     std::vector<InspectedRoute> inputs, outputs;
+    std::optional<RawEncoding> raw_encoding; // Present for a headerless raw filter.
 };
 struct InspectedConfiguration {
     std::filesystem::path file;

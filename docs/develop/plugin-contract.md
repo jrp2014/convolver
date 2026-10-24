@@ -302,9 +302,11 @@ How each adapter meets the contract where its format differs:
   display without an editor (VST3-3), so a mismatch found at activation is
   silent without a message, and the [speaker check](../use/plugins.md#channels)
   notice (`HostFilter::notice()`) is recorded but not shown. The adapter handles
-  variable block sizes, in-place host buffers, calls with no audio, inactive
-  channels and silence flags; 32- and 64-bit host buffers both use the float
-  engine.
+  variable block sizes, in-place host buffers, calls with no audio and inactive
+  channels; it reads input buffers even when the host flags them silent, and
+  never flags its output silent (VST3-10). `getTailSamples()` is the filter's
+  tail plus the 256-sample latency, measured at the output as Steinberg's tail
+  test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
   change notification when either changes; the tail stays at the longest
   filter used until the host reinitializes the unit. Bypass is
