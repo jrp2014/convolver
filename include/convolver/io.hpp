@@ -6,6 +6,8 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace convolver {
@@ -13,12 +15,44 @@ struct AudioInfo {
     int sample_rate;
     std::size_t channels;
 };
-// RAW streaming is little-endian IEEE float32, with explicit metadata.
+// RAW streams have no header: the rate and channel count are given explicitly.
 using RawSpec = AudioInfo;
+// Sample types. 8-bit PCM is unsigned in the WAV family (wav, rf64, w64) and
+// signed in the other containers; the other integer types are signed.
+enum class SampleType { pcm8, pcm16, pcm24, pcm32, float32, float64 };
+// Output containers. rf64, w64 and caf have no 4 GiB size limit; flac is
+// lossless compression (8, 16 and 24 bits only); raw is headerless and
+// little-endian, with no 8-bit type.
+enum class Container { wav, rf64, w64, aiff, caf, flac, raw };
+struct OutputEncoding {
+    Container container = Container::wav;
+    SampleType sample = SampleType::float32;
+    friend bool operator==(const OutputEncoding&, const OutputEncoding&) = default;
+};
+// Whether a container can hold a sample type (for example, flac has no float).
+bool supported(OutputEncoding) noexcept;
+// Whether the libsndfile this build uses can write a container. Only flac can
+// be missing: libsndfile builds without its external libraries leave it out.
+bool available(Container) noexcept;
+// The original WAV and RAW formats; each is shorthand for an OutputEncoding.
 // Integer WAV formats: wav_pcm8 is unsigned 8-bit; the others are signed.
 enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float, wav_pcm8 };
-// Container bits of an integer output format, or zero for float formats.
+OutputEncoding output_encoding(OutputFormat) noexcept;
+// Bits of an integer sample type or output format, or zero for float types.
+unsigned container_bits(SampleType) noexcept;
 unsigned container_bits(OutputFormat) noexcept;
+// How the samples of a RAW stream are stored: pcm16, pcm24, pcm32, float32 or
+// float64, little- or big-endian. Integers are scaled by 2^-(bits-1).
+struct RawEncoding {
+    SampleType sample = SampleType::float32;
+    bool big_endian = false;
+    friend bool operator==(const RawEncoding&, const RawEncoding&) = default;
+};
+// The names ffmpeg and sox use: s16le, s24le, s32le, f32le, f64le, or the same
+// ending in be. parse_raw_encoding returns nothing for any other name.
+std::optional<RawEncoding> parse_raw_encoding(std::string_view) noexcept;
+// Throws std::invalid_argument for pcm8, which raw streams do not have.
+std::string raw_encoding_name(RawEncoding);
 
 // Integer quantization, shared by every integer output format. With B
 // significant (valid) bits, samples are scaled by 2^(B-1), offset by the dither
@@ -87,7 +121,7 @@ class Pcm16Quantizer {
   private:
     Quantizer quantizer_;
 };
-// Optional container metadata for WAV output.
+// Optional container metadata, for the wav container only.
 struct OutputMetadata {
     // WAVE speaker positions (bit 0 front left ... bit 17 top back right), one
     // set bit per channel in channel order. Zero leaves the speakers unspecified
@@ -100,7 +134,10 @@ struct OutputMetadata {
 inline constexpr std::uint32_t known_speaker_bits = 0x3ffff;
 class AudioReader {
   public:
-    explicit AudioReader(const std::filesystem::path&, std::optional<RawSpec> = {});
+    // A RawSpec reads a headerless stream with the given encoding; without
+    // one, the file's own header describes it and the encoding is ignored.
+    explicit AudioReader(const std::filesystem::path&, std::optional<RawSpec> = {},
+                         RawEncoding = {});
     ~AudioReader();
     AudioReader(const AudioReader&) = delete;
     AudioReader& operator=(const AudioReader&) = delete;
@@ -117,8 +154,11 @@ class AudioReader {
 };
 class AudioWriter {
   public:
-    // Every integer format is quantized by Quantizer with these options; float
-    // and RAW formats reject dither, noise shaping and valid bits.
+    // Every integer sample type is quantized by Quantizer with these options;
+    // float types reject dither, noise shaping and valid bits. Valid bits below
+    // the container size and speaker masks need the wav container.
+    AudioWriter(const std::filesystem::path&, AudioInfo, OutputEncoding, QuantizationOptions = {},
+                OutputMetadata = {});
     AudioWriter(const std::filesystem::path&, AudioInfo, OutputFormat, QuantizationOptions = {},
                 OutputMetadata = {});
     ~AudioWriter();
@@ -137,12 +177,20 @@ class AudioWriter {
 struct ConfigurationSelection {
     int sample_rate = 0;
     std::size_t input_channels = 0, output_channels = 0;
+    // How headerless .pcm and .raw filters in a .cfg are stored. They are always
+    // mono at the configuration's rate; the default, little-endian float32, is
+    // what DRC and BruteFIR write.
+    RawEncoding raw_filter_encoding{};
 };
+
 // IR audio file, legacy .cfg, or configuration list. A list selects the first
 // entry matching every specified property. A sound file has as many outputs as
 // inputs.
+// raw_filters receives the selected configuration's IR files that were read as
+// headerless raw filters, with selection.raw_filter_encoding.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
-                                 std::vector<std::filesystem::path>* source_paths = nullptr);
+                                 std::vector<std::filesystem::path>* source_paths = nullptr,
+                                 std::vector<std::filesystem::path>* raw_filters = nullptr);
 Configuration load_configuration(const std::filesystem::path&, int expected_rate = 0,
                                  std::size_t expected_inputs = 0,
                                  std::vector<std::filesystem::path>* source_paths = nullptr);

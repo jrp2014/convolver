@@ -686,7 +686,200 @@ void quantizer_tests(const fs::path& dir) {
                 container_bits(OutputFormat::raw_float) == 0,
             "container bits");
 }
+// Every container and sample type round-trips through libsndfile with the
+// declared format; impossible combinations fail before a file is created.
+void missing_flac(const fs::path& p, OutputEncoding e) {
+    try {
+        AudioWriter w(p, {44100, 2}, e);
+    } catch (const std::runtime_error& error) {
+        require(std::string(error.what()).find("without FLAC support") != std::string::npos,
+                "a missing FLAC library is named");
+        require(!fs::exists(p), "unavailable FLAC output creates no file");
+        return;
+    }
+    throw std::runtime_error("FLAC output without FLAC support was accepted");
+}
+void container_tests(const fs::path& dir) {
+    const std::vector<float> samples{-1, .5f, .25f, -.125f, 0, .75f, -.5f, .0625f};
+    constexpr std::pair<Container, int> containers[]{
+        {Container::wav, SF_FORMAT_WAV}, {Container::rf64, SF_FORMAT_RF64},
+        {Container::w64, SF_FORMAT_W64}, {Container::aiff, SF_FORMAT_AIFF},
+        {Container::caf, SF_FORMAT_CAF}, {Container::flac, SF_FORMAT_FLAC},
+        {Container::raw, SF_FORMAT_RAW}};
+    constexpr SampleType types[]{SampleType::pcm8,  SampleType::pcm16,   SampleType::pcm24,
+                                 SampleType::pcm32, SampleType::float32, SampleType::float64};
+    int written = 0;
+    for (const auto& [container, sf_container] : containers)
+        for (const auto type : types) {
+            const OutputEncoding e{container, type};
+            const auto p = dir / "container.audio";
+            fs::remove(p);
+            const bool flac_ok =
+                type == SampleType::pcm8 || type == SampleType::pcm16 || type == SampleType::pcm24;
+            const bool expected = container == Container::flac  ? flac_ok
+                                  : container == Container::raw ? type != SampleType::pcm8
+                                                                : true;
+            require(supported(e) == expected, "supported() container/type table");
+            if (!expected) {
+                rejects([&] { AudioWriter w(p, {44100, 2}, e); });
+                require(!fs::exists(p), "an unsupported encoding creates no file");
+                continue;
+            }
+            if (!available(container)) {
+                // A libsndfile without FLAC (the preview packages build it
+                // that way) gets a clear refusal and no file.
+                require(container == Container::flac, "only FLAC can be unavailable");
+                missing_flac(p, e);
+                continue;
+            }
+            {
+                AudioWriter w(p, {44100, 2}, e);
+                w.write(samples);
+                w.close();
+            }
+            ++written;
+            const auto bits = container_bits(type);
+            if (container == Container::raw) {
+                const auto width = bits ? bits / 8 : type == SampleType::float64 ? 8 : 4;
+                require(fs::file_size(p) == samples.size() * width, "raw output size");
+                const RawEncoding raw{type, false};
+                AudioReader r(p, RawSpec{44100, 2}, raw);
+                std::vector<float> got(samples.size());
+                require(r.read(got) == 4 && got == samples, "raw output round-trips exactly");
+                continue;
+            }
+            SF_INFO info{};
+            SNDFILE* f = sf_open(p.string().c_str(), SFM_READ, &info);
+            require(f != nullptr, "libsndfile opens every written container");
+            const bool wav_family = container == Container::wav || container == Container::rf64 ||
+                                    container == Container::w64;
+            const int subtype = type == SampleType::pcm8
+                                    ? (wav_family ? SF_FORMAT_PCM_U8 : SF_FORMAT_PCM_S8)
+                                : type == SampleType::pcm16   ? SF_FORMAT_PCM_16
+                                : type == SampleType::pcm24   ? SF_FORMAT_PCM_24
+                                : type == SampleType::pcm32   ? SF_FORMAT_PCM_32
+                                : type == SampleType::float32 ? SF_FORMAT_FLOAT
+                                                              : SF_FORMAT_DOUBLE;
+            require((info.format & SF_FORMAT_TYPEMASK) == sf_container &&
+                        (info.format & SF_FORMAT_SUBMASK) == subtype && info.channels == 2 &&
+                        info.samplerate == 44100 && info.frames == 4,
+                    "written container, sample type and metadata");
+            std::vector<double> got(samples.size());
+            require(sf_readf_double(f, got.data(), 4) == 4, "read written container");
+            sf_close(f);
+            // These samples are exact in every type (pcm8 has 1/128 steps).
+            for (std::size_t i = 0; i < samples.size(); ++i)
+                require(got[i] == samples[i], "container samples are exact");
+        }
+    require(written == (available(Container::flac) ? 38 : 35),
+            "every supported encoding was written");
+    if (!available(Container::flac))
+        std::cout << "libsndfile has no FLAC: checked that FLAC output is refused\n";
+    // Header features that only the wav container carries.
+    rejects([&] {
+        AudioWriter w(dir / "x.flac", {48000, 2}, {Container::flac, SampleType::pcm24}, {}, {0x3});
+    });
+    rejects([&] {
+        QuantizationOptions q;
+        q.valid_bits = 20;
+        AudioWriter w(dir / "x.aiff", {48000, 1}, {Container::aiff, SampleType::pcm24}, q);
+    });
+    require(!fs::exists(dir / "x.flac") && !fs::exists(dir / "x.aiff"),
+            "rejected header features create no file");
+    // Integer output is quantized like WAV: dither applies, and stays reproducible.
+    const auto flac = dir / "dither.flac";
+    QuantizationOptions q{Dither::triangular, 3};
+    for (int pass = available(Container::flac) ? 0 : 2; pass < 2; ++pass) {
+        AudioWriter w(pass ? dir / "dither.wav" : flac, {48000, 1},
+                      pass ? OutputEncoding{Container::wav, SampleType::pcm16}
+                           : OutputEncoding{Container::flac, SampleType::pcm16},
+                      q);
+        w.write(std::vector<float>(64, 1e-5f));
+        w.close();
+    }
+    if (available(Container::flac)) {
+        AudioReader a(flac), b(dir / "dither.wav");
+        std::vector<float> x(64), y(64);
+        require(a.read(x) == 64 && b.read(y) == 64 && x == y,
+                "FLAC and WAV PCM16 carry the same quantized samples");
+    }
+    require(output_encoding(OutputFormat::raw_float) ==
+                    OutputEncoding{Container::raw, SampleType::float32} &&
+                output_encoding(OutputFormat::wav_pcm8) ==
+                    OutputEncoding{Container::wav, SampleType::pcm8},
+            "OutputFormat shorthands");
+    for (const auto& name : {"container.audio", "dither.flac", "dither.wav"})
+        fs::remove(dir / name);
+}
+// RAW input in every sample type and byte order decodes the same values.
+void raw_encoding_tests(const fs::path& dir) {
+    const auto p = dir / "encoded.raw";
+    struct Case {
+        RawEncoding encoding;
+        std::vector<unsigned char> bytes; // 0.5, -1, then the most negative step
+        float last;
+    };
+    const std::vector<Case> cases{
+        {{SampleType::pcm16, false}, {0x00, 0x40, 0x00, 0x80, 0x01, 0x00}, 1.f / 32768},
+        {{SampleType::pcm16, true}, {0x40, 0x00, 0x80, 0x00, 0x00, 0x01}, 1.f / 32768},
+        {{SampleType::pcm24, false},
+         {0x00, 0x00, 0x40, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff},
+         -1.f / 8388608},
+        {{SampleType::pcm24, true},
+         {0x40, 0x00, 0x00, 0x80, 0x00, 0x00, 0xff, 0xff, 0xff},
+         -1.f / 8388608},
+        {{SampleType::pcm32, false}, {0, 0, 0, 0x40, 0, 0, 0, 0x80, 0, 0, 0, 0x20}, .25f},
+        {{SampleType::pcm32, true}, {0x40, 0, 0, 0, 0x80, 0, 0, 0, 0x20, 0, 0, 0}, .25f},
+        {{SampleType::float32, true}, {0x3f, 0, 0, 0, 0xbf, 0x80, 0, 0, 0x3e, 0x80, 0, 0}, .25f},
+        {{SampleType::float64, false},
+         {0, 0, 0, 0, 0, 0, 0xe0, 0x3f, 0, 0, 0, 0, 0, 0, 0xf0, 0xbf, 0, 0, 0, 0, 0, 0, 0xd0, 0x3f},
+         .25f},
+        {{SampleType::float64, true},
+         {0x3f, 0xe0, 0, 0, 0, 0, 0, 0, 0xbf, 0xf0, 0, 0, 0, 0, 0, 0, 0x3f, 0xd0, 0, 0, 0, 0, 0, 0},
+         .25f},
+    };
+    for (const auto& c : cases) {
+        {
+            std::ofstream f(p, std::ios::binary | std::ios::trunc);
+            f.write(reinterpret_cast<const char*>(c.bytes.data()),
+                    static_cast<std::streamsize>(c.bytes.size()));
+        }
+        {
+            AudioReader r(p, RawSpec{48000, 1}, c.encoding);
+            std::vector<float> got(8);
+            require(r.declared_frames() == 3u, "RAW frame count uses the sample width");
+            require(r.read(got) == 3 && got[0] == .5f && got[1] == -1.f && got[2] == c.last,
+                    "RAW sample type decodes");
+        }
+        {
+            // One frame at a time reads every frame, whatever the sample width.
+            AudioReader r(p, RawSpec{48000, 1}, c.encoding);
+            std::vector<float> one(1), all;
+            while (r.read(one) == 1)
+                all.push_back(one[0]);
+            require(all == std::vector<float>{.5f, -1.f, c.last}, "RAW reads frame by frame");
+        }
+        // A file that is not a whole number of samples is rejected.
+        {
+            std::ofstream f(p, std::ios::binary | std::ios::app);
+            f.put(0);
+        }
+        rejects([&] { AudioReader bad(p, RawSpec{48000, 1}, c.encoding); });
+    }
+    rejects([&] { AudioReader r(p, RawSpec{48000, 1}, {SampleType::pcm8, false}); });
+    // The encoding is ignored when the file has a header.
+    wave(dir / "header.wav", 48000, 1, {.5f});
+    {
+        AudioReader h(dir / "header.wav", std::nullopt, {SampleType::pcm16, true});
+        std::vector<float> one(1);
+        require(h.read(one) == 1 && one[0] == .5f, "a header overrides the RAW encoding");
+    } // Closed before removal: Windows cannot delete an open file.
+    fs::remove(p);
+    fs::remove(dir / "header.wav");
+}
 void run(const fs::path& dir) {
+    container_tests(dir);
+    raw_encoding_tests(dir);
     dither_tests(dir);
     quantizer_tests(dir);
     const std::vector<float> samples{-1, 1, -.5f, .5f, 0, .125f, -.75f, .75f};

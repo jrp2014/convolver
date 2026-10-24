@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """End-to-end CLI checks through real FFTW and libsndfile, no Python packages."""
 import math
+import os
 import re
 from pathlib import Path
 import struct
@@ -167,6 +168,129 @@ def speaker_map_tests(d):
         assert not out.exists() and b'speaker' in p.stderr, p.stderr
     call(['--filter',config(0x3,2),'--input',src,'--output',out,'--speaker-map','wave'],ok=False)
 
+def container_tests(d):
+    """--output-format CONTAINER-TYPE and --raw-format, end to end."""
+    ir=d/'ct-ir.wav'; pcm(ir,[16384]); raw=struct.pack('<4f',.5,-.25,.125,-1.)
+    base=['--filter',ir,'--raw-input','48000','1','--input','-']
+    magic={'wav':b'RIFF','rf64':b'RF64','w64':b'riff','aiff':b'FORM','caf':b'caff','flac':b'fLaC'}
+    # Preview packages build libsndfile without FLAC; --version says which.
+    flac=b'(FLAC output available)' in call(['--version']).stdout
+    for name in ('wav-double','rf64-pcm24','w64-pcm8','aiff-pcm16','aiff-float','caf-pcm32',
+                 'caf-double','flac-pcm8','flac-pcm16','flac-pcm24'):
+        out=d/('ct.'+name.split('-')[0]); out.unlink(missing_ok=True)
+        if name.startswith('flac') and not flac:
+            p=call(base+['--output',out,'--output-format',name],ok=False,data=raw)
+            assert b'without FLAC support' in p.stderr and not out.exists(), p.stderr
+            continue
+        call(base+['--output',out,'--output-format',name],data=raw)
+        assert out.read_bytes()[:4]==magic[name.split('-')[0]], name
+    # The original format names still write the same files as before.
+    for name, subtype, size in (('wav-pcm8',1,1),('wav-pcm16',1,2),('wav-pcm24',1,3),
+                                ('wav-pcm32',1,4),('wav-float',3,4)):
+        out=d/'legacy.wav'
+        call(base+['--output',out,'--output-format',name],data=raw)
+        b=out.read_bytes()
+        assert b[:4]==b'RIFF' and b[8:16]==b'WAVEfmt ', name
+        assert struct.unpack('<HHIIHH',b[20:36])==(subtype,1,48000,48000*size,size,8*size), name
+    # Integer and double raw output, read back with the matching --raw-format.
+    for name, fmt, size in (('raw-pcm16','s16le',2),('raw-pcm24','s24le',3),
+                            ('raw-pcm32','s32le',4),('raw-double','f64le',8)):
+        p=call(base+['--output','-','--output-format',name],data=raw)
+        assert len(p.stdout)==4*size, (name, len(p.stdout))
+        back=call(['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--input','-',
+                   '--output','-','--output-format','raw-float'],data=p.stdout)
+        near(struct.unpack('<4f',back.stdout),[.125,-.0625,.03125,-.25])  # filtered twice
+    assert call(base+['--output','-','--output-format','raw-pcm16'],data=raw).stdout[:2]==b'\0\x20'
+    # s16 and s24 files whose size is not a multiple of 4 bytes keep every frame,
+    # across a read-chunk boundary, from a file and from redirected stdin.
+    for fmt, width in (('s16le',2),('s24le',3)):
+        n=4097; f=d/('odd.'+fmt); f.write_bytes(b''.join(
+            ((i%7-3)<<(8*width-4)).to_bytes(width,'little',signed=True) for i in range(n)))
+        args=['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--output','-',
+              '--output-format','raw-float']
+        p=call(args+['--input',f]); assert len(p.stdout)==4*n, (fmt, len(p.stdout))
+        with open(f,'rb') as seekable:  # stdin redirected from a file
+            p=subprocess.run([EXE,*map(str,args),'--input','-'],stdin=seekable,capture_output=True)
+        assert p.returncode==0 and len(p.stdout)==4*n, (fmt, p.returncode, len(p.stdout))
+        call(args+['--input','-'],data=f.read_bytes()+b'\0',ok=False)  # incomplete frame
+    # Big-endian input in each type.
+    for fmt, packed in (('s16be',struct.pack('>4h',16384,-8192,4096,-32768)),
+                        ('s32be',struct.pack('>4i',1<<30,-(1<<29),1<<28,-(1<<31))),
+                        ('f32be',struct.pack('>4f',.5,-.25,.125,-1.)),
+                        ('f64be',struct.pack('>4d',.5,-.25,.125,-1.)),
+                        ('s24be',b''.join(v.to_bytes(3,'big',signed=True)
+                                          for v in (1<<22,-(1<<21),1<<20,-(1<<23))))):
+        p=call(['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--input','-',
+                '--output','-','--output-format','raw-float'],data=packed)
+        near(struct.unpack('<4f',p.stdout),[.25,-.125,.0625,-.5])
+    out=d/'ct.flac'
+    for bad in (['--output-format','flac-float'],['--output-format','raw-pcm8'],
+                ['--output-format','flac-pcm32'],['--output-format','ogg-pcm16'],
+                ['--output-format','wav'],['--raw-format','u8'],['--raw-format','s16'],
+                ['--output-format','flac-pcm24','--speaker-map','config'],
+                ['--output-format','aiff-pcm24','--valid-bits','20']):
+        out.unlink(missing_ok=True)
+        call(base+['--output',out,*bad],ok=False,data=raw); assert not out.exists(), bad
+    call(['--filter',ir,'--input',d/'ct.aiff','--raw-format','s16le','--output',out],ok=False)
+    # A non-raw stream on stdout names the raw formats.
+    p=call(base+['--output','-','--output-format','aiff-pcm16'],ok=False,data=raw)
+    assert b'raw output format' in p.stderr, p.stderr
+    # Without FLAC, a FLAC input or IR says what is missing and what to do.
+    if b'no FLAC output' in call(['--version']).stdout:
+        fake=d/'ct-fake.flac'; fake.write_bytes(b'fLaC'+bytes(64))
+        p=call(['--filter',ir,'--input',fake,'--output',d/'ct-fake.wav'],ok=False)
+        assert b'built without FLAC' in p.stderr and b'flac --decode' in p.stderr, p.stderr
+        ogg=d/'ct-fake.ogg'; ogg.write_bytes(b'OggS'+bytes(64))
+        p=call(['--filter',ir,'--input',ogg,'--output',d/'ct-fake.wav'],ok=False)
+        assert b'an Ogg file' in p.stderr and b'oggdec' in p.stderr, p.stderr
+        assert b'flac --decode' not in p.stderr, p.stderr
+        (d/'ct-fake.cfg').write_text('48000 1 1 0\n0\n0\nct-fake.flac\n0\n0\n0\n')
+        p=call(['--filter',d/'ct-fake.cfg','--input',d/'ct.aiff','--output',d/'ct-fake.wav'],
+               ok=False)
+        assert b'built without FLAC' in p.stderr and b'looked for' not in p.stderr, p.stderr
+        # A named pipe is never reopened to sniff it: that would block forever.
+        if hasattr(os, 'mkfifo'):
+            fifo=d/'ct-fifo'; os.mkfifo(fifo)
+            writer=subprocess.Popen(['sh','-c','head -c 200 /dev/zero > "$1"','sh',str(fifo)])
+            p=subprocess.run([EXE,'--filter',str(ir),'--input',str(fifo),'--output',
+                              str(d/'ct-fifo.wav')],capture_output=True,timeout=20)
+            writer.wait(timeout=20)
+            assert p.returncode != 0 and b'built without FLAC' not in p.stderr, p.stderr
+    # A DRC-style .pcm filter in a configuration.
+    (d/'ct.pcm').write_bytes(struct.pack('<2f',.5,.25))
+    cfg=d/'ct-raw.cfg'; cfg.write_text('48000 1 1 0\n0\n0\nct.pcm\n0\n0\n0\n')
+    p=call(['--filter',cfg,'--raw-input','48000','1','--input','-','--output','-',
+            '--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    # The assumed sample type is reported, and --raw-filter-format changes it.
+    assert b"raw filter 'ct.pcm' read as mono f32le at 48000 Hz" in p.stderr, p.stderr
+    assert b'--raw-filter-format' in p.stderr, p.stderr
+    (d/'ct.pcm').write_bytes(struct.pack('<2h',16384,8192))
+    p=call(['--filter',cfg,'--raw-filter-format','s16le','--raw-input','48000','1','--input','-',
+            '--output','-','--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    assert b'read as mono s16le' in p.stderr, p.stderr
+    assert b'choose another sample type' not in p.stderr, p.stderr
+    # Two raw filters with the same file name are told apart by their folders.
+    for sub in ('ct-a','ct-b'):
+        (d/sub).mkdir(); (d/sub/'x.pcm').write_bytes(struct.pack('<f',1))
+    two=d/'ct-two.cfg'; two.write_text('48000 1 1 0\n0\n0\nct-a/x.pcm\n0\n0\n0\nct-b/x.pcm\n0\n0\n0\n')
+    p=call(['--filter',two,'--raw-input','48000','1','--input','-','--output','-',
+            '--output-format','raw-float'],data=raw)
+    assert b"'ct-a/x.pcm'" in p.stderr and b"'ct-b/x.pcm'" in p.stderr, p.stderr
+    # The option says when there is nothing for it to do.
+    p=call(['--filter',ir,'--raw-filter-format','s24le','--input',d/'ct.aiff',
+            '--output',d/'ct-unused.wav'])
+    assert b'--raw-filter-format has no effect' in p.stderr, p.stderr
+    p=call(['--filter',cfg,'--raw-filter-format','s16','--raw-input','48000','1','--input','-',
+            '--output','-','--output-format','raw-float'],ok=False,data=raw)
+    assert b'unsupported raw filter format' in p.stderr, p.stderr
+    # A WAV that happens to be named .pcm is still read through its header.
+    pcm(d/'ct.pcm',[16384,8192]); p=call(['--filter',cfg,'--raw-input','48000','1','--input','-',
+                                          '--output','-','--output-format','raw-float'],data=raw)
+    near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
+    assert b'raw filter' not in p.stderr, p.stderr
+
 def main():
     call(['--help'])
     version = call(['--version']).stdout
@@ -275,6 +399,7 @@ def main():
         call(args,data=b'')
         repeatability_tests(d)
         speaker_map_tests(d)
+        container_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d/'v-ir.wav',[16384]); pcm(d/'v-in.wav',[1000,-1000])
         p=subprocess.run([EXE,'--filter','v-ir.wav','--input','v-in.wav','--output','--validate'],

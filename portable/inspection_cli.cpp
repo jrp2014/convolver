@@ -23,6 +23,8 @@ constexpr auto usage = R"(Usage: convolver --inspect CONFIG [options]
   --all-configurations     Validate every list entry (no rate/channel selectors)
   --syntax-only            Check one configuration's text; do not open IR files
   --profile P              convolver (default) or portable-paths
+  --raw-filter-format F    Sample type of headerless .pcm/.raw filters (default
+                           f32le; any --raw-format name)
   --warnings-as-errors     Fail when any warning is reported
   --json                   Print one JSON report (schema 1) on stdout
 Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
@@ -292,6 +294,11 @@ void configuration(Json& j, const InspectedConfiguration& c) {
         j.optional(p.ir_file_channels);
         j.key("frames");
         j.optional(p.ir_frames);
+        j.key("raw_format");
+        if (p.raw_encoding)
+            j.string(raw_encoding_name(*p.raw_encoding));
+        else
+            j.null();
         j.close('}');
         j.key("partitions");
         j.optional(p.partitions);
@@ -395,6 +402,8 @@ void print_report(const InspectionReport& r, bool validate, bool warnings_as_err
             out << "  path " << i + 1 << ": " << p.reference << " channel " << p.ir_channel;
             if (p.ir_frames)
                 out << ", " << *p.ir_frames << " frames at " << *p.ir_sample_rate << " Hz";
+            if (p.raw_encoding)
+                out << ", raw mono " << raw_encoding_name(*p.raw_encoding);
             if (p.partitions)
                 out << ", " << *p.partitions << " partition" << (*p.partitions == 1 ? "" : "s");
             out << "\n    in:";
@@ -530,7 +539,7 @@ std::string report_json(InspectionReport& r, bool validate, bool warnings_as_err
 
 bool is_inspection(int argc, char** argv) {
     // Skip the values of render options, so a file named "--validate" stays a file.
-    constexpr std::array<std::pair<std::string_view, int>, 17> render_values{{
+    constexpr std::array<std::pair<std::string_view, int>, 19> render_values{{
         {"--filter", 1},
         {"--input", 1},
         {"--output", 1},
@@ -542,6 +551,8 @@ bool is_inspection(int argc, char** argv) {
         {"--output-format", 1},
         {"--speaker-map", 1},
         {"--raw-input", 2},
+        {"--raw-format", 1},
+        {"--raw-filter-format", 1},
         {"--dither", 1},
         {"--dither-seed", 1},
         {"--noise-shaping", 1},
@@ -599,7 +610,15 @@ int run_inspection(int argc, char** argv) {
                 warnings_as_errors = true;
             else if (option == "--json")
                 json = true;
-            else if (option == "--profile") {
+            else if (option == "--raw-filter-format") {
+                const auto name = value();
+                const auto parsed = parse_raw_encoding(name);
+                if (!parsed)
+                    throw Usage("unsupported raw filter format: " + name +
+                                " (use s16le, s24le, s32le, f32le or f64le, or the same with "
+                                "be for big-endian)");
+                options.raw_filter_encoding = *parsed;
+            } else if (option == "--profile") {
                 const auto name = value();
                 if (name == "convolver")
                     options.profile = InspectionProfile::convolver;

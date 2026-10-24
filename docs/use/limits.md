@@ -20,7 +20,7 @@ unsigned developer previews.
 | Offer every channel layout in LV2 | Use one of the [LV2 layouts](plugins.md#lv2-channel-layouts), or the VST3 or Audio Unit plug-in |
 | Open projects saved with the old Windows VST 2 plug-in | Load a preset made from the same `.cfg` |
 | Limit peaks | Lower the [gain](command-line.md#gain-and-attenuation) yourself; float output can exceed full scale, and integer output clips |
-| Write formats other than WAV and raw float | Convert the output with another tool; use raw float for streams longer than WAV's 4 GiB limit |
+| Write lossy formats such as MP3 or Ogg Vorbis | Write one of the [output formats](command-line.md#output-formats) and convert it with another tool |
 | Write output files all-or-nothing | Check the exit status: after a failure the output file may be incomplete |
 | Run in a plug-in host at double precision | Processing is single precision; 64-bit host buffers are converted |
 | Reach audio that ASIO or WASAPI exclusive mode sends on Windows | Use shared mode with [Equalizer APO](equalizer-apo.md), or a plug-in in the player |
