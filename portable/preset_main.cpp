@@ -114,7 +114,13 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                     "and --output-channels choose from configuration lists only");
             state = convolver::presets::read_vst3_preset(read_file(input));
         } else {
-            state = {convolver::load_configuration(input, selection), false};
+            std::vector<fs::path> raw_filters;
+            state = {convolver::load_configuration(input, selection, nullptr, &raw_filters), false};
+            // Presets embed the decoded taps, so say what a raw filter was taken to be.
+            for (const auto& raw_filter : raw_filters)
+                std::cerr << "raw filter '" << utf8(raw_filter.filename())
+                          << "' read as mono f32le at " << state.configuration->sample_rate
+                          << " Hz; convert raw filters in other sample types to WAV first\n";
         }
         if (alias) {
             constexpr auto max_channels =

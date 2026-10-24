@@ -325,6 +325,14 @@ means a patched FFmpeg build with `--enable-gpl`.
   Roon/JRiver/Audiolense-related workflows; record versions and exact supported
   subsets before adding a consumer-specific profile. See
   [configuration compatibility](docs/use/other-programs.md).
+- [ ] **CFG-2 — Configurations from and for other programs.** Import Equalizer
+  APO `Convolution:` files, CamillaDSP YAML and BruteFIR configurations into a
+  `.cfg` with its filters, so an existing setup can be brought over; and export
+  to CamillaDSP, which would do for Linux and Raspberry Pi players what HOST-4
+  does for Windows. Each converter needs fixtures from the program's own
+  documentation or sources, states what it cannot represent (per-channel EQ,
+  mixers with gains above unity, resampling) and fails rather than guess.
+  Optional; after CFG-1 shows which readers matter.
 - [ ] **COMPAT-1 — Files from released builds.** Round-trip tests with
   today's writer and reader can agree with each other while both break
   yesterday's files. When jrp publishes a preview, keep a small collection
@@ -345,9 +353,17 @@ means a patched FFmpeg build with `--enable-gpl`.
   [publication steps](docs/develop/releasing.md#publishing-an-unsigned-preview)
   when this is implemented. The four guarantees it protects are listed in
   [status](docs/project/status.md#compatibility-guarantees).
-- [ ] **IO-1 — Large files.** Specify and test RF64 output, boundary sizes and pipe
-  behavior. Current output choices are ordinary WAV and raw float; input decoder
-  support is not a promise of strict validation for every container.
+- [ ] **IO-1 — Large files.** Specify and test boundary sizes and pipe behavior
+  for output beyond 4 GiB. Input decoder support is not a promise of strict
+  validation for every container.
+  Progress (23 October 2026, PR #60): RF64, W64, CAF, FLAC and raw output have
+  no 4 GiB limit; WAV and AIFF stop with an error at it. Tests at the boundary
+  sizes remain.
+- [ ] **IO-5 — Speaker labels beyond WAV.** Carry `--speaker-map` labels into
+  the channel layouts of the other containers (WAVE_FORMAT_EXTENSIBLE in RF64
+  and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
+  layouts). Check what libsndfile can write and what readers honour first; a
+  rejected layout must fail as WAV does, not fall back to a default.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
@@ -476,7 +492,7 @@ with compatibility tests; linked IDs point to open work above.
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
-| Output is ordinary WAV or little-endian raw float; codecs depend on libsndfile build | WAV size limits and broader container validation remain IO-1. RAW has no embedded rate/channel metadata. | [RAW I/O](docs/use/command-line.md#raw-streams) |
+| Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
@@ -505,6 +521,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
+- [x] **IO-3 — More output containers.** 23 October 2026, PR #60;
+  [output formats](docs/use/command-line.md#output-formats).
+- [x] **IO-4 — Raw filters and raw sample types.** 24 October 2026, PR #60;
+  `f32le` by default and reported, `--raw-filter-format` for others;
+  [filter files](docs/use/configuration.md#filter-files),
+  [RAW streams](docs/use/command-line.md#raw-streams).
+- [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
+  decided not to ship the codec libraries; limitation and workarounds in
+  [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).
 - [x] **LV2-1 — Adapter and headless test.** 22 October 2026, PR #43;
   [LV2 tests](docs/develop/testing.md#lv2-tests).
 - [x] **LV2-2 — Loading filters.** 23 October 2026, PR #48;
