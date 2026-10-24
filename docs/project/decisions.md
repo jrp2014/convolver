@@ -35,6 +35,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | Next milestone: an independent user installs and uses an exact preview package by following the documentation | [Status](status.md#next-milestone-an-independent-user-runs-a-preview), [guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md) |
 | 22 October 2026 | REAPER and Carla are the suggested first named hosts; jrp will try them (replaced 23 October 2026) | [Host testing](../develop/host-testing.md#first-hosts) |
 | 23 October 2026 | jrp's first named hosts, on his Mac: REAPER and Audacity for VST3, GarageBand for the Audio Unit (a smoke test only). Replaces REAPER and Carla | [Host testing](../develop/host-testing.md#first-hosts) |
+| 23 October 2026 | The host-facing part of DIAG-1 comes before the named-host smoke tests. VST3 and AU show why they are silent in a read-only Status parameter and write the full explanation to a Convolver log file (and the macOS unified log), detailed enough to send with a report | [Adapter contract](../develop/plugin-contract.md#status-and-log), [plug-ins](../use/plugins.md#status-and-the-convolver-log) |
 
 ## Releases
 
@@ -55,7 +56,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 21 October 2026 | An empty instance passes audio through unchanged only with equal input and output counts; with unequal counts it plays silence | [Adapter contract](../develop/plugin-contract.md) |
 | 21 October 2026 | A failed first load plays silence, never unfiltered audio, with an error shown where the format allows | [Adapter contract](../develop/plugin-contract.md) |
 | 22 October 2026 | Bypass with unequal counts fades every output to silence | [Adapter contract](../develop/plugin-contract.md) |
-| 22 October 2026 | VST3 counts its configuration as known only after activation (JUCE hosts call `setupProcessing` with placeholder values first); no message for a mismatch found at activation until VST3-3 | [Adapter contract](../develop/plugin-contract.md) |
+| 22 October 2026 | VST3 counts its configuration as known only after activation (JUCE hosts call `setupProcessing` with placeholder values first); no message for a mismatch found at activation until VST3-3 (the message part replaced 23 October 2026: the Status parameter and Convolver log report it, DIAG-1) | [Adapter contract](../develop/plugin-contract.md) |
 | 22 October 2026 | Saving after a failed first load records the failure (host state version 2), so reopening stays silent | [Adapter contract](../develop/plugin-contract.md) |
 | 23 October 2026 | VST3 speaker arrangements are checked with a notice only: no enforced layouts, no host state version 3 and no buses above 8 channels; revisit on request | [Plug-in identities](../develop/plugin-identities.md#channel-layouts) |
 | 23 October 2026 | Whether saved state records bypass follows each format's convention: VST3 saves its bypass parameter; LV2 and Audio Units leave bypass to the host and ignore the flag in restored state | [Adapter contract](../develop/plugin-contract.md#bypass) |
@@ -70,6 +71,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | Host state version 2 only marks a failed first load; everything else is still written as version 1 | [Plug-in identities](../develop/plugin-identities.md) |
 | 22 October 2026 | AU presets keep Apple's standard keys and hold the state under `convolver-state`; LV2 presets hold it as an `atom:Chunk` under the base URI plus `state` | [Adapter contract](../develop/plugin-contract.md#preset-files) |
 | 23 October 2026 | The LV2 filter parameter and the saved file path share one URI, the base URI plus `filter`, which PipeWire `filter-chain` `config` entries also use | [Plug-in identities](../develop/plugin-identities.md) |
+| 24 October 2026 | Plug-in parameter IDs: VST3 Bypass 1000 and Status 1001, Audio Unit Status 1001, leaving 0 to 2 free for the old VST2 parameters | [Plug-in identities](../develop/plugin-identities.md) |
 
 ## Configuration and sound
 

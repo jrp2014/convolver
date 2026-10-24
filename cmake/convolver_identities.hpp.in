@@ -15,11 +15,16 @@ inline constexpr std::array<std::uint32_t, 4> vst3_processor_class_id{
     @convolver_vst3_processor_words@};
 inline constexpr std::array<std::uint32_t, 4> vst3_controller_class_id{
     @convolver_vst3_controller_words@};
+// Parameter IDs. Hosts keep automation and control mappings by ID; 0 to 2 stay
+// free for the historical VST2 plug-in's parameters (VST3-6).
+inline constexpr std::uint32_t vst3_bypass_parameter_id = @convolver_vst3_bypass_parameter@;
+inline constexpr std::uint32_t vst3_status_parameter_id = @convolver_vst3_status_parameter@;
 
 // AU component description codes. four_char packs them as Apple's OSType does.
 inline constexpr std::string_view au_type = "@CONVOLVER_ID_AU_TYPE@";
 inline constexpr std::string_view au_subtype = "@CONVOLVER_ID_AU_SUBTYPE@";
 inline constexpr std::string_view au_manufacturer = "@CONVOLVER_ID_AU_MANUFACTURER@";
+inline constexpr std::uint32_t au_status_parameter_id = @convolver_au_status_parameter@;
 constexpr std::uint32_t four_char(std::string_view code) noexcept {
     std::uint32_t value = 0;
     for (char c : code)

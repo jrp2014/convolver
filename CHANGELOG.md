@@ -12,6 +12,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- The VST3 and the Audio Unit say why they are silent or refused a preset
+  (DIAG-1): a read-only **Status** parameter, which hosts can list with the
+  plug-in's controls, shows one line such as "Silent: the filter is for 44100
+  Hz, the host runs at 48000 Hz", and the new Convolver log
+  (`~/Library/Logs/Convolver/Convolver.log`, `%LOCALAPPDATA%\Convolver\Convolver.log`
+  or `~/.local/state/convolver/convolver.log`; `CONVOLVER_LOG` overrides)
+  records every load, start and failure with the full explanation, ready to
+  send with a report. See [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
 - More output formats (IO-3): `--output-format` takes `CONTAINER-TYPE`, with
   `wav`, `rf64`, `w64`, `aiff`, `caf`, `flac` and `raw` containers and `pcm8`,
   `pcm16`, `pcm24`, `pcm32`, `float` and `double` samples (FLAC holds 8 to 24

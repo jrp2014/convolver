@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
+#include "host_log.hpp"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <new>
+#include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -37,6 +44,14 @@ void operator delete(void* p) noexcept {
     std::free(p);
 }
 void operator delete[](void* p) noexcept {
+    ::operator delete(p);
+}
+// Sized forms too, so library code (std::filesystem) never frees with the
+// runtime's own delete what this operator new allocated.
+void operator delete(void* p, std::size_t) noexcept {
+    ::operator delete(p);
+}
+void operator delete[](void* p, std::size_t) noexcept {
     ::operator delete(p);
 }
 using namespace convolver;
@@ -866,6 +881,185 @@ void allocation_failures() {
     f.load(HostState{filter(2)}, host, [](const Configuration&) {});
     require(!f.notice().empty(), "speaker notice not kept");
 }
+// CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
+// since temporary folders may hold characters outside the ANSI code page.
+std::optional<std::filesystem::path> log_variable() {
+#ifdef _WIN32
+    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#else
+    if (const char* value = std::getenv("CONVOLVER_LOG"))
+        return std::filesystem::path(value);
+#endif
+    return std::nullopt;
+}
+void set_log_variable(const std::optional<std::filesystem::path>& value) {
+#ifdef _WIN32
+    _wputenv_s(L"CONVOLVER_LOG", value ? value->wstring().c_str() : L""); // Empty removes it.
+#else
+    if (value)
+        setenv("CONVOLVER_LOG", value->c_str(), 1);
+    else
+        unsetenv("CONVOLVER_LOG");
+#endif
+}
+// A file name of this process's own, so that concurrent runs never share it.
+std::filesystem::path private_temp(const char* name) {
+    return std::filesystem::temp_directory_path() /
+           (std::string(name) + "-" + std::to_string(std::random_device{}()));
+}
+// DIAG-1: the status line a host shows, and the Convolver log.
+void status_lines() {
+    using Status = HostStatus;
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    const auto check = [&](const HostStatusLine& line, Status status, const char* part,
+                           const char* what) {
+        bool ascii = true;
+        for (const char ch : line.text)
+            ascii = ascii && static_cast<unsigned char>(ch) >= 32 &&
+                    static_cast<unsigned char>(ch) < 127;
+        if (line.status != status || !contains(line.text, part) ||
+            line.text.size() > max_status_text || !ascii) {
+            std::cerr << "status line: " << line.text << '\n';
+            throw std::runtime_error(what);
+        }
+    };
+    const auto refused = [](auto&& load) {
+        try {
+            load();
+        } catch (const std::invalid_argument&) {
+            return;
+        }
+        throw std::runtime_error("load not refused");
+    };
+    const HostLayout stereo{48000, 2, 2}, crossover_bus{48000, 2, 6};
+    const Configuration a{48000, 2, 2, 0, {}, {}, {{{1, .5f}, {{0, 1}}, {{1, 1}}}}};
+    auto other_rate = a;
+    other_rate.sample_rate = 44100;
+    Configuration crossover{48000, 2, 6, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+
+    HostFilter f(8);
+    check(host_status(f, std::nullopt), Status::no_filter, "No filter loaded.", "empty, unknown");
+    check(host_status(f, stereo), Status::no_filter, "audio passes unchanged", "empty, stereo");
+    check(host_status(f, crossover_bus), Status::no_filter, "silent, as inputs and outputs differ",
+          "empty, 2->6");
+    // A wrong rate as the first load: silence, with both rates.
+    refused([&] { f.load(HostState{other_rate}, stereo); });
+    check(host_status(f, stereo), Status::load_failed,
+          "Silent: the filter is for 44100 Hz, the host runs at 48000 Hz. Details in the "
+          "Convolver log.",
+          "failed first load");
+    // Accepted before the host is known (VST3 before activation, Audacity's
+    // window): what was loaded, not yet checked.
+    f.load(HostState{other_rate}, std::nullopt);
+    check(host_status(f, std::nullopt), Status::unchecked,
+          "Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.", "unchecked");
+    // Checked at activation: silence, and why.
+    static_cast<void>(f.activate(stereo));
+    check(host_status(f, stereo), Status::load_failed, "Silent: the filter is for 44100 Hz",
+          "mismatch at activation");
+    f.load(HostState{a}, stereo);
+    check(host_status(f, stereo), Status::playing, "Filter loaded: 48000 Hz, 2 in, 2 out.",
+          "playing");
+    // A refused replacement: the previous filter plays, and the line says so.
+    refused([&] { f.load(HostState{crossover}, stereo); });
+    check(host_status(f, stereo), Status::load_failed,
+          "Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.",
+          "refused replacement");
+    const std::array<std::pair<HostFailureKind, const char*>, 6> kinds{{
+        {HostFailureKind::filter_file, "filter file could not be read"},
+        {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
+        {HostFailureKind::state_newer, "saved by a newer Convolver"},
+        {HostFailureKind::preparation, "could not be prepared"},
+        {HostFailureKind::sample_rate, "the filter is for 0 Hz"},
+        {HostFailureKind::channels, "the filter has 0 in, 0 out"},
+    }};
+    for (const auto& [kind, part] : kinds) {
+        f.reject(kind, "why");
+        check(host_status(f, std::nullopt), Status::load_failed, part, "failure kind");
+        check(host_status(f, std::nullopt), Status::load_failed, "previous filter kept",
+              "failure kind keeps the filter");
+    }
+    // A saved failed load plays silence and says so.
+    HostState saved_failure;
+    saved_failure.failed = true;
+    f.load(saved_failure, stereo);
+    check(host_status(f, stereo), Status::load_failed,
+          "Silent: a load had failed when this was saved.", "saved failure");
+    f.fail_activation("no memory");
+    check(host_status(f, stereo), Status::load_failed,
+          "Silent: the plug-in could not start the filter.", "activation failure");
+    // A speaker notice is mentioned, briefly.
+    HostFilter labelled(8);
+    Configuration surround{48000, 2, 6, 0x3F, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    labelled.load(HostState{surround}, HostLayout{48000, 2, 6, 0x3, 0x633});
+    check(host_status(labelled, HostLayout{48000, 2, 6, 0x3, 0x633}), Status::playing,
+          "Speaker labels differ", "speaker notice");
+
+    // The log lines adapters write.
+    HostFilter g(8);
+    require(loaded_line(g, true) == "Loaded state with no filter." &&
+                contains(started_line(g, stereo, 512),
+                         "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
+                         "filter, so audio passes unchanged.") &&
+                contains(started_line(g, crossover_bus, 512), "plays silence"),
+            "empty instance log lines");
+    g.load(HostState{other_rate}, std::nullopt);
+    require(loaded_line(g, false) == "Loaded a filter for 44100 Hz, 2 in, 2 out; it is checked "
+                                     "when the host starts the plug-in.",
+            "unchecked load line");
+    static_cast<void>(g.activate(stereo));
+    require(contains(started_line(g, stereo, 64), "does not suit the host") &&
+                contains(started_line(g, stereo, 64), "Convolver does not resample"),
+            "silent start line does not explain");
+    g.load(saved_failure, stereo);
+    require(contains(loaded_line(g, true), "records a failed load") &&
+                contains(loaded_line(g, true), "plays silence"),
+            "saved failure load line");
+
+    // The file: one dated line per message, with the version and format, and
+    // rotation once it has grown past 1 MB.
+    const auto folder = private_temp("convolver-host-log-test");
+    std::filesystem::remove_all(folder);
+    const auto path = folder / "nested" / "Convolver.log";
+    const auto earlier = log_variable(); // Restored below.
+    set_log_variable(path);
+    require(host_log_path() == path, "CONVOLVER_LOG not used");
+    host_log("Test #1", "first line");
+    host_log("Test #1", "second line", false);
+    host_log("Test #1", "");
+    const auto read = [](const std::filesystem::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    };
+    auto text = read(path);
+    require(contains(text, " Convolver ") && contains(text, " Test #1") &&
+                contains(text, ": first line\n") && contains(text, ": second line\n") &&
+                std::count(text.begin(), text.end(), '\n') == 2,
+            "log lines not written");
+    {
+        std::ofstream grow(path, std::ios::app | std::ios::binary);
+        grow << std::string(1024 * 1024 + 1, 'x');
+    }
+    host_log("Test #1", "after rotation");
+    auto old = path;
+    old += ".old";
+    require(contains(read(old), "first line") && read(path).size() < 1024 &&
+                contains(read(path), "after rotation"),
+            "log not rotated");
+    // Empty turns the file off; an unwritable place is not an error.
+    set_log_variable(folder / "nested"); // A folder: cannot be opened.
+    host_log("Test #1", "dropped");
+#ifndef _WIN32
+    setenv("CONVOLVER_LOG", "", 1);
+    require(host_log_path().empty(), "empty CONVOLVER_LOG does not turn the log off");
+#endif
+    set_log_variable(earlier);
+    std::filesystem::remove_all(folder);
+}
+
 int main() {
     try {
         numeric<float>();
@@ -882,6 +1076,7 @@ int main() {
         unequal_bypass();
         muting();
         allocation_failures();
+        status_lines();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

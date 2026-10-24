@@ -204,3 +204,10 @@ if(APPLE)
         COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:convolver_vst3>"
         VERBATIM)
 endif()
+
+# DIAG-1: tests write the Convolver log in the build folder, never the user's.
+get_property(convolver_vst3_tests_here DIRECTORY PROPERTY TESTS)
+if(convolver_vst3_tests_here)
+    set_property(TEST ${convolver_vst3_tests_here} APPEND PROPERTY ENVIRONMENT
+        "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+endif()

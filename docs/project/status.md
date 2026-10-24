@@ -98,9 +98,12 @@ not fit its input instead of saving and presets.
 | Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI. The package has no CLI yet; the first preview will ship it (PLUG-5). Not demonstrated. |
 
 Recovering from a wrong preset is the weakest step today: VST3 keeps the
-working filter but reports the rejection only as `kResultFalse`, so the host
-may show nothing ([loading filters](../use/plugins.md#loading-a-filter)). PLUG-8 (done)
-keeps the reason; DIAG-1 decides where it is shown.
+working filter and reports the rejection to the host only as `kResultFalse`,
+which the host may not show. Since DIAG-1's first step, a read-only Status
+parameter says why and the Convolver log explains in full
+([status and log](../use/plugins.md#status-and-the-convolver-log)); whether
+REAPER, Audacity and GarageBand display the Status parameter is for HOST-1 to
+record.
 
 ## Next milestone: an independent user runs a preview
 

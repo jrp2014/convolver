@@ -49,7 +49,7 @@ behaviour:
 | Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
 | --- | --- | --- | --- |
 | **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence with no message, because VST3 has no status display without an editor; accepted until VST3-3 (owner's decision, 22 October 2026) |
+| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3, owner's decision, 22 October 2026). Since DIAG-1 the Status parameter says why and the Convolver log explains (owner's decision, 23 October 2026; see [status and log](#status-and-log)) |
 | **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
 
 The control side of these rules is shared code in the host layer, so every
@@ -102,8 +102,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
 Added 22 October 2026 from jrp's
 [release-readiness guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md);
 PLUG-8 implements it. Silence can be correct processing and still confuse the
-user, so every failure in the table above keeps a structured reason, even while
-the place it is shown is undecided (DIAG-1):
+user, so every failure in the table above keeps a structured reason; where it
+is shown is in [status and log](#status-and-log) (DIAG-1):
 
 - **What failed:** a missing or unreadable filter file, unreadable or
   malformed state, a newer state version, the sample rate, the channel counts
@@ -141,6 +141,48 @@ refused. A host format that the adapter refuses before any filter is
 involved (an Audio Unit asked for different input and output sample rates)
 is returned to the host as an error and logged, but not recorded: the unit
 does not start, and no filter request failed.
+
+## Status and log
+
+Decided by jrp on 23 October 2026 (DIAG-1, brought forward before the first
+named-host smoke tests): adapters without a host log interface show why they
+are silent or refused a load in two places, with the same words in every
+format.
+
+- **A read-only Status parameter** whose value is a `HostStatus` (Playing, No
+  filter, Load failed, Not checked yet) and whose text for the current value
+  is `host_status()`'s one line of at most 127 ASCII characters
+  ([`host.hpp`](../../include/convolver/host.hpp)). The status follows
+  `HostFilter::failure()`, so a refused replacement shows Load failed while
+  the previous filter plays, as LV2's status port does. Before the host's
+  configuration is known it is Not checked yet and names the filter's rate
+  and channels. The parameter is not automatable and is not part of the host
+  state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the
+  processor sends the line to the controller in a `ConvolverStatus` message
+  after every load, activation, connection, `setupProcessing` and
+  `setBusArrangements` (outside its control lock), and the controller asks the
+  host to reread its parameters (`restartComponent(kParamValuesChanged)`;
+  hosts may ignore it). Audio Unit: global parameter 1001, indexed, readable
+  and not writable; the line is the current value's
+  `kAudioUnitProperty_ParameterStringFromValue`, recomputed after every
+  restore, initialization, cleanup and stream format change, and a
+  parameter-change event is sent outside the control lock. Host writes to it
+  are ignored, and the value `AUBase::SaveState` writes with the other
+  parameters is ignored on restore.
+- **The Convolver log** (`host_log()` in
+  [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
+  load (`loaded_line()`), start (`started_line()`: rate, channels, block size
+  and what plays, with the failure or speaker notice in full) and rejection
+  (`HostFilter::rejection()`'s message), tagged with the version, format,
+  instance number and host program. An instance skips a line identical to the
+  one it wrote last, as hosts restart plug-ins often. Adapters write the file
+  outside their control lock. On macOS the lines also go to the unified log.
+  Control thread only. Locations are in the
+  [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
+  `CONVOLVER_LOG` into the build folder.
+
+LV2 keeps its own routes (the `status` port and `log:log`) and does not write
+the file. An editor (VST3-3, HOST-2) would show the same text.
 
 ## Initial restoration and live replacement
 
@@ -298,10 +340,10 @@ Compatibility rules for presets:
 
 How each adapter meets the contract where its format differs:
 
-- **VST3:** reports a rejected `setState` as `kResultFalse`; there is no status
-  display without an editor (VST3-3), so a mismatch found at activation is
-  silent without a message, and the [speaker check](../use/plugins.md#channels)
-  notice (`HostFilter::notice()`) is recorded but not shown. The adapter handles
+- **VST3:** reports a rejected `setState` as `kResultFalse`; the Status
+  parameter and the Convolver log ([status and log](#status-and-log)) say why,
+  including for a mismatch found at activation, and the log carries the
+  [speaker check](../use/plugins.md#channels) notice (`HostFilter::notice()`). The adapter handles
   variable block sizes, in-place host buffers, calls with no audio and inactive
   channels; it reads input buffers even when the host flags them silent, and
   never flags its output silent (VST3-10). `getTailSamples()` is the filter's
@@ -313,7 +355,8 @@ How each adapter meets the contract where its format differs:
   `kAudioUnitProperty_BypassEffect` driving `HostProcessor::set_bypass`, not
   `AUEffectBase`'s pass-through, and is saved in `ClassInfo`. The output is
   marked silent only once the tail has decayed. Rejections are returned to the
-  host as errors and logged to the unified log.
+  host as errors, shown by the Status parameter and written to the Convolver
+  log and the unified log.
 - **LV2:** ports are fixed, so each channel layout is its own plug-in
   ([identities](plugin-identities.md#channel-layouts)). Bypass is the `enabled`
   port, which the host saves, so the adapter's state does not record bypass and

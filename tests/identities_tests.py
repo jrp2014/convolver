@@ -29,10 +29,13 @@ FROZEN = {
     ('vst3', 'processor_class_id'): '73A81329E6484ADF9DA7D731A8C94201',
     ('vst3', 'controller_class_id'): '622AD87C23664CCFB157473FBCD4A6B9',
     ('vst3', 'macos_bundle_id'): 'io.github.jrp2014.convolver.vst3',
+    ('vst3', 'bypass_parameter_id'): 1000,
+    ('vst3', 'status_parameter_id'): 1001,
     ('au', 'type'): 'aufx',
     ('au', 'subtype'): 'Conv',
     ('au', 'manufacturer'): 'CONV',
     ('au', 'macos_bundle_id'): 'io.github.jrp2014.convolver.au',
+    ('au', 'status_parameter_id'): 1001,
     ('lv2', 'base_uri'): 'https://github.com/jrp2014/convolver/lv2#',
     ('lv2', 'bundle'): 'convolver.lv2',
     ('macos_installer', 'vst3_package_id'): 'io.github.jrp2014.convolver.pkg.vst3',
@@ -61,6 +64,11 @@ AU_SPEAKERS = ['Left', 'Right', 'Center', 'LFEScreen', 'LeftSurround', 'RightSur
 # Channel designations in LV2 port-groups (lv2/port-groups.lv2/port-groups.ttl).
 LV2_CHANNELS = {'left', 'right', 'center', 'side', 'centerLeft', 'centerRight', 'sideLeft',
                 'sideRight', 'rearLeft', 'rearRight', 'rearCenter', 'lowFrequencyEffects'}
+# The 2005-2006 VST2 plug-in's parameter indices (historical/convolverVST/convolverVST.h).
+# A host replacing it with the VST3 maps VST2 index n to VST3 parameter ID n unless the
+# plug-in remaps it (VST3-6), so new parameters stay clear of them (owner's decision,
+# 24 October 2026).
+VST2_PARAMETERS = ('Attenuation dB', 'Partitions', 'Planning rigour')
 REVERSE_DNS = re.compile(r'^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*){2,}$')
 # Files allowed to spell identities out: the registry, this test and dated records.
 COPIES_ALLOWED = ('plugins/identities.json', 'tests/identities_tests.py', 'CHANGELOG.md',
@@ -109,6 +117,15 @@ def check_rules(registry, errors):
             errors.append(f'VST3 class ID {cid}: 32 uppercase hex digits, not all zero')
     if len(set(ids)) != len(ids):
         errors.append('VST3 processor and controller class IDs must differ')
+    vst3_parameters = [registry['vst3'][k] for k in ('bypass_parameter_id', 'status_parameter_id')]
+    for name, pid in [*zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
+                      ('au status', au['status_parameter_id'])]:
+        # VST3 reserves IDs from 0x80000000 for hosts (vsttypes.h).
+        if not isinstance(pid, int) or not len(VST2_PARAMETERS) <= pid <= 0x7FFFFFFF:
+            errors.append(f'{name} parameter ID {pid!r}: a whole number from '
+                          f'{len(VST2_PARAMETERS)} (clear of the VST2 parameters) to 0x7FFFFFFF')
+    if len(set(vst3_parameters)) != len(vst3_parameters):
+        errors.append('VST3 parameter IDs must differ')
     bundles = [registry['vst3']['macos_bundle_id'], registry['au']['macos_bundle_id'],
                *registry['macos_installer'].values()]
     for bundle in bundles:

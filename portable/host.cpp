@@ -312,6 +312,68 @@ void HostFilter::fail_activation(std::string why) {
     activation_failure_ = std::move(f);
 }
 
+namespace {
+std::string ports(std::size_t inputs, std::size_t outputs) {
+    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
+}
+// The short reason of a failure, completing "Silent: " or "Load failed, ...: ".
+std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& host) {
+    switch (f.kind) {
+    case HostFailureKind::filter_file:
+        return "the filter file could not be read.";
+    case HostFailureKind::state_unreadable:
+        return "the preset or saved state could not be read.";
+    case HostFailureKind::state_newer:
+        return "the preset was saved by a newer Convolver.";
+    case HostFailureKind::sample_rate:
+        return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
+               (host ? ", the host runs at " + std::to_string(host->sample_rate) + " Hz." : ".");
+    case HostFailureKind::channels:
+        return "the filter has " + ports(f.inputs, f.outputs) +
+               (host && (host->inputs != f.inputs || host->outputs != f.outputs)
+                    ? ", the plug-in " + ports(host->inputs, host->outputs) + "."
+                    : ".");
+    case HostFailureKind::preparation:
+        return "the filter could not be prepared.";
+    case HostFailureKind::activation:
+        return "the plug-in could not start the filter.";
+    case HostFailureKind::saved_failure:
+        return "a load had failed when this was saved.";
+    }
+    return "the filter could not be loaded.";
+}
+} // namespace
+
+HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host) {
+    constexpr const char* details = " Details in the Convolver log.";
+    HostStatusLine line;
+    if (const auto& f = filter.failure()) {
+        line.status = HostStatus::load_failed;
+        line.text = (f->silent ? "Silent: " : "Load failed, previous filter kept: ") +
+                    short_reason(*f, host) + details;
+    } else if (const auto& c = filter.filter()) {
+        line.status = host ? HostStatus::playing : HostStatus::unchecked;
+        line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
+                    ports(c->input_channels, c->output_channels) +
+                    (host ? "." : "; checked when the host starts it.");
+        if (host && !filter.notice().empty())
+            line.text += " Speaker labels differ; see the Convolver log.";
+    } else if (filter.failed()) {
+        line.status = HostStatus::load_failed;
+        line.text = std::string("Silent: an earlier load failed.") + details;
+    } else {
+        line.status = HostStatus::no_filter;
+        line.text = !host                           ? "No filter loaded. Load a Convolver preset."
+                    : host->inputs == host->outputs ? "No filter: audio passes unchanged. Load a "
+                                                      "Convolver preset."
+                                                    : "No filter: silent, as inputs and outputs "
+                                                      "differ. Load a Convolver preset.";
+    }
+    if (line.text.size() > max_status_text)
+        line.text.resize(max_status_text);
+    return line;
+}
+
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;

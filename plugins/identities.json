@@ -8,13 +8,16 @@
   "vst3": {
     "processor_class_id": "73A81329E6484ADF9DA7D731A8C94201",
     "controller_class_id": "622AD87C23664CCFB157473FBCD4A6B9",
-    "macos_bundle_id": "io.github.jrp2014.convolver.vst3"
+    "macos_bundle_id": "io.github.jrp2014.convolver.vst3",
+    "bypass_parameter_id": 1000,
+    "status_parameter_id": 1001
   },
   "au": {
     "type": "aufx",
     "subtype": "Conv",
     "manufacturer": "CONV",
-    "macos_bundle_id": "io.github.jrp2014.convolver.au"
+    "macos_bundle_id": "io.github.jrp2014.convolver.au",
+    "status_parameter_id": 1001
   },
   "lv2": {
     "base_uri": "https://github.com/jrp2014/convolver/lv2#",
