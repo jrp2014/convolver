@@ -331,7 +331,7 @@ are `.github/workflows/vst3.yml`, `lv2.yml` and `au.yml`:
 
 AudioUnitSDK 1.4.0 needs C++23 (for `std::expected`), so the AU target builds
 as C++23 while the core and the other formats stay C++20. jrp chose 1.4.0 over
-the C++20 1.3.0 on 22 October 2026. Its licence is Apache-2.0, which is why the
+the C++20 1.3.0. Its licence is Apache-2.0, which is why the
 AU component is distributed under GPL-3.0-or-later
 ([AU licence](../project/plans/2026-10-21-plugin-formats.md#au-licence)).
 
@@ -404,8 +404,9 @@ the source repository at the packaged commit).
 `build_sources.py --cache build/downloads --output build/Convolver-source.tar.gz`
 assembles **committed** source and the pinned dependency archives. Then
 `python3 tests/release/source_build.py --archive build/Convolver-source.tar.gz`
-rebuilds dependencies, core, tools, SDK and external consumers from a fresh
-extraction without fetching. Its `--backend` defaults to `AUTO`, as above;
+rebuilds dependencies, core, tools and SDK from a fresh extraction without
+fetching, and runs their tests (the CMake package consumers, which nothing
+shipped uses, run in native CI instead). Its `--backend` defaults to `AUTO`, as above;
 `--sdk`, `--prefix` and `--backend` also check a fresh build against an SDK and
 dependencies you supply. A failed validator remains a release blocker.
 

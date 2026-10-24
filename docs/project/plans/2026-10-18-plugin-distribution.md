@@ -38,10 +38,10 @@ not implement a release or certify any commercial host. The existing
 [configuration interoperability plan](../../archive/plans/2026-10-18-configuration-interoperability.md)
 can proceed independently; its future APIs are not prerequisites here.
 
-**Priority revised on 21 October 2026:** AU and LV2 are no longer follow-ons.
+**Priority revised:** AU and LV2 are no longer follow-ons.
 They are developed in parallel with VST3, sharing one release pipeline (PLUG-5);
 see the [plug-in formats plan](2026-10-21-plugin-formats.md).
-**Signing decided on 21 October 2026:** first releases are unsigned previews on
+**Signing decided:** first releases are unsigned previews on
 macOS (ad-hoc signed, with documented quarantine removal) and Windows (SmartScreen
 warning). Task 4's signing steps and the production acceptance below stay the
 later gate; until then, milestone B is not claimed.
@@ -49,7 +49,7 @@ later gate; until then, milestone B is not claimed.
 Tasks 1–3, the installer templates and candidate gates is on `main`. The two
 signing scripts listed below were left out of `main` until signing is taken up;
 they are in history at `f4519022c`, the branch's last commit.
-**FFT settled on 21 October 2026 (PLUG-1):** the FFT choice below
+**FFT settled (PLUG-1):** the FFT choice below
 ("Windows/Linux use FFTW") was replaced: a plug-in must not share an FFTW
 planner with other code in the host process, so plug-in builds default to
 Ooura on Windows and Linux and Accelerate on macOS. FFTW stays a build option.

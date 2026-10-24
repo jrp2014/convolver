@@ -16,7 +16,7 @@ and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
 The [shared adapter contract](#shared-adapter-contract) below applies to every
 format and takes precedence over a per-format section that seems to disagree.
 
-**Priority (owner's decision, 21 October 2026):** develop VST3, LV2 and AU in
+**Priority:** develop VST3, LV2 and AU in
 parallel, as equal first priorities. The FFmpeg filter and a Windows-native
 adapter (Media Foundation, APO) are parked: FFmpeg because maintaining a
 patched FFmpeg source tree adds uncomfortable coupling, Windows because it needs
@@ -183,7 +183,7 @@ behaviour identical:
 | PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../../use/presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
 | PLUG-4 | One list of supported channel layouts, with [channel meaning](../../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
-| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0 on 22 October 2026), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
+| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
 
 After that the streams are separate and can be worked on at the same time, by
 different people or threads:
@@ -277,7 +277,7 @@ their own copies.
 
 ## Unsigned previews and production
 
-The first releases are unsigned previews (owner's decision, 21 October 2026).
+The first releases are unsigned previews.
 Signing must not become a hidden prerequisite for them. The two gates are
 separate:
 
@@ -291,7 +291,7 @@ separate:
 The next milestone (TODO, "Execution priorities") adds an independent user
 following the REL-2 journeys from the first preview's exact files (REL-3).
 It happens with the chosen candidate run's files before they are uploaded
-(owner's decision, 23 October 2026; see REL-3).
+(see REL-3).
 
 The candidate workflow builds and checks artifacts but cannot publish (its
 permissions are read-only). Publishing a preview is a manual step owned by jrp:
@@ -314,7 +314,7 @@ never changed after release (like the VST3 class IDs). State keys and the
 parameter URI live under the same base.
 
 **Channels.** LV2 ports are fixed in the `.ttl`, so each channel layout is a
-separate plug-in URI generated from one template (owner's decision, 22 October 2026): 1→1, 2→2, 1→2, 2→4,
+separate plug-in URI generated from one template: 1→1, 2→2, 1→2, 2→4,
 2→6, 2→8, 6→6 and 8→8, all discrete, within the VST3 adapter's 1–8 limit.
 Named layouts (port groups and designations) are added per the
 [layout rules](../../develop/plugin-identities.md#channel-layouts). A configuration whose counts
@@ -562,8 +562,7 @@ selection; the documentation should say so plainly.
 needs an app-extension container, and Logic, GarageBand and SoundSource load
 AUv2 effects.
 
-- **Identity:** type `aufx`, manufacturer `CONV` (the owner's choice, 21
-  October 2026) and subtype `Conv`. Every AU needs these codes, open source or not,
+- **Identity:** type `aufx`, manufacturer `CONV` and subtype `Conv`. Every AU needs these codes, open source or not,
   but nothing checks a registry: Apple's archived guide asked developers to
   register a "creator code", and developers report that the registration page
   no longer offers it. A manufacturer code needs at least one uppercase letter
@@ -625,7 +624,7 @@ compatible with GPLv3 but not GPLv2
 ([guidance](https://www.apache.org/licenses/GPL-compatibility.html)). Convolver is
 GPL-2.0-or-later, so a component combining the two can be distributed under
 GPL-3.0-or-later; the core, CLI, VST3 and LV2 builds and the source files stay
-GPL-2.0-or-later. **Decided 21 October 2026 (owner):** use AudioUnitSDK and
+GPL-2.0-or-later. **Decided:** use AudioUnitSDK and
 distribute the AU component under GPL-3.0-or-later. Ship the Apache-2.0 licence
 and any SDK `NOTICE` in the component's `licenses/`, and state the combined
 licence in its notices and the AU guide. The rejected alternative was writing
@@ -686,49 +685,45 @@ the LV2 plug-in serve FFmpeg too.
 
 ## Decisions for the owner
 
-- The plug-in FFT backend (PLUG-1). **Decided and implemented 21 October
-  2026:** Ooura on Linux and Windows, Accelerate on macOS, overridable with
+- The plug-in FFT backend (PLUG-1). **Decided and implemented:** Ooura on Linux and Windows, Accelerate on macOS, overridable with
   `CONVOLVER_FFT_BACKEND`. LV2 and AU builds inherit it.
-- Signing identities for releases (PLUG-5). **Decided 21 October 2026:**
+- Signing identities for releases (PLUG-5). **Decided:**
   start unsigned on macOS and Windows. Mac bundles are ad-hoc signed and users
   remove the download quarantine as the install guide explains; Windows
   installers show a SmartScreen warning. An Apple Developer ID (Gatekeeper and
   notarization) and Windows Authenticode come later. The two gates are
   separated under [unsigned previews and production](#unsigned-previews-and-production).
-- The AU component's licence ([AU licence](#au-licence)). **Decided 21
-  October 2026:** use AudioUnitSDK and distribute the AU component under
+- The AU component's licence ([AU licence](#au-licence)). **Decided:** use AudioUnitSDK and distribute the AU component under
   GPL-3.0-or-later, as GPL-2.0-or-later permits, with the Apache-2.0 notices;
   everything else stays GPL-2.0-or-later.
 - What an empty instance with unequal channel counts and a failed initial
-  load play ([loading and failure](../../develop/plugin-contract.md#loading-and-failure)). **Decided 21
-  October 2026:** silence for both, with an error indication, so an unloaded
+  load play ([loading and failure](../../develop/plugin-contract.md#loading-and-failure)). **Decided:** silence for both, with an error indication, so an unloaded
   crossover never sends full-range audio to a driver; identity stays for an
   empty instance with equal counts. This changes current VST3 behaviour for
   unequal counts.
 - Whether to enforce named layouts or offer VST3 buses above 8 channels
-  (VST3-1). **Decided 23 October 2026 (owner):** neither for now. A filter's
+  (VST3-1). **Decided:** neither for now. A filter's
   output mask is compared with the host's arrangement and gives a notice only;
   no host state version 3; buses stay at 1 to 8 channels. Revisit on request.
 - What bypass plays with unequal channel counts ([bypass](../../develop/plugin-contract.md#bypass)).
-  **Decided 22 October 2026 (owner):** silence on every output, including a
+  **Decided:** silence on every output, including a
   1→2 filter that forks one input; equal counts keep input *c* to output *c*.
   `HostProcessor` implements it, so VST3 already follows it.
-- Whether saved state records bypass ([bypass](../../develop/plugin-contract.md#bypass)). **Decided 23
-  October 2026 (owner):** follow each format's convention. VST3 saves its
+- Whether saved state records bypass ([bypass](../../develop/plugin-contract.md#bypass)). **Decided:** follow each format's convention. VST3 saves its
   bypass parameter; LV2 and AU leave bypass to the host and ignore the flag in
   restored state.
-- Failed replacement (raised in the owner's review, 21 October 2026): keep the
+- Failed replacement (raised in jrp's review): keep the
   running filter in every adapter, with an explicit error indication. Adopted
   in the contract above; VST3 needs a fix for presets loaded while inactive.
 - Which channel layouts to publish as LV2 URIs. Recommendation: the eight
   above, all discrete, added to only on request, as
   `https://github.com/jrp2014/convolver/lv2#discrete-2-6` and so on.
-  **Decided 22 October 2026 (owner):** as recommended, recorded in the PLUG-4
+  **Decided:** as recommended, recorded in the PLUG-4
   registry.
 - The LV2 URI base and the macOS identifier namespace (PLUG-4). Recommendation:
   `https://github.com/jrp2014/convolver/lv2#`, and `io.github.jrp2014.convolver.*`
   in place of `org.convolver.*` (a domain the project does not control) before
-  the first release. **Decided 22 October 2026 (owner):** as recommended.
+  the first release. **Decided:** as recommended.
 - Whether restore prefers the embedded filter or the file. Recommendation:
   embedded, as VST3 presets do, with an explicit reload.
 - Whether to publish macOS/Windows LV2 bundles at all. Recommendation: build

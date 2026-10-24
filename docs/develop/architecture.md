@@ -111,7 +111,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | A plug-in adapter | Its format folder, the [shared adapter contract](plugin-contract.md) | Its `Adapter` driver for the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), its validator, pluginval where it applies |
 | First-use examples or their generator | `examples/first-use/`, `tests/plugins/fixtures.py`, marked commands in the READMEs | `examples.fixtures`, `examples.first_use`, then every adapter's harness test |
 | Adding a native test | `convolver_native_test` in [`CMakeLists.txt`](../../CMakeLists.txt) | The new test is built by `cmake --build build --target check` from a fresh build directory, and is listed by `ctest -N -L native` |
-| Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer` |
+| Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer.*` |
 | Versioning | `SOURCE_PATHS`, build-version CMake and version workflow | `python3 tests/versioning_tests.py`; do not run the mutating helper as a dry run |
 | Documentation | [Page ownership and maintenance](documentation.md) | Markdown/link checks; run changed examples; preserve historical hashes |
 

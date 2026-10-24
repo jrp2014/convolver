@@ -168,6 +168,16 @@ if(CONVOLVER_BUILD_NATIVE)
         set_source_files_properties(portable/kernels.cpp PROPERTIES COMPILE_OPTIONS "${contract_options}")
         set_source_files_properties(portable/kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "${avx2_options}")
     endif()
+    # Experimental only: compare vDSP arithmetic with the existing split kernels.
+    option(CONVOLVER_EXPERIMENT_VDSP_MAC "Benchmark vDSP complex accumulation (Apple only)" OFF)
+    if(CONVOLVER_EXPERIMENT_VDSP_MAC)
+        if(NOT APPLE)
+            message(FATAL_ERROR "The vDSP MAC experiment requires Apple Accelerate.")
+        endif()
+        target_sources(convolver_core PRIVATE portable/kernels_vdsp.cpp)
+        target_compile_definitions(convolver_core PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
+        target_link_libraries(convolver_core PRIVATE "-framework Accelerate")
+    endif()
     add_library(convolver_host STATIC portable/host.cpp portable/host_log.cpp portable/state.cpp)
     add_library(Convolver::host ALIAS convolver_host)
     set_target_properties(convolver_host PROPERTIES EXPORT_NAME host POSITION_INDEPENDENT_CODE ON)
@@ -228,7 +238,10 @@ if(CONVOLVER_BUILD_NATIVE)
         add_executable(convolver_benchmark tests/native/benchmark.cpp)
         target_include_directories(convolver_benchmark PRIVATE portable)
         target_link_libraries(convolver_benchmark PRIVATE convolver_core)
-        list(APPEND native_targets convolver_benchmark)
+        add_executable(convolver_mac_benchmark docs/benchmarks/src/vdsp_mac.cpp)
+        target_include_directories(convolver_mac_benchmark PRIVATE portable)
+        target_link_libraries(convolver_mac_benchmark PRIVATE convolver_core)
+        list(APPEND native_targets convolver_benchmark convolver_mac_benchmark)
         if(CONVOLVER_BUILD_IO)
             # Startup, reset, replacement and loading at a host callback size (PERF-5).
             add_executable(convolver_callback_benchmark tests/native/callback_benchmark.cpp)
@@ -259,6 +272,9 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.engine convolver_engine_tests
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
+        if(CONVOLVER_EXPERIMENT_VDSP_MAC)
+            target_compile_definitions(convolver_engine_tests PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
+        endif()
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.host convolver_host_tests
@@ -372,11 +388,11 @@ if(CONVOLVER_BUILD_TESTS)
             add_test(NAME versioning COMMAND "${CMAKE_COMMAND}" -E env
                 "CONVOLVER_TEST_CMAKE=${CMAKE_COMMAND}" "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/versioning_tests.py")
-            set_tests_properties(versioning PROPERTIES LABELS "build;versioning" TIMEOUT 120)
+            set_tests_properties(versioning PROPERTIES LABELS "build;versioning;repository" TIMEOUT 120)
         endif()
         add_test(NAME identities COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/identities_tests.py")
-        set_tests_properties(identities PROPERTIES LABELS "build;identities")
+        set_tests_properties(identities PROPERTIES LABELS "build;identities;repository")
         add_test(NAME native.cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
@@ -421,9 +437,11 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME examples.first_use COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/fixtures.py" run-documented
             --cli "$<TARGET_FILE:convolver_cli>" --work "${PROJECT_BINARY_DIR}/first-use")
-        set_tests_properties(examples.fixtures examples.first_use PROPERTIES
-            LABELS "examples;real-libraries;cli" TIMEOUT 120)
-        set_tests_properties(examples.first_use PROPERTIES FIXTURES_SETUP first_use_renders)
+        set_tests_properties(examples.first_use PROPERTIES LABELS "examples;real-libraries;cli"
+            TIMEOUT 120 FIXTURES_SETUP first_use_renders)
+        # The fixtures check reads the repository only, and no build option changes it
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
+        set_tests_properties(examples.fixtures PROPERTIES LABELS "examples;repository" TIMEOUT 120)
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)
@@ -461,14 +479,29 @@ if(CONVOLVER_BUILD_TESTS)
     if(CONVOLVER_DOCUMENTATION_TESTS)
         add_test(NAME documentation COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/documentation_regressions.py")
-        set_tests_properties(documentation PROPERTIES LABELS "docs;provenance" TIMEOUT 30)
+        set_tests_properties(documentation PROPERTIES LABELS "docs;provenance;repository" TIMEOUT 30)
     endif()
     if(CONVOLVER_BUILD_NATIVE AND CONVOLVER_PACKAGE_TESTS)
         configure_file(tests/consumer/cache.cmake.in consumer-cache.cmake @ONLY)
         configure_file(tests/consumer/verify.cmake.in consumer-verification.cmake @ONLY)
-        add_test(NAME packaging.consumer COMMAND "${CMAKE_COMMAND}" "-DCONFIG=$<CONFIG>"
-            -P "${CMAKE_CURRENT_BINARY_DIR}/consumer-verification.cmake")
-        set_tests_properties(packaging.consumer PROPERTIES LABELS "packaging;real-libraries" TIMEOUT 180)
+        # One CTest entry per consumer, so they can run side by side. The
+        # install step copies the consumer project and relocates the package
+        # once for all of them.
+        set(consumer_cases installed-core installed-host source-core source-no-ctest missing-component)
+        if(CONVOLVER_BUILD_IO)
+            list(APPEND consumer_cases installed-io)
+        else()
+            list(APPEND consumer_cases missing-io)
+        endif()
+        foreach(step IN ITEMS install LISTS consumer_cases)
+            add_test(NAME packaging.consumer.${step} COMMAND "${CMAKE_COMMAND}" "-DCONFIG=$<CONFIG>"
+                "-DSTEP=${step}" -P "${CMAKE_CURRENT_BINARY_DIR}/consumer-verification.cmake")
+            set_tests_properties(packaging.consumer.${step} PROPERTIES LABELS "packaging;consumer;real-libraries"
+                TIMEOUT 180)
+        endforeach()
+        set_tests_properties(packaging.consumer.install PROPERTIES FIXTURES_SETUP consumer_package)
+        list(TRANSFORM consumer_cases PREPEND packaging.consumer.)
+        set_tests_properties(${consumer_cases} PROPERTIES FIXTURES_REQUIRED consumer_package)
     endif()
     add_custom_target(check COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" USES_TERMINAL VERBATIM)

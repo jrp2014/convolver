@@ -1,0 +1,20 @@
+kernel divergence: Accelerate, vDSP against baseline, B=256
+| Workload | input gain (dB) | FMA-baseline max abs | rel. to peak | dBFS | samples differing | subnormal outputs | baseline-oracle max abs | FMA-oracle max abs | FMA-oracle rel. |
+| 64k stereo, white noise | -10.7 | 5.36e-07 | 5.43e-07 | -125.4 | 88.3% | 0.0% | 2.75e-07 | 3.99e-07 | 5.14e-07 |
+| 64k stereo, full-scale sine | -2.7 | 1.31e-06 | 1.33e-06 | -117.6 | 87.5% | 0.0% | 7.87e-07 | 1.06e-06 | 1.09e-06 |
+FAILED GATE: 64k stereo, full-scale sine: FMA and baseline differ by more than 1e-6 of the peak
+FAILED GATE: 64k stereo, full-scale sine: FMA and baseline differ by more than -120 dBFS
+| 64k stereo, noise at -120 dBFS | -10.7 | 4.83e-13 | 4.89e-07 | -246.3 | 88.5% | 0.0% | 3.38e-13 | 3.26e-13 | 4.2e-07 |
+| 64k stereo, near-denormal noise | -10.7 | 5.38e-42 | 5.44e-07 | -825.4 | 54.1% | 23.0% | 3.41e-42 | 3.89e-42 | 5.02e-07 |
+| 64k 2->6 crossover, white noise | -4.0 | 6.93e-07 | 7.01e-07 | -123.2 | 88.3% | 0.0% | 4.43e-07 | 5.15e-07 | 6.19e-07 |
+| 128k stereo, white noise | -13.1 | 7.45e-07 | 7.54e-07 | -122.6 | 90.4% | 0.0% | 3.63e-07 | 6.71e-07 | 8.09e-07 |
+FAILED GATE: 128k stereo, white noise: FMA is noticeably further from the oracle
+| 256k stereo, white noise | -16.7 | 8.34e-07 | 8.44e-07 | -121.6 | 92.3% | 0.0% | 3.97e-07 | 6.67e-07 | 1.03e-06 |
+FAILED GATE: 256k stereo, white noise: FMA is noticeably further from the oracle
+| 512k stereo, white noise | -20.2 | 1.27e-06 | 1.28e-06 | -117.9 | 94.1% | 0.0% | 5.6e-07 | 7.69e-07 | 1.11e-06 |
+FAILED GATE: 512k stereo, white noise: FMA and baseline differ by more than 1e-6 of the peak
+FAILED GATE: 512k stereo, white noise: FMA and baseline differ by more than -120 dBFS
+| 512k stereo, full-scale sine | -8.1 | 4.08e-06 | 4.13e-06 | -107.8 | 94.2% | 0.0% | 2.06e-06 | 2.25e-06 | 2.99e-06 |
+FAILED GATE: 512k stereo, full-scale sine: FMA and baseline differ by more than 1e-6 of the peak
+FAILED GATE: 512k stereo, full-scale sine: FMA and baseline differ by more than -120 dBFS
+Diagnostic-only continuation; failed gates: 8

@@ -48,8 +48,8 @@ behaviour:
 
 | Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
 | --- | --- | --- | --- |
-| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence (owner's decision, 21 October 2026), because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence (owner's decision, 21 October 2026), never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3, owner's decision, 22 October 2026). Since DIAG-1 the Status parameter says why and the Convolver log explains (owner's decision, 23 October 2026; see [status and log](#status-and-log)) |
+| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence, because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
+| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence, never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3). Since DIAG-1 the Status parameter says why and the Convolver log explains (see [status and log](#status-and-log)) |
 | **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses; `setState` returns `kResultFalse` |
 
 The control side of these rules is shared code in the host layer, so every
@@ -59,8 +59,7 @@ replaces, which is saved and what plays) and `unfiltered_configuration` in
 filter directly when nothing has been processed since construction or reset.
 
 **Saving after a failed initial load** saves the failure: the host state
-records "load failed" (flag 4, state version 2; owner's decision, 22 October
-2026) and no filter, so reopening the project plays silence again instead of
+records "load failed" (flag 4, state version 2) and no filter, so reopening the project plays silence again instead of
 an empty instance's identity. Only this state is written as version 2.
 Restoring it is a successful load of what was saved, not a rejected
 replacement, so it replaces a working filter with silence.
@@ -95,7 +94,7 @@ before they set the sample rate and channel layout (VST3 `setState` before
   is not binding: JUCE-based hosts, pluginval among them, call it with
   placeholder values (44.1 kHz) before restoring state made for another rate,
   which a check at that point would wrongly reject (found by
-  `vst3.pluginval.acceptance` in VST3-7; owner's decision, 22 October 2026).
+  `vst3.pluginval.acceptance` in VST3-7).
 
 ## Failure reasons
 
@@ -144,7 +143,7 @@ does not start, and no filter request failed.
 
 ## Status and log
 
-Decided by jrp on 23 October 2026 (DIAG-1, brought forward before the first
+Decided by jrp (DIAG-1, brought forward before the first
 named-host smoke tests): adapters without a host log interface show why they
 are silent or refused a load in two places, with the same words in every
 format.
@@ -202,8 +201,7 @@ delayed by the reported latency so wet and dry line up. Wet processing carries
 on during bypass, so switching back does not lose history.
 
 - **Equal input and output counts:** the dry signal is input *c* on output *c*.
-- **Unequal counts:** every output ramps to silence (owner's decision,
-  22 October 2026). No output has an unfiltered counterpart: bypassing a 2→6
+- **Unequal counts:** every output ramps to silence. No output has an unfiltered counterpart: bypassing a 2→6
   crossover must not send full-range audio to a tweeter, and a 1→2 filter that
   forks a mono input to two outputs cannot tell which output the input belongs
   on. This matches the contract for an empty instance with unequal counts.
@@ -213,8 +211,7 @@ on during bypass, so switching back does not lose history.
 must not use its format's own pass-through bypass (see the AU design in the
 [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md#au-adapter-design)).
 
-Whether saved state records bypass follows each format's convention (owner's
-decision, 23 October 2026). VST3 saves its bypass parameter with the
+Whether saved state records bypass follows each format's convention. VST3 saves its bypass parameter with the
 component state, as the SDK's examples do. In LV2 (the `enabled` port) and
 Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
 bypass itself, so those adapters do not record it and ignore the flag in a
@@ -319,7 +316,8 @@ loading. These names are permanent, like the
   filter files were.
 
 The AU key, the LV2 state property and the bare state inside them (without the
-VST3 length prefix) are the owner's decision of 22 October 2026.
+VST3 length prefix) were decided by jrp
+([decisions log](../project/decisions.md#identities-and-file-formats)).
 
 Compatibility rules for presets:
 
