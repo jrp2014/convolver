@@ -7,7 +7,8 @@
 // - run(), connect_port() and the worker's work_response() are the audio
 //   thread. They never lock, allocate or do I/O: run() reads the bypass port
 //   and patch messages, writes the latency, status and notify ports, schedules
-//   worker requests and calls HostProcessor::process.
+//   worker requests (and a fault report, DIAG-1, for work() to log) and calls
+//   HostProcessor::process.
 // - work() runs on the host's worker thread, or inside run() when the host
 //   is free-wheeling. It takes the control lock.
 // - instantiate, activate, deactivate, cleanup and the state interface's
@@ -133,6 +134,10 @@ struct Instance {
     // filter it has already started playing. It can be left true only while
     // silence plays (a failed first load), where muting changes nothing.
     std::atomic<bool> unfiltered{true};
+    // DIAG-1: the processor's fault total when the status last cleared (an
+    // accepted load or activation), and whether a fault report is queued.
+    std::atomic<std::uint64_t> faults_cleared{0};
+    std::atomic<bool> fault_report_queued{false};
 
     // Audio side: run() and work_response(), and restore(), which never
     // runs at the same time as them.
@@ -152,6 +157,19 @@ struct Instance {
         else if (filter.filter())
             s = Status::running;
         shown.store(static_cast<int>(s), std::memory_order_relaxed);
+    }
+    // DIAG-1, control side: explains faults the processor counted that no
+    // earlier call explained.
+    void log_faults() {
+        if (!host)
+            return;
+        if (const auto fresh = filter.observe(host->faults()); fresh.any())
+            log_error(fault_message(fresh));
+    }
+    // After an accepted load or a new processor: Fault shows again only for
+    // later faults.
+    void clear_faults() {
+        faults_cleared.store(host ? host->faults().total() : 0, std::memory_order_release);
     }
     // Why the newest request failed, or the saved failure it restored.
     void log_rejection() {
@@ -309,6 +327,7 @@ void record_activation_failure(Instance& p, const char* why) noexcept {
 
 void activate_locked(Instance& p) {
     p.record_dropped();
+    p.log_faults(); // Before the processor that counted them goes.
     p.host.reset();
     try {
         // A fresh processor: the filter plays from the first frame, its tail
@@ -332,6 +351,7 @@ void activate_locked(Instance& p) {
         p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
+    p.clear_faults();
     p.update_status();
 }
 
@@ -463,6 +483,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.installed = r.generation;
     p.installed_path = std::move(kept_path);
     p.handled = std::max(p.handled, r.generation);
+    p.clear_faults();
     p.update_status();
     return Outcome::installed;
 }
@@ -474,6 +495,16 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
     if (size < sizeof r)
         return LV2_WORKER_ERR_UNKNOWN;
     std::memcpy(&r, data, sizeof r);
+    if (r.generation == 0) { // DIAG-1: run()'s fault report, not a request; no answer.
+        try {
+            std::lock_guard lock(p.control);
+            if (!p.closing)
+                p.log_faults();
+        } catch (...) {
+        }
+        p.fault_report_queued.store(false, std::memory_order_release);
+        return LV2_WORKER_SUCCESS;
+    }
     // A damaged request is still answered, as a failure, so the status does
     // not stay at Loading.
     const bool damaged = size - sizeof r != r.length || r.length > max_path_bytes;
@@ -627,12 +658,34 @@ void write_notification(Instance& p) {
     lv2_atom_forge_pop(&forge, &sequence);
 }
 
+// The processor's fault total, while it exists.
+std::uint64_t fault_total(const Instance& p) {
+    return p.host ? p.host->faults().total() : 0;
+}
+
 Status shown_status(const Instance& p) {
     if (p.requested.load(std::memory_order_relaxed) > p.answered)
         return Status::loading;
     if (p.answered && p.refused_here == p.answered)
         return Status::load_failed;
-    return static_cast<Status>(p.shown.load(std::memory_order_relaxed));
+    const auto shown = static_cast<Status>(p.shown.load(std::memory_order_relaxed));
+    // A load failure comes first, as host_status() orders them.
+    if (shown != Status::load_failed &&
+        fault_total(p) > p.faults_cleared.load(std::memory_order_acquire))
+        return Status::fault;
+    return shown;
+}
+
+// DIAG-1: new faults are explained by work(), outside the audio thread. One
+// report at a time; a host without a worker explains them at the next save,
+// restore, activation or deactivation.
+void report_faults(Instance& p) {
+    if (!p.schedule || fault_total(p) <= p.faults_cleared.load(std::memory_order_acquire) ||
+        p.fault_report_queued.exchange(true, std::memory_order_acq_rel))
+        return;
+    Request r; // Generation 0: requests are numbered from 1.
+    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) != LV2_WORKER_SUCCESS)
+        p.fault_report_queued.store(false, std::memory_order_release);
 }
 
 void run(LV2_Handle handle, std::uint32_t frames) {
@@ -641,8 +694,6 @@ void run(LV2_Handle handle, std::uint32_t frames) {
     read_messages(p);
     if (p.latency)
         *p.latency = static_cast<float>(p.host ? p.host->latency_frames() : 256);
-    if (p.status)
-        *p.status = static_cast<float>(shown_status(p));
     // lv2:enabled is 1 to process and 0 to bypass; anything else counts as on.
     const bool bypass = p.enabled && *p.enabled < .5f;
     p.bypass.store(bypass, std::memory_order_relaxed);
@@ -667,6 +718,10 @@ void run(LV2_Handle handle, std::uint32_t frames) {
             done += n;
         }
     }
+    // After processing, so a fault in this call shows at once.
+    if (p.status)
+        *p.status = static_cast<float>(shown_status(p));
+    report_faults(p);
     write_notification(p);
 }
 
@@ -675,6 +730,7 @@ void deactivate(LV2_Handle handle) {
     try {
         std::lock_guard lock(p.control);
         p.record_dropped();
+        p.log_faults();
         p.host.reset();
     } catch (...) {
     }
@@ -747,6 +803,7 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     try {
         std::lock_guard lock(p.control);
         p.record_dropped();
+        p.log_faults();
         HostState saved;
         saved.configuration = p.filter.filter();
         saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
@@ -826,6 +883,7 @@ std::optional<std::string> read_path(Instance& p, const void* value, std::size_t
 LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retrieve,
                                 LV2_State_Handle state, const LV2_Feature* const* features) {
     p.record_dropped();
+    p.log_faults(); // Explained under the filter that played; a load clears them.
     std::size_t state_size = 0, path_size = 0;
     std::uint32_t state_type = 0, path_type = 0, flags = 0;
     const void* embedded = retrieve(state, p.uris.state_key, &state_size, &state_type, &flags);
@@ -897,6 +955,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.installed = generation;
         p.installed_path = std::move(kept_path);
         p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
+        p.clear_faults();
         status = LV2_STATE_SUCCESS;
     } else {
         p.silence_failed_first_load(was_failed);

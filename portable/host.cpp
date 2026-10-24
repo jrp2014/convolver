@@ -266,6 +266,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     load_failure_ = std::move(saved_failure);
     activation_failure_.reset();
     notice_ = std::move(notice);
+    faults_ = {}; // A new filter, or a new start for the same one.
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {
@@ -275,6 +276,8 @@ void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest reque
 Configuration HostFilter::activate(const HostLayout& host) {
     notice_.clear();
     activation_failure_.reset();
+    faults_ = {};
+    observed_ = {}; // The adapter builds a new processor, which counts from 0.
     if (!filter_)
         return unfiltered_configuration(host, failed_);
     if (auto m = mismatch(*filter_, host)) {
@@ -313,6 +316,67 @@ void HostFilter::fail_activation(std::string why) {
 }
 
 namespace {
+// Counts only increase, except that a new processor starts again from 0.
+std::uint64_t since(std::uint64_t now, std::uint64_t before) noexcept {
+    return now >= before ? now - before : now;
+}
+std::string times(std::uint64_t n) {
+    return n == 1 ? "once" : std::to_string(n) + " times";
+}
+} // namespace
+
+HostFaults HostFilter::observe(const HostFaults& totals) noexcept {
+    HostFaults fresh;
+    fresh.rejected_input = since(totals.rejected_input, observed_.rejected_input);
+    fresh.output_overflow = since(totals.output_overflow, observed_.output_overflow);
+    fresh.processing_failure = since(totals.processing_failure, observed_.processing_failure);
+    fresh.invalid_call = since(totals.invalid_call, observed_.invalid_call);
+    observed_ = totals;
+    faults_.rejected_input += fresh.rejected_input;
+    faults_.output_overflow += fresh.output_overflow;
+    faults_.processing_failure += fresh.processing_failure;
+    faults_.invalid_call += fresh.invalid_call;
+    return fresh;
+}
+
+std::string fault_message(const HostFaults& f) {
+    if (!f.any())
+        return {};
+    std::string text = "While the filter played, Convolver met a problem in the audio.";
+    if (f.output_overflow)
+        text += " The output became too large to represent (" + times(f.output_overflow) +
+                "), because the input level or the filter's gain is extreme, so Convolver "
+                "silenced it and restarted the filter. Lower the level going into Convolver, or "
+                "the filter's gain (its attenuation in the .cfg), then load the filter again.";
+    if (f.rejected_input)
+        text += " The host sent invalid samples (not a number, infinite, or beyond the 32-bit "
+                "float range) " +
+                times(f.rejected_input) +
+                "; Convolver played them as silence. They usually come from a plug-in or source "
+                "before Convolver.";
+    if (f.processing_failure)
+        text += " The filter failed while processing (" + times(f.processing_failure) +
+                "), so Convolver silenced the audio and restarted the filter. This is a "
+                "Convolver bug: please report it with this log.";
+    if (f.invalid_call)
+        text += " The host passed more frames or channels than it had set up (" +
+                times(f.invalid_call) +
+                "), so Convolver refused those calls. Report this to the host's developers.";
+    return text + " The status shows Fault until a filter is loaded again or the host restarts "
+                  "the plug-in.";
+}
+
+namespace {
+// The short reason of a processing fault, the most serious first.
+std::string short_fault(const HostFaults& f) {
+    if (f.processing_failure)
+        return "the filter failed while playing and was restarted.";
+    if (f.output_overflow)
+        return "output too large, silenced and the filter restarted.";
+    if (f.invalid_call)
+        return "the host passed buffers that do not match its setup.";
+    return "invalid input samples (NaN or infinite) played as silence.";
+}
 std::string ports(std::size_t inputs, std::size_t outputs) {
     return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
 }
@@ -344,20 +408,26 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 }
 } // namespace
 
-HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host) {
-    constexpr const char* details = " Details in the Convolver log.";
+HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
+                           bool log_written) {
+    const char* details =
+        log_written ? " Details in the Convolver log." : " The Convolver log could not be written.";
     HostStatusLine line;
     if (const auto& f = filter.failure()) {
         line.status = HostStatus::load_failed;
         line.text = (f->silent ? "Silent: " : "Load failed, previous filter kept: ") +
                     short_reason(*f, host) + details;
+    } else if (filter.faults().any() && !filter.failed()) {
+        line.status = HostStatus::fault;
+        line.text = "Fault: " + short_fault(filter.faults()) + details;
     } else if (const auto& c = filter.filter()) {
         line.status = host ? HostStatus::playing : HostStatus::unchecked;
         line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
                     ports(c->input_channels, c->output_channels) +
                     (host ? "." : "; checked when the host starts it.");
         if (host && !filter.notice().empty())
-            line.text += " Speaker labels differ; see the Convolver log.";
+            line.text += log_written ? " Speaker labels differ; see the Convolver log."
+                                     : " Speaker labels differ.";
     } else if (filter.failed()) {
         line.status = HostStatus::load_failed;
         line.text = std::string("Silent: an earlier load failed.") + details;
@@ -391,6 +461,13 @@ struct HostProcessor::Impl {
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
     std::atomic<std::size_t> tail{0};
     std::atomic<std::uint64_t> published{0}; // Publications so far (control writes).
+    // DIAG-1: HostFaults, counted by the audio thread and read anywhere.
+    std::atomic<std::uint64_t> rejected_input{0}, output_overflow{0}, processing_failure{0},
+        invalid_call{0};
+    static void count(std::atomic<std::uint64_t>& n) noexcept {
+        // One writer (the audio thread), so a load and a store suffice.
+        n.store(n.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+    }
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     float dry_mix = 0;
@@ -482,8 +559,10 @@ struct HostProcessor::Impl {
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
                  std::size_t frames) noexcept {
-        if (frames > maximum || in.size() > inputs || out.size() > outputs)
+        if (frames > maximum || in.size() > inputs || out.size() > outputs) {
+            count(invalid_call);
             return false;
+        }
         if (!frames)
             return true;
         if (!previous) {
@@ -509,14 +588,17 @@ struct HostProcessor::Impl {
             }
         }
         started = true;
+        bool invalid_input = false;
         for (std::size_t t = 0; t < frames; ++t)
             for (std::size_t c = 0; c < inputs; ++c) {
                 double v = c < in.size() && in[c] ? in[c][t] : 0;
-                input[t * inputs + c] =
-                    std::isfinite(v) && std::abs(v) <= std::numeric_limits<float>::max()
-                        ? static_cast<float>(v)
-                        : 0.f;
+                const bool valid =
+                    std::isfinite(v) && std::abs(v) <= std::numeric_limits<float>::max();
+                invalid_input = invalid_input || !valid;
+                input[t * inputs + c] = valid ? static_cast<float>(v) : 0.f;
             }
+        if (invalid_input)
+            count(rejected_input);
         // Prepared, valid nonoverlapping spans and finite input satisfy Engine's
         // checked entry point; defensive containment keeps exceptions inside host.
         try {
@@ -524,6 +606,7 @@ struct HostProcessor::Impl {
             if (previous)
                 previous->engine.process(input, old_wet, frames);
         } catch (...) {
+            count(processing_failure);
             reset();
             for (auto channel : out)
                 if (channel)
@@ -570,8 +653,10 @@ struct HostProcessor::Impl {
             if (++dry_position == block)
                 dry_position = 0;
         }
-        if (invalid_output)
+        if (invalid_output) {
+            count(output_overflow);
             reset();
+        }
         if (previous && !warm && fade == 256) {
             retire(previous);
             previous = nullptr;
@@ -637,6 +722,14 @@ std::size_t HostProcessor::latency_frames() const noexcept {
 }
 std::size_t HostProcessor::tail_frames() const noexcept {
     return impl_->tail.load();
+}
+HostFaults HostProcessor::faults() const noexcept {
+    HostFaults f;
+    f.rejected_input = impl_->rejected_input.load(std::memory_order_relaxed);
+    f.output_overflow = impl_->output_overflow.load(std::memory_order_relaxed);
+    f.processing_failure = impl_->processing_failure.load(std::memory_order_relaxed);
+    f.invalid_call = impl_->invalid_call.load(std::memory_order_relaxed);
+    return f;
 }
 bool HostProcessor::process(std::span<const float* const> in, std::span<float* const> out,
                             std::size_t n) noexcept {

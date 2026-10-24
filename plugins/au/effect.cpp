@@ -15,8 +15,9 @@
 namespace convolver::au {
 namespace {
 // The Status parameter's values, in HostStatus order.
-constexpr std::array<const char*, 4> status_names{"Playing", "No filter", "Load failed",
-                                                  "Not checked yet"};
+constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
+                                                  "Not checked yet", "Fault"};
+static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
 
 std::string next_tag() {
     static std::atomic<unsigned> instances{0};
@@ -101,9 +102,25 @@ void Effect::log(const std::string& message, bool problem) noexcept {
     }
 }
 
+std::string Effect::observe_faults() noexcept {
+    if (!host_)
+        return {};
+    try {
+        return fault_message(filter_.observe(host_->faults()));
+    } catch (...) { // Out of memory for the message: the status still shows it.
+        return {};
+    }
+}
+
+void Effect::clear_faults(bool new_processor) noexcept {
+    faults_cleared_.store(host_ ? host_->faults().total() : 0, std::memory_order_release);
+    if (new_processor)
+        faults_signalled_ = 0; // The host does not render while it initializes.
+}
+
 void Effect::update_status() noexcept {
     try {
-        status_ = host_status(filter_, known_layout());
+        status_ = host_status(filter_, known_layout(), host_log_written());
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(status_.status), true);
     } catch (...) { // Out of memory: the previous status stays.
@@ -190,10 +207,11 @@ OSStatus Effect::Initialize() {
     }
     if (!identity::unequal_counts && in.mChannelsPerFrame != out.mChannelsPerFrame)
         return kAudioUnitErr_FormatNotSupported;
-    std::string message;
+    std::string message, faults;
     bool started = false, problem = true;
     {
         std::lock_guard lock(control_);
+        faults = observe_faults(); // Before the processor that counted them goes.
         try {
             const auto host = layout();
             // A filter that does not suit the host plays silence, and is kept so
@@ -204,6 +222,7 @@ OSStatus Effect::Initialize() {
             next->reset();
             tail_.store(next->tail_frames());
             host_ = std::move(next);
+            clear_faults(true);
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
@@ -226,6 +245,7 @@ OSStatus Effect::Initialize() {
         }
         update_status();
     }
+    log(faults);
     log(message, problem);
     notify_status();
     if (!started)
@@ -248,11 +268,16 @@ std::string Effect::activation_failed(const char* why) noexcept {
 // try a channel layout, then restore the project before preparing to play;
 // counting that probe would turn a 48 kHz project's filter into a failed load.
 void Effect::Cleanup() {
-    std::lock_guard lock(control_);
-    if (rendered_.load())
-        committed_ = initialized_;
-    host_.reset();
-    update_status(); // Read when the host next asks; no notification while it tears down.
+    std::string faults;
+    {
+        std::lock_guard lock(control_);
+        faults = observe_faults(); // Before the processor that counted them goes.
+        if (rendered_.load())
+            committed_ = initialized_;
+        host_.reset();
+        update_status(); // Read when the host next asks; no notification while it tears down.
+    }
+    log(faults);
 }
 
 // The host may call Reset from any thread, so the audio thread performs it at
@@ -312,9 +337,14 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
-        std::string text;
+        std::string text, faults;
         try {
             std::lock_guard lock(control_);
+            // A host showing Fault, which Render wrote, asks for its text:
+            // the faults are explained here, on the host's control thread.
+            faults = observe_faults();
+            if (!faults.empty())
+                update_status();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
             const auto value = request->inValue ? *request->inValue : current;
             const auto index = static_cast<long>(std::lround(value));
@@ -324,6 +354,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
                 text = status_names[static_cast<std::size_t>(index)];
         } catch (...) {
             return kAudioUnitErr_InvalidPropertyValue;
+        }
+        if (!faults.empty()) {
+            log(faults);
+            notify_status();
         }
         if (text.empty())
             return kAudioUnitErr_InvalidPropertyValue;
@@ -409,6 +443,11 @@ std::string Effect::error() {
     return filter_.error();
 }
 
+std::string Effect::rejection_line() {
+    std::lock_guard lock(control_);
+    return rejected_line(filter_);
+}
+
 std::string Effect::rejection() {
     std::lock_guard lock(control_);
     const auto& r = filter_.rejection();
@@ -419,10 +458,15 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
     std::vector<std::byte> bytes;
+    std::string faults;
     try {
         HostState state;
         {
             std::lock_guard lock(control_);
+            // Hosts save often (autosave too): faults are explained here as well.
+            faults = observe_faults();
+            if (!faults.empty())
+                update_status();
             state.configuration = filter_.filter();
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             if (host_)
@@ -434,6 +478,10 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         bytes = encode_host_state(state);
     } catch (...) {
         return kAudioUnitErr_InvalidPropertyValue;
+    }
+    if (!faults.empty()) {
+        log(faults);
+        notify_status();
     }
     if (const auto result = AUBase::SaveState(out); result != noErr)
         return result;
@@ -471,7 +519,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
         reject(HostFailureKind::state_unreadable,
                "The saved state is not an Audio Unit preset dictionary.");
-        log(rejection());
+        log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     }
@@ -494,21 +542,22 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     } catch (const NewerHostState& e) {
         reject(HostFailureKind::state_newer,
                std::string("The saved state could not be read: ") + e.what());
-        log(rejection());
+        log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
         reject(HostFailureKind::state_unreadable,
                std::string("The saved state could not be read: ") + e.what());
-        log(rejection());
+        log(rejection_line());
         notify_status();
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
     bool accepted = false, problem = true;
-    std::string message;
+    std::string message, faults;
     {
         std::lock_guard lock(control_);
+        faults = observe_faults(); // Explained under the filter that played; a load clears them.
         const bool was_failed = filter_.failed();
         // Initialized, a prepared replacement is published to the audio thread;
         // uninitialized, the next initialization installs the filter.
@@ -533,6 +582,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
                     host_->replace(c);
             });
             // Nothing from here on can throw: the request is accepted.
+            clear_faults(false);
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
         } catch (...) {
@@ -550,8 +600,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             // Why this request failed, or what was loaded (with the saved
             // failure it restored); not an older failure found at initialization.
             if (!accepted) {
-                if (const auto& r = filter_.rejection())
-                    message = r->message;
+                message = rejected_line(filter_);
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
                 message = loaded_line(filter_, host.has_value());
@@ -562,6 +611,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     }
     // Listeners may call back into the unit, so notify outside the lock.
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
+    log(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     notify_status();
     if (!accepted)
@@ -614,6 +664,16 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
         host->reset();
     host->set_bypass(bypass_.load(std::memory_order_relaxed));
     processed = host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames);
+    // DIAG-1: a new processing fault shows as Status Fault at once, with no
+    // logging or allocation here (an existing parameter's value is an atomic
+    // store); the host's next request for its text explains it.
+    const auto total = host->faults().total();
+    const auto cleared = faults_cleared_.load(std::memory_order_acquire);
+    if (total > cleared && faults_signalled_ <= cleared) {
+        Globals()->SetParameter(status_parameter,
+                                static_cast<AudioUnitParameterValue>(HostStatus::fault), true);
+        faults_signalled_ = total;
+    }
     AUSDK_RT_UNSAFE_END
     if (!processed)
         return kAudio_ParamError;

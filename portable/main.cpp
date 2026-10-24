@@ -74,7 +74,7 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
                       f32le (default, as DRC and BruteFIR write them) or any
                       --raw-format name; they are always mono
   --help              Show this help
-  --version           Show Convolver, source, FFT backend and libsndfile versions
+  --version           Show Convolver, source, FFT backend, CPU kernel and libsndfile versions
 FILE may be '-' for stdin/stdout; standard streams must be raw (--raw-input,
 a raw- output format).
 Files retain the entire FIR/routing tail. Algorithmic latency is trimmed unless
@@ -208,7 +208,8 @@ int run(int argc, char** argv) {
             if (option == "--version") {
                 std::cout << "Convolver portable " << CONVOLVER_VERSION_STRING
                           << "\nFFT backend: " << convolver::fft_backend_name() << " / "
-                          << convolver::fft_backend_version() << '\n'
+                          << convolver::fft_backend_version()
+                          << "\nCPU kernels: " << convolver::cpu_kernels_name() << '\n'
                           << convolver::sndfile_version()
                           << (convolver::available(convolver::Container::flac)
                                   ? " (FLAC output available)\n"

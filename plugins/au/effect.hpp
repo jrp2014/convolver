@@ -8,6 +8,7 @@
 #include <AudioUnitSDK/AUBase.h>
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -100,6 +101,8 @@ class Effect final : public ausdk::AUBase {
     std::string error();
     // Why the newest request failed (HostFilter::rejection), to log it.
     std::string rejection();
+    // The same, numbered for the log (rejected_line).
+    std::string rejection_line();
     // What the Status parameter shows (DIAG-1).
     HostStatusLine status();
 
@@ -120,6 +123,12 @@ class Effect final : public ausdk::AUBase {
     // listeners, outside the lock, as they may call back into the unit.
     void update_status() noexcept;
     void notify_status() noexcept;
+    // DIAG-1, under `control_`: takes the processor's fault counts into
+    // filter_ and returns their explanation, to log; empty if none are new.
+    std::string observe_faults() noexcept;
+    // After an accepted load or a new processor, under `control_`: Render
+    // writes Fault to the Status parameter again only for later faults.
+    void clear_faults(bool new_processor) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
@@ -127,6 +136,11 @@ class Effect final : public ausdk::AUBase {
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
+    // The processor's fault total when the status last cleared (control
+    // writes), and the total when Render last wrote Fault (audio thread, or
+    // control while uninitialized).
+    std::atomic<std::uint64_t> faults_cleared_{0};
+    std::uint64_t faults_signalled_ = 0;
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches

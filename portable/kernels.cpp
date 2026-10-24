@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "kernels.hpp"
+#include "convolver/engine.hpp"
 #include <atomic>
 #define CONVOLVER_KERNEL_NAMESPACE baseline
 #define CONVOLVER_KERNEL_NAME "baseline"
@@ -65,3 +66,7 @@ void force_baseline_kernels(bool force) noexcept {
     baseline_forced.store(force, std::memory_order_relaxed);
 }
 } // namespace convolver::detail
+
+const char* convolver::cpu_kernels_name() noexcept {
+    return detail::kernels().name;
+}

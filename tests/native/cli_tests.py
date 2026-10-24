@@ -296,6 +296,7 @@ def main():
     version = call(['--version']).stdout
     assert re.fullmatch(rb'Convolver portable [0-9]+\.[0-9]+\.[0-9]+(?:\+g[0-9a-f]+(?:\.dirty)?)?', version.splitlines()[0]), version
     assert b'FFT backend:' in version
+    assert re.search(rb'CPU kernels: (AVX2\+FMA|baseline)', version), version
     with tempfile.TemporaryDirectory(prefix='convolver-cli-') as t:
         d=Path(t); src=d/'entrée.wav'; ir=d/'ir.wav'; dst=d/'sortie ü.wav'
         for count in (0,1,16,17,64):

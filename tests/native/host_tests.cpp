@@ -96,7 +96,11 @@ template <class T> void numeric() {
     require(ok, "nonfinite input must be contained");
     for (auto v : data)
         require(v == 0, "invalid samples poisoned state");
+    require(host.faults().rejected_input == 1 && host.faults().total() == 1,
+            "rejected input not counted once");
     require(!host.process(in, out, 68), "overlarge callback accepted");
+    require(host.faults().invalid_call == 1 && host.faults().total() == 2,
+            "invalid call not counted");
 }
 void lifecycle() {
     auto c = mono();
@@ -903,6 +907,82 @@ void set_log_variable(const std::optional<std::filesystem::path>& value) {
         unsetenv("CONVOLVER_LOG");
 #endif
 }
+// DIAG-1: jrp's reproduction (review of 24 October 2026). Extreme but finite
+// input and filter values overflow the output: it is silenced and process()
+// succeeds, as before, but the fault is now counted, so the status no longer
+// says "Filter loaded" and the log explains.
+void processing_faults() {
+    const auto huge = std::numeric_limits<float>::max() / 4;
+    const Configuration loud = mono(huge);
+    const HostLayout layout{48000, 1, 1};
+    HostProcessor host(loud, 64, 8);
+    std::array<float, 64> data{};
+    data[0] = huge;
+    const float* in[] = {data.data()};
+    float* out[] = {data.data()};
+    audio_thread = true;
+    bool ok = host.process(in, out, 64);
+    audio_thread = false;
+    require(ok, "an overflowing call must still succeed");
+    for (auto v : data)
+        require(std::isfinite(v) && std::abs(v) <= std::numeric_limits<float>::max(),
+                "overflowing output not silenced");
+    const auto counted = host.faults();
+    require(counted.output_overflow == 1 && counted.total() == 1,
+            "output overflow not counted once");
+
+    HostFilter f(8);
+    f.load(HostState{loud}, layout);
+    require(host_status(f, layout).status == HostStatus::playing, "playing before observing");
+    const auto fresh = f.observe(host.faults());
+    require(fresh.output_overflow == 1 && f.faults().output_overflow == 1, "observe");
+    auto line = host_status(f, layout);
+    require(line.status == HostStatus::fault &&
+                line.text == "Fault: output too large, silenced and the filter restarted. Details "
+                             "in the Convolver log.",
+            "overflow status line");
+    require(host_status(f, layout, false).text.find("could not be written") != std::string::npos,
+            "unwritable log not mentioned");
+    const auto message = fault_message(fresh);
+    require(message.find("too large to represent (once)") != std::string::npos &&
+                message.find("Lower the level") != std::string::npos &&
+                message.find("invalid samples") == std::string::npos,
+            "overflow message");
+    require(fault_message({}).empty(), "message without faults");
+    // Latched: nothing new to log, and the status stays until a load or start.
+    require(!f.observe(host.faults()).any() && host_status(f, layout).status == HostStatus::fault,
+            "fault not latched");
+    // A failed load comes first; it does not clear the fault.
+    try {
+        f.load(HostState{mono()}, HostLayout{44100, 1, 1});
+    } catch (const std::invalid_argument&) {
+    }
+    require(host_status(f, layout).status == HostStatus::load_failed, "load failure first");
+    f.load(HostState{mono()}, layout);
+    require(!f.faults().any() && host_status(f, layout).status == HostStatus::playing,
+            "an accepted load clears the fault");
+    // A new processor counts from 0 after activate().
+    static_cast<void>(f.activate(layout));
+    HostFaults restarted;
+    restarted.rejected_input = 1;
+    require(f.observe(restarted).rejected_input == 1 &&
+                host_status(f, layout).text.find("invalid input samples") != std::string::npos,
+            "counts after activation");
+    HostFaults every{3, 2, 1, 1};
+    const auto all = fault_message(every);
+    require(all.find("(2 times)") != std::string::npos &&
+                all.find("invalid samples (not a number, infinite, or beyond the 32-bit float "
+                         "range) 3 times") != std::string::npos &&
+                all.find("Convolver bug") != std::string::npos &&
+                all.find("host's developers") != std::string::npos,
+            "every fault explained");
+    HostFilter g(8);
+    g.load(HostState{mono()}, layout);
+    static_cast<void>(g.observe(every));
+    require(host_status(g, layout).text.find("the filter failed while playing") !=
+                std::string::npos,
+            "most serious fault first");
+}
 // A file name of this process's own, so that concurrent runs never share it.
 std::filesystem::path private_temp(const char* name) {
     return std::filesystem::temp_directory_path() /
@@ -1000,16 +1080,24 @@ void status_lines() {
 
     // The log lines adapters write.
     HostFilter g(8);
-    require(loaded_line(g, true) == "Loaded state with no filter." &&
+    require(loaded_line(g, true) == "Request 0: Loaded state with no filter." &&
                 contains(started_line(g, stereo, 512),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
                          "filter, so audio passes unchanged.") &&
                 contains(started_line(g, crossover_bus, 512), "plays silence"),
             "empty instance log lines");
     g.load(HostState{other_rate}, std::nullopt);
-    require(loaded_line(g, false) == "Loaded a filter for 44100 Hz, 2 in, 2 out; it is checked "
-                                     "when the host starts the plug-in.",
+    require(loaded_line(g, false) == "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; it is "
+                                     "checked when the host starts the plug-in.",
             "unchecked load line");
+    require(rejected_line(g).empty(), "rejected line without a rejection");
+    try {
+        g.load(HostState{crossover}, stereo);
+    } catch (const std::invalid_argument&) {
+    }
+    require(rejected_line(g).rfind("Request 2: Filter not loaded; the previous filter is kept.",
+                                   0) == 0,
+            "rejected line");
     static_cast<void>(g.activate(stereo));
     require(contains(started_line(g, stereo, 64), "does not suit the host") &&
                 contains(started_line(g, stereo, 64), "Convolver does not resample"),
@@ -1035,10 +1123,19 @@ void status_lines() {
         return std::string(std::istreambuf_iterator<char>(in), {});
     };
     auto text = read(path);
+    // The process's first line is preceded by what ran (once per process; an
+    // earlier test in this process may have written it elsewhere).
     require(contains(text, " Convolver ") && contains(text, " Test #1") &&
-                contains(text, ": first line\n") && contains(text, ": second line\n") &&
-                std::count(text.begin(), text.end(), '\n') == 2,
+                contains(text, " (process ") && contains(text, ": first line\n") &&
+                contains(text, ": second line\n") &&
+                std::count(text.begin(), text.end(), '\n') <= 3 && host_log_written(),
             "log lines not written");
+    const auto session = execution_line();
+    require(contains(session, "Session: Convolver ") && contains(session, "FFT backend ") &&
+                contains(session, fft_backend_name()) && contains(session, "CPU kernels ") &&
+                contains(session, cpu_kernels_name()) && contains(session, ", process "),
+            "execution line");
+    require(contains(text, session.c_str()), "execution line not logged first");
     {
         std::ofstream grow(path, std::ios::app | std::ios::binary);
         grow << std::string(1024 * 1024 + 1, 'x');
@@ -1049,9 +1146,22 @@ void status_lines() {
     require(contains(read(old), "first line") && read(path).size() < 1024 &&
                 contains(read(path), "after rotation"),
             "log not rotated");
-    // Empty turns the file off; an unwritable place is not an error.
+    // Empty turns the file off; an unwritable place is not an error, but it
+    // is visible: host_log_written() is false (the status line says so) and
+    // the line goes to standard error.
     set_log_variable(folder / "nested"); // A folder: cannot be opened.
     host_log("Test #1", "dropped");
+    require(!host_log_written(), "unwritable log not noticed");
+    {
+        HostFilter h(8);
+        h.reject("why");
+        require(contains(host_status(h, std::nullopt, host_log_written()).text,
+                         "The Convolver log could not be written."),
+                "unwritable log not in the status line");
+    }
+    set_log_variable(path);
+    host_log("Test #1", "written again");
+    require(host_log_written(), "log not written again");
 #ifndef _WIN32
     setenv("CONVOLVER_LOG", "", 1);
     require(host_log_path().empty(), "empty CONVOLVER_LOG does not turn the log off");
@@ -1077,6 +1187,7 @@ int main() {
         muting();
         allocation_failures();
         status_lines();
+        processing_faults();
         std::cout << "host lifecycle passed\n";
     } catch (const std::exception& e) {
         audio_thread = false;

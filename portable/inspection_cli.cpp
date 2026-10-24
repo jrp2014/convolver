@@ -441,6 +441,8 @@ Json serialize_report(const InspectionReport& r, bool validate, bool warnings_as
     j.string(fft_backend_name());
     j.key("fft_backend_version");
     j.string(fft_backend_version());
+    j.key("cpu_kernels");
+    j.string(cpu_kernels_name());
     j.key("sndfile_version");
     j.string(sndfile_version());
     j.close('}');

@@ -37,6 +37,19 @@ Until 1.0 the C++ API may change between minor versions.
   records every load, start and failure with the full explanation, ready to
   send with a report. See [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
 
+- The plug-ins report problems met while playing (DIAG-1, jrp's review of
+  24 October 2026): output too large to represent (extreme input or filter
+  gain), invalid input samples, and buffers that do not match the host's
+  setup. The Status parameter (and LV2's status port) shows a new value,
+  **Fault**, instead of "Filter loaded", and the log explains what happened,
+  how often and what to change. The audio is silenced as before; nothing is
+  logged from the audio thread. The Convolver log also names the process and
+  numbers each load and refusal, its first line in each process says what ran
+  (version, FFT library, CPU kernels), and when the file cannot be written
+  the Status text says so and the lines go to standard error.
+  `convolver --version` and the JSON inspection report (`cpu_kernels`) name
+  the CPU kernels.
+
 - More output formats (IO-3): `--output-format` takes `CONTAINER-TYPE`, with
   `wav`, `rf64`, `w64`, `aiff`, `caf`, `flac` and `raw` containers and `pcm8`,
   `pcm16`, `pcm24`, `pcm32`, `float` and `double` samples (FLAC holds 8 to 24
