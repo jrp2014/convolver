@@ -207,7 +207,10 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   the log names the process, numbers requests and starts with what ran (FFT
   backend, CPU kernels); an unwritable log is said in the Status text;
   failed CI test jobs keep their evidence, and preview candidates keep
-  matching debugging symbols.
+  matching debugging symbols. Progress (24 October 2026, PR #72, from jrp's
+  review of 0.4.43): the candidate checks each kept symbol file's debugging
+  information and its identity against the packaged binary (GNU build ID,
+  Mach-O UUID, PDB GUID and age), tested by `release.symbols`.
   Remaining: the failure-by-surface table, the CLI and preset tool, and what
   named hosts actually show (HOST-1).
 
@@ -595,6 +598,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
   [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
+- [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
+  24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
+  in its constructor, so out of memory reaches the caller, and
+  `estimate_attenuation` refuses a non-finite noise response; tests in
+  `native.io` and `native.engine`.
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,

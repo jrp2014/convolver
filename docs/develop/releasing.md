@@ -56,14 +56,19 @@ packaged binaries (the VST3 plug-in, `convolver-preset` and
 (DIAG-1, jrp's review of 24 October 2026). The candidate build sets
 `CONVOLVER_DEBUG_SYMBOLS` ([build options](build.md#build-options)): Release
 code is compiled with debug information, which does not change the generated
-code, and the symbols are moved out of the binaries. `candidate.py` fails if
-any packaged binary has none.
+code, and the symbols are moved out of the binaries. After installing the
+package, `candidate.py` checks each packaged binary against its symbols
+([`symbols.py`](../../scripts/release/symbols.py), tested by `release.symbols`):
+the symbols must exist, hold debugging information and carry the binary's
+identity in the table below. It fails, naming each problem, if any binary's
+symbols are missing, empty, without debugging information or from another
+build. The artifact's `README.txt` lists the identity of each file.
 
-| Platform | Symbols | Matched by |
-| --- | --- | --- |
-| Linux | `<file>.debug` (`objcopy --only-keep-debug`); the binary is stripped and names it (`.gnu_debuglink`) | GNU build ID (`readelf -n`) |
-| macOS | `<file>.dSYM` (`dsymutil`); the binary is stripped of its debug map and signed again ad hoc | Mach-O UUID (`dwarfdump --uuid`) |
-| Windows | `<file>.pdb`, written there by the linker (`/DEBUG /OPT:REF /OPT:ICF`) | PDB signature (`dumpbin /headers`) |
+| Platform | Symbols | Matched by | Debugging information checked |
+| --- | --- | --- | --- |
+| Linux | `<file>.debug` (`objcopy --only-keep-debug`); the binary is stripped and names it (`.gnu_debuglink`) | GNU build ID (`readelf -n`), and the `.gnu_debuglink` name and CRC-32 | `.debug_info` not empty |
+| macOS | `<file>.dSYM` (`dsymutil`); the binary is stripped of its debug map and signed again ad hoc | Mach-O UUID of each architecture (`dwarfdump --uuid`) | `__DWARF,__debug_info` in `Contents/Resources/DWARF/<file>` not empty |
+| Windows | `<file>.pdb`, written there by the linker (`/DEBUG /OPT:REF /OPT:ICF`) | PDB name, GUID and age in the binary's CodeView record (`dumpbin /headers`) and in the PDB | DBI stream lists compiled modules |
 
 The symbols match only binaries from the same run, so keep them with every
 preview you publish (download them from the run that produced the candidate).

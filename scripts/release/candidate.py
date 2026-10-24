@@ -14,6 +14,7 @@ from build_dependencies import build as build_dependencies
 from contract import load_policy, platform_policy, sha256
 from installers import prepare
 from sources import extract
+from symbols import check as check_symbols
 from verify_artifact import inventory, verify_files
 
 
@@ -37,31 +38,20 @@ def extract_zip(archive, destination):
                 target.chmod((info.external_attr >> 16) & 0o777 or 0o644)
 
 
-def keep_symbols(build_dir, symbols, identifier, commit, version):
+def keep_symbols(build_dir, stage, symbols, identifier, commit, version, system=None):
     """Copies the packaged binaries' debugging symbols (CONVOLVER_DEBUG_SYMBOLS)
     to `symbols`, which the workflow keeps as its own artifact, never in the
-    package. Every packaged binary must have its symbols."""
+    package. Every packaged binary in `stage` must have symbols that hold
+    debugging information and match it (symbols.py)."""
     kept = build_dir / 'symbols'
-    files = sorted(p for p in kept.rglob('*') if p.is_file()) if kept.is_dir() else []
-    names = set()
-    for p in files:
-        parts = p.relative_to(kept).parts
-        if p.suffix in ('.debug', '.pdb'):
-            names.add(parts[-1])
-        else:  # Inside a .dSYM bundle, or something else, which is only copied.
-            names.update(part for part in parts if part.endswith('.dSYM'))
-    expected = {'Darwin': ['Convolver.dSYM', 'convolver-preset.dSYM', 'convolver-equalizer-apo.dSYM'],
-                'Windows': ['Convolver.pdb', 'convolver-preset.pdb', 'convolver-equalizer-apo.pdb'],
-                'Linux': ['Convolver.so.debug', 'convolver-preset.debug', 'convolver-equalizer-apo.debug']}
-    missing = [name for name in expected[platform.system()] if name not in names]
-    if missing:
-        raise ValueError('debugging symbols missing for: ' + ', '.join(missing) + ' (found ' +
-                         ', '.join(sorted(names)) + ')')
+    identities = check_symbols(kept, stage, system or platform.system())
     shutil.copytree(kept, symbols)
+    listing = ''.join(f'  {name}: {identity}\n' for name, identity in sorted(identities.items()))
     (symbols / 'README.txt').write_text(
         f'Debugging symbols for the Convolver {version} preview, {identifier}, built from {commit}.\n'
-        'They match only the binaries of the same candidate run (GNU build ID, Mach-O UUID or PDB\n'
-        'signature). See docs/develop/releasing.md#debugging-symbols.\n')
+        'They match only the binaries of the same candidate run, checked when it was built:\n'
+        f'{listing}'
+        'See docs/develop/releasing.md#debugging-symbols.\n')
 
 
 def build(archive, identifier, work, output, cmake, nsis=None):
@@ -103,9 +93,9 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
     run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2',
          '-LE', 'consumer'])
-    keep_symbols(build_dir, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
+    keep_symbols(build_dir, stage, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
     if nsis:
         version = subprocess.check_output([str(nsis), '/VERSION'], text=True).strip()
         if version != 'v' + policy['release_tools']['nsis']['version']:
