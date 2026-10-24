@@ -160,8 +160,12 @@ See [documentation maintenance](docs/develop/documentation.md#automated-checks) 
 Workflows use the latest major release of each action. Dependabot
 (`.github/dependabot.yml`) checks weekly and opens one grouped pull request when
 an action has a new release; review its release notes for changed inputs before
-merging. `ilammy/msvc-dev-cmd` has no Node 24 release yet, so GitHub still runs
-it on Node 24 with a deprecation warning.
+merging. Where an action's major tag still points at a release for an
+outdated Node.js, use its newest exact release instead (`ccache-action@v1.2.24`:
+its `v1` tag is still the Node 20 release 1.2.20); Dependabot moves exact tags
+too. Do not keep an action that has no release for the runner's current Node.js:
+the release workflow sets up the MSVC developer environment with `vswhere` and
+`vcvarsall.bat` in an inline step, because `ilammy/msvc-dev-cmd` has none.
 
 CI caches pre-commit environments by operating system, architecture, exact Python
 and Node versions, and `.pre-commit-config.yaml`. Windows jobs cache vcpkg binary
