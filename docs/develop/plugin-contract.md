@@ -183,7 +183,9 @@ format.
   process ID, and the process's first line is `execution_line()`: version,
   FFT backend and its version, CPU kernels, process and host program. A line
   the file does not take goes to standard error (and `OutputDebugString` on
-  Windows), after one line saying why. Locations are in the
+  Windows), after one line saying why, and `host_log_written()` turns false;
+  the file gets the execution line with its first written line. An empty
+  `CONVOLVER_LOG` turns the file off on purpose and is not a failure. Locations are in the
   [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
   `CONVOLVER_LOG` into the build folder.
 - **Processing faults** (jrp's review of 24 October 2026). `HostProcessor`
@@ -192,20 +194,24 @@ format.
   overflow (extreme but finite input or filter values: those samples are
   silenced and the filter restarts), processing failure (the engine threw:
   the call is silenced and returns false) and invalid calls (more frames or
-  channels than set up: refused). `HostProcessor::faults()` reads the counts
+  channels than set up: refused; only the Audio Unit reaches this, as the
+  VST3 adapter refuses such calls itself and LV2's are split to fit). `HostProcessor::faults()` reads the counts
   from any thread. On the control side, `HostFilter::observe()` takes them and
   returns the new ones, which adapters log with `fault_message()`;
   `HostFilter::faults()` keeps them until an accepted load or `activate()`,
-  and `host_status()` shows them as Fault after any load failure. The audio
+  and `host_status()` shows them as Fault unless a load failure is shown. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends
   `ConvolverFaults` and the processor explains; it also explains on
-  `setProcessing`, `getState`, `setState` and `setActive`. The Audio Unit's
+  `getState`, `setState` and `setActive` (not `setProcessing`, which hosts
+  may call on the audio thread). Each episode is logged, even if its text
+  repeats the last line. The Audio Unit's
   Render sets the parameter's value, and the next request for its text, save,
   restore, initialization or cleanup explains. LV2 shows Fault on its status
   port in the same `run()` and schedules a fault report (worker request
-  generation 0, never answered), whose `work()` logs through `log:log`; without
+  generation 0, never answered; one at a time, and only for faults no
+  report covered yet), whose `work()` logs through `log:log`; without
   a worker, the next save, restore, activation or deactivation does.
 
 LV2 keeps its own routes (the `status` port, whose values are Running, No

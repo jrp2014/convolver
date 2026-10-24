@@ -310,6 +310,10 @@ std::size_t Plugin::queued_work() {
     std::lock_guard lock(work_mutex_);
     return jobs_.size();
 }
+void Plugin::drop_queued_work() {
+    std::lock_guard lock(work_mutex_);
+    jobs_.clear();
+}
 
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
     auto& h = *static_cast<Plugin*>(context);

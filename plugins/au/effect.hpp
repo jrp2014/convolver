@@ -99,9 +99,7 @@ class Effect final : public ausdk::AUBase {
     // Why the unit plays silence or rejected its last filter; empty if neither.
     // The same text goes to the system log when it happens.
     std::string error();
-    // Why the newest request failed (HostFilter::rejection), to log it.
-    std::string rejection();
-    // The same, numbered for the log (rejected_line).
+    // Why the newest request failed, numbered for the log (rejected_line).
     std::string rejection_line();
     // What the Status parameter shows (DIAG-1).
     HostStatusLine status();
@@ -119,6 +117,9 @@ class Effect final : public ausdk::AUBase {
     // Writes to the Convolver log (host_log), skipping a repeat of the line
     // this instance wrote last, as hosts restart plug-ins often.
     void log(const std::string&, bool problem = true) noexcept;
+    // A fault explanation (observe_faults), logged even if it repeats the
+    // last line: each episode counts.
+    void log_faults(const std::string&) noexcept;
     // Recomputes the status under `control_`; notify_status() then tells
     // listeners, outside the lock, as they may call back into the unit.
     void update_status() noexcept;
@@ -149,7 +150,8 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> initialized_;
     std::atomic<bool> rendered_{false};
     std::optional<HostLayout> committed_;
-    HostStatusLine status_; // Under control_.
+    HostStatusLine status_;          // Under control_.
+    bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

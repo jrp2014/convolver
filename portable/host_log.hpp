@@ -31,8 +31,10 @@ std::filesystem::path host_log_path();
 // by why the file could not be written.
 void host_log(const char* format, const std::string& message, bool problem = true) noexcept;
 // DIAG-1: false once a line could not be written to the file (no folder,
-// no permission, or CONVOLVER_LOG set empty), until a later line is. Status
-// lines then say so instead of pointing to the log.
+// no permission, no home folder), until a later line is. Status lines then
+// say so instead of pointing to the log. CONVOLVER_LOG set empty turns the
+// file off on purpose: lines then go only to the macOS system log, and this
+// stays true.
 bool host_log_written() noexcept;
 // What ran, for support: Convolver's version, the FFT backend and its
 // version, the CPU kernels, the process ID and the host program.

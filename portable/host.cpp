@@ -342,7 +342,7 @@ HostFaults HostFilter::observe(const HostFaults& totals) noexcept {
 std::string fault_message(const HostFaults& f) {
     if (!f.any())
         return {};
-    std::string text = "While the filter played, Convolver met a problem in the audio.";
+    std::string text = "While audio played, Convolver met a problem in it.";
     if (f.output_overflow)
         text += " The output became too large to represent (" + times(f.output_overflow) +
                 "), because the input level or the filter's gain is extreme, so Convolver "
@@ -411,7 +411,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
                            bool log_written) {
     const char* details =
-        log_written ? " Details in the Convolver log." : " The Convolver log could not be written.";
+        log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
     if (const auto& f = filter.failure()) {
         line.status = HostStatus::load_failed;

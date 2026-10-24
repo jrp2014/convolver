@@ -197,20 +197,32 @@ void host_log(const char* format, const std::string& message, bool problem) noex
         // One writer at a time within the process; each line is one write.
         static std::mutex writing;
         std::lock_guard lock(writing);
-        static bool session_written = false; // The execution line, once per process.
+        // The execution line, once per process in the file and once on the
+        // fall-back route, so the file still gets it after a failed start.
+        static bool session_in_file = false, session_in_fall_back = false;
         const auto host = program();
         const auto prefix = now() + " Convolver " CONVOLVER_VERSION_STRING " " + format +
                             (host.empty() ? "" : " in " + host) + " (process " +
                             std::to_string(process_id()) + "): ";
-        auto line = prefix + message + "\n";
-        if (!session_written)
-            line = prefix + execution_line() + "\n" + line;
+        const auto line = prefix + message + "\n";
+        const auto session = prefix + execution_line() + "\n";
+        const auto fall_back_line = [&]() {
+            auto text = session_in_fall_back ? line : session + line;
+            session_in_fall_back = true;
+            return text;
+        };
+#ifndef _WIN32
+        // Set empty on purpose: the file is off, which is not a failure.
+        if (const char* chosen = std::getenv("CONVOLVER_LOG"); chosen && !*chosen) {
+            last_written.store(true, std::memory_order_relaxed);
+            return;
+        }
+#endif
         const auto path = host_log_path();
         if (path.empty()) {
             last_written.store(false, std::memory_order_relaxed);
-            fall_back(line, "No Convolver log file is set (CONVOLVER_LOG is empty, or there is no "
-                            "home folder).");
-            session_written = true;
+            fall_back(fall_back_line(), "No Convolver log file can be chosen (there is no home "
+                                        "folder in the environment).");
             return;
         }
         std::error_code ec;
@@ -221,19 +233,21 @@ void host_log(const char* format, const std::string& message, bool problem) noex
             old += ".old";
             std::filesystem::rename(path, old, ec);
         }
+        const auto text = session_in_file ? line : session + line;
         std::ofstream out(path, std::ios::app | std::ios::binary);
-        out.write(line.data(), static_cast<std::streamsize>(line.size()));
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
         out.close();
         const bool written = !out.fail();
         last_written.store(written, std::memory_order_relaxed);
-        session_written = true;
-        if (written)
+        if (written) {
+            session_in_file = true;
             explained = false; // A later failure explains itself again.
-        else {
+        } else {
             const auto where = path.u8string();
-            fall_back(line, "The Convolver log file " + std::string(where.begin(), where.end()) +
-                                " could not be written (check that its folder exists and can "
-                                "be written to).");
+            fall_back(fall_back_line(),
+                      "The Convolver log file " + std::string(where.begin(), where.end()) +
+                          " could not be written (check that its folder exists and can "
+                          "be written to).");
         }
     } catch (...) { // Out of memory: the message is dropped.
         last_written.store(false, std::memory_order_relaxed);

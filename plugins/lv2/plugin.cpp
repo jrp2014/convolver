@@ -138,6 +138,10 @@ struct Instance {
     // accepted load or activation), and whether a fault report is queued.
     std::atomic<std::uint64_t> faults_cleared{0};
     std::atomic<bool> fault_report_queued{false};
+    // The fault total the last report covers: set by run() when it schedules
+    // one and by work() when it has logged, never both at once (one report at
+    // a time); reset with the processor.
+    std::atomic<std::uint64_t> faults_reported{0};
 
     // Audio side: run() and work_response(), and restore(), which never
     // runs at the same time as them.
@@ -160,11 +164,17 @@ struct Instance {
     }
     // DIAG-1, control side: explains faults the processor counted that no
     // earlier call explained.
-    void log_faults() {
+    // Returns the processor's fault total it explained up to.
+    std::uint64_t log_faults() noexcept {
         if (!host)
-            return;
-        if (const auto fresh = filter.observe(host->faults()); fresh.any())
-            log_error(fault_message(fresh));
+            return 0;
+        const auto totals = host->faults();
+        try {
+            if (const auto fresh = filter.observe(totals); fresh.any())
+                log_error(fault_message(fresh));
+        } catch (...) { // Out of memory for the message: the status port still shows it.
+        }
+        return totals.total();
     }
     // After an accepted load or a new processor: Fault shows again only for
     // later faults.
@@ -352,6 +362,10 @@ void activate_locked(Instance& p) {
     }
     p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
     p.clear_faults();
+    // A report the host dropped (some flush queued work on deactivation)
+    // must not block later ones.
+    p.fault_report_queued.store(false, std::memory_order_release);
+    p.faults_reported.store(0, std::memory_order_relaxed);
     p.update_status();
 }
 
@@ -414,6 +428,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     // cannot run out of memory. Running out here, like the copy above, leaves
     // work() to answer with nothing recorded or changed.
     std::string kept_path = path;
+    p.log_faults(); // Explained under the filter that played; a load clears them.
     const bool was_failed = p.filter.failed();
     const auto failed = [&] {
         p.handled = std::max(p.handled, r.generation);
@@ -498,8 +513,8 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
     if (r.generation == 0) { // DIAG-1: run()'s fault report, not a request; no answer.
         try {
             std::lock_guard lock(p.control);
-            if (!p.closing)
-                p.log_faults();
+            if (!p.closing) // Faults counted since run() asked are covered too.
+                p.faults_reported.store(p.log_faults(), std::memory_order_relaxed);
         } catch (...) {
         }
         p.fault_report_queued.store(false, std::memory_order_release);
@@ -680,11 +695,16 @@ Status shown_status(const Instance& p) {
 // report at a time; a host without a worker explains them at the next save,
 // restore, activation or deactivation.
 void report_faults(Instance& p) {
-    if (!p.schedule || fault_total(p) <= p.faults_cleared.load(std::memory_order_acquire) ||
+    const auto total = fault_total(p);
+    // Only for faults no report was scheduled for yet.
+    if (!p.schedule || total <= p.faults_cleared.load(std::memory_order_acquire) ||
+        total <= p.faults_reported.load(std::memory_order_relaxed) ||
         p.fault_report_queued.exchange(true, std::memory_order_acq_rel))
         return;
     Request r; // Generation 0: requests are numbered from 1.
-    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) != LV2_WORKER_SUCCESS)
+    if (p.schedule->schedule_work(p.schedule->handle, sizeof r, &r) == LV2_WORKER_SUCCESS)
+        p.faults_reported.store(total, std::memory_order_relaxed);
+    else
         p.fault_report_queued.store(false, std::memory_order_release);
 }
 

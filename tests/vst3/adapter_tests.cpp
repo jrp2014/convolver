@@ -845,11 +845,49 @@ void status_and_log() {
     require(contains(log_text(), "The output became too large to represent (") &&
                 contains(log_text(), "Lower the level going into Convolver"),
             "fault not logged");
-    // Stopping playback explains nothing new: no repeat in the log.
+    // Stopping playback explains nothing: setProcessing may run on the audio
+    // thread. Nothing new is logged twice.
+    const auto count = [](const std::string& text, const char* part) {
+        std::size_t n = 0;
+        for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
+            ++n;
+        return n;
+    };
     {
         const auto logged = log_text();
         p.setProcessing(false);
-        require(log_text() == logged, "fault logged twice");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk && log_text() == logged, "fault logged twice");
+    }
+    // A second episode with the same text is logged too (the Status already
+    // shows Fault, so no new point): saving explains it.
+    {
+        std::array<float, 64> left{}, right{};
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {left.data(), right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ParameterChanges changes(4);
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.outputParameterChanges = &changes;
+        d.numSamples = 64;
+        p.setProcessing(true);
+        for (int block = 0; block < 6; ++block) {
+            left.fill(0);
+            left[0] = std::numeric_limits<float>::max() / 4;
+            require(p.process(d) == kResultOk, "second overflow refused");
+        }
+        require(changes.getParameterCount() == 0, "Fault written again while shown");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk &&
+                    count(log_text(), "The output became too large to represent (") == 2,
+                "second fault episode not logged on save");
     }
     // Restarted at another rate: silence until the rate is put back.
     require(p.setState(stream(good).get()) == kResultOk &&

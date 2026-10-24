@@ -1001,7 +1001,7 @@ void status_lines() {
             ascii = ascii && static_cast<unsigned char>(ch) >= 32 &&
                     static_cast<unsigned char>(ch) < 127;
         if (line.status != status || !contains(line.text, part) ||
-            line.text.size() > max_status_text || !ascii) {
+            line.text.size() > max_status_text || !ascii || line.text.back() != '.') {
             std::cerr << "status line: " << line.text << '\n';
             throw std::runtime_error(what);
         }
@@ -1048,6 +1048,12 @@ void status_lines() {
     check(host_status(f, stereo), Status::load_failed,
           "Load failed, previous filter kept: the filter has 2 in, 6 out, the plug-in 2 in, 2 out.",
           "refused replacement");
+    // The longest common line still fits when the log cannot be written.
+    refused([&] { f.load(HostState{other_rate}, stereo); });
+    check(host_status(f, stereo, false), Status::load_failed,
+          "Load failed, previous filter kept: the filter is for 44100 Hz, the host runs at 48000 "
+          "Hz. The log could not be written.",
+          "unwritable log, refused rate");
     const std::array<std::pair<HostFailureKind, const char*>, 6> kinds{{
         {HostFailureKind::filter_file, "filter file could not be read"},
         {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
@@ -1061,6 +1067,8 @@ void status_lines() {
         check(host_status(f, std::nullopt), Status::load_failed, part, "failure kind");
         check(host_status(f, std::nullopt), Status::load_failed, "previous filter kept",
               "failure kind keeps the filter");
+        check(host_status(f, std::nullopt, false), Status::load_failed,
+              "The log could not be written.", "failure kind, unwritable log");
     }
     // A saved failed load plays silence and says so.
     HostState saved_failure;
@@ -1156,7 +1164,7 @@ void status_lines() {
         HostFilter h(8);
         h.reject("why");
         require(contains(host_status(h, std::nullopt, host_log_written()).text,
-                         "The Convolver log could not be written."),
+                         "The log could not be written."),
                 "unwritable log not in the status line");
     }
     set_log_variable(path);
@@ -1165,6 +1173,12 @@ void status_lines() {
 #ifndef _WIN32
     setenv("CONVOLVER_LOG", "", 1);
     require(host_log_path().empty(), "empty CONVOLVER_LOG does not turn the log off");
+    set_log_variable(folder / "nested");
+    host_log("Test #1", "dropped");
+    require(!host_log_written(), "unwritable log not noticed again");
+    setenv("CONVOLVER_LOG", "", 1);
+    host_log("Test #1", "off");
+    require(host_log_written(), "a log turned off on purpose reads as unwritable");
 #endif
     set_log_variable(earlier);
     std::filesystem::remove_all(folder);

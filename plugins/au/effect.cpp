@@ -102,6 +102,17 @@ void Effect::log(const std::string& message, bool problem) noexcept {
     }
 }
 
+void Effect::log_faults(const std::string& message) noexcept {
+    try {
+        std::lock_guard lock(logging_);
+        if (message.empty())
+            return;
+        host_log(tag_.c_str(), message);
+        logged_ = message; // Repeats are logged: the log counts each episode.
+    } catch (...) {        // Out of memory: the line is dropped.
+    }
+}
+
 std::string Effect::observe_faults() noexcept {
     if (!host_)
         return {};
@@ -120,7 +131,8 @@ void Effect::clear_faults(bool new_processor) noexcept {
 
 void Effect::update_status() noexcept {
     try {
-        status_ = host_status(filter_, known_layout(), host_log_written());
+        status_log_written_ = host_log_written();
+        status_ = host_status(filter_, known_layout(), status_log_written_);
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(status_.status), true);
     } catch (...) { // Out of memory: the previous status stays.
@@ -128,6 +140,13 @@ void Effect::update_status() noexcept {
 }
 
 void Effect::notify_status() noexcept {
+    {
+        // The status was worked out before its lines were logged: if writing
+        // them changed whether the log can be written, say so now.
+        std::lock_guard lock(control_);
+        if (status_log_written_ != host_log_written())
+            update_status();
+    }
     AudioUnitEvent event{};
     event.mEventType = kAudioUnitEvent_ParameterValueChange;
     event.mArgument.mParameter = {GetComponentInstance(), status_parameter, kAudioUnitScope_Global,
@@ -245,7 +264,7 @@ OSStatus Effect::Initialize() {
         }
         update_status();
     }
-    log(faults);
+    log_faults(faults);
     log(message, problem);
     notify_status();
     if (!started)
@@ -277,7 +296,7 @@ void Effect::Cleanup() {
         host_.reset();
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
-    log(faults);
+    log_faults(faults);
 }
 
 // The host may call Reset from any thread, so the audio thread performs it at
@@ -356,7 +375,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             return kAudioUnitErr_InvalidPropertyValue;
         }
         if (!faults.empty()) {
-            log(faults);
+            log_faults(faults);
             notify_status();
         }
         if (text.empty())
@@ -448,12 +467,6 @@ std::string Effect::rejection_line() {
     return rejected_line(filter_);
 }
 
-std::string Effect::rejection() {
-    std::lock_guard lock(control_);
-    const auto& r = filter_.rejection();
-    return r ? r->message : std::string();
-}
-
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
@@ -480,7 +493,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         return kAudioUnitErr_InvalidPropertyValue;
     }
     if (!faults.empty()) {
-        log(faults);
+        log_faults(faults);
         notify_status();
     }
     if (const auto result = AUBase::SaveState(out); result != noErr)
@@ -611,7 +624,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     }
     // Listeners may call back into the unit, so notify outside the lock.
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
-    log(faults);
+    log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     notify_status();
     if (!accepted)

@@ -416,6 +416,39 @@ void status_and_log(host::World& world, const Fixture& f) {
     check(p->restore(state_of(a), chunk(world)) == LV2_STATE_SUCCESS, label + "load after fault");
     p->run_empty();
     check(p->status == static_cast<float>(lv2::Status::running), label + "a load clears Fault");
+    {
+        // A host whose worker gets round to requests late: however many runs
+        // fault, one fault report is queued; once it has run, clean runs
+        // queue nothing; a new fault reports again, also after a
+        // reactivation that dropped a queued report. (Invalid input, as the
+        // loud filter can overflow even on silence, depending on the FFT.)
+        host::Features late;
+        late.worker = host::Worker::deferred;
+        auto d = instance(world, a, late);
+        d->activate();
+        check(d->restore(state_of(a), chunk(world)) == LV2_STATE_SUCCESS,
+              label + "deferred: filter");
+        std::vector<float> invalid(f.input.size());
+        for (std::size_t i = 0; i < invalid.size(); i += 301)
+            invalid[i] = std::numeric_limits<float>::quiet_NaN(); // One per run.
+        const std::vector<float> clean(f.input.size());
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->status == static_cast<float>(lv2::Status::fault) && d->queued_work() == 1,
+              label + "deferred: one fault report however many runs");
+        check(d->run_deferred_work() == 1 && d->log.contains(LV2_LOG__Error, "invalid samples"),
+              label + "deferred: the report explains");
+        static_cast<void>(render(*d, clean, 2000, 300));
+        check(d->queued_work() == 0 && d->status == static_cast<float>(lv2::Status::fault),
+              label + "deferred: clean runs schedule no more reports");
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->queued_work() == 1, label + "deferred: a new fault reports again");
+        d->deactivate();
+        d->drop_queued_work();
+        d->activate();
+        static_cast<void>(render(*d, invalid, 2000, 300));
+        check(d->queued_work() == 1 && d->run_deferred_work() == 1,
+              label + "deferred: a fault after reactivation still reports");
+    }
 
     // Without log:log, messages go to stderr and nothing breaks.
     host::Features quiet;

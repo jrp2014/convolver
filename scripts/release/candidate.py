@@ -43,9 +43,13 @@ def keep_symbols(build_dir, symbols, identifier, commit, version):
     package. Every packaged binary must have its symbols."""
     kept = build_dir / 'symbols'
     files = sorted(p for p in kept.rglob('*') if p.is_file()) if kept.is_dir() else []
-    names = {p.relative_to(kept).parts[-1] if p.suffix in ('.debug', '.pdb') else
-             next(part for part in p.relative_to(kept).parts if part.endswith('.dSYM'))
-             for p in files}
+    names = set()
+    for p in files:
+        parts = p.relative_to(kept).parts
+        if p.suffix in ('.debug', '.pdb'):
+            names.add(parts[-1])
+        else:  # Inside a .dSYM bundle, or something else, which is only copied.
+            names.update(part for part in parts if part.endswith('.dSYM'))
     expected = {'Darwin': ['Convolver.dSYM', 'convolver-preset.dSYM', 'convolver-equalizer-apo.dSYM'],
                 'Windows': ['Convolver.pdb', 'convolver-preset.pdb', 'convolver-equalizer-apo.pdb'],
                 'Linux': ['Convolver.so.debug', 'convolver-preset.debug', 'convolver-equalizer-apo.debug']}

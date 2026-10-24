@@ -202,6 +202,7 @@ bool Processor::observe_faults() noexcept {
     if (!fresh.any())
         return false;
     try {
+        logged_.clear(); // A repeat episode is logged too: the log counts them.
         log(fault_message(fresh));
     } catch (...) { // Out of memory for the message: the status still shows it.
     }
@@ -266,20 +267,11 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
     return kResultOk;
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
-    bool faulted = false;
-    {
-        // Hosts stop processing when playback stops: a good moment to
-        // explain what went wrong while it played.
-        std::lock_guard lock(control_);
-        faulted = observe_faults();
-    }
+    // Not a place to explain faults: hosts may call this on the audio
+    // thread, where nothing may lock, allocate or write the log.
     if (state && host_) {
         host_->set_bypass(bypass_.load());
         host_->reset();
-    }
-    if (faulted) {
-        write_log();
-        send_status();
     }
     return kResultOk;
 }

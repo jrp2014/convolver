@@ -27,7 +27,7 @@ Contents: [native tests](#native-production-tests),
 [lifecycle sequences](#lifecycle-sequences-plug-7),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
-[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
+[documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns),
 [evidence from failed CI runs](#evidence-from-failed-ci-runs) and
 [when CI runs](#ci-triggers).
 
