@@ -247,3 +247,81 @@ jobs:
           path: test-evidence
           retention-days: 14
           if-no-files-found: ignore
+
+  # The formal tests above use Ubuntu 24.04's lilv packages. This job builds
+  # the newest upstream releases of lilv and the libraries under it (zix,
+  # serd, sord, sratom, with the newest lv2 headers) and runs the same LV2
+  # tests against them, so problems that later packages would bring show up
+  # early. It reports them as warnings and never fails the run (CI-6).
+  upstream-lilv:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
+    name: Newest upstream lilv (advisory)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build pkg-config libsndfile1-dev
+      - name: Newest upstream sources
+        id: sources
+        continue-on-error: true
+        run: |
+          python scripts/release/sources.py --latest --fetch --cache "$RUNNER_TEMP/downloads" \
+            --destination "$RUNNER_TEMP/sources" --github-output "$RUNNER_TEMP/upstream.env" lv2
+          python scripts/release/resolve.py checkout --destination "$RUNNER_TEMP/upstream" \
+            --github-output "$RUNNER_TEMP/upstream.env"
+      - name: Build lv2, zix, serd, sord, sratom and lilv
+        id: libraries
+        if: steps.sources.outcome == 'success'
+        continue-on-error: true
+        run: |
+          prefix="$RUNNER_TEMP/upstream-prefix"
+          for name in lv2 zix serd sord sratom lilv; do
+            source=$(sed -n "s/^$name=//p" "$RUNNER_TEMP/upstream.env")
+            options=(-Ddocs=disabled -Dtests=disabled)
+            if [ "$name" = lv2 ]; then options+=(-Dplugins=disabled); fi
+            meson setup "$RUNNER_TEMP/upstream-build/$name" "$source" "--prefix=$prefix" --libdir=lib \
+              --buildtype=release "${options[@]}"
+            ninja -C "$RUNNER_TEMP/upstream-build/$name" install
+          done
+          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$prefix/lib" >> "$GITHUB_ENV"
+      - name: Convolver's LV2 tests against them
+        id: tests
+        if: steps.libraries.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "lilv $(pkg-config --modversion lilv-0) from $(pkg-config --variable=libdir lilv-0)"
+          cmake -S . -B build-upstream -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_BUILD_LV2=ON \
+            -DCONVOLVER_LEGACY_TESTS=OFF
+          cmake --build build-upstream --parallel \
+            --target convolver_lv2_tests convolver_lv2_adapter convolver_preset_tool
+          ctest --test-dir build-upstream --output-on-failure --parallel 2 \
+            -R '^(examples\.first_use|lv2\..*)$'
+      - name: Report what the newest upstream lilv shows
+        if: always()
+        env:
+          SOURCES: ${{ steps.sources.outcome }}
+          LIBRARIES: ${{ steps.libraries.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+        run: |
+          if [ "$TESTS" = success ]; then
+            echo "Convolver's LV2 tests pass against the newest upstream lilv too." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$SOURCES" != success ]; then
+            stage='fetching the newest upstream sources failed'
+          elif [ "$LIBRARIES" != success ]; then
+            stage='building the newest upstream lilv and its libraries failed'
+          else
+            stage="Convolver's LV2 build or tests fail against them"
+          fi
+          message="Newest upstream lilv: $stage; see this job's log."
+          message="$message Advisory: the formal LV2 tests use Ubuntu's packages."
+          echo "::warning title=Newest upstream lilv::$message"
+          echo "**Warning:** $message" >> "$GITHUB_STEP_SUMMARY"

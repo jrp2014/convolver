@@ -338,9 +338,9 @@ releases, and where its archive is downloaded.
 | FFTW | `fftw3` tags; the archive from fftw.org | Source builds with the FFTW backend (none of the preview packages) | Job summary, source manifest |
 | libsndfile | `libsndfile` tags; the release archive, checked against the digest GitHub publishes | Preview packages and their candidates | Job summary, source and artifact manifests, `convolver --version` |
 | NSIS | `kichik/nsis` tags (`v313` is 3.13); the archive from SourceForge | The Windows installer | Job summary, candidate record |
-| pluginval | `Tracktion/pluginval` tags, pre-releases included (2.0 is still in beta) | VST3 validation, later LV2 and AU | Job summary |
+| pluginval | `Tracktion/pluginval` tags (1.0.4 in October 2026); the newest 2.0 beta in an advisory run | VST3 validation, later LV2 and AU | Job summary |
 | `lv2lint` | Its own Git host; when that does not answer, the newest version FreeBSD's ports list | LV2 validation | Job summary |
-| `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates | LV2 tests | Job summary |
+| `lilv` (test host) and its libraries | The runner image's Ubuntu 24.04 packages, with updates; the newest upstream releases in an advisory job | LV2 tests | Job summary |
 | `auval` | Ships with macOS on the `macos-15` image | AU validation | Each run logs the macOS and Xcode versions |
 
 The other CI jobs (native, VST3, LV2 and regression) take FFTW and libsndfile
@@ -348,8 +348,7 @@ from the runner's package manager (apt, Homebrew or vcpkg) at its newest
 version, as a source build would. Their versions appear only in the job logs
 and in `convolver --version`, not in a manifest.
 
-Pre-releases are skipped except where the policy allows them (pluginval). For
-each dependency a build records the version, the tag, the commit the tag
+For each dependency a build records the version, the tag, the commit the tag
 points at and the SHA-256 of the archive it downloaded:
 
 - every CI job lists them in its summary;
@@ -394,6 +393,28 @@ while the corresponding source bundle carries every dependency's archive (about
 The VST3, LV2, Audio Unit and candidate workflows also run every Monday, so a
 new upstream release is built and tested within a week even when nothing in
 Convolver changes. GitHub Actions versions are updated by Dependabot instead.
+
+### Pre-releases and newer upstream versions
+
+Builds and formal tests use full releases only, never a beta or release
+candidate. What a newer pre-release or upstream version signposts is still
+looked at, but only as advice: it shows up as a warning in the job summary and
+never fails a run.
+
+- Every summary names a newer pre-release of a dependency or tool when there
+  is one (for example a `v1.20.0-rc1` beside lv2 1.18.10), without using it.
+- pluginval: the formal tests use the newest full release. When a newer
+  pre-release exists (2.0.0-beta3 in October 2026), the VST3 jobs also run
+  `vst3.pluginval` with it, `--rtcheck` included on macOS, and report any
+  problems as warnings. The acceptance test is the exception: it needs
+  pluginval 2's `test` command, which no full release has yet, so it runs with
+  the pre-release and must pass
+  ([pluginval](testing.md#pluginval)).
+- lilv: the formal LV2 tests use Ubuntu 24.04's packages. The **Newest upstream
+  lilv (advisory)** job builds the newest releases of lilv, zix, serd, sord
+  and sratom (`resolve.py checkout`, from the policy's `test_sources`) with the
+  newest lv2 headers, runs the same LV2 tests against them and reports a
+  failure as a warning.
 
 ### When a new release breaks the build
 

@@ -109,9 +109,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: vcpkg install fftw3:x64-windows-static-md 'libsndfile[core]:x64-windows-static-md'
-      # CI-6: the newest pluginval 2 release; the summary records its version
-      # and checksum, checked against GitHub's published digest where there is one.
-      - name: Newest pluginval
+      # CI-6: the formal tests use the newest full pluginval release (not a
+      # beta); the summary records its version and checksum, checked against
+      # GitHub's published digest where there is one.
+      - name: Newest pluginval release
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -121,14 +122,18 @@ jobs:
             macOS) executable=pluginval.app/Contents/MacOS/pluginval ;;
             Windows) executable=pluginval.exe ;;
           esac
+          echo "PLUGINVAL_EXECUTABLE=$executable" >> "$GITHUB_ENV"
           directory="$RUNNER_TEMP/pluginval"
           python scripts/release/resolve.py tool pluginval --cache "$directory" --os "$RUNNER_OS" \
             --github-output "$RUNNER_TEMP/pluginval.env"
           archive=$(sed -n 's/^archive=//p' "$RUNNER_TEMP/pluginval.env")
+          version=$(sed -n 's/^version=//p' "$RUNNER_TEMP/pluginval.env")
           (cd "$directory" && unzip -q "$archive")
           echo "PLUGINVAL=$directory/$executable" >> "$GITHUB_ENV"
-          # rtcheck (macOS only) flags real-time-unsafe calls during processing.
-          if [ "$RUNNER_OS" = macOS ]; then
+          echo "PLUGINVAL_VERSION=$version" >> "$GITHUB_ENV"
+          # rtcheck (pluginval 2, macOS only) flags real-time-unsafe calls
+          # during processing.
+          if [ "$RUNNER_OS" = macOS ] && [ "${version%%.*}" -ge 2 ]; then
             echo "PLUGINVAL_ARGS=--rtcheck;relaxed" >> "$GITHUB_ENV"
           fi
       # Compiler cache: pull requests restore it; main and manual runs also
@@ -163,6 +168,43 @@ jobs:
         run: >-
           ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
           --parallel 2 ${{ matrix.tests }}
+      # The newest pluginval beta or release candidate, when one is newer than
+      # the release above: what it reports is a warning in the summary, not a
+      # failure, since a pre-release only signposts what is coming. The one
+      # exception is the acceptance test, which needs pluginval 2's `test`
+      # command that no full release has yet (docs/develop/testing.md#pluginval).
+      - name: Newest pluginval pre-release (advisory)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          directory="$RUNNER_TEMP/pluginval-prerelease"
+          python scripts/release/resolve.py tool pluginval --prerelease --cache "$directory" \
+            --os "$RUNNER_OS" --github-output "$RUNNER_TEMP/pluginval-prerelease.env"
+          grep -qx 'available=true' "$RUNNER_TEMP/pluginval-prerelease.env" || exit 0
+          archive=$(sed -n 's/^archive=//p' "$RUNNER_TEMP/pluginval-prerelease.env")
+          version=$(sed -n 's/^version=//p' "$RUNNER_TEMP/pluginval-prerelease.env")
+          (cd "$directory" && unzip -q "$archive")
+          arguments=''
+          if [ "$RUNNER_OS" = macOS ]; then arguments='--rtcheck;relaxed'; fi
+          cmake -S . -B build-vst3 "-DCONVOLVER_PLUGINVAL=$directory/$PLUGINVAL_EXECUTABLE" \
+            "-DCONVOLVER_PLUGINVAL_ARGS=$arguments"
+          if ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval$'; then
+            echo "pluginval $version (pre-release): validation passes, as with $PLUGINVAL_VERSION." \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            message="pluginval $version (pre-release) reports problems that $PLUGINVAL_VERSION does not;"
+            message="$message see the log of this step. Advisory: the formal result is $PLUGINVAL_VERSION's."
+            echo "::warning title=pluginval $version::$message"
+            echo "**Warning:** $message" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Required only while the formal release cannot run it (pluginval 1).
+          if [ "${PLUGINVAL_VERSION%%.*}" -lt 2 ]; then
+            ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval\.acceptance$'
+          elif ! ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval\.acceptance$'; then
+            echo "::warning title=pluginval $version::The acceptance test fails with this pre-release;" \
+              "see the log of this step."
+          fi
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         shell: bash

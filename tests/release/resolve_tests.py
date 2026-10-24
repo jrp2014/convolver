@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Builds resolve each dependency to its newest upstream release and record it exactly (CI-6)."""
+import contextlib
 import copy
 import hashlib
+import io
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -46,6 +49,11 @@ TAGS = {
     'https://github.com/libsndfile/libsndfile': {'1.2.2': 'b' * 40, 'v1.0.30': 'c' * 40},
     'https://github.com/kichik/nsis': {'v311': 'd' * 40, 'v313': 'e' * 40, 'v3061': 'f' * 40, 'v2.46': '0' * 40},
     'https://github.com/Tracktion/pluginval': {'v1.0.4': '1' * 40, 'v2.0.0-beta3': '2' * 40},
+    'https://gitlab.com/drobilla/zix.git': {'v0.8.2': '3' * 40},
+    'https://gitlab.com/drobilla/serd.git': {'v0.32.10': '4' * 40},
+    'https://gitlab.com/drobilla/sord.git': {'v0.16.22': '5' * 40},
+    'https://gitlab.com/lv2/sratom.git': {'v0.6.22': '6' * 40},
+    'https://gitlab.com/lv2/lilv.git': {'v0.26.4': '7' * 40, 'v0.28.0': '8' * 40, 'v0.30.0-rc1': '9' * 40},
 }
 SUBMODULES = {'base': 'b' * 39 + '1', 'cmake': 'b' * 39 + '2', 'pluginterfaces': 'b' * 39 + '3',
               'public.sdk': 'b' * 39 + '4'}
@@ -129,6 +137,9 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(set(records), contract.REQUIRED_DEPENDENCIES)
         self.assertEqual((records['lv2']['version'], records['lv2']['revision']), ('1.18.10', '5' * 40))
         self.assertEqual(records['audiounitsdk']['version'], '1.4.0')
+        self.assertEqual(records['lv2']['newer_prerelease'], 'v1.20.0-rc1')
+        self.assertNotIn('newer_prerelease', records['audiounitsdk'])
+        self.assertIn('- lv2: `v1.20.0-rc1` (not used; builds and formal tests use 1.18.10)', resolve.markdown(records))
         self.assertEqual(records['fftw']['url'], 'https://www.fftw.org/fftw-3.3.11.tar.gz')
         self.assertEqual(records['vst3sdk']['url'],
                          'https://codeload.github.com/steinbergmedia/vst3sdk/tar.gz/' + '2' * 40)
@@ -225,6 +236,34 @@ class ResolveTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b'https://example.org/b')
 
 
+class CheckoutTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.policy = contract.load_policy(ROOT / 'packaging/release-policy.json')
+
+    def test_newest_releases_in_build_order(self):
+        cloned = []
+
+        def cloner(remote, tag, directory):
+            cloned.append((Path(directory).name, tag))
+            return upstream.parse_ls_remote(listing(TAGS[remote]))[tag]
+        records = resolve.checkout(self.policy, Path('sources'), lister=lister, cloner=cloner)
+        self.assertEqual(cloned, [('zix', 'v0.8.2'), ('serd', 'v0.32.10'), ('sord', 'v0.16.22'),
+                                  ('sratom', 'v0.6.22'), ('lilv', 'v0.28.0')])
+        self.assertEqual(records['lilv']['revision'], '8' * 40)
+        self.assertEqual(records['lilv']['newer_prerelease'], 'v0.30.0-rc1')
+        table = resolve.checkout_markdown(records)
+        self.assertIn('| [lilv](https://gitlab.com/lv2/lilv.git) | 0.28.0 | `v0.28.0` |', table)
+        self.assertIn('- lilv: `v0.30.0-rc1` (not used', table)
+
+    def test_a_moved_tag_is_refused(self):
+        with self.assertRaisesRegex(resolve.ResolveError, 'lilv: the clone of v0.28.0 is at ' + '0' * 40):
+            resolve.checkout(self.policy, Path('sources'), ['lilv'], lister=lister,
+                             cloner=lambda *args: '0' * 40)
+        with self.assertRaisesRegex(resolve.ResolveError, 'unknown test sources'):
+            resolve.checkout(self.policy, Path('sources'), ['jack'], lister=lister)
+
+
 class ToolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -236,7 +275,8 @@ class ToolTests(unittest.TestCase):
         return resolve.resolve_tool(self.policy, name, Path(temporary.name), kwargs.pop('os_name', None),
                                     kwargs.pop('wanted', None), lister=kwargs.pop('lister', lister),
                                     fetcher=kwargs.pop('fetcher', fake_fetcher),
-                                    digest=kwargs.pop('digest', lambda *args: None))
+                                    digest=kwargs.pop('digest', lambda *args: None),
+                                    prerelease=kwargs.pop('prerelease', False))
 
     def test_nsis(self):
         record, path = self.tool('nsis')
@@ -246,14 +286,37 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(self.tool('nsis', wanted='3.11')[0]['version'], '3.11')
 
     def test_pluginval_per_os_with_published_digest(self):
-        asset_url = 'https://github.com/Tracktion/pluginval/releases/download/v2.0.0-beta3/pluginval_macOS.zip'
+        asset_url = 'https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip'
         record, _ = self.tool('pluginval', os_name='macOS', digest=lambda *args: digest(asset_url))
-        self.assertEqual((record['version'], record['url']), ('2.0.0-beta3', asset_url))
+        self.assertEqual((record['version'], record['url']), ('1.0.4', asset_url))
+        self.assertEqual(record['newer_prerelease'], 'v2.0.0-beta3')
+        self.assertIn('newer pre-release exists upstream: `v2.0.0-beta3`', resolve.tool_markdown('pluginval', record))
         self.assertEqual(record['checked_against'], 'the digest GitHub publishes for the asset')
         with self.assertRaisesRegex(resolve.ResolveError, 'differs from the digest GitHub publishes'):
             self.tool('pluginval', os_name='Linux', digest=lambda *args: '0' * 64)
         with self.assertRaisesRegex(resolve.ResolveError, "no download for 'Plan9'"):
             self.tool('pluginval', os_name='Plan9')
+
+    def test_pluginval_prerelease_is_advisory(self):
+        record, path = self.tool('pluginval', os_name='Linux', prerelease=True)
+        self.assertEqual(record['version'], '2.0.0-beta3')
+        self.assertIn('advisory', record['chosen'])
+        self.assertEqual(path.name, 'pluginval_Linux.zip')
+
+        def released(remote):
+            return listing({'v1.0.4': '1' * 40, 'v1.0.1-beta5': '2' * 40, 'v2.0.0': '3' * 40})
+        self.assertEqual(self.tool('pluginval', os_name='Linux', prerelease=True, lister=released), (None, None))
+        self.assertEqual(self.tool('pluginval', os_name='Linux', lister=released)[0]['version'], '2.0.0')
+
+    def test_prerelease_on_the_command_line(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'out'
+            with mock.patch.object(resolve, 'resolve_tool', return_value=(None, None)), \
+                    contextlib.redirect_stdout(io.StringIO()) as printed:
+                self.assertEqual(resolve.main(['tool', 'pluginval', '--prerelease', '--cache', temporary,
+                                               '--github-output', str(output)]), 0)
+            self.assertEqual(output.read_text(), 'available=false\n')
+            self.assertIn('No pre-release of pluginval is newer', printed.getvalue())
 
     def test_lv2lint_falls_back_to_freebsd_ports(self):
         distinfo = ('TIMESTAMP = 1\nSHA256 (lv2lint-0.16.2.tar.xz) = '

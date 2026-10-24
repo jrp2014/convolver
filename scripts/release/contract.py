@@ -62,6 +62,9 @@ def validate_policy(policy, source=None):
     for section in ('release_tools', 'test_tools'):
         for name, rule in policy.get(section, {}).items():
             _validate_source(f'{section}.{name}', rule)
+    # Git sources that only advisory CI jobs build (a checkout, no archive).
+    for name, rule in policy.get('test_sources', {}).items():
+        _validate_source(f'test_sources.{name}', rule, archive=False)
     if not policy.get('vcpkg'):
         raise ValueError('missing vcpkg settings')
     if policy['vcpkg'].get('triplet') != 'x64-windows-static-md':
@@ -85,12 +88,12 @@ def validate_policy(policy, source=None):
             raise ValueError('tested platform requires evidence')
 
 
-def _validate_source(name, rule):
+def _validate_source(name, rule, archive=True):
     """Where a dependency or tool comes from: its repository, how its tags name
     releases, and its archive's URL."""
     if not str(rule.get('upstream', '')).startswith('https://'):
         raise ValueError(f'{name}: missing https upstream repository')
-    if not str(rule.get('url', '')).startswith('https://'):
+    if archive and not str(rule.get('url', '')).startswith('https://'):
         raise ValueError(f'{name}: missing https archive URL template')
     if 'tag_pattern' in rule:
         try:

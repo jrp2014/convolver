@@ -223,7 +223,11 @@ Until 1.0 the C++ API may change between minor versions.
   `licenses/DEPENDENCIES.json`, and a recorded build can be repeated with
   `sources.py --lock`. The VST3 and Audio Unit plug-ins name their SDK in the
   Convolver log. The VST3, LV2, Audio Unit and candidate workflows also run
-  every Monday, replacing the weekly Dependency updates check. See
+  every Monday, replacing the weekly Dependency updates check. Formal tests
+  use full releases only: pluginval moves from 2.0.0-beta3 to 1.0.4, and the
+  beta runs as an advisory check whose findings are warnings (the acceptance
+  test, which needs pluginval 2, still runs on it). A new advisory LV2 job
+  tests against the newest upstream lilv and its libraries. See
   [supporting libraries](docs/develop/build.md#supporting-libraries).
 
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the

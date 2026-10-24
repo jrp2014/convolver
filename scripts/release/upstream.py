@@ -112,6 +112,23 @@ def newest(rule, tags, wanted=None):
     return version, found[version], tags[found[version]]
 
 
+def newest_prerelease(rule, tags):
+    """(version, tag, commit) of the newest pre-release (beta, rc) that is newer
+    than the newest release, or None. Formal tests use releases; a pre-release
+    is only tried, to see what it signposts."""
+    final = releases(dict(rule, prereleases=False), tags)
+    newest_final = max((version_key(v) for v in final), default=None)
+    candidates = {}
+    for tag in tags:
+        version = tag_version(rule, tag)
+        if version and not is_final(version) and (newest_final is None or version_key(version) > newest_final):
+            candidates[version] = tag
+    if not candidates:
+        return None
+    version = max(candidates, key=version_key)
+    return version, candidates[version], tags[candidates[version]]
+
+
 def _describe_tags(rule):
     if rule.get('tag_pattern'):
         return f'tags matching {rule["tag_pattern"]}'

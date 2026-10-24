@@ -207,7 +207,6 @@
     "pluginval": {
       "upstream": "https://github.com/Tracktion/pluginval",
       "tag_prefix": "v",
-      "prereleases": true,
       "url": "https://github.com/Tracktion/pluginval/releases/download/{tag}/{asset}",
       "github_release": "Tracktion/pluginval",
       "assets": {
@@ -224,6 +223,28 @@
         "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-{version}.tar.xz"
       ],
       "distinfo": "https://raw.githubusercontent.com/freebsd/freebsd-ports/main/audio/lv2lint/distinfo"
+    }
+  },
+  "test_sources": {
+    "zix": {
+      "upstream": "https://gitlab.com/drobilla/zix.git",
+      "tag_prefix": "v"
+    },
+    "serd": {
+      "upstream": "https://gitlab.com/drobilla/serd.git",
+      "tag_prefix": "v"
+    },
+    "sord": {
+      "upstream": "https://gitlab.com/drobilla/sord.git",
+      "tag_prefix": "v"
+    },
+    "sratom": {
+      "upstream": "https://gitlab.com/lv2/sratom.git",
+      "tag_prefix": "v"
+    },
+    "lilv": {
+      "upstream": "https://gitlab.com/lv2/lilv.git",
+      "tag_prefix": "v"
     }
   }
 }

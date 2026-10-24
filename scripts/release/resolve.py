@@ -20,7 +20,12 @@ the same sources later: sources.py --lock FILE fetches exactly those archives
 and refuses any whose checksum differs.
 
 python3 scripts/release/resolve.py dependencies --cache DIR --lock FILE [NAME ...]
-python3 scripts/release/resolve.py tool pluginval --cache DIR [--os Linux]
+Pre-releases are never used for builds or formal tests. A newer one is named
+in the record (`newer_prerelease`), and `tool --prerelease` fetches it for an
+advisory run.
+
+python3 scripts/release/resolve.py tool pluginval --cache DIR [--os Linux] [--prerelease]
+python3 scripts/release/resolve.py checkout --destination DIR [NAME ...]   (test sources, advisory builds)
 python3 scripts/release/resolve.py packages PACKAGE ...   (installed Debian packages, for the summary)
 python3 scripts/release/resolve.py explain-failure [--suspect NAME]   (after a failed CI step)
 """
@@ -150,11 +155,12 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
     for name in sorted(n for n in names if 'submodule_of' not in rules[n]):
         rule = rules[name]
         try:
-            version, tag, revision = upstream.newest(rule, upstream.parse_ls_remote(lister(rule['upstream'])),
-                                                     wanted.get(name))
+            tags = upstream.parse_ls_remote(lister(rule['upstream']))
+            version, tag, revision = upstream.newest(rule, tags, wanted.get(name))
             chosen = f'requested ({version})' if name in wanted else 'newest release'
             parents[name] = (version, tag, chosen)
             records[name] = _record(rule, version, tag, revision, chosen, cache, fetcher, digest)
+            _note_prerelease(records[name], rule, tags)
         except (OSError, RuntimeError, ValueError) as error:
             errors.append(f'{name}: {error}')
     for parent in sorted({rules[n]['submodule_of'] for n in names if 'submodule_of' in rules[n]}):
@@ -189,6 +195,23 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
     return records
 
 
+def _note_prerelease(record, rule, tags):
+    """Names a newer beta or release candidate, which builds do not use but
+    which may signpost changes to come."""
+    if rule.get('prereleases'):
+        return
+    found = upstream.newest_prerelease(rule, tags)
+    if found:
+        record['newer_prerelease'] = found[1]
+
+
+def prerelease_notes(records):
+    """Markdown lines naming the newer pre-releases that were not used."""
+    notes = [f'- {name}: `{record["newer_prerelease"]}` (not used; builds and formal tests use '
+             f'{record["version"]})' for name, record in sorted(records.items()) if record.get('newer_prerelease')]
+    return ('\nNewer pre-releases upstream:\n\n' + '\n'.join(notes) + '\n') if notes else ''
+
+
 def lock(records, resolved_at=None):
     """A lock file's contents: what was resolved and when."""
     resolved_at = resolved_at or datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -215,7 +238,7 @@ def markdown(records, heading='Dependencies used'):
         lines.append(f'| [{name}]({record["url"]}) | {record["version"]} | `{record.get("tag", "-")}` | '
                      f'`{record.get("revision", "-")}` | `{record["sha256"]}` | {record.get("chosen", "recorded")}'
                      f'{"; matches GitHub digest" if record.get("checked_against", "").startswith("the digest") else ""} |')
-    return '\n'.join(lines) + '\n'
+    return '\n'.join(lines) + '\n' + prerelease_notes(records)
 
 
 def report(text):
@@ -272,20 +295,35 @@ def _distinfo(url, fetcher):
 
 
 def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream.ls_remote, fetcher=download,
-                 digest=_published_digest):
-    """(record, archive path) for a release or test tool from the policy."""
+                 digest=_published_digest, prerelease=False):
+    """(record, archive path) for a release or test tool from the policy.
+
+    With prerelease, the newest beta or release candidate that is newer than
+    the newest release instead, for an advisory run; (None, None) if there is
+    none."""
     rules = dict(policy.get('release_tools', {}), **policy.get('test_tools', {}))
     if name not in rules:
         raise ResolveError(f'unknown tool {name} (the release policy has {sorted(rules)})')
     rule = rules[name]
     expected, against = None, 'nothing (no published checksum)'
+    newer = None
     try:
-        version, tag, revision = upstream.newest(rule, upstream.parse_ls_remote(lister(rule['upstream'])), wanted)
-        chosen = f'requested ({version})' if wanted else 'newest release'
+        tags = upstream.parse_ls_remote(lister(rule['upstream']))
+        if prerelease:
+            found = upstream.newest_prerelease(rule, tags)
+            if found is None:
+                return None, None
+            version, tag, revision = found
+            chosen = 'newest pre-release, newer than the newest release (advisory)'
+        else:
+            version, tag, revision = upstream.newest(rule, tags, wanted)
+            chosen = f'requested ({version})' if wanted else 'newest release'
+            found = None if rule.get('prereleases') else upstream.newest_prerelease(rule, tags)
+            newer = found[1] if found else None
     except (OSError, RuntimeError) as error:
         # A small host with bad days: a packager's record of the newest release
         # and its checksum (FreeBSD's ports) stands in, and says so.
-        if 'distinfo' not in rule or wanted:
+        if 'distinfo' not in rule or wanted or prerelease:
             raise ResolveError(f'{name}: cannot list the releases at {rule["upstream"]}: {error}\n{HELP}') from error
         known = _distinfo_or_empty(rule['distinfo'], fetcher)
         if not known:
@@ -333,8 +371,53 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
                   'checked_against': against, 'upstream': rule['upstream']}
         if revision:
             record['revision'] = revision
+        if newer:
+            record['newer_prerelease'] = newer
         return record, path
     raise ResolveError(f'{name} {version}: no download succeeded:\n  ' + '\n  '.join(failures) + f'\n{HELP}')
+
+
+def _clone(remote, tag, directory):
+    upstream._git(['-c', 'advice.detachedHead=false', 'clone', '--quiet', '--depth', '1', '--branch', tag,
+                   remote, str(directory)], timeout=600)
+    return upstream._git(['rev-parse', 'HEAD'], cwd=directory).strip()
+
+
+def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=_clone):
+    """Clones the newest release of each test source (all, in the policy's
+    order, by default) into destination/NAME; returns their records. Only
+    advisory jobs build these, so the formal tests never depend on them."""
+    rules = policy.get('test_sources', {})
+    names = list(rules) if not names else names
+    unknown = sorted(set(names) - set(rules))
+    if unknown:
+        raise ResolveError(f'unknown test sources: {unknown} (the release policy has {sorted(rules)})')
+    records, errors = {}, []
+    for name in names:
+        rule = rules[name]
+        try:
+            tags = upstream.parse_ls_remote(lister(rule['upstream']))
+            version, tag, revision = upstream.newest(rule, tags)
+            commit = cloner(rule['upstream'], tag, Path(destination) / name)
+            if commit != revision:
+                raise ValueError(f'the clone of {tag} is at {commit}, but the tag points at {revision}')
+            records[name] = {'version': version, 'tag': tag, 'revision': revision, 'url': rule['upstream'],
+                             'chosen': 'newest release'}
+            _note_prerelease(records[name], rule, tags)
+        except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+            errors.append(f'{name}: {error}')
+    if errors:
+        raise ResolveError('Cannot check out every test source:\n  ' + '\n  '.join(errors) + '\n' + HELP)
+    return records
+
+
+def checkout_markdown(records):
+    lines = ['### Newest upstream sources (advisory build)', '', '| Source | Version | Tag | Commit |',
+             '| --- | --- | --- | --- |']
+    for name, record in records.items():
+        lines.append(f'| [{name}]({record["url"]}) | {record["version"]} | `{record["tag"]}` | '
+                     f'`{record["revision"]}` |')
+    return '\n'.join(lines) + '\n' + prerelease_notes(records)
 
 
 def _distinfo_or_empty(url, fetcher):
@@ -348,7 +431,9 @@ def tool_markdown(name, record):
     return (f'### {name} used\n\n{name} {record["version"]} (tag `{record["tag"]}`'
             + (f', commit `{record["revision"]}`' if record.get('revision') else '') +
             f'), from {record["url"]}, SHA-256 `{record["sha256"]}`, checked against '
-            f'{record["checked_against"]}; chosen: {record["chosen"]}.\n')
+            f'{record["checked_against"]}; chosen: {record["chosen"]}.\n'
+            + (f'\nA newer pre-release exists upstream: `{record["newer_prerelease"]}` (not used here).\n'
+               if record.get('newer_prerelease') else ''))
 
 
 def packages_markdown(names, query=None):
@@ -393,7 +478,15 @@ def main(argv=None):
     tool.add_argument('--cache', type=Path, required=True)
     tool.add_argument('--os', dest='os_name', help='Linux, macOS or Windows, for tools with one download per OS')
     tool.add_argument('--version', help='use this release instead of the newest')
-    tool.add_argument('--github-output', type=Path, help='append archive=, version= and sha256= here')
+    tool.add_argument('--github-output', type=Path,
+                      help='append available=, archive=, version= and sha256= here')
+    tool.add_argument('--prerelease', action='store_true',
+                      help='the newest beta or release candidate newer than the newest release, for an advisory '
+                           'run; reports available=false when there is none')
+    sources = commands.add_parser('checkout', help='clone the newest release of test sources (advisory builds)')
+    sources.add_argument('--destination', type=Path, required=True)
+    sources.add_argument('--github-output', type=Path, help='append NAME=DIRECTORY here')
+    sources.add_argument('names', nargs='*', help='test sources from the policy (default: all, in build order)')
     packages = commands.add_parser('packages', help='report the installed versions of Debian packages')
     packages.add_argument('packages', nargs='+')
     explain = commands.add_parser('explain-failure', help='say how to tell whether a new release broke CI')
@@ -414,12 +507,30 @@ def main(argv=None):
             records = resolve(policy, args.cache.resolve(), args.names or None, parse_wanted(args.version))
             args.lock.write_text(json.dumps(lock(records), indent=2) + '\n', encoding='utf-8')
             report(markdown(records))
-        else:
-            record, path = resolve_tool(policy, args.name, args.cache.resolve(), args.os_name, args.version)
-            report(tool_markdown(args.name, record))
+        elif args.command == 'checkout':
+            destination = args.destination.resolve()
+            records = checkout(policy, destination, args.names or None)
+            report(checkout_markdown(records))
             if args.github_output:
                 with args.github_output.open('a', encoding='utf-8') as output:
-                    output.write(f'archive={path.as_posix()}\nversion={record["version"]}\nsha256={record["sha256"]}\n')
+                    output.writelines(f'{name}={(destination / name).as_posix()}\n' for name in records)
+        else:
+            if args.prerelease and args.version:
+                raise ResolveError('--prerelease takes the newest pre-release; it cannot be combined with --version')
+            record, path = resolve_tool(policy, args.name, args.cache.resolve(), args.os_name, args.version,
+                                        prerelease=args.prerelease)
+            if record is None:
+                report(f'### {args.name} pre-release\n\nNo pre-release of {args.name} is newer than its newest '
+                       'release, so there is nothing more to try.\n')
+            else:
+                report(tool_markdown(args.name, record))
+            if args.github_output:
+                with args.github_output.open('a', encoding='utf-8') as output:
+                    if record is None:
+                        output.write('available=false\n')
+                    else:
+                        output.write(f'available=true\narchive={path.as_posix()}\nversion={record["version"]}\n'
+                                     f'sha256={record["sha256"]}\n')
     except ResolveError as error:
         print(f'error: {error}', file=sys.stderr)
         return 1

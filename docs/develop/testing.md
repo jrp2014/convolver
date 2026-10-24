@@ -470,17 +470,19 @@ JUCE-based host that runs headless. It is downloaded separately, never linked
 into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to
 add:
 
-- `vst3.pluginval`: `pluginval validate --strictness-level 10 --skip-gui-tests`.
-  Open and close, state save and restore, bus layouts, parameter fuzzing and
-  thread safety, allocations during processing and oversized blocks, at several
-  sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS` adds options; CI adds
-  `--rtcheck;relaxed` on macOS, where pluginval can flag real-time-unsafe calls
-  in process callbacks.
+- `vst3.pluginval`: pluginval's validation at `--strictness-level 10
+  --skip-gui-tests` (`pluginval validate` in pluginval 2, `--validate` in
+  pluginval 1). Open and close, state save and restore, bus layouts, parameter
+  fuzzing and thread safety, allocations during processing and oversized
+  blocks, at several sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS`
+  adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
+  can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
   size 300) and a cross-feed `.cfg` (block size 61), loads each through the
   host's state call, renders noise with `pluginval test`, and compares the
   output with a direct double-precision convolution delayed by 256 samples
-  (tolerance 1e-5). A second render must match the first exactly.
+  (tolerance 1e-5). A second render must match the first exactly. It needs
+  pluginval 2's `test` command and skips itself with pluginval 1.
 
 [`tests/vst3/pluginval_tests.py`](../../tests/vst3/pluginval_tests.py) runs
 both. On Linux it uses `xvfb-run` when there is no display (JUCE needs an X
@@ -488,8 +490,12 @@ server). JUCE's host only accepts state in its own wrapper (an XML document
 holding the component state in JUCE's base64 variant), so the script converts
 the preset's component chunk; given raw component state, JUCE leaves the
 plug-in empty and it passes delayed dry audio, which the acceptance comparison
-would catch. CI uses the newest pluginval release (2.0.0-beta3 in October
-2026) and records its version and checksum in the job summary. The VST3 CI matrix runs
+would catch. CI's formal run uses the newest full pluginval release (1.0.4 in
+October 2026) and records its version and checksum in the job summary. A
+newer pre-release (2.0.0-beta3) then runs both tests again: its validation
+findings are warnings, but the acceptance test must pass, because no full
+release can run it yet
+([pre-releases](build.md#pre-releases-and-newer-upstream-versions)). The VST3 CI matrix runs
 on Linux, Windows and macOS. None of this proves hard real-time deadlines or
 compatibility with every DAW; see [host testing](host-testing.md).
 

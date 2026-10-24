@@ -564,7 +564,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   October 2026, PR #77, by jrp's decision: builds resolve the newest release of
   each SDK, library and tool instead of a pin, and record version, commit and
   checksum in the job summary, source and artifact manifests and, for VST3 and
-  AU, the Convolver log; `sources.py --lock` repeats a recorded build;
+  AU, the Convolver log; `sources.py --lock` repeats a recorded build. Formal
+  tests use full releases; newer pre-releases (pluginval 2.0 beta) and
+  upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
