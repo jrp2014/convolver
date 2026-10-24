@@ -7,12 +7,15 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <new>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -78,11 +81,67 @@ std::vector<float> run(Engine& engine, const std::vector<float>& input, std::siz
     }
     return out;
 }
-double worst_error = 0; // Largest |actual - oracle|, reported at the end.
-void close(const std::vector<float>& actual, const std::vector<double>& expected) {
+// The worst oracle error is reported relative to the peak of the case's
+// expected output, because float rounding scales with the signal: a louder
+// case has a larger absolute error at the same accuracy. The report names the
+// case, so a new loud test is not mistaken for a loss of accuracy.
+struct OracleError {
+    double relative = 0, absolute = 0, peak = 0; // relative = absolute / peak.
+    const char* group = "";
+    const char* kernels = "";
+    std::size_t block = 0;
+};
+const char* oracle_group = "";        // The test function running, set by main.
+std::vector<OracleError> group_worst; // One entry per group and kernel set, in run order.
+OracleError worst_absolute;           // The case with the largest |actual - oracle|.
+void record(const std::vector<float>& actual, const std::vector<double>& expected,
+            std::size_t block) {
+    OracleError e{0, 0, 0, oracle_group, detail::kernels().name, block};
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+        e.absolute = std::max(e.absolute, std::abs(actual[i] - expected[i]));
+        e.peak = std::max(e.peak, std::abs(expected[i]));
+    }
+    if (e.peak > 0)
+        e.relative = e.absolute / e.peak;
+    if (e.absolute > worst_absolute.absolute || worst_absolute.group[0] == 0)
+        worst_absolute = e;
+    // Silent cases (any error is caught by the tolerance below) and the
+    // single exact case of invalid() add nothing to the relative report.
+    if (e.peak == 0 || std::string_view(e.group) == "invalid inputs")
+        return;
+    if (group_worst.empty() || std::string_view(group_worst.back().group) != e.group ||
+        std::string_view(group_worst.back().kernels) != e.kernels)
+        group_worst.push_back(e);
+    else if (e.relative > group_worst.back().relative)
+        group_worst.back() = e;
+}
+void report_oracle_errors() {
+    std::ostringstream out; // Keeps the formatting off std::cout.
+    const auto line = [&out](const std::string& label, const OracleError& e) {
+        out << "  " << std::left << std::setw(46) << label << std::right << std::setprecision(3)
+            << e.relative << " of peak (" << e.relative / std::numeric_limits<float>::epsilon()
+            << " float epsilons); " << e.absolute << " absolute at peak " << e.peak
+            << ", B = " << e.block << '\n';
+    };
+    const auto name = [](const OracleError& e) { return std::string(e.group) + ", " + e.kernels; };
+    out << "Worst error against the double oracle, relative to the output peak, by group of "
+           "cases and kernel set:\n";
+    const OracleError* worst = nullptr;
+    for (const auto& e : group_worst) {
+        line(name(e), e);
+        if (!worst || e.relative > worst->relative)
+            worst = &e;
+    }
+    if (worst)
+        line("overall: " + name(*worst), *worst);
+    line("largest absolute: " + name(worst_absolute), worst_absolute);
+    out << "  (Absolute errors grow with the signal level; compare the relative figures.)\n";
+    std::cout << out.str();
+}
+void close(const std::vector<float>& actual, const std::vector<double>& expected,
+           std::size_t block) {
     require(actual.size() == expected.size(), "output size");
-    for (std::size_t i = 0; i < actual.size(); ++i)
-        worst_error = std::max(worst_error, std::abs(actual[i] - expected[i]));
+    record(actual, expected, block);
     for (std::size_t i = 0; i < actual.size(); ++i)
         if (!std::isfinite(actual[i]) ||
             std::abs(actual[i] - expected[i]) > 2e-5 * (1 + std::abs(expected[i])))
@@ -97,7 +156,7 @@ void scenario(const Configuration& c, std::size_t b, const std::vector<float>& i
     require(engine.tail_frames() == tail(c), "tail");
     auto expected = oracle(c, in, b);
     auto a = run(engine, in, expected.size() / c.output_channels, {1, 7, 2, 31, 3});
-    close(a, expected);
+    close(a, expected, b);
     engine.reset();
     engine.process({}, {}, 0);
     auto whole = run(engine, in, expected.size() / c.output_channels, {expected.size()});
@@ -166,14 +225,14 @@ void cases() {
          expected_two = oracle(mono({1, 0, 0, 1}), in, 8);
     std::vector<float> first(1);
     one.process(std::span<const float>(in).first(1), first, 1);
-    close(run(two, in, expected_two.size(), {1, 9}), expected_two);
+    close(run(two, in, expected_two.size(), {1, 9}), expected_two, 8);
     std::vector<float> remaining(in.begin() + 1, in.end());
     auto rest = run(one, remaining, expected_one.size() - 1, {2, 1});
     first.insert(first.end(), rest.begin(), rest.end());
-    close(first, expected_one);
+    close(first, expected_one, 3);
     Engine moved(std::move(one));
     moved.reset();
-    close(run(moved, in, expected_one.size(), {7}), expected_one);
+    close(run(moved, in, expected_one.size(), {7}), expected_one, 3);
 }
 // Paths with identical ordered input routes share one forward transform and history.
 // Check sharing against the oracle and against separately prepared single-path engines.
@@ -257,7 +316,7 @@ void history_validity() {
         const auto frames = expected.size() / c.output_channels;
         Engine fresh(c, b);
         const auto reference = run(fresh, in, frames, {frames});
-        close(reference, expected);
+        close(reference, expected, b);
         // Reset after 1 to 9 blocks: before, at and after the 5-slot ring fills
         // and wraps, and part-way through a block.
         for (const std::size_t before : {b, 2 * b + 1, 5 * b, 6 * b + b / 2, 9 * b}) {
@@ -364,7 +423,7 @@ void invalid() {
     input[0] = std::numeric_limits<float>::quiet_NaN();
     rejects([&] { engine.process(input, output, 1); });
     // Rejections must leave the processing state untouched.
-    close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3));
+    close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3), 3);
 }
 void attenuation() {
     // Two inputs, two outputs. Output 0 combines a cancelling pair on input 0
@@ -570,18 +629,22 @@ int main() {
 #endif
         for (bool baseline : {false, true}) {
             detail::force_baseline_kernels(baseline);
+            oracle_group = "cases";
             cases();
+            oracle_group = "shared_input_mixes";
             shared_input_mixes();
+            oracle_group = "history_validity";
             history_validity();
         }
         detail::force_baseline_kernels(false);
         kernels_agree();
         attenuation();
+        oracle_group = "invalid inputs";
         invalid();
         no_processing_allocation();
         std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
-                  << " kernels; worst absolute error against the double oracle " << worst_error
-                  << ")\n";
+                  << " kernels)\n";
+        report_oracle_errors();
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;

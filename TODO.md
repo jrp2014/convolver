@@ -551,6 +551,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   LV2 sanitizer stages as parallel jobs building only their targets,
   one CTest entry per package consumer, a parallel offline rebuild, ccache on
   Linux and macOS, and each kind of test run only where it can change; [which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests).
+- [x] **CI-4 — Report the oracle error relative to the signal.** 24 October
+  2026, PR #74: `native.engine` prints the worst error relative to the output
+  peak for each group of cases and kernel set, with B, and where the largest
+  absolute error came from, so a new, louder test (PERF-5's
+  `history_validity`, peak 7.6) no longer looks like a tenfold loss of
+  accuracy; [native tests](docs/develop/testing.md#native-production-tests).
 - [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
   an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
   `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).

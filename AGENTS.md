@@ -69,7 +69,8 @@ CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpk
 plus Ooura configurations described in [testing](docs/develop/testing.md).
 
 - Every DSP change must pass the direct double-precision oracle tests in
-  `tests/native/engine_tests.cpp`; report the worst error you observed.
+  `tests/native/engine_tests.cpp`; report the worst error you observed
+  (relative to the output peak, as the test prints it).
 - `tests/regression/` compiles **historical** functions by slicing
   `historical/` source on text markers. If you edit those files, update the
   matching `tests/regression/*.py` in the same change.
