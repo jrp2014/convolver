@@ -113,8 +113,7 @@ FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg
 
 The [preview packages](install.md#what-a-preview-package-contains) contain a libsndfile built
 without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
-and will stay that way, to keep the packages free of extra dependencies
-(owner's decision, 24 October 2026). So
+and will stay that way, to keep the packages free of extra dependencies. So
 the plug-ins and the tools in a package cannot read FLAC or Ogg files (as
 input or as IRs), and the command line will be the same when packages include
 it (PLUG-5). `convolver --version` says whether the libsndfile in use has FLAC

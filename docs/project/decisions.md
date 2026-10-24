@@ -10,8 +10,10 @@ explains it and owns the details.
 **In short:** jrp decides anything permanent or user-facing: identities, state
 and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
-jrp decides, record it here with its date, and where the work is described as
-"(owner's decision, *date*)". Changing a decision is a new decision: add a row
+jrp decides, record it here with its date. Developer and project pages may add
+"(owner's decision, *date*)" where the work is described; user pages in
+`docs/use/` never do, and a change users will notice goes in the
+[changelog](../../CHANGELOG.md) instead. Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
