@@ -266,8 +266,10 @@ found on the audio thread itself: the current filter ramps to silence over 64
 samples and stays silent until a filter published after the mute takes over
 and fades in from silence; one published before it but not yet picked up by
 the audio thread is silenced too. Bypass still passes the dry signal. Destruction and
-reconfiguration require audio to have stopped. Reset clears history without
-allocation, but its work scales with prepared storage. Filter preparation can
+reconfiguration require audio to have stopped. Reset invalidates history
+without allocation; its work scales with the block buffers and delay lines,
+not the filter length, and until the history refills the callbacks after it
+cost less than warmed ones (PERF-5). Filter preparation can
 be expensive; neither FFT planning nor file access belongs in a callback.
 
 Finite input outside float range, and nonfinite input, become silence.
@@ -346,7 +348,8 @@ How each adapter meets the contract where its format differs:
   [speaker check](../use/plugins.md#channels) notice (`HostFilter::notice()`). The adapter handles
   variable block sizes, in-place host buffers, calls with no audio and inactive
   channels; it reads input buffers even when the host flags them silent, and
-  never flags its output silent (VST3-10). `getTailSamples()` is the filter's
+  flags an output channel silent exactly when a call left it all zero, so only
+  once the tail and latency have drained (VST3-10). `getTailSamples()` is the filter's
   tail plus the 256-sample latency, measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property

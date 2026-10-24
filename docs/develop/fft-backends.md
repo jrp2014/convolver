@@ -34,7 +34,8 @@ Contents: [selection and contract](#selection-and-contract),
 [x86-64 FFTW tuning](#fftw-tuning-on-x86-64-and-split-spectra),
 [shared forward transforms](#shared-forward-transforms),
 [overlap-add versus overlap-save](#overlap-add-and-overlap-save),
-[compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels) and
+[compiler flags and AVX2 kernels](#compiler-flags-and-avx2-kernels),
+[startup, reset and filter loading](#startup-reset-and-filter-loading) and
 [reproduction steps](#reproduce).
 
 | Backend | Availability | Separate FFT dependency | Planning |
@@ -677,6 +678,76 @@ Not measured here: Apple Silicon (AppleClang, Accelerate), where Clang's
 default target is already the M1 and NEON is always used, and MSVC on Windows.
 Rerun cases 10 to 18 there before choosing other flags for those builds (PERF-1).
 
+## Startup, reset and filter loading
+
+Measured 24 October 2026 (PERF-5, PERF-6) on a 4-vCPU Intel Xeon cloud VM at
+2.10 GHz, Ubuntu 24.04, Clang 18.1.3, Ubuntu FFTW 3.3.10 (estimate plans) and
+the AVX2+FMA kernels: Release builds of `main` at `0269064` (before) and of
+PR #70 (after), alternated in each of three rounds of 2 s per run; the tables
+give medians. It is a shared virtual machine: treat differences under about
+10% as noise. [Raw data](../benchmarks/2026-10-24-x86-startup-reset-load.csv),
+made with [`callback_scenarios.sh`](../benchmarks/src/callback_scenarios.sh)
+and `convolver_callback_benchmark`.
+
+The workload is the one in jrp's performance review of `0269064`: 65,536-tap
+paths in a 6×6 matrix (36 paths, 6 shared input mixes), driven through
+`HostProcessor` as the plug-ins drive it, with the host callback size chosen
+apart from the partition size B. Four scenarios:
+
+- **warm:** callbacks once the history is full (steady processing);
+- **startup:** the first callbacks of a new processor;
+- **reset:** `reset()`, then the callbacks after it;
+- **replace:** `prepare()` and `publish()` of a new filter, then the callbacks
+  after it: one block of warm-up and a 256-frame crossfade with both engines
+  running, then the new engine alone.
+
+The last three time the callbacks that cover the filter length plus two blocks,
+long enough for the history to fill again; ns/frame is their average.
+
+| Scenario | B | Callback | Before ns/frame | After ns/frame | Speed-up | Before p99.9 µs | After p99.9 µs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| warm | 256 | 64 | 5976 | 6206 | 0.96× | 2513 | 3024 |
+| startup | 256 | 64 | 6032 | 3276 | 1.84× | 2636 | 2174 |
+| reset | 256 | 64 | 6444 | 3181 | 2.03× | 3156 | 1978 |
+| replace | 256 | 64 | 6009 | 3339 | 1.80× | 5531 | 2614 |
+| warm | 257 | 64 | 7190 | 6986 | 1.03× | 2757 | 3138 |
+| startup | 257 | 64 | 6828 | 4319 | 1.58× | 3656 | 2489 |
+| reset | 257 | 64 | 7065 | 3870 | 1.83× | 2956 | 2148 |
+| replace | 257 | 64 | 7146 | 4141 | 1.73× | 3754 | 3465 |
+| warm | 1024 | 64 | 1488 | 1480 | 1.01× | 1989 | 1916 |
+| startup | 1024 | 64 | 1527 | 920 | 1.66× | 1993 | 1845 |
+| reset | 1024 | 64 | 1440 | 891 | 1.62× | 2101 | 1757 |
+| replace | 1024 | 64 | 1568 | 974 | 1.61× | 3728 | 2021 |
+| warm | 256 | 512 | 5986 | 6079 | 0.98× | 5588 | 6316 |
+| startup | 256 | 512 | 6098 | 3162 | 1.93× | 5983 | 4275 |
+| reset | 256 | 512 | 5863 | 2987 | 1.96× | 5985 | 4235 |
+| replace | 256 | 512 | 6001 | 3014 | 1.99× | 12470 | 4983 |
+
+- **Steady processing is unchanged**, as expected: PERF-5 skips only
+  partitions that would meet the silence before the first block.
+- **The average over the refill about halves**, because the first blocks
+  after a start, reset or replacement visit few partitions and the last visit
+  all of them. The slowest callbacks fall less, since the end of the refill
+  costs as much as steady processing.
+- **Replacement gains most at the tail of the distribution**: while the old
+  and new engines run together, the new one no longer pays for its whole
+  filter, so the 99.9th-percentile callback at B = 256 falls from 5.5 to
+  2.6 ms with 64-frame callbacks and from 12.5 to 5.0 ms with 512-frame ones.
+- **`reset()` itself** took 143–165 µs at B = 256 and 257 and 152 µs at
+  B = 1024 before; it now takes about 4 µs and 13 µs. What remains is
+  clearing each path's overlap buffer (36 × B floats) and the host's buffers.
+- **B = 257** costs about 1.17 times B = 256 when warm here, because the FFTW
+  backend transforms 2B = 514 points. The Accelerate and Ooura backends round
+  the transform up to a power of two (1024), which is why jrp measured about
+  1.82 times on Accelerate. The plug-ins use B = 256; a user-selectable block
+  size (PERF-2) should offer powers of two.
+
+Loading a 2→6 crossover whose six paths each name a channel of one six-channel
+65,536-frame float WAV (as `examples/first-use/crossover` does at a smaller
+size) took a median of 2.42 ms before and 0.86 ms after (2.8×), because the
+file is opened and decoded once instead of six times (PERF-6). The remaining
+time is parsing, path resolution and copying each path's channel.
+
 ## Reproduce
 
 ### Overlap-add and overlap-save
@@ -774,6 +845,27 @@ The divergence table is the output of `native.kernel_divergence` in a Release
 build (`ctest -R kernel_divergence -V`, or run `convolver_kernel_divergence_tests`).
 
 Without `--variant` it builds `-O2`, `-O3`, LTO, v3 and v3 without FMA.
+
+### Startup, reset and loading
+
+Build `main` and the change to compare as Release builds with
+`-DCONVOLVER_BUILD_BENCHMARKS=ON` (the script needs
+`convolver_callback_benchmark` in both, so copy
+`tests/native/callback_benchmark.cpp` and its CMake lines into an older
+tree), then:
+
+```sh
+sh docs/benchmarks/src/callback_scenarios.sh before/convolver_callback_benchmark \
+    after/convolver_callback_benchmark 3 > startup-reset-load.csv   # about 15 minutes
+```
+
+Each line is `round,build,` followed by the benchmark's CSV row. One
+scenario on its own, for example jrp's baseline at B = 1024:
+
+```sh
+build/convolver_callback_benchmark --scenario warm --taps 65536 --inputs 6 --outputs 6 \
+    --layout matrix --block 1024 --callback 64 --seconds 5
+```
 
 ### Comparing backends
 

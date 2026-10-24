@@ -41,6 +41,8 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 
 1. `load_configuration` resolves a sound file, configuration or list into an
    in-memory `Configuration`. No path lookup is needed during processing.
+   `decode_impulses` opens and decodes each filter file once, however many
+   paths name it (PERF-6), and keeps no cache between loads.
 2. `Engine` validates that graph, prepares FFTs, partitions the IRs and allocates
    all buffers. Filter spectra receive their `1/N` normalization here.
 3. `Engine::process` accepts interleaved float frames, applies input delays, and
@@ -50,7 +52,10 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
    retains its own filter spectra, inverse transform contribution and overlap.
 5. Results are added in path/route order, pass through output delays, and leave
    through the output staging buffer. Caller chunk sizes do not change the stream.
-6. `reset` clears processing history. It does not rebuild plans or read files.
+6. `reset` invalidates processing history: each `Mix` counts the spectra
+   written since construction or reset, and paths multiply only those
+   partitions (PERF-5), so neither reset nor the blocks after it pay for
+   history known to be silence. It does not rebuild plans or read files.
 
 The FFT interface uses interleaved real/imaginary bins. The engine stores its
 partition spectra in separate real and imaginary arrays for multiply-accumulate

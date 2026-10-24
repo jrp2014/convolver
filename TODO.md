@@ -425,9 +425,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   a failed plug-in. Accept any finite rate in range and play silence with the
   reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
   small tolerance counts as a match.
-- [ ] **VST3-10 — Mark silent output.** Set the output silence flags once the
-  output has been silent for the tail and latency, as the Audio Unit does, so
-  hosts can skip downstream work and suspend the instance.
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
@@ -489,6 +486,10 @@ so the preset file path is not needed).
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
   and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
   benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
+  Progress: `convolver_callback_benchmark` (PR #70) times callbacks at a host
+  callback size chosen apart from B, for warmed processing, startup, reset,
+  live replacement and configuration loading; its first results are in
+  [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
 
 ## Documented limitations
 
@@ -505,7 +506,7 @@ with compatibility tests; linked IDs point to open work above.
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
-| Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with storage. | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
+| Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
@@ -557,6 +558,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PERF-4 — Compiler flags and CPU-specific kernels.** 24 October 2026,
   PR #61: run-time AVX2+FMA kernels, with FMA by owner's decision (24 October
   2026) and a divergence test; [compiler flags and AVX2 kernels](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
+- [x] **PERF-5 — Track valid input history.** 24 October 2026, PR #70: paths
+  multiply only the history written since start or reset, and reset
+  invalidates instead of clearing; output bit-identical;
+  [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
+- [x] **PERF-6 — Decode each filter file once per load.** 24 October 2026,
+  PR #70: same errors and limits;
+  [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
 - [x] **PLUG-1 — FFT backend for plug-ins.** 21 October 2026;
   [plug-in builds](docs/develop/fft-backends.md#plug-in-builds).
 - [x] **PLUG-2 — Shared adapter test harness.** 22 October 2026, PR #28;
@@ -580,3 +588,6 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md): tail
   includes the latency, input silence flags not trusted, Bypass text converts
   back, controller state calls succeed; [adapter contract](docs/develop/plugin-contract.md).
+- [x] **VST3-10 — Mark silent output.** 24 October 2026, PR #70: an output
+  channel is flagged silent exactly when a call left it all zero, so once the
+  tail and latency have drained; [format notes](docs/develop/plugin-contract.md#format-notes).
