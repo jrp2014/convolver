@@ -12,6 +12,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Faster processing on x86-64 (PERF-4): the partition multiply-accumulate,
+  which takes 85-99% of the time for room-correction filters, is also compiled
+  for AVX2 and used on CPUs that have it (most Intel and AMD CPUs since
+  2013-2015).
+  Release binaries still run on any x86-64 CPU, and the output is bit-identical
+  to the baseline code, so renders do not depend on the CPU. Measured 1.2-1.4
+  times faster for 32k-128k-tap stereo and 2→6 crossover filters at B = 256
+  (1.2 with the Ooura FFT the plug-ins use, 1.4 with FFTW) ([measurements](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels)).
+  `-DCONVOLVER_AVX2_KERNELS=OFF` leaves them out. `convolver_benchmark` gained
+  room-correction cases and reports which kernels ran.
+
 - An LV2 plug-in for Linux (LV2-1), built with `-DCONVOLVER_BUILD_LV2=ON`: one
   bundle, `convolver.lv2`, with a plug-in for each fixed layout (1→1, 2→2, 1→2,
   2→4, 2→6, 2→8, 6→6 and 8→8). Filters load from presets written by

@@ -433,6 +433,10 @@ so the preset file path is not needed).
   65536-tap stereo filter at B = 256 took about 0.6 µs per frame (about 3% of
   one core at 48 kHz) and B = 1024 was about 3.5 times cheaper; a 6×6 matrix of
   16384-tap filters (36 paths) took about 2.9 µs per frame (about 14%).
+  PERF-4 measured compiler flags on x86-64 Linux only; rerun the
+  room-correction cases of `convolver_benchmark` (cases 10 to 18) on Apple
+  Silicon (AppleClang, Accelerate) and Windows (MSVC, Ooura) before choosing
+  flags for those builds.
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** Prototype
   only for a demonstrated long-filter/latency bottleneck. If PERF-3 shows the
   plug-ins need less CPU, first consider letting the user choose a larger block
@@ -455,6 +459,15 @@ so the preset file path is not needed).
   partitioning (PERF-2), memory layout or another FFT (FFT-2) deserves work,
   and whether slow preparation needs VST3-5. PERF-1 keeps the throughput
   benchmarks reproducible; ROBUST-1 adds stress under repeated changes.
+
+- [ ] **PERF-4 — Compiler flags and CPU-specific kernels.** Measure which
+  release flags make the engine fastest for room-correction filters (32k-128k
+  taps, stereo and 2→6 crossovers) with Clang and GCC, keeping shipped binaries
+  portable and the oracle, bit-identical render and NaN tests passing. Findings
+  and the run-time AVX2 kernels: [FFT guide](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels).
+  Open: jrp's choice between bit-identical kernels and FMA kernels (7–10%
+  faster with Ooura, no faster with FFTW; output then differs between CPUs in
+  the last bits).
 
 ## Documented limitations
 

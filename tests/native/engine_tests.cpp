@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/engine.hpp"
+#include "kernels.hpp"
 #include "oracle.hpp"
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -365,16 +368,97 @@ void attenuation() {
     rejects([&] { estimate_attenuation(dirac, 0, 0); });
     rejects([&] { estimate_attenuation(Configuration{}); });
 }
+// PERF-4: every kernel set must give the baseline's results bit for bit, over
+// odd lengths (vector remainders) and values with a wide range of exponents.
+// Bit for bit, so that signed zeros and NaN payloads count too.
+bool same(const std::vector<float>& a, const std::vector<float>& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), [](float p, float q) {
+        return std::bit_cast<std::uint32_t>(p) == std::bit_cast<std::uint32_t>(q);
+    });
+}
+void kernels_match_baseline() {
+    const auto& fast = detail::kernels();
+    const auto& base = detail::baseline_kernels();
+    std::mt19937 random(7);
+    std::uniform_real_distribution<float> value(-1, 1);
+    std::uniform_int_distribution<int> exponent(-40, 40);
+    for (std::size_t bins : {std::size_t(1), std::size_t(3), std::size_t(7), std::size_t(8),
+                             std::size_t(9), std::size_t(17), std::size_t(33), std::size_t(257),
+                             std::size_t(513), std::size_t(1025)}) {
+        std::vector<float> x(2 * bins), h(2 * bins), interleaved(2 * bins);
+        for (auto* v : {&x, &h, &interleaved})
+            for (auto& f : *v)
+                f = std::ldexp(value(random), exponent(random));
+        std::vector<float> a(2 * bins), b(2 * bins);
+        fast.deinterleave(interleaved.data(), a.data(), bins, 0.37f);
+        base.deinterleave(interleaved.data(), b.data(), bins, 0.37f);
+        require(same(a, b), "deinterleave kernels differ");
+        fast.interleave(x.data(), x.data() + bins, a.data(), bins);
+        base.interleave(x.data(), x.data() + bins, b.data(), bins);
+        require(same(a, b), "interleave kernels differ");
+        fast.multiply(a.data(), a.data() + bins, x.data(), h.data(), bins);
+        base.multiply(b.data(), b.data() + bins, x.data(), h.data(), bins);
+        require(same(a, b), "multiply kernels differ");
+        for (int repeat = 0; repeat < 8; ++repeat) {
+            fast.multiply_accumulate(a.data(), a.data() + bins, x.data(), h.data(), bins);
+            base.multiply_accumulate(b.data(), b.data() + bins, x.data(), h.data(), bins);
+        }
+        require(same(a, b), "multiply-accumulate kernels differ");
+        // A ring of five spectra, starting at each slot, summed over three partitions.
+        std::vector<float> ring(5 * 2 * bins), filters(3 * 2 * bins);
+        for (auto* v : {&ring, &filters})
+            for (auto& f : *v)
+                f = std::ldexp(value(random), exponent(random));
+        for (std::size_t head = 0; head < 5; ++head) {
+            fast.accumulate(a.data(), a.data() + bins, ring.data(), head, 5, filters.data(), 3,
+                            bins);
+            base.accumulate(b.data(), b.data() + bins, ring.data(), head, 5, filters.data(), 3,
+                            bins);
+            require(same(a, b), "partition accumulation kernels differ");
+        }
+    }
+    // A whole engine with long, shared and cross-routed paths renders identically.
+    Configuration c{48000, 2, 3, 0, {0, 5}, {0, 0, 3}, {}};
+    std::mt19937 fill(11);
+    for (std::size_t p = 0; p < 4; ++p) {
+        FilterPath path;
+        path.impulse.resize(3000 + 517 * p);
+        for (auto& f : path.impulse)
+            f = value(fill) * 0.1f;
+        path.inputs = {{p % 2, 1}, {(p + 1) % 2, 0.25f}};
+        path.outputs = {{p % 3, 0.5f + 0.25f * float(p)}};
+        c.paths.push_back(std::move(path));
+    }
+    std::vector<float> in(2 * 9000);
+    for (auto& f : in)
+        f = value(fill);
+    std::vector<float> outputs[2];
+    for (int pass = 0; pass < 2; ++pass) {
+        detail::force_baseline_kernels(pass == 1);
+        Engine engine(c, 128);
+        outputs[pass] = run(engine, in, 9000 + 128 + tail(c), {128, 77, 300});
+    }
+    detail::force_baseline_kernels(false);
+    require(same(outputs[0], outputs[1]), "engine output depends on the kernel set");
+}
 } // namespace
 int main() {
     try {
-        cases();
+        // Oracle checks with the kernels this CPU selects, then with the baseline set.
+        const auto* selected = detail::kernels().name;
+        for (bool baseline : {false, true}) {
+            detail::force_baseline_kernels(baseline);
+            cases();
+            shared_input_mixes();
+        }
+        detail::force_baseline_kernels(false);
+        kernels_match_baseline();
         attenuation();
-        shared_input_mixes();
         invalid();
         no_processing_allocation();
-        std::cout << "native engine tests passed (" << fft_backend_name()
-                  << "; worst absolute error against the double oracle " << worst_error << ")\n";
+        std::cout << "native engine tests passed (" << fft_backend_name() << ", " << selected
+                  << " kernels; worst absolute error against the double oracle " << worst_error
+                  << ")\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         return 1;
