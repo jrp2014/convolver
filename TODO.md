@@ -602,7 +602,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
-  `native.io` and `native.engine`.
+  `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,

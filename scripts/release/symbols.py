@@ -21,6 +21,7 @@ so an empty `.debug` file or a `.dSYM` holding only `Info.plist` passed.
 """
 from pathlib import Path
 import struct
+import uuid as uuids
 import zlib
 
 # Kept symbol file and the packaged binary (a glob under the staged package).
@@ -63,7 +64,7 @@ NT_GNU_BUILD_ID = 3
 
 def elf_sections(data, what):
     """{name: (type, contents or None for NOBITS)} of a little-endian ELF file."""
-    if data[:4] != b'\x7fELF':
+    if data[:4] != b'\x7fELF' or len(data) < 6:
         raise SymbolError(f'{what} is not an ELF file')
     if data[5] != 1:
         raise SymbolError(f'{what} is not little-endian ELF')
@@ -84,7 +85,10 @@ def elf_sections(data, what):
     names = data[names_offset:names_offset + names_size]
     sections = {}
     for name_index, kind, _flags, _addr, offset, size, *_ in headers:
-        name = names[name_index:names.index(b'\0', name_index)].decode('ascii', 'replace')
+        end = names.find(b'\0', name_index)
+        if end < 0:
+            raise SymbolError(f'{what} has a malformed section name table')
+        name = names[name_index:end].decode('ascii', 'replace')
         if kind == SHT_NOBITS:
             sections[name] = (kind, None)
         else:
@@ -122,8 +126,11 @@ def check_elf(binary, debug):
     if link is None or link[1] is None:
         raise SymbolError(f'the packaged {binary.name} has no .gnu_debuglink naming its symbols')
     contents = link[1]
-    name = contents[:contents.find(b'\0')].decode('utf-8', 'replace')
-    crc_offset = (len(name) + 1 + 3) // 4 * 4
+    end = contents.find(b'\0')
+    if end < 0:
+        raise SymbolError(f'the packaged {binary.name} has a malformed .gnu_debuglink')
+    name = contents[:end].decode('utf-8', 'replace')
+    crc_offset = (end + 1 + 3) // 4 * 4
     crc, = _unpack('<I', contents, crc_offset, f'{binary.name} .gnu_debuglink')
     if name != debug.name:
         raise SymbolError(f'the packaged {binary.name} names {name} as its symbols, not {debug.name}')
@@ -159,7 +166,8 @@ def _macho_slice(data, what):
         if size < 8:
             raise SymbolError(f'{what} has a malformed load command')
         if cmd == LC_UUID:
-            uuid = bytes(_unpack('<16s', data, offset + 8, what)[0]).hex()
+            # As dwarfdump --uuid prints it.
+            uuid = str(uuids.UUID(bytes=bytes(_unpack('<16s', data, offset + 8, what)[0]))).upper()
         elif cmd == segment[1]:
             fields = _unpack(segment[0], data, offset + 8, what)
             first = offset + 8 + struct.calcsize(segment[0])
@@ -286,6 +294,11 @@ def pdb_streams(data, what):
     return streams
 
 
+def guid_text(raw):
+    """A GUID as dumpbin, WinDbg and symstore print it."""
+    return '{' + str(uuids.UUID(bytes_le=bytes(raw))).upper() + '}'
+
+
 def check_pe(binary, pdb):
     guid, age, path = pe_codeview(_read(binary), binary.name)
     named = path.replace('\\', '/').rsplit('/', 1)[-1]
@@ -300,9 +313,9 @@ def check_pe(binary, pdb):
         raise SymbolError(f'{pdb.name} has no DBI stream, so it holds no debugging information')
     _signature, _version, dbi_age = struct.unpack_from('<iII', dbi, 0)
     modules, = struct.unpack_from('<i', dbi, 24)
-    identity = f'{guid.hex()}, age {age}'
+    identity = f'{guid_text(guid)}, age {age}'
     if bytes(pdb_guid) != guid or age not in (pdb_age, dbi_age):
-        raise SymbolError(f'{pdb.name} has signature {bytes(pdb_guid).hex()}, age {pdb_age}, but the '
+        raise SymbolError(f'{pdb.name} has signature {guid_text(pdb_guid)}, age {pdb_age}, but the '
                           f'packaged {binary.name} expects {identity}: the symbols come from another link')
     if modules <= 0:
         raise SymbolError(f'{pdb.name} lists no compiled modules, so it holds no debugging information')
@@ -333,6 +346,8 @@ def check(kept, stage, system):
                 identities[name] = CHECKS[system](binaries[0], found[0])
             except SymbolError as error:
                 problems.append(f'{name}: {error}')
+            except (ValueError, IndexError, struct.error) as error:  # Malformed beyond the checks above.
+                problems.append(f'{name}: cannot be read ({error})')
     if problems:
         raise SymbolError('the kept debugging symbols cannot be used for the packaged binaries:\n  '
                           + '\n  '.join(problems))

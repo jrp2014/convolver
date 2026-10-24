@@ -190,6 +190,12 @@ class SymbolTests(unittest.TestCase):
         self.write(self.stage / 'bin/convolver-preset', elf(b'\x22' * 20))
         self.fails('Linux', 'no .gnu_debuglink')
 
+    def test_linux_malformed(self):
+        self.linux()
+        for data in (b'\x7fELF\x02', elf(b'\x22' * 20)[:100], b'\x7fELF' + b'\xff' * 200):
+            self.write(self.kept / 'convolver-preset.debug', data)
+            self.fails('Linux', 'convolver-preset.debug')
+
     def test_missing_binary(self):
         self.linux()
         (self.stage / 'bin/convolver-equalizer-apo').unlink()
@@ -207,7 +213,7 @@ class SymbolTests(unittest.TestCase):
     def test_darwin_matching(self):
         self.darwin()
         found = symbols.check(self.kept, self.stage, 'Darwin')
-        self.assertEqual(found['Convolver.dSYM'], 'Mach-O UUID ' + '01' * 16 + ' (arm64)')
+        self.assertEqual(found['Convolver.dSYM'], 'Mach-O UUID 01010101-0101-0101-0101-010101010101 (arm64)')
 
     def test_darwin_only_info_plist(self):
         self.darwin()
@@ -252,7 +258,7 @@ class SymbolTests(unittest.TestCase):
     def test_windows_matching(self):
         self.windows()
         found = symbols.check(self.kept, self.stage, 'Windows')
-        self.assertEqual(found['Convolver.pdb'], 'PDB signature ' + '40' * 16 + ', age 1')
+        self.assertEqual(found['Convolver.pdb'], 'PDB signature {40404040-4040-4040-4040-404040404040}, age 1')
 
     def test_windows_empty_missing_mismatched(self):
         self.windows()
@@ -285,9 +291,16 @@ class SymbolTests(unittest.TestCase):
         compiler = shutil.which('cc') or shutil.which('clang') or shutil.which('gcc')
         if compiler is None:
             self.skipTest('no C compiler')
-        c = self.root / 'program.c'
+        # Compile and link separately and keep the object file: on macOS the
+        # linker only records where the debugging information is (the object
+        # files) and dsymutil reads it from there, so a one-step build, whose
+        # temporary object is deleted, gives a dSYM without any (which the
+        # check rightly refuses).
+        c = self.root / f'{output.name}.c'
+        obj = self.root / f'{output.name}.o'
         c.write_text(source)
-        subprocess.run([compiler, '-g', *flags, str(c), '-o', str(output)], check=True)
+        subprocess.run([compiler, '-g', '-c', str(c), '-o', str(obj)], check=True)
+        subprocess.run([compiler, *flags, str(obj), '-o', str(output)], check=True)
 
     @unittest.skipUnless(platform.system() == 'Linux' and shutil.which('objcopy'), 'needs Linux binutils')
     def test_real_elf(self):
