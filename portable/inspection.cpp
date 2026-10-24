@@ -209,13 +209,15 @@ class Inspector {
                 verify(result, std::move(cfg));
             } else {
                 auto cfg = detail::configuration_graph(l.document->configuration);
-                const auto decoded = detail::decode_impulses(*l.document, cfg, budget_);
+                const auto decoded = detail::decode_impulses(*l.document, cfg, budget_,
+                                                             options_.raw_filter_encoding);
                 for (std::size_t i = 0; i < decoded.size(); ++i) {
                     auto& f = result.paths[i];
                     f.resolved = decoded[i].resolved;
                     f.ir_sample_rate = decoded[i].info.sample_rate;
                     f.ir_file_channels = decoded[i].info.channels;
                     f.ir_frames = decoded[i].frames;
+                    f.raw_encoding = decoded[i].raw;
                 }
                 verify(result, std::move(cfg));
             }
@@ -350,6 +352,23 @@ class Inspector {
         for (const auto& ref : refs)
             for (auto& [code, message] : portability_problems(doc.source, ref.spelling))
                 add({code, DiagnosticSeverity::warning, message, position(ref.location), chain(c)});
+        if (doc.kind == ParsedDocument::Kind::configuration)
+            for (const auto& p : doc.configuration.paths)
+                if (raw_filter_reference(doc.source, p.ir))
+                    add({"raw-filter", DiagnosticSeverity::warning,
+                         "'" + p.ir.spelling + "' is a raw filter; Convolver reads it as mono " +
+                             raw_encoding_name(options_.raw_filter_encoding) +
+                             ", but other "
+                             "programs that read .cfg files expect sound files such as WAV",
+                         position(p.ir.location), chain(c)});
+    }
+    static bool raw_filter_reference(const std::filesystem::path& owner,
+                                     const detail::ParsedReference& ref) {
+        try {
+            return detail::raw_filter(detail::resolve_reference(owner, ref));
+        } catch (const ConfigurationError&) {
+            return false; // A nonportable path is reported on its own.
+        }
     }
     std::vector<std::pair<std::string, std::string>>
     portability_problems(const std::filesystem::path& owner, std::string spelling) const {
@@ -439,6 +458,8 @@ InspectionReport inspect_configuration(const std::filesystem::path& path,
     if (options.expected_rate < 0 || options.expected_rate > 768000 ||
         options.expected_inputs > 256 || options.expected_outputs > 256)
         throw std::invalid_argument("expected audio properties out of range");
+    if (options.raw_filter_encoding.sample == SampleType::pcm8)
+        throw std::invalid_argument("raw filters have no 8-bit sample type");
     if (!options.block_frames || options.block_frames > (1u << 20))
         throw std::invalid_argument("block frames must be between 1 and 1048576");
     if (options.all_configurations &&

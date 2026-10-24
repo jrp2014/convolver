@@ -198,6 +198,11 @@ def main():
         (work / 'mono.cfg').write_text('44100 1 2 0\n0\n0 0\nir ü.wav\n1\n0\n0.25 1\n',
                                        encoding='utf-8')
         run('--name', 'Raum «ü» <A&B> "q" \\', work / 'mono.cfg', root / 'Fork.vstpreset')
+        # A raw filter is embedded as f32le, and the tool says so.
+        (work / 'drc.pcm').write_bytes(b'\0\0\0\x3f')
+        (work / 'raw.cfg').write_text('44100 1 1 0\n0\n0\ndrc.pcm\n0\n0\n0\n')
+        note = run(work / 'raw.cfg', root / 'Raw.vstpreset').stderr
+        assert "raw filter 'drc.pcm' read as mono f32le at 44100 Hz" in note, note
         shutil.rmtree(work)
         run(root / 'Fork.vstpreset', root / 'Fork.aupreset', root / 'Fork.preset.lv2')
         fork = read_vstpreset(root / 'Fork.vstpreset')

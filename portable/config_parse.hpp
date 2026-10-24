@@ -149,11 +149,17 @@ struct DecodedIr {
     std::filesystem::path resolved;
     AudioInfo info{};
     std::size_t frames = 0;
+    std::optional<RawEncoding> raw; // Present when read as a headerless raw filter.
 };
+// A filter whose name ends in .pcm or .raw (any case) is a headerless mono
+// file at the configuration's sample rate (little-endian float32 by default,
+// as DRC and BruteFIR write them), unless it starts with a sound-file header (a WAV named
+// .pcm still reads as WAV). A missing file counts as raw.
+bool raw_filter(const std::filesystem::path& resolved);
 // Decode every path's selected IR channel into cfg (from configuration_graph).
 // budget counts decoded samples across one resolution operation.
 std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg,
-                                       std::size_t& budget);
+                                       std::size_t& budget, RawEncoding raw_encoding = {});
 // A sound file used directly: diagonal routing, decoded coefficients.
 Configuration decode_audio_filter(AudioReader&, std::size_t& budget, const SourceLocation&);
 

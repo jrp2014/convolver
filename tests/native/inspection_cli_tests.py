@@ -104,7 +104,27 @@ def invalid_utf8_warnings():
         assert any(x['code'] == 'invalid-utf8' for x in r['diagnostics']), r
 
 
+def raw_filter_reports():
+    # A headerless .pcm filter: its assumed sample type is shown, and can be chosen.
+    with tempfile.TemporaryDirectory(prefix='convolver-rawfilter-') as t:
+        d = Path(t)
+        (d / 'drc.pcm').write_bytes(struct.pack('<2f', .5, .25))
+        (d / 'raw.cfg').write_text('48000 1 1 0\n0\n0\ndrc.pcm\n0\n0\n0\n')
+        wav(d / 'ir.wav', [1])
+        (d / 'wav.cfg').write_text('48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n')
+        path = report(['--inspect', 'raw.cfg'], 0, d)['configurations'][0]['paths'][0]['ir']
+        assert path['raw_format'] == 'f32le' and path['frames'] == 2, path
+        assert b'raw mono f32le' in call(['--inspect', 'raw.cfg'], 0, d).stdout
+        path = report(['--inspect', 'raw.cfg', '--raw-filter-format', 's16be'], 0,
+                      d)['configurations'][0]['paths'][0]['ir']
+        assert path['raw_format'] == 's16be' and path['frames'] == 4, path
+        assert report(['--inspect', 'wav.cfg'], 0, d)['configurations'][0]['paths'][0][
+            'ir']['raw_format'] is None
+        call(['--inspect', 'raw.cfg', '--raw-filter-format', 'u8'], 2, d)
+
+
 def main():
+    raw_filter_reports()
     assert b'--inspect' in call(['--help'], 0).stdout
     assert b'--syntax-only' in call(['--inspect', '--help'], 0).stdout
     with tempfile.TemporaryDirectory(prefix='convolver-inspect-') as t:
