@@ -214,6 +214,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The version is now 0.5.0, the series the first preview will come from.
+  CMake consumers now request `find_package(Convolver 0.5)`; the package keeps
+  its same-minor compatibility policy, so a consumer asking for 0.4 no longer
+  finds it.
+
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
   VST3 plug-in and GarageBand for the Audio Unit, each with a step-by-step
   [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host)
