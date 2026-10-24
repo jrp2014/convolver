@@ -524,6 +524,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **AU-1 — Adapter and test.** 23 October 2026, PR #44, with the bypass
   follow-up in PR #49; [plug-in guide](docs/use/plugins.md),
   [Audio Unit licence](docs/use/plugins.md#audio-unit-licence).
+- [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
+  24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

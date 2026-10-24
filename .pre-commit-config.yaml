@@ -59,6 +59,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: ci-scope-tests
+        name: CI scope for documentation-only pull requests
+        entry: python tests/ci_scope_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: actionlint
         name: GitHub Actions and embedded ShellCheck
         entry: actionlint
