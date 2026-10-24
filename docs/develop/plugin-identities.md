@@ -30,8 +30,10 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | VST3 | Processor class ID | `73A81329E6484ADF9DA7D731A8C94201` | Hosts and `.vstpreset` files refer to the plug-in by this |
 | VST3 | Controller class ID | `622AD87C23664CCFB157473FBCD4A6B9` | |
 | VST3 | macOS bundle identifier | `io.github.jrp2014.convolver.vst3` | `CFBundleIdentifier` in `Convolver.vst3` |
+| VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 0 to 2 stay free: they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). Owner's decision, 24 October 2026 |
 | AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | Owner's decision, 21 October 2026 |
 | AU | macOS bundle identifier | `io.github.jrp2014.convolver.au` | For `Convolver.component` (AU-1) |
+| AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. Owner's decision, 24 October 2026 |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |

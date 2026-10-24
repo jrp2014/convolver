@@ -1,0 +1,75 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Asks for what docs/use/troubleshooting.md#report-a-problem lists.
+name: Problem report
+description: Convolver crashed, played the wrong thing, or refused a filter it should accept.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thank you for reporting a problem. Please keep private audio and session
+        files out of the report, and use the bundled examples (the package's
+        `presets/` folder, or `examples/first-use/` in the source) to show the
+        problem where you can.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Convolver version or package
+      description: >-
+        The version (`convolver --version`), or the package's SHA-256 checksum
+        if you installed a preview package.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where you used it
+      multiple: true
+      options:
+        - Command-line tool (convolver)
+        - VST3 plug-in
+        - Audio Unit plug-in
+        - LV2 plug-in
+        - Preset tool (convolver-preset)
+        - Equalizer APO export
+        - C++ library
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Operating system and version, and processor (for example macOS 26.1, Apple M2).
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: For a plug-in, the host program and its version (for example REAPER 7.2).
+  - type: input
+    id: audio
+    attributes:
+      label: Audio settings
+      description: Sample rate, input and output channel counts, and buffer size.
+  - type: textarea
+    id: messages
+    attributes:
+      label: Messages
+      description: Any error message or log, pasted as text.
+      render: text
+  - type: textarea
+    id: filter
+    attributes:
+      label: Filter
+      description: >-
+        The `.cfg` file or a description of the IR files (channels, length,
+        sample rate). The smallest example that shows the problem helps most.

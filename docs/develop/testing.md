@@ -24,6 +24,7 @@ below. A test list is coverage information; a pass claim needs an actual run.
 
 Contents: [native tests](#native-production-tests),
 [plug-in comparisons](#plug-in-comparisons-plug-2),
+[lifecycle sequences](#lifecycle-sequences-plug-7),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
 [documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns)
@@ -317,6 +318,82 @@ and a CTest entry with `FIXTURES_REQUIRED first_use_renders`, as in
 [`plugins/vst3/CMakeLists.txt`](../../plugins/vst3/CMakeLists.txt). Status ports
 and host error messages are format-specific; LV2 and AU check them in their
 own tests.
+
+## Lifecycle sequences (PLUG-7)
+
+A host does many things to an instance in turn: it loads filters, plays,
+resets, bypasses, stops and starts it, changes the rate or the channels, saves
+and reopens the session. Each is tested on its own above; the defects found in
+jrp's reviews of 0.4.19 and 0.4.30 came from combinations. The runner in
+[`tests/plugins/lifecycle.hpp`](../../tests/plugins/lifecycle.hpp) holds a small
+reference model of the [shared adapter contract](plugin-contract.md): plain
+data and one function per operation, each rule citing the contract clause or
+the format's specification it comes from, never the implementation.
+
+**Sequences.** Each format's driver says which operations it supports. The
+runner enumerates every allowed sequence up to a length after each start:
+a negotiated empty instance, one already playing filter A, and one created
+before the host negotiated anything (LV2, which fixes the rate and channels at
+instantiation, starts instead with filter A's file queued for the worker).
+Then it runs fixed sequences (the defects found so far) and eight seeded
+sequences of 40 operations. Every
+sequence starts on a new instance.
+
+**Checks.** After the last operation of an enumerated sequence, and after every
+operation of a fixed or seeded one, it compares with the model:
+
+- the saved filter, the "load failed" flag and (VST3) the saved bypass;
+- the failure record: its kind, its request number and whether it is silent;
+- LV2's saved filter path and status port;
+- what is audible. A burst of noise must come out as the double-precision
+  oracle of the filter the model says plays, or as the dry input delayed by
+  the latency, or as exact silence. With no audio since the last activation or
+  reset, the filter must play from the first frame (direct installation);
+  otherwise silence is played first until every ramp and crossfade is over.
+  Every prefix of an enumerated sequence is enumerated too, so this covers the
+  audible filter after every operation without listening in between, which
+  would change the sequence;
+- that no audio-thread call allocates or frees through `operator new` and
+  `delete` (aligned forms included) or, on Linux, locks with
+  `pthread_mutex_lock`.
+  [`tests/plugins/audio_guard.hpp`](../../tests/plugins/audio_guard.hpp)
+  replaces them in the test executable and checks at start that it sees
+  allocations and locks, including the LV2 plug-in library's own (linked
+  with `ENABLE_EXPORTS`). It does not see `malloc`, `fftwf_malloc`, try-locks
+  or read-write locks.
+
+**Running out of memory.** As `native.host` does for `HostFilter` alone
+(`allocation_failures`), fixed sequences load filter B with the plug-in's
+allocations failing from the first onwards, then from the second, and so on
+until it loads (`state-B-starved`), and again with only one allocation failing
+each time (`state-B-shortage`). After each failed attempt the saved filter
+must be unchanged and, while active, what plays must still be what the model
+expects. Only allocations made during the plug-in's own call fail: for Audio
+Units that call goes through the Audio Unit SDK's dispatch, whose C++
+allocations fail too, while Core Foundation's never do (they do not go
+through `operator new`).
+These are fixed sequences only, at the start of a session, as a replacement,
+while inactive and before the host is configured, because each one restores
+the state some fifty times.
+
+A failure prints the sequence, for example
+`start state-A play state-empty file-refused listen`, and the check that
+failed; `lifecycle::parse` turns it into a fixed regression.
+
+| Test | Driver | Operations beyond loading state, playing, bypass, reset, stop, start and reopen |
+| --- | --- | --- |
+| `native.host_lifecycle` | `HostFilter` and `HostProcessor` with only what the contract asks of an adapter ([`host_lifecycle_tests.cpp`](../../tests/native/host_lifecycle_tests.cpp)) | Rate and layout changes, negotiation after restoring |
+| `vst3.lifecycle` | The processor through its SDK interfaces ([`lifecycle_tests.cpp`](../../tests/vst3/lifecycle_tests.cpp)) | The same, and bypass saved with the state |
+| `au.lifecycle` | The unit through the Audio Unit API, macOS only ([`lifecycle_tests.cpp`](../../tests/au/lifecycle_tests.cpp)) | The same; formats bind once the unit has rendered |
+| `lv2.lifecycle` | The plug-in through lilv ([`lifecycle_tests.cpp`](../../tests/lv2/lifecycle_tests.cpp)) | The empty state map; filter files queued for a worker that runs only when a sequence says, so a request can be outstanding across any other operation, teardown included; a full worker queue; a request overtaking one the worker is preparing; a host with no worker |
+
+**Length.** `CONVOLVER_LIFECYCLE_LENGTH` sets how many operations are enumerated
+after each start: 4, or 3 in sanitizer builds, where a sequence is ten to
+twenty times slower. LV2, with about twice as many operations, uses one fewer
+(`CONVOLVER_LV2_LIFECYCLE_LENGTH`). Each executable also takes the length as
+its last argument. On one machine in October 2026, `vst3.lifecycle` (Debug,
+no sanitizers) ran 31,170 sequences per layout (31,152 enumerated, the rest
+fixed and seeded), for both layouts in about 30 seconds.
 
 ## Plug-in format tests
 
@@ -654,7 +731,8 @@ qualification. Never bypass system security to turn those checks green.
 ## CI triggers
 
 The test workflows run for every pull request, for every push to `main` and
-when started by hand. A commit pushed to a branch that has a pull request runs
+when started by hand; a pull request that changes only documentation skips
+their builds and tests ([below](#documentation-only-pull-requests)). A commit pushed to a branch that has a pull request runs
 once, as part of that pull request; a branch without one gets no automatic
 run, so open the draft pull request early ([workflow](workflow.md#before-you-start))
 or use Actions, then "Run workflow" on the branch. A new commit on a pull request
@@ -664,6 +742,41 @@ re-running an older commit's run cancels the current one.
 
 This keeps the queue short. On the owner's Free plan GitHub runs at most 20
 jobs at once across the account's repositories, and only 5 on macOS, and one
-commit starts about 18 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
+commit starts about 24 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
+
+### Documentation-only pull requests
+
+A pull request that changes only documentation runs Lint, which has every
+documentation check: Markdown, links and anchors, the repository rules and the
+plug-in identity check. The workflows that build or package start with a short
+`scope` job on Linux, which runs [`ci_scope.py`](../../scripts/ci_scope.py) on
+the files the pull request changes; their other jobs then show as skipped.
+Pushes to `main` and manual runs always run everything, as a backstop.
+The `scope` jobs add six short Linux jobs to every commit (a full run was 18
+jobs before them); a documentation-only commit starts 7, none on macOS, and one
+that changes a packaged page starts 13, two of them on macOS.
+
+Documentation here means Markdown files anywhere and everything under `docs/`,
+except:
+
+- pages the build's tests read, which run everything: the top-level
+  `README.md`, `examples/first-use/README.md` and `docs/use/first-filter.md`
+  (`examples.first_use` runs their commands) and the archived website with its
+  two records in `docs/review-2026-10/` (`documentation`);
+- pages copied into the preview packages, which also run the
+  [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
+  `examples/plugin-presets/README.md` and the Ooura `README.md`.
+
+When a test starts reading another page, or the packages gain one, add it to
+the lists in `ci_scope.py`. `tests/ci_scope_tests.py` (in pre-commit) checks the
+lists against the test and packaging sources and checks that every workflow
+run for pull requests, other than Lint, either starts with the `scope` job or
+filters its own paths, and that no job in them overrides a skip with
+`always()` or `cancelled()`.
+
+No status check is required on `main` at present. If one is made required,
+require a job that always reports: a skipped matrix job shows under its
+unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
+forever on a documentation-only pull request.

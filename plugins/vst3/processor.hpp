@@ -9,6 +9,8 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace convolver::vst3 {
 // Permanent class IDs from plugins/identities.json (PLUG-4); never change them.
@@ -20,7 +22,13 @@ inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0]
                                            identity::vst3_controller_class_id[1],
                                            identity::vst3_controller_class_id[2],
                                            identity::vst3_controller_class_id[3]);
-inline constexpr Steinberg::Vst::ParamID bypass_id = 0;
+// Parameter IDs from plugins/identities.json; never change them.
+inline constexpr Steinberg::Vst::ParamID bypass_id = identity::vst3_bypass_parameter_id;
+// DIAG-1: read-only, never automated or saved. Its value is a HostStatus and
+// its text the instance's HostStatusLine, which the processor sends to the
+// controller in a status_message whenever it may have changed.
+inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_parameter_id;
+inline constexpr const char* status_message = "ConvolverStatus";
 // HostProcessor's block, passed to it: the fixed delay between input and output.
 inline constexpr Steinberg::uint32 latency_samples = 256;
 // One input and one output bus, each with 1 to 8 channels (counts may differ).
@@ -58,16 +66,32 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::uint32 PLUGIN_API getTailSamples() override;
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
+    Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
-    // speakers that differ from the host's arrangement. VST3 has no route to
-    // show it yet (DIAG-1, VST3-3); tests read it.
+    // speakers that differ from the host's arrangement; logged when it changes.
     std::string notice();
     // Why the last load failed or the instance plays silence (PLUG-8), as
-    // HostFilter::failure() keeps it; VST3 has no route to show it yet (DIAG-1).
+    // HostFilter::failure() keeps it; logged in full, summarised by status().
     std::optional<HostFailure> failure();
+    // What the Status parameter shows (DIAG-1).
+    HostStatusLine status();
 
   private:
     void record_activation_failure(const char* why) noexcept;
+    // Queues a line for the Convolver log under control_, skipping a repeat
+    // of the line this instance queued last, as hosts restart plug-ins often;
+    // write_log() writes the queue (host_log) after control_ is released, so
+    // file access never holds up the host's other control calls.
+    void log(const std::string&, bool problem = true) noexcept;
+    void write_log() noexcept;
+    Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
+                               Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
+    // Sends status() to the controller; outside control_, as the controller
+    // may call back into the host.
+    void send_status() noexcept;
+    HostStatusLine status_locked() const;
+    Steinberg::tresult load_state(Steinberg::IBStream*);
+    Steinberg::tresult activate(Steinberg::TBool);
     HostLayout layout() const;
     std::optional<HostLayout> known_layout() const;
     template <class T>
@@ -84,6 +108,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
     std::optional<HostLayout> activated_;
+    std::string logged_;                                 // The last line log() queued.
+    std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
+    const std::string tag_; // "VST3 #n": this instance in the Convolver log.
 };
 class Controller final : public Steinberg::Vst::EditController {
   public:
@@ -107,5 +134,23 @@ class Controller final : public Steinberg::Vst::EditController {
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override {
         return Steinberg::kResultOk;
     }
+
+    // The processor's status_message: the Status parameter's value and text.
+    Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
+    // The Status parameter's current value reads as the processor's line; other
+    // values (a host asking how a value would read) as their status name.
+    Steinberg::tresult PLUGIN_API getParamStringByValue(Steinberg::Vst::ParamID,
+                                                        Steinberg::Vst::ParamValue,
+                                                        Steinberg::Vst::String128) override;
+    std::string status_text() {
+        std::lock_guard lock(status_lock_);
+        return status_text_;
+    }
+
+  private:
+    // The host may restore state (and so send the status) on another thread
+    // than the one reading parameter text.
+    std::mutex status_lock_;
+    std::string status_text_;
 };
 } // namespace convolver::vst3

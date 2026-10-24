@@ -57,8 +57,12 @@ Contents: [before you start](#before-you-start) ·
   is permanent or changes what users get: plug-in identities (IDs, URIs, AU
   codes), state or preset formats, `.cfg` syntax, licences, defaults that
   change the sound, dependencies shipped in releases, and anything published.
-  Continue only on work that does not depend on the answer. Record the answer where the work is described, as "(owner's decision,
-  21 October 2026)", in the [decisions log](../project/decisions.md) and in the pull request.
+  Continue only on work that does not depend on the answer. Record the answer,
+  with its date, in the [decisions log](../project/decisions.md) and in the pull
+  request. Developer and project pages that describe the work may add
+  "(owner's decision, 21 October 2026)"; user pages (`docs/use/`) never carry
+  decision dates. When a decision changes what users get between releases, the
+  [changelog](../../CHANGELOG.md) entry says what changed.
 - **Keep shared files small to merge.** Several streams edit `TODO.md`,
   `CHANGELOG.md`, `CMakeLists.txt`, `packaging/release-policy.json`,
   `docs/README.md` and the [plug-in formats plan](../project/plans/2026-10-21-plugin-formats.md).

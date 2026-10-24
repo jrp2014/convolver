@@ -94,11 +94,25 @@ if(CONVOLVER_BUILD_TESTS)
             TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
         list(APPEND au_test_targets convolver_au_harness)
     endif()
-    foreach(target IN ITEMS convolver_au_tests convolver_au_harness)
+    # PLUG-7: lifecycle sequences against the reference model.
+    add_executable(convolver_au_lifecycle "${PROJECT_SOURCE_DIR}/tests/au/lifecycle_tests.cpp"
+        "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp" "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
+    target_link_libraries(convolver_au_lifecycle PRIVATE convolver_au_adapter convolver_presets)
+    add_test(NAME au.lifecycle COMMAND convolver_au_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
+    set_tests_properties(au.lifecycle PROPERTIES LABELS "au;real-libraries;plug7" TIMEOUT 600)
+    list(APPEND au_test_targets convolver_au_lifecycle)
+    foreach(target IN ITEMS convolver_au_tests convolver_au_harness convolver_au_lifecycle)
         if(TARGET ${target})
             set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
             target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/tests")
         endif()
     endforeach()
     add_dependencies(check ${au_test_targets})
+    # DIAG-1: tests write the Convolver log in the build folder, never the user's.
+    set_property(TEST au.adapter au.bundle APPEND PROPERTY ENVIRONMENT
+        "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+    if(TEST au.harness)
+        set_property(TEST au.harness APPEND PROPERTY ENVIRONMENT
+            "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+    endif()
 endif()

@@ -25,6 +25,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace convolver::lv2_test {
@@ -91,6 +92,7 @@ enum class Worker {
     threaded,    // A worker thread; answers are delivered after the next run().
     synchronous, // Free-wheeling: work() runs inside schedule_work, answers after run().
     immediate,   // As synchronous, but answers are delivered at once, inside run().
+    deferred,    // Requests wait until run_deferred_work(); answers after the next run().
 };
 
 struct Features {
@@ -146,6 +148,9 @@ class Plugin {
     // and state:freePath are passed, mapping paths inside the folder to
     // relative ones.
     LV2_State_Status restore(const std::vector<Property>&);
+    // With CONVOLVER_AUDIO_GUARD: the plug-in's restore() runs with
+    // audio_guard::Starve(first, second).
+    std::optional<std::pair<std::size_t, bool>> starve_restore;
     struct Saved {
         LV2_State_Status status = LV2_STATE_SUCCESS;
         std::vector<std::byte> bytes; // Under <base>state.
@@ -175,6 +180,11 @@ class Plugin {
     bool scheduling_fails = false;
     // Threaded worker: waits until the queue is empty and work() has returned.
     void wait_for_worker();
+    // Deferred worker: calls work() on this thread for up to `count` queued
+    // requests, oldest first, as a host's worker thread would when it gets
+    // round to them. Returns how many it ran.
+    std::size_t run_deferred_work(std::size_t count = ~std::size_t(0));
+    std::size_t queued_work();
     // Pauses the next work() call to reach `point`, through the plug-in's
     // test hook; wait_until_paused() returns once it has, resume() lets it go.
     void pause_at(lv2::WorkerPoint point);

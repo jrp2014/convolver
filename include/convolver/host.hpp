@@ -61,7 +61,8 @@ Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
 // thread (docs/develop/plugin-contract.md#failure-reasons). Adapters
-// read it from HostFilter::failure(); where it is shown is DIAG-1's decision.
+// read it from HostFilter::failure(), show it with host_status() and log it
+// (docs/develop/plugin-contract.md#status-and-log).
 enum class HostFailureKind {
     filter_file,      // The filter file is missing or cannot be read.
     state_unreadable, // The saved state or preset is malformed or the wrong type.
@@ -199,10 +200,32 @@ class HostFilter {
     std::string notice_;
 };
 
+// DIAG-1: what a host's status display shows for an instance, for formats
+// with no editor (a read-only parameter in VST3 and AU). The status follows
+// failure(): a refused replacement shows "load failed" although the previous
+// filter keeps playing, as LV2's status port does.
+enum class HostStatus {
+    playing = 0,     // A filter is accepted and suits the host.
+    no_filter = 1,   // An empty instance: identity, or silence for unequal counts.
+    load_failed = 2, // The newest request failed, or the instance plays silence.
+    unchecked = 3,   // A filter is accepted, but the host's configuration is not known yet.
+};
+struct HostStatusLine {
+    HostStatus status = HostStatus::no_filter;
+    // One line of at most max_status_text characters (ASCII), saying what the
+    // instance plays and, after a failure, why, in short; the full
+    // explanation is HostFilter::failure()'s message, which adapters log.
+    std::string text;
+};
+inline constexpr std::size_t max_status_text = 127; // VST3's String128, less its terminator.
+// `host` is the configuration the instance plays under, or nullopt while it
+// is not known (VST3 before activation, AU before initialization).
+HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host);
+
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, prepare, publish, collect, destruction;
-// serialize these calls. Audio: process, set_bypass, reset, mute; one audio
+// serialize these calls. Audio: process, set_bypass, reset, mute, publications; one audio
 // thread per instance. Control and audio may overlap only for replace, prepare,
 // publish and collect. Teardown requires stopped audio.
 class HostProcessor {
@@ -243,12 +266,23 @@ class HostProcessor {
     void reset() noexcept;
     void set_bypass(bool) noexcept;
     // Audio thread: the current filter ramps to silence over 64 frames and
-    // stays silent until the next published filter takes over, which then
-    // fades in from silence as any replacement does. Bypass still passes the
-    // dry signal. For a failure the audio thread finds itself, before the
-    // control side can publish silence: LV2's run() refusing an empty
-    // instance's first load (no worker, or a full worker queue).
+    // stays silent until a filter published after this call takes over,
+    // which then fades in from silence as any replacement does; one published
+    // before it (still waiting for the audio thread) is silenced too. Bypass
+    // still passes the dry signal. For a failure the audio thread finds
+    // itself, before the control side can publish silence: LV2's run()
+    // refusing an empty instance's first load (no worker, or a full worker
+    // queue).
     void mute() noexcept;
+    // The same for publications up to `through`, a count publications()
+    // returned. An adapter that decides to mute from a flag its control side
+    // clears before publishing reads the count first, then the flag, so a
+    // filter published after the flag was cleared is never silenced. A count
+    // older than the filter already playing does nothing.
+    void mute(std::uint64_t through) noexcept;
+    // Audio thread: how many filters replace() and publish() have handed
+    // over so far.
+    std::uint64_t publications() const noexcept;
     std::size_t latency_frames() const noexcept;
     std::size_t tail_frames() const noexcept;
     // Missing input channels mean silence; null output channels are discarded.

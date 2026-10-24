@@ -65,15 +65,22 @@ documentation alone.
 Fixed defect: a reset during a filter transition delayed the next filter
 (found in jrp's review of 0.4.19; fixed on 23 October 2026 by the VST3-7
 follow-up, [PR #40](https://github.com/jrp2014/convolver/pull/40)). Lifecycle
-sequences that would catch defects like it are PLUG-7.
+sequences that would catch defects like it are PLUG-7 (done).
 
 Fixed defects from jrp's review of 0.4.30 ([PR #55](https://github.com/jrp2014/convolver/pull/55)):
 an LV2 first load refused without a worker played unfiltered audio until the
 next control call; restoring an empty LV2 state map did not reset the plug-in,
 as the LV2 specification requires; and running out of memory in
 `HostFilter::load` could leave one filter playing while another was saved.
-The tests had followed the implementation, so PLUG-7 now takes its
+The tests had followed the implementation, so PLUG-7 takes its
 expectations from the shared contract and each format's specification.
+
+Fixed defects found by the PLUG-7 lifecycle sequences
+([PR #58](https://github.com/jrp2014/convolver/pull/58)): after an empty LV2
+state was restored while playing, a filter file `run()` refused in the same
+cycle still let the unfiltered input play; and VST3 and AU reported a load
+made while inactive as failed after keeping it, when memory ran out while
+working out its tail.
 
 ## User journeys for the first preview
 
@@ -91,9 +98,12 @@ not fit its input instead of saving and presets.
 | Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI. The package has no CLI yet; the first preview will ship it (PLUG-5). Not demonstrated. |
 
 Recovering from a wrong preset is the weakest step today: VST3 keeps the
-working filter but reports the rejection only as `kResultFalse`, so the host
-may show nothing ([loading filters](../use/plugins.md#loading-a-filter)). PLUG-8 (done)
-keeps the reason; DIAG-1 decides where it is shown.
+working filter and reports the rejection to the host only as `kResultFalse`,
+which the host may not show. Since DIAG-1's first step, a read-only Status
+parameter says why and the Convolver log explains in full
+([status and log](../use/plugins.md#status-and-the-convolver-log)); whether
+REAPER, Audacity and GarageBand display the Status parameter is for HOST-1 to
+record.
 
 ## Next milestone: an independent user runs a preview
 
@@ -110,7 +120,7 @@ and AU join later previews once their own journeys are demonstrated
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export added ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI and the journey presets remain |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload (owner's decision, 23 October 2026); the tester is still to be chosen by jrp |
-| Lifecycle sequences checked against a reference model | Proposed here, so the next defect of this kind is caught | PLUG-7 | Not started |
+| Lifecycle sequences checked against a reference model | Proposed here, so the next defect of this kind is caught | PLUG-7 | Done ([PR #58](https://github.com/jrp2014/convolver/pull/58)); `au.lifecycle` runs in macOS CI only |
 | Smoke test of VST3 in at least one named host | Proposed here, already the preview gate in the plug-in plan | HOST-1 | Not run |
 
 At publication, and before the next preview: COMPAT-1 keeps presets, a host

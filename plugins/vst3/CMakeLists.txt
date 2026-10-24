@@ -154,6 +154,21 @@ if(CONVOLVER_BUILD_IO)
             set_tests_properties(vst3.harness PROPERTIES LABELS "vst3;real-libraries;plug2"
                 TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
             add_dependencies(check convolver_vst3_harness)
+            # PLUG-7: lifecycle sequences against the reference model.
+            add_executable(convolver_vst3_lifecycle "${PROJECT_SOURCE_DIR}/tests/vst3/lifecycle_tests.cpp"
+                "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp"
+                "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp" processor.cpp
+                "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+            target_include_directories(convolver_vst3_lifecycle PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+                "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
+            target_link_libraries(convolver_vst3_lifecycle PRIVATE Convolver::host sdk sdk_hosting
+                ${CMAKE_DL_LIBS})
+            if(APPLE)
+                target_link_libraries(convolver_vst3_lifecycle PRIVATE "-framework Cocoa")
+            endif()
+            add_test(NAME vst3.lifecycle COMMAND convolver_vst3_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
+            set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300)
+            add_dependencies(check convolver_vst3_lifecycle)
         endif()
         add_dependencies(check convolver_vst3_preset)
         # Tracktion pluginval: an independent (JUCE) host, downloaded separately.
@@ -188,4 +203,11 @@ if(APPLE)
         COMMAND codesign --force --sign - --timestamp=none "$<TARGET_BUNDLE_DIR:convolver_vst3>"
         COMMAND codesign --verify --deep --strict "$<TARGET_BUNDLE_DIR:convolver_vst3>"
         VERBATIM)
+endif()
+
+# DIAG-1: tests write the Convolver log in the build folder, never the user's.
+get_property(convolver_vst3_tests_here DIRECTORY PROPERTY TESTS)
+if(convolver_vst3_tests_here)
+    set_property(TEST ${convolver_vst3_tests_here} APPEND PROPERTY ENVIRONMENT
+        "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
 endif()

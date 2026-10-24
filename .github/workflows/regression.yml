@@ -20,7 +20,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Pull requests that change only documentation skip the builds and tests
+  # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: scope
+        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+
   unix:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
     name: ${{ matrix.os }} / ${{ matrix.cxx }} / ${{ matrix.build }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -67,7 +82,7 @@ jobs:
           clang-tidy-18 -p build portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp \
             portable/attenuation.cpp portable/config.cpp \
             portable/config_parse.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/io.cpp \
-            portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/state.cpp \
+            portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/state.cpp \
             portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp \
             portable/equalizer_apo_main.cpp
       - name: Linked versions
@@ -104,6 +119,8 @@ jobs:
       - name: Compare FFTW and Ooura output
         run: python tests/native/backend_equivalence.py build/convolver build-ooura/convolver
   windows:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7

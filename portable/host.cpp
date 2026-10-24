@@ -312,20 +312,85 @@ void HostFilter::fail_activation(std::string why) {
     activation_failure_ = std::move(f);
 }
 
+namespace {
+std::string ports(std::size_t inputs, std::size_t outputs) {
+    return std::to_string(inputs) + " in, " + std::to_string(outputs) + " out";
+}
+// The short reason of a failure, completing "Silent: " or "Load failed, ...: ".
+std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& host) {
+    switch (f.kind) {
+    case HostFailureKind::filter_file:
+        return "the filter file could not be read.";
+    case HostFailureKind::state_unreadable:
+        return "the preset or saved state could not be read.";
+    case HostFailureKind::state_newer:
+        return "the preset was saved by a newer Convolver.";
+    case HostFailureKind::sample_rate:
+        return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
+               (host ? ", the host runs at " + std::to_string(host->sample_rate) + " Hz." : ".");
+    case HostFailureKind::channels:
+        return "the filter has " + ports(f.inputs, f.outputs) +
+               (host && (host->inputs != f.inputs || host->outputs != f.outputs)
+                    ? ", the plug-in " + ports(host->inputs, host->outputs) + "."
+                    : ".");
+    case HostFailureKind::preparation:
+        return "the filter could not be prepared.";
+    case HostFailureKind::activation:
+        return "the plug-in could not start the filter.";
+    case HostFailureKind::saved_failure:
+        return "a load had failed when this was saved.";
+    }
+    return "the filter could not be loaded.";
+}
+} // namespace
+
+HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host) {
+    constexpr const char* details = " Details in the Convolver log.";
+    HostStatusLine line;
+    if (const auto& f = filter.failure()) {
+        line.status = HostStatus::load_failed;
+        line.text = (f->silent ? "Silent: " : "Load failed, previous filter kept: ") +
+                    short_reason(*f, host) + details;
+    } else if (const auto& c = filter.filter()) {
+        line.status = host ? HostStatus::playing : HostStatus::unchecked;
+        line.text = "Filter loaded: " + std::to_string(c->sample_rate) + " Hz, " +
+                    ports(c->input_channels, c->output_channels) +
+                    (host ? "." : "; checked when the host starts it.");
+        if (host && !filter.notice().empty())
+            line.text += " Speaker labels differ; see the Convolver log.";
+    } else if (filter.failed()) {
+        line.status = HostStatus::load_failed;
+        line.text = std::string("Silent: an earlier load failed.") + details;
+    } else {
+        line.status = HostStatus::no_filter;
+        line.text = !host                           ? "No filter loaded. Load a Convolver preset."
+                    : host->inputs == host->outputs ? "No filter: audio passes unchanged. Load a "
+                                                      "Convolver preset."
+                                                    : "No filter: silent, as inputs and outputs "
+                                                      "differ. Load a Convolver preset.";
+    }
+    if (line.text.size() > max_status_text)
+        line.text.resize(max_status_text);
+    return line;
+}
+
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
         Prepared* next_retired = nullptr;
+        std::uint64_t number = 0; // Publications are numbered from 1, in order.
         explicit Prepared(const Configuration& c, std::size_t block) : engine(c, block) {}
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
+    static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
     const int rate;
     const std::size_t inputs, outputs, maximum, block;
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
     std::atomic<std::size_t> tail{0};
+    std::atomic<std::uint64_t> published{0}; // Publications so far (control writes).
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     float dry_mix = 0;
@@ -334,6 +399,9 @@ struct HostProcessor::Impl {
     // an unmuted filter's output is unchanged.
     float level = 1, previous_level = 1;
     bool muted = false, previous_muted = false;
+    // Publications up to this number were made before mute(): adopting one
+    // keeps the silence. Only a filter published after it ends the silence.
+    std::uint64_t muted_through = 0;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
@@ -373,6 +441,10 @@ struct HostProcessor::Impl {
         collect();
         // Conservative tail never shrinks during a session, including transitions.
         tail.store(std::max(tail.load(), prepared->engine.tail_frames()));
+        // Counted before it is handed over: an audio thread that sees the new
+        // count also sees what the control side did before publishing.
+        prepared->number = published.load(std::memory_order_relaxed) + 1;
+        published.store(prepared->number, std::memory_order_release);
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
     void replace(const Configuration& c) {
@@ -428,8 +500,12 @@ struct HostProcessor::Impl {
                     retire(current);
                 }
                 current = next;
-                level = 1;
-                muted = false;
+                // A filter published before mute() is as silenced as the
+                // one it replaces (jrp's contract: silent until the next
+                // published filter takes over; PLUG-7 found the adoption of an
+                // earlier publication lifting it).
+                muted = muted && next->number <= muted_through;
+                level = muted ? 0.f : 1.f;
             }
         }
         started = true;
@@ -543,8 +619,18 @@ void HostProcessor::reset() noexcept {
 void HostProcessor::set_bypass(bool value) noexcept {
     impl_->bypass = value;
 }
+std::uint64_t HostProcessor::publications() const noexcept {
+    return impl_->published.load(std::memory_order_acquire);
+}
 void HostProcessor::mute() noexcept {
+    mute(publications());
+}
+void HostProcessor::mute(std::uint64_t through) noexcept {
+    // A filter published after `through` is already playing: nothing to mute.
+    if (impl_->current && impl_->current->number > through)
+        return;
     impl_->muted = true;
+    impl_->muted_through = std::max(impl_->muted_through, through);
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;
