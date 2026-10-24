@@ -213,10 +213,12 @@ Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 the SDK's hosting code. None of these establishes compatibility in a particular
 commercial DAW.
 
-`packaging.consumer` installs and relocates the package, builds and runs an
-external core/host/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs seven C++/package
-suites without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
+The `packaging.consumer.*` tests install and relocate the package
+(`packaging.consumer.install`, a CTest fixture), then build and run external
+core/host/I/O consumers and verify components and source-tree use with and
+without a parent CTest setup, one consumer per test so CTest can run them in
+parallel. A core-only configuration runs the native C++ tests and the package
+consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See
@@ -233,7 +235,8 @@ LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it ([Audio Unit tests](#audio-unit-tests)). The weekly [Dependency updates](../../.github/workflows/updates.yml)
+it ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
+entry: see [which configurations run which tests](#which-configurations-run-which-tests). The weekly [Dependency updates](../../.github/workflows/updates.yml)
 workflow reports newer releases of those pins; it tests nothing in Convolver.
 
 ## Plug-in comparisons (PLUG-2)
@@ -524,7 +527,9 @@ AU-4.
 The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
 UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
 and runs `lv2lint` on every plug-in in the bundle, with the
-[pinned packages](build.md#pinned-format-dependencies).
+[pinned packages](build.md#pinned-format-dependencies). The three run as
+separate jobs side by side; the sanitizer jobs build only what their tests run
+(the `convolver_lv2_tests` target, or the adapter test and the preset tool).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
 Convolver needs `urid:map` for its state (lv2apply 0.24.22 then crashes rather
 than reporting the refusal).
@@ -790,3 +795,42 @@ No status check is required on `main` at present. If one is made required,
 require a job that always reports: a skipped matrix job shows under its
 unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
 forever on a documentation-only pull request.
+
+### Which configurations run which tests
+
+A local build runs every CTest entry. CI runs each kind of test only where
+something that can change its result differs from every other job: the
+compiler or its version, build type and flags, architecture, FFT backend,
+sanitizer, CMake generator, linked libraries or the package's shape
+(owner's decision, 24 October 2026). Plug-in builds compile the core exactly
+as native builds do, so a plug-in job whose compiler, flags and backend match
+another job runs only its own format's tests. The CTest labels select them.
+
+| Tests | Run in | Not run in |
+| --- | --- | --- |
+| `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
+| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit, the release candidates and the offline rebuild (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
+| Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
+
+CTest still runs a fixture's setup when a selected test needs it, so
+`ctest -L vst3` runs `examples.first_use` before `vst3.harness`. A new CI
+configuration starts from this table: add it where it changes a result, and
+give a new build-independent check the `repository` label.
+
+### Compiler cache
+
+The Linux and macOS jobs of the native, VST3, Audio Unit and fuzz workflows,
+and the LV2 sanitizer jobs, compile through [ccache](https://ccache.dev/), set up by
+[ccache-action](https://github.com/hendrikmuhs/ccache-action) and passed to
+CMake as the compiler launcher. ccache's own hash covers the compiler, every
+flag and every included header, so a cached object is reused only for an
+identical compilation; the cache key (workflow, job and matrix entry) only
+chooses which earlier cache to start from. Pull requests restore the cache that
+`main` saved and never save one, so the repository's 10 GB cache stays bounded
+and a pull request cannot change what `main` builds from; pushes to `main` and
+manual runs save theirs. Each job's log ends with ccache's hit statistics.
+
+The Windows jobs use the Visual Studio generator, which takes no compiler
+launcher, and the release candidates are built without a cache, from the
+corresponding source alone.
