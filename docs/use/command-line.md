@@ -99,7 +99,10 @@ Dither is off by default. `--dither` selects `none` (default), `triangular`
 difference of successive uniform values, same amplitude, high-pass error
 spectrum) or `rectangular`. `--dither-seed N` (default 0) seeds the generator;
 the same seed, input and channel count give byte-identical output regardless of
-buffering. Float and RAW formats reject dither, noise shaping and valid bits.
+buffering, on the same build and CPU. On x86-64, CPUs with and without AVX2 and
+FMA use different processing code, whose output differs at float-rounding level
+(below -120 dBFS), so a dithered or integer render can differ in its lowest bit
+between such machines ([measurements](../develop/fft-backends.md#avx2-kernels-chosen-at-run-time)). Float and RAW formats reject dither, noise shaping and valid bits.
 
 `--noise-shaping` selects one of the historical engine's error-feedback shapers:
 `simple` (first order), `second-order`, `third-order`, `ninth-order` or

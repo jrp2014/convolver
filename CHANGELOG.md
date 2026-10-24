@@ -16,9 +16,9 @@ Until 1.0 the C++ API may change between minor versions.
   which takes 85-99% of the time for room-correction filters, is also compiled
   for AVX2 with fused multiply-add (FMA) and used on CPUs that have both (most
   Intel and AMD CPUs since 2013-2015). Release binaries still run on any x86-64
-  CPU. Measured 1.2-1.4 times faster for 32k-128k-tap stereo and 2→6 crossover
-  filters at B = 256 (1.32 with Clang and 1.42 with GCC using the Ooura FFT the
-  plug-ins use, of which FMA gives 3-6%) ([measurements](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels)).
+  CPU. Measured about 1.3 (Clang) to 1.4 (GCC) times faster on average for
+  32k-128k-tap stereo and 2→6 crossover filters at B = 256, 1.1-1.6 per
+  workload, with the Ooura FFT the plug-ins use; FMA gives 3-6% of that ([measurements](docs/develop/fft-backends.md#compiler-flags-and-avx2-kernels)).
   **Numerical effect:** output on CPUs with AVX2+FMA differs from other CPUs by
   float rounding only: at most 7.5e-7 of the peak (-122.6 dBFS) on 64k-512k
   filters, so 24-bit renders may differ in their lowest bits, with no change in

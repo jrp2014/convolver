@@ -137,7 +137,7 @@ if(CONVOLVER_BUILD_NATIVE)
         target_sources(convolver_core PRIVATE portable/kernels_avx2.cpp)
         target_compile_definitions(convolver_core PRIVATE CONVOLVER_AVX2_KERNELS)
         # No implicit contraction in either set, even with -march flags added by the
-        # user: the baseline stays unfused and the AVX2 set fuses only where its
+        # user (other targets have only the baseline and keep the default): the baseline stays unfused and the AVX2 set fuses only where its
         # intrinsics say. MSVC and clang-cl get the contraction pragma in
         # portable/kernels.inc; MSVC's /arch:AVX2 already allows FMA instructions.
         if(MSVC)

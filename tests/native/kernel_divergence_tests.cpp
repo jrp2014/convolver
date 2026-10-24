@@ -14,9 +14,13 @@
 //     so that the full-level signal's output peaks at -0.1 dBFS (these synthetic
 //     filters have up to about +11 dB of gain, which would clip, and the absolute
 //     differences scale with the level). The quiet inputs are that level less
-//     120 dB, or 1e-36 of it: output near FLT_MIN (1.2e-38), with many filter
-//     products and spectrum values subnormal, where FMA's single rounding and
-//     the baseline's two could differ most.
+//     120 dB, or 1e-35 of it: output peaking near 1e-35, where about a quarter
+//     of the output samples and many products are subnormal (below FLT_MIN,
+//     1.2e-38), so FMA's single rounding and the baseline's two meet reduced
+//     precision. The test requires that case to have subnormal output and
+//     differing samples, so it cannot pass vacuously (at 1e-37 of the level,
+//     for example, the sets agree exactly because subnormal steps swamp the
+//     rounding difference).
 //   - Each set against the oracle: within the engine tests' oracle tolerance,
 //     2e-5 * (1 + |expected|), and the FMA set's worst error at most 1.5 times
 //     the baseline set's (FMA must not make the result noticeably worse).
@@ -93,7 +97,7 @@ double amplitude(Signal s) {
     case Signal::quiet:
         return 1e-6;
     case Signal::near_denormal:
-        return 1e-36;
+        return 1e-35;
     default:
         return 1;
     }
@@ -161,7 +165,8 @@ int main() {
             std::cout << "(this CPU or build has only the baseline set; the FMA comparison is "
                          "trivially zero, the oracle comparison still runs)\n";
         std::cout << "| Workload | input gain (dB) | FMA-baseline max abs | rel. to peak | dBFS | "
-                     "baseline-oracle max abs | FMA-oracle max abs | FMA-oracle rel. |\n";
+                     "samples differing | subnormal outputs | baseline-oracle max abs | "
+                     "FMA-oracle max abs | FMA-oracle rel. |\n";
         constexpr std::size_t block = 256, points = 256;
         for (const auto& w : workloads) {
             if (w.long_filter && !release)
@@ -194,10 +199,13 @@ int main() {
             const auto in = input_signal(w.signal, frames, level);
             const auto a = render(c, block, in, false), b = render(c, block, in, true);
             double diff = 0, peak = 0;
+            std::size_t differing = 0, subnormal = 0;
             for (std::size_t i = 0; i < a.size(); ++i) {
                 require(std::isfinite(a[i]) && std::isfinite(b[i]), "non-finite output");
                 diff = std::max(diff, double(std::abs(a[i] - b[i])));
                 peak = std::max(peak, double(std::abs(b[i])));
+                differing += a[i] != b[i] ? 1 : 0;
+                subnormal += std::fpclassify(b[i]) == FP_SUBNORMAL ? 1 : 0;
             }
             double oracle_fast = 0, oracle_base = 0, oracle_peak = 0;
             const auto first = block + w.taps - 1;
@@ -216,16 +224,25 @@ int main() {
             }
             const double relative = peak > 0 ? diff / peak : 0;
             char line[256];
-            std::snprintf(line, sizeof line,
-                          "| %s | %.1f | %.3g | %.3g | %.1f | %.3g | %.3g | %.3g |\n", w.name,
-                          db(level), diff, relative, db(diff), oracle_base, oracle_fast,
-                          oracle_peak > 0 ? oracle_fast / oracle_peak : 0);
+            std::snprintf(
+                line, sizeof line,
+                "| %s | %.1f | %.3g | %.3g | %.1f | %.1f%% | %.1f%% | %.3g | %.3g | %.3g |\n",
+                w.name, db(level), diff, relative, db(diff),
+                100.0 * double(differing) / double(a.size()),
+                100.0 * double(subnormal) / double(a.size()), oracle_base, oracle_fast,
+                oracle_peak > 0 ? oracle_fast / oracle_peak : 0);
             std::cout << line << std::flush;
             require(relative <= 1e-6, std::string(w.name) + ": FMA and baseline differ by more "
                                                             "than 1e-6 of the peak");
             if (amplitude(w.signal) >= 1e-6)
                 require(diff <= 1e-6,
                         std::string(w.name) + ": FMA and baseline differ by more than -120 dBFS");
+            if (w.signal == Signal::near_denormal) {
+                require(subnormal > 0, std::string(w.name) + ": no subnormal output to test");
+                require(fast == base || differing > 0,
+                        std::string(w.name) +
+                            ": the sets agree exactly, so the case tests nothing");
+            }
             require(oracle_fast <= 1.5 * oracle_base,
                     std::string(w.name) + ": FMA is noticeably further from the oracle");
         }

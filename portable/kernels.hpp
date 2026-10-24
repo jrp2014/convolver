@@ -4,12 +4,13 @@
 
 namespace convolver::detail {
 // The partition multiply-accumulate and spectrum layout loops, which take almost
-// all of the processing time for long filters. The baseline set is plain C++
-// compiled without contraction. The AVX2 set is the same code compiled for AVX2,
-// except that the multiplies use explicit fused multiply-add intrinsics: its
-// results differ from the baseline set by float rounding only (owner's decision,
-// 24 October 2026). Each frequency bin is computed on its own, so within a set
-// the results do not depend on vector width or position.
+// all of the processing time for long filters. The baseline set is plain C++,
+// compiled without contraction where an AVX2 set exists (x86-64). The AVX2 set
+// is the same code compiled for AVX2, except that the multiplies use explicit
+// fused multiply-add intrinsics: its results differ from the baseline set by
+// float rounding only (owner's decision, 24 October 2026). Each frequency bin is
+// computed on its own, so within a set the results do not depend on vector
+// width or position.
 struct Kernels {
     void (*deinterleave)(const float* from, float* to, std::size_t bins, float scale) noexcept;
     void (*interleave)(const float* re, const float* im, float* to, std::size_t bins) noexcept;

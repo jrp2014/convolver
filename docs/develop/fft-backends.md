@@ -553,10 +553,13 @@ x86-64: once for the baseline and once with `-mavx2 -mfma -ffp-contract=off`
 (`/arch:AVX2` with MSVC, which allows FMA). In the AVX2 copy the multiply and
 multiply-accumulate use explicit FMA intrinsics, per bin
 `re += fma(xr, hr, -(xi·hi))` and `im += fma(xr, hi, xi·hr)`, in the vector
-loop and the scalar remainder alike. Neither copy is contracted implicitly,
-even if `-march` flags are added (`-ffp-contract=off`, and pragmas for clang,
-clang-cl and MSVC), so the baseline stays unfused and each set's results
-depend only on the CPU's set, not on the compiler: GCC 13 and Clang 18 gave
+loop and the scalar remainder alike. In x86-64 builds with the AVX2 kernels,
+neither copy is contracted implicitly, even if `-march` flags are added
+(`-ffp-contract=off`, and pragmas for clang, clang-cl and MSVC), so the
+baseline stays unfused and each set's results depend only on the CPU's set,
+not on the compiler (other targets, such as arm64, and builds with
+`-DCONVOLVER_AVX2_KERNELS=OFF` use the compiler's default contraction, as
+before PERF-4): GCC 13 and Clang 18 gave
 identical divergence figures below. `kernels()` checks once that the CPU has
 AVX2 and FMA and that the operating system saves the 256-bit registers;
 otherwise the baseline set is used. Each engine takes the chosen set when it is
@@ -581,7 +584,10 @@ convolution at 256 frames per output where the whole filter is engaged. The
 filters are synthetic room corrections (a central peak in decaying noise) or,
 for the crossover, Blackman-windowed bands at 10–250–2500–24k Hz. The input is
 scaled so that the full-level signal's output peaks at -0.1 dBFS; the quiet
-inputs are that level less 120 dB, or 1e-36 of it (output near `FLT_MIN`).
+inputs are that level less 120 dB, or 1e-35 of it (output peaking near 1e-35,
+with about a quarter of the output samples subnormal, below `FLT_MIN`; the test
+requires subnormal output and some differing samples there, so the case cannot
+pass vacuously).
 Measured 24 October 2026 with the Ooura FFT, Release builds, GCC 13.3 and
 Clang 18.1.3 giving identical figures; "relative" is to the output's peak, dBFS
 to full scale (1.0):
@@ -591,7 +597,7 @@ to full scale (1.0):
 | 64k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 2.8e-7 | 2.6e-7 |
 | 64k stereo, full-scale 997 Hz sine | 4.8e-7 | 4.8e-7 | -126.4 | 8.1e-7 | 8.7e-7 |
 | 64k stereo, noise at -120 dB | 1.5e-13 | 1.5e-7 | -256.5 | 2.2e-13 | 2.2e-13 |
-| 64k stereo, noise near `FLT_MIN` | 0 | 0 | | 1.2e-42 | 1.2e-42 |
+| 64k stereo, noise at subnormal level | 1.4e-42 | 1.5e-7 | | 2.7e-42 | 2.7e-42 |
 | 64k 2→6 crossover, white noise | 2.4e-7 | 2.4e-7 | -132.5 | 3.6e-7 | 3.6e-7 |
 | 128k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.0e-7 | 3.5e-7 |
 | 256k stereo, white noise | 1.8e-7 | 1.8e-7 | -135.0 | 3.6e-7 | 3.9e-7 |
@@ -619,7 +625,8 @@ every magnitude.
 
 Speedup of the AVX2 kernels **without FMA** (the set before 24 October) over
 the same `-O3` build without them (`-DCONVOLVER_AVX2_KERNELS=OFF`), median of
-5 rounds, on the 4-vCPU VM described above; above 1 is faster:
+5 rounds, on the 4-vCPU VM described above
+([CSV](../benchmarks/2026-10-24-x86-avx2-kernels.csv)); above 1 is faster:
 
 | | 32k stereo | 64k stereo | 128k stereo | 64k true stereo | 64k crossover | 32k crossover | 16k crossover | 4k stereo | 512k reverb |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -636,13 +643,14 @@ frame (about 2.0–2.3% of one core at 48 kHz) and a 64k 2→6 crossover
 amounts (Clang, Ooura: 184 to 150 µs for 64k stereo, 419 to 360 µs for the 64k
 crossover). The same runs built the whole engine for v3 with FMA and without
 the kernels: 1.42, 1.32, 1.42 and 1.34 times the baseline (same order), no
-faster than the kernels with FFTW and 7–10% faster with Ooura.
+faster than these kernels without FMA with FFTW and 7–10% faster with Ooura.
 
 Speedup **with FMA** (the kernels as now), measured on 24 October 2026 on a
 different, smaller VM: 2 vCPUs of an Intel Xeon at 2.70 GHz (AVX2, FMA and
 AVX-512), 7 GiB, Ubuntu 24.04, the same compilers, the Ooura FFT only (FFTW was
 not installed there), another session sharing the machine. Three builds ran in
-a shuffled order per case, pinned to one core, 15 rounds of 0.5 s: without the
+a shuffled order per case, pinned to one core, 15 rounds of 0.5 s
+([CSV](../benchmarks/2026-10-24-x86-avx2-fma-kernels.csv), Ooura rows only): without the
 kernels, with the earlier AVX2 kernels without FMA (commit 356a707) and with
 the AVX2+FMA kernels. Speedup over the build without the kernels, median of
 the 15 rounds:

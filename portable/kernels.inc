@@ -6,10 +6,12 @@
 // CONVOLVER_KERNEL_NAME (a string literal) before including it. Define
 // CONVOLVER_KERNEL_FMA as well for the AVX2 set, which then multiplies with
 // explicit fused multiply-add intrinsics (immintrin.h's are compiler built-ins).
-// Nothing is contracted implicitly, whatever instruction set or flags the file is
-// compiled with: the baseline set rounds every product, and the FMA set fuses
-// exactly the operations written below, so each set's results do not depend on
-// the compiler. GCC gets -ffp-contract=off from CMakeLists.txt.
+// In x86-64 builds with the AVX2 kernels nothing is contracted implicitly,
+// whatever -march flags are added: the baseline set rounds every product, and
+// the FMA set fuses exactly the operations written below, so each set's results
+// do not depend on the compiler. GCC gets -ffp-contract=off from CMakeLists.txt.
+// Other builds (arm64, or CONVOLVER_AVX2_KERNELS off) have only the baseline set
+// and keep the compiler's default contraction, as the engine did before PERF-4.
 #if defined(CONVOLVER_AVX2_KERNELS) && (defined(__x86_64__) || defined(_M_X64)) && !defined(_M_ARM64EC)
 #if defined(__clang__)
 #pragma STDC FP_CONTRACT OFF
