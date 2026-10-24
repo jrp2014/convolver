@@ -64,10 +64,13 @@ if(CONVOLVER_BUILD_TESTS)
     set_tests_properties(lv2.fft_symbols PROPERTIES LABELS "lv2;real-libraries" SKIP_RETURN_CODE 77)
     add_dependencies(check convolver_lv2)
     if(CONVOLVER_BUILD_IO AND TARGET convolver_cli AND TARGET convolver_preset_tool)
-        foreach(name adapter harness)
+        foreach(name adapter harness lifecycle)
             set(sources "${PROJECT_SOURCE_DIR}/tests/lv2/${name}_tests.cpp" "${PROJECT_SOURCE_DIR}/tests/lv2/host.cpp")
             if(name STREQUAL "harness")
                 list(APPEND sources "${PROJECT_SOURCE_DIR}/tests/plugins/harness.cpp")
+            elseif(name STREQUAL "lifecycle")
+                list(APPEND sources "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp"
+                    "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
             endif()
             add_executable(convolver_lv2_${name} ${sources})
             target_include_directories(convolver_lv2_${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -77,6 +80,13 @@ if(CONVOLVER_BUILD_TESTS)
             if(CONVOLVER_SANITIZERS)
                 target_compile_options(convolver_lv2_${name} PRIVATE -fsanitize=address,undefined
                     -fno-sanitize-recover=all -fno-omit-frame-pointer)
+            endif()
+            if(name STREQUAL "lifecycle")
+                # The plug-in library must resolve operator new and
+                # pthread_mutex_lock to the guard's definitions.
+                set_target_properties(convolver_lv2_${name} PROPERTIES ENABLE_EXPORTS ON)
+                target_compile_definitions(convolver_lv2_${name} PRIVATE CONVOLVER_AUDIO_GUARD)
+                target_link_libraries(convolver_lv2_${name} PRIVATE ${CMAKE_DL_LIBS})
             endif()
             add_dependencies(convolver_lv2_${name} convolver_lv2)
             add_dependencies(check convolver_lv2_${name})
@@ -94,5 +104,9 @@ if(CONVOLVER_BUILD_TESTS)
         # About three minutes under ASan; sanitizer builds need the margin.
         set_tests_properties(lv2.harness PROPERTIES LABELS "lv2;real-libraries;plug2"
             TIMEOUT 600 FIXTURES_REQUIRED first_use_renders)
+        # PLUG-7: lifecycle sequences against the reference model.
+        add_test(NAME lv2.lifecycle COMMAND convolver_lv2_lifecycle "${lv2_bundle_dir}"
+            "${PROJECT_BINARY_DIR}/lv2-test" ${CONVOLVER_LV2_LIFECYCLE_LENGTH})
+        set_tests_properties(lv2.lifecycle PROPERTIES LABELS "lv2;real-libraries;plug7" TIMEOUT 600)
     endif()
 endif()

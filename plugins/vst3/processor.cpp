@@ -175,16 +175,23 @@ tresult PLUGIN_API Processor::setState(IBStream* stream) {
         // replacement is published; inactive, the next activation installs it.
         const auto host = host_ ? std::optional(layout()) : known_layout();
         const bool bypass = next.bypass;
+        // The inactive tail is worked out before anything changes: it needs
+        // memory, and a request that runs out is rejected whole (PLUG-7).
+        uint32 inactive_tail = 0;
+        if (!host_ && next.configuration) {
+            try {
+                inactive_tail = static_cast<uint32>(configuration_tail_frames(*next.configuration));
+            } catch (...) {
+                filter_.reject(HostFailureKind::preparation, "The filter could not be prepared.");
+                throw;
+            }
+        }
         filter_.load(std::move(next), host, [&](const Configuration& c) {
             if (host_)
                 host_->replace(c);
         });
-        if (host_)
-            tail_.store(static_cast<uint32>(host_->tail_frames()));
-        else
-            tail_.store(filter_.filter()
-                            ? static_cast<uint32>(configuration_tail_frames(*filter_.filter()))
-                            : 0);
+        // Nothing from here on can throw: the request is accepted.
+        tail_.store(host_ ? static_cast<uint32>(host_->tail_frames()) : inactive_tail);
         bypass_.store(bypass);
         return kResultOk;
     } catch (...) {

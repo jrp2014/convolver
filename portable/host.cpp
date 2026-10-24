@@ -316,16 +316,19 @@ struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
         Prepared* next_retired = nullptr;
+        std::uint64_t number = 0; // Publications are numbered from 1, in order.
         explicit Prepared(const Configuration& c, std::size_t block) : engine(c, block) {}
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
+    static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
     const int rate;
     const std::size_t inputs, outputs, maximum, block;
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
     std::atomic<std::size_t> tail{0};
+    std::atomic<std::uint64_t> published{0}; // Publications so far (control writes).
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     float dry_mix = 0;
@@ -334,6 +337,9 @@ struct HostProcessor::Impl {
     // an unmuted filter's output is unchanged.
     float level = 1, previous_level = 1;
     bool muted = false, previous_muted = false;
+    // Publications up to this number were made before mute(): adopting one
+    // keeps the silence. Only a filter published after it ends the silence.
+    std::uint64_t muted_through = 0;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
@@ -373,6 +379,10 @@ struct HostProcessor::Impl {
         collect();
         // Conservative tail never shrinks during a session, including transitions.
         tail.store(std::max(tail.load(), prepared->engine.tail_frames()));
+        // Counted before it is handed over: an audio thread that sees the new
+        // count also sees what the control side did before publishing.
+        prepared->number = published.load(std::memory_order_relaxed) + 1;
+        published.store(prepared->number, std::memory_order_release);
         delete pending.exchange(prepared.release(), std::memory_order_acq_rel);
     }
     void replace(const Configuration& c) {
@@ -428,8 +438,12 @@ struct HostProcessor::Impl {
                     retire(current);
                 }
                 current = next;
-                level = 1;
-                muted = false;
+                // A filter published before mute() is as silenced as the
+                // one it replaces (jrp's contract: silent until the next
+                // published filter takes over; PLUG-7 found the adoption of an
+                // earlier publication lifting it).
+                muted = muted && next->number <= muted_through;
+                level = muted ? 0.f : 1.f;
             }
         }
         started = true;
@@ -543,8 +557,18 @@ void HostProcessor::reset() noexcept {
 void HostProcessor::set_bypass(bool value) noexcept {
     impl_->bypass = value;
 }
+std::uint64_t HostProcessor::publications() const noexcept {
+    return impl_->published.load(std::memory_order_acquire);
+}
 void HostProcessor::mute() noexcept {
+    mute(publications());
+}
+void HostProcessor::mute(std::uint64_t through) noexcept {
+    // A filter published after `through` is already playing: nothing to mute.
+    if (impl_->current && impl_->current->number > through)
+        return;
     impl_->muted = true;
+    impl_->muted_through = std::max(impl_->muted_through, through);
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;
