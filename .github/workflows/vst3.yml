@@ -31,14 +31,16 @@ jobs:
   vst3:
     needs: scope
     if: needs.scope.outputs.build == 'true'
+    name: vst3 (${{ matrix.os }}, ${{ matrix.fft }})
     strategy:
       fail-fast: false
       matrix:
         # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
         # the FFTW job keeps the explicit override working. The core
         # suite runs here only where no other job builds the same
-        # compiler, flags and backend: on Linux and macOS the native and
-        # Audio Unit jobs do, so those run the VST3 tests alone
+        # compiler, flags and backend: on Linux the native g++ jobs do,
+        # so those run the VST3 tests alone. macos-latest has a newer
+        # Xcode than the Audio Unit job's macos-15, so it keeps the suite
         # (docs/develop/testing.md#which-configurations-run-which-tests).
         include:
           - os: ubuntu-latest
@@ -49,7 +51,7 @@ jobs:
             tests: -L vst3
           - os: macos-latest
             fft: AUTO
-            tests: -L vst3
+            tests: -LE 'repository|consumer'
           - os: windows-latest
             fft: AUTO
             tests: -LE 'repository|consumer'

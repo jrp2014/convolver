@@ -207,8 +207,8 @@ The `packaging.consumer.*` tests install and relocate the package
 (`packaging.consumer.install`, a CTest fixture), then build and run external
 core/host/I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
-parallel. Core-only configuration runs seven C++/package
-suites without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
+parallel. A core-only configuration runs the native C++ tests and the package
+consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See
@@ -800,7 +800,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit, the release candidates and the offline rebuild (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (matches native g++ Release with FFTW and with Ooura) and VST3 on macOS (matches the Audio Unit job) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so
@@ -810,8 +810,8 @@ give a new build-independent check the `repository` label.
 
 ### Compiler cache
 
-The Linux and macOS jobs of the native, VST3, LV2, Audio Unit and fuzz
-workflows compile through [ccache](https://ccache.dev/), set up by
+The Linux and macOS jobs of the native, VST3, Audio Unit and fuzz workflows,
+and the LV2 sanitizer jobs, compile through [ccache](https://ccache.dev/), set up by
 [ccache-action](https://github.com/hendrikmuhs/ccache-action) and passed to
 CMake as the compiler launcher. ccache's own hash covers the compiler, every
 flag and every included header, so a cached object is reused only for an

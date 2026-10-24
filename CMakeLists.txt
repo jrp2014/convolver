@@ -425,12 +425,11 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME examples.first_use COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/fixtures.py" run-documented
             --cli "$<TARGET_FILE:convolver_cli>" --work "${PROJECT_BINARY_DIR}/first-use")
-        set_tests_properties(examples.fixtures examples.first_use PROPERTIES
-            LABELS "examples;real-libraries;cli" TIMEOUT 120)
-        set_tests_properties(examples.first_use PROPERTIES FIXTURES_SETUP first_use_renders)
-        # Checks of the repository that no build option changes (CI runs them in
-        # one configuration per OS: docs/develop/testing.md#which-configurations-run-which-tests).
-        set_tests_properties(examples.fixtures PROPERTIES LABELS "examples;repository")
+        set_tests_properties(examples.first_use PROPERTIES LABELS "examples;real-libraries;cli"
+            TIMEOUT 120 FIXTURES_SETUP first_use_renders)
+        # The fixtures check reads the repository only, and no build option changes it
+        # (docs/develop/testing.md#which-configurations-run-which-tests).
+        set_tests_properties(examples.fixtures PROPERTIES LABELS "examples;repository" TIMEOUT 120)
     endif()
     if(CONVOLVER_LEGACY_TESTS)
         if(NOT legacy_default)
