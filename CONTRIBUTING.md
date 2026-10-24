@@ -78,6 +78,23 @@ Apple SDKs. CI upgrades the standalone clang-tidy package before each analysis
 run and prints its version. Fix real diagnostics rather than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
 
+### When a new Clang release turns CI red
+
+Because the tools are not pinned, a new release can fail CI on code that
+nobody changed. That is accepted (owner's decision, 24 October 2026); handle
+it by which tool failed:
+
+- **clang-format** changes layout only, never behaviour. Apply the
+  `lint-fixes` patch from the failed Lint run, or run `pre-commit clean` and
+  `pre-commit run clang-format --all-files`, and commit the result on its own
+  as `style: apply clang-format X.Y.Z layout`. Do not change `.clang-format`
+  to keep the old layout unless jrp asks.
+- **clang-tidy** adds or sharpens checks, and `.clang-tidy` treats every
+  warning as an error, so a new failure usually points at real code. Fix the
+  code in its own commit and say what the diagnostic found. If a diagnostic is
+  a false positive, suppress that one line with `// NOLINT(check-name)` and a
+  reason; do not turn the check off.
+
 ## Lint checks
 
 Use Python 3.12 and Node.js 24 for the same environment as the lint CI job.
