@@ -203,9 +203,11 @@ Given `-DCONVOLVER_PLUGINVAL=/path/to/pluginval`, two more load the bundle in
 the SDK's hosting code. None of these establishes compatibility in a particular
 commercial DAW.
 
-`packaging.consumer` installs and relocates the package, builds and runs an
-external core/host/I/O consumer, and verifies components and source-tree use with and
-without a parent CTest setup. Core-only configuration runs seven C++/package
+The `packaging.consumer.*` tests install and relocate the package
+(`packaging.consumer.install`, a CTest fixture), then build and run external
+core/host/I/O consumers and verify components and source-tree use with and
+without a parent CTest setup, one consumer per test so CTest can run them in
+parallel. Core-only configuration runs seven C++/package
 suites without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay

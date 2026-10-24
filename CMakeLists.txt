@@ -470,9 +470,23 @@ if(CONVOLVER_BUILD_TESTS)
     if(CONVOLVER_BUILD_NATIVE AND CONVOLVER_PACKAGE_TESTS)
         configure_file(tests/consumer/cache.cmake.in consumer-cache.cmake @ONLY)
         configure_file(tests/consumer/verify.cmake.in consumer-verification.cmake @ONLY)
-        add_test(NAME packaging.consumer COMMAND "${CMAKE_COMMAND}" "-DCONFIG=$<CONFIG>"
-            -P "${CMAKE_CURRENT_BINARY_DIR}/consumer-verification.cmake")
-        set_tests_properties(packaging.consumer PROPERTIES LABELS "packaging;real-libraries" TIMEOUT 180)
+        # One CTest entry per consumer, so they can run side by side. The
+        # install step copies the consumer project and relocates the package
+        # once for all of them.
+        set(consumer_cases installed-core installed-host source-core source-no-ctest missing-component)
+        if(CONVOLVER_BUILD_IO)
+            list(APPEND consumer_cases installed-io)
+        else()
+            list(APPEND consumer_cases missing-io)
+        endif()
+        foreach(step IN ITEMS install LISTS consumer_cases)
+            add_test(NAME packaging.consumer.${step} COMMAND "${CMAKE_COMMAND}" "-DCONFIG=$<CONFIG>"
+                "-DSTEP=${step}" -P "${CMAKE_CURRENT_BINARY_DIR}/consumer-verification.cmake")
+            set_tests_properties(packaging.consumer.${step} PROPERTIES LABELS "packaging;real-libraries" TIMEOUT 180)
+        endforeach()
+        set_tests_properties(packaging.consumer.install PROPERTIES FIXTURES_SETUP consumer_package)
+        list(TRANSFORM consumer_cases PREPEND packaging.consumer.)
+        set_tests_properties(${consumer_cases} PROPERTIES FIXTURES_REQUIRED consumer_package)
     endif()
     add_custom_target(check COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" USES_TERMINAL VERBATIM)

@@ -105,7 +105,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | The Equalizer APO export | [Equalizer APO guide](../use/equalizer-apo.md); the model in the test must follow Equalizer APO's sources | `export.equalizer_apo`, and `export.equalizer_apo.runtime` in Equalizer APO itself on Windows CI; report their worst errors |
 | A plug-in adapter | Its format folder, the [shared adapter contract](plugin-contract.md) | Its `Adapter` driver for the [PLUG-2 harness](testing.md#plug-in-comparisons-plug-2), its validator, pluginval where it applies |
 | First-use examples or their generator | `examples/first-use/`, `tests/plugins/fixtures.py`, marked commands in the READMEs | `examples.fixtures`, `examples.first_use`, then every adapter's harness test |
-| Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer` |
+| Package/dependencies | Top-level CMake, `cmake/`, presets and workflow matrix | Full build plus `core-only` and `packaging.consumer.*` |
 | Versioning | `SOURCE_PATHS`, build-version CMake and version workflow | `python3 tests/versioning_tests.py`; do not run the mutating helper as a dry run |
 | Documentation | [Page ownership and maintenance](documentation.md) | Markdown/link checks; run changed examples; preserve historical hashes |
 
