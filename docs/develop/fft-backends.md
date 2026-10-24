@@ -339,6 +339,11 @@ now implemented ([below](#shared-forward-transforms)); inverse-transform sharing
 and non-uniform partitioning remain open as **PERF-2** in
 [TODO](../../TODO.md#fft-libraries-and-performance).
 
+The [24 October M5 Max vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
+compares these kernels with Accelerate complex multiply-add without changing
+layout. It found no substantial whole-engine gain and exceeded existing
+numerical-divergence limits; the current kernels remain the default.
+
 ### Shared forward transforms
 
 Paths whose ordered input routes are identical (same channels, same order,
