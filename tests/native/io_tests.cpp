@@ -869,9 +869,11 @@ void raw_encoding_tests(const fs::path& dir) {
     rejects([&] { AudioReader r(p, RawSpec{48000, 1}, {SampleType::pcm8, false}); });
     // The encoding is ignored when the file has a header.
     wave(dir / "header.wav", 48000, 1, {.5f});
-    AudioReader h(dir / "header.wav", std::nullopt, {SampleType::pcm16, true});
-    std::vector<float> one(1);
-    require(h.read(one) == 1 && one[0] == .5f, "a header overrides the RAW encoding");
+    {
+        AudioReader h(dir / "header.wav", std::nullopt, {SampleType::pcm16, true});
+        std::vector<float> one(1);
+        require(h.read(one) == 1 && one[0] == .5f, "a header overrides the RAW encoding");
+    } // Closed before removal: Windows cannot delete an open file.
     fs::remove(p);
     fs::remove(dir / "header.wav");
 }
