@@ -193,7 +193,7 @@ int run(int argc, char** argv) {
         std::size_t block = 256, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
-        bool keep = false, speaker_map = false, raw_format = false;
+        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -283,6 +283,7 @@ int run(int argc, char** argv) {
                                                 " (use s16le, s24le, s32le, f32le or f64le, or "
                                                 "the same with be for big-endian)");
                 raw_filter_encoding = *parsed;
+                raw_filter_format = true;
             } else if (option == "--gain-db") {
                 audio_options = true;
                 auto text = value();
@@ -423,13 +424,28 @@ int run(int argc, char** argv) {
                                               raw_filter_encoding},
             &dependencies, &raw_filters);
         // A raw filter's sample type is an assumption, so say which one was used.
+        // Names are relative to the configuration's folder, so two filters with
+        // the same file name in different folders can be told apart.
         for (const auto& raw_filter : raw_filters) {
-            const auto name = raw_filter.filename().u8string();
+            std::error_code ec;
+            auto shown = std::filesystem::relative(
+                raw_filter,
+                filter.parent_path().empty() ? std::filesystem::path(".") : filter.parent_path(),
+                ec);
+            if (ec || shown.empty())
+                shown = raw_filter;
+            const auto name = shown.generic_u8string();
             std::cerr << "convolver: raw filter '" << std::string(name.begin(), name.end())
                       << "' read as mono " << convolver::raw_encoding_name(raw_filter_encoding)
-                      << " at " << config.sample_rate
-                      << " Hz (choose another sample type with --raw-filter-format)\n";
+                      << " at " << config.sample_rate << " Hz"
+                      << (raw_filter_format ? ""
+                                            : " (choose another sample type with "
+                                              "--raw-filter-format)")
+                      << '\n';
         }
+        if (raw_filter_format && raw_filters.empty())
+            std::cerr << "convolver: --raw-filter-format has no effect: the configuration "
+                         "has no headerless .pcm or .raw filters\n";
         for (const auto& source : dependencies)
             if (same_file(source, output))
                 throw std::invalid_argument(

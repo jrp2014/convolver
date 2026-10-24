@@ -576,7 +576,10 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     } catch (const std::runtime_error& e) {
         // A libsndfile without its codec libraries only says the format is
         // unimplemented; say which codec is missing and what to do instead.
-        if (!raw && path != "-" && !available(Container::flac))
+        // Only regular files are sniffed: reopening a named pipe would block.
+        std::error_code regular_error;
+        if (!raw && path != "-" && std::filesystem::is_regular_file(path, regular_error) &&
+            !available(Container::flac))
             if (const auto codec = compressed_codec(path))
                 throw std::runtime_error(std::string(e.what()) + " (this is " + codec +
                                          ", but this Convolver's libsndfile was built without "

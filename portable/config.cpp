@@ -401,7 +401,9 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                              " (raw filters are read as mono " +
                                              raw_encoding_name(raw_encoding) + ")");
             // The file is there but libsndfile cannot read it (a codec its build
-            // lacks, for example): the path hint below would mislead.
+            // lacks, for example): the path hint below would mislead. The code
+            // stays missing-asset on purpose: codes are stable, and
+            // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
                 throw ConfigurationError("missing-asset", path.ir.location,
                                          "filter '" + path.ir.spelling + "': " + e.what());
@@ -587,6 +589,8 @@ Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection,
                                  std::vector<std::filesystem::path>* source_paths,
                                  std::vector<std::filesystem::path>* raw_filters) {
+    if (raw_filters)
+        raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
         selection.input_channels > 256 || selection.output_channels > 256)
         throw std::invalid_argument("expected audio properties out of range");
@@ -620,7 +624,6 @@ Configuration load_configuration(const std::filesystem::path& path,
         const auto decoded =
             detail::decode_impulses(*leaf.document, cfg, budget, selection.raw_filter_encoding);
         if (raw_filters) {
-            raw_filters->clear();
             for (const auto& ir : decoded)
                 if (ir.raw && std::find(raw_filters->begin(), raw_filters->end(), ir.resolved) ==
                                   raw_filters->end())

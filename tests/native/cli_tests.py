@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """End-to-end CLI checks through real FFTW and libsndfile, no Python packages."""
 import math
+import os
 import re
 from pathlib import Path
 import struct
@@ -247,6 +248,14 @@ def container_tests(d):
         p=call(['--filter',d/'ct-fake.cfg','--input',d/'ct.aiff','--output',d/'ct-fake.wav'],
                ok=False)
         assert b'built without FLAC' in p.stderr and b'looked for' not in p.stderr, p.stderr
+        # A named pipe is never reopened to sniff it: that would block forever.
+        if hasattr(os, 'mkfifo'):
+            fifo=d/'ct-fifo'; os.mkfifo(fifo)
+            writer=subprocess.Popen(['sh','-c','head -c 200 /dev/zero > "$1"','sh',str(fifo)])
+            p=subprocess.run([EXE,'--filter',str(ir),'--input',str(fifo),'--output',
+                              str(d/'ct-fifo.wav')],capture_output=True,timeout=20)
+            writer.wait(timeout=20)
+            assert p.returncode != 0 and b'built without FLAC' not in p.stderr, p.stderr
     # A DRC-style .pcm filter in a configuration.
     (d/'ct.pcm').write_bytes(struct.pack('<2f',.5,.25))
     cfg=d/'ct-raw.cfg'; cfg.write_text('48000 1 1 0\n0\n0\nct.pcm\n0\n0\n0\n')
@@ -261,6 +270,18 @@ def container_tests(d):
             '--output','-','--output-format','raw-float'],data=raw)
     near(struct.unpack('<5f',p.stdout),[.25,0.,0.,-.46875,-.25])
     assert b'read as mono s16le' in p.stderr, p.stderr
+    assert b'choose another sample type' not in p.stderr, p.stderr
+    # Two raw filters with the same file name are told apart by their folders.
+    for sub in ('ct-a','ct-b'):
+        (d/sub).mkdir(); (d/sub/'x.pcm').write_bytes(struct.pack('<f',1))
+    two=d/'ct-two.cfg'; two.write_text('48000 1 1 0\n0\n0\nct-a/x.pcm\n0\n0\n0\nct-b/x.pcm\n0\n0\n0\n')
+    p=call(['--filter',two,'--raw-input','48000','1','--input','-','--output','-',
+            '--output-format','raw-float'],data=raw)
+    assert b"'ct-a/x.pcm'" in p.stderr and b"'ct-b/x.pcm'" in p.stderr, p.stderr
+    # The option says when there is nothing for it to do.
+    p=call(['--filter',ir,'--raw-filter-format','s24le','--input',d/'ct.aiff',
+            '--output',d/'ct-unused.wav'])
+    assert b'--raw-filter-format has no effect' in p.stderr, p.stderr
     p=call(['--filter',cfg,'--raw-filter-format','s16','--raw-input','48000','1','--input','-',
             '--output','-','--output-format','raw-float'],ok=False,data=raw)
     assert b'unsupported raw filter format' in p.stderr, p.stderr

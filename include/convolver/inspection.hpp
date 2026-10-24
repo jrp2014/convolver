@@ -56,8 +56,8 @@ struct InspectedFilterPath {
     // Present once the IR has been opened and decoded.
     std::optional<int> ir_sample_rate;
     std::optional<std::size_t> ir_file_channels, ir_frames, partitions;
-    std::optional<RawEncoding> raw_encoding; // Present for a headerless raw filter.
     std::vector<InspectedRoute> inputs, outputs;
+    std::optional<RawEncoding> raw_encoding; // Present for a headerless raw filter.
 };
 struct InspectedConfiguration {
     std::filesystem::path file;

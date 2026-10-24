@@ -310,6 +310,10 @@ void run(const fs::path& dir) {
         require(s24_loaded.paths.at(0).impulse == std::vector<float>{.5f, -.5f} &&
                     raws.size() == 1 && raws[0].filename() == "s24.pcm",
                 "a raw filter in another sample type, and the list of raw filters read");
+        // The list is replaced, not appended to, and is empty for a sound file.
+        wave(dir / "plain.wav", 44100, 1, {1.f});
+        load_configuration(dir / "plain.wav", s24, nullptr, &raws);
+        require(raws.empty(), "a sound file reads no raw filters");
         InspectionOptions s24_inspect;
         s24_inspect.raw_filter_encoding = s24.raw_filter_encoding;
         const auto s24_report = inspect_configuration(dir / "s24.cfg", s24_inspect);
@@ -429,7 +433,7 @@ void run(const fs::path& dir) {
          {"absent.cfg", "two.txt",   "bad.cfg",     "unrelated.cfg", "list.txt",  "cyclic.txt",
           "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",       "drive.txt", "outer.txt",
           "sub.txt",    "dash.cfg",  "drc.pcm",     "cut.RAW",       "raw.cfg",   "cut.cfg",
-          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg",  "s24.pcm",       "s24.cfg"})
+          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg",  "s24.pcm",       "s24.cfg",   "plain.wav"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

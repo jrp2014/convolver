@@ -28,7 +28,8 @@ Contents:
 - [File rendering](#file-rendering): [gain](#gain-and-attenuation),
   [output formats](#output-formats),
   [integer output and dither](#integer-formats-dither-and-noise-shaping),
-  [speaker labels](#speaker-labels), [output safety](#output-safety)
+  [speaker labels](#speaker-labels), [FLAC and Ogg](#flac-and-ogg),
+  [output safety](#output-safety)
 - [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
 - [FFTW plan tuning](#fftw-plan-tuning)
@@ -114,10 +115,10 @@ The [preview packages](install.md#what-a-preview-package-contains) contain a lib
 without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
 and will stay that way, to keep the packages free of extra dependencies
 (owner's decision, 24 October 2026). So
-packaged copies of Convolver, the command line and the plug-ins alike, cannot
-read FLAC or Ogg files (input or IR) or write FLAC. `convolver --version` says
-whether the libsndfile in use has FLAC (`libsndfile ... (no FLAC output)`
-otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
+the plug-ins and the tools in a package cannot read FLAC or Ogg files (as
+input or as IRs), and the command line will be the same when packages include
+it (PLUG-5). `convolver --version` says whether the libsndfile in use has FLAC
+(it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
 refused with a message before any file is created.
 
 To work with FLAC anyway, do one of these:
@@ -142,13 +143,14 @@ To work with FLAC anyway, do one of these:
     | ffmpeg -f f32le -ar 48000 -ac 2 -i - -c:a flac -sample_fmt s32 corrected.flac
   ```
 
-  FIR filters in FLAC are converted once with `flac --decode`; the plug-ins
-  need this too.
+  FIR filters in FLAC are converted once with `flac --decode`, and the `.cfg`
+  then names the `.wav` instead of the `.flac`; the plug-ins need this too.
 - **Build Convolver against a libsndfile that has FLAC.** The libsndfile
   packages of Linux distributions (`libsndfile1-dev` on Debian and Ubuntu),
   Homebrew (`libsndfile`) and vcpkg (`libsndfile` with its default features)
   include FLAC and Ogg. [Build from source](../develop/build.md) with one of
-  them, then check that `convolver --version` no longer says `no FLAC output`.
+  them (with vcpkg, install `libsndfile` rather than the `libsndfile[core]`
+  the Windows build commands use, which leaves the codecs out), then check that `convolver --version` no longer says `no FLAC output`.
 
 ### Integer formats, dither and noise shaping
 
@@ -336,7 +338,8 @@ convolver --inspect room.cfg --syntax-only --json
   will not survive copying to another machine; the default profile is
   `convolver`. See [profiles](other-programs.md#check-that-a-configuration-will-travel).
 - `--json` prints one UTF-8 JSON document (report schema 1) on stdout, also when
-  validation fails. Diagnostics are also printed to stderr.
+  validation fails. Diagnostics are also printed to stderr. New keys may be
+  added within schema 1; removing or changing the meaning of one raises it.
 - `convolver --inspect --help` lists every inspection option.
 - Exit status: 0 valid, 1 invalid or unreadable, 2 invalid usage.
   `--warnings-as-errors` makes warnings fail.
@@ -345,7 +348,9 @@ A report gives, per inspected configuration, the rate, channel counts and raw
 channel mask; declared delay tokens and milliseconds beside effective frames;
 ordered routes with their source tokens and effective channel/gain (`-0` is
 channel 0, gain -1); each IR's spelling, line, resolved path, channel, rate and
-decoded length; partitions per path; latency (one block) and the FIR/delay tail
+decoded length, and for a headerless raw filter the sample type it was read as
+(`raw_format`, for example `f32le`; null for other IRs and for IRs that were
+not opened); partitions per path; latency (one block) and the FIR/delay tail
 separately; and `accounted_buffer_bytes`, the engine's prepared float buffers
 (an upper bound: paths with the same input mix share their history). That
 estimate excludes FFT plan internals, allocator overhead and file decoding
