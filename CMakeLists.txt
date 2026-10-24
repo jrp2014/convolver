@@ -231,8 +231,9 @@ if(CONVOLVER_BUILD_NATIVE)
         list(APPEND native_targets convolver_benchmark)
     endif()
     if(CONVOLVER_BUILD_TESTS)
-        # Every native test is registered here, so its executable is built by the
-        # check target and gets the shared compile, warning and sanitizer settings
+        # Every native test executable is registered here (the Python-driven
+        # native tests are added further down), so the check target builds it
+        # and it gets the shared compile, warning and sanitizer settings
         # (applied to native_targets below), the test labels and the timeout.
         set(test_targets "")
         function(convolver_native_test name target)

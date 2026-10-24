@@ -34,11 +34,13 @@ bool supported(OutputEncoding) noexcept;
 // Whether the libsndfile this build uses can write a container. Only flac can
 // be missing: libsndfile builds without its external libraries leave it out.
 bool available(Container) noexcept;
-// Whether libsndfile recognises the file's content as a sound file, whatever
-// the file is called: true also for a recognised header it cannot read (a
-// damaged one, or a codec this build lacks). Only regular files are opened, so
-// a named pipe, a directory or a missing file is false. A bare MPEG frame sync
-// is not enough, because sample data matches it too often.
+// Whether a file's content is a sound file, whatever the file is called:
+// libsndfile recognises it, or it starts with an unmistakable container marker
+// (WAV, RF64, BW64, W64, AIFF, CAF, AU, FLAC, Ogg). True also for a header that
+// cannot be read (a damaged one, or a codec this build lacks). Only regular
+// files are opened, so a named pipe, a directory or a missing file is false.
+// A bare MPEG frame sync or an MPC 2000 marker is not enough: sample data
+// matches them too often.
 bool sound_file_header(const std::filesystem::path&);
 // The original WAV and RAW formats; each is shorthand for an OutputEncoding.
 // Integer WAV formats: wav_pcm8 is unsigned 8-bit; the others are signed.

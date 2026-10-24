@@ -82,13 +82,16 @@ cycle still let the unfiltered input play; and VST3 and AU reported a load
 made while inactive as failed after keeping it, when memory ran out while
 working out its tail.
 
-Fixed defects from jrp's review of 0.4.37: a sound file with a header that
-Convolver did not list (Sun/NeXT AU, for example) named `.pcm` or `.raw` was
-read as raw samples, header included, while inspection called it valid;
-libsndfile now decides what has a header. Syntax-only inspection with the
+Fixed defects from jrp's review of 0.4.37, after the commit above
+([PR #66](https://github.com/jrp2014/convolver/pull/66)): a sound file with a
+header that Convolver did not list (Sun/NeXT AU, for example) named `.pcm` or
+`.raw` was read as raw samples, header included, while inspection called it
+valid; libsndfile's detection now decides, with the old container markers kept
+for the cases it does not report. Syntax-only inspection with the
 `portable-paths` profile opened such filters, so a named pipe blocked it; it
 now opens none. A new native test was missing from the `check` target and the
-sanitizer flags; every native test is now registered through one CMake helper.
+sanitizer flags; every native test executable is now registered through one
+CMake helper.
 
 ## User journeys for the first preview
 

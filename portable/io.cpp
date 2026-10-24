@@ -312,15 +312,28 @@ bool sound_file_header(const std::filesystem::path& path) {
     std::error_code ec;
     if (path == "-" || !std::filesystem::is_regular_file(path, ec))
         return false;
-    // libsndfile's last check matches a bare MPEG frame sync, 11 set bits that
-    // sample data has about once in five thousand files (its own source calls
-    // it "prone to false positives"). An MPEG file with an ID3v2 tag still
-    // counts: libsndfile identifies it from the tag.
+    unsigned char head[4]{};
     {
         std::ifstream file(path, std::ios::binary);
-        unsigned char head[2]{};
-        if (file.read(reinterpret_cast<char*>(head), sizeof head) && head[0] == 0xFF &&
-            (head[1] & 0xE0) == 0xE0)
+        file.read(reinterpret_cast<char*>(head), sizeof head);
+        if (file.gcount() == sizeof head) {
+            // These container markers are unmistakable, and libsndfile does
+            // not always say it saw them: it does not know BW64, and it
+            // reports an AU or WAV in an encoding it lacks as unrecognised.
+            const std::string_view marker(reinterpret_cast<const char*>(head), sizeof head);
+            for (const std::string_view known : {"RIFF", "RIFX", "RF64", "BW64", "riff", "FORM",
+                                                 "caff", "fLaC", "OggS", ".snd", "dns."})
+                if (marker == known)
+                    return true;
+        }
+        // libsndfile identifies two formats from too few bits for sample
+        // data not to match by chance: a bare MPEG frame sync (11 bits, about
+        // one file in 5000; its source calls the check "prone to false
+        // positives") and an Akai MPC 2000 sample (two bytes, 01 04). Neither
+        // is a format anyone names .pcm or .raw. An MPEG file with an ID3v2
+        // tag still counts: libsndfile identifies it from the tag.
+        if (file.gcount() >= 2 &&
+            ((head[0] == 0xFF && (head[1] & 0xE0) == 0xE0) || (head[0] == 1 && head[1] == 4)))
             return false;
     }
     SF_INFO info{};

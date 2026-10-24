@@ -106,10 +106,13 @@ AIFF, CAF, FLAC or Ogg Vorbis. Its sample rate must be the configuration's. The
 [FLAC and Ogg](command-line.md#flac-and-ogg) says how to work around that.
 
 A filename ending in `.pcm` or `.raw` (in any letter case) is a raw filter,
-unless libsndfile recognises the file's content as a sound file: a WAV, AIFF
-or AU file named `.pcm` is still read through its header. If the header is
-recognised but cannot be read, Convolver reports an error rather than reading
-the file as samples. A raw filter is a headerless file of mono samples. Convolver reads
+unless the file's content is a sound file: one that libsndfile recognises, or
+one that starts like a WAV, RF64, BW64, AIFF, CAF, AU, FLAC or Ogg file. A WAV
+or AU file named `.pcm` is still read through its header, and a header that
+cannot be read is reported as an error rather than read as samples. Two
+libsndfile signatures are too short to tell from sample data, so a file
+starting with either is a raw filter: a bare MPEG audio frame (an MP3 without
+an ID3 tag) and an Akai MPC 2000 sample. A raw filter is a headerless file of mono samples. Convolver reads
 it as little-endian 32-bit float (`f32le`), the type
 [DRC](https://drc-fir.sourceforge.net/) and BruteFIR write by default, and says
 so: rendering prints a line such as

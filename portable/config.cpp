@@ -358,8 +358,8 @@ bool raw_filter_name(const std::filesystem::path& path) {
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return extension == ".pcm" || extension == ".raw";
 }
-// libsndfile decides whether the content is a sound file, so a .pcm or .raw
-// file with any header it reads is read through that header, as it always was.
+// sound_file_header decides whether the content is a sound file, so a .pcm or
+// .raw file with a header is read through that header, as it always was.
 bool raw_filter(const std::filesystem::path& resolved) {
     return raw_filter_name(resolved) && !sound_file_header(resolved);
 }
@@ -373,6 +373,14 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         const auto resolved = resolve_reference(doc.source, path.ir);
         std::optional<AudioReader> ir;
         const bool raw = raw_filter(resolved);
+        // Appended to errors about a file whose name says raw but whose content
+        // was read as a sound file, so the user knows why.
+        const std::string read_as_sound =
+            !raw && raw_filter_name(resolved)
+                ? " (the name ends like a raw filter's, but the content starts like a sound "
+                  "file, so Convolver read it as one; if it is headerless samples that happen "
+                  "to look like a header, convert it to WAV, for example with SoX)"
+                : "";
         try {
             if (raw)
                 ir.emplace(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding);
@@ -390,15 +398,9 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             // stays missing-asset on purpose: codes are stable, and
             // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
-                throw ConfigurationError(
-                    "missing-asset", path.ir.location,
-                    "filter '" + path.ir.spelling + "': " + e.what() +
-                        (raw_filter_name(resolved)
-                             ? " (the name ends like a raw filter's, but libsndfile recognises "
-                               "the content as a sound file, so Convolver read it as one; if "
-                               "it is headerless samples that happen to look like a header, "
-                               "convert it to WAV, for example with SoX)"
-                             : ""));
+                throw ConfigurationError("missing-asset", path.ir.location,
+                                         "filter '" + path.ir.spelling + "': " + e.what() +
+                                             read_as_sound);
             // Includes a bare "-": standard input cannot be a filter.
             throw ConfigurationError(
                 "missing-asset", path.ir.location,
@@ -415,7 +417,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                          std::to_string(cfg.sample_rate) +
                                          " Hz configuration). Every IR a configuration names "
                                          "must have the sample rate on its first line; "
-                                         "Convolver never resamples IRs");
+                                         "Convolver never resamples IRs" +
+                                         read_as_sound);
         // read_impulses targets the last path, so decode into a single path and
         // transfer only its coefficients after all routing has been validated.
         std::vector<FilterPath> decoded(1);

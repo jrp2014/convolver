@@ -174,8 +174,9 @@ Until 1.0 the C++ API may change between minor versions.
 - macOS VST3 bundles are re-sealed with an ad-hoc signature after the SDK adds
   `moduleinfo.json`, and `vst3.signature` verifies the seal.
 
-- `sound_file_header()` in `convolver/io.hpp`: whether libsndfile recognises a
-  file's content as a sound file, opening regular files only.
+- `sound_file_header()` in `convolver/io.hpp`: whether a file's content is a
+  sound file (libsndfile recognises it, or it starts with a container marker),
+  opening regular files only.
 
 ### Changed
 
@@ -275,10 +276,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 - A filter named `.pcm` or `.raw` that is a sound file with a header (Sun/NeXT
   AU, for example) was read as raw samples, header included, because only some
-  headers were recognised. libsndfile now decides: any file it recognises as a
-  sound file is read through its header, whatever its name, and a header it
-  recognises but cannot read is an error that says so, not raw samples. Found
-  in jrp's review of 0.4.37.
+  headers were recognised. Now such a filter is read through its header when
+  libsndfile recognises its content or it starts like a WAV, RF64, BW64, AIFF,
+  CAF, AU, FLAC or Ogg file, and a header that cannot be read is an error that
+  says so, not raw samples. Found in jrp's review of 0.4.37.
 - `--inspect --syntax-only --profile portable-paths` opened `.pcm` and `.raw`
   filters to look for a header, so a named pipe with such a name blocked it.
   Syntax-only inspection now opens no filter file; its `raw-filter` warning

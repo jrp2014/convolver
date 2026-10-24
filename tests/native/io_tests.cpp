@@ -911,9 +911,35 @@ void sound_file_header_tests(const fs::path& dir) {
     require(!sound_file_header(bytes("short.raw", {0, 0, 0x80})), "a 3-byte file has no header");
     require(!sound_file_header(bytes("silence.raw", std::vector<unsigned char>(64))),
             "zero samples have no header");
-    // f32le 1160.0 starts FF FB: a bare MPEG frame sync is sample data, not a header.
-    require(!sound_file_header(bytes("sync.raw", {0xff, 0xfb, 0x90, 0x44, 0xff, 0xfb, 0x90, 0x44})),
+    // Realistic raw filters (4096 small f32le samples) whose first sample
+    // happens to start like a weak libsndfile signature. libsndfile itself
+    // would claim both: the MPEG one fails to open, the MPC 2000 one opens.
+    const auto filter = [&](const char* name, std::array<unsigned char, 4> first) {
+        std::vector<unsigned char> b(first.begin(), first.end());
+        std::uint32_t state = 12345;
+        for (int i = 1; i < 4096; ++i) {
+            state = state * 1664525u + 1013904223u;
+            const float v = static_cast<float>(static_cast<std::int32_t>(state)) * 1e-12f;
+            const auto word = std::bit_cast<std::uint32_t>(v);
+            for (int k = 0; k < 4; ++k)
+                b.push_back(static_cast<unsigned char>(word >> (8 * k)));
+        }
+        return bytes(name, b);
+    };
+    // f32le 1159.875 is FF FB 90 44, a bare MPEG frame sync.
+    require(!sound_file_header(filter("sync.raw", {0xff, 0xfb, 0x90, 0x44})),
             "a bare MPEG frame sync is not a header");
+    // f32le 1.0001222 is 01 04 80 3F, libsndfile's two-byte MPC 2000 marker.
+    require(!sound_file_header(filter("mpc.raw", {0x01, 0x04, 0x80, 0x3f})),
+            "an MPC 2000 marker is not a header");
+    // Markers libsndfile does not report: BW64, and an AU encoding it lacks.
+    require(sound_file_header(
+                bytes("bw.raw", {'B', 'W', '6', '4', 0, 0, 0, 0, 'W', 'A', 'V', 'E', 0, 0, 0, 0})),
+            "a BW64 marker is a header");
+    require(sound_file_header(
+                bytes("unknown.raw", {'.', 's', 'n', 'd', 0,    0,    0, 24, 0, 0, 0, 4, 0, 0,
+                                      0,   99,  0,   0,   0xac, 0x44, 0, 0,  0, 1, 0, 0, 0, 0})),
+            "an AU in an encoding libsndfile lacks is a header");
     require(!sound_file_header(dir / "absent.raw") && !sound_file_header(dir) &&
                 !sound_file_header("-"),
             "only existing regular files are examined");
@@ -924,8 +950,8 @@ void sound_file_header_tests(const fs::path& dir) {
     require(!sound_file_header(pipe), "a named pipe is not examined");
     fs::remove(pipe);
 #endif
-    for (const auto* name :
-         {"sun.pcm", "zero-channels.raw", "drc.raw", "short.raw", "silence.raw", "sync.raw"})
+    for (const auto* name : {"sun.pcm", "zero-channels.raw", "drc.raw", "short.raw", "silence.raw",
+                             "sync.raw", "mpc.raw", "bw.raw", "unknown.raw"})
         fs::remove(dir / name);
 }
 void run(const fs::path& dir) {
