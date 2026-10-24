@@ -9,12 +9,12 @@ Revision note, 21 October 2026: the [documentation review](../../review-2026-10/
 corrected speaker-mask semantics, buffering/latency requirements and Equalizer
 APO coverage. These are proposed contracts, not implemented adapter behavior.
 
-**Parked (owner, 21 October 2026):** a Windows-native adapter needs more thought
+**Parked:** a Windows-native adapter needs more thought
 before any work starts. VST3, LV2 and AU come first; see the
 [plug-in formats plan](2026-10-21-plugin-formats.md).
 
-**Update, 22 October 2026:** asked to choose this plan's target users, the
-owner chose system-wide filtering through Equalizer APO. That route is now the
+**Update:** asked to choose this plan's target users, jrp
+chose system-wide filtering through Equalizer APO. That route is now the
 [Equalizer APO export](../../use/equalizer-apo.md) (HOST-4); the MFT stays parked.
 
 **In short:**
@@ -426,5 +426,5 @@ DirectShow hosts. What changes:
   Check in the Legacy player.
 - **Per-user registration:** we found no per-user equivalent of `MFTRegister`.
   Verify before promising non-administrator installs.
-- **Speaker masks** follow the VST3-1 decision (owner, 23 October 2026): compare the
+- **Speaker masks** follow the VST3-1 decision: compare the
   filter's output mask with the device's and warn, never reject.

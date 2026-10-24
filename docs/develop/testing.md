@@ -74,7 +74,7 @@ misses all of that.
   tolerance, or if the FMA set's oracle error exceeds 1.5 times the
   baseline's ([measurements](fft-backends.md#avx2-kernels-chosen-at-run-time)).
   Do not widen these limits to make it pass: a failure is a divergence to
-  investigate (owner's decision, 24 October 2026).
+  investigate.
 - `native.io`: real libsndfile float/PCM8/16/24/32 round trips, valid-bit headers, clipping, seeded dither
   and noise-shaping behavior,
   legacy parser/config lists, Windows/POSIX/mixed relative paths, signed zero, malformed input,
@@ -801,8 +801,7 @@ forever on a documentation-only pull request.
 A local build runs every CTest entry. CI runs each kind of test only where
 something that can change its result differs from every other job: the
 compiler or its version, build type and flags, architecture, FFT backend,
-sanitizer, CMake generator, linked libraries or the package's shape
-(owner's decision, 24 October 2026). Plug-in builds compile the core exactly
+sanitizer, CMake generator, linked libraries or the package's shape. Plug-in builds compile the core exactly
 as native builds do, so a plug-in job whose compiler, flags and backend match
 another job runs only its own format's tests. The CTest labels select them.
 
