@@ -10,6 +10,28 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Fixed
+
+- Plug-ins: after a filter loaded, a processing fault from before it (for
+  example from the audio played while the new filter was being prepared) could
+  turn the Status back to Fault at the next status check, though the new
+  filter played cleanly. An accepted load now takes one snapshot of the fault
+  counts for both the audio thread and the control side: earlier faults are
+  still logged, saying that the status does not show them, but no longer
+  shown or signalled. Found in jrp's review of
+  0.4.43.
+- Audio Unit and VST3: the audio thread could set Status to Fault while a
+  load failure was showing, hiding Load failed until the next status check.
+  Load failed now stays ahead of Fault on the audio thread too, as LV2's
+  status port already did. Found in jrp's review of 0.4.43.
+- VST3 and Audio Unit: when an empty instance's first load failed, faults
+  counted while that filter was prepared were left out of the log. They are
+  now explained like any other. Found in the independent review of the fixes
+  above.
+- The plug-in and troubleshooting guides said the VST3 cannot show why a load
+  failed and that the speaker check's note cannot be shown. Both now point to
+  the Status parameter and the Convolver log. Found in jrp's review of 0.4.43.
+
 ## [0.5.0] - 2026-10-24
 
 The series the first preview comes from. It includes the changes tagged

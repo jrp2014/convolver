@@ -58,6 +58,8 @@ std::string speaker_notice(const Configuration&, const HostLayout&);
 // load or a filter that does not suit the host).
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
 
+class HostProcessor;
+
 // PLUG-8: why a request to load a filter failed, or why an instance plays
 // silence, kept as a value on the control side and never touched by the audio
 // thread (docs/develop/plugin-contract.md#failure-reasons). Adapters
@@ -139,6 +141,19 @@ struct HostFaults {
 // What happened, why and what to change, for the log: one sentence per kind
 // of fault. Empty when there are none.
 std::string fault_message(const HostFaults&);
+// What HostFilter::observe() found. `current`: faults met by the filter that
+// plays now, which faults() (and so the status) shows. `earlier`: faults
+// counted before an accepted load replaced the filter they met, while the new
+// one was prepared; logged, but never shown.
+struct HostFaultReport {
+    HostFaults current, earlier;
+    bool any() const noexcept {
+        return current.any() || earlier.any();
+    }
+};
+// The log text for both parts, each with its own ending, so the log never
+// says the status shows Fault for faults it does not show.
+std::string fault_message(const HostFaultReport&);
 
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
@@ -156,6 +171,13 @@ class HostFilter {
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
         return failed_;
+    }
+    // DIAG-1: whether host_status() shows a load failure, which comes before
+    // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
+    // every load, rejection and activation, so the audio thread does not show
+    // Fault over it either.
+    bool failure_shown() const noexcept {
+        return activation_failure_.has_value() || load_failure_.has_value() || failed_;
     }
     // Why the instance plays silence or rejected its last load (PLUG-8).
     // A failure found at activation comes first; it clears at the next
@@ -202,9 +224,12 @@ class HostFilter {
     // (prepare, which may throw, then publish, which cannot). What plays is
     // then always what is saved, even when memory runs out.
     // `request` says where the state came from (numbered if 0).
+    // `counting`: the processor that plays (if any). An accepted load clears
+    // its fault baseline (HostProcessor::clear_faults()) and observes from the
+    // same snapshot, so faults shown afterwards are only the new filter's.
     void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {},
-              HostRequest request = {});
+              HostRequest request = {}, HostProcessor* counting = nullptr);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw.
     void reject(HostFailureKind, std::string why, HostRequest request = {});
@@ -229,8 +254,10 @@ class HostFilter {
     // was built) and returns the faults that no earlier call returned, for the
     // adapter to log; they are added to faults(). activate() starts the count
     // again for a new processor, so call this before discarding the old one,
-    // and before load(): an accepted load clears faults().
-    HostFaults observe(const HostFaults& totals) noexcept;
+    // and before load(): an accepted load clears faults(). Faults counted
+    // between the last call and an accepted load (while it was prepared) are
+    // returned as `earlier`, for the log, and not added to faults().
+    HostFaultReport observe(const HostFaults& totals) noexcept;
 
   private:
     HostRequest numbered(HostRequest);
@@ -245,6 +272,7 @@ class HostFilter {
     std::optional<HostFailure> load_failure_, activation_failure_;
     std::string notice_;
     HostFaults faults_, observed_; // Shown since the last clear; processor totals seen.
+    HostFaults unshown_; // Counted before an accepted load and not yet returned by observe().
 };
 
 // DIAG-1: what a host's status display shows for an instance, for formats
@@ -340,6 +368,23 @@ class HostProcessor {
     // also while audio runs: each count is read on its own, so a snapshot
     // taken during a call may show one count of it and not another.
     HostFaults faults() const noexcept;
+    // DIAG-1, the one place where an accepted load starts the fault count
+    // afresh. Control side: takes a snapshot of faults() and makes it the
+    // baseline that the audio-side calls below measure from, and returns it
+    // for HostFilter::load(), which observes from the same snapshot.
+    HostFaults clear_faults() noexcept;
+    // Control side: while the status shows a load failure, which comes first
+    // (host_status()), the audio thread must not show Fault over it.
+    void hold_fault_signal(bool held) noexcept;
+    // Any thread: faults counted since the last clear_faults() (all of them,
+    // for a processor never cleared).
+    bool faults_since_clear() const noexcept;
+    // Audio thread: true when faults arrived since the last clear_faults(),
+    // the adapter has not shown them yet, and no load failure holds the
+    // signal. After the adapter has shown Fault, it calls fault_signalled(),
+    // so each clear shows Fault at most once.
+    bool fault_to_signal() const noexcept;
+    void fault_signalled() noexcept;
     // Missing input channels mean silence; null output channels are discarded.
     // In-place input/output is supported. Nonfinite input/output is silenced.
     // False means invalid dimensions, with no state advance or output guarantee,
