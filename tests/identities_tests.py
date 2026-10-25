@@ -36,6 +36,9 @@ FROZEN = {
     ('au', 'manufacturer'): 'CONV',
     ('au', 'macos_bundle_id'): 'io.github.jrp2014.convolver.au',
     ('au', 'status_parameter_id'): 1001,
+    # PLUG-10's settings in the Audio Unit (AU-7), approved by jrp 25 October 2026.
+    ('au', 'gain_parameter_id'): 0,
+    ('au', 'mix_parameter_id'): 1003,
     ('lv2', 'base_uri'): 'https://github.com/jrp2014/convolver/lv2#',
     ('lv2', 'bundle'): 'convolver.lv2',
     ('macos_installer', 'vst3_package_id'): 'io.github.jrp2014.convolver.pkg.vst3',
@@ -118,14 +121,22 @@ def check_rules(registry, errors):
     if len(set(ids)) != len(ids):
         errors.append('VST3 processor and controller class IDs must differ')
     vst3_parameters = [registry['vst3'][k] for k in ('bypass_parameter_id', 'status_parameter_id')]
+    au_names = ('status', 'mix')
+    au_parameters = [au[f'{k}_parameter_id'] for k in au_names]
     for name, pid in [*zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
-                      ('au status', au['status_parameter_id'])]:
+                      *((f'au {k}', p) for k, p in zip(au_names, au_parameters))]:
         # VST3 reserves IDs from 0x80000000 for hosts (vsttypes.h).
         if not isinstance(pid, int) or not len(VST2_PARAMETERS) <= pid <= 0x7FFFFFFF:
             errors.append(f'{name} parameter ID {pid!r}: a whole number from '
                           f'{len(VST2_PARAMETERS)} (clear of the VST2 parameters) to 0x7FFFFFFF')
+    # Gain takes the VST2 Attenuation's index on purpose (jrp, 25 October 2026),
+    # with a new range; VST3-6 must convert old values if it maps VST2 projects.
+    if au['gain_parameter_id'] != VST2_PARAMETERS.index('Attenuation dB'):
+        errors.append('au gain parameter ID: the VST2 Attenuation index, 0')
     if len(set(vst3_parameters)) != len(vst3_parameters):
         errors.append('VST3 parameter IDs must differ')
+    if len({au['gain_parameter_id'], *au_parameters}) != len(au_parameters) + 1:
+        errors.append('AU parameter IDs must differ')
     bundles = [registry['vst3']['macos_bundle_id'], registry['au']['macos_bundle_id'],
                *registry['macos_installer'].values()]
     for bundle in bundles:

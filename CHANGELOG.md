@@ -10,6 +10,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Audio Unit: Gain (−100 to +24 dB) and Mix (0 to 100% wet) parameters,
+  saved with the project. Their defaults (0 dB, 100%) sound exactly as
+  before.
+
 ### Changed
 
 - CLI: integer output below 20 significant bits (pcm8, pcm16, `--valid-bits`

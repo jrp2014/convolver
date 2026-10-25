@@ -346,6 +346,15 @@ except the Audio Unit build, which runs in a source checkout.
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
+9. The [settings](../use/plugins.md#settings), with the echo playing. Record
+   where the window shows Gain and Mix and how it shows their values. Set
+   Gain to −12 dB: the level drops smoothly, without a click. Set Mix to 0%:
+   you hear the dry track; 50% mixes the two. Save, quit and reopen the
+   project: both values come back, and the log's `Loaded a filter ...` line
+   after the reopening ends with
+   `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the
+   plug-in with the defaults before restoring the project, so the
+   `Started at ...` line just before it shows 0 dB and 100%).
 
 ## Production qualification
 

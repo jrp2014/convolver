@@ -24,6 +24,8 @@ and are maintained here.
   log, LV2's status port and, later, a status display in the other formats.
 - Bypass ramps over 64 samples to the input delayed by the latency, or to
   silence when the counts differ.
+- Gain and mix are host parameters whose defaults keep the sound unchanged
+  ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
   prepared elsewhere and handed over.
 
@@ -37,7 +39,7 @@ optimization in every adapter.
 Contents: [loading and failure](#loading-and-failure) ·
 [failure reasons](#failure-reasons) ·
 [initial restoration and live replacement](#initial-restoration-and-live-replacement) ·
-[bypass](#bypass) · [channel layouts](#channel-layouts) ·
+[bypass](#bypass) · [settings](#settings) · [channel layouts](#channel-layouts) ·
 [replacement and threads](#replacement-and-threads) · [host state](#host-state) ·
 [preset files](#preset-files) · [format notes](#format-notes)
 
@@ -270,6 +272,49 @@ Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
 bypass itself, so those adapters do not record it and ignore the flag in a
 state from another format.
 
+## Settings
+
+PLUG-10, from the [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings),
+whose choices jrp made on 24 and 25 October 2026
+([decisions](../project/decisions.md#identities-and-file-formats)). Every
+adapter offers the same settings as host parameters, so they work in generic
+host controls, automation and host presets without a window. The defaults
+(gain 0 dB, mix 100%) leave every output sample exactly as it was before the
+settings existed, which `native.host_settings` checks bit for bit. The
+first version has Gain and Mix only (jrp asked to keep it simple, 25 October
+2026); the plan's Gain modes, Latency choice and meters follow later
+([TODO PLUG-10](../../TODO.md)).
+
+- **The shared code.** `HostSettings` in
+  [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
+  the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
+  `set_mix()` are audio-thread calls like `set_bypass()`, and each change
+  ramps linearly over 64 frames.
+- **Gain** applies to the filtered signal, after convolution and before the
+  mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
+  in decibels (jrp). During a replacement both filters play at the same gain.
+- **Mix** is the filtered share, 0 to 1, of the output before bypass; the
+  rest is the latency-aligned dry signal that bypass uses. With unequal input
+  and output counts there is no dry signal ([bypass](#bypass)), so the mix is
+  always 1. Like bypass, a mix below 1 still passes its dry share while a
+  failed first load plays silence (equal counts only).
+- **Saved form:** each format's own way. The Audio Unit's parameters are
+  saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
+  in host state version 3, written only when a setting differs from its
+  default (VST3-4); LV2 will add control ports (LV2-7). A preset from
+  `convolver-preset` carries the filter only, and a state moved between
+  formats carries the filter but not the settings, as
+  [how the plug-ins behave](../use/plugins.md#settings) tells users.
+- **Audio Unit (AU-7).** Global parameters Gain (0, decibels) and Mix (1003,
+  percent), listed before Status. Values a host writes are stored within
+  their ranges, and Render hands both to the processor on every call.
+  `RestoreState` reads the parameter values from "data" itself, with bounds
+  checks (AUBase's reader has none), and applies them only when the filter is
+  accepted; it ignores Status and unknown IDs, keeps settings the state does
+  not hold (a `convolver-preset` preset has an empty "data"), and keeps both
+  when "data" is malformed (and logs it). The start line in the log lists the
+  settings (`started_line()` with `settings_words()`).
+
 ## Channel layouts
 
 What a channel means (discrete or a named speaker layout), how presets with no
@@ -358,9 +403,9 @@ loading. These names are permanent, like the
 - **AU (`.aupreset`):** an XML property list, the dictionary that Audio Units
   save as `ClassInfo`. It has Apple's standard keys (`version` 0, `type`,
   `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,
-  `name`) and an empty `data`, since the AU has no parameters, so the
-  AudioUnitSDK's own checks accept it. The encoded state is under the key
-  `convolver-state`.
+  `name`) and an empty `data`, so the AudioUnitSDK's own checks accept it
+  and the unit's [settings](#settings) keep their values when it is loaded.
+  The encoded state is under the key `convolver-state`.
 - **LV2 (`NAME.preset.lv2/`):** a preset bundle with `manifest.ttl` and
   `preset.ttl`. The preset is a `pset:Preset` that applies to the plug-in URI
   for the filter's channel counts, with one state property, the LV2 base URI

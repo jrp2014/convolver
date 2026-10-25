@@ -21,9 +21,15 @@ inline constexpr UInt32 max_channels = identity::max_channels;
 // DIAG-1: the read-only Status parameter, an indexed HostStatus whose current
 // value reads (kAudioUnitProperty_ParameterStringFromValue) as the unit's
 // HostStatusLine. AUBase::SaveState writes its value with the other
-// parameters, but RestoreState ignores parameter data, so it never comes back.
+// parameters, but RestoreState ignores it, so it never comes back.
 // Its ID comes from plugins/identities.json; never change it.
 inline constexpr AudioUnitParameterID status_parameter = identity::au_status_parameter_id;
+// AU-7: PLUG-10's settings as global parameters, saved by AUBase::SaveState
+// with ClassInfo and restored by RestoreState (docs/develop/plugin-contract.md#settings):
+// Gain in dB (min_gain_db to max_gain_db) and Mix in percent. IDs from
+// plugins/identities.json; never change them.
+inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
+inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
@@ -64,10 +70,13 @@ class Effect final : public ausdk::AUBase {
     OSStatus GetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, void*) override;
     OSStatus SetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void*,
                          UInt32) override;
+    // Settings first, Status last, as generic host views list them.
+    OSStatus GetParameterList(AudioUnitScope, AudioUnitParameterID*, UInt32&) override;
     OSStatus GetParameterInfo(AudioUnitScope, AudioUnitParameterID,
                               AudioUnitParameterInfo&) override;
     OSStatus GetParameterValueStrings(AudioUnitScope, AudioUnitParameterID, CFArrayRef*) override;
-    // The Status parameter is read-only: a host's write is ignored.
+    // The Status parameter is read-only: a host's write is ignored. Gain and
+    // Mix are stored within their ranges; Render hands them to the processor.
     OSStatus SetParameter(AudioUnitParameterID, AudioUnitScope, AudioUnitElement,
                           AudioUnitParameterValue, UInt32) AUSDK_RTSAFE override;
 
@@ -103,6 +112,8 @@ class Effect final : public ausdk::AUBase {
     std::string rejection_line();
     // What the Status parameter shows (DIAG-1).
     HostStatusLine status();
+    // AU-7: the settings the parameters hold, within their ranges.
+    HostSettings settings();
 
   private:
     HostLayout layout();
@@ -131,6 +142,8 @@ class Effect final : public ausdk::AUBase {
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
+    // AU-7: stores a Gain or Mix value clamped to its range.
+    void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.

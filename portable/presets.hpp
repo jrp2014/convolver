@@ -21,8 +21,9 @@ std::optional<Format> format_for(const std::filesystem::path&);
 
 // Permanent names (owner's decision, 22 October 2026): AU-2 and LV2-2 read
 // the encoded host state (bare, without VST3's length prefix) from these.
-// The AU ClassInfo dictionary keeps Apple's standard keys (an empty "data",
-// since the AU has no parameters, so AUBase::RestoreState still works) and adds:
+// The AU ClassInfo dictionary keeps Apple's standard keys (an empty "data", so
+// AUBase::RestoreState still works and the unit's settings keep their values)
+// and adds:
 inline constexpr std::string_view au_state_key = "convolver-state";
 // LV2 state property, an atom:Chunk (xsd:base64Binary in Turtle): the base URI
 // from plugins/identities.json followed by this.

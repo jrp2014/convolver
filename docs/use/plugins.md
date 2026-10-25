@@ -17,17 +17,20 @@ does not fit. Installing is in [install](install.md); making presets is in
   LV2 also by choosing a file), and the host saves the filter inside your
   project. A read-only Status parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
-- Latency is always 256 samples, and the host makes up for it.
+- Latency is always 256 samples, and the host makes up for it. The Audio
+  Unit has [settings](#settings) for the gain and the wet/dry mix; the VST3
+  and LV2 plug-ins do not have them yet.
 - A filter that does not fit the host's sample rate or channel counts never
-  lets unfiltered audio through: a first filter that does not fit plays
-  silence, and one that replaces a working filter is refused, leaving the
-  working filter playing.
+  lets unfiltered audio through (unless you bypass the plug-in or set its
+  Mix below 100%): a first filter that does not fit plays silence, and one
+  that replaces a working filter is refused, leaving the working filter
+  playing.
 
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
 [when a filter does not fit](#when-a-filter-does-not-fit) ·
 [status and the Convolver log](#status-and-the-convolver-log) ·
-[latency and tail](#latency-and-tail) · [bypass](#bypass) ·
+[settings](#settings) · [latency and tail](#latency-and-tail) · [bypass](#bypass) ·
 [replacing a filter](#replacing-a-filter) · [audio](#audio) ·
 [LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
 [LV2 filter files](#lv2-filter-files) ·
@@ -44,6 +47,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Choose a `.cfg` or IR file directly | No | No | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
+| [Settings](#settings): gain, mix | Not yet | Yes | Not yet |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -207,6 +211,30 @@ started. Setting the environment variable `CONVOLVER_LOG` to a file path
 sends the log there instead; on macOS and Linux, setting it empty turns the file off (the Status text
 still points to the log; on macOS the lines are in the system log). LV2 has
 no file of its own: it writes to the host's log.
+
+## Settings
+
+The Audio Unit has two settings, which hosts show with its other parameters
+(in GarageBand and Logic, in the plug-in window's generic controls). Their
+defaults play exactly as Convolver did before the settings existed.
+
+| Setting | Values | Default | What it does |
+| --- | --- | --- | --- |
+| **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
+
+- Changes fade over 64 samples, so automating them does not click.
+- The host saves the settings in the project and in presets it saves itself.
+  A preset made by `convolver-preset` holds the filter only, so loading it
+  leaves the settings as they are. The
+  [Convolver log](#status-and-the-convolver-log) lists the settings each
+  time the plug-in starts, and again when it restores saved settings (some
+  hosts, GarageBand among them, start the plug-in before restoring the
+  project).
+- **Settings and other formats.** The VST3 and LV2 plug-ins have no settings
+  yet, so a filter moved to them from an Audio Unit project or preset plays
+  at 0 dB, fully wet. The same project can therefore sound different in
+  another format.
 
 ## Latency and tail
 

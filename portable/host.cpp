@@ -488,6 +488,18 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     return line;
 }
 
+namespace {
+float gain_from_db(double db) noexcept {
+    return static_cast<float>(std::pow(10.0, db / 20));
+}
+double clamp_gain_db(double db) noexcept {
+    return std::isnan(db) ? 0 : std::clamp(db, min_gain_db, max_gain_db);
+}
+double clamp_mix(double mix) noexcept {
+    return std::isnan(mix) ? 1 : std::clamp(mix, 0.0, 1.0);
+}
+} // namespace
+
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
@@ -524,6 +536,12 @@ struct HostProcessor::Impl {
     }
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
+    // PLUG-10: the gain and mix the adapter set (audio thread), and the values
+    // playing, which ramp to them over 64 frames.
+    double set_db = 0;
+    std::size_t gain_ramp = 0, mix_ramp = 0;
+    float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
+    float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
     float dry_mix = 0;
     // mute(): the current filter's level ramps to 0; the level of the filter
     // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
@@ -535,7 +553,8 @@ struct HostProcessor::Impl {
     std::uint64_t muted_through = 0;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
-    Impl(const Configuration& c, std::size_t maximum_, std::size_t block_)
+    Impl(const Configuration& c, std::size_t maximum_, std::size_t block_,
+         const HostSettings& settings = {})
         : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
           maximum(maximum_), block(block_) {
         if (!inputs || !outputs || inputs > 256 || outputs > 256 || !maximum ||
@@ -548,6 +567,27 @@ struct HostProcessor::Impl {
         dry.resize(outputs * block);
         tail.store(prepared->engine.tail_frames());
         current = prepared.release();
+        set_db = clamp_gain_db(settings.gain_db);
+        set_gain = gain = gain_target = gain_from_db(set_db);
+        mix_setting = static_cast<float>(clamp_mix(settings.mix));
+        mix = mix_target = target_mix();
+    }
+    float target_mix() const noexcept {
+        return inputs == outputs ? mix_setting : 1.f;
+    }
+    // Audio thread, at the start of a call: a new gain or mix starts a
+    // 64-frame ramp.
+    void retarget() noexcept {
+        if (set_gain != gain_target) {
+            gain_target = set_gain;
+            gain_step = (gain_target - gain) / 64;
+            gain_ramp = 64;
+        }
+        if (const auto t = target_mix(); t != mix_target) {
+            mix_target = t;
+            mix_step = (t - mix) / 64;
+            mix_ramp = 64;
+        }
     }
     ~Impl() {
         delete current;
@@ -609,6 +649,10 @@ struct HostProcessor::Impl {
         warm = 0;
         fade = 0;
         dry_mix = bypass ? 1.f : 0.f;
+        // The stream starts again: the settings apply at once, without ramps.
+        gain = gain_target = set_gain;
+        mix = mix_target = target_mix();
+        gain_ramp = mix_ramp = 0;
     }
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
@@ -641,6 +685,7 @@ struct HostProcessor::Impl {
                 level = muted ? 0.f : 1.f;
             }
         }
+        retarget();
         started = true;
         bool invalid_input = false;
         for (std::size_t t = 0; t < frames; ++t)
@@ -680,6 +725,14 @@ struct HostProcessor::Impl {
                 }
             }
             dry_mix = std::clamp(dry_mix + (bypass ? 1.f / 64 : -1.f / 64), 0.f, 1.f);
+            if (gain_ramp && --gain_ramp)
+                gain += gain_step;
+            else
+                gain = gain_target;
+            if (mix_ramp && --mix_ramp)
+                mix += mix_step;
+            else
+                mix = mix_target;
             if (muted)
                 level = std::max(0.f, level - 1.f / 64);
             if (previous_muted)
@@ -696,6 +749,11 @@ struct HostProcessor::Impl {
                 double value = level * static_cast<double>(wet[index]);
                 if (previous)
                     value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
+                // Gain 1 and mix 1 (the defaults) leave every value exactly
+                // as it was before the settings existed.
+                value *= gain;
+                if (mix != 1)
+                    value = mix * value + (1.0 - mix) * dry_value;
                 value = (1.0 - dry_mix) * value + dry_mix * dry_value;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {
                     value = 0;
@@ -722,6 +780,9 @@ struct HostProcessor::Impl {
 };
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
     : impl_(std::make_unique<Impl>(c, maximum, block)) {}
+HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
+                             const HostSettings& settings, std::size_t block)
+    : impl_(std::make_unique<Impl>(c, maximum, block, settings)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);
@@ -757,6 +818,16 @@ void HostProcessor::reset() noexcept {
 }
 void HostProcessor::set_bypass(bool value) noexcept {
     impl_->bypass = value;
+}
+void HostProcessor::set_gain_db(double db) noexcept {
+    db = clamp_gain_db(db);
+    if (db == impl_->set_db)
+        return;
+    impl_->set_db = db;
+    impl_->set_gain = gain_from_db(db);
+}
+void HostProcessor::set_mix(double mix) noexcept {
+    impl_->mix_setting = static_cast<float>(clamp_mix(mix));
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);

@@ -301,6 +301,21 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true);
 
+// PLUG-10: the settings every adapter offers as host parameters
+// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
+// it was before the settings existed.
+inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
+struct HostSettings {
+    // The filtered signal's gain in decibels, within min_gain_db and
+    // max_gain_db (clamped there by HostProcessor).
+    double gain_db = 0;
+    // The share of the filtered signal, 0 to 1; the rest is the input delayed
+    // by the latency. Ignored (always 1) when input and output counts differ,
+    // as there is no dry signal (the bypass rule). Clamped to 0..1.
+    double mix = 1;
+    bool operator==(const HostSettings&) const = default;
+};
+
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, prepare, publish, collect, destruction;
@@ -310,6 +325,9 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
+    // PLUG-10: with the settings (gain and mix) applied from the first frame.
+    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
+                  std::size_t block = 256);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -344,6 +362,11 @@ class HostProcessor {
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
     void set_bypass(bool) noexcept;
+    // PLUG-10, audio thread, like set_bypass: the gain in decibels (clamped
+    // to min_gain_db..max_gain_db) and the mix (0 to 1, ignored for unequal
+    // counts). Each change ramps over 64 frames.
+    void set_gain_db(double) noexcept;
+    void set_mix(double) noexcept;
     // Audio thread: the current filter ramps to silence over 64 frames and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
