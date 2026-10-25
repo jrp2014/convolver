@@ -748,8 +748,8 @@ long enough for the history to fill again; ns/frame is their average.
 - **B = 257** costs about 1.17 times B = 256 when warm here, because the FFTW
   backend transforms 2B = 514 points. The Accelerate and Ooura backends round
   the transform up to a power of two (1024), which is why jrp measured about
-  1.82 times on Accelerate. The plug-ins use B = 256; a user-selectable block
-  size (PERF-2) should offer powers of two.
+  1.82 times on Accelerate. The plug-ins use B = 256; the planned Latency setting
+  (PLUG-10) offers powers of two only.
 
 Loading a 2→6 crossover whose six paths each name a channel of one six-channel
 65,536-frame float WAV (as `examples/first-use/crossover` does at a smaller

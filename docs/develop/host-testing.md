@@ -42,7 +42,7 @@ Host facts were checked on 23 October 2026.
 | --- | --- | --- | --- | --- |
 | [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
 | [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track |
-| GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, and GarageBand offers only the stereo version of an effect, so only the `44100-stereo` presets apply. Preview packages hold no Audio Unit yet, so build it from source |
+| GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, and GarageBand offers only the stereo version of an effect, so only the `44100-stereo` presets apply. Preview packages hold no Audio Unit yet (AU-5 adds it for the first preview), so build it from source |
 
 Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
 [TODO](../../TODO.md), with the details in [every report](#every-report).
@@ -127,7 +127,7 @@ These are tools for developers, not evidence that a DAW works.
   that the validator and pluginval do not already catch. (The SDK's third
   sample, the VST3 Inspector, only lists a plug-in's class information.)
   - `editorhost` only opens a plug-in's own editor window. Convolver has no
-    editor (VST3-3 is deferred), so it stops at once with "EditController does
+    editor yet (planned in VST3-3 and VST3-11), so it stops at once with "EditController does
     not provide its own editor". It becomes worth a smoke test only if an editor
     is added, and pluginval's GUI tests (skipped in CI today with
     `--skip-gui-tests`) could cover the same ground instead.
