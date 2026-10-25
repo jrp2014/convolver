@@ -253,16 +253,18 @@ results for its older baseline `5df874e`; it is not current validation evidence.
 Consult the [native workflow](../../.github/workflows/regression.yml) and
 [VST3 workflow](../../.github/workflows/vst3.yml) for the configured matrix; a workflow
 file alone is not evidence that a job passed. The [LV2](../../.github/workflows/lv2.yml)
-workflow installs the
-[pinned format tools](build.md#pinned-format-dependencies) and checks
+workflow installs the newest
+[format tools](build.md#supporting-libraries) and checks
 them on LV2's example plug-ins, then builds Convolver's bundle and runs the
 LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
-against the pinned AudioUnitSDK, runs its CTest tests and `auval -strict` on
+against the newest AudioUnitSDK, runs its CTest tests and `auval -strict` on
 it ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
-entry: see [which configurations run which tests](#which-configurations-run-which-tests). The weekly [Dependency updates](../../.github/workflows/updates.yml)
-workflow reports newer releases of those pins; it tests nothing in Convolver.
+entry: see [which configurations run which tests](#which-configurations-run-which-tests). These
+workflows and the candidate workflow also run every Monday, so a new upstream
+release of an SDK or tool is tested within a week even when Convolver has not
+changed; each job's summary lists the versions it used.
 
 ## Plug-in comparisons (PLUG-2)
 
@@ -470,17 +472,19 @@ JUCE-based host that runs headless. It is downloaded separately, never linked
 into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to
 add:
 
-- `vst3.pluginval`: `pluginval validate --strictness-level 10 --skip-gui-tests`.
-  Open and close, state save and restore, bus layouts, parameter fuzzing and
-  thread safety, allocations during processing and oversized blocks, at several
-  sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS` adds options; CI adds
-  `--rtcheck;relaxed` on macOS, where pluginval can flag real-time-unsafe calls
-  in process callbacks.
+- `vst3.pluginval`: pluginval's validation at `--strictness-level 10
+  --skip-gui-tests` (`pluginval validate` in pluginval 2, `--validate` in
+  pluginval 1). Open and close, state save and restore, bus layouts, parameter
+  fuzzing and thread safety, allocations during processing and oversized
+  blocks, at several sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS`
+  adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
+  can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
   size 300) and a cross-feed `.cfg` (block size 61), loads each through the
   host's state call, renders noise with `pluginval test`, and compares the
   output with a direct double-precision convolution delayed by 256 samples
-  (tolerance 1e-5). A second render must match the first exactly.
+  (tolerance 1e-5). A second render must match the first exactly. It needs
+  pluginval 2's `test` command and skips itself with pluginval 1.
 
 [`tests/vst3/pluginval_tests.py`](../../tests/vst3/pluginval_tests.py) runs
 both. On Linux it uses `xvfb-run` when there is no display (JUCE needs an X
@@ -488,7 +492,12 @@ server). JUCE's host only accepts state in its own wrapper (an XML document
 holding the component state in JUCE's base64 variant), so the script converts
 the preset's component chunk; given raw component state, JUCE leaves the
 plug-in empty and it passes delayed dry audio, which the acceptance comparison
-would catch. CI pins pluginval 2.0.0-beta3 by checksum. The VST3 CI matrix runs
+would catch. CI's formal run uses the newest full pluginval release (1.0.4 in
+October 2026) and records its version and checksum in the job summary. A
+newer pre-release (2.0.0-beta3) then runs both tests again: its validation
+findings are warnings, but the acceptance test must pass, because no full
+release can run it yet
+([pre-releases](build.md#pre-releases-and-newer-upstream-versions)). The VST3 CI matrix runs
 on Linux, Windows and macOS. None of this proves hard real-time deadlines or
 compatibility with every DAW; see [host testing](host-testing.md).
 
@@ -553,7 +562,7 @@ AU-4.
 The [LV2 workflow](../../.github/workflows/lv2.yml) runs these under ASan and
 UBSan, runs `lv2.adapter` again under ThreadSanitizer for the worker's threads,
 and runs `lv2lint` on every plug-in in the bundle, with the
-[pinned packages](build.md#pinned-format-dependencies). The three run as
+newest [packages](build.md#supporting-libraries). The three run as
 separate jobs side by side; the sanitizer jobs build only what their tests run
 (the `convolver_lv2_tests` target, or the adapter test and the preset tool).
 lilv's `lv2apply` cannot host Convolver: it offers plug-ins no features, and
@@ -721,8 +730,8 @@ open validation gaps and intentional constraints.
 
 The native tests link actual production translation units and actual
 libraries. The earlier October 2026 local test setup used these sources; they
-are not dependency pins for current builds (those are in
-[build from source](build.md#pinned-format-dependencies)):
+are not the versions current builds use (those take the newest releases; see
+[build from source](build.md#supporting-libraries)):
 
 - FFTW 3.3.11, archive SHA256
   `5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1`.

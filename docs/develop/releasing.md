@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Releasing
 
-[Documentation index](../README.md) · [Build from source](build.md#pinned-preview-recipe) ·
+[Documentation index](../README.md) · [Build from source](build.md#preview-recipe) ·
 [Host testing](host-testing.md) · [Status](../project/status.md)
 
 For jrp and anyone preparing a release: how candidate packages are made, how an
@@ -26,8 +26,9 @@ Contents: [candidates](#candidates) ·
 ## Candidates
 
 The [release workflow](../../.github/workflows/release.yml) ("Plug-in
-distribution candidates") downloads checksum-pinned dependencies, builds and
-tests each platform with the [pinned preview recipe](build.md#pinned-preview-recipe),
+distribution candidates") downloads the newest release of each dependency into
+one source bundle, recording each version, commit and checksum, then builds and
+tests each platform from that bundle with the [preview recipe](build.md#preview-recipe),
 and uploads unsigned packages with corresponding source. It has read-only
 repository permissions. Version numbers come from the root `VERSION` file.
 
@@ -45,8 +46,10 @@ work because it links.
 Each run records the compiler, runtime choice, architecture, backend, system
 build, runtime dependency inventory, source commit, source-archive checksum and
 file hashes. The CI logs and artifact manifests are the authoritative record.
-The source bundle holds the pinned SDKs, FFTW and libsndfile sources, the build
-materials and notices, and rebuilds without fetching anything.
+The source bundle holds the SDK, FFTW and libsndfile sources it was built from
+(its `source-manifest.json` records each release, commit and checksum), the
+build materials and notices, and rebuilds without fetching anything. The
+candidate record names the NSIS release that made the Windows installer.
 
 ### Debugging symbols
 
@@ -79,8 +82,9 @@ address> <addresses>`, or let the crash reporter find it by UUID; on Linux, use
 Windows, add the folder to the debugger's symbol path.
 
 Which formats a package contains is decided by PLUG-5 in [TODO](../../TODO.md);
-the pins are in [`release-policy.json`](../../packaging/release-policy.json)
-and [build from source](build.md#pinned-format-dependencies).
+where each dependency comes from is in
+[`release-policy.json`](../../packaging/release-policy.json), and how builds
+choose and record releases in [build from source](build.md#supporting-libraries).
 
 ## Publishing an unsigned preview
 
@@ -173,7 +177,7 @@ and `sign-windows.ps1`.
 Convolver, and FFTW when a build selects it, are GPL-2.0-or-later; the Audio
 Unit is distributed under GPL-3.0-or-later because of AudioUnitSDK's Apache-2.0
 licence ([Audio Unit licence](../use/plugins.md#audio-unit-licence));
-libsndfile is LGPL-2.1-or-later; the pinned VST3 SDK is MIT; the built-in Ooura
+libsndfile is LGPL-2.1-or-later; the VST3 SDK is MIT; the built-in Ooura
 FFT has a permissive notice, shipped as `licenses/Ooura.txt`. Packages include
 the upstream author and licence files, and FFTW's notice only in builds that use
 it.

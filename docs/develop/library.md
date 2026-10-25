@@ -217,4 +217,4 @@ The `release-vst3` preset enables the separate `PluginDistribution` installation
 component. It stages the SDK bundle, `convolver-preset`, `convolver-equalizer-apo`, presets,
 notices and user guide (with the presets and Equalizer APO guides);
 it does not replace the C++ library exports above. See the
-[pinned source recipe](build.md) and [preview qualification record](releasing.md).
+[source recipe](build.md#preview-recipe) and [preview qualification record](releasing.md).

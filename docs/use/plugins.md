@@ -178,7 +178,7 @@ starts with the time, the Convolver version, the format and instance (`VST3 #2`)
 the host program and its process number. Loads and refusals are numbered
 (`Request 3:`), so you can follow a sequence of presets. The first line each
 time a host starts Convolver says what is running: the version, the FFT
-library, the CPU kernels and the process. When something does not work, send
+library, the CPU kernels, the plug-in SDK it was built with (VST3 and Audio Unit) and the process. When something does not work, send
 this file with your report.
 
 If the file cannot be written (its folder cannot be created or written to, or

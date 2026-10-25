@@ -557,6 +557,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **CI-5 — No actions on a deprecated Node.js.** 24 October 2026, PR #76:
   an inline MSVC developer-environment step replaces `ilammy/msvc-dev-cmd`, and
   `ccache-action` uses its newest exact release; [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
+- [x] **CI-6 — Keep supporting libraries on their newest releases.** 24
+  October 2026, PR #77, by jrp's decision: builds resolve the newest release of
+  each SDK, library and tool instead of a pin, and record version, commit and
+  checksum in the job summary, source and artifact manifests and, for VST3 and
+  AU, the Convolver log; `sources.py --lock` repeats a recorded build. Formal
+  tests use full releases; newer pre-releases (pluginval 2.0 beta) and
+  upstream lilv run as advisory checks;
+  [supporting libraries](docs/develop/build.md#supporting-libraries).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
@@ -601,7 +609,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PLUG-4 — Layouts and identities.** 22 October 2026, PR #27;
   [plug-in identities](docs/develop/plugin-identities.md).
 - [x] **PLUG-6 — Pin format dependencies.** 22 October 2026, PR #31;
-  [pinned format dependencies](docs/develop/build.md#pinned-format-dependencies).
+  [supporting libraries](docs/develop/build.md#supporting-libraries); replaced by CI-6.
 - [x] **PLUG-7 — Lifecycle sequence tests.** 23 October 2026, PR #58;
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
