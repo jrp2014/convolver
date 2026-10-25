@@ -316,6 +316,15 @@ void diagnostics_follow_settings() {
          "audio passes at -5.2 dB",
          "audio passes at -5.2 dB",
          HostStatus::no_filter},
+        {"no filter, gain -0.01 dB",
+         mono,
+         false,
+         false,
+         {-.01, 1},
+         static_cast<float>(.5 * std::pow(10.0, -.01 / 20)),
+         "audio passes at -0.01 dB",
+         "audio passes at -0.01 dB",
+         HostStatus::no_filter},
         {"no filter, gain -20 dB, mix 0%",
          mono,
          false,
@@ -429,6 +438,15 @@ void diagnostics_follow_settings() {
         require(c.heard == .5f || c.filter_loaded || !contains(line.text, "unchanged"),
                 std::string(c.what) + ": says unchanged, but the level changed");
     }
+    // A filter the adapter could not start has no processor: nothing plays,
+    // whatever Mix says (the independent review).
+    HostFilter unstarted;
+    unstarted.load(HostState{Configuration{48000, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}}},
+                   mono);
+    unstarted.fail_activation("no memory");
+    const auto failed_start = host_status(unstarted, mono, true, HostSettings{0, .5});
+    require(contains(failed_start.text, "Silent: the plug-in could not start the filter."),
+            "activation failure at Mix 50%: " + failed_start.text);
     // Before the host is known, a refused first load cannot say whether
     // Mix's dry share will play (it does only with equal counts).
     HostFilter unknown;

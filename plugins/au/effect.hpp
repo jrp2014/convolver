@@ -142,6 +142,9 @@ class Effect final : public ausdk::AUBase {
     // notify_status() then tells listeners, outside the lock, as they may
     // call back into the unit.
     void update_status() noexcept;
+    // Under `control_`: the status text again, for the current Gain and Mix,
+    // leaving the Status value alone (PLUG-10).
+    void refresh_status_text() noexcept;
     void notify_status() noexcept;
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
