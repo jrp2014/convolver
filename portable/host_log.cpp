@@ -152,6 +152,17 @@ std::string rejected_line(const HostFilter& filter) {
     return r ? request_words(r->request) + r->message : std::string();
 }
 
+std::string settings_words(const HostSettings& s, bool equal_counts) {
+    char gain[32] = {};
+    std::snprintf(gain, sizeof gain, "gain %g dB", s.gain_db);
+    if (!equal_counts)
+        return std::string(gain) +
+               ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
+    char mix[32] = {};
+    std::snprintf(mix, sizeof mix, ", mix %g%% wet", 100 * s.mix);
+    return std::string(gain) + mix;
+}
+
 std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,
                          const HostSettings* settings) {
     auto line = "Started at " + std::to_string(host.sample_rate) + " Hz, " +

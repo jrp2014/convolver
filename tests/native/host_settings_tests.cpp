@@ -228,6 +228,12 @@ void ramps() {
     host.set_gain_db(std::numeric_limits<double>::quiet_NaN());
     out = per_sample(host, 100);
     require(std::abs(out[99] - 1) < 1e-6, "a gain that is not a number should play 0 dB");
+    // After a reset the stream starts again: a new gain applies at once.
+    host.set_gain_db(-20);
+    host.reset();
+    out = per_sample(host, 200);
+    require(out[63] == 0 && std::abs(out[64] - std::pow(10.0, -1.0)) < 1e-6,
+            "gain after a reset should apply without a ramp");
 }
 
 // With unequal counts there is no dry signal, so the mix stays 100% wet.
@@ -250,15 +256,9 @@ void unequal_mix() {
 }
 
 void settings_text() {
-    HostSettings s;
-    require(checked_settings(s) == s, "defaults are valid");
-    s.gain_db = -500;
-    s.mix = 2;
-    const auto c = checked_settings(s);
-    require(c.gain_db == min_gain_db && c.mix == 1, "settings not clamped");
     require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet",
             "settings words: " + settings_words(HostSettings{}, true));
-    s = HostSettings{-6, .5};
+    HostSettings s{-6, .5};
     require(settings_words(s, true) == "gain -6 dB, mix 50% wet",
             "settings words: " + settings_words(s, true));
     require(settings_words(s, false).find("no dry signal") != std::string::npos,

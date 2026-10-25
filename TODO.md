@@ -363,6 +363,15 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   carry the version; `auval` lists the view; GarageBand smoke steps, including
   a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
   Needed for the first preview.
+- [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
+  mode, mix and latency as global parameters (IDs beside Status 1001 in
+  `plugins/identities.json`), latency indexed and not automatable, with
+  latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  Needed for the first preview.
+  Progress (25 October 2026, PR #80): Gain (0) and Mix (1003), saved in
+  `ClassInfo` ([settings](docs/use/plugins.md#settings)). Remaining, with
+  PLUG-10's deferred parts: Gain mode (1002) and Latency (1004), with the
+  latency change notification.
 
 ## FFmpeg integration
 
@@ -646,10 +655,6 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `ClassInfo` under `convolver-state`, and `.aupreset` files from the preset
   tool; loading one from a named host's preset menu is checked under AU-4;
   [presets](docs/use/presets.md).
-- [x] **AU-7 — Settings as Audio Unit parameters.** 25 October 2026, PR #80:
-  Gain and Mix (the gain modes and Latency follow with PLUG-10's rest);
-  [settings](docs/use/plugins.md#settings),
-  [contract](docs/develop/plugin-contract.md#settings).
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:

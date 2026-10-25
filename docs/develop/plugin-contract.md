@@ -285,9 +285,9 @@ first version has Gain and Mix only (jrp asked to keep it simple, 25 October
 2026); the plan's Gain modes, Latency choice and meters follow later
 ([TODO PLUG-10](../../TODO.md)).
 
-- **The shared code.** `HostSettings`, `checked_settings()` and
-  `settings_words()` in [`host.hpp`](../../include/convolver/host.hpp).
-  `HostProcessor` takes the settings at construction; `set_gain_db()` and
+- **The shared code.** `HostSettings` in
+  [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
+  the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
   ramps linearly over 64 frames.
 - **Gain** applies to the filtered signal, after convolution and before the
@@ -296,7 +296,8 @@ first version has Gain and Mix only (jrp asked to keep it simple, 25 October
 - **Mix** is the filtered share, 0 to 1, of the output before bypass; the
   rest is the latency-aligned dry signal that bypass uses. With unequal input
   and output counts there is no dry signal ([bypass](#bypass)), so the mix is
-  always 1.
+  always 1. Like bypass, a mix below 1 still passes its dry share while a
+  failed first load plays silence (equal counts only).
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
   in host state version 3, written only when a setting differs from its

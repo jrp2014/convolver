@@ -54,6 +54,9 @@ std::string loaded_line(const HostFilter&, bool host_known);
 // After a rejected load: HostFilter::rejection()'s message, numbered as
 // loaded_line() numbers accepted ones ("Request 3: "); empty if there is none.
 std::string rejected_line(const HostFilter&);
+// PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
+// `equal_counts` false says the mix does not apply.
+std::string settings_words(const HostSettings&, bool equal_counts);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them

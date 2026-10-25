@@ -138,7 +138,7 @@ HostSettings Effect::settings() {
     HostSettings s;
     s.gain_db = Globals()->GetParameterRT(gain_parameter);
     s.mix = Globals()->GetParameterRT(mix_parameter) / 100.0;
-    return checked_settings(s);
+    return s; // Within range: store() clamps every value.
 }
 
 void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexcept {

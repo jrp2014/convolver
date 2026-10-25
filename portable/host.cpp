@@ -6,7 +6,6 @@
 #include <atomic>
 #include <bit>
 #include <cmath>
-#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -500,23 +499,6 @@ double clamp_mix(double mix) noexcept {
     return std::isnan(mix) ? 1 : std::clamp(mix, 0.0, 1.0);
 }
 } // namespace
-
-HostSettings checked_settings(HostSettings s) {
-    s.gain_db = clamp_gain_db(s.gain_db);
-    s.mix = clamp_mix(s.mix);
-    return s;
-}
-
-std::string settings_words(const HostSettings& s, bool equal_counts) {
-    char gain[32] = {};
-    std::snprintf(gain, sizeof gain, "gain %g dB", s.gain_db);
-    if (!equal_counts)
-        return std::string(gain) +
-               ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    char mix[32] = {};
-    std::snprintf(mix, sizeof mix, ", mix %g%% wet", 100 * s.mix);
-    return std::string(gain) + mix;
-}
 
 struct HostProcessor::Impl {
     struct Prepared {

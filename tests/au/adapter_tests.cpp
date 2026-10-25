@@ -374,7 +374,7 @@ void rejected_presets() {
     still_kept("state from a newer Convolver");
     recorded(HostFailureKind::state_newer, 0, false, "state from a newer Convolver");
     // AUBase reads "data" (parameter values) without bounds checks; this unit
-    // ignores it (its one parameter, Status, is read-only), so a damaged one is harmless.
+    // reads it itself with them, so a damaged one is harmless.
     require(modified([&](CFMutableDictionaryRef d) {
                 const UInt8 junk[] = {0, 0, 0, 0, 0xff, 0xff, 0xff};
                 const auto data = CFDataCreate(nullptr, junk, sizeof junk);
@@ -663,7 +663,7 @@ void settings_parameters() {
             "settings not restored");
     check(copy.initialize(), "copy initialization");
     require(std::abs(steady_output(copy, 3) - (.5 * .25 * gain + .25)) < 1e-5,
-            "restored settings not applied from the first frame");
+            "restored settings not applied");
     // A preset from convolver-preset has no parameter values: settings keep theirs.
     check(copy.load(state_of(half)), "preset without settings");
     require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,

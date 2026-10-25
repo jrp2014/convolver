@@ -306,20 +306,15 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 // it was before the settings existed.
 inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
 struct HostSettings {
-    // Output gain in decibels, within min_gain_db and max_gain_db.
+    // The filtered signal's gain in decibels, within min_gain_db and
+    // max_gain_db (clamped there by HostProcessor).
     double gain_db = 0;
     // The share of the filtered signal, 0 to 1; the rest is the input delayed
     // by the latency. Ignored (always 1) when input and output counts differ,
-    // as there is no dry signal (the bypass rule).
+    // as there is no dry signal (the bypass rule). Clamped to 0..1.
     double mix = 1;
     bool operator==(const HostSettings&) const = default;
 };
-// gain_db clamped to its range (0 if not a number), mix to 0..1 (1 if not a
-// number).
-HostSettings checked_settings(HostSettings);
-// The settings in words for the log, such as "gain 0 dB, mix 100% wet".
-// `equal_counts` false says the mix does not apply.
-std::string settings_words(const HostSettings&, bool equal_counts);
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.

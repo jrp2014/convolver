@@ -21,9 +21,10 @@ does not fit. Installing is in [install](install.md); making presets is in
   Unit has [settings](#settings) for the gain and the wet/dry mix; the VST3
   and LV2 plug-ins do not have them yet.
 - A filter that does not fit the host's sample rate or channel counts never
-  lets unfiltered audio through: a first filter that does not fit plays
-  silence, and one that replaces a working filter is refused, leaving the
-  working filter playing.
+  lets unfiltered audio through (unless you bypass the plug-in or set its
+  Mix below 100%): a first filter that does not fit plays silence, and one
+  that replaces a working filter is refused, leaving the working filter
+  playing.
 
 Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
@@ -220,7 +221,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
 
 - Changes fade over 64 samples, so automating them does not click.
 - The host saves the settings in the project and in presets it saves itself.
