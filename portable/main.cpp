@@ -2,6 +2,7 @@
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
+#include "dither_advice.hpp"
 #include "file.hpp"
 #include "inspection_cli.hpp"
 #include <algorithm>
@@ -56,11 +57,13 @@ Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
   --speaker-map config
                       Label WAV output channels with the configuration's channel
                       mask (WAVE_FORMAT_EXTENSIBLE). wav- formats only.
-  --dither D           Integer PCM only: none (default), triangular,
-                      triangular-highpass or rectangular
+  --dither D           Integer PCM only: triangular, triangular-highpass or
+                      none. Default triangular below 20 significant bits
+                      (pcm8, pcm16), none from 20 bits, where it is inaudible
   --dither-seed N      Dither generator seed (default 0); output is reproducible
-  --noise-shaping S    Integer PCM only: none (default), simple, second-order,
-                      third-order, ninth-order or sony-sbm (error feedback)
+  --noise-shaping S    Integer PCM only: none (default), simple, third-order or
+                      ninth-order (error feedback). Convolver says when another
+                      choice is clearly less audible at the sample rate
   --valid-bits N       Integer PCM only: quantize to N significant bits (8 up to
                       the container), stored left-justified, e.g. 20 in wav-pcm24
   --output-channels N  From a configuration list, select the first entry with N
@@ -186,8 +189,8 @@ int run(int argc, char** argv) {
         convolver::OutputEncoding format;
         convolver::RawEncoding raw_encoding, raw_filter_encoding;
         std::optional<convolver::Dither> dither;
-        std::uint64_t dither_seed = 0;
-        convolver::NoiseShaping shaping = convolver::NoiseShaping::none;
+        std::optional<std::uint64_t> dither_seed;
+        std::optional<convolver::NoiseShaping> shaping;
         unsigned valid_bits = 0;
         std::size_t block = 256, output_channels = 0;
         float gain = 1;
@@ -321,34 +324,10 @@ int run(int argc, char** argv) {
                 format = *parsed;
             } else if (option == "--dither") {
                 audio_options = true;
-                const auto name = value();
-                if (name == "none")
-                    dither = convolver::Dither::none;
-                else if (name == "rectangular")
-                    dither = convolver::Dither::rectangular;
-                else if (name == "triangular")
-                    dither = convolver::Dither::triangular;
-                else if (name == "triangular-highpass")
-                    dither = convolver::Dither::triangular_highpass;
-                else
-                    throw std::invalid_argument("unsupported dither: " + name);
+                dither = convolver::cli::parse_dither(value());
             } else if (option == "--noise-shaping") {
                 audio_options = true;
-                const auto name = value();
-                if (name == "none")
-                    shaping = convolver::NoiseShaping::none;
-                else if (name == "simple")
-                    shaping = convolver::NoiseShaping::simple;
-                else if (name == "second-order")
-                    shaping = convolver::NoiseShaping::second_order;
-                else if (name == "third-order")
-                    shaping = convolver::NoiseShaping::third_order;
-                else if (name == "ninth-order")
-                    shaping = convolver::NoiseShaping::ninth_order;
-                else if (name == "sony-sbm")
-                    shaping = convolver::NoiseShaping::sony_sbm;
-                else
-                    throw std::invalid_argument("unsupported noise shaping: " + name);
+                shaping = convolver::cli::parse_noise_shaping(value());
             } else if (option == "--valid-bits") {
                 audio_options = true;
                 const auto bits = count(value());
@@ -358,10 +337,12 @@ int run(int argc, char** argv) {
             } else if (option == "--dither-seed") {
                 audio_options = true;
                 const auto text = value();
+                std::uint64_t seed = 0;
                 const auto [end, error] =
-                    std::from_chars(text.data(), text.data() + text.size(), dither_seed);
+                    std::from_chars(text.data(), text.data() + text.size(), seed);
                 if (error != std::errc{} || end != text.data() + text.size())
                     throw std::invalid_argument("dither seed must be a non-negative integer");
+                dither_seed = seed;
             } else
                 throw std::invalid_argument("unknown option: " + option);
         }
@@ -374,7 +355,7 @@ int run(int argc, char** argv) {
         const auto bits = convolver::container_bits(format.sample);
         if (!bits && dither && *dither != convolver::Dither::none)
             throw std::invalid_argument("--dither applies only to integer PCM output");
-        if (!bits && shaping != convolver::NoiseShaping::none)
+        if (!bits && shaping && *shaping != convolver::NoiseShaping::none)
             throw std::invalid_argument("--noise-shaping applies only to integer PCM output");
         if (valid_bits && valid_bits > bits)
             throw std::invalid_argument(
@@ -465,9 +446,13 @@ int run(int argc, char** argv) {
                       << (safe ? estimate.worst_case_peak : estimate.noise_peak) << ")\n";
         }
         convolver::Engine engine(config, block, fft_options);
-        // Dither and shaping are opt-in; integer PCM is plainly rounded by default.
-        const convolver::QuantizationOptions quantization{dither.value_or(convolver::Dither::none),
-                                                          dither_seed, shaping, valid_bits};
+        // TPDF dither by default below 20 significant bits, and advice on
+        // pointless or clearly beaten choices (dither_advice.hpp).
+        const auto plan = convolver::cli::plan_quantization(bits, valid_bits, info.sample_rate,
+                                                            dither, shaping, dither_seed);
+        for (const auto& note : plan.notes)
+            std::cerr << "convolver: " << note << '\n';
+        const auto& quantization = plan.options;
         convolver::OutputMetadata metadata;
         if (speaker_map) {
             metadata.channel_mask = config.channel_mask;
