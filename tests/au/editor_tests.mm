@@ -202,6 +202,18 @@ void window() {
     require(contains(view.titleField.stringValue, "Audio Unit #"),
             "window title " + text(view.titleField.stringValue));
 
+    // Accessibility: named controls (VoiceOver reads the label or title).
+    // AppKit supplies the buttons' role itself, and on a CI runner with no
+    // accessibility client it need not report one, so only names are checked.
+    require([view.statusField.accessibilityLabel isEqualToString:@"Status"], "status label");
+    require([view.diagnosticsButton.title isEqualToString:@"Copy diagnostics"] &&
+                [view.logButton.title isEqualToString:@"Show log"],
+            "button titles: " + text(view.diagnosticsButton.title) + ", " +
+                text(view.logButton.title));
+    require(view.explanationView.accessibilityLabel.length > 0 && !view.explanationView.editable &&
+                view.explanationView.selectable,
+            "explanation text");
+
     // Copy diagnostics, to a pasteboard of the test's own.
     NSPasteboard* board = [NSPasteboard pasteboardWithUniqueName];
     view.pasteboard = board;
@@ -214,15 +226,6 @@ void window() {
             "copied:\n" + text(pasted));
     [board releaseGlobally];
     require(view.logButton.enabled, "Show log disabled with a log file");
-
-    // Accessibility: named controls with their roles (VoiceOver reads them).
-    require([view.statusField.accessibilityLabel isEqualToString:@"Status"], "status label");
-    require([view.diagnosticsButton.accessibilityRole isEqualToString:NSAccessibilityButtonRole] &&
-                [view.logButton.accessibilityRole isEqualToString:NSAccessibilityButtonRole],
-            "button roles");
-    require(view.explanationView.accessibilityLabel.length > 0 && !view.explanationView.editable &&
-                view.explanationView.selectable,
-            "explanation text");
 
     // Corrected: a mono filter plays.
     unit.uninitialize();
