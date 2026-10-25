@@ -16,6 +16,8 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace convolver::au {
 // HostProcessor's fixed latency; AU reports it in seconds.
@@ -127,7 +129,16 @@ class Effect final : public ausdk::AUBase {
     // foreign state), as HostFilter::load records its own rejections.
     // Returns the explanation of faults counted before it (observe_faults()),
     // to log before the rejection.
-    std::string reject(HostFailureKind, const std::string& why);
+    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {});
+    // Gain and Mix as a saved state holds them.
+    using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
+    // The common step of RestoreState and a chosen file: loads `next`, then
+    // logs and notifies outside the lock. `saved` settings are applied if
+    // it is accepted. Returns whether it was.
+    bool install(HostState next, const HostRequest&, const SavedSettings* saved,
+                 bool settings_unreadable);
+    // AU-6: a filter file chosen in the window (load_property).
+    OSStatus load_file(const std::string& path);
     // Records an initialization that could not build the processor (PLUG-8);
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;
@@ -177,6 +188,9 @@ class Effect final : public ausdk::AUBase {
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
+    // AU-6: the last report read, for a read while a load holds `control_`.
+    std::mutex report_cache_lock_;
+    std::optional<HostReport> report_cache_; // Under report_cache_lock_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

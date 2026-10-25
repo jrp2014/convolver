@@ -7,7 +7,7 @@ namespace {
 // The usual macOS panel layout (jrp's GarageBand run: the first version
 // filled whatever size the host offered and left most of it blank). A fixed
 // width, a height that fits the text, label and value rows for the details,
-// and the buttons at the bottom right.
+// Choose Filter at the bottom left and the other buttons at the bottom right.
 constexpr CGFloat width = 560;
 constexpr CGFloat margin = 20;
 constexpr CGFloat button_height = 32;
@@ -94,11 +94,22 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     }
     return text;
 }
+// The first file dropped on the window, as if chosen.
+NSURL* dropped_file(id<NSDraggingInfo> sender) {
+    NSArray<NSURL*>* urls =
+        [sender.draggingPasteboard readObjectsForClasses:@[ [NSURL class] ]
+                                                 options:@{
+                                                     NSPasteboardURLReadingFileURLsOnlyKey : @YES
+                                                 }];
+    return urls.firstObject;
+}
+
 } // namespace
 
 @implementation CONVOLVER_DIAGNOSTIC_VIEW {
     ConvolverReportSource report_;
     ConvolverDiagnosticsSource diagnostics_;
+    ConvolverFileLoader loader_;
     NSScrollView* scroll_;
     NSTimer* timer_;
     NSString* shown_; // The explanation and details last shown, so a refresh keeps a selection.
@@ -110,7 +121,8 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
-                     settings:(NSArray<NSDictionary<NSString*, id>*>*)settings {
+                     settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
+                       loader:(ConvolverFileLoader)loader {
     // The view's own size: the frame gives only its position.
     self = [super initWithFrame:NSMakeRect(NSMinX(frame), NSMinY(frame), width, 240)];
     if (!self)
@@ -118,6 +130,7 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     _pasteboard = [NSPasteboard generalPasteboard];
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
+    loader_ = [loader copy];
     const CGFloat inner = width - 2 * margin;
 
     _titleField = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize]],
@@ -196,8 +209,25 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     _explanationView.textContainer.containerSize = NSMakeSize(inner, CGFLOAT_MAX);
     _explanationView.textContainer.widthTracksTextView = YES;
     _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to change";
+    // A file dropped on the text goes to the window, not into the text.
+    [_explanationView unregisterDraggedTypes];
     scroll_.documentView = _explanationView;
     [self addSubview:scroll_];
+
+    // Choose Filter at the bottom left, as the old Convolver's filter
+    // button; a file dropped anywhere on the window does the same.
+    _chooseButton = [NSButton buttonWithTitle:@"Choose Filter…"
+                                       target:self
+                                       action:@selector(chooseFilter:)];
+    _chooseButton.toolTip =
+        @"Loads a Convolver configuration (.cfg) or a sound file as the filter; you can also "
+        @"drop the file on this window. The project keeps the filter itself, as a preset does, "
+        @"so moving the file later does not change it.";
+    _chooseButton.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
+    _chooseButton.hidden = loader_ == nil;
+    [self addSubview:_chooseButton];
+    if (loader_)
+        [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
 
     // The buttons at the bottom right, Show log rightmost.
     _logButton = [NSButton buttonWithTitle:@"Show log" target:self action:@selector(showLog:)];
@@ -236,6 +266,8 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     _logButton.frame = NSMakeRect(width - margin - log_width, buttons, log_width, button_height);
     _diagnosticsButton.frame =
         NSMakeRect(NSMinX(_logButton.frame) - 12 - copy_width, buttons, copy_width, button_height);
+    const CGFloat choose_width = MAX(NSWidth(_chooseButton.frame), 130);
+    _chooseButton.frame = NSMakeRect(margin, buttons, choose_width, button_height);
 }
 
 - (BOOL)isFlipped {
@@ -348,6 +380,41 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     shown_ = text;
     [_explanationView.textStorage setAttributedString:styled(explanation, details)];
     [self fit];
+}
+
+- (BOOL)loadFile:(NSString*)path {
+    const BOOL accepted = loader_ && path.length > 0 && loader_(path);
+    [self refresh]; // The report says what plays now, and why a refused file was refused.
+    return accepted;
+}
+
+// The system's file dialog, run modally: a sheet would attach to the host's
+// window, which a plug-in does not own.
+- (void)chooseFilter:(id)sender {
+    NSOpenPanel* panel = [NSOpenPanel openPanel];
+    panel.canChooseFiles = YES;
+    panel.canChooseDirectories = NO;
+    panel.allowsMultipleSelection = NO;
+    panel.message =
+        @"Choose a Convolver configuration (.cfg) or a sound file to use as the filter.";
+    panel.prompt = @"Load";
+    if ([panel runModal] != NSModalResponseOK || !panel.URL.fileURL)
+        return;
+    if (![self loadFile:panel.URL.path])
+        NSBeep();
+}
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+    return loader_ && dropped_file(sender) ? NSDragOperationCopy : NSDragOperationNone;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    NSURL* file = dropped_file(sender);
+    if (!file)
+        return NO;
+    if (![self loadFile:file.path])
+        NSBeep();
+    return YES; // Taken, even if refused: the window says why.
 }
 
 - (void)putDiagnosticsOnPasteboard:(id)sender {

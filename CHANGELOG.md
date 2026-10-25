@@ -20,12 +20,18 @@ Until 1.0 the C++ API may change between minor versions.
   filter, settings and software details, and has Copy diagnostics (the report
   and this instance's recent log lines, as text) and Show log (the log file
   in the Finder), with Gain and Mix sliders, because hosts such as
-  GarageBand show it instead of their generic controls. It does not load
-  filters yet. No sound changes.
+  GarageBand show it instead of their generic controls. **Choose Filter…**
+  (or dropping a file on the window) loads a `.cfg`, configuration list or
+  sound file directly, as the old Convolver did, read as `convolver-preset`
+  reads it, so the project then holds the same state a preset would. While
+  a filter is being prepared the window shows the last report rather than
+  waiting. No sound changes.
 - Library (internal to the adapters): the editor report (PLUG-9) in
   `portable/host_report.hpp`, built from the Status line and the log's
   wording, and `playing_words()`, the part of the log's start line that says
-  what plays, which the report shares.
+  what plays, which the report shares; and `portable/filter_file.hpp`
+  (PLUG-9), the one step from a filter file to plug-in state, now shared by
+  `convolver-preset`, the LV2 plug-in and the Audio Unit.
 
 ### Changed
 

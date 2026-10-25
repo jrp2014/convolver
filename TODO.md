@@ -279,8 +279,12 @@ Shared work, done once for all three formats:
   `report_text()` and Copy diagnostics' `diagnostics_text()` in
   `portable/host_report.hpp`, checked per state in `native.host_report`, for
   the Audio Unit's first window; the log's start line now gives the same
-  mono-track advice. Remaining: the file-to-state load step and the
-  settings' computed gains and meters as PLUG-10 adds them.
+  mono-track advice. The file-to-state step is shared as
+  `portable/filter_file.hpp` (`filter_file_state()`, `read_filter_file()`),
+  used by `convolver-preset`, the LV2 plug-in and the Audio Unit's Choose
+  Filter; `au.editor` checks that a file loaded in the window saves the
+  state the tool writes. Remaining: the settings' computed gains and meters
+  as PLUG-10 adds them, and VST3's load message (VST3-3).
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -394,18 +398,25 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   compact layout and the sliders): the window opens from the Plug-ins slot,
   shows Playing on a saved project and Load failed with the stereo-track
   advice on a mono track; Copy diagnostics and Show log work.
-  Known limitation of this first version: the window reads the report
-  synchronously, building it under the unit's control lock on the host's
-  main thread (unlike the editor plan's
-  [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads), where
-  the window copies reports pushed to it), so a slow state restore on
-  another thread stalls the window's next read. Before more window features
-  depend on that read (the load request first), add a responsiveness test
-  (a read during a slow restore on another thread must return promptly) and
-  change the read to a pushed copy if it fails.
-  Remaining: the load request property and choosing a file, the view shared
-  with VST3-11, and practical checks to record: GarageBand with the compact
-  layout and the sliders (including a `.cfg` inside its sandbox), a long
+  Then, at jrp's request before more testing (the old Convolver chose a
+  `.cfg` or sound file directly): **Choose Filter…** and dropping a file on
+  the window, through a load property (64002) that reads the file with
+  PLUG-9's shared step and installs it as a state restore does, with a
+  `ClassInfo` change notification after it.
+  The window still reads the report itself rather than copying reports
+  pushed to it (the editor plan's
+  [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads)), but a
+  read no longer waits for a load: while a load holds the control lock it
+  returns the last report, and `au.editor` checks that reads stay prompt
+  during a slow restore on another thread. Limitation: a chosen file is
+  read and its filter prepared on the host's main thread, so the window
+  (and the host) waits for a long filter; a worker thread, as LV2 has, is
+  for later.
+  Remaining: recent files and reload (the editor plan's conveniences), the
+  view shared with VST3-11, and practical checks to record: GarageBand with
+  the compact layout, the sliders and Choose Filter (a sound file, and a
+  `.cfg` inside its sandbox, whose WAV files it must be allowed to read;
+  whether GarageBand marks the project changed after a chosen file), a long
   explanation (a list `.cfg`) scrolling, Gain and Mix automation with the
   window open (the sliders send no begin and end gestures yet, so recording
   automation by dragging them is untested), and VoiceOver.

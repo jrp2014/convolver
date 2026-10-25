@@ -15,8 +15,8 @@ set(lv2_binary "convolver${CMAKE_SHARED_MODULE_SUFFIX}")
 add_library(convolver_lv2 MODULE plugin.cpp)
 target_include_directories(convolver_lv2 PRIVATE "${PROJECT_SOURCE_DIR}/portable"
     "${Convolver_BINARY_DIR}/generated")
-target_link_libraries(convolver_lv2 PRIVATE Convolver::host Convolver::io convolver_presets
-    PkgConfig::CONVOLVER_LV2)
+target_link_libraries(convolver_lv2 PRIVATE Convolver::host Convolver::io convolver_filter_file
+    convolver_presets PkgConfig::CONVOLVER_LV2)
 target_compile_features(convolver_lv2 PRIVATE cxx_std_20)
 # "$<1:...>" keeps multi-configuration generators from adding a subfolder.
 set_target_properties(convolver_lv2 PROPERTIES PREFIX "" OUTPUT_NAME convolver

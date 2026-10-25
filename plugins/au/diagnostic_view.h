@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // AU-6: Convolver's first window, the smallest useful one: the status, the
 // Gain and Mix sliders, the full explanation of what plays and what to
-// change, the details, and the Copy diagnostics and Show log buttons. Native
+// change, the details, and the Choose Filter, Copy diagnostics and Show log
+// buttons; a filter file can also be dropped on it. Native
 // AppKit controls only, so screen readers, keyboard use, dark mode and text
 // scaling come from the system. It reads and sets everything through blocks
 // a format supplies (the Audio Unit's custom properties and parameters), on
@@ -29,6 +30,10 @@ typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
 // change the user made, which the format passes to the host.
 typedef double (^ConvolverSettingGetter)(void);
 typedef void (^ConvolverSettingSetter)(double value);
+// Loads the filter file at `path` (a .cfg, a configuration list or a sound
+// file); returns whether the plug-in accepted it. Either way the report then
+// says what plays and why.
+typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // One setting the window shows as a slider is a dictionary with the keys
 // @"name" (NSString), @"minimum" and @"maximum" (NSNumber), @"unit"
 // (NSString, as @" dB") for writing its value, @"get"
@@ -40,7 +45,11 @@ typedef void (^ConvolverSettingSetter)(double value);
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
-                     settings:(NSArray<NSDictionary<NSString*, id>*>*)settings;
+                     settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
+                       loader:(nullable ConvolverFileLoader)loader;
+// What Choose Filter and a drop do with the file: loads it and rereads the
+// report. Returns whether the plug-in accepted it.
+- (BOOL)loadFile:(NSString*)path;
 // Reads the report now.
 - (void)refresh;
 // What the view does twice a second while it is in a window, which catches
@@ -53,6 +62,7 @@ typedef void (^ConvolverSettingSetter)(double value);
 @property(readonly, nonatomic) NSTextField* titleField;
 @property(readonly, nonatomic) NSTextField* statusField;
 @property(readonly, nonatomic) NSTextView* explanationView;
+@property(readonly, nonatomic) NSButton* chooseButton;
 @property(readonly, nonatomic) NSButton* diagnosticsButton;
 @property(readonly, nonatomic) NSButton* logButton;
 @property(readonly, nonatomic) NSArray<NSSlider*>* settingSliders;

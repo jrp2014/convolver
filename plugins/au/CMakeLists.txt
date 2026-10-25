@@ -33,7 +33,12 @@ convolver_sdk_description("AudioUnitSDK" "${CONVOLVER_AU_SDK}")
 add_library(convolver_au_adapter STATIC effect.cpp)
 target_include_directories(convolver_au_adapter PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
-target_link_libraries(convolver_au_adapter PUBLIC convolver_ausdk Convolver::host)
+if(NOT TARGET convolver_filter_file)
+    message(FATAL_ERROR "The Audio Unit loads filter files chosen in its window, so it needs "
+        "CONVOLVER_BUILD_IO (libsndfile)")
+endif()
+target_link_libraries(convolver_au_adapter PUBLIC convolver_ausdk Convolver::host
+    convolver_filter_file)
 target_compile_options(convolver_au_adapter PRIVATE -Wall -Wextra -Wpedantic)
 set_target_properties(convolver_au_adapter PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)

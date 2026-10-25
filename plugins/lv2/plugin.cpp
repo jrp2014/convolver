@@ -33,6 +33,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
+#include "filter_file.hpp"
 #include "presets.hpp"
 #include <algorithm>
 #include <array>
@@ -376,36 +377,6 @@ void activate(LV2_Handle handle) {
 
 // --- Loading a filter file ------------------------------------------------------
 
-// Why a filter file could not be used, to record under its request.
-struct ReadFailure {
-    HostFailureKind kind = HostFailureKind::filter_file;
-    std::string message;
-};
-
-// Loads `path` for this instance's rate and channels, so a list chooses its
-// entry as in the CLI. On failure, fills `failure` and returns none; the
-// caller records it, unless a newer request has overtaken this one.
-std::optional<Configuration> read_filter_file(const Instance& p, const std::string& path,
-                                              ReadFailure& failure) {
-    try {
-        return load_configuration(
-            path, ConfigurationSelection{p.layout.sample_rate, p.layout.inputs, p.layout.outputs});
-    } catch (const std::exception& e) {
-        // Readable, but made for another rate or other channels? Then the
-        // record's kind says so; the message already explains. (A file that
-        // fails for another reason as well is classified by rate or channels.)
-        failure.kind = HostFailureKind::filter_file;
-        try {
-            const auto any = load_configuration(path);
-            failure.kind = any.sample_rate != p.layout.sample_rate ? HostFailureKind::sample_rate
-                                                                   : HostFailureKind::channels;
-        } catch (...) {
-        }
-        failure.message = "The filter file \"" + path + "\" could not be used: " + e.what();
-    }
-    return std::nullopt;
-}
-
 void pause_at(const Instance& p, WorkerPoint point) {
     if (p.pause)
         p.pause(p.pause_context, point);
@@ -446,8 +417,10 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
                         request);
         return failed();
     }
-    ReadFailure why;
-    auto next = read_filter_file(p, path, why);
+    // The step convolver-preset uses, for this instance's rate and channels
+    // (a list chooses its entry as in the CLI; PLUG-9).
+    FilterFileFailure why;
+    auto next = read_filter_file(path, p.layout, why);
     pause_at(p, WorkerPoint::read);
     // 1. Already overtaken: stop before recording a failure or FFT planning.
     if (r.generation < newest())
@@ -458,7 +431,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     }
     try {
         p.filter.load(
-            HostState{std::move(next)}, p.layout,
+            std::move(*next), p.layout,
             [&](const Configuration& c) {
                 if (!p.host) { // Inactive: the next activation installs it.
                     if (r.generation != newest())
@@ -962,11 +935,10 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         if (embedded)
             p.log_rejection();
         const HostRequest from_file{HostFilterSource::file, *path, generation};
-        ReadFailure why;
-        if (auto next = read_filter_file(p, *path, why)) {
+        FilterFileFailure why;
+        if (auto next = read_filter_file(*path, p.layout, why)) {
             try {
-                p.filter.load(HostState{std::move(next)}, p.layout, install, from_file,
-                              p.host.get());
+                p.filter.load(std::move(*next), p.layout, install, from_file, p.host.get());
                 loaded = true;
             } catch (...) {
             }

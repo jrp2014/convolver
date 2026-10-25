@@ -68,6 +68,17 @@ void cases() {
          HostStatus::no_filter,
          {"No filter is loaded.", "has not started", "load a Convolver preset"},
          {"Silent"}},
+        // The Audio Unit's window has Choose Filter.
+        {"empty, the window chooses files",
+         [&] {
+             HostFilter f(8);
+             auto x = facts(stereo);
+             x.chooses_files = true;
+             return host_report(f, x);
+         },
+         HostStatus::no_filter,
+         {"choose a filter file (Choose Filter", "load a Convolver preset"},
+         {"Silent"}},
         {"empty, Gain -20 dB",
          [&] {
              HostFilter f(8);

@@ -47,7 +47,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | How to get it | Preview package, or build | Build from source | Build from source |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
-| Choose a `.cfg` or IR file directly | No | No | [Yes](#lv2-filter-files) |
+| Choose a `.cfg` or IR file directly | No | [Yes](#the-audio-units-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
 | [Settings](#settings): gain, mix | Not yet | Yes | Not yet |
@@ -89,8 +89,14 @@ The filter is prepared away from the audio, then installed. A preset loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
-In LV2 you can also choose the `.cfg` file, list or impulse response itself,
-with the host's file chooser ([LV2 filter files](#lv2-filter-files)).
+In the Audio Unit you can also choose the `.cfg` file, list or impulse
+response itself, in Convolver's window: **Choose Filter…**, or drop the file
+on the window ([the Audio Unit's window](#the-audio-units-window)). In LV2
+you choose it with the host's file chooser
+([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
+file as `convolver-preset` does, for the rate and channels the host has
+set, and the project then holds the filter itself, as with a preset: moving
+or deleting the file afterwards changes nothing.
 
 ## When a filter does not fit
 
@@ -256,6 +262,17 @@ the plug-in's button in the track's Plug-ins area. The window has:
   (rate, channels, paths, its longest response, and the request number the
   log uses); Gain and Mix; latency and tail; the software (version, FFT
   library, CPU kernels, the Audio Unit SDK); and where the log is.
+- **Choose Filter…** opens the file dialog for a `.cfg` file, a
+  configuration list or a sound file (WAV, AIFF and the other formats
+  libsndfile reads); dropping the file on the window does the same. A list
+  chooses its entry by the host's rate and channels, as the command-line
+  tool does. The status and explanation then say whether it plays and, if
+  not, why, naming the file; a file that does not suit the plug-in leaves
+  the previous filter playing. The project saves the filter itself, not the
+  file's path: after reopening, the Filter detail says it came from the
+  saved project. Not yet tried in GarageBand, which runs plug-ins in a
+  sandbox: a `.cfg` there may not be allowed to read the WAV files beside
+  it. A preset always works.
 - **Copy diagnostics** puts all of this, with this instance's recent lines
   from the Convolver log, on the clipboard as plain text, ready to paste into
   a report.
@@ -264,8 +281,9 @@ the plug-in's button in the track's Plug-ins area. The window has:
 
 The text can be selected and copied. The controls are standard macOS ones
 with names for VoiceOver, which has not been tried with the window yet. The
-window updates while it is on screen. It does not yet load filters: load
-presets from the host's preset menu.
+window updates while it is on screen. While a filter is being prepared it
+shows the last report and updates when the filter is ready. The window has
+no list of recent files and does not reload a file yet.
 
 ## Settings
 

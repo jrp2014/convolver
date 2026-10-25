@@ -16,4 +16,12 @@ inline constexpr AudioUnitPropertyID report_property = 64000;
 // the report and this instance's recent Convolver log lines, for Copy
 // diagnostics. Reads the log file.
 inline constexpr AudioUnitPropertyID diagnostics_property = 64001;
+// Read and write, global. A CFStringRef: setting it loads that filter file (a
+// .cfg, a configuration list or a sound file) for the unit's rate and
+// channels, as convolver-preset reads it, and the saved state then holds the
+// filter, not the path. The result shows in the report; setting it returns
+// an error if the file was not loaded. Reading it gives the path of the
+// file loaded in this session, empty if the filter came from saved state.
+// The caller releases what it reads.
+inline constexpr AudioUnitPropertyID load_property = 64002;
 } // namespace convolver::au

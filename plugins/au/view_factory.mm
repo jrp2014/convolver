@@ -95,9 +95,17 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
     if (NSDictionary<NSString*, id>* mix =
             setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet"))
         [settings addObject:mix];
+    // A chosen or dropped file goes to the unit by path, as a property: the
+    // unit reads it, so this also works when the host runs it in another process.
+    ConvolverFileLoader loader = ^BOOL(NSString* path) {
+      CFStringRef value = (__bridge CFStringRef)path;
+      return AudioUnitSetProperty(unit, convolver::au::load_property, kAudioUnitScope_Global, 0,
+                                  &value, sizeof value) == noErr;
+    };
     return [[CONVOLVER_DIAGNOSTIC_VIEW alloc] initWithFrame:frame
                                                      report:report
                                                 diagnostics:diagnostics
-                                                   settings:settings];
+                                                   settings:settings
+                                                     loader:loader];
 }
 @end

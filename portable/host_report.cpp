@@ -67,8 +67,12 @@ std::string explanation(const HostFilter& filter, const HostReportFacts& facts) 
     if (filter.faults().any())
         text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
     if (!filter.filter() && !failure && !filter.failed())
-        text += " To filter the audio, load a Convolver preset (made with convolver-preset) from "
-                "the host's preset menu.";
+        text += facts.chooses_files
+                    ? " To filter the audio, choose a filter file (Choose Filter, or drop a .cfg "
+                      "or sound file on this window), or load a Convolver preset (made with "
+                      "convolver-preset) from the host's preset menu."
+                    : " To filter the audio, load a Convolver preset (made with convolver-preset) "
+                      "from the host's preset menu.";
     return text;
 }
 

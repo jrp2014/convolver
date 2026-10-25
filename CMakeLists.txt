@@ -223,6 +223,13 @@ if(CONVOLVER_BUILD_NATIVE)
         # Inspection reports the engine's own latency/tail/storage analysis.
         target_link_libraries(convolver_io PUBLIC Convolver::core PRIVATE SndFile::sndfile)
         list(APPEND native_targets convolver_io)
+        # PLUG-9: a filter file as the state a plug-in saves, one step shared by
+        # convolver-preset and the plug-ins that load files (LV2, Audio Unit).
+        add_library(convolver_filter_file STATIC portable/filter_file.cpp)
+        set_target_properties(convolver_filter_file PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        target_include_directories(convolver_filter_file PUBLIC portable)
+        target_link_libraries(convolver_filter_file PUBLIC Convolver::host Convolver::io)
+        list(APPEND native_targets convolver_filter_file)
     endif()
     if(CONVOLVER_BUILD_CLI)
         add_executable(convolver_cli portable/main.cpp portable/inspection_cli.cpp
@@ -239,7 +246,7 @@ if(CONVOLVER_BUILD_NATIVE)
         if(MINGW)
             target_link_options(convolver_preset_tool PRIVATE -municode)
         endif()
-        target_link_libraries(convolver_preset_tool PRIVATE convolver_presets Convolver::io)
+        target_link_libraries(convolver_preset_tool PRIVATE convolver_presets convolver_filter_file)
         # Equalizer APO export: a filter for system-wide playback on Windows.
         add_executable(convolver_equalizer_apo portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp)
         add_dependencies(convolver_equalizer_apo convolver_build_version)

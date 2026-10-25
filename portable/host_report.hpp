@@ -29,6 +29,9 @@ struct HostReportFacts {
     HostSettings settings;
     std::size_t latency_frames = 0, tail_frames = 0;
     bool log_written = true; // host_log_written()
+    // The format's window can load a filter file (the Audio Unit's Choose
+    // Filter), so an empty instance is told about it as well as presets.
+    bool chooses_files = false;
 };
 
 struct HostReport {

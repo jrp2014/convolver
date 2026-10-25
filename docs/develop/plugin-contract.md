@@ -199,9 +199,25 @@ format.
   version. Unlike the editor plan's rule that the window copies reports
   pushed to it ([threads](../project/plans/2026-10-24-plugin-editor.md#threads),
   rule 2), the AU window reads 64000 itself, as Audio Unit views do: twice a
-  second while its window is on screen, on the main thread. Each read builds
-  the report under the unit's control lock, so a slow state restore on
-  another thread delays the window's next read until it ends. While faults
+  second while its window is on screen, on the main thread. A read builds
+  the report under the unit's control lock when the lock is free, and keeps
+  a copy; while a load holds the lock (a state restore or a chosen file,
+  preparing its filter), a read returns that copy at once instead of
+  waiting, and the load's notification brings the next read. Only a read
+  before any other waits. Property 64002 (read and write, a `CFString`)
+  loads a filter file chosen in the window: the unit reads it with
+  `read_filter_file()` ([`filter_file.hpp`](../../portable/filter_file.hpp),
+  the step `convolver-preset` uses) for its current rate and channels, then
+  installs it through the same `HostFilter::load` as a state restore, with
+  `HostRequest{HostFilterSource::file, path}`, so the failure rules,
+  replacement and saving are unchanged and the saved state is the one the
+  tool writes. Setting it returns an error when the file was not loaded;
+  reading it gives the path of this session's accepted file load. The file
+  is read outside the control lock, on the thread that set the property
+  (the host's main thread for the window); preparing the filter runs under
+  the lock there, as a restore does. An accepted file load also sends a
+  `ClassInfo` change notification, for hosts that mark the project changed
+  from it. While faults
   go on, a read takes them in (and logs them) at most every 10 seconds, once
   Render's Fault is explained.
 - **The Convolver log** (`host_log()` in

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // AU-6: Convolver's window and the properties it reads, through the Audio
-// Unit API with the unit registered in-process: the report and Copy
-// diagnostics properties, their change notifications, and the AppKit view
+// Unit API with the unit registered in-process: the report, Copy
+// diagnostics and filter file properties, their change notifications, a
+// report read that does not wait for a slow load, and the AppKit view
 // that the factory makes, attached to an off-screen window, showing the
 // status and the full explanation, with working Copy diagnostics and Show
 // log buttons. jrp's first GarageBand run is the main case: a stereo preset
@@ -14,7 +15,11 @@
 #endif
 #include "au/au_host.hpp"
 #import "diagnostic_view.h"
+#include "filter_file.hpp"
+#include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -24,6 +29,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #define CONVOLVER_TEXT_OF(x) #x
@@ -89,6 +95,65 @@ std::string read_file(const std::string& path) {
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
+// A 16-bit WAV with an impulse of one half on every channel.
+void write_wav(const std::filesystem::path& path, int rate, int channels, int frames) {
+    std::ofstream out(path, std::ios::binary);
+    const auto put = [&](std::uint32_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out.put(static_cast<char>((value >> (8 * i)) & 0xff));
+    };
+    const auto data = static_cast<std::uint32_t>(frames * channels * 2);
+    out.write("RIFF", 4);
+    put(36 + data, 4);
+    out.write("WAVEfmt ", 8);
+    put(16, 4);
+    put(1, 2); // PCM
+    put(static_cast<std::uint32_t>(channels), 2);
+    put(static_cast<std::uint32_t>(rate), 4);
+    put(static_cast<std::uint32_t>(rate * channels * 2), 4);
+    put(static_cast<std::uint32_t>(channels * 2), 2);
+    put(16, 2);
+    out.write("data", 4);
+    put(data, 4);
+    for (int f = 0; f < frames; ++f)
+        for (int c = 0; c < channels; ++c)
+            put(f == 0 ? 16384 : 0, 2);
+    if (!out)
+        throw std::runtime_error("could not write " + path.string());
+}
+
+// A folder of this process's own for filter files, removed afterwards.
+class TemporaryFolder {
+  public:
+    TemporaryFolder()
+        : path_(std::filesystem::temp_directory_path() /
+                ("convolver-au-files-" + std::to_string(std::random_device{}()))) {
+        std::filesystem::create_directories(path_);
+    }
+    TemporaryFolder(const TemporaryFolder&) = delete;
+    TemporaryFolder& operator=(const TemporaryFolder&) = delete;
+    ~TemporaryFolder() {
+        std::error_code ignored;
+        std::filesystem::remove_all(path_, ignored);
+    }
+    std::filesystem::path operator/(const char* name) const {
+        return path_ / name;
+    }
+
+  private:
+    std::filesystem::path path_;
+};
+
+std::string loaded_path(Unit& unit) {
+    CFStringRef value = nullptr;
+    UInt32 size = sizeof value;
+    check(AudioUnitGetProperty(unit.get(), au::load_property, kAudioUnitScope_Global, 0, &value,
+                               &size),
+          "filter file property");
+    NSString* path = CFBridgingRelease(value);
+    return text(path);
+}
+
 // The Convolver log goes to a file of this process's own while it exists.
 class PrivateLog {
   public:
@@ -127,6 +192,15 @@ void properties(const PrivateLog& log) {
         check(AudioUnitGetPropertyInfo(unit.get(), id, kAudioUnitScope_Global, 0, &size, &writable),
               "property info " + std::to_string(id));
         require(size == sizeof(CFTypeRef) && !writable, "property info " + std::to_string(id));
+    }
+    {
+        UInt32 size = 0;
+        Boolean writable = false;
+        check(AudioUnitGetPropertyInfo(unit.get(), au::load_property, kAudioUnitScope_Global, 0,
+                                       &size, &writable),
+              "filter file property info");
+        require(size == sizeof(CFStringRef) && writable, "filter file property info");
+        require(loaded_path(unit).empty(), "a filter file before any was chosen");
     }
     // Registered without its bundle, the unit offers no window rather than a
     // bundle it cannot name; auval checks the installed component's.
@@ -337,6 +411,105 @@ void window() {
     unit.uninitialize();
 }
 
+// Choose Filter and a drop: a sound file loads through the load property
+// with the step convolver-preset uses, so the saved state is the one the
+// tool writes for the same rate and channels; a file that does not suit
+// the unit is refused with its name and the reason, the previous filter
+// still playing.
+void files() {
+    TemporaryFolder folder;
+    const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav";
+    write_wav(stereo, 44100, 2, 8);
+    write_wav(mono, 44100, 1, 8);
+    Unit unit;
+    check(unit.configure(44100, 2, 2, 512), "stereo formats");
+    check(unit.initialize(), "stereo initialization");
+    Class factory_class = NSClassFromString(@CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
+    id<AUCocoaUIBase> factory = [[factory_class alloc] init];
+    CONVOLVER_DIAGNOSTIC_VIEW* view =
+        (CONVOLVER_DIAGNOSTIC_VIEW*)[factory uiViewForAudioUnit:unit.get()
+                                                       withSize:NSMakeSize(0, 0)];
+    require(!view.chooseButton.hidden &&
+                [view.chooseButton.title isEqualToString:@"Choose Filter…"],
+            "Choose Filter button: " + text(view.chooseButton.title));
+    require([view.registeredDraggedTypes containsObject:NSPasteboardTypeFileURL],
+            "the window takes no dropped files");
+
+    require([view loadFile:@(stereo.c_str())], "the stereo file was refused");
+    auto r = report(unit);
+    require([r[@"status name"] isEqualToString:@"Playing"] &&
+                [view.statusField.stringValue isEqualToString:@"Playing"],
+            "after the stereo file: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
+    require(contains(r[@"details"], stereo.c_str()),
+            "the details do not name the file:\n" + text(r[@"details"]));
+    require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
+    require(encode_host_state(unit.saved()) ==
+                encode_host_state(filter_file_state(stereo, {44100, 2, 2})),
+            "the saved state differs from convolver-preset's");
+
+    require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
+    r = report(unit);
+    require(contains(r[@"explanation"], mono.c_str()) &&
+                contains(r[@"explanation"], "could not be used"),
+            "mono file refusal: " + text(r[@"explanation"]));
+    require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
+    const auto missing = folder / "missing.cfg";
+    require(![view loadFile:@(missing.c_str())], "a missing file accepted");
+    require(contains(report(unit)[@"explanation"], missing.c_str()),
+            "missing file: " + text(report(unit)[@"explanation"]));
+    unit.uninitialize();
+}
+
+// TODO AU-6: a report read while a slow load holds the unit's control lock
+// on another thread returns at once, with the last report, instead of
+// waiting for the load; the window then rereads when the load is done.
+void responsive() {
+    Unit unit;
+    check(unit.configure(44100, 2, 2, 512), "stereo formats");
+    check(unit.initialize(), "stereo initialization");
+    static_cast<void>(report(unit)); // What the window shows before the load.
+    // A long filter, so preparing it takes a while.
+    Configuration slow{44100, 2, 2, 0, {}, {}, {}};
+    for (std::size_t ch = 0; ch < 2; ++ch) {
+        std::vector<float> taps(6'000'000, 1e-6f);
+        taps[0] = .5f;
+        slow.paths.push_back({std::move(taps), {{ch, 1}}, {{ch, 1}}});
+    }
+    const auto plist = au_test::class_info(state_of(slow), "slow");
+    std::atomic<bool> done{false};
+    OSStatus loaded = noErr;
+    double load_seconds = 0;
+    std::thread loader([&] {
+        const auto start = std::chrono::steady_clock::now();
+        loaded = unit.restore(plist);
+        load_seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        done = true;
+    });
+    double worst = 0;
+    int reads = 0;
+    while (!done) {
+        const auto start = std::chrono::steady_clock::now();
+        static_cast<void>(report(unit));
+        worst = std::max(
+            worst, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+        ++reads;
+    }
+    loader.join();
+    CFRelease(plist);
+    check(loaded, "slow load");
+    // A read that waited would take most of the load's time.
+    require(reads > 0 && worst < std::min(.05, load_seconds / 5),
+            "a report read waited for the load: worst read " + std::to_string(worst) +
+                " s during a " + std::to_string(load_seconds) + " s load, " +
+                std::to_string(reads) + " reads");
+    std::cout << "worst report read during a " << load_seconds << " s load: " << worst << " s ("
+              << reads << " reads)\n";
+    require(contains(report(unit)[@"details"], "6000000"),
+            "the report after the load: " + text(report(unit)[@"details"]));
+    unit.uninitialize();
+}
+
 AudioUnitParameterValue status_value(Unit& unit) {
     AudioUnitParameterValue value = -1;
     check(
@@ -390,6 +563,8 @@ int main() {
             PrivateLog log;
             properties(log);
             window();
+            files();
+            responsive();
             faults(log);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';

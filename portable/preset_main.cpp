@@ -3,6 +3,7 @@
 // Built with CONVOLVER_VST3_PRESET_ALIAS it is convolver-vst3-preset, which
 // keeps its original arguments, messages and output for existing scripts.
 #include "convolver/io.hpp"
+#include "filter_file.hpp"
 #include "presets.hpp"
 #include <charconv>
 #include <cstddef>
@@ -115,7 +116,8 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             state = convolver::presets::read_vst3_preset(read_file(input));
         } else {
             std::vector<fs::path> raw_filters;
-            state = {convolver::load_configuration(input, selection, nullptr, &raw_filters), false};
+            // The step the plug-ins use for a file chosen in their window (PLUG-9).
+            state = convolver::filter_file_state(input, selection, &raw_filters);
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
                 std::cerr << "raw filter '" << utf8(raw_filter.filename())

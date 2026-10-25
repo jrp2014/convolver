@@ -548,7 +548,15 @@ Four CTest tests run when the adapter is built (label `au`):
   text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
-  window stops reading the unit. Then faults: invalid input rendered, the
+  window stops reading the unit. Then filter files (Choose Filter and a
+  drop): a stereo WAV loaded through the load property plays, the details
+  and the property name it, and the saved state equals
+  `filter_file_state()`'s, what `convolver-preset` writes; a mono WAV and a
+  missing file are refused with the file named, the stereo filter still
+  playing. Then responsiveness: report reads while another thread restores
+  a 2 × 6 000 000-tap filter (whose preparation holds the control lock)
+  must each take under a fifth of the restore and under 50 ms; the test
+  prints the worst read. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an
   open window makes, log the faults once. The AU workflow's `auval -strict`
   step also requires `Cocoa Views Available: 1`.
