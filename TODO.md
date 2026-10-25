@@ -151,8 +151,8 @@ which put FFmpeg next, is kept as a dated record and is superseded here.
   debugging", and that it configure the plug-in as the old Convolver did,
   as inspiration rather than a copy; the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md) proposes native
   views (decided) over shared report code, with gain, latency and mix as host
-  parameters, in phases PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13,
-  AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
+  parameters, in phases PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to
+  VST3-13, AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -276,6 +276,16 @@ Shared work, done once for all three formats:
   non-default settings; `convolver-preset --gain-db`, `--block-size` and
   `--mix`. Defaults leave the sound unchanged. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
+- [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
+  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), asked for by jrp on 25 October 2026:
+  only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
+  plug-ins use Ooura or Accelerate, which have no planner), a Quick or
+  Measured planning choice, Quick by default, passed through `HostProcessor`
+  and applied while preparing, never on the audio thread. Its tooltip states
+  the measured gain (at most about 6% overall in the 18 October measurements,
+  least for long filters) and the longer loads, rechecked on the current
+  engine first. Saved with PLUG-10's settings only when Measured; not
+  automatable.
 
 LV2 (Linux first; also PipeWire system audio):
 

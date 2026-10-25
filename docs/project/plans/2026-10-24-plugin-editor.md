@@ -9,8 +9,8 @@ the engine can do now. Nothing here is implemented. The framework is decided:
 native views ([decisions](../decisions.md#direction)); the settings, their
 saved form, scope and order wait for jrp's choices in
 [decisions for jrp](#decisions-for-jrp). Open work is tracked as PLUG-9,
-PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6 and LV2-7 in
-[TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
+PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6 and
+LV2-7 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
 The rules every adapter follows stay in the
 [plug-in adapter contract](../../develop/plugin-contract.md); where this plan
 and the contract seem to disagree, the contract wins until a change to it is
@@ -34,8 +34,8 @@ whoever then implements one of its phases.
   diagnostics for reports.
 - **Modernised, not copied.** Settings that the engine made obsolete go: FFTW
   "tuning rigour" (released plug-ins use Ooura or Accelerate, which have no
-  planner; a plug-in built with FFTW keeps quick planning, see the table
-  below), and dither and noise shaping (plug-ins hand floating-point audio to
+  planner; a plug-in built with FFTW gets an optional planning choice that
+  states its small measured gain, PLUG-11), and dither and noise shaping (plug-ins hand floating-point audio to
   the host, and dither belongs once, at the host's final conversion to
   integer). The rest become host parameters, so they also work
   from hosts' generic controls, automation and presets, even before the
@@ -155,7 +155,7 @@ setting they offered, and what it becomes:
 | **Calculate optimum attenuation** button (property pages); estimated and peak gain in the description (VST2) | Ran the noise estimate; the peak gain was a guaranteed but "extremely conservative" bound | **Modernised:** the Estimate and No clipping modes, recomputed automatically for each filter, seeded so the estimate is the same every time (the old one varied), plus an output peak and clip count so the user sees the result |
 | **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, with the dry path latency-aligned |
 | **Partitions** / **No of partitions** (all) | Traded latency against processor load and cache use; 0 meant plain overlap-save | **Modernised as Latency:** the engine always uses uniform partitions of B frames, so the choice is B itself, shown as delay in milliseconds, with the measured load beside it instead of the old advice to time "Calculate optimum attenuation" or run `perftest` |
-| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped:** released plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which have no planner to tune, because FFTW's planner is not thread-safe and another plug-in or the host may load the same FFTW ([plug-in builds](../../develop/fft-backends.md#plug-in-builds), decided 21 October). A plug-in built with FFTW anyway (`-DCONVOLVER_FFT_BACKEND=FFTW`, which CMake warns about) plans with FFTW's quick estimate. Measured planning gained about 2–6% on some workloads for 4–26 ms more setup ([measurements](../../develop/fft-backends.md#fftw-implementation-and-planning-comparisons)), too little to justify a setting, a wisdom file per user and longer loads in the host. The window shows the FFT library and CPU kernels instead. The CLI keeps FFTW tuning |
+| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped from released plug-ins; optional in FFTW builds (PLUG-11):** released plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which have no planner to tune, because FFTW's planner is not thread-safe and another plug-in or the host may load the same FFTW ([plug-in builds](../../develop/fft-backends.md#plug-in-builds), decided 21 October). A plug-in built with FFTW anyway (`-DCONVOLVER_FFT_BACKEND=FFTW`, which CMake warns about) plans with FFTW's quick estimate, and PLUG-11 offers measured planning there, with a tooltip stating its small measured gain ([FFT planning](#settings) below). The window always shows the FFT library and CPU kernels. The CLI keeps full FFTW tuning |
 | **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** the old players wrote integer samples straight to the sound card, so Convolver was the last step and had to dither. A plug-in exchanges 32-bit floating-point audio with the host, and more processing (other plug-ins, faders) usually follows it; dither added there would be added again or undone later. Dither belongs once, at the final conversion to integer, which the host's render or the audio driver does (24-bit playback rounding is far below a converter's own noise). The 2006 VST2 window had no dither either. The CLI keeps both |
 | Version and `http://convolver.sf.net` (property pages); help text with an e-mail address (VST2) | Identification and help | **Kept:** version in the title; links to the user guide and the GitHub issues instead of the retired address |
 | OK, Cancel, Apply, Help (property pages) | Dialog buttons | **Dropped:** a plug-in window applies changes at once, as hosts expect, and the host's undo covers parameters |
@@ -242,6 +242,37 @@ bypass. With unequal input and output counts there is no dry signal (the
   control side reads. This replaces the old advice to time a calculation or
   run `perftest`, and is the evidence PERF-3 asks for, measured in the user's
   own host.
+
+**FFT planning** (PLUG-11, optional; only in plug-ins built with FFTW; jrp
+asked for it on 25 October).
+
+- Released plug-ins use Ooura or Accelerate and show no planning control. A
+  plug-in built with `-DCONVOLVER_FFT_BACKEND=FFTW` shows a Planning choice
+  beside Latency: Quick (FFTW's estimate; the default and today's behaviour)
+  or Measured (FFTW's measure). Patient is not offered: on x86-64 it matched
+  measured within noise and took 2–5 times longer to plan.
+- Its tooltip, and a line in Details, state what was measured, so nobody
+  expects much: "Measured planning made Convolver at most about 6% faster in
+  our tests, and long filters gain least, because the FFTs are a small part
+  of their work. Each load takes longer (4–26 ms on Apple Silicon, up to
+  0.5 s per block size on x86-64), and FFTW's planner is shared with any
+  other plug-in in the host that uses FFTW." The figures are from the
+  [measurements](../../develop/fft-backends.md#fftw-implementation-and-planning-comparisons)
+  and [where the time goes](../../develop/fft-backends.md#where-the-time-goes):
+  whole-engine gains of about 2–6% on some of eight workloads on Apple
+  Silicon, and on x86-64 FFTs 1.2–1.8 times faster alone but under 4% of the
+  work for filters of 16,384 taps or more. PLUG-11 rechecks them on the
+  current engine and puts the date in the tooltip's source comment.
+- Planning runs while the processor is prepared on the control side, never on
+  the audio thread. Convolver already serialises its own planner calls; other
+  FFTW users in the host are not covered, which is why CMake warns about FFTW
+  plug-in builds and why this stays a build-specific option.
+- Saved with the other settings, written only when Measured is chosen (VST3
+  host state version 3); not automatable, and a change prepares a new
+  processor as a Latency change does. How the Audio Unit and LV2 save it
+  follows the saved-form choice below.
+- Loading a wisdom file made by `convolver --tune-fft` would remove the
+  planning delay; it is left out unless asked for.
 
 **Where settings are saved.**
 
@@ -557,6 +588,7 @@ Each phase is its own pull request, follows the
 | --- | --- | --- | --- |
 | 1. Shared, no window | **PLUG-9** | `HostReport`, `report_fields()`, `report_text()`, and the preset tool's file-to-state step as a shared function; headless tests | Nothing |
 | 1 | **PLUG-10** | Gain (three modes), mix and latency in `HostProcessor` with ramps; meters; host state version 3; `convolver-preset` options; oracle and state tests; a contract change in its own pull request first | jrp's choices on settings |
+| 1 (optional) | **PLUG-11** | Quick or Measured FFT planning in FFTW-built plug-ins, with the tooltip stating the measured gain; planning options passed through `HostProcessor` | PLUG-10 |
 | 1 | **VST3-3** | Controller report copy, `ConvolverLoad`, `setDirty`, Bypass edits from the controller; headless tests. No `createView` yet | PLUG-9 |
 | 1 | **VST3-4** | The settings as VST3 parameters, saved in the component state, with latency changes reported to the host | PLUG-10 |
 | 1 | **AU-7** | The settings as Audio Unit parameters, with latency and tail notifications | PLUG-10 |
@@ -633,8 +665,9 @@ Recommended answers first. None of these blocks PLUG-9.
    ([decisions](../decisions.md#direction)). Linux stays open for VST3-13.
 2. **Settings:** Gain with the Set, Estimate and No clipping modes, Latency,
    Mix (the old "Effect level"; decided) and meters, as host parameters in
-   every format, defaults leaving today's sound unchanged; tuning rigour and
-   dither are not brought back.
+   every format, defaults leaving today's sound unchanged; dither is not
+   brought back, and tuning rigour returns only as PLUG-11's optional
+   planning choice in FFTW-built plug-ins (asked for 25 October).
 3. **Gain parameter (decided):** VST3 ID 0, with no new ID, but a new
    mapping rather than the 2006 one ([decisions](../decisions.md#identities-and-file-formats)).
    Its range is jrp's to approve when PLUG-10 proposes it.

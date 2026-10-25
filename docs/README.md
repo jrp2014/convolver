@@ -149,8 +149,8 @@ current direction; the Media Foundation and FFmpeg plans are parked.
   choice, and the plan to develop VST3, LV2 and AU in parallel, including LV2
   for PipeWire system audio.
 - [Plug-in editor](project/plans/2026-10-24-plugin-editor.md) (HOST-2,
-  PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6,
-  LV2-7): a window in every plug-in format that configures the plug-in
+  PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7,
+  LV2-6, LV2-7): a window in every plug-in format that configures the plug-in
   (filter, gain, latency, mix) as the old Convolver did, modernised, and shows
   the status, the full explanation of a failure, what is loaded and the
   Convolver log; settings, framework, threads, testing, accessibility and
