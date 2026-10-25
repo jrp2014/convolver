@@ -278,8 +278,9 @@ Shared work, done once for all three formats:
   Progress (25 October 2026, PR #84): the report, `report_fields()`,
   `report_text()` and Copy diagnostics' `diagnostics_text()` in
   `portable/host_report.hpp`, checked per state in `native.host_report`, for
-  the Audio Unit's first window. Remaining: the file-to-state load step and
-  the settings' computed gains and meters as PLUG-10 adds them.
+  the Audio Unit's first window; the log's start line now gives the same
+  mono-track advice. Remaining: the file-to-state load step and the
+  settings' computed gains and meters as PLUG-10 adds them.
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -384,12 +385,30 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plug-in is silent.
   Progress (25 October 2026, PR #84): the smallest useful window, at jrp's
   request in his review of 0.5.5: report and Copy diagnostics properties
-  (64000, 64001) with change notifications, and an AppKit view (status, the
-  full reason and what to change, details, Copy diagnostics, Show log) named
-  by `kAudioUnitProperty_CocoaUI`, with versioned class names; `au.editor`
-  and `auval` check it. Remaining: the load request property and choosing a
-  file, the settings in the window, the view shared with VST3-11, and the
-  GarageBand smoke steps (including a `.cfg` inside its sandbox).
+  (64000, 64001) with change notifications, and an AppKit view named by
+  `kAudioUnitProperty_CocoaUI`, with versioned class names: the status, Gain
+  and Mix sliders (GarageBand shows the window instead of its generic
+  controls), the full reason and what to change, the details, Copy
+  diagnostics and Show log, sized to its text. `au.editor` and `auval`
+  check it. jrp's GarageBand run on 25 October (build `a05818c`, before the
+  compact layout and the sliders): the window opens from the Plug-ins slot,
+  shows Playing on a saved project and Load failed with the stereo-track
+  advice on a mono track; Copy diagnostics and Show log work.
+  Known limitation of this first version: the window reads the report
+  synchronously, building it under the unit's control lock on the host's
+  main thread (unlike the editor plan's
+  [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads), where
+  the window copies reports pushed to it), so a slow state restore on
+  another thread stalls the window's next read. Before more window features
+  depend on that read (the load request first), add a responsiveness test
+  (a read during a slow restore on another thread must return promptly) and
+  change the read to a pushed copy if it fails.
+  Remaining: the load request property and choosing a file, the view shared
+  with VST3-11, and practical checks to record: GarageBand with the compact
+  layout and the sliders (including a `.cfg` inside its sandbox), a long
+  explanation (a list `.cfg`) scrolling, Gain and Mix automation with the
+  window open (the sliders send no begin and end gestures yet, so recording
+  automation by dragging them is untested), and VoiceOver.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
