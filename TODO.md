@@ -742,6 +742,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85,
+  from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
+  build only what their tests run, long tests carry a CTest `COST` so they
+  start first, and the portable clang-tidy files are analysed side by side;
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
