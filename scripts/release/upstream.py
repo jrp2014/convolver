@@ -14,12 +14,16 @@ import time
 
 VERSION = re.compile(r'(?P<number>\d+(?:\.\d+)*)(?:[._-]build[._-](?P<build>\d+))?'
                      r'(?:[._-]?(?P<suffix>alpha|beta|rc|pre|pl)(?P<suffix_number>\d*))?$')
-# Pre-releases sort below the release, patch levels (FFTW's -plN) above it.
-RANK = {'alpha': 0, 'beta': 0, 'rc': 0, 'pre': 0, None: 1, 'pl': 2}
+# Pre-releases sort below the release, by stage (alpha, then beta, then
+# release candidate; "pre" is taken as a release candidate, as PEP 440 does),
+# and patch levels (FFTW's -plN) above it. FINAL is the rank of a release.
+FINAL = 3
+RANK = {'alpha': 0, 'beta': 1, 'rc': 2, 'pre': 2, None: FINAL, 'pl': FINAL + 1}
 
 
 def version_key(text):
-    """Orders versions: numbers, then build, then pre-release < release < patch level."""
+    """Orders versions: numbers, then build, then alpha < beta < rc < release
+    < patch level, then the stage's number (beta3 < rc1 < rc2)."""
     match = VERSION.fullmatch(text)
     if not match:
         return None
@@ -32,7 +36,7 @@ def version_key(text):
 def is_final(text):
     """A release or patch level, not a pre-release."""
     key = version_key(text)
-    return key is not None and key[2] > 0
+    return key is not None and key[2] >= FINAL
 
 
 def parse_ls_remote(output):

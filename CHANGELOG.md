@@ -10,6 +10,33 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Fixed
+
+- Supporting-library downloads (CI-6): a cached archive is reused only while
+  it has the checksum of its first download. Before, `--latest` recomputed the
+  checksum of whatever was in the cache, so an archive changed there was
+  recorded as trusted under the original upstream commit; it is now refused,
+  with how to download it again. Replaying a lock file already checked its
+  recorded checksum. Found in jrp's review of 0.5.2.
+- Supporting libraries and tools (CI-6): pre-releases are ordered by stage
+  (alpha, beta, then release candidate), so a newer `2.0.0-rc1` is tried
+  instead of `2.0.0-beta3`, which used to rank above it. Found in jrp's review
+  of 0.5.2.
+- Library: `HostFilter::observe()` compiles again in code written for 0.5.0,
+  where it returned `HostFaults`. Its `HostFaultReport` now derives from
+  `HostFaults`, counting every fault the call returns (current plus earlier),
+  and a constructor takes `current`, `earlier` and `held` in that order, so
+  code written for 0.5.1 to 0.5.4 compiles too, braces included. Two uses
+  still do not: a pointer to `observe` as a member function returning
+  `HostFaults`, and designated initialisers of `HostFaultReport`. Found in
+  jrp's review of 0.5.2.
+- Plug-ins: after a rejected replacement, a fault in the audio was logged
+  saying that the status shows Fault, while the status rightly kept showing
+  Load failed. The log now says that Load failed shows instead. Found in
+  jrp's review of 0.5.2.
+
+## [0.5.4] - 2026-10-25
+
 ### Added
 
 - Audio Unit: Gain (−100 to +24 dB) and Mix (0 to 100% wet) parameters,
@@ -18,6 +45,8 @@ Until 1.0 the C++ API may change between minor versions.
 - Example presets: `repeat`, half the input at once and a quarter of it a
   quarter of a second later, so the filter is easy to hear (the `echo`
   example's 5 ms tap only colours the tone). The package now has 18 examples.
+
+## [0.5.3] - 2026-10-25
 
 ### Changed
 
@@ -36,6 +65,36 @@ Until 1.0 the C++ API may change between minor versions.
 - CLI: `--dither rectangular`, `--noise-shaping second-order` and
   `--noise-shaping sony-sbm`, which another choice always beats; naming them is
   an error that says why and what to use. The library's `Quantizer` keeps them.
+
+## [0.5.2] - 2026-10-25
+
+### Changed
+
+- Builds use the newest release of every supporting library and tool instead
+  of pinned versions (CI-6), so security and bug fixes arrive without a pin
+  being moved: the VST3 SDK, `lv2`, AudioUnitSDK, FFTW, libsndfile, NSIS for
+  the Windows installer (now 3.13, was 3.11), pluginval, `lv2lint` and the
+  `lilv` packages. Each build records exactly what it used (version, commit
+  and archive checksum) in its job summary, the source bundle's
+  `source-manifest.json` and the package's `artifact-manifest.json` and
+  `licenses/DEPENDENCIES.json`, and a recorded build can be repeated with
+  `sources.py --lock`. The VST3 and Audio Unit plug-ins name their SDK in the
+  Convolver log. The VST3, LV2, Audio Unit and candidate workflows also run
+  every Monday, replacing the weekly Dependency updates check. Formal tests
+  use full releases only: pluginval moves from 2.0.0-beta3 to 1.0.4, and the
+  beta runs as an advisory check whose findings are warnings (the acceptance
+  test, which needs pluginval 2, still runs on it). A new advisory LV2 job
+  tests against the newest upstream lilv and its libraries. See
+  [supporting libraries](docs/develop/build.md#supporting-libraries).
+
+## [0.5.1] - 2026-10-25
+
+### Changed
+
+- Library: `HostFilter::observe()` returns a `HostFaultReport` (`current` and
+  `earlier` faults) instead of `HostFaults`, and `HostFilter::load()` takes
+  the `HostProcessor` that plays (optional), for the fixes below. Code that used the
+  result as `HostFaults` no longer compiled.
 
 ### Fixed
 
@@ -179,7 +238,7 @@ automatically as 0.4.1 to 0.4.46.
   record, what is audible and that audio-thread calls neither allocate nor
   lock ([testing](docs/develop/testing.md#lifecycle-sequences-plug-7)).
 - An Audio Unit (AUv2 effect) adapter for macOS, `Convolver.component`
-  (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the newest
+  (AU-1, AU-2): build with `-DCONVOLVER_BUILD_AU=ON` and the pinned
   AudioUnitSDK, then load `.aupreset` files from `convolver-preset` through the
   host's preset menu. 1 to 8 channels per side (counts may differ), latency and
   tail reported in seconds, bypass with the same 64-sample ramp and delayed dry
@@ -225,11 +284,13 @@ automatically as 0.4.1 to 0.4.46.
   it. `convolver-vst3-preset` is now the same tool under its old name, with the
   same arguments and byte-identical output. See [plug-in presets](docs/use/presets.md).
 
-- Plug-in format dependencies (PLUG-6): AudioUnitSDK and the `lv2` headers
-  in the release policy, and the test tools `lilv` and `lv2lint` in new LV2
-  and Audio Unit CI workflows. Builds now take the newest release of each
-  (CI-6, below). See
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
+- Pinned plug-in format dependencies (PLUG-6): AudioUnitSDK 1.4.0 and the
+  `lv2` 1.18.10 headers by commit and checksum in the release policy, and the
+  test tools `lilv` 0.24.22 and `lv2lint` 0.16.2 in new LV2 and Audio Unit CI
+  workflows. A weekly Dependency updates workflow reports newer upstream
+  releases of every pin and keeps one tracking issue current. See
+  [pinned format dependencies](https://github.com/jrp2014/convolver/blob/v0.5.0/docs/develop/build.md#pinned-format-dependencies)
+  (0.5.2 replaced the pins, see above).
 
 - First-use examples in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
@@ -253,7 +314,7 @@ automatically as 0.4.1 to 0.4.46.
   renders that load real filters through the host and match a direct
   convolution. Optional locally via `-DCONVOLVER_PLUGINVAL`.
 - The SDK validator also runs in extensive mode (`vst3.validator.extensive`).
-- Unsigned VST3 preview distributions: recorded dependencies and corresponding
+- Unsigned VST3 preview distributions: pinned dependencies and corresponding
   source, relocatable archives with synthetic presets, unsigned installer
   templates, and a read-only candidate workflow on Windows, Linux and both macOS
   architectures (`-DCONVOLVER_PACKAGE_PLUGINS=ON`, preset `release-vst3`).
@@ -270,23 +331,6 @@ automatically as 0.4.1 to 0.4.46.
 - The version is now 0.5.0. CMake consumers now request
   `find_package(Convolver 0.5)`; the package keeps its same-minor
   compatibility policy, so a consumer asking for 0.4 no longer finds it.
-
-- Builds use the newest release of every supporting library and tool instead
-  of pinned versions (CI-6), so security and bug fixes arrive without a pin
-  being moved: the VST3 SDK, `lv2`, AudioUnitSDK, FFTW, libsndfile, NSIS for
-  the Windows installer (now 3.13, was 3.11), pluginval, `lv2lint` and the
-  `lilv` packages. Each build records exactly what it used (version, commit
-  and archive checksum) in its job summary, the source bundle's
-  `source-manifest.json` and the package's `artifact-manifest.json` and
-  `licenses/DEPENDENCIES.json`, and a recorded build can be repeated with
-  `sources.py --lock`. The VST3 and Audio Unit plug-ins name their SDK in the
-  Convolver log. The VST3, LV2, Audio Unit and candidate workflows also run
-  every Monday, replacing the weekly Dependency updates check. Formal tests
-  use full releases only: pluginval moves from 2.0.0-beta3 to 1.0.4, and the
-  beta runs as an advisory check whose findings are warnings (the acceptance
-  test, which needs pluginval 2, still runs on it). A new advisory LV2 job
-  tests against the newest upstream lilv and its libraries. See
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
 
 - Host testing names jrp's first hosts on macOS: REAPER and Audacity for the
   VST3 plug-in and GarageBand for the Audio Unit, each with a step-by-step
@@ -612,7 +656,11 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/jrp2014/convolver/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/jrp2014/convolver/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/jrp2014/convolver/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/jrp2014/convolver/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/jrp2014/convolver/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jrp2014/convolver/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jrp2014/convolver/compare/v0.3.0...v0.3.1
