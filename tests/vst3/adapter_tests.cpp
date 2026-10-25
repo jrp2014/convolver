@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "host_log.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
@@ -708,6 +709,9 @@ void status_and_log() {
     HostApplication context;
     Processor p;
     Controller c;
+    // CI-6: the Convolver log names the SDK the plug-in was built with.
+    require(contains(convolver::execution_line(), ", built with VST3 SDK "),
+            "SDK missing from the Convolver log's session line");
     require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk,
             "status initialize");
     ParameterInfo info{};

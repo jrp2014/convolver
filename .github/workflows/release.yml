@@ -9,6 +9,10 @@ name: Plug-in distribution candidates
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Each Monday, so that a new upstream release of a library or NSIS shows up
+  # within a week even when nothing here changes (CI-6).
+  schedule:
+    - cron: '23 6 * * 1'
 
 permissions:
   contents: read
@@ -49,13 +53,15 @@ jobs:
           python tests/release/artifact_tests.py
           python tests/release/installer_tests.py
           python tests/release/gate_tests.py
-          python tests/release/update_tests.py
+          python tests/release/resolve_tests.py
           python tests/release/docs_tests.py
           python tests/release/symbols_tests.py
+      # CI-6: each dependency's newest release; source-manifest.json and the
+      # job summary record exactly which (version, tag, commit, checksum).
       - name: Assemble corresponding source
         run: >-
           python scripts/release/build_sources.py
-          --cache build/downloads --fetch
+          --cache build/downloads --fetch --latest
           --output build/Convolver-source.tar.gz
       - uses: actions/upload-artifact@v7
         with:
@@ -119,14 +125,15 @@ jobs:
         with:
           name: corresponding-source
           path: build/source
-      - name: Fetch pinned installer compiler
+      - name: Fetch the newest installer compiler
+        id: nsis
         if: runner.os == 'Windows'
-        run: python scripts/release/fetch_nsis.py --output build/nsis
+        run: python scripts/release/fetch_nsis.py --output build/nsis --github-output "$env:GITHUB_OUTPUT"
       - name: Exercise installer upgrade and locked-file recovery
         if: runner.os == 'Windows'
         run: >-
           python tests/release/windows_installer.py
-          --nsis build/nsis/nsis-3.11/makensis.exe
+          --nsis "${{ steps.nsis.outputs.makensis }}"
       - name: Build and verify Unix candidate
         if: runner.os != 'Windows'
         run: >-
@@ -141,7 +148,7 @@ jobs:
           --archive build/source/Convolver-source.tar.gz
           --platform windows-x86_64
           --work build/candidate --output build/assets
-          --nsis build/nsis/nsis-3.11/makensis.exe
+          --nsis "${{ steps.nsis.outputs.makensis }}"
       - name: Rebuild supplied source with networking disabled
         if: runner.os == 'Linux'
         run: >-
@@ -149,6 +156,9 @@ jobs:
           tests/release/source_build.py
           --archive build/source/Convolver-source.tar.gz
           --cmake "$(command -v cmake)"
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python scripts/release/resolve.py explain-failure
       - uses: actions/upload-artifact@v7
         with:
           name: candidate-${{ matrix.platform }}

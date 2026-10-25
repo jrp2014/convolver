@@ -1254,6 +1254,13 @@ void status_lines() {
                 contains(session, cpu_kernels_name()) && contains(session, ", process "),
             "execution line");
     require(contains(text, session.c_str()), "execution line not logged first");
+    // CI-6: an adapter names the SDK it was built with.
+    require(!contains(session, "built with"), "SDK named before an adapter set it");
+    set_host_log_sdk("Example SDK 1.2.3, commit 0123456789ab");
+    require(
+        contains(execution_line(), ", built with Example SDK 1.2.3, commit 0123456789ab, process "),
+        "SDK missing from the execution line");
+    set_host_log_sdk(nullptr);
     {
         std::ofstream grow(path, std::ios::app | std::ios::binary);
         grow << std::string(1024 * 1024 + 1, 'x');

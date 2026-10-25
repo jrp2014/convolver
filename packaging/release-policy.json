@@ -1,13 +1,12 @@
 {
-  "schema": 1,
+  "schema": 2,
   "channel": "developer-preview",
   "base_commit": "0bf77d003870bba9a72244f68efa9eb288010d7b",
   "dependencies": {
     "vst3sdk": {
-      "version": "3.8.1-build-84",
-      "revision": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96",
-      "url": "https://codeload.github.com/steinbergmedia/vst3sdk/tar.gz/3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96",
-      "sha256": "fbc6e6f713cd3644ab9440496a75ce714e2ad435dbdd38825fe8834f31456fb6",
+      "upstream": "https://github.com/steinbergmedia/vst3sdk",
+      "tag_prefix": "v",
+      "url": "https://codeload.github.com/steinbergmedia/vst3sdk/tar.gz/{revision}",
       "archive": "vst3sdk.tar.gz",
       "directory": "vst3sdk",
       "license": "MIT",
@@ -16,10 +15,10 @@
       ]
     },
     "vst3-base": {
-      "version": "3.8.1-build-84",
-      "revision": "fcf9da0bd27a16f7f03773a3a39822f28f5c8477",
-      "url": "https://codeload.github.com/steinbergmedia/vst3_base/tar.gz/fcf9da0bd27a16f7f03773a3a39822f28f5c8477",
-      "sha256": "3753d45a79b5e324c2843d74a18c8f1117fe0b1118fa9312658aecf6360ec603",
+      "submodule_of": "vst3sdk",
+      "path": "base",
+      "upstream": "https://github.com/steinbergmedia/vst3_base",
+      "url": "https://codeload.github.com/steinbergmedia/vst3_base/tar.gz/{revision}",
       "archive": "vst3-base.tar.gz",
       "directory": "vst3sdk/base",
       "license": "MIT",
@@ -28,10 +27,10 @@
       ]
     },
     "vst3-cmake": {
-      "version": "3.8.1-build-84",
-      "revision": "054c9143cbb8d47fc4694e473f2ee3b4d951a8f5",
-      "url": "https://codeload.github.com/steinbergmedia/vst3_cmake/tar.gz/054c9143cbb8d47fc4694e473f2ee3b4d951a8f5",
-      "sha256": "d8bddb3d87d66b5078e803d271ef82ba51bc74f941e0ca8256e7145950db409e",
+      "submodule_of": "vst3sdk",
+      "path": "cmake",
+      "upstream": "https://github.com/steinbergmedia/vst3_cmake",
+      "url": "https://codeload.github.com/steinbergmedia/vst3_cmake/tar.gz/{revision}",
       "archive": "vst3-cmake.tar.gz",
       "directory": "vst3sdk/cmake",
       "license": "MIT",
@@ -40,10 +39,10 @@
       ]
     },
     "vst3-pluginterfaces": {
-      "version": "3.8.1-build-84",
-      "revision": "4f547e8e102b47de4a8b8aaf343c73b700786372",
-      "url": "https://codeload.github.com/steinbergmedia/vst3_pluginterfaces/tar.gz/4f547e8e102b47de4a8b8aaf343c73b700786372",
-      "sha256": "ee70777eebb8450fc04fae2a6dd452f723d12bfb8222af443b8c1f8a9259089a",
+      "submodule_of": "vst3sdk",
+      "path": "pluginterfaces",
+      "upstream": "https://github.com/steinbergmedia/vst3_pluginterfaces",
+      "url": "https://codeload.github.com/steinbergmedia/vst3_pluginterfaces/tar.gz/{revision}",
       "archive": "vst3-pluginterfaces.tar.gz",
       "directory": "vst3sdk/pluginterfaces",
       "license": "MIT",
@@ -52,10 +51,10 @@
       ]
     },
     "vst3-public-sdk": {
-      "version": "3.8.1-build-84",
-      "revision": "586dc5e6c8012c3e4b01c79389375cbe96bdb1da",
-      "url": "https://codeload.github.com/steinbergmedia/vst3_public_sdk/tar.gz/586dc5e6c8012c3e4b01c79389375cbe96bdb1da",
-      "sha256": "71319491b771068b8e2c5374c22830a339677e9d54c4cd33af4a0aa210e4c838",
+      "submodule_of": "vst3sdk",
+      "path": "public.sdk",
+      "upstream": "https://github.com/steinbergmedia/vst3_public_sdk",
+      "url": "https://codeload.github.com/steinbergmedia/vst3_public_sdk/tar.gz/{revision}",
       "archive": "vst3-public-sdk.tar.gz",
       "directory": "vst3sdk/public.sdk",
       "license": "MIT",
@@ -64,10 +63,9 @@
       ]
     },
     "lv2": {
-      "version": "1.18.10",
-      "revision": "0bcde338db1c63bbc503b4d1f6d7b55ed43154af",
-      "url": "https://codeload.github.com/lv2/lv2/tar.gz/0bcde338db1c63bbc503b4d1f6d7b55ed43154af",
-      "sha256": "38d515cf1cb95d6f7d0191b8e383cbd95975a1ccec082d4e729eece7ec6a0c3e",
+      "upstream": "https://github.com/lv2/lv2",
+      "tag_prefix": "v",
+      "url": "https://codeload.github.com/lv2/lv2/tar.gz/{revision}",
       "archive": "lv2.tar.gz",
       "directory": "lv2",
       "license": "ISC",
@@ -77,10 +75,9 @@
       ]
     },
     "audiounitsdk": {
-      "version": "1.4.0",
-      "revision": "bd98b31feff57a15989fcfab4cd86dc63382b1ac",
-      "url": "https://codeload.github.com/apple/AudioUnitSDK/tar.gz/bd98b31feff57a15989fcfab4cd86dc63382b1ac",
-      "sha256": "163dc32422c4df153062fb93be1dbc5394af20488c973b81fef61fbd5db22f1c",
+      "upstream": "https://github.com/apple/AudioUnitSDK",
+      "tag_prefix": "AudioUnitSDK-",
+      "url": "https://codeload.github.com/apple/AudioUnitSDK/tar.gz/{revision}",
       "archive": "audiounitsdk.tar.gz",
       "directory": "AudioUnitSDK",
       "license": "Apache-2.0",
@@ -90,26 +87,26 @@
       ]
     },
     "fftw": {
-      "version": "3.3.11",
-      "url": "https://www.fftw.org/fftw-3.3.11.tar.gz",
-      "sha256": "5630c24cdeb33b131612f7eb4b1a9934234754f9f388ff8617458d0be6f239a1",
+      "upstream": "https://github.com/FFTW/fftw3",
+      "tag_prefix": "fftw-",
+      "url": "https://www.fftw.org/fftw-{version}.tar.gz",
       "archive": "fftw.tar.gz",
       "directory": "fftw",
       "license": "GPL-2.0-or-later"
     },
     "libsndfile": {
-      "version": "1.2.2",
-      "url": "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz",
-      "sha256": "3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e",
+      "upstream": "https://github.com/libsndfile/libsndfile",
+      "tag_prefix": "",
+      "github_release": "libsndfile/libsndfile",
+      "url": "https://github.com/libsndfile/libsndfile/releases/download/{version}/libsndfile-{version}.tar.xz",
       "archive": "libsndfile.tar.xz",
       "directory": "libsndfile",
       "license": "LGPL-2.1-or-later"
     }
   },
   "vcpkg": {
-    "baseline": "664933b8d385dfc01f4e0cdff4c7c74e71f6a740",
     "triplet": "x64-windows-static-md",
-    "usage": "Optional developer recipe; release builds compile the pinned sources directly"
+    "usage": "Windows CI and the optional developer recipe use the runner's own vcpkg; release builds compile the resolved sources directly"
   },
   "platforms": [
     {
@@ -199,10 +196,56 @@
   },
   "release_tools": {
     "nsis": {
-      "version": "3.11",
-      "url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11.zip",
-      "sha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1"
+      "upstream": "https://github.com/kichik/nsis",
+      "tag_pattern": "v(3)(\\d\\d)(\\d?)",
+      "url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/{version}/nsis-{version}.zip",
+      "license": "Zlib"
     }
   },
-  "production_enabled": false
+  "production_enabled": false,
+  "test_tools": {
+    "pluginval": {
+      "upstream": "https://github.com/Tracktion/pluginval",
+      "tag_prefix": "v",
+      "advisory_prerelease_run": true,
+      "url": "https://github.com/Tracktion/pluginval/releases/download/{tag}/{asset}",
+      "github_release": "Tracktion/pluginval",
+      "assets": {
+        "Linux": "pluginval_Linux.zip",
+        "macOS": "pluginval_macOS.zip",
+        "Windows": "pluginval_Windows.zip"
+      }
+    },
+    "lv2lint": {
+      "upstream": "https://git.open-music-kontrollers.ch/~hp/lv2lint",
+      "tag_prefix": "",
+      "url": "https://git.open-music-kontrollers.ch/~hp/lv2lint/snapshot/lv2lint-{version}.tar.xz",
+      "mirrors": [
+        "http://distcache.FreeBSD.org/ports-distfiles/lv2lint-{version}.tar.xz"
+      ],
+      "distinfo": "https://raw.githubusercontent.com/freebsd/freebsd-ports/main/audio/lv2lint/distinfo"
+    }
+  },
+  "test_sources": {
+    "zix": {
+      "upstream": "https://gitlab.com/drobilla/zix.git",
+      "tag_prefix": "v"
+    },
+    "serd": {
+      "upstream": "https://gitlab.com/drobilla/serd.git",
+      "tag_prefix": "v"
+    },
+    "sord": {
+      "upstream": "https://gitlab.com/drobilla/sord.git",
+      "tag_prefix": "v"
+    },
+    "sratom": {
+      "upstream": "https://gitlab.com/lv2/sratom.git",
+      "tag_prefix": "v"
+    },
+    "lilv": {
+      "upstream": "https://gitlab.com/lv2/lilv.git",
+      "tag_prefix": "v"
+    }
+  }
 }

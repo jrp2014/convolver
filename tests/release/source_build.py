@@ -8,7 +8,7 @@ import json
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/release'))
-from contract import load_policy, sha256
+from contract import load_policy, sha256, with_records
 from sources import extract
 from build_dependencies import build as build_dependencies
 
@@ -57,7 +57,9 @@ if __name__ == '__main__':
                       if p.is_file() and p.name != 'source-manifest.json'}
             if actual != manifest['files']:
                 raise ValueError('source archive file inventory/hash mismatch')
-            policy = load_policy(source / 'convolver/packaging/release-policy.json')
+            # The exact dependency releases the archive records (CI-6).
+            policy = with_records(load_policy(source / 'convolver/packaging/release-policy.json'),
+                                  manifest['dependencies'])
             work = root / 'dependencies-build'
             sdk, prefix = build_dependencies(policy, source / 'dependencies', work, args.cmake, fetch=False,
                                              backend=args.backend)

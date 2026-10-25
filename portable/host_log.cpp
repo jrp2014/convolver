@@ -107,11 +107,21 @@ std::string filter_words(const Configuration& c) {
 }
 } // namespace
 
+namespace {
+std::atomic<const char*> sdk_description{nullptr};
+} // namespace
+
+void set_host_log_sdk(const char* description) noexcept {
+    sdk_description.store(description, std::memory_order_relaxed);
+}
+
 std::string execution_line() {
     const auto host = program();
+    const char* sdk = sdk_description.load(std::memory_order_relaxed);
     return "Session: Convolver " CONVOLVER_VERSION_STRING ", FFT backend " +
            std::string(fft_backend_name()) + " (" + fft_backend_version() + "), CPU kernels " +
-           cpu_kernels_name() + ", process " + std::to_string(process_id()) +
+           cpu_kernels_name() + (sdk ? std::string(", built with ") + sdk : std::string()) +
+           ", process " + std::to_string(process_id()) +
            (host.empty() ? "" : ", host program " + host) + ".";
 }
 

@@ -14,15 +14,17 @@ def sha256(path):
     return digest.hexdigest()
 
 
-# Every pinned dependency. Entries with 'formats' are used only by builds of
-# those plug-in formats; the others (FFTW, libsndfile) by every build.
+# Every supporting library builds may use. Entries with 'formats' are used only
+# by builds of those plug-in formats; the others (FFTW, libsndfile) by every
+# build. The policy says where each comes from; resolve.py picks the newest
+# release and records it (CI-6).
 REQUIRED_DEPENDENCIES = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk',
                          'lv2', 'audiounitsdk', 'fftw', 'libsndfile'}
 PLUGIN_FORMATS = {'vst3', 'lv2', 'au'}
 
 
 def used_dependencies(policy, formats=('vst3',), backend='AUTO'):
-    """Names of the pinned dependencies a build of these formats compiles.
+    """Names of the dependencies a build of these formats compiles.
 
     FFTW is used only when the FFT backend is FFTW."""
     unknown = set(formats) - PLUGIN_FORMATS
@@ -43,7 +45,7 @@ def load_policy(path):
 
 
 def validate_policy(policy, source=None):
-    if policy.get('schema') != 1:
+    if policy.get('schema') != 2:
         raise ValueError('unsupported policy schema')
     if not re.fullmatch(r'\d+\.\d+\.\d+', policy.get('version', '')):
         raise ValueError('invalid version')
@@ -55,19 +57,16 @@ def validate_policy(policy, source=None):
         raise ValueError('base_commit must be an immutable revision')
     if set(policy.get('dependencies', {})) != REQUIRED_DEPENDENCIES:
         raise ValueError('missing or unexpected dependencies')
-    for name, dep in policy['dependencies'].items():
-        if not re.fullmatch(r'[0-9a-f]{64}', dep.get('sha256', '')):
-            raise ValueError(f'{name}: missing/invalid sha256')
-        if not dep.get('url', '').startswith('https://') or not dep.get('license') or not dep.get('version'):
-            raise ValueError(f'{name}: missing URL, version or license')
-        formats = dep.get('formats')
-        if formats is not None and (not formats or not set(formats) <= PLUGIN_FORMATS):
-            raise ValueError(f'{name}: formats must name plug-in formats from {sorted(PLUGIN_FORMATS)}')
-        # A format SDK is pinned by commit as well as by archive checksum.
-        if (formats or name.startswith('vst3')) and not re.fullmatch(r'[0-9a-f]{40}', dep.get('revision', '')):
-            raise ValueError(f'{name}: missing immutable revision')
-    if not re.fullmatch(r'[0-9a-f]{40}', policy.get('vcpkg', {}).get('baseline', '')):
-        raise ValueError('missing vcpkg baseline')
+    for name, rule in policy['dependencies'].items():
+        _validate_rule(name, rule, policy['dependencies'])
+    for section in ('release_tools', 'test_tools'):
+        for name, rule in policy.get(section, {}).items():
+            _validate_source(f'{section}.{name}', rule)
+    # Git sources that only advisory CI jobs build (a checkout, no archive).
+    for name, rule in policy.get('test_sources', {}).items():
+        _validate_source(f'test_sources.{name}', rule, archive=False)
+    if not policy.get('vcpkg'):
+        raise ValueError('missing vcpkg settings')
     if policy['vcpkg'].get('triplet') != 'x64-windows-static-md':
         raise ValueError('Windows requires static dependencies and dynamic MSVC runtime')
     names, ids = set(), set()
@@ -87,6 +86,72 @@ def validate_policy(policy, source=None):
             raise ValueError('invalid support status')
         if platform['status'] == 'tested' and not platform.get('evidence'):
             raise ValueError('tested platform requires evidence')
+
+
+def _validate_source(name, rule, archive=True):
+    """Where a dependency or tool comes from: its repository, how its tags name
+    releases, and its archive's URL."""
+    if not str(rule.get('upstream', '')).startswith('https://'):
+        raise ValueError(f'{name}: missing https upstream repository')
+    if archive and not str(rule.get('url', '')).startswith('https://'):
+        raise ValueError(f'{name}: missing https archive URL template')
+    if 'tag_pattern' in rule:
+        try:
+            re.compile(rule['tag_pattern'])
+        except re.error as error:
+            raise ValueError(f'{name}: invalid tag_pattern: {error}') from error
+    elif 'tag_prefix' not in rule and 'submodule_of' not in rule:
+        raise ValueError(f'{name}: missing tag_prefix or tag_pattern')
+    for key in ('sha256', 'revision', 'version'):
+        if key in rule:
+            raise ValueError(f'{name}: the policy does not pin a {key}; builds resolve the newest release '
+                             '(scripts/release/resolve.py)')
+
+
+def _validate_rule(name, rule, rules):
+    _validate_source(name, rule)
+    if not rule.get('license') or not rule.get('archive') or not rule.get('directory'):
+        raise ValueError(f'{name}: missing license, archive or directory')
+    formats = rule.get('formats')
+    if formats is not None and (not formats or not set(formats) <= PLUGIN_FORMATS):
+        raise ValueError(f'{name}: formats must name plug-in formats from {sorted(PLUGIN_FORMATS)}')
+    parent = rule.get('submodule_of')
+    if parent is not None:
+        if parent not in rules or 'submodule_of' in rules[parent] or not rule.get('path'):
+            raise ValueError(f'{name}: submodule_of must name a top-level dependency, with a path')
+        if '{revision}' not in rule['url']:
+            raise ValueError(f'{name}: a submodule archive is fetched by commit ({{revision}})')
+
+
+def validate_records(records):
+    """Resolved dependencies (a lock file, or a source manifest's) name an exact
+    release: its version, the commit its tag points at, an https archive URL
+    and the archive's checksum."""
+    for name, record in records.items():
+        if not re.fullmatch(r'[0-9a-f]{64}', record.get('sha256', '')):
+            raise ValueError(f'{name}: missing/invalid sha256')
+        if not record.get('url', '').startswith('https://') or not record.get('license') or not record.get('version'):
+            raise ValueError(f'{name}: missing URL, version or license')
+        if not re.fullmatch(r'[0-9a-f]{40}', record.get('revision', '')):
+            raise ValueError(f'{name}: missing immutable revision')
+        if not record.get('archive') or not record.get('directory'):
+            raise ValueError(f'{name}: missing archive or directory')
+        formats = record.get('formats')
+        if formats is not None and (not formats or not set(formats) <= PLUGIN_FORMATS):
+            raise ValueError(f'{name}: formats must name plug-in formats from {sorted(PLUGIN_FORMATS)}')
+
+
+def with_records(policy, records):
+    """The policy, with its dependency rules replaced by resolved records."""
+    missing = set(policy['dependencies']) - set(records)
+    if missing:
+        raise ValueError(f'no record for dependencies: {sorted(missing)}')
+    validate_records(records)
+    # A newer pre-release is noted at resolution time only; it is not part of
+    # what a build used, so it stays out of manifests.
+    return dict(policy, dependencies={name: {key: value for key, value in records[name].items()
+                                             if key not in ('newer_prerelease', 'prerelease_tried')}
+                                      for name in policy['dependencies']})
 
 
 def platform_policy(policy, identifier):
