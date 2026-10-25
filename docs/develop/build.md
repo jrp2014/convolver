@@ -372,7 +372,12 @@ points at and the SHA-256 of the archive it downloaded:
 
 `scripts/release/resolve.py` finds the newest releases (with `git ls-remote`,
 so no API token is needed) and `scripts/release/sources.py` fetches, checks and
-unpacks them. To get the newest SDKs yourself:
+unpacks them. Most dependencies publish no checksum, so the checksum of the
+first download is the one recorded. The `--cache` folder keeps each archive
+with the URL and checksum it was downloaded with; a cached archive is reused
+only for the same URL and only while its checksum is unchanged. One that has
+changed is refused, never recorded under a new checksum: delete it to download
+it again. To get the newest SDKs yourself:
 
 ```sh
 python3 scripts/release/sources.py --latest --fetch --cache build/downloads \
