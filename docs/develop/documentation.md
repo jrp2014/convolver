@@ -118,7 +118,7 @@ can act on it without a separate copy of the rules:
 | Navigation and vocabulary | [Index](../README.md), [using Convolver](../use/README.md), [concepts](../use/concepts.md) | Current entry points; avoid unexplained abbreviations |
 | First successes | [Your first filter](../use/first-filter.md), [your first sound in a host](../use/first-sound-in-a-host.md) | `examples.first_use` runs the first; the release examples check the second |
 | Configuration grammar | [Configuration](../use/configuration.md) | `config_parse.cpp`, `config.cpp`, corpus |
-| CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp` and tests |
+| CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp`, `dither_advice.cpp` and tests |
 | What Convolver does not do | [Limits](../use/limits.md) | TODO's documented limitations |
 | Symptoms and fixes | [Troubleshooting](../use/troubleshooting.md) | Diagnostics in `config.cpp`, the tools and the adapters |
 | Other readers of the format, path portability | [Other programs](../use/other-programs.md) | `tests/compatibility/`, `downstream-evidence.json` |

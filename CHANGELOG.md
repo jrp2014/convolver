@@ -10,6 +10,24 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Changed
+
+- CLI: integer output below 20 significant bits (pcm8, pcm16, `--valid-bits`
+  17 to 19) now gets triangular (TPDF) dither unless `--dither none` is given,
+  so fades and quiet passages turn into steady hiss rather than distortion.
+  This changes the bytes of such files. From 20 bits output is still plainly
+  rounded, since dither would be inaudible there. A note on stderr says when
+  dither was added.
+- CLI: Convolver now warns when dither or noise shaping is pointless (from 20
+  bits) or when another choice keeps the noise at least 3 dB less audible at
+  the output sample rate, and names that choice.
+
+### Removed
+
+- CLI: `--dither rectangular`, `--noise-shaping second-order` and
+  `--noise-shaping sony-sbm`, which another choice always beats; naming them is
+  an error that says why and what to use. The library's `Quantizer` keeps them.
+
 ### Fixed
 
 - Plug-ins: after a filter loaded, a processing fault from before it (for

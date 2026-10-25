@@ -114,7 +114,9 @@ misses all of that.
   detection and include-chain formatting.
 - `native.cli`: subprocess file renders compared with independent expected
   output; empty, exact and partial last blocks, gain/matrix routing, both latency
-  modes, real RAW pipelines, and protection against overwriting inputs/IRs/configs.
+  modes, real RAW pipelines, protection against overwriting inputs/IRs/configs,
+  the dither default by resolution, the advice on pointless or beaten dither and
+  shaping choices, and the errors for removed options.
 - `native.inspection`: the inspection API's selection traversal, located and
   chained diagnostics, syntax-only null fields, all-entry validation after
   failures, raw filters (including AU files named `.raw` and `.pcm`, read
