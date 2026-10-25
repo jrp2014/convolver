@@ -330,10 +330,11 @@ sample exactly as it was before the settings existed, which
   `host_block_sizes`), listed before Status; Gain mode and Latency carry
   `kAudioUnitParameterFlag_NonRealTime`. Values a host writes are stored
   within their ranges. Render reads Gain and Mix each call and hands them to
-  the processor. A new Gain mode set off the render thread is applied at once
-  under the control lock (computing the estimate as above); one set on the
-  render thread waits for the next control call (save, restore, a request for
-  the Status text). A new Latency takes effect at the next `Initialize`,
+  the processor. A new Gain mode set outside `Render` is applied at once
+  under the control lock (computing the estimate as above), even on the
+  thread that renders, as offline tools do; one set from within `Render`
+  waits for the next control call (save, restore, a request for the Status
+  text). A new Latency takes effect at the next `Initialize`,
   which builds the processor; uninitialized, the latency reported is the one
   chosen, with a property-change notification, and initialized, the running
   processor's, with a log line saying when the new value applies. Rebuilding

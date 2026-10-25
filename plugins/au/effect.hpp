@@ -79,10 +79,11 @@ class Effect final : public ausdk::AUBase {
                               AudioUnitParameterInfo&) override;
     OSStatus GetParameterValueStrings(AudioUnitScope, AudioUnitParameterID, CFArrayRef*) override;
     // The Status parameter is read-only: a host's write is ignored. Settings
-    // are stored within their ranges. Off the render thread, a new Gain mode
-    // is applied at once (computing the noise estimate if needed) and a new
-    // Latency is reported; from the render thread they wait for the next
-    // control call (sync_settings). Latency takes effect at the next
+    // are stored within their ranges. Outside Render, a new Gain mode is
+    // applied at once (computing the noise estimate if needed) and a new
+    // Latency is reported; from within Render they wait for the next control
+    // call (sync_settings). Both are marked NonRealTime, so hosts do not
+    // automate them on the audio thread. Latency takes effect at the next
     // Initialize, which builds the processor.
     OSStatus SetParameter(AudioUnitParameterID, AudioUnitScope, AudioUnitElement,
                           AudioUnitParameterValue, UInt32) AUSDK_RTSAFE override;
@@ -170,7 +171,8 @@ class Effect final : public ausdk::AUBase {
     // AU-7: the latency reported to the host, in frames: the processor's
     // block size while initialized, otherwise the one Latency chooses.
     std::atomic<std::size_t> latency_{default_host_block};
-    // The thread that last called Render, to keep heavy work off it.
+    // The thread inside Render, or none: SetParameter keeps heavy work out
+    // of Render.
     std::atomic<pthread_t> render_thread_{};
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,

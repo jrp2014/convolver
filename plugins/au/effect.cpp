@@ -398,7 +398,7 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
         id != latency_parameter)
         return kAudioUnitErr_InvalidParameter;
     AUSDK_RT_UNSAFE_BEGIN("Clamping stores into the existing parameter map; the work for a mode "
-                          "or latency change runs only off the render thread")
+                          "or latency change runs only outside Render")
     store(id, value);
     if ((id == gain_mode_parameter || id == latency_parameter) && !on_render_thread()) {
         std::string message;
@@ -967,8 +967,10 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     // is told about these three calls only; the rest of Render stays checked.
     bool processed = false;
     AUSDK_RT_UNSAFE_BEGIN("HostProcessor's audio functions are real-time safe, unannotated")
-    // So that SetParameter keeps heavy work off this thread (pthread_self
-    // reads a register; it is not annotated either).
+    // So that SetParameter keeps heavy work out of Render (pthread_self reads
+    // a register; it is not annotated either). Cleared on the way out: hosts
+    // and tools that render offline may set parameters on the same thread
+    // between calls, and those changes apply at once.
     render_thread_.store(pthread_self(), std::memory_order_relaxed);
     if (reset_requested_.exchange(false))
         host->reset();
@@ -986,6 +988,7 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
                                 static_cast<AudioUnitParameterValue>(HostStatus::fault), true);
         host->fault_signalled();
     }
+    render_thread_.store(pthread_t{}, std::memory_order_relaxed);
     AUSDK_RT_UNSAFE_END
     if (!processed)
         return kAudio_ParamError;
