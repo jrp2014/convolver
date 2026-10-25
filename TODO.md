@@ -519,7 +519,7 @@ with compatibility tests; linked IDs point to open work above.
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
 | Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
-| Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; VST3 exchanges floats. Fixed shaping coefficients do not imply equal audibility at every sample rate. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
+| Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
 | Source tags and configured CI do not prove a release is qualified | Tie results to exact commits; named hosts, clean machines and signatures remain release evidence. | [Versioning](docs/develop/versioning.md), [testing](docs/develop/testing.md) |
 | Finite oracle, fuzz and heap-guard tests do not prove all-input correctness or hard realtime | Keep explicit numerical tolerances and test boundaries; ROBUST-1. | [Testing](docs/develop/testing.md#validation-limits-and-release-work) |
@@ -582,6 +582,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `f32le` by default and reported, `--raw-filter-format` for others;
   [filter files](docs/use/configuration.md#filter-files),
   [RAW streams](docs/use/command-line.md#raw-streams).
+- [x] **IO-7 — Dither defaults by output resolution.** 25 October 2026, PR #79;
+  [integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping).
 - [x] **IO-6 — FLAC in the preview packages.** 24 October 2026, PR #60:
   decided not to ship the codec libraries; limitation and workarounds in
   [FLAC and Ogg](docs/use/command-line.md#flac-and-ogg).

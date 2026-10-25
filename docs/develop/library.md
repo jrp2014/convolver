@@ -173,10 +173,13 @@ optional `raw_filters` argument lists those it read, and inspection takes the
 same choice in `InspectionOptions` and reports it per path.
 
 `AudioWriter` defaults to plain rounding for integer formats; pass
-`QuantizationOptions` to enable dither, noise shaping or valid bits, as the
+`QuantizationOptions` to enable dither, noise shaping or valid bits. The
 command line's [integer output](../use/command-line.md#integer-formats-dither-and-noise-shaping)
-describes. The noise-shaping coefficients are in
-[io.hpp](../../include/convolver/io.hpp). `AudioWriter(path, info, format, {}, OutputMetadata{mask})`
+describes what each does and when it can be heard. Unlike the library, the
+command line adds triangular dither by default below 20 bits and no longer
+offers `rectangular`, `second_order` or `sony_sbm`, which the library keeps for
+compatibility and comparison with the historical engine. The noise-shaping
+coefficients are in [io.hpp](../../include/convolver/io.hpp). `AudioWriter(path, info, format, {}, OutputMetadata{mask})`
 writes [speaker labels](../use/command-line.md#speaker-labels); the default
 `OutputMetadata{}` keeps the plain header. `estimate_attenuation` in
 [engine.hpp](../../include/convolver/engine.hpp) is the calculation behind

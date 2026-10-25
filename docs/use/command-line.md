@@ -14,8 +14,10 @@ To build it, see [build from source](../develop/build.md).
   whole filter tail. Rate and channel counts must match; nothing is resampled.
 - Output is 32-bit float WAV by default. `--output-format` also writes RF64,
   W64, AIFF, CAF, FLAC and raw files, in 8- to 32-bit integer or 32- and 64-bit
-  float. Integer output is plainly rounded unless you ask for `--dither`,
-  `--noise-shaping` or `--valid-bits`.
+  float. Integer output below 20 bits (pcm8, pcm16) gets triangular dither
+  unless you give `--dither none`; from 20 bits it is plainly rounded, because
+  plain rounding is already inaudible there. Convolver says when a dither or
+  noise-shaping choice is pointless or clearly beaten at the sample rate.
 - `--gain-db` takes a fixed decibel value, `auto` (noise-based estimate) or
   `no-clip` (worst-case filter bound). Neither estimate is a limiter.
 - `--inspect` and `--validate` explain what a configuration resolves to without
@@ -167,28 +169,78 @@ integer (ties toward +infinity) and clipped to [-2^(B-1), 2^(B-1) - 1]. PCM24
 and PCM32 output before version 0.4 used libsndfile's conversion, which can
 differ by at most one LSB.
 
-Dither is off by default. `--dither` selects `none` (default), `triangular`
-(independent TPDF, error power 1/4 LSB² at every signal level),
-`triangular-highpass` (the historical engine's "Triangular": per-channel
-difference of successive uniform values, same amplitude, high-pass error
-spectrum) or `rectangular`. `--dither-seed N` (default 0) seeds the generator;
-the same seed, input and channel count give byte-identical output regardless of
-buffering, on the same build and CPU. On x86-64, CPUs with and without AVX2 and
-FMA use different processing code, whose output differs at float-rounding level
-(below -120 dBFS), so a dithered or integer render can differ in its lowest bit
-between such machines ([measurements](../develop/fft-backends.md#avx2-kernels-chosen-at-run-time)).
+Whether dither and noise shaping can be heard depends on the number of
+significant bits B (the container's, or `--valid-bits`):
+
+| Significant bits | Default | Why |
+| --- | --- | --- |
+| Fewer than 20 (pcm8, pcm16, `--valid-bits` 17 to 19) | `--dither triangular` | Without dither, fades, reverb tails and quiet passages are rounded into distortion that follows the signal. At 16 bits that distortion, or the hiss that replaces it, reaches the threshold of hearing with peaks at about 105 dB SPL |
+| 20 or more (pcm24, pcm32, `--valid-bits` 20 or more) | `--dither none` | Plain rounding stays about 8 dB or more below the threshold of hearing with peaks at 120 dB SPL (measured at 44.1 to 96 kHz), so dither and shaping only add noise. From float, 32-bit rounding is exact above -48 dBFS |
+
+`--dither` selects `triangular` (independent TPDF, error power 1/4 LSB² at
+every signal level), `triangular-highpass` (the historical engine's
+"Triangular": per-channel difference of successive uniform values, the same
+amplitude with a high-pass spectrum, so a little less audible) or `none`.
+`--dither none` below 20 bits draws a warning, and dither or shaping given
+from 20 bits draws a warning that it is pointless; both are still applied.
+`--dither-seed N` (default 0) seeds the generator, and says so when there is
+no dither to seed. The same seed, input and channel count give
+byte-identical output regardless of buffering, on the same build and CPU. On
+x86-64, CPUs with and without AVX2 and FMA use different processing code,
+whose output differs at float-rounding level (below -120 dBFS), so a dithered
+or integer render can differ in its lowest bit between such machines
+([measurements](../develop/fft-backends.md#avx2-kernels-chosen-at-run-time)).
 Float and double formats reject dither, noise shaping and valid bits.
 
-`--noise-shaping` selects one of the historical engine's error-feedback shapers:
-`simple` (first order), `second-order`, `third-order`, `ninth-order` or
-`sony-sbm` (the historical "Pseudo Sony SBM"), or `none` (default). Each
-subtracts a fixed combination of the channel's previous quantization errors
-before rounding, so the error spectrum is the rounding error filtered by
-1 - Σ c_k z^-k, redistributing noise across frequency, often at the cost of more total noise.
-The coefficients are fixed; their audible effect depends on sample rate and
-playback conditions. The fed-back error is taken before
-clipping, so overload cannot make a shaper run away (the historical code could
-wrap). Shaping works with or without dither; use it with dither.
+`--noise-shaping` selects one of the historical engine's error-feedback
+shapers: `simple` (first order), `third-order`, `ninth-order` or `none`
+(default). Each subtracts a fixed combination of the channel's previous
+quantization errors before rounding, so the error spectrum is the rounding
+error filtered by 1 - Σ c_k z^-k. This moves noise to frequencies where
+hearing is less sensitive, at the cost of more total noise. Because the
+coefficients are fixed, the best shaper depends on the sample rate. The
+fed-back error is taken before clipping, so overload cannot make a shaper run
+away (the historical code could wrap). Shaping stays off by default because
+it raises the total and high-frequency noise, which matters if the file is
+processed further.
+
+Convolver compares your choice with the others at the output sample rate.
+When another choice keeps the noise at least 3 dB further below the
+threshold of hearing, it prints that choice; with the defaults it adds it to
+the note saying that dither was added. The best choices measured:
+
+| Sample rate | Best choice | Less audible than plain triangular dither |
+| --- | --- | --- |
+| 8 to 16 kHz | `--dither triangular` (the default) | 0 dB; shaping makes noise worse at these rates |
+| 22.05 kHz | `--dither triangular-highpass --noise-shaping third-order` | 3 dB, too little to be suggested |
+| 32 kHz | `--dither triangular --noise-shaping third-order` | 5 dB |
+| 44.1 and 48 kHz | `--dither triangular-highpass --noise-shaping ninth-order` | 17 to 18 dB |
+| 64 kHz | `--dither triangular-highpass --noise-shaping ninth-order` | 17 dB |
+| 88.2 kHz and above | `--dither triangular-highpass --noise-shaping simple` | 15 to 29 dB |
+
+Three of the historical engine's choices are no longer offered, because
+another always does better, and naming them is an error that says why:
+`rectangular` dither leaves noise that rises and falls with the signal (noise
+modulation), which triangular dither removes for 1.8 dB more noise;
+`second-order` shaping gives the same result as `third-order` (within 1 dB);
+and `sony-sbm` is at least 3 dB more audible than another choice. Both were
+measured with either dither at every rate in the table above, 8 to 384 kHz. The library's `Quantizer` keeps all of them.
+
+#### How the advice was measured
+
+Convolver's own quantizer was run on a busy test signal at 8 to 384 kHz, and
+its error was compared with the threshold of hearing in quiet (ISO 226:2003)
+in each auditory filter band from 25 Hz to 18 kHz. With full scale at 120 dB
+SPL, the margin in the worst band decides how audible a choice is; only the
+differences between choices are used, and they are the same at every bit
+depth. The model is strict: a silent room or headphones, no masking by the
+music. Fades were checked with a 4-LSB tone, and real sources were found to
+dither themselves once their own noise reaches about 0.4 LSB. These results
+agree with Lipshitz, Wannamaker and Vanderkooy, "Quantization and Dither: A
+Theoretical Survey" (J. Audio Eng. Soc. 40(5), 1992), and with Meyer and
+Moran, "Audibility of a CD-Standard A/D/A Loop Inserted into High-Resolution
+Audio Playback" (J. Audio Eng. Soc. 55(9), 2007), who heard 16-bit noise only
+at 10 to 20 dB above normal gain in quiet passages.
 
 `--valid-bits N` quantizes to N significant bits (8 up to the container size)
 and stores them left-justified with the low bits zero, in a

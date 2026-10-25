@@ -74,6 +74,8 @@ std::string raw_encoding_name(RawEncoding);
 // Dither comes from a seeded generator consumed in interleaved sample order, so
 // output depends only on the seed, channel count and sample sequence, not on how
 // the stream is split into write calls.
+// The command line offers none, triangular and triangular_highpass, with
+// triangular by default below 20 significant bits (portable/dither_advice.hpp).
 enum class Dither { none, rectangular, triangular, triangular_highpass };
 // The historical engine's error-feedback noise shapers. Each subtracts a fixed
 // FIR combination of the channel's previous quantization errors, H = sum c_k
@@ -85,6 +87,7 @@ enum class Dither { none, rectangular, triangular, triangular_highpass };
 // - sony_sbm: twelve coefficients from 1.47933 ("Pseudo Sony SBM").
 // The fed-back error is the rounding error including dither, taken before
 // clipping, so it stays bounded and the shaper cannot run away after overload.
+// The command line offers none, simple, third_order and ninth_order.
 enum class NoiseShaping { none, simple, second_order, third_order, ninth_order, sony_sbm };
 struct QuantizationOptions {
     Dither dither = Dither::none;

@@ -71,13 +71,13 @@ def integer_format_tests(d):
     ir=d/'if-ir.wav'; src=d/'if-in.wav'; dst=d/'if-out.wav'
     pcm(ir,[32767]); pcm(src,[(((i*379)%12001)-6000) for i in range(3000)])
     base=['--filter',ir,'--input',src,'--output',dst]
-    call(base+['--output-format','wav-pcm8'])
+    call(base+['--output-format','wav-pcm8','--dither','none'])
     fmt,bits,valid,mask,payload=wave_fields(dst)
     assert (fmt,bits,valid)==(1,8,8) and len(payload)==3000
     exact=[(((i*379)%12001)-6000)*32767/32768/256 for i in range(3000)]
     assert all(abs((b-128)-x)<=0.5+1e-6 for b,x in zip(payload,exact))
     for fmt_name,container in (('wav-pcm24',24),('wav-pcm32',32)):
-        for shaping in ('simple','second-order','third-order','ninth-order','sony-sbm'):
+        for shaping in ('simple','third-order','ninth-order'):
             call(base+['--output-format',fmt_name,'--valid-bits','16','--dither','triangular',
                        '--noise-shaping',shaping])
             fmt,bits,valid,mask,payload=wave_fields(dst)
@@ -87,8 +87,26 @@ def integer_format_tests(d):
                     for i in range(0,len(payload),width)]
             assert all(v % (1<<(container-16))==0 for v in values)
             assert values!=[0]*len(values)
-    call(base+['--output-format','wav-pcm24','--dither','rectangular','--noise-shaping','none'])
+    # From 20 bits dither is off by default, still available, and called pointless.
+    p=call(base+['--output-format','wav-pcm24','--dither','triangular'])
     fmt,bits,valid,mask,_=wave_fields(dst); assert (fmt,bits,valid)==(1,24,24)
+    assert b'pointless at 24 significant bits' in p.stderr, p.stderr
+    p=call(base+['--output-format','wav-pcm24','--valid-bits','20','--noise-shaping','simple'])
+    assert b'pointless at 20 significant bits' in p.stderr, p.stderr
+    p=call(base+['--output-format','wav-pcm32','--dither','triangular'])
+    assert b'exact above -48 dBFS' in p.stderr, p.stderr
+    assert not call(base+['--output-format','wav-pcm24']).stderr
+    # Below 20 bits TPDF dither is the default, and the note says so.
+    p=call(base+['--output-format','wav-pcm24','--valid-bits','19'])
+    assert b'19-bit output: adding triangular (TPDF) dither' in p.stderr, p.stderr
+    dithered_default=wave_fields(dst)[4]
+    call(base+['--output-format','wav-pcm24','--valid-bits','19','--dither','triangular'])
+    assert wave_fields(dst)[4]==dithered_default
+    # At 20 valid bits the default is plain rounding, the same as --dither none.
+    assert not call(base+['--output-format','wav-pcm24','--valid-bits','20']).stderr
+    plain_default=wave_fields(dst)[4]
+    call(base+['--output-format','wav-pcm24','--valid-bits','20','--dither','none'])
+    assert wave_fields(dst)[4]==plain_default and plain_default!=dithered_default
 
 def automatic_gain_tests(d):
     """--gain-db auto/no-clip apply the attenuation estimates and report them."""
@@ -195,12 +213,14 @@ def container_tests(d):
     # Integer and double raw output, read back with the matching --raw-format.
     for name, fmt, size in (('raw-pcm16','s16le',2),('raw-pcm24','s24le',3),
                             ('raw-pcm32','s32le',4),('raw-double','f64le',8)):
-        p=call(base+['--output','-','--output-format',name],data=raw)
+        plain=['--dither','none'] if name=='raw-pcm16' else []
+        p=call(base+['--output','-','--output-format',name]+plain,data=raw)
         assert len(p.stdout)==4*size, (name, len(p.stdout))
         back=call(['--filter',ir,'--raw-input','48000','1','--raw-format',fmt,'--input','-',
                    '--output','-','--output-format','raw-float'],data=p.stdout)
         near(struct.unpack('<4f',back.stdout),[.125,-.0625,.03125,-.25])  # filtered twice
-    assert call(base+['--output','-','--output-format','raw-pcm16'],data=raw).stdout[:2]==b'\0\x20'
+    assert call(base+['--output','-','--output-format','raw-pcm16','--dither','none'],
+                data=raw).stdout[:2]==b'\0\x20'
     # s16 and s24 files whose size is not a multiple of 4 bytes keep every frame,
     # across a read-chunk boundary, from a file and from redirected stdin.
     for fmt, width in (('s16le',2),('s24le',3)):
@@ -363,7 +383,8 @@ def main():
                               '--raw-input','48000','1','--output',str(raw_path),
                               '--output-format','raw-float'],stdin=redirected,capture_output=True)
         assert p.returncode!=0 and raw_path.read_bytes()==raw
-        # PCM16 output is plainly rounded by default; dither is opt-in and reproducible.
+        # PCM16 output has TPDF dither by default; --dither none rounds plainly;
+        # dither is reproducible from its seed.
         pcm(ir,[13107]); pcm(src,[((i*379)%12001)-6000 for i in range(4000)])
         def shorts(path):
             with wave.open(str(path),'rb') as f:
@@ -371,17 +392,45 @@ def main():
                 return struct.unpack('<%dh' % f.getnframes(), f.readframes(f.getnframes()))
         base=['--filter',ir,'--input',src,'--output',dst,'--output-format','wav-pcm16']
         exact=[(((i*379)%12001)-6000)*13107/32768 for i in range(4000)]
-        call(base); plain=shorts(dst); call(base+['--dither','none']); assert shorts(dst)==plain
+        p=call(base+['--dither','none']); plain=shorts(dst)
+        assert b'without dither, 16-bit output' in p.stderr, p.stderr
         assert all(a==math.floor(b+.5) for a,b in zip(plain,exact) if abs(b%1-.5)>.01)
-        call(base+['--dither','triangular']); first=shorts(dst)
+        p=call(base); first=shorts(dst)
+        assert b'16-bit output: adding triangular (TPDF) dither' in p.stderr, p.stderr
+        assert b'triangular-highpass --noise-shaping ninth-order' in p.stderr, p.stderr
+        call(base+['--dither','triangular']); assert shorts(dst)==first
         call(base+['--dither','triangular','--dither-seed','0'])
         assert shorts(dst)==first and first!=plain
         assert all(abs(a-b)<=1.5 for a,b in zip(first,exact))
         call(base+['--dither','triangular','--dither-seed','1']); assert shorts(dst)!=first
-        for mode in ('rectangular','triangular-highpass'):
-            call(base+['--dither',mode]); assert all(abs(a-b)<=1.5 for a,b in zip(shorts(dst),exact))
+        call(base+['--dither','triangular-highpass'])
+        assert all(abs(a-b)<=1.5 for a,b in zip(shorts(dst),exact))
+        # A choice another beats clearly at this rate (48 kHz) points to it;
+        # the best choice draws no warning.
+        p=call(base+['--noise-shaping','simple'])
+        assert b'warning: at 48000 Hz, --dither triangular-highpass --noise-shaping ninth-order' in p.stderr, p.stderr
+        assert not call(base+['--dither','triangular-highpass','--noise-shaping','ninth-order']).stderr
+        p=call(base+['--output-format','wav-float','--dither-seed','4'])
+        assert b'--dither-seed has no effect' in p.stderr, p.stderr
+        # Options another always beats are refused with the reason and the alternative.
+        for removed, why in ((['--dither','rectangular'],b'noise modulation'),
+                             (['--noise-shaping','second-order'],b'Use third-order'),
+                             (['--noise-shaping','sony-sbm'],b'at least 3 dB less audible')):
+            p=call(base+removed,ok=False); assert why in p.stderr, p.stderr
+        # Shaping alone still adds the default dither, and says so.
+        p=call(base+['--noise-shaping','ninth-order'])
+        assert b'adding triangular (TPDF) dither' in p.stderr, p.stderr
+        # The advice follows the sample rate: none at 8 kHz, where the default is
+        # best; simple shaping with high-pass dither at 96 kHz.
+        for rate, advice in ((8000, None),
+                             (96000, b'--dither triangular-highpass --noise-shaping simple would keep the noise about 16 dB')):
+            r_ir=d/'rate-ir.wav'; r_src=d/'rate-in.wav'
+            pcm(r_ir,[13107],rate=rate); pcm(r_src,[((i*379)%12001)-6000 for i in range(4000)],rate=rate)
+            p=call(['--filter',r_ir,'--input',r_src,'--output',dst,'--output-format','wav-pcm16'])
+            assert b'adding triangular (TPDF) dither' in p.stderr, p.stderr
+            assert (advice in p.stderr) if advice else (b'would keep' not in p.stderr), (rate, p.stderr)
         for extra in (['--dither','bogus'],['--dither-seed','-1'],['--dither-seed','x'],
-                      ['--output-format','wav-float','--dither','rectangular'],
+                      ['--output-format','wav-float','--dither','triangular'],
                       ['--output-format','raw-float','--dither','triangular'],
                       ['--noise-shaping','bogus'],['--output-format','wav-float','--noise-shaping','simple'],
                       ['--valid-bits','7'],['--valid-bits','17'],['--output-format','wav-pcm8','--valid-bits','9'],
