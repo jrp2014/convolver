@@ -52,6 +52,7 @@ ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / 'packaging/release-policy.json'
 # Copied from the policy rule into each record, so a record alone can unpack,
 # build and credit its dependency.
+NOTE_FIELDS = ('newer_prerelease', 'prerelease_tried')
 RULE_FIELDS = ('upstream', 'archive', 'directory', 'license', 'notice', 'formats', 'submodule_of', 'path')
 HELP = ('Builds use the newest upstream release of each dependency '
         '(docs/develop/build.md#supporting-libraries).')
@@ -203,6 +204,8 @@ def _note_prerelease(record, rule, tags):
     found = upstream.newest_prerelease(rule, tags)
     if found:
         record['newer_prerelease'] = found[1]
+        if rule.get('advisory_prerelease_run'):
+            record['prerelease_tried'] = True
 
 
 def prerelease_notes(records):
@@ -212,10 +215,29 @@ def prerelease_notes(records):
     return ('\nNewer pre-releases upstream:\n\n' + '\n'.join(notes) + '\n') if notes else ''
 
 
+def warn_prereleases(records):
+    """A GitHub Actions warning for each newer pre-release that no advisory run
+    tries, so that what it signposts is looked at (its release notes)."""
+    if os.environ.get('GITHUB_ACTIONS') != 'true':
+        return
+    for name, record in sorted(records.items()):
+        if record.get('newer_prerelease') and not record.get('prerelease_tried'):
+            print(f'::warning title=Newer {name} pre-release::{name} {record["newer_prerelease"]} is out upstream; '
+                  f'builds and formal tests use {record["version"]}. Check its release notes for changes to come.')
+    sys.stdout.flush()
+
+
+def without_notes(records):
+    """The records without what only describes upstream at resolution time
+    (a newer pre-release), which would be stale in a lock file or manifest."""
+    return {name: {key: value for key, value in record.items() if key not in NOTE_FIELDS}
+            for name, record in records.items()}
+
+
 def lock(records, resolved_at=None):
     """A lock file's contents: what was resolved and when."""
     resolved_at = resolved_at or datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    return {'schema': 1, 'resolved_at': resolved_at, 'dependencies': records}
+    return {'schema': 1, 'resolved_at': resolved_at, 'dependencies': without_notes(records)}
 
 
 def load_records(path):
@@ -373,6 +395,8 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
             record['revision'] = revision
         if newer:
             record['newer_prerelease'] = newer
+            if rule.get('advisory_prerelease_run'):
+                record['prerelease_tried'] = True
         return record, path
     raise ResolveError(f'{name} {version}: no download succeeded:\n  ' + '\n  '.join(failures) + f'\n{HELP}')
 
@@ -386,7 +410,9 @@ def _clone(remote, tag, directory):
 def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=_clone):
     """Clones the newest release of each test source (all, in the policy's
     order, by default) into destination/NAME; returns their records. Only
-    advisory jobs build these, so the formal tests never depend on them."""
+    advisory jobs build these, so the formal tests never depend on them, and a
+    pre-release newer than the newest release is taken: it is what such a job
+    is for."""
     rules = policy.get('test_sources', {})
     names = list(rules) if not names else names
     unknown = sorted(set(names) - set(rules))
@@ -397,13 +423,14 @@ def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=
         rule = rules[name]
         try:
             tags = upstream.parse_ls_remote(lister(rule['upstream']))
-            version, tag, revision = upstream.newest(rule, tags)
+            found = upstream.newest_prerelease(rule, tags)
+            version, tag, revision = found or upstream.newest(rule, tags)
             commit = cloner(rule['upstream'], tag, Path(destination) / name)
             if commit != revision:
                 raise ValueError(f'the clone of {tag} is at {commit}, but the tag points at {revision}')
             records[name] = {'version': version, 'tag': tag, 'revision': revision, 'url': rule['upstream'],
-                             'chosen': 'newest release'}
-            _note_prerelease(records[name], rule, tags)
+                             'chosen': 'newest pre-release, newer than the newest release' if found
+                             else 'newest release'}
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
             errors.append(f'{name}: {error}')
     if errors:
@@ -507,6 +534,7 @@ def main(argv=None):
             records = resolve(policy, args.cache.resolve(), args.names or None, parse_wanted(args.version))
             args.lock.write_text(json.dumps(lock(records), indent=2) + '\n', encoding='utf-8')
             report(markdown(records))
+            warn_prereleases(records)
         elif args.command == 'checkout':
             destination = args.destination.resolve()
             records = checkout(policy, destination, args.names or None)
@@ -524,6 +552,7 @@ def main(argv=None):
                        'release, so there is nothing more to try.\n')
             else:
                 report(tool_markdown(args.name, record))
+                warn_prereleases({args.name: record})
             if args.github_output:
                 with args.github_output.open('a', encoding='utf-8') as output:
                     if record is None:

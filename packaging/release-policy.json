@@ -207,6 +207,7 @@
     "pluginval": {
       "upstream": "https://github.com/Tracktion/pluginval",
       "tag_prefix": "v",
+      "advisory_prerelease_run": true,
       "url": "https://github.com/Tracktion/pluginval/releases/download/{tag}/{asset}",
       "github_release": "Tracktion/pluginval",
       "assets": {

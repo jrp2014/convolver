@@ -396,25 +396,31 @@ Convolver changes. GitHub Actions versions are updated by Dependabot instead.
 
 ### Pre-releases and newer upstream versions
 
-Builds and formal tests use full releases only, never a beta or release
-candidate. What a newer pre-release or upstream version signposts is still
-looked at, but only as advice: it shows up as a warning in the job summary and
-never fails a run.
+The critical gate is the newest full release on the current platform, never a
+beta or release candidate. What a newer pre-release or upstream version
+signposts is still looked at, but only as advice: it is reported as a GitHub
+Actions warning and in the job summary, and does not fail a run (with the one
+exception below).
 
 - Every summary names a newer pre-release of a dependency or tool when there
   is one (for example a `v1.20.0-rc1` beside lv2 1.18.10), without using it.
+  Where no advisory run tries it, the job also raises a warning asking for
+  its release notes to be read. Lock files and manifests leave the note out,
+  since it describes upstream, not the build.
 - pluginval: the formal tests use the newest full release. When a newer
   pre-release exists (2.0.0-beta3 in October 2026), the VST3 jobs also run
   `vst3.pluginval` with it, `--rtcheck` included on macOS, and report any
-  problems as warnings. The acceptance test is the exception: it needs
-  pluginval 2's `test` command, which no full release has yet, so it runs with
-  the pre-release and must pass
+  problems as warnings, including a failed download. The acceptance test is
+  the exception: it needs pluginval 2's `test` command, which no full release
+  has yet, so it runs with the pre-release and must pass (a skip counts as a
+  failure there)
   ([pluginval](testing.md#pluginval)).
 - lilv: the formal LV2 tests use Ubuntu 24.04's packages. The **Newest upstream
-  lilv (advisory)** job builds the newest releases of lilv, zix, serd, sord
-  and sratom (`resolve.py checkout`, from the policy's `test_sources`) with the
-  newest lv2 headers, runs the same LV2 tests against them and reports a
-  failure as a warning.
+  lilv (advisory)** job builds the newest versions of lilv, zix, serd, sord
+  and sratom (`resolve.py checkout`, from the policy's `test_sources`; a
+  pre-release when it is newer than the newest release) with the newest lv2
+  headers, runs the same LV2 tests against them and reports any failure,
+  including a failed download or build, as a warning.
 
 ### When a new release breaks the build
 

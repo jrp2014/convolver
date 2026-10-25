@@ -159,6 +159,17 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual((records['audiounitsdk']['version'], records['audiounitsdk']['chosen']),
                          ('1.3.0', 'requested (1.3.0)'))
 
+    def test_prerelease_notes_warn_but_stay_out_of_records(self):
+        records = self.resolve({'lv2', 'audiounitsdk'})
+        with mock.patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                contextlib.redirect_stdout(io.StringIO()) as printed:
+            resolve.warn_prereleases(records)
+        self.assertEqual(printed.getvalue().count('::warning'), 1)
+        self.assertIn('lv2 v1.20.0-rc1 is out upstream; builds and formal tests use 1.18.10', printed.getvalue())
+        self.assertNotIn('newer_prerelease', resolve.lock(records)['dependencies']['lv2'])
+        policy = dict(self.policy, dependencies={n: self.policy['dependencies'][n] for n in records})
+        self.assertNotIn('newer_prerelease', contract.with_records(policy, records)['dependencies']['lv2'])
+
     def test_release_asset_checked_against_github(self):
         published = {}
 
@@ -213,7 +224,7 @@ class ResolveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'lock.json'
             path.write_text(json.dumps(resolve.lock(records, '2026-10-24T00:00:00Z')))
-            self.assertEqual(resolve.load_records(path), records)
+            self.assertEqual(resolve.load_records(path), resolve.without_notes(records))
             path.write_text(json.dumps({'schema': 1}))
             with self.assertRaisesRegex(ValueError, 'no dependency records'):
                 resolve.load_records(path)
@@ -248,16 +259,17 @@ class CheckoutTests(unittest.TestCase):
             cloned.append((Path(directory).name, tag))
             return upstream.parse_ls_remote(listing(TAGS[remote]))[tag]
         records = resolve.checkout(self.policy, Path('sources'), lister=lister, cloner=cloner)
+        # The advisory build tries lilv's release candidate, newer than 0.28.0.
         self.assertEqual(cloned, [('zix', 'v0.8.2'), ('serd', 'v0.32.10'), ('sord', 'v0.16.22'),
-                                  ('sratom', 'v0.6.22'), ('lilv', 'v0.28.0')])
-        self.assertEqual(records['lilv']['revision'], '8' * 40)
-        self.assertEqual(records['lilv']['newer_prerelease'], 'v0.30.0-rc1')
+                                  ('sratom', 'v0.6.22'), ('lilv', 'v0.30.0-rc1')])
+        self.assertEqual(records['lilv']['revision'], '9' * 40)
+        self.assertIn('pre-release', records['lilv']['chosen'])
+        self.assertEqual(records['zix']['chosen'], 'newest release')
         table = resolve.checkout_markdown(records)
-        self.assertIn('| [lilv](https://gitlab.com/lv2/lilv.git) | 0.28.0 | `v0.28.0` |', table)
-        self.assertIn('- lilv: `v0.30.0-rc1` (not used', table)
+        self.assertIn('| [lilv](https://gitlab.com/lv2/lilv.git) | 0.30.0-rc1 | `v0.30.0-rc1` |', table)
 
     def test_a_moved_tag_is_refused(self):
-        with self.assertRaisesRegex(resolve.ResolveError, 'lilv: the clone of v0.28.0 is at ' + '0' * 40):
+        with self.assertRaisesRegex(resolve.ResolveError, 'lilv: the clone of v0.30.0-rc1 is at ' + '0' * 40):
             resolve.checkout(self.policy, Path('sources'), ['lilv'], lister=lister,
                              cloner=lambda *args: '0' * 40)
         with self.assertRaisesRegex(resolve.ResolveError, 'unknown test sources'):
@@ -290,6 +302,7 @@ class ToolTests(unittest.TestCase):
         record, _ = self.tool('pluginval', os_name='macOS', digest=lambda *args: digest(asset_url))
         self.assertEqual((record['version'], record['url']), ('1.0.4', asset_url))
         self.assertEqual(record['newer_prerelease'], 'v2.0.0-beta3')
+        self.assertTrue(record['prerelease_tried'])  # The VST3 jobs run it; no extra warning.
         self.assertIn('newer pre-release exists upstream: `v2.0.0-beta3`', resolve.tool_markdown('pluginval', record))
         self.assertEqual(record['checked_against'], 'the digest GitHub publishes for the asset')
         with self.assertRaisesRegex(resolve.ResolveError, 'differs from the digest GitHub publishes'):

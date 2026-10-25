@@ -165,6 +165,7 @@ def main(argv=None):
             resolved_at = json.loads(args.lock.read_text(encoding='utf-8')).get('resolved_at')
         args.record.write_text(json.dumps(resolve.lock(records, resolved_at), indent=2) + '\n', encoding='utf-8')
     resolve.report(resolve.markdown(records))
+    resolve.warn_prereleases(records)
     for name in sorted(args.names):
         print(f"{name} {records[name]['version']}: {args.destination / records[name]['directory']}")
     if args.github_output:

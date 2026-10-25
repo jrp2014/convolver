@@ -147,7 +147,11 @@ def with_records(policy, records):
     if missing:
         raise ValueError(f'no record for dependencies: {sorted(missing)}')
     validate_records(records)
-    return dict(policy, dependencies={name: records[name] for name in policy['dependencies']})
+    # A newer pre-release is noted at resolution time only; it is not part of
+    # what a build used, so it stays out of manifests.
+    return dict(policy, dependencies={name: {key: value for key, value in records[name].items()
+                                             if key not in ('newer_prerelease', 'prerelease_tried')}
+                                      for name in policy['dependencies']})
 
 
 def platform_policy(policy, identifier):

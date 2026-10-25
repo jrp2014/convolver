@@ -178,32 +178,66 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          # Problems here are warnings, except that the acceptance test must
+          # pass while the formal release (pluginval 1) cannot run it.
+          required=false
+          if [ "${PLUGINVAL_VERSION%%.*}" -lt 2 ]; then required=true; fi
+          advise() {
+            echo "::warning title=pluginval pre-release::$1"
+            echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          give_up() {
+            if [ "$required" = true ]; then
+              echo "::error title=pluginval pre-release::$1 The acceptance test needs it (pluginval 2)."
+              exit 1
+            fi
+            advise "$1"
+            exit 0
+          }
           directory="$RUNNER_TEMP/pluginval-prerelease"
           python scripts/release/resolve.py tool pluginval --prerelease --cache "$directory" \
-            --os "$RUNNER_OS" --github-output "$RUNNER_TEMP/pluginval-prerelease.env"
-          grep -qx 'available=true' "$RUNNER_TEMP/pluginval-prerelease.env" || exit 0
+            --os "$RUNNER_OS" --github-output "$RUNNER_TEMP/pluginval-prerelease.env" ||
+            give_up "Cannot fetch the newest pluginval pre-release; see the log of this step."
+          if ! grep -qx 'available=true' "$RUNNER_TEMP/pluginval-prerelease.env"; then
+            # No newer pre-release: the formal release must then run the acceptance test itself.
+            if [ "$required" = true ]; then
+              echo "::error::No pluginval 2 to run the acceptance test with."
+              exit 1
+            fi
+            exit 0
+          fi
           archive=$(sed -n 's/^archive=//p' "$RUNNER_TEMP/pluginval-prerelease.env")
           version=$(sed -n 's/^version=//p' "$RUNNER_TEMP/pluginval-prerelease.env")
-          (cd "$directory" && unzip -q "$archive")
+          if [ "${version%%.*}" -lt 2 ]; then
+            required=false  # It could not run the acceptance test either.
+            advise "pluginval $version cannot run the acceptance test (it needs pluginval 2)."
+          fi
+          (cd "$directory" && unzip -q "$archive") ||
+            give_up "Cannot unpack pluginval $version; see the log of this step."
           arguments=''
           if [ "$RUNNER_OS" = macOS ]; then arguments='--rtcheck;relaxed'; fi
           cmake -S . -B build-vst3 "-DCONVOLVER_PLUGINVAL=$directory/$PLUGINVAL_EXECUTABLE" \
-            "-DCONVOLVER_PLUGINVAL_ARGS=$arguments"
-          if ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval$'; then
+            "-DCONVOLVER_PLUGINVAL_ARGS=$arguments" ||
+            give_up "Cannot configure the tests with pluginval $version; see the log of this step."
+          if ctest --test-dir build-vst3 -C Release --output-on-failure --no-tests=error \
+            -R '^vst3\.pluginval$'; then
             echo "pluginval $version (pre-release): validation passes, as with $PLUGINVAL_VERSION." \
               >> "$GITHUB_STEP_SUMMARY"
           else
             message="pluginval $version (pre-release) reports problems that $PLUGINVAL_VERSION does not;"
-            message="$message see the log of this step. Advisory: the formal result is $PLUGINVAL_VERSION's."
-            echo "::warning title=pluginval $version::$message"
-            echo "**Warning:** $message" >> "$GITHUB_STEP_SUMMARY"
+            advise "$message see the log of this step. The formal result is $PLUGINVAL_VERSION's."
           fi
-          # Required only while the formal release cannot run it (pluginval 1).
-          if [ "${PLUGINVAL_VERSION%%.*}" -lt 2 ]; then
-            ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval\.acceptance$'
-          elif ! ctest --test-dir build-vst3 -C Release --output-on-failure -R '^vst3\.pluginval\.acceptance$'; then
-            echo "::warning title=pluginval $version::The acceptance test fails with this pre-release;" \
-              "see the log of this step."
+          if [ "$required" = true ]; then
+            # A skip (exit code 77) would pass silently, so it is refused.
+            ctest --test-dir build-vst3 -C Release --output-on-failure --no-tests=error \
+              -R '^vst3\.pluginval\.acceptance$' --output-junit "$RUNNER_TEMP/acceptance.xml"
+            if grep -q '<skipped' "$RUNNER_TEMP/acceptance.xml"; then
+              echo "::error::The acceptance test was skipped with pluginval $version."
+              exit 1
+            fi
+          elif [ "${version%%.*}" -ge 2 ] && ! ctest --test-dir build-vst3 -C Release --output-on-failure \
+            --no-tests=error -R '^vst3\.pluginval\.acceptance$'; then
+            advise "The acceptance test fails with pluginval $version (pre-release); see the log of this step."
           fi
       - name: Explain a failure that may come from a new upstream release
         if: failure()

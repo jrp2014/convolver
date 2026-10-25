@@ -96,6 +96,7 @@ if __name__ == '__main__':
     else:
         records = resolve.load_records(args.lock)
     resolve.report(resolve.markdown(records))
+    resolve.warn_prereleases(records)
     used = used_dependencies(policy, args.formats, args.backend)
     policy = dict(policy, dependencies={name: rule for name, rule in policy['dependencies'].items() if name in used})
     build(with_records(policy, records), args.cache, args.work, args.cmake, args.fetch, args.architecture,
