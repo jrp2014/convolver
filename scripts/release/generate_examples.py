@@ -16,13 +16,19 @@ def generate(output, converter):
     examples = []
     for rate in (44100, 48000, 96000):
         for channels in (1, 2):
-            for kind in ('identity', 'echo'):
+            for kind in ('identity', 'echo', 'repeat'):
                 name = f'{kind}-{rate}-' + ('mono' if channels == 1 else 'stereo')
                 folder = output / name
                 folder.mkdir(exist_ok=True)
                 # Exactly representable coefficients: identity; or -6 dB direct
-                # plus a quarter-amplitude delayed tap, with headroom.
-                impulse = [1.0] if kind == 'identity' else [0.5] + [0.0] * 256 + [0.25]
+                # plus a quarter-amplitude delayed tap, with headroom. The echo's
+                # tap (257 samples, about 5 ms) is heard only as a hollow tone;
+                # the repeat's (a quarter of a second) is heard as a repeat.
+                delay = {'identity': 0, 'echo': 257, 'repeat': rate // 4}[kind]
+                taps = [[0, 1.0]] if kind == 'identity' else [[0, 0.5], [delay, 0.25]]
+                impulse = [0.0] * (delay + 1)
+                for position, value in taps:
+                    impulse[position] = value
                 (folder / 'impulse.wav').write_bytes(float_wav_bytes(rate, [impulse] * channels))
                 zeroes = ' '.join(['0'] * channels)
                 config = f'{rate} {channels} {channels} 0\n{zeroes}\n{zeroes}\n'
@@ -34,7 +40,7 @@ def generate(output, converter):
                     preset.unlink()  # Only this generator's own output directory.
                 subprocess.run([str(converter), str(folder / 'impulse.wav'), str(preset)], check=True)
                 examples.append(dict(name=name, rate=rate, channels=channels, kind=kind,
-                                     taps=[[0, 1.0]] if kind == 'identity' else [[0, 0.5], [257, 0.25]], latency=256))
+                                     taps=taps, latency=256))
     (output / 'examples.json').write_text(json.dumps(examples, indent=2) + '\n', encoding='utf-8')
 
 

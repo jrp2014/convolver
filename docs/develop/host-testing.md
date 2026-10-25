@@ -42,7 +42,7 @@ Host facts were checked on 23 October 2026.
 | --- | --- | --- | --- | --- |
 | [REAPER](https://www.reaper.fm/download.php) 7 (Cockos) | VST3 | Free 60-day evaluation, fully functional; it keeps running afterwards with a reminder, though the licence then expects a purchase | Projects that save plug-in state, offline rendering, latency compensation, CPU meter. Also loads AU on macOS, for AU-4 later | Tracks have at least two channels, so mono presets are not part of its smoke test |
 | [Audacity](https://www.audacityteam.org/download/) 4.0 or later (GPL) | VST3 | Free | An audio editor: real-time effects on a track, and effects applied to a selection. Version 4.0 (3 September 2026) loads VST3 and, on macOS, AU | Its preset menu imports only Audacity's own text files, not `.vstpreset`; presets come from the system VST3 preset folder instead ([preparation](#prepare-the-mac)). It asks Convolver for stereo on every track |
-| GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, and GarageBand offers only the stereo version of an effect, so only the `44100-stereo` presets apply. Preview packages hold no Audio Unit yet (AU-5 adds it for the first preview), so build it from source |
+| GarageBand 10.4 (Apple) | Audio Unit only | Free with macOS | Apple's own host, with the same Audio Unit check as Logic | Projects run at 44.1 kHz only, so only the `44100` presets apply. GarageBand runs an effect in mono (1 in, 1 out) on a track whose input is mono and in stereo on a stereo track (seen 25 October 2026), and Convolver plays silence when the preset does not match. It offers no other layouts. Preview packages hold no Audio Unit yet (AU-5 adds it for the first preview), so build it from source |
 
 Record each result under HOST-1 (VST3 hosts) or AU-4 (GarageBand) in
 [TODO](../../TODO.md), with the details in [every report](#every-report).
@@ -162,7 +162,7 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    system-wide.
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
    stereo, where the host offers both ([first hosts](#first-hosts)). Check
-   that the identity and echo examples sound as expected.
+   that the identity, echo and repeat examples sound as expected.
 3. Save the project, close and reopen it, and check that the filter is restored.
 4. Try a preset with the wrong rate or channel count while a working filter is
    running. The working filter must keep running, the plug-in's Status
@@ -198,16 +198,18 @@ except the Audio Unit build, which runs in a source checkout.
    auval -v aufx Conv CONV
    ```
 
-   The output must end with `AU VALIDATION SUCCEEDED`. Then make the two
-   GarageBand presets from the package's VST3 examples, so they appear in the
+   The output must end with `AU VALIDATION SUCCEEDED`. Then make the
+   GarageBand presets, mono and stereo, from the package's VST3 examples, so they appear in the
    unit's preset menu (the tool refuses to overwrite, so delete old copies
    before running it again):
 
    ```sh
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
-   for kind in identity echo; do
-     ./bin/convolver-preset "presets/$kind-44100-stereo/filter.vstpreset" \
-       ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-stereo.aupreset
+   for kind in identity echo repeat; do
+     for layout in mono stereo; do
+       ./bin/convolver-preset "presets/$kind-44100-$layout/filter.vstpreset" \
+         ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-$layout.aupreset
+     done
    done
    ```
 
@@ -261,7 +263,10 @@ except the Audio Unit build, which runs in a source checkout.
    `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
    hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
    the direct sound, too soon to hear as a separate repeat.) Status reads
-   `Filter loaded: 48000 Hz, 2 in, 2 out.`
+   `Filter loaded: 48000 Hz, 2 in, 2 out.` Import
+   `presets/repeat-48000-stereo/filter.vstpreset`: each sound comes again,
+   quieter, a quarter of a second later. Import the echo preset again for the
+   next steps.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
@@ -291,7 +296,8 @@ except the Audio Unit build, which runs in a source checkout.
    **E**) and add Convolver. In its preset menu choose `identity-48000-stereo`
    (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
    Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
-   REAPER. Record whether a preset chosen during playback is heard at once or
+   REAPER. Choose `repeat-48000-stereo`: each sound comes again a quarter of a
+   second later; then choose `echo-48000-stereo` again. Record whether a preset chosen during playback is heard at once or
    only after stopping and starting playback again. The effect's window lists
    a read-only Status. Audacity's window has its own copy of the plug-in,
    which normally is not started, so Status should read `Filter loaded: 48000
@@ -323,7 +329,10 @@ except the Audio Unit build, which runs in a source checkout.
 1. Turn on *GarageBand › Settings › Audio/MIDI › Enable Audio Units* and
    restart GarageBand if it asks.
 2. Create an empty project with an audio track, and drag the 44.1 kHz stereo
-   file onto it (GarageBand projects always run at 44.1 kHz).
+   file onto it (GarageBand projects always run at 44.1 kHz). In Smart
+   Controls › Track › Recording Settings, set the track's input to stereo
+   (the button beside *Input* shows two circles): on a mono input GarageBand
+   runs the plug-in in mono, and the stereo presets then play silence.
 3. Show Smart Controls (**B**) and open the **Plug-ins** area. Click an empty
    plug-in slot and choose *Audio Units › Convolver › Convolver*. Click the
    middle of the slot to open its window. With no preset loaded it passes the
@@ -331,7 +340,9 @@ except the Audio Unit build, which runs in a source checkout.
    what it reads: the full line (`No filter: audio passes unchanged. ...`), or
    only its name (`No filter`), as Apple's generic window may show.
 4. From the window's preset menu choose `identity-44100-stereo`, then
-   `echo-44100-stereo`, and listen as in REAPER.
+   `echo-44100-stereo`, and listen as in REAPER. Then choose
+   `repeat-44100-stereo`: each sound comes again, quieter, a quarter of a
+   second later. Go back to `echo-44100-stereo` for the next steps.
 5. Switch the plug-in off and on with the slot's power button while playing;
    note any click. GarageBand, not Convolver, saves whether the plug-in is off.
 6. Save the project, quit, reopen and play: the echo is still there.
@@ -346,10 +357,11 @@ except the Audio Unit build, which runs in a source checkout.
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
-9. The [settings](../use/plugins.md#settings), with the echo playing. Record
-   where the window shows Gain and Mix and how it shows their values. Set
-   Gain to −12 dB: the level drops smoothly, without a click. Set Mix to 0%:
-   you hear the dry track; 50% mixes the two. Save, quit and reopen the
+9. The [settings](../use/plugins.md#settings). Choose `repeat-44100-stereo`,
+   where the changes are easiest to hear, and play. Record where the window
+   shows Gain and Mix and how it shows their values. Set Gain to −12 dB: the
+   level drops smoothly, without a click. Set Mix to 0%: you hear the dry
+   track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
    after the reopening ends with
    `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the
@@ -361,7 +373,7 @@ except the Audio Unit build, which runs in a source checkout.
 1. Download through the actual user-facing route, retaining quarantine metadata.
    Install the signed package and scan without disabling security. Check
    `convolver-preset` operation too.
-2. Check identity and echo output at 44.1/48/96 kHz, mono/stereo, variable blocks,
+2. Check identity, echo and repeat output at 44.1/48/96 kHz, mono/stereo, variable blocks,
    long-tail silence, stop/start/seek and offline/bounce rendering. Align numerical
    comparison by 256 samples; use an independent time-domain convolution reference.
 3. Exercise bypass automation, multiple instances and filter replacements. Check

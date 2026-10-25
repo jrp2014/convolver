@@ -31,7 +31,7 @@ def check(root, validator=None, probe=None):
     from documentation_examples import check as check_documentation
     check_documentation(root)
     examples = json.loads((root / 'presets/examples.json').read_text())
-    assert len(examples) == 12, 'expected mono/stereo x three rates x identity/echo'
+    assert len(examples) == 18, 'expected mono/stereo x three rates x identity/echo/repeat'
     with tempfile.TemporaryDirectory(prefix='convolver-relocation-') as temporary:
         relocated = Path(temporary) / 'Convolver ü with spaces'
         shutil.copytree(root, relocated)
