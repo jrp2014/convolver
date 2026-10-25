@@ -20,32 +20,8 @@ namespace {
 constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
                                                   "Not checked yet", "Fault"};
 static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
-// AU-7: the Gain mode parameter's values, in GainMode order, and Latency's.
-constexpr std::array<const char*, 3> mode_names{"Set", "Estimate", "No clipping"};
-static_assert(static_cast<std::size_t>(GainMode::no_clipping) == mode_names.size() - 1);
-constexpr AudioUnitParameterValue default_latency_index = 2;
-static_assert(host_block_sizes[2] == default_host_block);
-constexpr std::array<AudioUnitParameterID, 5> parameter_order{
-    gain_parameter, gain_mode_parameter, mix_parameter, latency_parameter, status_parameter};
-
-AudioUnitParameterValue index_value(AudioUnitParameterValue value, std::size_t count) {
-    if (!std::isfinite(value))
-        return 0;
-    return std::clamp<AudioUnitParameterValue>(std::round(value), 0,
-                                               static_cast<AudioUnitParameterValue>(count - 1));
-}
-
-CFArrayRef string_array(std::span<const std::string> texts) {
-    std::vector<CFStringRef> names;
-    for (const auto& text : texts)
-        names.push_back(CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8));
-    const auto array = CFArrayCreate(nullptr, reinterpret_cast<const void**>(names.data()),
-                                     static_cast<CFIndex>(names.size()), &kCFTypeArrayCallBacks);
-    for (auto* name : names)
-        if (name)
-            CFRelease(name);
-    return array;
-}
+constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
+                                                              status_parameter};
 
 // AU-7: the global parameter values in AUBase's saved "data" blob, read with
 // bounds checks (AUBase's own reader has none): for each scope and element,
@@ -154,86 +130,28 @@ Effect::Effect(AudioComponentInstance instance)
     // AU-7: the settings at their defaults, which keep the sound unchanged.
     const HostSettings defaults;
     Globals()->SetParameter(gain_parameter, static_cast<AudioUnitParameterValue>(defaults.gain_db));
-    Globals()->SetParameter(gain_mode_parameter,
-                            static_cast<AudioUnitParameterValue>(defaults.gain_mode));
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
-    Globals()->SetParameter(latency_parameter, default_latency_index);
-}
-
-bool Effect::on_render_thread() const noexcept {
-    const auto render = render_thread_.load(std::memory_order_relaxed);
-    return render && pthread_equal(render, pthread_self());
-}
-
-std::size_t Effect::chosen_block() noexcept {
-    const auto index =
-        index_value(Globals()->GetParameterRT(latency_parameter), host_block_sizes.size());
-    return host_block_sizes[static_cast<std::size_t>(index)];
 }
 
 HostSettings Effect::settings() {
     HostSettings s;
-    const auto* globals = Globals();
-    s.gain_db = globals->GetParameterRT(gain_parameter);
-    s.gain_mode = static_cast<GainMode>(
-        index_value(globals->GetParameterRT(gain_mode_parameter), mode_names.size()));
-    s.mix = globals->GetParameterRT(mix_parameter) / 100.0;
-    s.block = chosen_block();
+    s.gain_db = Globals()->GetParameterRT(gain_parameter);
+    s.mix = Globals()->GetParameterRT(mix_parameter) / 100.0;
     return checked_settings(s);
 }
 
-HostMeters Effect::meters() {
-    std::lock_guard lock(control_);
-    return host_ ? host_->meters() : HostMeters{};
-}
-
 void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexcept {
-    switch (id) {
-    case gain_parameter:
+    if (id == gain_parameter)
         value = std::isnan(value)
                     ? 0.f
                     : std::clamp(value, static_cast<AudioUnitParameterValue>(min_gain_db),
                                  static_cast<AudioUnitParameterValue>(max_gain_db));
-        break;
-    case gain_mode_parameter:
-        value = index_value(value, mode_names.size());
-        break;
-    case mix_parameter:
+    else if (id == mix_parameter)
         value = std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
-        break;
-    case latency_parameter:
-        value = index_value(value, host_block_sizes.size());
-        break;
-    default:
+    else
         return;
-    }
     static_cast<void>(Globals()->SetParameterOrError(id, value));
-}
-
-std::string Effect::sync_settings() noexcept {
-    if (!host_)
-        return {}; // Initialize applies every setting.
-    try {
-        const auto mode = settings().gain_mode;
-        if (mode == host_->gain_mode())
-            return {};
-        // What plays: the accepted filter, unless the instance plays silence.
-        const auto& failure = filter_.failure();
-        const auto& accepted = filter_.filter();
-        const Configuration* playing =
-            accepted && !(failure && failure->silent) ? &*accepted : nullptr;
-        try {
-            host_->set_gain_mode(mode, playing);
-        } catch (const std::exception& e) {
-            return std::string("Gain mode Estimate could not be applied, so the filter plays at "
-                               "the Set gain: ") +
-                   e.what() + ".";
-        }
-        return "Gain mode set to " + std::string(mode_names[static_cast<std::size_t>(mode)]) + ".";
-    } catch (...) { // Out of memory: the processor keeps its mode.
-        return {};
-    }
 }
 
 void Effect::log(const std::string& message, bool problem) noexcept {
@@ -335,16 +253,6 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.defaultValue = 0;
         info.flags = settable;
         return noErr;
-    case gain_mode_parameter:
-        FillInParameterName(info, CFSTR("Gain mode"), false);
-        info.unit = kAudioUnitParameterUnit_Indexed;
-        info.minValue = 0;
-        info.maxValue = static_cast<AudioUnitParameterValue>(mode_names.size() - 1);
-        info.defaultValue = static_cast<AudioUnitParameterValue>(GainMode::set);
-        // Estimate convolves noise for a while: not a value to automate.
-        info.flags = settable | kAudioUnitParameterFlag_ValuesHaveStrings |
-                     kAudioUnitParameterFlag_NonRealTime;
-        return noErr;
     case mix_parameter:
         FillInParameterName(info, CFSTR("Mix"), false);
         info.unit = kAudioUnitParameterUnit_Percent;
@@ -353,16 +261,6 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.defaultValue = 100;
         info.flags = settable;
         return noErr;
-    case latency_parameter:
-        FillInParameterName(info, CFSTR("Latency"), false);
-        info.unit = kAudioUnitParameterUnit_Indexed;
-        info.minValue = 0;
-        info.maxValue = static_cast<AudioUnitParameterValue>(host_block_sizes.size() - 1);
-        info.defaultValue = default_latency_index;
-        // A new block size needs a new processor (at the next Initialize).
-        info.flags = settable | kAudioUnitParameterFlag_ValuesHaveStrings |
-                     kAudioUnitParameterFlag_NonRealTime;
-        return noErr;
     default:
         return kAudioUnitErr_InvalidParameter;
     }
@@ -370,20 +268,18 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
 
 OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id,
                                           CFArrayRef* out) {
-    if (scope != kAudioUnitScope_Global ||
-        (id != status_parameter && id != gain_mode_parameter && id != latency_parameter))
+    if (scope != kAudioUnitScope_Global || id != status_parameter)
         return kAudioUnitErr_InvalidProperty;
     if (!out) // Asked whether the strings exist.
         return noErr;
-    std::vector<std::string> texts;
-    if (id == status_parameter)
-        texts.assign(status_names.begin(), status_names.end());
-    else if (id == gain_mode_parameter)
-        texts.assign(mode_names.begin(), mode_names.end());
-    else
-        for (const auto frames : host_block_sizes)
-            texts.push_back(std::to_string(frames) + " frames");
-    *out = string_array(texts);
+    std::array<CFStringRef, status_names.size()> names{};
+    for (std::size_t i = 0; i < names.size(); ++i)
+        names[i] = CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8);
+    *out = CFArrayCreate(nullptr, reinterpret_cast<const void**>(names.data()),
+                         static_cast<CFIndex>(names.size()), &kCFTypeArrayCallBacks);
+    for (auto* name : names)
+        if (name)
+            CFRelease(name);
     return *out ? noErr : kAudioUnitErr_InvalidProperty;
 }
 
@@ -394,32 +290,10 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
         return AUBase::SetParameter(id, scope, element, value, offset);
     if (id == status_parameter)
         return noErr;
-    if (id != gain_parameter && id != gain_mode_parameter && id != mix_parameter &&
-        id != latency_parameter)
+    if (id != gain_parameter && id != mix_parameter)
         return kAudioUnitErr_InvalidParameter;
-    AUSDK_RT_UNSAFE_BEGIN("Clamping stores into the existing parameter map; the work for a mode "
-                          "or latency change runs only outside Render")
+    AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map")
     store(id, value);
-    if ((id == gain_mode_parameter || id == latency_parameter) && !on_render_thread()) {
-        std::string message;
-        bool latency_changed = false;
-        {
-            std::lock_guard lock(control_);
-            if (id == gain_mode_parameter)
-                message = sync_settings();
-            else if (!host_) {
-                const auto block = chosen_block();
-                latency_changed = latency_.exchange(block) != block;
-            } else if (chosen_block() != host_->latency_frames()) {
-                message = "Latency " + std::to_string(chosen_block()) +
-                          " frames chosen; it takes effect when the host next starts the plug-in "
-                          "(initializes it).";
-            }
-        }
-        log(message, message.find("could not") != std::string::npos);
-        if (latency_changed)
-            PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
-    }
     AUSDK_RT_UNSAFE_END
     return noErr;
 }
@@ -461,14 +335,13 @@ OSStatus Effect::Initialize() {
             const auto host = layout();
             current = settings();
             // A filter that does not suit the host plays silence, and is kept so
-            // that correcting the rate or channels brings it back. The settings
-            // apply from the first frame; Estimate computes the noise estimate.
-            auto next = std::make_unique<HostProcessor>(filter_.activate(host),
-                                                        GetMaxFramesPerSlice(), current);
+            // that correcting the rate or channels brings it back. Gain and Mix
+            // apply from the first frame.
+            auto next = std::make_unique<HostProcessor>(
+                filter_.activate(host), GetMaxFramesPerSlice(), current, latency_frames);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
-            latency_.store(next->latency_frames());
             host_ = std::move(next);
             initialized_ = host;
             rendered_.store(false);
@@ -522,7 +395,6 @@ void Effect::Cleanup() {
         if (rendered_.load())
             committed_ = initialized_;
         host_.reset();
-        latency_.store(chosen_block()); // What the next initialization uses.
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
     log_faults(faults);
@@ -585,13 +457,12 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
-        std::string text, faults, settings_message;
+        std::string text, faults;
         try {
             std::lock_guard lock(control_);
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
-            settings_message = sync_settings();
             if (!faults.empty())
                 update_status();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
@@ -608,7 +479,6 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             log_faults(faults);
             notify_status();
         }
-        log(settings_message, settings_message.find("could not") != std::string::npos);
         if (text.empty())
             return kAudioUnitErr_InvalidPropertyValue;
         request->outString =
@@ -675,7 +545,7 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
 
 Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
     const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
-    return rate > 0 ? static_cast<Float64>(latency_.load()) / rate : 0;
+    return rate > 0 ? static_cast<Float64>(latency_frames) / rate : 0;
 }
 
 Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
@@ -702,14 +572,13 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
     std::vector<std::byte> bytes;
-    std::string faults, settings_message;
+    std::string faults;
     try {
         HostState state;
         {
             std::lock_guard lock(control_);
             // Hosts save often (autosave too): faults are explained here as well.
             faults = observe_faults();
-            settings_message = sync_settings();
             if (!faults.empty())
                 update_status();
             state.configuration = filter_.filter();
@@ -728,8 +597,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         log_faults(faults);
         notify_status();
     }
-    log(settings_message, settings_message.find("could not") != std::string::npos);
-    // AU-7: AUBase writes the parameter values (the settings, and Status,
+    // AU-7: AUBase writes the parameter values (Gain and Mix, and Status,
     // which RestoreState ignores) under "data".
     if (const auto result = AUBase::SaveState(out); result != noErr)
         return result;
@@ -805,8 +673,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
-    // AU-7: the settings saved with the state. A preset from convolver-preset
-    // has none, and settings it does not hold keep their values.
+    // AU-7: Gain and Mix as saved with the state, applied if the state is
+    // accepted. A preset from convolver-preset has none, and settings it does
+    // not hold keep their values.
     std::optional<std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>> saved;
     bool settings_unreadable = false;
     if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
@@ -818,22 +687,11 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         settings_unreadable = !saved;
     }
 
-    bool accepted = false, problem = true, latency_changed = false;
-    std::string message, faults, settings_message;
+    bool accepted = false, problem = true;
+    std::string message, faults;
     {
         std::lock_guard lock(control_);
         faults = observe_faults(); // Explained under the filter that played; a load clears them.
-        // The settings go first, so that a filter prepared now has its Gain
-        // mode's gains; a rejected request puts the earlier values back.
-        std::array<AudioUnitParameterValue, 4> earlier{};
-        constexpr std::array<AudioUnitParameterID, 4> settings_ids{
-            gain_parameter, gain_mode_parameter, mix_parameter, latency_parameter};
-        for (std::size_t i = 0; i < settings_ids.size(); ++i)
-            earlier[i] = Globals()->GetParameterRT(settings_ids[i]);
-        if (saved)
-            for (const auto& [id, value] : *saved)
-                store(id, value); // Status and unknown IDs are ignored.
-        settings_message = sync_settings();
         const bool was_failed = filter_.failed();
         // Initialized, a prepared replacement is published to the audio thread;
         // uninitialized, the next initialization installs the filter.
@@ -863,6 +721,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
+            if (saved)
+                for (const auto& [id, value] : *saved)
+                    store(id, value); // Status and unknown IDs are ignored.
         } catch (...) {
             // A failed first load plays silence rather than the unfiltered input.
             if (host_ && filter_.failed() && !was_failed) {
@@ -876,18 +737,6 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             if (!host_ && filter_.failed())
                 tail_.store(0);
         }
-        if (!accepted && saved) {
-            for (std::size_t i = 0; i < settings_ids.size(); ++i)
-                store(settings_ids[i], earlier[i]);
-            settings_message = sync_settings();
-        }
-        if (!host_)
-            latency_changed = latency_.exchange(chosen_block()) != chosen_block();
-        else if (accepted && chosen_block() != host_->latency_frames())
-            settings_message += (settings_message.empty() ? "" : " ") + std::string("Latency ") +
-                                std::to_string(chosen_block()) +
-                                " frames restored; it takes effect when the host next starts the "
-                                "plug-in (initializes it).";
         try {
             // Why this request failed, or what was loaded (with the saved
             // failure it restored); not an older failure found at initialization.
@@ -903,15 +752,14 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     }
     // Listeners may call back into the unit, so notify outside the lock.
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
-    if (latency_changed)
-        PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     if (accepted && settings_unreadable)
-        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain, Gain "
-            "mode, Mix and Latency keep their values.");
-    log(settings_message, settings_message.find("could not") != std::string::npos);
+        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain and "
+            "Mix keep their values.");
     notify_status();
+    if (!accepted)
+        return kAudioUnitErr_InvalidPropertyValue;
     if (saved) {
         // Hosts and generic views reread the settings.
         AudioUnitEvent event{};
@@ -921,11 +769,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             AUEventListenerNotify(nullptr, nullptr, &event);
         }
     }
-    if (!accepted)
-        return kAudioUnitErr_InvalidPropertyValue;
     // The preset name and element names, as AUBase restores them. Its "data"
-    // (parameter values) is left out: the settings were read above with
-    // bounds checks, and AUBase reads that blob without them.
+    // (parameter values) is left out: Gain and Mix were read above with bounds
+    // checks, and AUBase reads that blob without them.
     const auto copy = CFDictionaryCreateMutableCopy(nullptr, 0, dict);
     if (!copy)
         return noErr;
@@ -967,15 +813,10 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     // is told about these three calls only; the rest of Render stays checked.
     bool processed = false;
     AUSDK_RT_UNSAFE_BEGIN("HostProcessor's audio functions are real-time safe, unannotated")
-    // So that SetParameter keeps heavy work out of Render (pthread_self reads
-    // a register; it is not annotated either). Cleared on the way out: hosts
-    // and tools that render offline may set parameters on the same thread
-    // between calls, and those changes apply at once.
-    render_thread_.store(pthread_self(), std::memory_order_relaxed);
     if (reset_requested_.exchange(false))
         host->reset();
     host->set_bypass(bypass_.load(std::memory_order_relaxed));
-    // AU-7: Gain (Set mode's value) and Mix, ramped by the processor.
+    // AU-7: Gain and Mix, ramped by the processor.
     host->set_gain_db(Globals()->GetParameterRT(gain_parameter));
     host->set_mix(Globals()->GetParameterRT(mix_parameter) / 100.0);
     processed = host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames);
@@ -988,7 +829,6 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
                                 static_cast<AudioUnitParameterValue>(HostStatus::fault), true);
         host->fault_signalled();
     }
-    render_thread_.store(pthread_t{}, std::memory_order_relaxed);
     AUSDK_RT_UNSAFE_END
     if (!processed)
         return kAudio_ParamError;

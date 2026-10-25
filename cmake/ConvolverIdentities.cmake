@@ -56,12 +56,9 @@ convolver_identity(convolver_vst3_bypass_parameter vst3 bypass_parameter_id)
 convolver_identity(convolver_vst3_status_parameter vst3 status_parameter_id)
 convolver_identity(convolver_au_status_parameter au status_parameter_id)
 convolver_identity(convolver_au_gain_parameter au gain_parameter_id)
-convolver_identity(convolver_au_gain_mode_parameter au gain_mode_parameter_id)
 convolver_identity(convolver_au_mix_parameter au mix_parameter_id)
-convolver_identity(convolver_au_latency_parameter au latency_parameter_id)
 foreach(id IN ITEMS "${convolver_vst3_bypass_parameter}" "${convolver_vst3_status_parameter}" "${convolver_au_status_parameter}"
-        "${convolver_au_gain_parameter}" "${convolver_au_gain_mode_parameter}" "${convolver_au_mix_parameter}"
-        "${convolver_au_latency_parameter}")
+        "${convolver_au_gain_parameter}" "${convolver_au_mix_parameter}")
     if(NOT id MATCHES "^[0-9]+$")
         message(FATAL_ERROR "plugins/identities.json: parameter ID '${id}' is not a whole number")
     endif()

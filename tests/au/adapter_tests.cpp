@@ -588,8 +588,7 @@ void render_requires_initialization() {
 } // namespace
 
 // AU-7: PLUG-10's settings as global parameters. Ranges and defaults, what
-// they do to the audio, Latency taking effect at the next initialization,
-// and saving and restoring them with ClassInfo.
+// they do to the audio, and saving and restoring them with ClassInfo.
 AudioUnitParameterValue parameter(Unit& unit, AudioUnitParameterID id) {
     AudioUnitParameterValue v = -1;
     check(AudioUnitGetParameter(unit.get(), id, kAudioUnitScope_Global, 0, &v), "parameter value");
@@ -614,13 +613,10 @@ void settings_parameters() {
         AudioUnitParameterID id;
         AudioUnitParameterUnit unit;
         float min, max, def;
-        bool strings, non_real_time;
     };
     for (const auto& e :
-         {Expected{au::gain_parameter, kAudioUnitParameterUnit_Decibels, -100, 24, 0, false, false},
-          Expected{au::gain_mode_parameter, kAudioUnitParameterUnit_Indexed, 0, 2, 0, true, true},
-          Expected{au::mix_parameter, kAudioUnitParameterUnit_Percent, 0, 100, 100, false, false},
-          Expected{au::latency_parameter, kAudioUnitParameterUnit_Indexed, 0, 6, 2, true, true}}) {
+         {Expected{au::gain_parameter, kAudioUnitParameterUnit_Decibels, -100, 24, 0},
+          Expected{au::mix_parameter, kAudioUnitParameterUnit_Percent, 0, 100, 100}}) {
         Unit unit;
         AudioUnitParameterInfo info{};
         UInt32 size = sizeof info;
@@ -630,23 +626,11 @@ void settings_parameters() {
         require(info.unit == e.unit && info.minValue == e.min && info.maxValue == e.max &&
                     info.defaultValue == e.def &&
                     (info.flags & kAudioUnitParameterFlag_IsReadable) &&
-                    (info.flags & kAudioUnitParameterFlag_IsWritable) &&
-                    !!(info.flags & kAudioUnitParameterFlag_ValuesHaveStrings) == e.strings &&
-                    !!(info.flags & kAudioUnitParameterFlag_NonRealTime) == e.non_real_time,
+                    (info.flags & kAudioUnitParameterFlag_IsWritable),
                 "parameter " + std::to_string(e.id) + " info");
         if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
             CFRelease(info.cfNameString);
         require(parameter(unit, e.id) == e.def, "parameter " + std::to_string(e.id) + " default");
-        if (e.strings) {
-            CFArrayRef names = nullptr;
-            size = sizeof names;
-            check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterValueStrings,
-                                       kAudioUnitScope_Global, e.id, &names, &size),
-                  "settings value strings");
-            require(names && CFArrayGetCount(names) == static_cast<CFIndex>(e.max + 1),
-                    "settings value strings count");
-            CFRelease(names);
-        }
         // Values outside the range are stored within it.
         set_parameter(unit, e.id, e.max + 1000);
         require(parameter(unit, e.id) == e.max, "parameter not clamped above");
@@ -659,64 +643,30 @@ void settings_parameters() {
     for (std::size_t ch = 0; ch < 2; ++ch)
         half.paths.push_back({{.5f}, {{ch, 1}}, {{ch, 1}}});
     Unit unit;
-    Notifications seen;
-    check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
-                                       &Notifications::listener, &seen),
-          "latency listener");
     check(unit.configure(48000, 2, 2, 512), "settings formats");
-    // Latency chosen before initialization: reported at once, and the host told.
-    set_parameter(unit, au::latency_parameter, 0);
-    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000 &&
-                seen.count[kAudioUnitProperty_Latency] > 0,
-            "Latency before initialization not reported");
     check(unit.load(state_of(half)), "settings filter");
     check(unit.initialize(), "settings initialization");
-    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000, "Latency not used");
     require(std::abs(steady_output(unit, 2) - .25f) < 1e-5, "default settings changed the sound");
     set_parameter(unit, au::gain_parameter, -6);
-    require(std::abs(steady_output(unit, 2) - .25 * std::pow(10.0, -6.0 / 20)) < 1e-5,
-            "Gain not applied");
+    const double gain = std::pow(10.0, -6.0 / 20);
+    require(std::abs(steady_output(unit, 2) - .25 * gain) < 1e-5, "Gain not applied");
     set_parameter(unit, au::mix_parameter, 50);
-    require(std::abs(steady_output(unit, 2) - (.5 * .25 * std::pow(10.0, -6.0 / 20) + .25)) < 1e-5,
-            "Mix not applied");
-    // No clipping: the filter's bound is 0.5, so its gain is +6 dB.
-    set_parameter(unit, au::mix_parameter, 100);
-    set_parameter(unit, au::gain_mode_parameter, 2);
-    require(std::abs(steady_output(unit, 2) - .5) < 1e-5, "No clipping not applied");
-    // Estimate: the noise estimate of the filter that plays.
-    set_parameter(unit, au::gain_mode_parameter, 1);
-    const auto noise = estimate_attenuation(half).noise_peak;
-    require(std::abs(steady_output(unit, 2) - .25 / noise) < 1e-5, "Estimate not applied");
-    // Latency changed while initialized: the running processor keeps its own
-    // until the next initialization.
-    set_parameter(unit, au::latency_parameter, 3);
-    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
-            "Latency changed without a new processor");
-    unit.uninitialize();
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "uninitialized latency not the chosen one");
-    check(unit.initialize(), "settings reinitialization");
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000, "new Latency not used");
+    require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
 
-    // Saved with ClassInfo, restored into a new instance, also before it is
+    // Saved with ClassInfo, restored into a new instance before it is
     // initialized, and applied when it is.
-    set_parameter(unit, au::gain_parameter, -12);
     const auto saved = unit.class_info_now();
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
     check(copy.restore(saved), "restore with settings");
-    require(parameter(copy, au::gain_parameter) == -12 &&
-                parameter(copy, au::gain_mode_parameter) == 1 &&
-                parameter(copy, au::mix_parameter) == 100 &&
-                parameter(copy, au::latency_parameter) == 3 &&
-                copy.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+    require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
             "settings not restored");
     check(copy.initialize(), "copy initialization");
-    require(std::abs(steady_output(copy, 3) - .25 / noise) < 1e-5, "restored Estimate mode");
+    require(std::abs(steady_output(copy, 3) - (.5 * .25 * gain + .25)) < 1e-5,
+            "restored settings not applied from the first frame");
     // A preset from convolver-preset has no parameter values: settings keep theirs.
     check(copy.load(state_of(half)), "preset without settings");
-    require(parameter(copy, au::gain_parameter) == -12 &&
-                parameter(copy, au::gain_mode_parameter) == 1,
+    require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
             "a preset without settings reset them");
     // Malformed parameter data: the filter loads, the settings keep their values.
     const auto mutable_copy =
@@ -771,10 +721,9 @@ void status_parameter() {
                                &size),
           "parameter list");
     // AU-7: the settings first, as generic views list them, then Status.
-    require(size == 5 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
-                ids[1] == au::gain_mode_parameter && ids[2] == au::mix_parameter &&
-                ids[3] == au::latency_parameter && ids[4] == au::status_parameter,
-            "the parameters should be Gain, Gain mode, Mix, Latency and Status");
+    require(size == 3 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
+                ids[1] == au::mix_parameter && ids[2] == au::status_parameter,
+            "the parameters should be Gain, Mix and Status");
     AudioUnitParameterInfo info{};
     size = sizeof info;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,

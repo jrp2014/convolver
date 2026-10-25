@@ -159,8 +159,7 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
                 std::to_string(max_frames) + " frames. ";
     const auto with_settings = [&](std::string text) {
         if (settings)
-            text += " Settings: " +
-                    settings_words(*settings, host.sample_rate, host.inputs == host.outputs) + ".";
+            text += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";
         return text;
     };
     if (const auto& f = filter.failure(); f && f->silent)

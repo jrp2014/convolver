@@ -38,9 +38,7 @@ FROZEN = {
     ('au', 'status_parameter_id'): 1001,
     # PLUG-10's settings in the Audio Unit (AU-7), approved by jrp 25 October 2026.
     ('au', 'gain_parameter_id'): 0,
-    ('au', 'gain_mode_parameter_id'): 1002,
     ('au', 'mix_parameter_id'): 1003,
-    ('au', 'latency_parameter_id'): 1004,
     ('lv2', 'base_uri'): 'https://github.com/jrp2014/convolver/lv2#',
     ('lv2', 'bundle'): 'convolver.lv2',
     ('macos_installer', 'vst3_package_id'): 'io.github.jrp2014.convolver.pkg.vst3',
@@ -123,7 +121,7 @@ def check_rules(registry, errors):
     if len(set(ids)) != len(ids):
         errors.append('VST3 processor and controller class IDs must differ')
     vst3_parameters = [registry['vst3'][k] for k in ('bypass_parameter_id', 'status_parameter_id')]
-    au_names = ('status', 'gain_mode', 'mix', 'latency')
+    au_names = ('status', 'mix')
     au_parameters = [au[f'{k}_parameter_id'] for k in au_names]
     for name, pid in [*zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
                       *((f'au {k}', p) for k, p in zip(au_names, au_parameters))]:

@@ -20,7 +20,7 @@ std::uint64_t splitmix64(std::uint64_t& state) noexcept {
 }
 // Exact peak bound: output o is sum_i (k_oi * x_i) with k_oi the sum over paths of
 // out_gain * in_gain * h. Its largest magnitude for |x| <= 1 is sum_i sum_n |k_oi[n]|.
-double peak_bound(const Configuration& c) {
+double worst_case_peak(const Configuration& c) {
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
@@ -108,12 +108,8 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
     AttenuationEstimate result;
     result.noise_peak = peak;
     result.noise_attenuation_db = attenuation_db(peak);
-    result.worst_case_peak = peak_bound(c);
+    result.worst_case_peak = worst_case_peak(c);
     result.worst_case_attenuation_db = attenuation_db(result.worst_case_peak);
     return result;
-}
-double worst_case_peak(const Configuration& c) {
-    validate_configuration(c);
-    return peak_bound(c);
 }
 } // namespace convolver

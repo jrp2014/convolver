@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// PLUG-10: HostProcessor's settings (gain and its modes, mix, block size) and
-// meters, checked against the direct double-precision oracle, sample by
-// sample through their ramps, and without allocation on the audio thread.
+// PLUG-10: HostProcessor's settings (gain and mix), checked against the
+// direct double-precision oracle, sample by sample through their ramps, and
+// without allocation on the audio thread.
 #include "convolver/host.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -152,8 +151,7 @@ void gain_and_mix_against_oracle() {
         HostSettings s;
         s.gain_db = k.gain_db;
         s.mix = k.mix;
-        s.block = k.block;
-        HostProcessor host(c, k.callback, s);
+        HostProcessor host(c, k.callback, s, k.block);
         require(host.latency_frames() == k.block, "block size not used");
         const auto input = noise(random, 2 * (4 * k.block + 700));
         const auto output = play(host, input, 2, 2, k.callback);
@@ -205,9 +203,7 @@ std::vector<float> per_sample(HostProcessor& host, std::size_t frames, float lev
 
 // A change of gain or mix ramps linearly over 64 frames, never in one step.
 void ramps() {
-    HostSettings s;
-    s.block = 64;
-    HostProcessor host(tap_filter(1), 1, s);
+    HostProcessor host(tap_filter(1), 1, HostSettings{}, 64);
     per_sample(host, 200); // Past the latency: output 1.
     host.set_gain_db(-20);
     auto out = per_sample(host, 100);
@@ -234,73 +230,12 @@ void ramps() {
     require(std::abs(out[99] - 1) < 1e-6, "a gain that is not a number should play 0 dB");
 }
 
-// Estimate and No clipping apply estimate_attenuation()'s values for the
-// filter that plays, including after a replacement and a mode change.
-void gain_modes() {
-    const auto first = tap_filter(.25f), second = tap_filter(.5f);
-    const auto e1 = estimate_attenuation(first), e2 = estimate_attenuation(second);
-    require(worst_case_peak(first) == e1.worst_case_peak, "worst_case_peak() differs");
-    HostSettings s;
-    s.block = 64;
-    s.gain_mode = GainMode::no_clipping;
-    HostProcessor host(first, 1, s);
-    auto out = per_sample(host, 100, .5f);
-    require(std::abs(out[99] - .5 * .25 / e1.worst_case_peak) < 1e-6, "No clipping gain");
-    // Estimate while playing: computed here, then ramped to.
-    host.set_gain_mode(GainMode::estimate, &first);
-    require(host.gain_mode() == GainMode::estimate, "mode not kept");
-    out = per_sample(host, 100, .5f);
-    require(std::abs(out[99] - .5 * .25 / e1.noise_peak) < 1e-5, "Estimate gain after a switch");
-    require(out[10] != out[99], "Estimate switch should ramp");
-    // A replacement prepared in Estimate mode carries its own estimate.
-    host.replace(second);
-    out = per_sample(host, 1000, .5f);
-    require(std::abs(out[999] - .5 * .5 / e2.noise_peak) < 1e-5, "replacement's Estimate gain");
-    // Set mode plays the set gain; the computed modes ignore it.
-    host.set_gain_db(-6);
-    host.set_gain_mode(GainMode::set);
-    out = per_sample(host, 100, .5f);
-    require(std::abs(out[99] - .5 * .5 * std::pow(10.0, -6.0 / 20)) < 1e-6, "Set gain");
-    // A replacement prepared in Set mode has no estimate; switching computes it.
-    host.replace(first);
-    per_sample(host, 1000, .5f);
-    host.set_gain_mode(GainMode::estimate, &first);
-    out = per_sample(host, 100, .5f);
-    require(std::abs(out[99] - .5 * .25 / e1.noise_peak) < 1e-5, "Estimate after Set-mode load");
-    // An estimate that cannot be computed: the mode is kept, the Set gain plays.
-    auto huge = tap_filter(std::numeric_limits<float>::max());
-    huge.paths[0].impulse.assign(4, std::numeric_limits<float>::max());
-    HostSettings plain;
-    plain.block = 64;
-    HostProcessor big(tap_filter(1), 1, plain);
-    bool threw = false;
-    try {
-        big.set_gain_mode(GainMode::estimate, &huge);
-    } catch (const std::overflow_error&) {
-        threw = true;
-    }
-    require(threw && big.gain_mode() == GainMode::estimate, "estimate failure not reported");
-    // ... and a filter prepared in Estimate mode whose estimate fails is refused.
-    threw = false;
-    try {
-        HostProcessor refused(huge, 1, [] {
-            HostSettings e;
-            e.gain_mode = GainMode::estimate;
-            return e;
-        }());
-    } catch (const std::overflow_error&) {
-        threw = true;
-    }
-    require(threw, "a filter without an estimate accepted in Estimate mode");
-}
-
 // With unequal counts there is no dry signal, so the mix stays 100% wet.
 void unequal_mix() {
     Configuration c{48000, 1, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}, {1, 1}}}}};
     HostSettings s;
-    s.block = 64;
     s.mix = 0;
-    HostProcessor host(c, 1, s);
+    HostProcessor host(c, 1, s, 64);
     for (int t = 0; t < 200; ++t) {
         float in = .5f, a = 0, b = 0;
         const float* ins[] = {&in};
@@ -314,65 +249,23 @@ void unequal_mix() {
     }
 }
 
-// Meters: the peak, samples above full scale and callback timings, reset on request.
-void meters() {
-    HostSettings s;
-    s.block = 64;
-    s.gain_db = 6;
-    HostProcessor host(tap_filter(1), 64, s);
-    require(host.meters().calls == 0 && host.meters().peak == 0, "fresh meters");
-    std::array<float, 64> in{}, out{};
-    in.fill(.75f);
-    const float* ins[] = {in.data()};
-    float* outs[] = {out.data()};
-    for (int k = 0; k < 4; ++k) {
-        audio_thread = true;
-        host.process(ins, outs, 64);
-        audio_thread = false;
-    }
-    const auto m = host.meters();
-    const auto expected = static_cast<float>(.75 * std::pow(10.0, 6.0 / 20));
-    require(std::abs(m.peak - expected) < 1e-6, "peak meter");
-    require(m.clipped == 3 * 64, "samples above full scale: " + std::to_string(m.clipped));
-    require(m.calls == 4 && m.load_max >= 0 && m.load_p99 > 0 && m.load_p99 <= 2.05,
-            "callback load");
-    // Quiet input; its first block still plays the loud one, after the latency.
-    in.fill(.1f);
-    audio_thread = true;
-    host.process(ins, outs, 64);
-    audio_thread = false;
-    host.reset_meters();
-    require(host.meters().calls == 5, "reset waits for the audio thread");
-    audio_thread = true;
-    host.process(ins, outs, 64);
-    audio_thread = false;
-    const auto after = host.meters();
-    require(after.calls == 1 && after.clipped == 0 &&
-                std::abs(after.peak - .1 * std::pow(10.0, 6.0 / 20)) < 1e-5,
-            "meters reset");
-}
-
 void settings_text() {
     HostSettings s;
     require(checked_settings(s) == s, "defaults are valid");
     s.gain_db = -500;
     s.mix = 2;
-    s.block = 300;
     const auto c = checked_settings(s);
-    require(c.gain_db == min_gain_db && c.mix == 1 && c.block == default_host_block,
-            "settings not clamped");
-    require(settings_words(HostSettings{}, 48000, true) ==
-                "latency 256 frames (5.3 ms at 48000 Hz), gain 0 dB (Set), mix 100% wet",
-            "settings words: " + settings_words(HostSettings{}, 48000, true));
-    s = HostSettings{};
-    s.gain_mode = GainMode::estimate;
-    s.mix = .5;
-    require(settings_words(s, 44100, false).find("Estimate") != std::string::npos &&
-                settings_words(s, 44100, false).find("no dry signal") != std::string::npos,
-            "settings words for Estimate and unequal counts");
+    require(c.gain_db == min_gain_db && c.mix == 1, "settings not clamped");
+    require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet",
+            "settings words: " + settings_words(HostSettings{}, true));
+    s = HostSettings{-6, .5};
+    require(settings_words(s, true) == "gain -6 dB, mix 50% wet",
+            "settings words: " + settings_words(s, true));
+    require(settings_words(s, false).find("no dry signal") != std::string::npos,
+            "settings words for unequal counts");
     HostFilter filter;
     const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
-    require(line.find("Settings: latency 256 frames") != std::string::npos,
+    require(line.find("Settings: gain -6 dB, mix 50% wet.") != std::string::npos,
             "started line without settings: " + line);
 }
 } // namespace
@@ -382,9 +275,7 @@ int main() {
         defaults_unchanged();
         gain_and_mix_against_oracle();
         ramps();
-        gain_modes();
         unequal_mix();
-        meters();
         settings_text();
         std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n",
                     worst_relative, worst_case.c_str());

@@ -167,10 +167,8 @@ misses all of that.
   without them, through bypass and a replacement; gain and mix from the first
   frame against the oracle at blocks of 64 to 4096 frames and callbacks of 1
   to 4096, printing the worst error relative to the output peak; the 64-frame
-  ramps sample by sample; clamping; Estimate and No clipping against
-  `estimate_attenuation()`, after a mode switch, a replacement and a
-  Set-mode load, and when the estimate cannot be computed; the mix with
-  unequal counts; the meters and their reset; and the log's settings words.
+  ramps sample by sample; clamping; the mix with unequal counts; and the
+  log's settings words.
   The audio thread is checked for allocation throughout.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
@@ -525,10 +523,9 @@ Three CTest tests run when the adapter is built (label `au`):
   the tests only), an initialization that cannot build its processor, bypass
   switched from another thread while rendering, the output silence flag, no
   C++ allocation while rendering, and the settings (AU-7): parameter info,
-  defaults and clamping, Gain, Mix, No clipping and Estimate in the audio,
-  Latency before and after initialization, and saving and restoring them
-  with `ClassInfo`, including a preset without settings, malformed parameter
-  data and a rejected preset.
+  defaults and clamping, Gain and Mix in the audio, and saving and restoring
+  them with `ClassInfo`, including a preset without settings, malformed
+  parameter data and a rejected preset.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.

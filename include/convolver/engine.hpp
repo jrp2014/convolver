@@ -67,10 +67,6 @@ struct AttenuationEstimate {
 // planning: not for the audio thread.
 AttenuationEstimate estimate_attenuation(const Configuration&, std::uint64_t seed = 0,
                                          std::size_t lengths = 10);
-// PLUG-10: AttenuationEstimate::worst_case_peak alone, without the noise
-// convolution: a sum of absolute taps, cheap enough for every filter load.
-// Validates like the Engine.
-double worst_case_peak(const Configuration&);
 
 // Backend selected when building the library; strings have static lifetime.
 const char* fft_backend_name() noexcept;

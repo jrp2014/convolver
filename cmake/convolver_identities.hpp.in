@@ -28,9 +28,7 @@ inline constexpr std::uint32_t au_status_parameter_id = @convolver_au_status_par
 // PLUG-10's settings (AU-7). Gain shares ID 0 with the historical VST2
 // plug-in's Attenuation, by jrp's decision, with a new range.
 inline constexpr std::uint32_t au_gain_parameter_id = @convolver_au_gain_parameter@;
-inline constexpr std::uint32_t au_gain_mode_parameter_id = @convolver_au_gain_mode_parameter@;
 inline constexpr std::uint32_t au_mix_parameter_id = @convolver_au_mix_parameter@;
-inline constexpr std::uint32_t au_latency_parameter_id = @convolver_au_latency_parameter@;
 constexpr std::uint32_t four_char(std::string_view code) noexcept {
     std::uint32_t value = 0;
     for (char c : code)

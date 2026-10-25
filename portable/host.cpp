@@ -5,7 +5,6 @@
 #include <array>
 #include <atomic>
 #include <bit>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -491,12 +490,6 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
 }
 
 namespace {
-// The linear gain that brings `peak` to full scale; 1 for a silent filter.
-float gain_for_peak(double peak) noexcept {
-    if (!(peak > 0))
-        return 1;
-    return static_cast<float>(std::min(1 / peak, double(std::numeric_limits<float>::max())));
-}
 float gain_from_db(double db) noexcept {
     return static_cast<float>(std::pow(10.0, db / 20));
 }
@@ -506,51 +499,23 @@ double clamp_gain_db(double db) noexcept {
 double clamp_mix(double mix) noexcept {
     return std::isnan(mix) ? 1 : std::clamp(mix, 0.0, 1.0);
 }
-// PLUG-10's callback load histogram: steps of 5% of the callback period, the
-// last for 200% and more.
-constexpr std::size_t load_steps = 41;
-// A publication number as 32 bits that are never 0 (0 means nothing handed over).
-constexpr std::uint64_t estimate_key(std::uint64_t number) noexcept {
-    return (number & 0x7FFFFFFFU) | 0x80000000U;
-}
-constexpr double load_step = 0.05;
 } // namespace
 
 HostSettings checked_settings(HostSettings s) {
     s.gain_db = clamp_gain_db(s.gain_db);
     s.mix = clamp_mix(s.mix);
-    if (std::find(host_block_sizes.begin(), host_block_sizes.end(), s.block) ==
-        host_block_sizes.end())
-        s.block = default_host_block;
-    if (s.gain_mode != GainMode::estimate && s.gain_mode != GainMode::no_clipping)
-        s.gain_mode = GainMode::set;
     return s;
 }
 
-std::string settings_words(const HostSettings& s, int sample_rate, bool equal_counts) {
-    char latency[64] = {};
-    if (sample_rate > 0)
-        std::snprintf(latency, sizeof latency, " (%.1f ms at %d Hz)",
-                      1000.0 * static_cast<double>(s.block) / sample_rate, sample_rate);
+std::string settings_words(const HostSettings& s, bool equal_counts) {
     char gain[32] = {};
-    std::snprintf(gain, sizeof gain, "%g dB", s.gain_db);
-    auto words = "latency " + std::to_string(s.block) + " frames" + latency + ", gain ";
-    switch (s.gain_mode) {
-    case GainMode::estimate:
-        words += "Estimate (the filter's noise estimate)";
-        break;
-    case GainMode::no_clipping:
-        words += "No clipping (the filter's worst-case bound)";
-        break;
-    case GainMode::set:
-        words += std::string(gain) + " (Set)";
-        break;
-    }
+    std::snprintf(gain, sizeof gain, "gain %g dB", s.gain_db);
     if (!equal_counts)
-        return words + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    char mix[16] = {};
-    std::snprintf(mix, sizeof mix, "%g", 100 * s.mix);
-    return words + ", mix " + mix + "% wet";
+        return std::string(gain) +
+               ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
+    char mix[32] = {};
+    std::snprintf(mix, sizeof mix, ", mix %g%% wet", 100 * s.mix);
+    return std::string(gain) + mix;
 }
 
 struct HostProcessor::Impl {
@@ -558,23 +523,12 @@ struct HostProcessor::Impl {
         Engine engine;
         Prepared* next_retired = nullptr;
         std::uint64_t number = 0; // Publications are numbered from 1, in order.
-        // PLUG-10: the linear gains of the computed modes. The noise estimate
-        // is computed only in Estimate mode, or handed over later
-        // (set_gain_mode()); until then Estimate plays the Set gain.
-        float bound_gain = 1, noise_gain = 1;
-        bool noise_known = false;
-        Prepared(const Configuration& c, std::size_t block, GainMode mode) : engine(c, block) {
-            bound_gain = gain_for_peak(worst_case_peak(c));
-            if (mode == GainMode::estimate) {
-                noise_gain = gain_for_peak(estimate_attenuation(c).noise_peak);
-                noise_known = true;
-            }
-        }
+        explicit Prepared(const Configuration& c, std::size_t block) : engine(c, block) {}
     };
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
     static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
-    // Members are grouped by size (8, 4, then 1 byte) to avoid padding.
+    const int rate;
     const std::size_t inputs, outputs, maximum, block;
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
@@ -587,6 +541,7 @@ struct HostProcessor::Impl {
     // The fault total at the last clear_faults() (control writes), and at the
     // last fault_signalled() (audio thread writes).
     std::atomic<std::uint64_t> faults_cleared{0}, faults_signalled{0};
+    std::atomic<bool> signal_held{false};
     std::uint64_t fault_total() const noexcept {
         return rejected_input.load(std::memory_order_relaxed) +
                output_overflow.load(std::memory_order_relaxed) +
@@ -599,89 +554,51 @@ struct HostProcessor::Impl {
     }
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
-    // Publications up to this number were made before mute(): adopting one
-    // keeps the silence. Only a filter published after it ends the silence.
-    std::uint64_t muted_through = 0;
-    // PLUG-10. The mode is written on the control side; Set's gain and the
-    // mix on the audio thread. `gain` and `mix` ramp to their targets over 64
-    // frames; the filter being faded out keeps the gain it had.
-    // A noise estimate handed over by set_gain_mode(): estimate_key() of the
-    // publication number in the high half, the gain's float bits in the low;
-    // 0 before any.
-    std::atomic<std::uint64_t> handed_estimate{0};
+    // PLUG-10: the gain and mix the adapter set (audio thread), and the values
+    // playing, which ramp to them over 64 frames.
     double set_db = 0;
     std::size_t gain_ramp = 0, mix_ramp = 0;
-    // Meters, written by the audio thread only (reset on request).
-    std::atomic<std::uint64_t> clipped{0}, calls{0};
-    std::array<std::atomic<std::uint64_t>, load_steps> load_counts{};
-    const int rate;
-    std::atomic<GainMode> mode{GainMode::set};
-    float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0, previous_gain = 1;
+    float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
-    std::atomic<float> peak{0}, load_max{0};
-    static_assert(std::atomic<float>::is_always_lock_free);
-    static_assert(std::atomic<GainMode>::is_always_lock_free);
     float dry_mix = 0;
     // mute(): the current filter's level ramps to 0; the level of the filter
     // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
     // an unmuted filter's output is unchanged.
     float level = 1, previous_level = 1;
-    std::atomic<bool> signal_held{false}, meters_reset{false};
     bool muted = false, previous_muted = false;
+    // Publications up to this number were made before mute(): adopting one
+    // keeps the silence. Only a filter published after it ends the silence.
+    std::uint64_t muted_through = 0;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_,
          const HostSettings& settings = {})
-        : inputs(c.input_channels), outputs(c.output_channels), maximum(maximum_), block(block_),
-          rate(c.sample_rate) {
+        : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
+          maximum(maximum_), block(block_) {
         if (!inputs || !outputs || inputs > 256 || outputs > 256 || !maximum ||
             maximum > (1U << 20) || std::max(inputs, outputs) * maximum > (1U << 24))
             throw std::invalid_argument("invalid host channel count or callback capacity");
-        mode.store(settings.gain_mode);
-        set_db = clamp_gain_db(settings.gain_db);
-        set_gain = gain_from_db(set_db);
-        mix_setting = static_cast<float>(clamp_mix(settings.mix));
-        auto prepared = std::make_unique<Prepared>(c, block, settings.gain_mode);
+        auto prepared = std::make_unique<Prepared>(c, block);
         input.resize(inputs * maximum);
         wet.resize(outputs * maximum);
         old_wet.resize(wet.size());
         dry.resize(outputs * block);
         tail.store(prepared->engine.tail_frames());
         current = prepared.release();
-        gain = gain_target = target_gain();
+        set_db = clamp_gain_db(settings.gain_db);
+        set_gain = gain = gain_target = gain_from_db(set_db);
+        mix_setting = static_cast<float>(clamp_mix(settings.mix));
         mix = mix_target = target_mix();
-    }
-    // Audio thread: the gain the current filter should play at, and the mix.
-    float target_gain() const noexcept {
-        switch (mode.load(std::memory_order_relaxed)) {
-        case GainMode::estimate:
-            return current->noise_known ? current->noise_gain : set_gain;
-        case GainMode::no_clipping:
-            return current->bound_gain;
-        case GainMode::set:
-            break;
-        }
-        return set_gain;
     }
     float target_mix() const noexcept {
         return inputs == outputs ? mix_setting : 1.f;
     }
-    // Audio thread: takes a noise estimate handed over for the current filter.
-    void take_estimate() noexcept {
-        if (current->noise_known)
-            return;
-        const auto handed = handed_estimate.load(std::memory_order_acquire);
-        if ((handed >> 32) == estimate_key(current->number)) {
-            current->noise_gain = std::bit_cast<float>(static_cast<std::uint32_t>(handed));
-            current->noise_known = true;
-        }
-    }
-    // Audio thread, at the start of a call: new targets start a 64-frame ramp.
+    // Audio thread, at the start of a call: a new gain or mix starts a
+    // 64-frame ramp.
     void retarget() noexcept {
-        take_estimate();
-        if (const auto t = target_gain(); t != gain_target) {
-            gain_target = t;
-            gain_step = (t - gain) / 64;
+        if (set_gain != gain_target) {
+            gain_target = set_gain;
+            gain_step = (gain_target - gain) / 64;
             gain_ramp = 64;
         }
         if (const auto t = target_mix(); t != mix_target) {
@@ -689,14 +606,6 @@ struct HostProcessor::Impl {
             mix_step = (t - mix) / 64;
             mix_ramp = 64;
         }
-    }
-    void reset_meter_values() noexcept {
-        peak.store(0, std::memory_order_relaxed);
-        clipped.store(0, std::memory_order_relaxed);
-        calls.store(0, std::memory_order_relaxed);
-        load_max.store(0, std::memory_order_relaxed);
-        for (auto& n : load_counts)
-            n.store(0, std::memory_order_relaxed);
     }
     ~Impl() {
         delete current;
@@ -715,7 +624,7 @@ struct HostProcessor::Impl {
     std::unique_ptr<Prepared> prepare(const Configuration& c) const {
         if (c.sample_rate != rate || c.input_channels != inputs || c.output_channels != outputs)
             throw std::invalid_argument("replacement must preserve sample rate and channels");
-        return std::make_unique<Prepared>(c, block, mode.load());
+        return std::make_unique<Prepared>(c, block);
     }
     void publish(std::unique_ptr<Prepared> prepared) noexcept {
         collect();
@@ -758,12 +667,10 @@ struct HostProcessor::Impl {
         warm = 0;
         fade = 0;
         dry_mix = bypass ? 1.f : 0.f;
-        // The stream starts again: settings apply at once, without ramps.
-        take_estimate();
-        gain = gain_target = target_gain();
+        // The stream starts again: the settings apply at once, without ramps.
+        gain = gain_target = set_gain;
         mix = mix_target = target_mix();
         gain_ramp = mix_ramp = 0;
-        previous_gain = 1;
     }
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
@@ -774,16 +681,12 @@ struct HostProcessor::Impl {
         }
         if (!frames)
             return true;
-        const auto began = std::chrono::steady_clock::now();
-        if (meters_reset.exchange(false, std::memory_order_acq_rel))
-            reset_meter_values();
         if (!previous) {
             if (auto next = pending.exchange(nullptr, std::memory_order_acq_rel)) {
                 if (started) {
                     previous = current;
                     previous_level = level;
                     previous_muted = muted;
-                    previous_gain = gain;
                     warm = block;
                     fade = 0;
                 } else {
@@ -798,11 +701,6 @@ struct HostProcessor::Impl {
                 // earlier publication lifting it).
                 muted = muted && next->number <= muted_through;
                 level = muted ? 0.f : 1.f;
-                // The new filter starts at its own gain: it fades in from
-                // silence, or nothing has been heard yet.
-                take_estimate();
-                gain = gain_target = target_gain();
-                gain_ramp = 0;
             }
         }
         retarget();
@@ -818,8 +716,6 @@ struct HostProcessor::Impl {
             }
         if (invalid_input)
             count(rejected_input);
-        float call_peak = 0;
-        std::uint64_t call_clipped = 0;
         // Prepared, valid nonoverlapping spans and finite input satisfy Engine's
         // checked entry point; defensive containment keeps exceptions inside host.
         try {
@@ -868,12 +764,12 @@ struct HostProcessor::Impl {
                 auto& delayed = dry[dry_position * outputs + c];
                 float dry_value = delayed;
                 delayed = inputs == outputs ? input[t * inputs + c] : 0.f;
+                double value = level * static_cast<double>(wet[index]);
+                if (previous)
+                    value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
                 // Gain 1 and mix 1 (the defaults) leave every value exactly
                 // as it was before the settings existed.
-                double value = static_cast<double>(level) * gain * wet[index];
-                if (previous)
-                    value = (1.0 - blend) * previous_level * previous_gain * old_wet[index] +
-                            blend * value;
+                value *= gain;
                 if (mix != 1)
                     value = mix * value + (1.0 - mix) * dry_value;
                 value = (1.0 - dry_mix) * value + dry_mix * dry_value;
@@ -881,9 +777,6 @@ struct HostProcessor::Impl {
                     value = 0;
                     invalid_output = true;
                 }
-                const auto size = static_cast<float>(std::abs(value));
-                call_peak = std::max(call_peak, size);
-                call_clipped += size > 1 ? 1 : 0;
                 if (c < out.size() && out[c])
                     out[c][t] = static_cast<T>(value);
             }
@@ -899,33 +792,15 @@ struct HostProcessor::Impl {
             previous = nullptr;
             previous_level = 1;
             previous_muted = false;
-            previous_gain = 1;
         }
-        measure(began, frames, call_peak, call_clipped);
         return true;
-    }
-    // Audio thread: the meters after a call. One writer, so loads and stores.
-    void measure(std::chrono::steady_clock::time_point began, std::size_t frames, float call_peak,
-                 std::uint64_t call_clipped) noexcept {
-        if (call_peak > peak.load(std::memory_order_relaxed))
-            peak.store(call_peak, std::memory_order_relaxed);
-        if (call_clipped)
-            clipped.store(clipped.load(std::memory_order_relaxed) + call_clipped,
-                          std::memory_order_relaxed);
-        const std::chrono::duration<double> took = std::chrono::steady_clock::now() - began;
-        const double load = rate > 0 ? took.count() * rate / static_cast<double>(frames) : 0;
-        if (static_cast<float>(load) > load_max.load(std::memory_order_relaxed))
-            load_max.store(static_cast<float>(load), std::memory_order_relaxed);
-        const auto step = std::min(load_steps - 1, static_cast<std::size_t>(load / load_step));
-        count(load_counts[step]);
-        count(calls);
     }
 };
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
     : impl_(std::make_unique<Impl>(c, maximum, block)) {}
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings)
-    : impl_(std::make_unique<Impl>(c, maximum, settings.block, settings)) {}
+                             const HostSettings& settings, std::size_t block)
+    : impl_(std::make_unique<Impl>(c, maximum, block, settings)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);
@@ -971,49 +846,6 @@ void HostProcessor::set_gain_db(double db) noexcept {
 }
 void HostProcessor::set_mix(double mix) noexcept {
     impl_->mix_setting = static_cast<float>(clamp_mix(mix));
-}
-void HostProcessor::set_gain_mode(GainMode mode, const Configuration* playing) {
-    if (mode != GainMode::estimate && mode != GainMode::no_clipping)
-        mode = GainMode::set;
-    struct SetMode { // The mode is set however the estimate turns out.
-        Impl& impl;
-        GainMode mode;
-        ~SetMode() {
-            impl.mode.store(mode, std::memory_order_release);
-        }
-    } set_mode{*impl_, mode};
-    if (mode != GainMode::estimate)
-        return;
-    // The newest publication is what plays, or will once the audio thread
-    // takes it (0: the filter the processor was built with).
-    const auto number = impl_->published.load(std::memory_order_relaxed);
-    const float noise = playing ? gain_for_peak(estimate_attenuation(*playing).noise_peak) : 1.f;
-    impl_->handed_estimate.store((estimate_key(number) << 32) | std::bit_cast<std::uint32_t>(noise),
-                                 std::memory_order_release);
-}
-GainMode HostProcessor::gain_mode() const noexcept {
-    return impl_->mode.load(std::memory_order_relaxed);
-}
-HostMeters HostProcessor::meters() const noexcept {
-    HostMeters m;
-    m.peak = impl_->peak.load(std::memory_order_relaxed);
-    m.clipped = impl_->clipped.load(std::memory_order_relaxed);
-    m.load_max = impl_->load_max.load(std::memory_order_relaxed);
-    std::array<std::uint64_t, load_steps> counts{};
-    std::uint64_t total = 0;
-    for (std::size_t i = 0; i < load_steps; ++i)
-        total += counts[i] = impl_->load_counts[i].load(std::memory_order_relaxed);
-    m.calls = total;
-    std::uint64_t seen = 0;
-    for (std::size_t i = 0; i < load_steps && total; ++i)
-        if ((seen += counts[i]) * 100 >= total * 99) {
-            m.load_p99 = static_cast<double>(i + 1) * load_step;
-            break;
-        }
-    return m;
-}
-void HostProcessor::reset_meters() noexcept {
-    impl_->meters_reset.store(true, std::memory_order_release);
 }
 std::uint64_t HostProcessor::publications() const noexcept {
     return impl_->published.load(std::memory_order_acquire);
