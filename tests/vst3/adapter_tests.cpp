@@ -895,6 +895,45 @@ void status_and_log() {
                     count(log_text(), "The output became too large to represent (") == 2,
                 "second fault episode not logged on save");
     }
+    // jrp's review of 0.4.43: a load failure comes before Fault on the audio
+    // side too. After a refused replacement, invalid input writes no Fault
+    // over "Load failed"; an accepted load releases the signal.
+    {
+        require(p.setState(stream(good).get()) == kResultOk &&
+                    p.setState(stream(wrong).get()) == kResultFalse &&
+                    status() == convolver::HostStatus::load_failed,
+                "refused replacement before invalid input");
+        std::array<float, 64> left{}, right{};
+        float* ins[] = {left.data(), right.data()};
+        float* outs[] = {left.data(), right.data()};
+        AudioBusBuffers input{}, output{};
+        input.numChannels = output.numChannels = 2;
+        input.channelBuffers32 = ins;
+        output.channelBuffers32 = outs;
+        ProcessData d{};
+        d.symbolicSampleSize = kSample32;
+        d.numInputs = d.numOutputs = 1;
+        d.inputs = &input;
+        d.outputs = &output;
+        d.numSamples = 64;
+        const auto play_invalid = [&](ParameterChanges& changes) {
+            d.outputParameterChanges = &changes;
+            left.fill(0);
+            left[0] = std::numeric_limits<float>::quiet_NaN();
+            require(p.process(d) == kResultOk, "invalid input refused");
+        };
+        ParameterChanges held(4);
+        play_invalid(held);
+        require(held.getParameterCount() == 0 && status() == convolver::HostStatus::load_failed,
+                "Fault written over Load failed");
+        require(p.setState(stream(good).get()) == kResultOk, "good after refusal");
+        ParameterChanges released(4);
+        play_invalid(released);
+        require(released.getParameterCount() == 1, "Fault not written after an accepted load");
+        MemoryStream saved;
+        require(p.getState(&saved) == kResultOk && status() == convolver::HostStatus::fault,
+                "fault after an accepted load not shown");
+    }
     // Restarted at another rate: silence until the rate is put back.
     require(p.setState(stream(good).get()) == kResultOk &&
                 status() == convolver::HostStatus::playing,
