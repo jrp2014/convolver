@@ -363,6 +363,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   carry the version; `auval` lists the view; GarageBand smoke steps, including
   a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
   Needed for the first preview.
+  From jrp's first GarageBand run (25 October 2026): Apple's generic window
+  shows the Status row with no value, so a stereo preset on a mono track
+  played silence with no visible reason. The window must show why the
+  plug-in is silent.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with

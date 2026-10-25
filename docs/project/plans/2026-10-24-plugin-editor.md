@@ -738,8 +738,8 @@ and VST3-4 are in, as they share the report code and differ only in views.
   Unit (its view, parameters, validation and packaging) are now on the path
   to the first preview, and they are the largest part of it. PLUG-9 and
   PLUG-10 can start at once, alongside PLUG-5 and REL-2; the VST3 windows
-  need VST3-3 and VST3-4 first, and the Audio Unit's view needs AU-7 too. GarageBand offers only stereo effects at
-  44.1 kHz, so the Audio Unit's 2→6 journey needs a second host.
+  need VST3-3 and VST3-4 first, and the Audio Unit's view needs AU-7 too. GarageBand offers only mono and stereo
+  effects at 44.1 kHz, so the Audio Unit's 2→6 journey needs a second host.
 - **Key handling and focus** differ by host; the smoke tests check that typing
   in the window does not trigger the host's shortcuts and vice versa.
 
