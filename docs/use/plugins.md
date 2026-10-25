@@ -42,7 +42,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
 | Choose a `.cfg` or IR file directly | No | No | [Yes](#lv2-filter-files) |
-| Where a refused load is explained | Nowhere yet: the host only sees the refusal | The host gets an error; the reason is in the macOS Console | The host's log, and a status output |
+| Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
@@ -63,8 +63,10 @@ the end of its first line, which presets keep) and the host's output
 arrangement names different ones, the filter still plays, routed by channel
 number. For example, a 7.1 filter with side speakers on outputs 7 and 8, on a
 7.1 Cine output whose channels 7 and 8 are left and right of centre, plays
-those outputs on the centre pair. Convolver notes the difference but cannot
-show the note yet, because it has no window. The check never refuses a preset;
+those outputs on the centre pair. The Status text then ends with "Speaker
+labels differ; see the Convolver log.", and the
+[Convolver log](#status-and-the-convolver-log) names the speakers on each
+side. The check never refuses a preset;
 in a layout with side speakers and no back ones (5.1 written as `60F`), the
 side speakers count as the back pair.
 
@@ -152,8 +154,10 @@ infinite, usually from a plug-in before Convolver), or an Audio Unit host
 passed buffers that do not match its setup (a VST3 host gets an error back
 from the call instead). Convolver silences the affected audio rather than pass it on, and
 the log says what happened, how often and what to change. The status stays at
-Fault until you load a filter again or the host restarts the plug-in (stops
-and starts it, for example by changing the sample rate). Some hosts show Fault
+Fault until a filter loads or the host restarts the plug-in (stops
+and starts it, for example by changing the sample rate). A load that fails
+shows Load failed instead, as the more urgent message, and faults from before
+a filter loaded do not come back once it plays; the log still records them. Some hosts show Fault
 while playing but fill in the log line and the text only when the project is
 saved or the host restarts the plug-in.
 

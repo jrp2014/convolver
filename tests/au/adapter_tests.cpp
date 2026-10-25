@@ -724,6 +724,23 @@ void status_parameter() {
     check(unit.load(state_of(stereo(48000))), "load after a fault");
     require(value() == HostStatus::playing && contains(shown(), "Filter loaded"),
             "a load does not clear Fault: " + shown());
+    // jrp's review of 0.4.43: Render must not write Fault over Load failed,
+    // which comes first; an accepted load releases the signal.
+    const auto render_invalid = [&] {
+        Buffers b(2, 2, 512);
+        bool silent = false;
+        for (auto& channel : b.in)
+            channel.assign(channel.size(), 0.f);
+        b.in[0][0] = std::numeric_limits<float>::quiet_NaN();
+        check(render(unit, b, 512, false, silent), "invalid-input render");
+    };
+    require(unit.load(state_of(stereo(44100))) != noErr && value() == HostStatus::load_failed,
+            "refused replacement before invalid input");
+    render_invalid();
+    require(value() == HostStatus::load_failed, "Render wrote Fault over Load failed");
+    check(unit.load(state_of(stereo(48000))), "good after refusal");
+    render_invalid();
+    require(value() == HostStatus::fault, "Render did not write Fault after an accepted load");
     unit.uninitialize();
     if (earlier)
         setenv("CONVOLVER_LOG", earlier->c_str(), 1);

@@ -109,7 +109,9 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> known_layout();
     // Records a load that failed before it reached HostFilter (unreadable or
     // foreign state), as HostFilter::load records its own rejections.
-    void reject(HostFailureKind, const std::string& why);
+    // Returns the explanation of faults counted before it (observe_faults()),
+    // to log before the rejection.
+    std::string reject(HostFailureKind, const std::string& why);
     // Records an initialization that could not build the processor (PLUG-8);
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;
@@ -120,16 +122,15 @@ class Effect final : public ausdk::AUBase {
     // A fault explanation (observe_faults), logged even if it repeats the
     // last line: each episode counts.
     void log_faults(const std::string&) noexcept;
-    // Recomputes the status under `control_`; notify_status() then tells
-    // listeners, outside the lock, as they may call back into the unit.
+    // Recomputes the status under `control_`, and tells the processor whether
+    // a load failure holds Render's Fault signal (it comes first);
+    // notify_status() then tells listeners, outside the lock, as they may
+    // call back into the unit.
     void update_status() noexcept;
     void notify_status() noexcept;
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
-    // After an accepted load or a new processor, under `control_`: Render
-    // writes Fault to the Status parameter again only for later faults.
-    void clear_faults(bool new_processor) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
@@ -137,11 +138,6 @@ class Effect final : public ausdk::AUBase {
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
-    // The processor's fault total when the status last cleared (control
-    // writes), and the total when Render last wrote Fault (audio thread, or
-    // control while uninitialized).
-    std::atomic<std::uint64_t> faults_cleared_{0};
-    std::uint64_t faults_signalled_ = 0;
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches

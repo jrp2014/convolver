@@ -126,8 +126,9 @@ checklist says so:
   the [index](../README.md); user-visible changes are in the
   [CHANGELOG](../../CHANGELOG.md).
 - **TODO:** the item is ticked with its evidence, or has a `Progress` line for
-  what remains. A plan that is now fully implemented moves to
-  [`archive/plans/`](../archive/plans/README.md).
+  what remains. A plan that is now fully implemented, or superseded,
+  moves to [`archive/plans/`](../archive/plans/README.md)
+  ([rule](documentation.md#current-claims-and-dated-evidence)).
 - **Reviewed:** an [independent review](#independent-review) has been done and
   its findings answered in the pull request.
 

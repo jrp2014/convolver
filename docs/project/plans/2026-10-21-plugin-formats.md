@@ -5,16 +5,17 @@ Status: written on 21 October 2026 against Convolver `75f3924` (package 0.4.3)
 and revised the same day against `4e1bb1b` (0.4.6) after the owner's review.
 It revises the format order in the
 [FFmpeg filter plan](2026-10-21-ffmpeg-filter.md) and the
-[plug-in distribution plan](2026-10-18-plugin-distribution.md).
-**Current state:** PLUG-1 (the plug-in FFT backend), PLUG-2 (the
-[shared comparison harness](../../develop/testing.md#plug-in-comparisons-plug-2), with
-DOC-1's first-use fixtures) and PLUG-4 (the
-[identity and layout registry](../../develop/plugin-identities.md)) are implemented. Everything
-else here is proposed: no LV2 or AU code exists yet, and the VST3 changes
-listed are not made. Open work is tracked as PLUG-1 to PLUG-6, LV2-1 to LV2-5
-and AU-1 to AU-5 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au).
-The [shared adapter contract](#shared-adapter-contract) below applies to every
-format and takes precedence over a per-format section that seems to disagree.
+[plug-in distribution plan](../../archive/plans/2026-10-18-plugin-distribution.md).
+**Current state (24 October 2026, `9fa13f7`, 0.4.44):** the shared
+groundwork is done (PLUG-1 to PLUG-4 and PLUG-6 to PLUG-8), and so are the
+first steps of each stream: VST3-1, VST3-7, VST3-8 and VST3-10; LV2-1 and
+LV2-2; AU-1 and AU-2. The [shared adapter contract](../../develop/plugin-contract.md)
+now lives in the developer guides; it applies to every format and takes
+precedence over a per-format section below that seems to disagree. Still open: the release pipeline for all
+three formats (PLUG-5), LV2-3 to LV2-5, AU-3 to AU-5 and the named-host tests
+(HOST-1, AU-4). The first preview holds VST3 only; LV2 and AU join later
+previews. Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
+The sections below are the plan as revised on 21 October 2026.
 
 **Priority:** develop VST3, LV2 and AU in
 parallel, as equal first priorities. The FFmpeg filter and a Windows-native
@@ -47,8 +48,10 @@ more thought before any work starts.
   cannot pass a file path to a plug-in today, so LV2 does not help there yet.
 - **Framework: none.** Write each adapter directly against the format's own
   C or C++ headers, sharing `HostProcessor`, as the VST3 adapter already does.
-  These headers outlive any framework built on them. DPF is the fallback if a
-  shared editor across formats is ever needed; JUCE is not recommended.
+  These headers outlive any framework built on them. DPF was the fallback if a
+  shared editor across formats was ever needed; on 24 October 2026 jrp chose
+  native views instead ([editor plan](2026-10-24-plugin-editor.md#framework-choice)).
+  JUCE is not recommended.
 
 Contents: [recommendations](#revised-recommendations) ·
 [who loads which format](#who-loads-which-format) ·
@@ -156,7 +159,7 @@ plumbing) is small, and the existing VST3 adapter is about 500 lines over
 | Option | Formats | Licence | Longevity and risk | Verdict |
 | --- | --- | --- | --- | --- |
 | **Format headers directly** (LV2 1.18, VST3 SDK, Apple AudioUnitSDK, CLAP) | One per adapter | LV2 ISC; VST3 MIT since 3.8 ([announcement](https://sonicstate.com/news/2025/10/30/vst-3-now-available-under-mit-license)); AudioUnitSDK Apache-2.0 ([repo](https://github.com/apple/AudioUnitSDK)); CLAP MIT | These are the standards themselves. LV2's C API has been compatible since 2008; every framework depends on them anyway | **Recommended**, matching the VST3 adapter |
-| DPF (DISTRHO Plugin Framework) | LV2, VST2, VST3, CLAP, AU, LADSPA, DSSI, JACK standalone | ISC | Active since about 2012 and used by many free plug-ins, but largely one maintainer; its own build system | Fallback if a shared editor across formats is needed |
+| DPF (DISTRHO Plugin Framework) | LV2, VST2, VST3, CLAP, AU, LADSPA, DSSI, JACK standalone | ISC | Active since about 2012 and used by many free plug-ins, but largely one maintainer; its own build system | Was the fallback for a shared editor; replaced by native views on 24 October 2026 |
 | JUCE 8 | VST3, AU, AUv3, AAX, LV2, standalone | AGPLv3 or commercial (free tier up to $20k revenue) | Commercially owned; licence changed from GPLv3 to AGPLv3 in JUCE 8; large dependency | Not recommended: AGPL binaries and vendor control |
 | iPlug2 | VST2, VST3, AUv2, AUv3, AAX, CLAP, WAM | zlib-like | No Linux or LV2 | Excluded for this goal |
 | clap-wrapper | CLAP wrapped as VST3, AUv2, AUv3, AAX, standalone | MIT | Young (2023); no LV2 | Only relevant for a CLAP-first rewrite, which we do not need |

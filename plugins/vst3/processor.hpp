@@ -94,9 +94,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // filter_ and queues their explanation for the log. True if there were
     // new ones, so the status has changed.
     bool observe_faults() noexcept;
-    // After an accepted load or a new processor, under control_: the audio
-    // thread signals Fault again only for faults after this.
-    void clear_faults(bool new_processor) noexcept;
+    // Under control_, after every load, rejection and activation: the audio
+    // thread must not show Fault over a load failure (failure_shown()).
+    void hold_fault_signal() const noexcept;
     // Audio thread: writes Fault to the Status parameter for new faults.
     void signal_faults(Steinberg::Vst::ProcessData&) noexcept;
     Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
@@ -117,11 +117,6 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::unique_ptr<HostProcessor> host_;
     std::atomic<bool> bypass_{false};
     std::atomic<Steinberg::uint32> tail_{0};
-    // The processor's fault total when the status last cleared (control
-    // writes), and the total when the audio thread last wrote Fault to the
-    // Status parameter (audio, or control while inactive).
-    std::atomic<std::uint64_t> faults_cleared_{0};
-    std::uint64_t faults_signalled_ = 0;
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,
                                        output_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo;

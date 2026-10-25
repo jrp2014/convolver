@@ -119,7 +119,7 @@ without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
 and will stay that way, to keep the packages free of extra dependencies. So
 the plug-ins and the tools in a package cannot read FLAC or Ogg files (as
 input or as IRs), and the command line will be the same when packages include
-it (PLUG-5). `convolver --version` says whether the libsndfile in use has FLAC
+it. `convolver --version` says whether the libsndfile in use has FLAC
 (it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
 refused with a message before any file is created.
 
@@ -219,7 +219,8 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
 - A mask of 0 (and any sound-file filter, which has no mask) means unspecified:
   the CLI says so on stderr and writes the plain header.
 - Only `wav-` formats carry the labels; any other container stops the render
-  before the output is created (labels in other containers are TODO IO-5).
+  before the output is created (labels in other containers are not yet
+  supported).
 - After writing, the CLI reads the finished header back and fails if the labels
   are not exactly the requested mask, so a sound-file library that cannot write
   them is reported rather than silently ignored.
