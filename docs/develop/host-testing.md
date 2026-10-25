@@ -198,14 +198,14 @@ except the Audio Unit build, which runs in a source checkout.
    auval -v aufx Conv CONV
    ```
 
-   The output must end with `AU VALIDATION SUCCEEDED`. Then make the two
+   The output must end with `AU VALIDATION SUCCEEDED`. Then make the three
    GarageBand presets from the package's VST3 examples, so they appear in the
    unit's preset menu (the tool refuses to overwrite, so delete old copies
    before running it again):
 
    ```sh
    mkdir -p ~/Library/Audio/Presets/Convolver/Convolver
-   for kind in identity echo; do
+   for kind in identity echo repeat; do
      ./bin/convolver-preset "presets/$kind-44100-stereo/filter.vstpreset" \
        ~/Library/Audio/Presets/Convolver/Convolver/$kind-44100-stereo.aupreset
    done
@@ -331,7 +331,9 @@ except the Audio Unit build, which runs in a source checkout.
    what it reads: the full line (`No filter: audio passes unchanged. ...`), or
    only its name (`No filter`), as Apple's generic window may show.
 4. From the window's preset menu choose `identity-44100-stereo`, then
-   `echo-44100-stereo`, and listen as in REAPER.
+   `echo-44100-stereo`, and listen as in REAPER. Then choose
+   `repeat-44100-stereo`: each sound comes again, quieter, a quarter of a
+   second later. Go back to `echo-44100-stereo` for the next steps.
 5. Switch the plug-in off and on with the slot's power button while playing;
    note any click. GarageBand, not Convolver, saves whether the plug-in is off.
 6. Save the project, quit, reopen and play: the echo is still there.
@@ -346,10 +348,11 @@ except the Audio Unit build, which runs in a source checkout.
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
-9. The [settings](../use/plugins.md#settings), with the echo playing. Record
+9. The [settings](../use/plugins.md#settings), with `repeat-44100-stereo`
+   playing, where the changes are easiest to hear. Record
    where the window shows Gain and Mix and how it shows their values. Set
    Gain to −12 dB: the level drops smoothly, without a click. Set Mix to 0%:
-   you hear the dry track; 50% mixes the two. Save, quit and reopen the
+   you hear the dry track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
    after the reopening ends with
    `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the

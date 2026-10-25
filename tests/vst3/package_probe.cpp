@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iterator>
 #include <stdexcept>
+#include <string>
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 using namespace convolver::vst3;
@@ -18,7 +19,14 @@ void require(bool ok, const char* message) {
     if (!ok)
         throw std::runtime_error(message);
 }
-int probe(const std::filesystem::path& path, int rate, int count, bool echo) {
+// The examples' taps (scripts/release/generate_examples.py): identity; the
+// echo, half at once and a quarter 257 samples later; the repeat, the same a
+// quarter of a second later.
+int delay_of(const std::string& kind, int rate) {
+    return kind == "echo" ? 257 : kind == "repeat" ? rate / 4 : 0;
+}
+
+int probe(const std::filesystem::path& path, int rate, int count, const std::string& kind) {
     try {
         require(count == 1 || count == 2, "mono/stereo only");
         HostApplication context;
@@ -47,8 +55,13 @@ int probe(const std::filesystem::path& path, int rate, int count, bool echo) {
         data.inputs = &in;
         data.outputs = &out;
         // Independent time-domain oracle: channel impulses of 1 and -0.5.
+        const int delay = delay_of(kind, rate);
+        const bool delayed = delay > 0;
+        constexpr std::array<int, 8> blocks{1, 73, 137, 3, 129, 137, 137, 137};
         int position = 0;
-        for (int block : {1, 73, 137, 3, 129, 137, 137, 137}) {
+        // Past the delayed tap (for the repeat, a quarter of a second).
+        for (std::size_t b = 0; b < blocks.size() || position <= 256 + delay + 137; ++b) {
+            const int block = blocks[b % blocks.size()];
             left.fill(0);
             right.fill(0);
             if (position == 0) {
@@ -60,9 +73,9 @@ int probe(const std::filesystem::path& path, int rate, int count, bool echo) {
             require(p.process(data) == kResultOk, "process");
             for (int i = 0; i < block; ++i) {
                 const int sample = position + i;
-                const float expected = sample == 256             ? (echo ? .5f : 1.f)
-                                       : (echo && sample == 513) ? .25f
-                                                                 : 0.f;
+                const float expected = sample == 256                        ? (delayed ? .5f : 1.f)
+                                       : (delayed && sample == 256 + delay) ? .25f
+                                                                            : 0.f;
                 for (int c = 0; c < count; ++c)
                     require(std::isfinite(channels[c][i]) &&
                                 std::abs(channels[c][i] - expected * (c == 0 ? 1.f : -.5f)) < 1e-5f,
@@ -92,5 +105,5 @@ int main(int argc, char** argv) {
     if (argc != 5)
         return 2;
     return probe(argv[1], std::stoi(argv[2]), std::stoi(argv[3]),
-                 std::filesystem::path(argv[4]) == "echo");
+                 std::filesystem::path(argv[4]).string());
 }

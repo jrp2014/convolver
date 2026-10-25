@@ -7,8 +7,9 @@ what you hear, then make a preset from your own filter.
 
 **In short:** load Convolver on a mono or stereo track, load the matching
 `identity` preset (you should hear no change), then the `echo` preset (you
-should hear it quieter, with a hollow tone). Save and reopen the project to
-check that the filter is kept.
+should hear it quieter, with a hollow tone), then the `repeat` preset (you
+should hear each sound again a quarter of a second later). Save and reopen the
+project to check that the filter is kept.
 
 You need a plug-in host that loads VST3: a DAW such as REAPER, an audio
 editor such as Audacity (version 4 or later), or a plug-in rack such as Carla.
@@ -20,8 +21,8 @@ everything the computer plays. For that on Windows, see the
 
 ## Load the examples
 
-The package's `presets/` folder has 12 examples: `identity` and `echo`, in mono
-and stereo, at 44100, 48000 and 96000 Hz. Each folder is named
+The package's `presets/` folder has 18 examples: `identity`, `echo` and
+`repeat`, in mono and stereo, at 44100, 48000 and 96000 Hz. Each folder is named
 `KIND-RATE-LAYOUT` and holds `filter.vstpreset`, the `filter.cfg` it was made
 from, and `impulse.wav`.
 
@@ -40,7 +41,9 @@ from, and `impulse.wav`.
    separate repeat, so it sounds about 5 dB quieter and hollow, like a comb
    filter. Convolver does not lower the level for you,
    so leave headroom with your own filters.
-6. Switch the host's bypass on and off. Save the project, close it and reopen
+6. Load the matching `repeat` preset: the same two taps, but the second comes
+   a quarter of a second later, so you hear each sound again, quieter.
+7. Switch the host's bypass on and off. Save the project, close it and reopen
    it: the filter is back. Presets carry the filter inside them, so the
    original WAV and `.cfg` files are not needed.
 
