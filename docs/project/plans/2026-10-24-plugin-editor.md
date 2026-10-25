@@ -33,9 +33,11 @@ whoever then implements one of its phases.
   peak and clip count, the processing load, and the Convolver log, with Copy
   diagnostics for reports.
 - **Modernised, not copied.** Settings that the engine made obsolete go: FFTW
-  "tuning rigour" (plug-ins use Ooura or Accelerate, which need no planning),
-  and dither and noise shaping (plug-ins hand floating-point audio to the
-  host, which quantizes). The rest become host parameters, so they also work
+  "tuning rigour" (released plug-ins use Ooura or Accelerate, which have no
+  planner; a plug-in built with FFTW keeps quick planning, see the table
+  below), and dither and noise shaping (plug-ins hand floating-point audio to
+  the host, and dither belongs once, at the host's final conversion to
+  integer). The rest become host parameters, so they also work
   from hosts' generic controls, automation and presets, even before the
   window exists.
 - **Framework: native views, no framework** (decided). One AppKit view on
@@ -153,8 +155,8 @@ setting they offered, and what it becomes:
 | **Calculate optimum attenuation** button (property pages); estimated and peak gain in the description (VST2) | Ran the noise estimate; the peak gain was a guaranteed but "extremely conservative" bound | **Modernised:** the Estimate and No clipping modes, recomputed automatically for each filter, seeded so the estimate is the same every time (the old one varied), plus an output peak and clip count so the user sees the result |
 | **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, with the dry path latency-aligned |
 | **Partitions** / **No of partitions** (all) | Traded latency against processor load and cache use; 0 meant plain overlap-save | **Modernised as Latency:** the engine always uses uniform partitions of B frames, so the choice is B itself, shown as delay in milliseconds, with the measured load beside it instead of the old advice to time "Calculate optimum attenuation" or run `perftest` |
-| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped:** the plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which need no planning; the window shows the FFT library and CPU kernels instead. The CLI keeps FFTW tuning |
-| **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** they exchange floating-point audio with the host, which does any quantizing. The CLI keeps both |
+| **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped:** released plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which have no planner to tune, because FFTW's planner is not thread-safe and another plug-in or the host may load the same FFTW ([plug-in builds](../../develop/fft-backends.md#plug-in-builds), decided 21 October). A plug-in built with FFTW anyway (`-DCONVOLVER_FFT_BACKEND=FFTW`, which CMake warns about) plans with FFTW's quick estimate. Measured planning gained about 2–6% on some workloads for 4–26 ms more setup ([measurements](../../develop/fft-backends.md#fftw-implementation-and-planning-comparisons)), too little to justify a setting, a wisdom file per user and longer loads in the host. The window shows the FFT library and CPU kernels instead. The CLI keeps FFTW tuning |
+| **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** the old players wrote integer samples straight to the sound card, so Convolver was the last step and had to dither. A plug-in exchanges 32-bit floating-point audio with the host, and more processing (other plug-ins, faders) usually follows it; dither added there would be added again or undone later. Dither belongs once, at the final conversion to integer, which the host's render or the audio driver does (24-bit playback rounding is far below a converter's own noise). The 2006 VST2 window had no dither either. The CLI keeps both |
 | Version and `http://convolver.sf.net` (property pages); help text with an e-mail address (VST2) | Identification and help | **Kept:** version in the title; links to the user guide and the GitHub issues instead of the retired address |
 | OK, Cancel, Apply, Help (property pages) | Dialog buttons | **Dropped:** a plug-in window applies changes at once, as hosts expect, and the host's undo covers parameters |
 | System-modal message boxes (all) | Every error and warning | **Replaced** by the status banner and the log |
