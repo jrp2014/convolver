@@ -19,8 +19,9 @@ Until 1.0 the C++ API may change between minor versions.
   start line does), the host,
   filter, settings and software details, and has Copy diagnostics (the report
   and this instance's recent log lines, as text) and Show log (the log file
-  in the Finder). It does not load filters or change settings yet. No sound
-  changes.
+  in the Finder), with Gain and Mix sliders, because hosts such as
+  GarageBand show it instead of their generic controls. It does not load
+  filters yet. No sound changes.
 - Library (internal to the adapters): the editor report (PLUG-9) in
   `portable/host_report.hpp`, built from the Status line and the log's
   wording, and `playing_words()`, the part of the log's start line that says

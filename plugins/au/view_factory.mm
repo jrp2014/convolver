@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // AU-6: the Cocoa view factory that kAudioUnitProperty_CocoaUI names. Hosts
 // load it from the component bundle and ask it for Convolver's window, which
-// reads the unit only through AudioUnitGetProperty, by value, as Apple asks,
-// so it also works when the host runs the unit in another process
-// (GarageBand does).
+// uses the unit only through the Audio Unit API (properties by value, as
+// Apple asks, and the Gain and Mix parameters), so it also works when the
+// host runs the unit in another process (GarageBand does).
+#include "convolver_identities.hpp"
 #import "diagnostic_view.h"
 #include "view_properties.hpp"
+#import <AudioToolbox/AudioUnitUtilities.h>
+#include <cmath>
 #if __has_include(<AudioToolbox/AUCocoaUIView.h>)
 #import <AudioToolbox/AUCocoaUIView.h>
 #else
@@ -25,6 +28,39 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
     if (AudioUnitGetProperty(unit, id, kAudioUnitScope_Global, 0, &value, &size) != noErr)
         return nullptr;
     return value;
+}
+
+// One of the unit's settings as the window's slider: its range from the
+// unit, its value read and changed through the Audio Unit API. AUParameterSet
+// tells the host and its other views, as a host's own control would.
+NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parameter_id,
+                                     NSString* name, int decimals, NSString* unit_text) {
+    AudioUnitParameterInfo info{};
+    UInt32 size = sizeof info;
+    if (AudioUnitGetProperty(unit, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
+                             parameter_id, &info, &size) != noErr)
+        return nil;
+    if (info.flags & kAudioUnitParameterFlag_CFNameRelease && info.cfNameString)
+        CFRelease(info.cfNameString);
+    ConvolverSettingGetter get = ^double(void) {
+      AudioUnitParameterValue value = 0;
+      return AudioUnitGetParameter(unit, parameter_id, kAudioUnitScope_Global, 0, &value) == noErr
+                 ? value
+                 : NAN;
+    };
+    ConvolverSettingSetter set = ^(double value) {
+      const AudioUnitParameter parameter{unit, parameter_id, kAudioUnitScope_Global, 0};
+      AUParameterSet(nullptr, nullptr, &parameter, static_cast<AudioUnitParameterValue>(value), 0);
+    };
+    return @{
+        @"name" : name,
+        @"minimum" : @(info.minValue),
+        @"maximum" : @(info.maxValue),
+        @"decimals" : @(decimals),
+        @"unit" : unit_text,
+        @"get" : [get copy],
+        @"set" : [set copy]
+    };
 }
 } // namespace
 
@@ -51,8 +87,16 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
       id value = CFBridgingRelease(property_value(unit, convolver::au::diagnostics_property));
       return [value isKindOfClass:[NSString class]] ? value : nil;
     };
+    NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
+    if (NSDictionary<NSString*, id>* gain =
+            setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", 1, @" dB"))
+        [settings addObject:gain];
+    if (NSDictionary<NSString*, id>* mix =
+            setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", 0, @"% wet"))
+        [settings addObject:mix];
     return [[CONVOLVER_DIAGNOSTIC_VIEW alloc] initWithFrame:frame
                                                      report:report
-                                                diagnostics:diagnostics];
+                                                diagnostics:diagnostics
+                                                   settings:settings];
 }
 @end

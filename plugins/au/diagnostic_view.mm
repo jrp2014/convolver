@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
+#include <cmath>
 
 namespace {
 // The usual macOS panel layout (jrp's GarageBand run: the first version
@@ -10,7 +11,9 @@ constexpr CGFloat width = 560;
 constexpr CGFloat margin = 20;
 constexpr CGFloat button_height = 32;
 constexpr CGFloat label_column = 76; // Where the detail values start.
-constexpr CGFloat text_top = 64;
+constexpr CGFloat settings_top = 66;
+constexpr CGFloat setting_row = 28;
+constexpr CGFloat value_width = 84;
 constexpr CGFloat most_text = 480; // Longer text scrolls (a list .cfg explains every candidate).
 constexpr NSTimeInterval refresh_interval = 0.5;
 
@@ -99,11 +102,14 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     NSTimer* timer_;
     NSString* shown_; // The explanation and details last shown, so a refresh keeps a selection.
     NSString* logPath_;
+    NSArray<NSDictionary<NSString*, id>*>* settings_;
+    CGFloat textTop_; // Under the settings.
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
-                  diagnostics:(ConvolverDiagnosticsSource)diagnostics {
+                  diagnostics:(ConvolverDiagnosticsSource)diagnostics
+                     settings:(NSArray<NSDictionary<NSString*, id>*>*)settings {
     // The view's own size: the frame gives only its position.
     self = [super initWithFrame:NSMakeRect(NSMinX(frame), NSMinY(frame), width, 240)];
     if (!self)
@@ -125,9 +131,49 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     _statusField.accessibilityLabel = @"Status";
     [self addSubview:_statusField];
 
+    // The settings: name, slider, value. A host that shows this window shows
+    // it instead of its generic controls (jrp's GarageBand run).
+    settings_ = [settings copy];
+    NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
+    NSMutableArray<NSTextField*>* values = [NSMutableArray array];
+    CGFloat y = settings_top;
+    for (NSUInteger i = 0; i < settings_.count; ++i, y += setting_row) {
+        NSDictionary<NSString*, id>* setting = settings_[i];
+        NSTextField* name =
+            label([NSFont systemFontOfSize:[NSFont systemFontSize]], [NSColor secondaryLabelColor]);
+        name.stringValue = setting[@"name"];
+        name.frame = NSMakeRect(margin, y + 4, label_column - 8, 18);
+        name.autoresizingMask = NSViewMaxYMargin;
+        [self addSubview:name];
+        NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
+                                            minValue:[setting[@"minimum"] doubleValue]
+                                            maxValue:[setting[@"maximum"] doubleValue]
+                                              target:self
+                                              action:@selector(settingChanged:)];
+        slider.continuous = YES;
+        slider.tag = static_cast<NSInteger>(i);
+        slider.frame =
+            NSMakeRect(margin + label_column, y, inner - label_column - value_width - 8, 24);
+        slider.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
+        slider.accessibilityLabel = setting[@"name"];
+        [self addSubview:slider];
+        NSTextField* value = label([NSFont monospacedDigitSystemFontOfSize:[NSFont systemFontSize]
+                                                                    weight:NSFontWeightRegular],
+                                   [NSColor labelColor]);
+        value.alignment = NSTextAlignmentRight;
+        value.frame = NSMakeRect(width - margin - value_width, y + 4, value_width, 18);
+        value.autoresizingMask = NSViewMinXMargin | NSViewMaxYMargin;
+        [self addSubview:value];
+        [sliders addObject:slider];
+        [values addObject:value];
+    }
+    _settingSliders = sliders;
+    _settingValues = values;
+    textTop_ = settings_.count ? y + 10 : settings_top - 2;
+
     // No border or box: the text reads as part of the panel. It scrolls only
     // when it is longer than most_text.
-    scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(margin, text_top, inner, 100)];
+    scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(margin, textTop_, inner, 100)];
     scroll_.hasVerticalScroller = YES;
     scroll_.autohidesScrollers = YES;
     scroll_.borderType = NSNoBorder;
@@ -178,8 +224,8 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     const CGFloat text =
         ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
     const CGFloat shown = MIN(MAX(text, 40), most_text);
-    scroll_.frame = NSMakeRect(margin, text_top, width - 2 * margin, shown);
-    const CGFloat buttons = text_top + shown + 16;
+    scroll_.frame = NSMakeRect(margin, textTop_, width - 2 * margin, shown);
+    const CGFloat buttons = textTop_ + shown + 16;
     const CGFloat log_width = MAX(NSWidth(_logButton.frame), 100);
     const CGFloat copy_width = MAX(NSWidth(_diagnosticsButton.frame), 150);
     _logButton.frame = NSMakeRect(width - margin - log_width, buttons, log_width, button_height);
@@ -224,7 +270,46 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     return YES;
 }
 
+// A setting's value as the window writes it ("-12.0 dB", "50% wet").
+- (NSString*)describe:(double)value of:(NSDictionary<NSString*, id>*)setting {
+    return [NSString
+        stringWithFormat:@"%.*f%@", [setting[@"decimals"] intValue], value, setting[@"unit"]];
+}
+
+// The user moved a slider: the format passes the value to the host.
+- (void)settingChanged:(NSSlider*)slider {
+    const auto i = static_cast<NSUInteger>(slider.tag);
+    if (i >= settings_.count)
+        return;
+    NSDictionary<NSString*, id>* setting = settings_[i];
+    ConvolverSettingSetter set = setting[@"set"];
+    if (set)
+        set(slider.doubleValue);
+    _settingValues[i].stringValue = [self describe:slider.doubleValue of:setting];
+}
+
+// The settings as the host has them now (automation, its own controls),
+// except while the user is dragging a slider.
+- (void)readSettings {
+    const BOOL dragging = [NSEvent pressedMouseButtons] != 0;
+    for (NSUInteger i = 0; i < settings_.count; ++i) {
+        ConvolverSettingGetter get = settings_[i][@"get"];
+        const double value = get ? get() : NAN;
+        if (std::isnan(value)) {
+            _settingSliders[i].enabled = NO;
+            _settingValues[i].stringValue = @"";
+            continue;
+        }
+        _settingSliders[i].enabled = YES;
+        if (!dragging && _settingSliders[i].doubleValue != value)
+            _settingSliders[i].doubleValue = value;
+        _settingValues[i].stringValue =
+            [self describe:(dragging ? _settingSliders[i].doubleValue : value) of:settings_[i]];
+    }
+}
+
 - (void)refresh {
+    [self readSettings];
     NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
     NSString *explanation, *details;
     if (!report) {

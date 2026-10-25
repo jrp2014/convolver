@@ -237,6 +237,10 @@ the plug-in's button in the track's Plug-ins area. The window has:
   as GarageBand does (the Software detail names that process).
 - **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
   the same as the Status parameter, written out and coloured.
+- **Gain and Mix** as sliders with their values. A host that shows
+  Convolver's window shows it instead of its generic controls, so the
+  settings are here; moving a slider changes the setting as the host's own
+  control would, and the sliders follow changes the host makes.
 - **What plays, why, and what to change**, in full, as the log explains it.
   For example, a stereo preset on a GarageBand mono track reads: "The saved
   filter does not suit the host, so Convolver plays silence until it does.
@@ -257,14 +261,14 @@ the plug-in's button in the track's Plug-ins area. The window has:
 
 The text can be selected and copied. The controls are standard macOS ones
 with names for VoiceOver, which has not been tried with the window yet. The
-window updates while it is on screen. It does not yet load filters or
-change settings: load presets from the host's preset menu, and use the
-host's generic controls for Gain and Mix.
+window updates while it is on screen. It does not yet load filters: load
+presets from the host's preset menu.
 
 ## Settings
 
 The Audio Unit has two settings, which hosts show with its other parameters
-(in GarageBand and Logic, in the plug-in window's generic controls). Their
+and Convolver's window shows as sliders (in GarageBand, the window replaces
+the generic controls). Their
 defaults play exactly as Convolver did before the settings existed.
 
 | Setting | Values | Default | What it does |

@@ -205,7 +205,7 @@ void window() {
     // Fitted to its text, whatever size the host offers (jrp's GarageBand
     // run: the first version filled a large window and left it mostly blank).
     require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 150 &&
-                NSHeight(view.frame) <= 400,
+                NSHeight(view.frame) <= 460,
             "empty window size " + std::to_string(NSWidth(view.frame)) + " x " +
                 std::to_string(NSHeight(view.frame)));
     NSView* offered = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(1270, 1120)];
@@ -254,6 +254,40 @@ void window() {
     require(view.explanationView.accessibilityLabel.length > 0 && !view.explanationView.editable &&
                 view.explanationView.selectable,
             "explanation text");
+
+    // Gain and Mix as sliders (jrp's GarageBand run: a host that shows this
+    // window no longer shows its generic sliders). Moving one sets the
+    // parameter; a change from the host moves the slider.
+    require(view.settingSliders.count == 2 && view.settingValues.count == 2, "no setting sliders");
+    NSSlider* gain = view.settingSliders[0];
+    NSSlider* mix = view.settingSliders[1];
+    require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
+                mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
+            "slider ranges or values");
+    require([view.settingValues[0].stringValue isEqualToString:@"0.0 dB"] &&
+                [view.settingValues[1].stringValue isEqualToString:@"100% wet"],
+            "setting values " + text(view.settingValues[0].stringValue) + ", " +
+                text(view.settingValues[1].stringValue));
+    require([gain.accessibilityLabel isEqualToString:@"Gain"], "Gain slider label");
+    gain.doubleValue = -12;
+    [gain sendAction:gain.action to:gain.target];
+    AudioUnitParameterValue now = 0;
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain value");
+    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12.0 dB"],
+            "the Gain slider did not set Gain: " + std::to_string(now));
+    check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
+          "Mix from the host");
+    [view refresh];
+    require(mix.doubleValue == 50 && [view.settingValues[1].stringValue isEqualToString:@"50% wet"],
+            "the Mix slider did not follow the host");
+    require(contains(view.explanationView.string, "gain -12 dB, mix 50% wet"),
+            "the details do not show the settings:\n" + text(view.explanationView.string));
+    check(AudioUnitSetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, 0, 0),
+          "Gain back");
+    check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),
+          "Mix back");
+    [view refresh];
 
     // Copy diagnostics, to a pasteboard of the test's own.
     NSPasteboard* board = [NSPasteboard pasteboardWithUniqueName];

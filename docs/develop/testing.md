@@ -543,7 +543,9 @@ Four CTest tests run when the adapter is built (label `au`):
   track (and a preset restored again and again, whose identical failure is
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the text whatever size the host offers, the
-  buttons at the bottom right, its status and text before and after the fix, Copy diagnostics (onto a
+  buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
+  setting its parameter, a host change moving the slider), its status and
+  text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
   window stops reading the unit. Then faults: invalid input rendered, the
