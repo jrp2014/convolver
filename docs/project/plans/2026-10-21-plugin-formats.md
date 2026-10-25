@@ -13,8 +13,8 @@ LV2-2; AU-1 and AU-2. The [shared adapter contract](../../develop/plugin-contrac
 now lives in the developer guides; it applies to every format and takes
 precedence over a per-format section below that seems to disagree. Still open: the release pipeline for all
 three formats (PLUG-5), LV2-3 to LV2-5, AU-3 to AU-5 and the named-host tests
-(HOST-1, AU-4). The first preview holds VST3 and, since jrp's choice of 25
-October 2026, the Audio Unit; LV2 joins a later preview. Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
+(HOST-1, AU-4). The first preview holds VST3 and the Audio Unit; LV2 joins a
+later preview ([decisions](../decisions.md#releases)). Open work and its order are in [TODO](../../../TODO.md#execution-priorities).
 The sections below are the plan as revised on 21 October 2026.
 
 **Priority:** develop VST3, LV2 and AU in

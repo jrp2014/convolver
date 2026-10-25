@@ -42,7 +42,7 @@ package, following only the documentation. This is the end-to-end test. "Ready" 
 REL-2 journeys work, not that a set of items is ticked. The first preview is
 cut from the 0.5 series and holds the VST3 plug-in, the Audio Unit (macOS),
 the `convolver` CLI and the preset tool, with the editor's settings and window
-in both plug-in formats (jrp, 25 October 2026); LV2 joins a later preview once
+in both plug-in formats; LV2 joins a later preview once
 its own journeys are demonstrated. What still blocks it, with the evidence, is in
 [status](docs/project/status.md#what-still-blocks-the-first-preview).
 Finishing a dependable product matters more than another substantial
@@ -54,9 +54,9 @@ boundary and C++20 in the core.
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too (jrp, 25 October 2026). Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit (25 October 2026): **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in PR #73, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
@@ -64,7 +64,7 @@ boundary and C++20 in the core.
 | Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
-| On request or measured need | **HOST-2** (CLAP), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
+| On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
 DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
 remain open supporting work; take them up when a reproducible defect or the milestone
@@ -262,8 +262,8 @@ Shared work, done once for all three formats:
   "VST is a registered trademark of Steinberg Media Technologies GmbH." in the
   documentation and packages, and the VST Compatible logo where they require
   it; [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)), with
-  wording jrp approves; and the Audio Unit component (AU-5), which jrp moved
-  into the first preview on 25 October 2026. LV2 joins a later preview.
+  wording jrp approves; and the Audio Unit component (AU-5), which is in the
+  first preview. LV2 joins a later preview.
 - [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
   report value in `Convolver::host` built on the control side (status, full
@@ -274,6 +274,7 @@ Shared work, done once for all three formats:
   file-to-state step as a shared function, so a load from the window gives
   state byte-identical to `convolver-preset`'s. Table-driven tests per
   failure kind in `native.host`; the contract change in its own pull request.
+  Needed for the first preview.
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -289,14 +290,14 @@ Shared work, done once for all three formats:
   Needed for the first preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
-  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), asked for by jrp on 25 October 2026:
+  [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
   plug-ins use Ooura or Accelerate, which have no planner), a Quick or
   Measured planning choice, Quick by default, passed through `HostProcessor`
   and applied while preparing, never on the audio thread. Its tooltip states
-  the measured gain (at most about 6% overall in the 18 October measurements,
-  least for long filters) and the longer loads, rechecked on the current
-  engine first. Saved with PLUG-10's settings only when Measured; not
+  the measured gain (about 2–6% in the 18 October whole-engine tests on Apple
+  Silicon, least for long filters; short filters at small blocks may gain
+  more, so measure them on x86-64 first) and the longer loads. Saved with PLUG-10's settings only when Measured; not
   automatable.
 
 LV2 (Linux first; also PipeWire system audio):
@@ -334,6 +335,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-3 — Validation.** `auval` and pluginval in macOS CI. `auval -strict`
   runs since PR #44; still to add: pluginval on the component, and a
   ThreadSanitizer build of `au.adapter` (bypass switched while rendering).
+  Needed for the first preview.
 - [ ] **AU-4 — User guide and host matrix.** The Audio Unit in
   `docs/use/plugins.md` and `docs/use/install.md` (written in DOC-4); Logic, GarageBand,
   SoundSource, Live, REAPER and FL Studio results, including loading an
@@ -341,8 +343,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   GarageBand is jrp's first Audio Unit host, with a
   [smoke test](docs/develop/host-testing.md#garageband-audio-unit) limited to
   44.1 kHz stereo. Not yet run.
-- [ ] **AU-5 — Release.** In the first preview (jrp, 25 October 2026).
-  Unsigned preview component under PLUG-5 (ad-hoc
+  Needed for the first preview.
+- [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
 - [ ] **AU-6 — Editor window.** Custom properties (IDs from 64000) for the
@@ -351,10 +353,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (`kAudioUnitProperty_CocoaUI`) over the VST3-11 view, with class names that
   carry the version; `auval` lists the view; GarageBand smoke steps, including
   a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  Needed for the first preview.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
   latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  Needed for the first preview.
 
 ## FFmpeg integration
 
@@ -383,7 +387,7 @@ means a patched FFmpeg build with `--enable-gpl`.
   pinned FFmpeg release, build script, CI job comparing filter output with the
   CLI, and a user guide once it works.
 - [ ] **FFMPEG-4 — Reverb support.** Latency-aligned dry/wet mix in the host
-  layer (shared with VST3-4), filter gain, and a faster long-IR choice (larger
+  layer (shared with PLUG-10), filter gain, and a faster long-IR choice (larger
   offline block or PERF-2).
 - [ ] **FFMPEG-5 — Upstream decision.** Decide whether to submit the filter to
   FFmpeg after FFMPEG-3 has users; it overlaps `afir`, so the case rests on
@@ -485,14 +489,18 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `vst3.lifecycle`. `IDataExchangeHandler` could feed meters later. Plug-in
   snapshots for host browsers (`smtg_target_add_plugin_snapshots`) need the
   window first.
+  Needed for the first preview.
 - [ ] **VST3-4 — Gain, mix and latency parameters.** PLUG-10's settings as
   VST3 parameters ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)): Gain (ID 0,
   VST2's attenuation ID, with a new range for jrp to approve), Gain mode, Mix
   tagged `kDryWetMix` through `IParameterFunctionName`, and Latency (not
   automatable), saved in the component state, with
   `restartComponent(kLatencyChanged)` when latency changes and tests in hosts
-  that compensate it. A `kLowLatencyMode` switch only makes sense if PERF-2
-  provides a lower-latency mode.
+  that compensate it. The IDs (Gain on 0, the others from 1002) go in
+  `plugins/identities.json`, `tests/identities_tests.py` and
+  `docs/develop/plugin-identities.md`, which today keeps 0 to 2 free. A
+  `kLowLatencyMode` switch only makes sense if PERF-2 provides a lower-latency
+  mode. Needed for the first preview.
 - [ ] **VST3-5 — Progress for slow filter preparation.** `setState` prepares the
   filter synchronously on the host's thread. Measure the worst case (PERF-3) for long,
   multichannel filters (including FFTW planning) and, if hosts stall noticeably,
@@ -508,16 +516,19 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
   small tolerance counts as a match.
 - [ ] **VST3-11 — Editor window on macOS.** An AppKit view behind `IPlugView`
-  (`kPlatformTypeNSView`), shared later with AU-6: status and full messages,
-  active configuration, choose and reload a filter, copy diagnostics, show the
-  log, bypass. Opened in CI by `editorhost` and pluginval's GUI tests, with an
+  (`kPlatformTypeNSView`), shared with AU-6: status and full messages,
+  active configuration, choose and reload a filter (with drag and drop,
+  recent files and reload when the file changes), the settings (gain and its
+  mode, mix, latency) with the output peak, clip count and load, copy
+  diagnostics, show the log, bypass. Needed for the first preview. Opened in CI by `editorhost` and pluginval's GUI tests, with an
   accessibility test of names, roles and text; smoke steps in REAPER and
   Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)).
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
+  Needed for the first preview.
 - [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
-  Linux VST3 build only, as a stop-gap (jrp, 25 October 2026), driven by the
+  Linux VST3 build only, as a stop-gap, driven by the
   host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
   to the package checks and licence notices; opened by `editorhost` under
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
@@ -564,9 +575,8 @@ so the preset file path is not needed).
   flags for those builds.
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** Prototype
   only for a demonstrated long-filter/latency bottleneck. If PERF-3 shows the
-  plug-ins need less CPU, first consider letting the user choose a larger block
-  (`HostProcessor` already accepts one; it changes reported latency and needs
-  saved state and each format's latency-change call). Nonuniform partitions are
+  plug-ins need less CPU, first point users to a larger block with the
+  Latency setting (PLUG-10). Nonuniform partitions are
   the route to low latency and low CPU together. Preserve routing, tail,
   delay and reset behavior; account for changed floating-point accumulation order.
   Shared forward transforms are already implemented.

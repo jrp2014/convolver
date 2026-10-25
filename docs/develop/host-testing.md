@@ -127,7 +127,7 @@ These are tools for developers, not evidence that a DAW works.
   that the validator and pluginval do not already catch. (The SDK's third
   sample, the VST3 Inspector, only lists a plug-in's class information.)
   - `editorhost` only opens a plug-in's own editor window. Convolver has no
-    editor (VST3-3 is deferred), so it stops at once with "EditController does
+    editor yet (planned in VST3-3 and VST3-11), so it stops at once with "EditController does
     not provide its own editor". It becomes worth a smoke test only if an editor
     is added, and pluginval's GUI tests (skipped in CI today with
     `--skip-gui-tests`) could cover the same ground instead.
