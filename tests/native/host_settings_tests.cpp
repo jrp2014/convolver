@@ -268,6 +268,181 @@ void settings_text() {
     require(line.find("Settings: gain -6 dB, mix 50% wet.") != std::string::npos,
             "started line without settings: " + line);
 }
+
+// jrp's review of 0.5.5: Status and the start line said "audio passes
+// unchanged" with no filter at Gain -20 dB (the output was a tenth of the
+// input), and "Silent" after a refused first load at Mix 50% (the dry half
+// played). Each case plays a steady 0.5 through what the instance plays and
+// checks the words against the level heard.
+void diagnostics_follow_settings() {
+    const auto contains = [](const std::string& text, const std::string& part) {
+        return text.find(part) != std::string::npos;
+    };
+    struct Case {
+        const char* what;
+        HostLayout host;
+        bool refused_first_load, filter_loaded;
+        HostSettings settings;
+        float heard;                  // The steady output for an input of 0.5.
+        const char *status, *started; // Parts of the Status line and of started_line().
+        HostStatus value;
+    };
+    const HostLayout mono{48000, 1, 1}, split{48000, 1, 2};
+    const std::vector<Case> cases{
+        {"no filter, defaults",
+         mono,
+         false,
+         false,
+         {},
+         .5f,
+         "No filter: audio passes unchanged.",
+         "No filter, so audio passes unchanged.",
+         HostStatus::no_filter},
+        {"no filter, gain -20 dB",
+         mono,
+         false,
+         false,
+         {-20, 1},
+         .05f,
+         "No filter: audio passes at -20.0 dB (Gain and Mix).",
+         "No filter, so audio passes at -20.0 dB, set by Gain and Mix.",
+         HostStatus::no_filter},
+        {"no filter, gain -20 dB, mix 50%",
+         mono,
+         false,
+         false,
+         {-20, .5},
+         .275f,
+         "audio passes at -5.2 dB",
+         "audio passes at -5.2 dB",
+         HostStatus::no_filter},
+        {"no filter, gain -20 dB, mix 0%",
+         mono,
+         false,
+         false,
+         {-20, 0},
+         .5f,
+         "audio passes unchanged",
+         "audio passes unchanged",
+         HostStatus::no_filter},
+        {"no filter, 1 in 2 out, mix 50%",
+         split,
+         false,
+         false,
+         {-20, .5},
+         0,
+         "No filter: silent, as inputs and outputs differ.",
+         "Convolver plays silence.",
+         HostStatus::no_filter},
+        {"refused first load, defaults",
+         mono,
+         true,
+         false,
+         {},
+         0,
+         "Silent: the filter is for 44100 Hz",
+         "so Convolver plays silence",
+         HostStatus::load_failed},
+        {"refused first load, mix 50%",
+         mono,
+         true,
+         false,
+         {0, .5},
+         .25f,
+         "Load failed, only the dry signal plays: the filter is for 44100 Hz",
+         "With Mix at 50% wet, though, the dry signal still plays instead of silence: the input "
+         "at -6.0 dB.",
+         HostStatus::load_failed},
+        {"refused first load, gain +24 dB, mix 0%",
+         mono,
+         true,
+         false,
+         {24, 0},
+         .5f,
+         "Load failed, only the dry signal plays:",
+         "With Mix at 0% wet, though, the dry signal still plays instead of silence: the input "
+         "unchanged.",
+         HostStatus::load_failed},
+        {"refused first load, 1 in 2 out, mix 50%",
+         split,
+         true,
+         false,
+         {0, .5},
+         0,
+         "Silent: ",
+         "so Convolver plays silence",
+         HostStatus::load_failed},
+        {"filter, mix 0%",
+         mono,
+         false,
+         true,
+         {-20, 0},
+         .5f,
+         "Filter loaded: 48000 Hz, 1 in, 1 out. Mix 0%: only the dry signal plays.",
+         "Playing ",
+         HostStatus::playing},
+        {"filter, mix 50%",
+         mono,
+         false,
+         true,
+         {0, .5},
+         .5f * (.5f * .25f + .5f),
+         "Filter loaded: 48000 Hz, 1 in, 1 out.",
+         "Playing ",
+         HostStatus::playing},
+    };
+    for (const auto& c : cases) {
+        HostFilter filter;
+        if (c.refused_first_load) {
+            Configuration wrong_rate{44100, c.host.inputs, c.host.outputs, 0, {}, {}, {}};
+            for (std::size_t o = 0; o < c.host.outputs; ++o)
+                wrong_rate.paths.push_back({{1}, {{0, 1}}, {{o, 1}}});
+            try {
+                filter.load(HostState{wrong_rate}, c.host);
+            } catch (const std::invalid_argument&) {
+            }
+            require(filter.failed(), std::string(c.what) + ": the first load was not refused");
+        }
+        if (c.filter_loaded)
+            filter.load(
+                HostState{Configuration{48000, 1, 1, 0, {}, {}, {{{.25f}, {{0, 1}}, {{0, 1}}}}}},
+                c.host);
+        HostProcessor host(filter.activate(c.host), 64, c.settings, 64);
+        const auto output = play(host, std::vector<float>(2048 * c.host.inputs, .5f), c.host.inputs,
+                                 c.host.outputs, 64);
+        for (std::size_t i = output.size() - 64 * c.host.outputs; i < output.size(); ++i)
+            require(std::abs(output[i] - c.heard) < 1e-5f,
+                    std::string(c.what) + ": heard " + std::to_string(output[i]) + ", expected " +
+                        std::to_string(c.heard));
+        const auto line = host_status(filter, c.host, true, c.settings);
+        require(line.status == c.value && contains(line.text, c.status) &&
+                    line.text.size() <= max_status_text,
+                std::string(c.what) + ": Status " + line.text);
+        const auto started = started_line(filter, c.host, 64, &c.settings);
+        require(contains(started, c.started), std::string(c.what) + ": started line " + started);
+        // The audible words never contradict the level heard.
+        require(c.heard == 0 || (!contains(line.text, "Silent") &&
+                                 (!contains(started, "plays silence") ||
+                                  contains(started, "still plays instead of silence"))),
+                std::string(c.what) + ": says silent, but " + std::to_string(c.heard) +
+                    " is heard");
+        require(c.heard == .5f || c.filter_loaded || !contains(line.text, "unchanged"),
+                std::string(c.what) + ": says unchanged, but the level changed");
+    }
+    // Before the host is known, a refused first load cannot say whether
+    // Mix's dry share will play (it does only with equal counts).
+    HostFilter unknown;
+    try {
+        unknown.load(HostState{Configuration{44100, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}}},
+                     mono);
+    } catch (const std::invalid_argument&) {
+    }
+    const auto line = host_status(unknown, std::nullopt, true, HostSettings{0, .5});
+    require(contains(line.text, "Load failed, no filter plays: "),
+            "unknown host, mix 50%: " + line.text);
+    require(contains(host_status(unknown, std::nullopt).text, "Silent: "),
+            "unknown host, defaults: " + host_status(unknown, std::nullopt).text);
+}
 } // namespace
 
 int main() {
@@ -277,6 +452,7 @@ int main() {
         ramps();
         unequal_mix();
         settings_text();
+        diagnostics_follow_settings();
         std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n",
                     worst_relative, worst_case.c_str());
         std::cout << "host settings passed\n";

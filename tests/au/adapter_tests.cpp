@@ -732,6 +732,74 @@ void settings_parameters() {
     unit.uninitialize();
 }
 
+// The text a host shows for the Status parameter's current value.
+std::string status_text(Unit& unit) {
+    AudioUnitParameterStringFromValue request{au::status_parameter, nullptr, nullptr};
+    UInt32 bytes = sizeof request;
+    check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterStringFromValue,
+                               kAudioUnitScope_Global, 0, &request, &bytes),
+          "Status text");
+    require(request.outString != nullptr, "Status text missing");
+    char text[256] = {};
+    CFStringGetCString(request.outString, text, sizeof text, kCFStringEncodingUTF8);
+    CFRelease(request.outString);
+    return text;
+}
+
+// jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
+// filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
+// "audio passes unchanged", and after a refused first load at Mix 50% it
+// played as 0.25 while Status said "Silent". Status and the start line now
+// say what is heard.
+void settings_in_diagnostics() {
+    const auto contains = [](const std::string& text, const char* part) {
+        return text.find(part) != std::string::npos;
+    };
+    {
+        PrivateLog log("gain-status");
+        Unit unit;
+        check(unit.configure(48000, 2, 2, 512), "gain status formats");
+        set_parameter(unit, au::gain_parameter, -20);
+        check(unit.initialize(), "gain status initialization");
+        require(std::abs(steady_output(unit, 3) - .05f) < 1e-5, "Gain -20 dB without a filter");
+        const auto shown = status_text(unit);
+        require(shown == "No filter: audio passes at -20.0 dB (Gain and Mix). Load a Convolver "
+                         "preset.",
+                "no filter at Gain -20 dB: " + shown);
+        require(contains(log.text(), "No filter, so audio passes at -20.0 dB, set by Gain and "
+                                     "Mix. Settings: gain -20 dB, mix 100% wet."),
+                "start line at Gain -20 dB: " + log.text());
+        // Changed while it plays: the next read of Status follows.
+        set_parameter(unit, au::gain_parameter, 0);
+        require(contains(status_text(unit), "audio passes unchanged"),
+                "Status after Gain returned to 0 dB: " + status_text(unit));
+        unit.uninitialize();
+    }
+    PrivateLog log("mix-status");
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "mix status formats");
+    set_parameter(unit, au::mix_parameter, 50);
+    check(unit.initialize(), "mix status initialization");
+    require(unit.load(state_of(stereo(44100))) != noErr, "wrong-rate preset accepted");
+    require(std::abs(steady_output(unit, 3) - .25f) < 1e-5, "Mix 50% after a refused first load");
+    const auto shown = status_text(unit);
+    require(shown == "Load failed, only the dry signal plays: the filter is for 44100 Hz, the "
+                     "host runs at 48000 Hz. Details in the Convolver log.",
+            "refused first load at Mix 50%: " + shown);
+    // Started again, the start line says the dry half plays.
+    unit.uninitialize();
+    check(unit.initialize(), "mix status restart");
+    require(contains(log.text(), "With Mix at 50% wet, though, the dry signal still plays instead "
+                                 "of silence: the input at -6.0 dB."),
+            "start line after a refused first load at Mix 50%: " + log.text());
+    // At Mix 100% it is silent again, and Status says so.
+    set_parameter(unit, au::mix_parameter, 100);
+    require(std::abs(steady_output(unit, 3)) < 1e-6, "Mix 100% after a refused first load");
+    require(contains(status_text(unit), "Silent: the filter is for 44100 Hz"),
+            "Status at Mix 100%: " + status_text(unit));
+    unit.uninitialize();
+}
+
 // DIAG-1: the read-only Status parameter says in one line why the unit is
 // silent or refused a preset, and the Convolver log explains in full.
 void status_parameter() {
@@ -910,6 +978,7 @@ int main() {
         failed_initialization();
         status_parameter();
         settings_parameters();
+        settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

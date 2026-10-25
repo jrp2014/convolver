@@ -189,7 +189,8 @@ std::string Effect::observe_faults() noexcept {
 void Effect::update_status() noexcept {
     try {
         status_log_written_ = host_log_written();
-        status_ = host_status(filter_, known_layout(), status_log_written_);
+        // Gain and Mix change what plays without a filter (PLUG-10).
+        status_ = host_status(filter_, known_layout(), status_log_written_, settings());
         if (host_) // Render must not show Fault over a load failure.
             host_->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
@@ -215,6 +216,7 @@ void Effect::notify_status() noexcept {
 
 HostStatusLine Effect::status() {
     std::lock_guard lock(control_);
+    update_status(); // With the Gain and Mix set now, as hosts read it.
     return status_;
 }
 
@@ -463,8 +465,9 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
-            if (!faults.empty())
-                update_status();
+            // Also after a change of Gain or Mix, which a host may make on
+            // any thread without telling the control side (PLUG-10).
+            update_status();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
             const auto value = request->inValue ? *request->inValue : current;
             const auto index = static_cast<long>(std::lround(value));

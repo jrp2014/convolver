@@ -986,24 +986,16 @@ void processing_faults() {
             "every fault explained");
     HostFilter g(8);
     g.load(HostState{mono()}, layout);
-    // 0.5.0's interface still compiles and counts the same (the 0.5.2 review):
-    // observe() returned HostFaults then.
-    static_assert(std::is_convertible_v<HostFaultReport, HostFaults>);
-    const HostFaults as_in_0_5_0 = g.observe(every);
-    require(as_in_0_5_0.rejected_input == 3 && as_in_0_5_0.total() == 7,
-            "observe() as 0.5.0 returned it");
-    auto assigned = g.observe(HostFaults{});
-    assigned = every; // 0.5.0: a HostFaults result could be assigned.
-    require(assigned.total() == 7 && assigned.current.total() == 7, "HostFaults assigned");
-    // And 0.5.1's aggregate order still holds for braces.
+    // Positional braces fill current, earlier and held in order.
     HostFaults one;
     one.invalid_call = 1;
     const HostFaultReport braced{every, one};
-    require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 &&
-                braced.total() == 8 && !braced.held,
+    require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 && !braced.held &&
+                braced.any(),
             "HostFaultReport{current, earlier}");
     require(fault_message(HostFaultReport{one}).find("host's developers") != std::string::npos,
             "HostFaultReport{current}");
+    static_cast<void>(g.observe(every));
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");
@@ -1039,8 +1031,7 @@ void processing_faults() {
     require(window.earlier.rejected_input == 1 && !window.current.any() && !h.faults().any() &&
                 host_status(h, layout).status == HostStatus::playing,
             "a fault counted while the replacement was prepared is shown against it");
-    require(window.rejected_input == 1 && window.total() == 1 && !window.held,
-            "0.5.0's counts are current plus earlier");
+    require(!window.held, "no load failure holds the report");
     // Its log text must not claim the status shows it.
     const auto earlier = fault_message(window);
     require(earlier.find("does not show these") != std::string::npos &&

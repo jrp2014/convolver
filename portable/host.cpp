@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "host_log.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -353,14 +355,6 @@ std::string times(std::uint64_t n) {
 }
 } // namespace
 
-HostFaultReport::HostFaultReport(const HostFaults& current_faults, const HostFaults& earlier_faults,
-                                 bool load_failure_shown) noexcept
-    : HostFaults(current_faults), current(current_faults), earlier(earlier_faults),
-      held(load_failure_shown) {
-    // 0.5.0's result: every fault no earlier call returned.
-    *this += earlier_faults;
-}
-
 HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
     const auto current = since(totals, observed_);
     observed_ = totals;
@@ -430,6 +424,34 @@ std::string fault_message(const HostFaultReport& r) {
 }
 
 namespace {
+float gain_from_db(double db) noexcept {
+    return static_cast<float>(std::pow(10.0, db / 20));
+}
+double clamp_gain_db(double db) noexcept {
+    return std::isnan(db) ? 0 : std::clamp(db, min_gain_db, max_gain_db);
+}
+double clamp_mix(double mix) noexcept {
+    return std::isnan(mix) ? 1 : std::clamp(mix, 0.0, 1.0);
+}
+} // namespace
+
+UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
+    const double mix = clamp_mix(settings.mix), db = clamp_gain_db(settings.gain_db);
+    UnfilteredSound sound;
+    sound.silent = !identity && mix == 1;
+    sound.unchanged = mix == 0 || (identity && db == 0);
+    if (sound.silent || sound.unchanged)
+        return sound;
+    // As HostProcessor::process() mixes them: Gain on the filtered path (the
+    // input itself, or silence), and the rest of Mix as the dry input.
+    const double level = (identity ? mix * gain_from_db(db) : 0.0) + (1 - mix);
+    char text[48] = {};
+    std::snprintf(text, sizeof text, "%+.1f dB", 20 * std::log10(level));
+    sound.level = text;
+    return sound;
+}
+
+namespace {
 // The short reason of a processing fault, the most serious first.
 std::string short_fault(const HostFaults& f) {
     if (f.processing_failure)
@@ -472,13 +494,27 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
 } // namespace
 
 HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLayout>& host,
-                           bool log_written) {
+                           bool log_written, const HostSettings& settings) {
     const char* details =
         log_written ? " Details in the Convolver log." : " The log could not be written.";
     HostStatusLine line;
+    // PLUG-10: Mix lets the dry input through only with equal counts, which
+    // are known once the host has started the instance.
+    const bool dry_known = host && host->inputs == host->outputs;
+    const bool dry_unknown = !host && clamp_mix(settings.mix) < 1;
+    // What plays with no filter heard, before the reason: "Silent: " only
+    // when Mix lets no dry signal through.
+    const auto silent_words = [&](bool newest) -> std::string {
+        if (dry_unknown)
+            return newest ? "Load failed, no filter plays: " : "No filter plays: ";
+        if (dry_known && !unfiltered_sound(settings, false).silent)
+            return newest ? "Load failed, only the dry signal plays: "
+                          : "Only the dry signal plays: ";
+        return "Silent: ";
+    };
     if (const auto& f = filter.failure()) {
         line.status = HostStatus::load_failed;
-        line.text = (f->silent ? "Silent: " : "Load failed, previous filter kept: ") +
+        line.text = (f->silent ? silent_words(true) : "Load failed, previous filter kept: ") +
                     short_reason(*f, host) + details;
     } else if (filter.faults().any() && !filter.failed()) {
         line.status = HostStatus::fault;
@@ -491,33 +527,27 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
         if (host && !filter.notice().empty())
             line.text += log_written ? " Speaker labels differ; see the Convolver log."
                                      : " Speaker labels differ.";
+        if (dry_known && clamp_mix(settings.mix) == 0)
+            line.text += " Mix 0%: only the dry signal plays.";
     } else if (filter.failed()) {
         line.status = HostStatus::load_failed;
-        line.text = std::string("Silent: an earlier load failed.") + details;
+        line.text = silent_words(false) + "an earlier load failed." + details;
     } else {
         line.status = HostStatus::no_filter;
-        line.text = !host                           ? "No filter loaded. Load a Convolver preset."
-                    : host->inputs == host->outputs ? "No filter: audio passes unchanged. Load a "
-                                                      "Convolver preset."
-                                                    : "No filter: silent, as inputs and outputs "
-                                                      "differ. Load a Convolver preset.";
+        if (!host)
+            line.text = "No filter loaded. Load a Convolver preset.";
+        else if (!dry_known)
+            line.text = "No filter: silent, as inputs and outputs differ. Load a Convolver preset.";
+        else if (const auto sound = unfiltered_sound(settings, true); !sound.unchanged)
+            line.text = "No filter: audio passes at " + sound.level +
+                        " (Gain and Mix). Load a Convolver preset.";
+        else
+            line.text = "No filter: audio passes unchanged. Load a Convolver preset.";
     }
     if (line.text.size() > max_status_text)
         line.text.resize(max_status_text);
     return line;
 }
-
-namespace {
-float gain_from_db(double db) noexcept {
-    return static_cast<float>(std::pow(10.0, db / 20));
-}
-double clamp_gain_db(double db) noexcept {
-    return std::isnan(db) ? 0 : std::clamp(db, min_gain_db, max_gain_db);
-}
-double clamp_mix(double mix) noexcept {
-    return std::isnan(mix) ? 1 : std::clamp(mix, 0.0, 1.0);
-}
-} // namespace
 
 struct HostProcessor::Impl {
     struct Prepared {

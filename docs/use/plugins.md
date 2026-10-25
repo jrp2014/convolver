@@ -151,6 +151,13 @@ example (some hosts show only the status name in the first column):
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 
+The Audio Unit's text also follows its [settings](#settings) when no filter
+is heard. With no filter loaded and Gain or Mix changed, it reads, for
+example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; after a
+failed load with Mix below 100%, `Load failed, only the dry signal plays:
+...` instead of `Silent: ...`, as the dry share still plays. A filter at Mix
+0% adds `Mix 0%: only the dry signal plays.`
+
 **Fault** means something went wrong in the audio while it played, with or
 without a filter loaded: the output became too large to represent (an extreme
 input level or filter gain), the host sent invalid samples (not a number or

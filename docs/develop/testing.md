@@ -52,7 +52,9 @@ top-level `CMakeLists.txt`. It adds the executable and the CTest entry, the
 `native` and `real-libraries` labels and the timeout, and puts the executable
 in the list that receives the shared warning and sanitizer flags and that the
 `check` target builds. A test added with `add_executable` and `add_test` alone
-misses all of that.
+misses all of that. Plug-in tests are built in their format's folder under
+`plugins/`; list each there in `convolver_sanitize()`, so that the sanitizer
+build compiles it, and the adapter code it holds, with ASan and UBSan.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.

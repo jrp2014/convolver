@@ -147,18 +147,7 @@ std::string fault_message(const HostFaults&);
 // one was prepared; logged, but never shown. `held`: the status shows a load
 // failure, which comes before Fault (HostFilter::failure_shown()), so it does
 // not show `current` either.
-// The HostFaults it derives from count every fault that no earlier call
-// returned (current plus earlier), which is what observe() returned in 0.5.0,
-// so code that takes the result as HostFaults (or assigns HostFaults to it)
-// still compiles and gets the same counts. The constructor fills them; they
-// do not follow later changes to `current` or `earlier`. It takes `current`,
-// `earlier` and `held` in the order of the 0.5.1 aggregate, so brace
-// initialisation from two HostFaults keeps that meaning and cannot fill the
-// base instead. Designated initialisers no longer work.
-struct HostFaultReport : HostFaults {
-    HostFaultReport() = default;
-    HostFaultReport(const HostFaults& current_faults, const HostFaults& earlier_faults = {},
-                    bool load_failure_shown = false) noexcept;
+struct HostFaultReport {
     HostFaults current, earlier;
     bool held = false;
     bool any() const noexcept {
@@ -290,6 +279,21 @@ class HostFilter {
     HostFaults unshown_; // Counted before an accepted load and not yet returned by observe().
 };
 
+// PLUG-10: the settings every adapter offers as host parameters
+// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
+// it was before the settings existed.
+inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
+struct HostSettings {
+    // The filtered signal's gain in decibels, within min_gain_db and
+    // max_gain_db (clamped there by HostProcessor).
+    double gain_db = 0;
+    // The share of the filtered signal, 0 to 1; the rest is the input delayed
+    // by the latency. Ignored (always 1) when input and output counts differ,
+    // as there is no dry signal (the bypass rule). Clamped to 0..1.
+    double mix = 1;
+    bool operator==(const HostSettings&) const = default;
+};
+
 // DIAG-1: what a host's status display shows for an instance, for formats
 // with no editor (a read-only parameter in VST3 and AU). The status follows
 // failure(): a refused replacement shows "load failed" although the previous
@@ -312,24 +316,12 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // `host` is the configuration the instance plays under, or nullopt while it
 // is not known (VST3 before activation, AU before initialization).
 // `log_written` false (host_log_written()) says the Convolver log could not
-// be written, instead of pointing to it.
+// be written, instead of pointing to it. `settings` are the instance's Gain
+// and Mix (PLUG-10): without a filter, or after a failed load, the text says
+// what they let through (the input at a changed level, or the dry signal),
+// not only what the filter does.
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
-                           bool log_written = true);
-
-// PLUG-10: the settings every adapter offers as host parameters
-// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
-// it was before the settings existed.
-inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
-struct HostSettings {
-    // The filtered signal's gain in decibels, within min_gain_db and
-    // max_gain_db (clamped there by HostProcessor).
-    double gain_db = 0;
-    // The share of the filtered signal, 0 to 1; the rest is the input delayed
-    // by the latency. Ignored (always 1) when input and output counts differ,
-    // as there is no dry signal (the bypass rule). Clamped to 0..1.
-    double mix = 1;
-    bool operator==(const HostSettings&) const = default;
-};
+                           bool log_written = true, const HostSettings& settings = {});
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.

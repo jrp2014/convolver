@@ -22,11 +22,8 @@ int main() {
     float* outputs[] = {output};
     if (!host.process(inputs, outputs, 8) || std::abs(output[4] - 1) > 1e-5)
         return 1;
-    // Written against 0.5.0, when observe() returned HostFaults: every 0.5.x
-    // must still compile it.
     convolver::HostFilter filter(8);
-    const convolver::HostFaults faults = filter.observe(host.faults());
-    if (faults.any() || faults.rejected_input != 0)
+    if (filter.observe(host.faults()).any())
         return 1;
 #endif
     try {

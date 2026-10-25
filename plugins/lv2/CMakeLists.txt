@@ -37,10 +37,7 @@ elseif(UNIX)
     set_property(TARGET convolver_lv2 APPEND PROPERTY LINK_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 endif()
-if(CONVOLVER_SANITIZERS)
-    target_compile_options(convolver_lv2 PRIVATE -fsanitize=address,undefined
-        -fno-sanitize-recover=all -fno-omit-frame-pointer)
-endif()
+convolver_sanitize(convolver_lv2)
 
 add_custom_command(
     OUTPUT "${lv2_bundle_dir}/manifest.ttl" "${lv2_bundle_dir}/convolver.ttl"
@@ -77,10 +74,7 @@ if(CONVOLVER_BUILD_TESTS)
                 "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
             target_link_libraries(convolver_lv2_${name} PRIVATE Convolver::host Convolver::io
                 convolver_presets PkgConfig::CONVOLVER_LILV PkgConfig::CONVOLVER_LV2)
-            if(CONVOLVER_SANITIZERS)
-                target_compile_options(convolver_lv2_${name} PRIVATE -fsanitize=address,undefined
-                    -fno-sanitize-recover=all -fno-omit-frame-pointer)
-            endif()
+            convolver_sanitize(convolver_lv2_${name})
             if(name STREQUAL "lifecycle")
                 # The plug-in library must resolve operator new and
                 # pthread_mutex_lock to the guard's definitions.

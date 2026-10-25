@@ -15,7 +15,7 @@ renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
 and LV2 plug-ins are implemented and tested automatically; no named host has
 been tested and no independent user has followed the instructions. The next
 milestone is end-to-end testing: an independent user installing and using an
-exact preview package, cut from the 0.5 series. Four things
+exact preview package, cut from the 0.6 series. Four things
 [still block it](#what-still-blocks-the-first-preview): jrp's host smoke
 tests (VST3, and the Audio Unit in GarageBand), the CLI and journey presets in
 the package with the journeys written, the plug-in settings and windows with
@@ -64,7 +64,7 @@ documentation alone.
 | Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and on Windows CI in Equalizer APO's own `Benchmark.exe` (`export.equalizer_apo.runtime`) | Not yet checked on a real Windows device (HOST-4) | No; in the preview package since PR #38, not yet published |
 | VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) on Linux, macOS and Windows | None yet (HOST-1: REAPER and Audacity chosen, not yet run) | No; preview candidates are CI artifacts only |
 | LV2 plug-in ([guide](../use/plugins.md)) | Yes: adapter and layouts (LV2-1); filter files through the worker and saved paths (LV2-2) | Yes: `lv2.harness`, `lv2.adapter` and `lv2lint` on Linux | None | No; joins a later preview |
-| Audio Unit ([guide](../use/plugins.md)) | Yes, built from source: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4) | Yes: `au.harness`, `au.adapter`, `au.bundle` and `auval -strict` on macOS | None yet (AU-4: GarageBand chosen, not yet run) | No; in the first preview (AU-5), not yet in the package |
+| Audio Unit ([guide](../use/plugins.md)) | Yes, built from source: adapter, state and `.aupreset` loading (AU-1, AU-2; a named host's preset menu is checked under AU-4) | Yes: `au.harness`, `au.adapter`, `au.bundle` and `auval -strict` on macOS | GarageBand: jrp's first checks (25 October 2026) passed: a preset loaded and heard, Gain and Mix by ear and after reopening, silence for a stereo preset on a mono track. The full smoke test is not yet recorded (AU-4) | No; in the first preview (AU-5), not yet in the package |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | No; run by hand once (FFMPEG-1) | Not applicable | Not applicable |
 
@@ -117,7 +117,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.5.x tag.
+The first preview is cut from a 0.6.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ The first preview is cut from a 0.5.x tag.
 | Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
 | The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` runs in CI; pluginval for the component, GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) and the component in the package remain |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
-| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Planned ([editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items), [PR #78](https://github.com/jrp2014/convolver/pull/78)); not started |
+| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Started: Gain and Mix in the Audio Unit ([PR #80](https://github.com/jrp2014/convolver/pull/80)), checked by jrp in GarageBand; Status and the log describe them ([PR #83](https://github.com/jrp2014/convolver/pull/83)). Remaining: the gain modes, the latency choice and meters (PLUG-10), the settings in VST3 (VST3-4), and every window (PLUG-9, VST3-11 to VST3-13, AU-6) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
