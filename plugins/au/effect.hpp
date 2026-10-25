@@ -5,6 +5,8 @@
 #pragma once
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "host_report.hpp"
+#include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <atomic>
 #include <cstddef>
@@ -114,6 +116,8 @@ class Effect final : public ausdk::AUBase {
     HostStatusLine status();
     // AU-7: the settings the parameters hold, within their ranges.
     HostSettings settings();
+    // AU-6: the editor report, after explaining any new faults (PLUG-9).
+    HostReport report();
 
   private:
     HostLayout layout();
@@ -142,6 +146,9 @@ class Effect final : public ausdk::AUBase {
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
+    // AU-6, under `control_`: the report as it stands; `faults` receives the
+    // explanation of faults counted since the last look, to log.
+    HostReport report_locked(std::string& faults);
     // AU-7: stores a Gain or Mix value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
 

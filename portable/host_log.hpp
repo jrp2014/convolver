@@ -68,10 +68,25 @@ UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
 // `equal_counts` false says the mix does not apply.
 std::string settings_words(const HostSettings&, bool equal_counts);
+// What plays under `host` and why, in full: the silent failure (with what
+// Mix's dry share still lets through), the filter with any speaker notice,
+// or what passes with no filter. The part of started_line() after the
+// host's rate, channels and block size; the editor report (PLUG-9) uses it
+// too, so the window and the log say the same.
+std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them
 // (settings_words(); PLUG-10).
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
                          const HostSettings* settings = nullptr);
+// PLUG-9: the host's program name where the platform gives it (empty
+// otherwise), as the log's lines name it.
+std::string host_program_name();
+// PLUG-9, for Copy diagnostics: the last lines (at most `max_lines`) that
+// this process wrote to the Convolver log for `format` (an adapter's tag,
+// such as "Audio Unit #2"), with this process's session line, read from at
+// most the last 64 KiB of the file. Empty when the file cannot be read.
+// Control or UI thread; never from audio processing.
+std::string host_log_recent(const std::string& format, std::size_t max_lines = 40);
 } // namespace convolver

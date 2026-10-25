@@ -17,9 +17,7 @@
 namespace convolver::au {
 namespace {
 // The Status parameter's values, in HostStatus order.
-constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
-                                                  "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+constexpr auto& status_names = host_status_names;
 constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
                                                               status_parameter};
 
@@ -89,6 +87,18 @@ CFStringRef state_key() {
 
 std::string hz(double rate) {
     return std::to_string(static_cast<long long>(rate));
+}
+
+// UTF-8 text as a CFString the caller releases; null if out of memory.
+CFStringRef cf_string(const std::string& text) {
+    return CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(text.data()),
+                                   static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
+}
+
+// AU-6: the component bundle that holds the window's classes. Not found when
+// the unit was registered in-process without its bundle (the AU tests).
+CFBundleRef view_bundle() {
+    return CFBundleGetBundleWithIdentifier(CFSTR(CONVOLVER_AU_BUNDLE_ID));
 }
 
 bool same(const HostLayout& a, const HostLayout& b) {
@@ -212,6 +222,35 @@ void Effect::notify_status() noexcept {
     event.mArgument.mParameter = {GetComponentInstance(), status_parameter, kAudioUnitScope_Global,
                                   0};
     AUEventListenerNotify(nullptr, nullptr, &event);
+    // AU-6: Convolver's window rereads the report.
+    PropertyChanged(report_property, kAudioUnitScope_Global, 0);
+}
+
+HostReport Effect::report_locked(std::string& faults) {
+    // As for the Status text: faults Render signalled are explained here,
+    // and Gain or Mix may have changed on another thread.
+    faults = observe_faults();
+    update_status();
+    HostReportFacts facts;
+    facts.format = tag_;
+    facts.host = known_layout();
+    facts.max_frames = host_ ? GetMaxFramesPerSlice() : 0;
+    facts.settings = settings();
+    facts.latency_frames = latency_frames;
+    facts.tail_frames = tail_.load();
+    facts.log_written = status_log_written_;
+    return host_report(filter_, facts);
+}
+
+HostReport Effect::report() {
+    std::string faults;
+    HostReport r;
+    {
+        std::lock_guard lock(control_);
+        r = report_locked(faults);
+    }
+    log_faults(faults);
+    return r;
 }
 
 HostStatusLine Effect::status() {
@@ -426,6 +465,18 @@ OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
         writable = false;
         return noErr;
     }
+    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+        size = sizeof(CFTypeRef);
+        writable = false;
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+        if (!view_bundle())
+            return kAudioUnitErr_InvalidProperty; // Registered without the bundle (the tests).
+        size = sizeof(AudioUnitCocoaViewInfo);
+        writable = false;
+        return noErr;
+    }
     return AUBase::GetPropertyInfo(id, scope, element, size, writable);
 }
 
@@ -451,6 +502,54 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             f->message.copy(t.message, sizeof t.message - 1);
         }
         std::memcpy(data, &t, sizeof t);
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+        CFTypeRef value = nullptr;
+        try {
+            const auto r = report();
+            if (id == report_property) {
+                const auto fields = report_fields(r);
+                const auto dict = CFDictionaryCreateMutable(
+                    nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                for (const auto& [key, text] : fields) {
+                    const auto k = cf_string(key), v = cf_string(text);
+                    if (dict && k && v)
+                        CFDictionarySetValue(dict, k, v);
+                    if (k)
+                        CFRelease(k);
+                    if (v)
+                        CFRelease(v);
+                }
+                value = dict;
+            } else {
+                value = cf_string(diagnostics_text(r, tag_));
+            }
+        } catch (...) { // Out of memory.
+        }
+        if (!value)
+            return kAudioUnitErr_InvalidPropertyValue;
+        std::memcpy(data, &value, sizeof value); // The caller releases it.
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+        const auto bundle = view_bundle();
+        if (!bundle)
+            return kAudioUnitErr_InvalidProperty;
+        // The class names carry the version, so two Convolver builds in one
+        // host keep their own windows (Objective-C has one class namespace).
+        AudioUnitCocoaViewInfo info{
+            CFBundleCopyBundleURL(bundle),
+            {CFStringCreateWithCString(nullptr, CONVOLVER_AU_VIEW_FACTORY_NAME,
+                                       kCFStringEncodingUTF8)}};
+        if (!info.mCocoaAUViewBundleLocation || !info.mCocoaAUViewClass[0]) {
+            if (info.mCocoaAUViewBundleLocation)
+                CFRelease(info.mCocoaAUViewBundleLocation);
+            if (info.mCocoaAUViewClass[0])
+                CFRelease(info.mCocoaAUViewClass[0]);
+            return kAudioUnitErr_InvalidProperty;
+        }
+        std::memcpy(data, &info, sizeof info); // The caller releases the URL and the name.
         return noErr;
     }
     if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {

@@ -94,8 +94,12 @@ jobs:
           # Make the component registrar rescan, as after an installer.
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           auval -a | grep -i conv || true
+      # AU-6: auval also lists and loads Convolver's window.
       - name: auval (strict)
-        run: auval -strict -v aufx Conv CONV
+        shell: bash  # With pipefail, so auval's own failure still fails the step.
+        run: |
+          auval -strict -v aufx Conv CONV | tee auval.txt
+          grep -q "Cocoa Views Available: 1" auval.txt
       # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
       - name: Explain a failure that may come from a new upstream release
         if: failure()

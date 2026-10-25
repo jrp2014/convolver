@@ -193,7 +193,8 @@ if(CONVOLVER_BUILD_NATIVE)
         target_compile_definitions(convolver_core PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
         target_link_libraries(convolver_core PRIVATE "-framework Accelerate")
     endif()
-    add_library(convolver_host STATIC portable/host.cpp portable/host_log.cpp portable/state.cpp)
+    add_library(convolver_host STATIC portable/host.cpp portable/host_log.cpp portable/host_report.cpp
+        portable/state.cpp)
     add_library(Convolver::host ALIAS convolver_host)
     set_target_properties(convolver_host PROPERTIES EXPORT_NAME host POSITION_INDEPENDENT_CODE ON)
     target_link_libraries(convolver_host PUBLIC Convolver::core)
@@ -298,6 +299,9 @@ if(CONVOLVER_BUILD_NATIVE)
         # PLUG-10: gain and mix.
         convolver_native_test(native.host_settings convolver_host_settings_tests
             SOURCES tests/native/host_settings_tests.cpp LIBRARIES Convolver::host)
+        # PLUG-9: the editor report and Copy diagnostics.
+        convolver_native_test(native.host_report convolver_host_report_tests
+            SOURCES tests/native/host_report_tests.cpp LIBRARIES Convolver::host)
         # PLUG-7: lifecycle sequences against the reference model.
         convolver_native_test(native.host_lifecycle convolver_host_lifecycle_tests
             SOURCES tests/native/host_lifecycle_tests.cpp tests/plugins/lifecycle.cpp
