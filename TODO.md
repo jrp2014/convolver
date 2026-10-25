@@ -289,6 +289,15 @@ Shared work, done once for all three formats:
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
   Needed for the first preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
+  Progress (25 October 2026, PR #80): Gain and Mix in `HostProcessor`, the
+  contract's [settings](docs/develop/plugin-contract.md#settings) and the
+  divergence in [how the plug-ins behave](docs/use/plugins.md#settings), with
+  the Audio Unit's parameters (AU-7). Deferred to keep the first version
+  simple (jrp, 25 October 2026): the Estimate and No clipping gain modes
+  (IDs 1002 approved), the Latency choice (1004 approved; latency stays 256
+  frames) and the meters; the first try at all three is in PR #80's history
+  (commit 7f2ce96). Host state version 3, which only VST3 writes, lands with
+  VST3-4.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
@@ -359,6 +368,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `plugins/identities.json`), latency indexed and not automatable, with
   latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
   Needed for the first preview.
+  Progress (25 October 2026, PR #80): Gain (0) and Mix (1003), saved in
+  `ClassInfo` ([settings](docs/use/plugins.md#settings)). Remaining, with
+  PLUG-10's deferred parts: Gain mode (1002) and Latency (1004), with the
+  latency change notification.
 
 ## FFmpeg integration
 
@@ -625,6 +638,7 @@ with compatibility tests; linked IDs point to open work above.
 
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
+| Plug-in settings (gain, mix) only in the Audio Unit so far; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain or mix in another format; VST3-4 and LV2-7 add the settings there. | [Settings](docs/use/plugins.md#settings) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |

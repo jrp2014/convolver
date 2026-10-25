@@ -374,7 +374,7 @@ void rejected_presets() {
     still_kept("state from a newer Convolver");
     recorded(HostFailureKind::state_newer, 0, false, "state from a newer Convolver");
     // AUBase reads "data" (parameter values) without bounds checks; this unit
-    // ignores it (its one parameter, Status, is read-only), so a damaged one is harmless.
+    // reads it itself with them, so a damaged one is harmless.
     require(modified([&](CFMutableDictionaryRef d) {
                 const UInt8 junk[] = {0, 0, 0, 0, 0xff, 0xff, 0xff};
                 const auto data = CFDataCreate(nullptr, junk, sizeof junk);
@@ -585,7 +585,152 @@ void render_requires_initialization() {
     require(render(unit, b, 64, false, silent) == kAudioUnitErr_Uninitialized,
             "rendered without initialization");
 }
+
+// While it exists, the Convolver log goes to a file of this process's own
+// (CTest's is shared with the other AU tests).
+class PrivateLog {
+  public:
+    explicit PrivateLog(const std::string& name)
+        : path_(std::filesystem::temp_directory_path() /
+                ("convolver-au-" + name + "-" + std::to_string(std::random_device{}()) + ".log")) {
+        if (const char* configured = std::getenv("CONVOLVER_LOG"))
+            earlier_ = configured;
+        setenv("CONVOLVER_LOG", path_.c_str(), 1);
+    }
+    PrivateLog(const PrivateLog&) = delete;
+    PrivateLog& operator=(const PrivateLog&) = delete;
+    ~PrivateLog() {
+        if (earlier_)
+            setenv("CONVOLVER_LOG", earlier_->c_str(), 1);
+        else
+            unsetenv("CONVOLVER_LOG");
+        std::error_code ignored;
+        std::filesystem::remove(path_, ignored);
+    }
+    std::string text() const {
+        std::ifstream in(path_, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    }
+
+  private:
+    std::filesystem::path path_;
+    std::optional<std::string> earlier_;
+};
 } // namespace
+
+// AU-7: PLUG-10's settings as global parameters. Ranges and defaults, what
+// they do to the audio, and saving and restoring them with ClassInfo.
+AudioUnitParameterValue parameter(Unit& unit, AudioUnitParameterID id) {
+    AudioUnitParameterValue v = -1;
+    check(AudioUnitGetParameter(unit.get(), id, kAudioUnitScope_Global, 0, &v), "parameter value");
+    return v;
+}
+void set_parameter(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue v) {
+    check(AudioUnitSetParameter(unit.get(), id, kAudioUnitScope_Global, 0, v, 0), "set parameter");
+}
+// Renders constant input 0.5 on both channels for `blocks` blocks of 512 and
+// returns the last sample of the left output.
+float steady_output(Unit& unit, int blocks) {
+    Buffers b(2, 2, 512);
+    for (auto& channel : b.in)
+        channel.assign(channel.size(), .5f);
+    bool silent = false;
+    for (int k = 0; k < blocks; ++k)
+        check(render(unit, b, 512, false, silent), "settings render");
+    return b.out[0].back();
+}
+void settings_parameters() {
+    struct Expected {
+        AudioUnitParameterID id;
+        AudioUnitParameterUnit unit;
+        float min, max, def;
+    };
+    for (const auto& e :
+         {Expected{au::gain_parameter, kAudioUnitParameterUnit_Decibels, -100, 24, 0},
+          Expected{au::mix_parameter, kAudioUnitParameterUnit_Percent, 0, 100, 100}}) {
+        Unit unit;
+        AudioUnitParameterInfo info{};
+        UInt32 size = sizeof info;
+        check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterInfo,
+                                   kAudioUnitScope_Global, e.id, &info, &size),
+              "settings parameter info");
+        require(info.unit == e.unit && info.minValue == e.min && info.maxValue == e.max &&
+                    info.defaultValue == e.def &&
+                    (info.flags & kAudioUnitParameterFlag_IsReadable) &&
+                    (info.flags & kAudioUnitParameterFlag_IsWritable),
+                "parameter " + std::to_string(e.id) + " info");
+        if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
+            CFRelease(info.cfNameString);
+        require(parameter(unit, e.id) == e.def, "parameter " + std::to_string(e.id) + " default");
+        // Values outside the range are stored within it.
+        set_parameter(unit, e.id, e.max + 1000);
+        require(parameter(unit, e.id) == e.max, "parameter not clamped above");
+        set_parameter(unit, e.id, e.min - 1000);
+        require(parameter(unit, e.id) == e.min, "parameter not clamped below");
+    }
+
+    // Gain and Mix act on the audio: a one-tap filter of 0.5 on each channel.
+    Configuration half{48000, 2, 2, 0, {}, {}, {}};
+    for (std::size_t ch = 0; ch < 2; ++ch)
+        half.paths.push_back({{.5f}, {{ch, 1}}, {{ch, 1}}});
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "settings formats");
+    check(unit.load(state_of(half)), "settings filter");
+    check(unit.initialize(), "settings initialization");
+    require(std::abs(steady_output(unit, 2) - .25f) < 1e-5, "default settings changed the sound");
+    set_parameter(unit, au::gain_parameter, -6);
+    const double gain = std::pow(10.0, -6.0 / 20);
+    require(std::abs(steady_output(unit, 2) - .25 * gain) < 1e-5, "Gain not applied");
+    set_parameter(unit, au::mix_parameter, 50);
+    require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
+
+    // Saved with ClassInfo, restored into a new instance before it is
+    // initialized, and applied when it is. The log line for the restore lists
+    // them, since hosts may start the unit before restoring a project.
+    const auto saved = unit.class_info_now();
+    Unit copy;
+    check(copy.configure(48000, 2, 2, 512), "copy formats");
+    {
+        PrivateLog log("settings");
+        check(copy.restore(saved), "restore with settings");
+        require(log.text().find("Restored settings: gain -6 dB, mix 50% wet.") != std::string::npos,
+                "the restore's log line does not list the settings");
+    }
+    require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
+            "settings not restored");
+    check(copy.initialize(), "copy initialization");
+    require(std::abs(steady_output(copy, 3) - (.5 * .25 * gain + .25)) < 1e-5,
+            "restored settings not applied");
+    // A preset from convolver-preset has no parameter values: settings keep theirs.
+    check(copy.load(state_of(half)), "preset without settings");
+    require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
+            "a preset without settings reset them");
+    // Malformed parameter data: the filter loads, the settings keep their values.
+    const auto mutable_copy =
+        CFDictionaryCreateMutableCopy(nullptr, 0, static_cast<CFDictionaryRef>(saved));
+    const UInt8 truncated[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0};
+    const auto bad = CFDataCreate(nullptr, truncated, sizeof truncated);
+    CFDictionarySetValue(mutable_copy, CFSTR(kAUPresetDataKey), bad);
+    CFRelease(bad);
+    set_parameter(copy, au::gain_parameter, 3);
+    check(copy.restore(mutable_copy), "restore with malformed parameter data");
+    require(parameter(copy, au::gain_parameter) == 3, "malformed data changed a setting");
+    CFRelease(mutable_copy);
+    // A rejected preset leaves the settings as they were.
+    const auto wrong = au_test::class_info(state_of(stereo(44100)));
+    const auto wrong_copy =
+        CFDictionaryCreateMutableCopy(nullptr, 0, static_cast<CFDictionaryRef>(wrong));
+    const auto good_data =
+        CFDictionaryGetValue(static_cast<CFDictionaryRef>(saved), CFSTR(kAUPresetDataKey));
+    CFDictionarySetValue(wrong_copy, CFSTR(kAUPresetDataKey), good_data);
+    require(copy.restore(wrong_copy) != noErr, "wrong-rate preset accepted");
+    require(parameter(copy, au::gain_parameter) == 3, "a rejected preset changed a setting");
+    CFRelease(wrong_copy);
+    CFRelease(wrong);
+    CFRelease(saved);
+    copy.uninitialize();
+    unit.uninitialize();
+}
 
 // DIAG-1: the read-only Status parameter says in one line why the unit is
 // silent or refused a preset, and the Convolver log explains in full.
@@ -607,13 +752,15 @@ void status_parameter() {
     };
     Unit unit;
     const auto au = unit.get();
-    AudioUnitParameterID ids[4]{};
+    AudioUnitParameterID ids[8]{};
     UInt32 size = sizeof ids;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterList, kAudioUnitScope_Global, 0, ids,
                                &size),
           "parameter list");
-    require(size == sizeof(AudioUnitParameterID) && ids[0] == au::status_parameter,
-            "the unit should have exactly one parameter, Status");
+    // AU-7: the settings first, as generic views list them, then Status.
+    require(size == 3 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
+                ids[1] == au::mix_parameter && ids[2] == au::status_parameter,
+            "the parameters should be Gain, Mix and Status");
     AudioUnitParameterInfo info{};
     size = sizeof info;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
@@ -762,6 +909,7 @@ int main() {
         render_requires_initialization();
         failed_initialization();
         status_parameter();
+        settings_parameters();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;
     } catch (const std::exception& e) {

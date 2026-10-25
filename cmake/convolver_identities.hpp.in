@@ -25,6 +25,10 @@ inline constexpr std::string_view au_type = "@CONVOLVER_ID_AU_TYPE@";
 inline constexpr std::string_view au_subtype = "@CONVOLVER_ID_AU_SUBTYPE@";
 inline constexpr std::string_view au_manufacturer = "@CONVOLVER_ID_AU_MANUFACTURER@";
 inline constexpr std::uint32_t au_status_parameter_id = @convolver_au_status_parameter@;
+// PLUG-10's settings (AU-7). Gain shares ID 0 with the historical VST2
+// plug-in's Attenuation, by jrp's decision, with a new range.
+inline constexpr std::uint32_t au_gain_parameter_id = @convolver_au_gain_parameter@;
+inline constexpr std::uint32_t au_mix_parameter_id = @convolver_au_mix_parameter@;
 constexpr std::uint32_t four_char(std::string_view code) noexcept {
     std::uint32_t value = 0;
     for (char c : code)

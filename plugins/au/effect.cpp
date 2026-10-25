@@ -6,6 +6,7 @@
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <exception>
@@ -19,6 +20,41 @@ namespace {
 constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
                                                   "Not checked yet", "Fault"};
 static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
+                                                              status_parameter};
+
+// AU-7: the global parameter values in AUBase's saved "data" blob, read with
+// bounds checks (AUBase's own reader has none): for each scope and element,
+// big-endian scope, element and count, then count pairs of ID and value bits.
+// Nothing when the blob is malformed.
+std::optional<std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>>
+saved_parameters(CFDataRef data) {
+    std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>> found;
+    const auto* p = CFDataGetBytePtr(data);
+    const auto size = static_cast<std::size_t>(CFDataGetLength(data));
+    std::size_t at = 0;
+    const auto word = [&](UInt32& out) {
+        if (size - at < 4)
+            return false;
+        out = (UInt32{p[at]} << 24) | (UInt32{p[at + 1]} << 16) | (UInt32{p[at + 2]} << 8) |
+              UInt32{p[at + 3]};
+        at += 4;
+        return true;
+    };
+    while (at < size) {
+        UInt32 scope = 0, element = 0, count = 0;
+        if (!word(scope) || !word(element) || !word(count) || count > (size - at) / 8)
+            return std::nullopt;
+        for (UInt32 i = 0; i < count; ++i) {
+            UInt32 id = 0, bits = 0;
+            word(id);
+            word(bits);
+            if (scope == kAudioUnitScope_Global && element == 0)
+                found.emplace_back(id, std::bit_cast<AudioUnitParameterValue>(bits));
+        }
+    }
+    return found;
+}
 
 std::string next_tag() {
     static std::atomic<unsigned> instances{0};
@@ -91,6 +127,31 @@ Effect::Effect(AudioComponentInstance instance)
     // Not UseIndexedParameters: that numbers parameters from 0, and Status is
     // 1001 (plugins/identities.json), so the parameter map is used instead.
     Globals()->SetParameter(status_parameter, static_cast<AudioUnitParameterValue>(status_.status));
+    // AU-7: the settings at their defaults, which keep the sound unchanged.
+    const HostSettings defaults;
+    Globals()->SetParameter(gain_parameter, static_cast<AudioUnitParameterValue>(defaults.gain_db));
+    Globals()->SetParameter(mix_parameter,
+                            static_cast<AudioUnitParameterValue>(100 * defaults.mix));
+}
+
+HostSettings Effect::settings() {
+    HostSettings s;
+    s.gain_db = Globals()->GetParameterRT(gain_parameter);
+    s.mix = Globals()->GetParameterRT(mix_parameter) / 100.0;
+    return s; // Within range: store() clamps every value.
+}
+
+void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexcept {
+    if (id == gain_parameter)
+        value = std::isnan(value)
+                    ? 0.f
+                    : std::clamp(value, static_cast<AudioUnitParameterValue>(min_gain_db),
+                                 static_cast<AudioUnitParameterValue>(max_gain_db));
+    else if (id == mix_parameter)
+        value = std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
+    else
+        return;
+    static_cast<void>(Globals()->SetParameterOrError(id, value));
 }
 
 void Effect::log(const std::string& message, bool problem) noexcept {
@@ -157,19 +218,52 @@ HostStatusLine Effect::status() {
     return status_;
 }
 
+OSStatus Effect::GetParameterList(AudioUnitScope scope, AudioUnitParameterID* list, UInt32& count) {
+    if (scope != kAudioUnitScope_Global)
+        return AUBase::GetParameterList(scope, list, count);
+    count = static_cast<UInt32>(parameter_order.size());
+    if (list)
+        std::copy(parameter_order.begin(), parameter_order.end(), list);
+    return noErr;
+}
+
 OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
                                   AudioUnitParameterInfo& info) {
-    if (scope != kAudioUnitScope_Global || id != status_parameter)
+    if (scope != kAudioUnitScope_Global)
         return kAudioUnitErr_InvalidParameter;
-    FillInParameterName(info, CFSTR("Status"), false);
-    info.unit = kAudioUnitParameterUnit_Indexed;
-    info.minValue = 0;
-    info.maxValue = static_cast<AudioUnitParameterValue>(status_names.size() - 1);
-    info.defaultValue = static_cast<AudioUnitParameterValue>(HostStatus::no_filter);
-    // Readable, not writable: hosts show it and never automate it.
-    info.flags = kAudioUnitParameterFlag_HasCFNameString | kAudioUnitParameterFlag_IsReadable |
-                 kAudioUnitParameterFlag_ValuesHaveStrings;
-    return noErr;
+    constexpr auto settable = kAudioUnitParameterFlag_HasCFNameString |
+                              kAudioUnitParameterFlag_IsReadable |
+                              kAudioUnitParameterFlag_IsWritable;
+    switch (id) {
+    case status_parameter:
+        FillInParameterName(info, CFSTR("Status"), false);
+        info.unit = kAudioUnitParameterUnit_Indexed;
+        info.minValue = 0;
+        info.maxValue = static_cast<AudioUnitParameterValue>(status_names.size() - 1);
+        info.defaultValue = static_cast<AudioUnitParameterValue>(HostStatus::no_filter);
+        // Readable, not writable: hosts show it and never automate it.
+        info.flags = kAudioUnitParameterFlag_HasCFNameString | kAudioUnitParameterFlag_IsReadable |
+                     kAudioUnitParameterFlag_ValuesHaveStrings;
+        return noErr;
+    case gain_parameter:
+        FillInParameterName(info, CFSTR("Gain"), false);
+        info.unit = kAudioUnitParameterUnit_Decibels;
+        info.minValue = static_cast<AudioUnitParameterValue>(min_gain_db);
+        info.maxValue = static_cast<AudioUnitParameterValue>(max_gain_db);
+        info.defaultValue = 0;
+        info.flags = settable;
+        return noErr;
+    case mix_parameter:
+        FillInParameterName(info, CFSTR("Mix"), false);
+        info.unit = kAudioUnitParameterUnit_Percent;
+        info.minValue = 0;
+        info.maxValue = 100;
+        info.defaultValue = 100;
+        info.flags = settable;
+        return noErr;
+    default:
+        return kAudioUnitErr_InvalidParameter;
+    }
 }
 
 OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id,
@@ -192,9 +286,16 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
 OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
                               AudioUnitElement element, AudioUnitParameterValue value,
                               UInt32 offset) AUSDK_RTSAFE {
-    if (scope == kAudioUnitScope_Global && id == status_parameter)
+    if (scope != kAudioUnitScope_Global || element != 0)
+        return AUBase::SetParameter(id, scope, element, value, offset);
+    if (id == status_parameter)
         return noErr;
-    return AUBase::SetParameter(id, scope, element, value, offset);
+    if (id != gain_parameter && id != mix_parameter)
+        return kAudioUnitErr_InvalidParameter;
+    AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map")
+    store(id, value);
+    AUSDK_RT_UNSAFE_END
+    return noErr;
 }
 
 HostLayout Effect::layout() {
@@ -226,15 +327,18 @@ OSStatus Effect::Initialize() {
         return kAudioUnitErr_FormatNotSupported;
     std::string message, faults;
     bool started = false, problem = true;
+    HostSettings current;
     {
         std::lock_guard lock(control_);
         faults = observe_faults(); // Before the processor that counted them goes.
         try {
             const auto host = layout();
+            current = settings();
             // A filter that does not suit the host plays silence, and is kept so
-            // that correcting the rate or channels brings it back.
-            auto next = std::make_unique<HostProcessor>(filter_.activate(host),
-                                                        GetMaxFramesPerSlice(), latency_frames);
+            // that correcting the rate or channels brings it back. Gain and Mix
+            // apply from the first frame.
+            auto next = std::make_unique<HostProcessor>(
+                filter_.activate(host), GetMaxFramesPerSlice(), current, latency_frames);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
@@ -255,7 +359,7 @@ OSStatus Effect::Initialize() {
             try {
                 const auto& f = filter_.failure();
                 problem = (f && f->silent) || !filter_.notice().empty();
-                message = started_line(filter_, *initialized_, GetMaxFramesPerSlice());
+                message = started_line(filter_, *initialized_, GetMaxFramesPerSlice(), &current);
             } catch (...) { // Out of memory for the message: the unit still plays.
             }
         }
@@ -493,6 +597,8 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         log_faults(faults);
         notify_status();
     }
+    // AU-7: AUBase writes the parameter values (Gain and Mix, and Status,
+    // which RestoreState ignores) under "data".
     if (const auto result = AUBase::SaveState(out); result != noErr)
         return result;
     // AUBase::SaveState creates a mutable dictionary.
@@ -567,6 +673,20 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
+    // AU-7: Gain and Mix as saved with the state, applied if the state is
+    // accepted. A preset from convolver-preset has none, and settings it does
+    // not hold keep their values.
+    std::optional<std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>> saved;
+    bool settings_unreadable = false;
+    if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
+        data && CFGetTypeID(data) == CFDataGetTypeID()) {
+        try {
+            saved = saved_parameters(static_cast<CFDataRef>(data));
+        } catch (...) { // Out of memory: the settings are left as they are.
+        }
+        settings_unreadable = !saved;
+    }
+
     bool accepted = false, problem = true;
     std::string message, faults;
     {
@@ -601,6 +721,9 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
+            if (saved)
+                for (const auto& [id, value] : *saved)
+                    store(id, value); // Status and unknown IDs are ignored.
         } catch (...) {
             // A failed first load plays silence rather than the unfiltered input.
             if (host_ && filter_.failed() && !was_failed) {
@@ -622,6 +745,15 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
                 message = loaded_line(filter_, host.has_value());
+                // Hosts such as GarageBand restore a project after starting the
+                // unit, so its "Started at" line shows the settings before this.
+                if (saved && std::ranges::any_of(*saved, [](const auto& p) {
+                        return p.first == gain_parameter || p.first == mix_parameter;
+                    })) {
+                    const auto counts = host ? *host : layout();
+                    message += " Restored settings: " +
+                               settings_words(settings(), counts.inputs == counts.outputs) + ".";
+                }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
         }
@@ -631,12 +763,24 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
+    if (accepted && settings_unreadable)
+        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain and "
+            "Mix keep their values.");
     notify_status();
     if (!accepted)
         return kAudioUnitErr_InvalidPropertyValue;
+    if (saved) {
+        // Hosts and generic views reread the settings.
+        AudioUnitEvent event{};
+        event.mEventType = kAudioUnitEvent_ParameterValueChange;
+        for (const auto id : parameter_order) {
+            event.mArgument.mParameter = {GetComponentInstance(), id, kAudioUnitScope_Global, 0};
+            AUEventListenerNotify(nullptr, nullptr, &event);
+        }
+    }
     // The preset name and element names, as AUBase restores them. Its "data"
-    // (parameter values) is left out: the only parameter is the read-only
-    // Status, and AUBase reads that blob without bounds checks.
+    // (parameter values) is left out: Gain and Mix were read above with bounds
+    // checks, and AUBase reads that blob without them.
     const auto copy = CFDictionaryCreateMutableCopy(nullptr, 0, dict);
     if (!copy)
         return noErr;
@@ -681,6 +825,9 @@ OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp&
     if (reset_requested_.exchange(false))
         host->reset();
     host->set_bypass(bypass_.load(std::memory_order_relaxed));
+    // AU-7: Gain and Mix, ramped by the processor.
+    host->set_gain_db(Globals()->GetParameterRT(gain_parameter));
+    host->set_mix(Globals()->GetParameterRT(mix_parameter) / 100.0);
     processed = host->process(std::span(in).first(inputs), std::span(out).first(outputs), frames);
     // DIAG-1: a new processing fault shows as Status Fault at once, with no
     // logging or allocation here (an existing parameter's value is an atomic

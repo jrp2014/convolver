@@ -100,7 +100,7 @@ def read_aupreset(path, name):
     assert plist['subtype'] == four_char(au['subtype'])
     assert plist['manufacturer'] == four_char(au['manufacturer'])
     assert plist['name'] == name, plist['name']
-    assert plist['data'] == b'', 'AUBase parameter data: empty, the AU has no parameters'
+    assert plist['data'] == b'', 'AUBase parameter data: empty, so settings keep their values'
     assert set(plist) == {'version', 'type', 'subtype', 'manufacturer', 'name', 'data',
                           'convolver-state'}, sorted(plist)
     return plist['convolver-state']

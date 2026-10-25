@@ -26,7 +26,7 @@ Until 1.0 the C++ API may change between minor versions.
   where it returned `HostFaults`. Its `HostFaultReport` now derives from
   `HostFaults`, counting every fault the call returns (current plus earlier),
   and a constructor takes `current`, `earlier` and `held` in that order, so
-  code written for 0.5.1 to 0.5.3 compiles too, braces included. Two uses
+  code written for 0.5.1 to 0.5.4 compiles too, braces included. Two uses
   still do not: a pointer to `observe` as a member function returning
   `HostFaults`, and designated initialisers of `HostFaultReport`. Found in
   jrp's review of 0.5.2.
@@ -34,6 +34,14 @@ Until 1.0 the C++ API may change between minor versions.
   saying that the status shows Fault, while the status rightly kept showing
   Load failed. The log now says that Load failed shows instead. Found in
   jrp's review of 0.5.2.
+
+## [0.5.4] - 2026-10-25
+
+### Added
+
+- Audio Unit: Gain (−100 to +24 dB) and Mix (0 to 100% wet) parameters,
+  saved with the project. Their defaults (0 dB, 100%) sound exactly as
+  before.
 
 ## [0.5.3] - 2026-10-25
 
@@ -645,7 +653,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/jrp2014/convolver/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jrp2014/convolver/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jrp2014/convolver/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jrp2014/convolver/compare/v0.5.0...v0.5.1

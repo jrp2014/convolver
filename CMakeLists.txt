@@ -281,6 +281,9 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.host convolver_host_tests
             SOURCES tests/native/host_tests.cpp LIBRARIES Convolver::host Threads::Threads)
+        # PLUG-10: gain and mix.
+        convolver_native_test(native.host_settings convolver_host_settings_tests
+            SOURCES tests/native/host_settings_tests.cpp LIBRARIES Convolver::host)
         # PLUG-7: lifecycle sequences against the reference model.
         convolver_native_test(native.host_lifecycle convolver_host_lifecycle_tests
             SOURCES tests/native/host_lifecycle_tests.cpp tests/plugins/lifecycle.cpp
