@@ -23,6 +23,8 @@ void require(bool ok, const char* message) {
 // echo, half at once and a quarter 257 samples later; the repeat, the same a
 // quarter of a second later.
 int delay_of(const std::string& kind, int rate) {
+    require(kind == "identity" || kind == "echo" || kind == "repeat",
+            "unknown example kind: the probe knows identity, echo and repeat");
     return kind == "echo" ? 257 : kind == "repeat" ? rate / 4 : 0;
 }
 

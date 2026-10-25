@@ -162,7 +162,7 @@ Keep private audio out of reports. Use the supplied synthetic examples.
    system-wide.
 2. Scan, insert Convolver, and load one example preset at 48 kHz in mono and
    stereo, where the host offers both ([first hosts](#first-hosts)). Check
-   that the identity and echo examples sound as expected.
+   that the identity, echo and repeat examples sound as expected.
 3. Save the project, close and reopen it, and check that the filter is restored.
 4. Try a preset with the wrong rate or channel count while a working filter is
    running. The working filter must keep running, the plug-in's Status
@@ -261,7 +261,10 @@ except the Audio Unit build, which runs in a source checkout.
    `presets/echo-48000-stereo/filter.vstpreset`: about 5 dB quieter, with a
    hollow, comb-filtered tone. (Its echo comes 257 samples, about 5 ms, after
    the direct sound, too soon to hear as a separate repeat.) Status reads
-   `Filter loaded: 48000 Hz, 2 in, 2 out.`
+   `Filter loaded: 48000 Hz, 2 in, 2 out.` Import
+   `presets/repeat-48000-stereo/filter.vstpreset`: each sound comes again,
+   quieter, a quarter of a second later. Import the echo preset again for the
+   next steps.
 5. Toggle the plug-in's bypass (the checkbox beside its name) while playing.
    The sound switches between filtered and unfiltered; note any click.
 6. Render the project (*File › Render*, offline) to a WAV and check that it
@@ -291,7 +294,8 @@ except the Audio Unit build, which runs in a source checkout.
    **E**) and add Convolver. In its preset menu choose `identity-48000-stereo`
    (listed with the plug-in's own presets after [preparation](#prepare-the-mac)).
    Play: unchanged. Choose `echo-48000-stereo`: quieter and hollow, as in
-   REAPER. Record whether a preset chosen during playback is heard at once or
+   REAPER. Choose `repeat-48000-stereo`: each sound comes again a quarter of a
+   second later; then choose `echo-48000-stereo` again. Record whether a preset chosen during playback is heard at once or
    only after stopping and starting playback again. The effect's window lists
    a read-only Status. Audacity's window has its own copy of the plug-in,
    which normally is not started, so Status should read `Filter loaded: 48000
@@ -348,11 +352,11 @@ except the Audio Unit build, which runs in a source checkout.
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
-9. The [settings](../use/plugins.md#settings), with `repeat-44100-stereo`
-   playing, where the changes are easiest to hear. Record
-   where the window shows Gain and Mix and how it shows their values. Set
-   Gain to −12 dB: the level drops smoothly, without a click. Set Mix to 0%:
-   you hear the dry track, without the repeat; 50% mixes the two. Save, quit and reopen the
+9. The [settings](../use/plugins.md#settings). Choose `repeat-44100-stereo`,
+   where the changes are easiest to hear, and play. Record where the window
+   shows Gain and Mix and how it shows their values. Set Gain to −12 dB: the
+   level drops smoothly, without a click. Set Mix to 0%: you hear the dry
+   track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
    after the reopening ends with
    `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the
@@ -364,7 +368,7 @@ except the Audio Unit build, which runs in a source checkout.
 1. Download through the actual user-facing route, retaining quarantine metadata.
    Install the signed package and scan without disabling security. Check
    `convolver-preset` operation too.
-2. Check identity and echo output at 44.1/48/96 kHz, mono/stereo, variable blocks,
+2. Check identity, echo and repeat output at 44.1/48/96 kHz, mono/stereo, variable blocks,
    long-tail silence, stop/start/seek and offline/bounce rendering. Align numerical
    comparison by 256 samples; use an independent time-domain convolution reference.
 3. Exercise bypass automation, multiple instances and filter replacements. Check
