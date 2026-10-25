@@ -216,7 +216,7 @@ endif()
 # CI-9: everything the vst3.* tests and their examples.first_use fixture run,
 # so a job that runs only `ctest -L vst3` can build this rather than every test
 # (as convolver_lv2_tests does for LV2). A test whose program is missing here
-# fails with "Could not find executable", so add a new test's target.
+# fails (CTest cannot find it, or its script reports it), so add a new test's target.
 if(CONVOLVER_BUILD_TESTS)
     add_custom_target(convolver_vst3_suite)
     add_dependencies(convolver_vst3_suite convolver_vst3 validator convolver_vst3_tests)

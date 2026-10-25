@@ -886,26 +886,32 @@ give a new build-independent check the `repository` label.
 
 ### Build targets and test order
 
-A job that runs only one format's tests builds only what those tests run, with
-the CLI for the `examples.first_use` fixture:
+Some jobs build only what their tests run. These three targets cover a
+format's whole test label, with the CLI for the `examples.first_use` fixture:
 
 | Target | Built by | Tests |
 | --- | --- | --- |
 | `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
 | `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
-| `convolver_lv2_tests` | LV2 sanitizer jobs | `examples.first_use` and `lv2.*` |
+| `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
 
-The other jobs build everything. A test whose program the target does not
-build fails with "Could not find executable", so a new plug-in test's target
-goes into its format's target (`au_test_targets` for the Audio Unit).
+The LV2 ThreadSanitizer job, the lv2lint bundle and the fuzz workflow name
+their few targets directly in the workflow; the other jobs build everything.
+A test whose program the target does not build fails (CTest reports "Could
+not find executable", a Python-driven test its own error), so a new plug-in
+test's target goes into its format's target (`au_test_targets` for the Audio
+Unit).
 
 Under `ctest --parallel`, CTest starts the tests that others need first (a
 fixture's setup), then the ready tests in decreasing `COST`. The long tests
-carry a `COST` of about their longest CI time in seconds, set where each test
-is defined, so they start at once instead of last: `vst3.lifecycle` took
-100 s on Windows and began about 20 s into the step. Static analysis runs
-[`clang_tidy.py`](../../scripts/clang_tidy.py), which analyses the same file
-list one file per CPU and lists every file that failed
+carry a `COST` of about their longest CI time in seconds, so they start at
+once instead of last. Plug-in tests set it where they are defined; the core's
+are one list in the top-level `CMakeLists.txt`, before the `check` target,
+which skips a name no longer defined, so rename a test there too. On `main` at
+b9381e4 (25 October 2026, VST3 run 40236000059), Windows `vst3.lifecycle`
+took 100 s and began 21 s into its step, which then took 122 s. Static
+analysis runs [`clang_tidy.py`](../../scripts/clang_tidy.py), which analyses
+the same file list one file per CPU and lists every file that failed
 ([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).
 
 ### Compiler cache

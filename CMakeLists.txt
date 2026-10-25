@@ -526,6 +526,7 @@ if(CONVOLVER_BUILD_TESTS)
     # long ones do not start late and finish last. Each COST is about the
     # test's longest time in CI, in seconds (macOS Debug with sanitizers, 25
     # October 2026). Fixture setups still run before the tests that need them.
+    # A name not defined in this build is skipped, so rename tests here too.
     set(test_costs compatibility.corpus 45 native.fft_planning 40 native.limits 28
         native.kernel_divergence 25 native.cli 22 native.host_settings 20 native.host_lifecycle 20)
     while(test_costs)
