@@ -155,25 +155,38 @@ std::string rejected_line(const HostFilter& filter) {
     return r ? request_words(r->request) + r->message : std::string();
 }
 
-namespace {
-// A setting as people read it: to one decimal ("-76 dB", "56.1%", not
-// GarageBand's slider values "-75.967 dB" and "56.1413%"), or two
-// significant digits for a value too small to show in one ("-0.01 dB").
-std::string setting(double value) {
-    char text[32] = {};
+std::string setting_text(double value, double low, double high) {
+    // Two significant digits for a value too small for one decimal.
+    int decimals = 1;
     if (value != 0 && std::abs(value) < .05)
-        std::snprintf(text, sizeof text, "%.2g", value);
-    else
-        std::snprintf(text, sizeof text, "%g", std::round(value * 10) / 10 + 0.0);
-    return text;
+        decimals = std::min(6, 1 - static_cast<int>(std::floor(std::log10(std::abs(value)))));
+    const auto text = [&](int places) {
+        char buffer[48] = {};
+        std::snprintf(buffer, sizeof buffer, "%.*f", places, value);
+        std::string out = buffer;
+        if (out.find('.') != std::string::npos) {
+            out.erase(out.find_last_not_of('0') + 1);
+            if (out.back() == '.')
+                out.pop_back();
+        }
+        return out == "-0" ? std::string("0") : out;
+    };
+    // A value near either end of the range keeps enough decimals not to read
+    // as the end itself (99.96% wet is not "100% wet").
+    auto out = text(decimals);
+    for (; decimals < 6; out = text(++decimals)) {
+        const double shown = std::strtod(out.c_str(), nullptr);
+        if (!((shown == low && value != low) || (shown == high && value != high)))
+            break;
+    }
+    return out;
 }
-} // namespace
 
 std::string settings_words(const HostSettings& s, bool equal_counts) {
-    const auto gain = "gain " + setting(s.gain_db) + " dB";
+    const auto gain = "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
     if (!equal_counts)
         return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    return gain + ", mix " + setting(100 * s.mix) + "% wet";
+    return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet";
 }
 
 std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {
@@ -201,7 +214,7 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     if (const auto& f = filter.failure(); f && f->silent) {
         auto line = f->message + mono_track_hint(*f, host);
         if (const auto s = sound(false); !s.silent) {
-            const auto mix = setting(100 * std::clamp(used.mix, 0.0, 1.0)) + "%";
+            const auto mix = setting_text(100 * std::clamp(used.mix, 0.0, 1.0), 0, 100) + "%";
             line += " With Mix at " + mix +
                     " wet, though, the dry signal still plays instead of silence: the input " +
                     dry_words(s) + ".";

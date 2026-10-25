@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
+#include "host_log.hpp"
 #include <cmath>
 
 namespace {
@@ -273,10 +274,19 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     return YES;
 }
 
-// A setting's value as the window writes it ("-12.0 dB", "50% wet").
+// A setting's value as the window writes it ("-12 dB", "50% wet"): the same
+// text as the report's details and the log (convolver::setting_text).
 - (NSString*)describe:(double)value of:(NSDictionary<NSString*, id>*)setting {
-    return [NSString
-        stringWithFormat:@"%.*f%@", [setting[@"decimals"] intValue], value, setting[@"unit"]];
+    const auto text = convolver::setting_text(value, [setting[@"minimum"] doubleValue],
+                                              [setting[@"maximum"] doubleValue]);
+    return [@(text.c_str()) stringByAppendingString:setting[@"unit"]];
+}
+
+// Shows `value` beside slider `i`, and gives VoiceOver the same words.
+- (void)show:(double)value at:(NSUInteger)i {
+    NSString* text = [self describe:value of:settings_[i]];
+    _settingValues[i].stringValue = text;
+    _settingSliders[i].accessibilityValueDescription = text;
 }
 
 // The user moved a slider: the format passes the value to the host.
@@ -288,7 +298,7 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     ConvolverSettingSetter set = setting[@"set"];
     if (set)
         set(slider.doubleValue);
-    _settingValues[i].stringValue = [self describe:slider.doubleValue of:setting];
+    [self show:slider.doubleValue at:i];
 }
 
 // The settings as the host has them now (automation, its own controls),
@@ -306,8 +316,7 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
         _settingSliders[i].enabled = YES;
         if (!dragging && _settingSliders[i].doubleValue != value)
             _settingSliders[i].doubleValue = value;
-        _settingValues[i].stringValue =
-            [self describe:(dragging ? _settingSliders[i].doubleValue : value) of:settings_[i]];
+        [self show:(dragging ? _settingSliders[i].doubleValue : value) at:i];
     }
 }
 

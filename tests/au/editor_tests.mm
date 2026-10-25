@@ -183,7 +183,9 @@ void properties(const PrivateLog& log) {
     const auto before_repeats = count(read_file(log.path()), refused);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
-    require(count(read_file(log.path()), refused) <= before_repeats + 1,
+    // Exactly one: the first repeat follows the start line, whose text
+    // differs, and the rest repeat it.
+    require(count(read_file(log.path()), refused) == before_repeats + 1,
             "repeated identical failures logged:\n" + read_file(log.path()));
     AudioUnitRemovePropertyListenerWithUserData(unit.get(), au::report_property, report_changed,
                                                 nullptr);
@@ -270,7 +272,7 @@ void window() {
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
-    require([view.settingValues[0].stringValue isEqualToString:@"0.0 dB"] &&
+    require([view.settingValues[0].stringValue isEqualToString:@"0 dB"] &&
                 [view.settingValues[1].stringValue isEqualToString:@"100% wet"],
             "setting values " + text(view.settingValues[0].stringValue) + ", " +
                 text(view.settingValues[1].stringValue));
@@ -280,15 +282,24 @@ void window() {
     AudioUnitParameterValue now = 0;
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "Gain value");
-    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12.0 dB"],
+    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12 dB"],
             "the Gain slider did not set Gain: " + std::to_string(now));
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
           "Mix from the host");
     [view refresh];
     require(mix.doubleValue == 50 && [view.settingValues[1].stringValue isEqualToString:@"50% wet"],
             "the Mix slider did not follow the host");
+    require([mix.accessibilityValueDescription isEqualToString:@"50% wet"],
+            "Mix slider's VoiceOver value: " + text(mix.accessibilityValueDescription));
     require(contains(view.explanationView.string, "gain -12 dB, mix 50% wet"),
             "the details do not show the settings:\n" + text(view.explanationView.string));
+    // Near an end of the range, the text does not round onto it.
+    check(
+        AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 99.96f, 0),
+        "Mix near 100");
+    [view refresh];
+    require([view.settingValues[1].stringValue hasPrefix:@"99.9"],
+            "Mix near 100 reads " + text(view.settingValues[1].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, 0, 0),
           "Gain back");
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),

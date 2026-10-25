@@ -32,9 +32,11 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
 
 // One of the unit's settings as the window's slider: its range from the
 // unit, its value read and changed through the Audio Unit API. AUParameterSet
-// tells the host and its other views, as a host's own control would.
+// tells the host and its other views of each change; the slider sends no
+// begin and end of a gesture, so a host records automation from it as
+// separate changes.
 NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parameter_id,
-                                     NSString* name, int decimals, NSString* unit_text) {
+                                     NSString* name, NSString* unit_text) {
     AudioUnitParameterInfo info{};
     UInt32 size = sizeof info;
     if (AudioUnitGetProperty(unit, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
@@ -56,7 +58,6 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
         @"name" : name,
         @"minimum" : @(info.minValue),
         @"maximum" : @(info.maxValue),
-        @"decimals" : @(decimals),
         @"unit" : unit_text,
         @"get" : [get copy],
         @"set" : [set copy]
@@ -89,10 +90,10 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
     };
     NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
     if (NSDictionary<NSString*, id>* gain =
-            setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", 1, @" dB"))
+            setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB"))
         [settings addObject:gain];
     if (NSDictionary<NSString*, id>* mix =
-            setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", 0, @"% wet"))
+            setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet"))
         [settings addObject:mix];
     return [[CONVOLVER_DIAGNOSTIC_VIEW alloc] initWithFrame:frame
                                                      report:report

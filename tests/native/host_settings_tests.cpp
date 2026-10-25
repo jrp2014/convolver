@@ -267,10 +267,17 @@ void settings_text() {
     for (const auto& [settings, words] :
          {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},
           std::pair{HostSettings{-12.04, .508}, "gain -12 dB, mix 50.8% wet"},
-          std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 100% wet"},
+          std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 99.96% wet"},
+          std::pair{HostSettings{-99.99, .99999}, "gain -99.99 dB, mix 99.999% wet"},
           std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
         require(settings_words(settings, true) == words,
                 "settings words: " + settings_words(settings, true));
+    // The window's slider text: never an exponent, never a range end it is not.
+    for (const auto& [value, text] :
+         {std::pair{23.97, "23.97"}, std::pair{24.0, "24"}, std::pair{-1e-9, "0"},
+          std::pair{1e-5, "0.00001"}, std::pair{-.0, "0"}, std::pair{-12.04, "-12"}})
+        require(setting_text(value, min_gain_db, max_gain_db) == text,
+                "setting text: " + setting_text(value, min_gain_db, max_gain_db));
     HostFilter filter;
     const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
     require(line.find("Settings: gain -6 dB, mix 50% wet.") != std::string::npos,

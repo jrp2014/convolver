@@ -212,8 +212,9 @@ format.
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the
   one it wrote last, as hosts restart plug-ins often; the Audio Unit also
-  compares numbered lines without their request number, as GarageBand
-  restores one preset several times in a row. Adapters write the file
+  compares failure lines without their request number, as GarageBand
+  restores one preset several times in a row (accepted loads are always
+  logged). Adapters write the file
   outside their control lock. On macOS the lines also go to the unified log.
   Control thread only. Loads and rejections are numbered by request
   (`loaded_line()`, `rejected_line()`: `Request 3: ...`), every line names the

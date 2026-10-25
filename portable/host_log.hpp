@@ -65,6 +65,12 @@ struct UnfilteredSound {
     std::string level;
 };
 UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
+// A setting's value as people read it, without its unit: one decimal at
+// most ("-76", "56.1", not a host slider's "-75.967" and "56.1413"), two
+// significant digits for a value too small for that ("-0.01"), and as many
+// decimals as it takes (up to six) not to read as `low` or `high` when it is
+// neither ("99.96", not "100"). The window's sliders show the same text.
+std::string setting_text(double value, double low, double high);
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
 // `equal_counts` false says the mix does not apply.
 std::string settings_words(const HostSettings&, bool equal_counts);

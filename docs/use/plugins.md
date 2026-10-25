@@ -239,8 +239,11 @@ the plug-in's button in the track's Plug-ins area. The window has:
   the same as the Status parameter, written out and coloured.
 - **Gain and Mix** as sliders with their values. A host that shows
   Convolver's window shows it instead of its generic controls, so the
-  settings are here; moving a slider changes the setting as the host's own
-  control would, and the sliders follow changes the host makes.
+  settings are here. Moving a slider changes the setting and tells the
+  host, and the sliders follow changes the host makes (automation, its own
+  controls). The window does not yet mark the start and end of a drag, so a
+  host recording automation from it may record each step separately; not
+  yet tried in GarageBand.
 - **What plays, why, and what to change**, in full, as the log explains it.
   For example, a stereo preset on a GarageBand mono track reads: "The saved
   filter does not suit the host, so Convolver plays silence until it does.

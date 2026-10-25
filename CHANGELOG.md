@@ -42,10 +42,12 @@ Until 1.0 the C++ API may change between minor versions.
 - The log and the plug-in window give Gain and Mix to one decimal ("gain
   -76 dB, mix 56.1% wet"), not as the host's slider set them ("-75.967 dB",
   "56.1413%"); a value too small for one decimal keeps two significant
-  digits.
+  digits, and a value near the end of its range keeps the decimals that
+  show it is not the end ("99.96% wet", not "100% wet"). The window's
+  sliders show the same text.
 - Audio Unit: a failure identical to the line just logged is not logged
   again under a new request number (GarageBand restored one preset five
-  times in a second on a mono track).
+  times in a second on a mono track); accepted loads are always logged.
 
 ### Fixed
 

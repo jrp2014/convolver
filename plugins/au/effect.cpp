@@ -208,11 +208,13 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
 void Effect::log(const std::string& message, bool problem) noexcept {
     try {
         std::lock_guard lock(logging_);
-        // The same line again is left out, even under a new request number:
-        // GarageBand restored one preset five times in a second on a mono
-        // track, and five identical failures pushed the useful lines out of
-        // Copy diagnostics (jrp's run of AU-6).
-        if (message.empty() || unnumbered(message) == unnumbered(logged_))
+        // The same line again is left out. A problem is left out even under
+        // a new request number: GarageBand restored one preset five times in
+        // a second on a mono track, and five identical failures pushed the
+        // useful lines out of Copy diagnostics (jrp's run of AU-6). An
+        // accepted load is always logged, so each reload has its line.
+        if (message.empty() || message == logged_ ||
+            (problem && unnumbered(message) == unnumbered(logged_)))
             return;
         host_log(tag_.c_str(), message, problem);
         logged_ = message;

@@ -30,8 +30,8 @@ typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
 typedef double (^ConvolverSettingGetter)(void);
 typedef void (^ConvolverSettingSetter)(double value);
 // One setting the window shows as a slider is a dictionary with the keys
-// @"name" (NSString), @"minimum" and @"maximum" (NSNumber), @"decimals"
-// (NSNumber) and @"unit" (NSString, as @" dB") for writing its value, @"get"
+// @"name" (NSString), @"minimum" and @"maximum" (NSNumber), @"unit"
+// (NSString, as @" dB") for writing its value, @"get"
 // (ConvolverSettingGetter) and @"set" (ConvolverSettingSetter).
 
 @interface CONVOLVER_DIAGNOSTIC_VIEW : NSView
