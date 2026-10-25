@@ -15,7 +15,8 @@ Until 1.0 the C++ API may change between minor versions.
 - Audio Unit: a small window of its own (AU-6, first version), so a user can
   see why the plug-in is silent or refused a preset without finding the log.
   It shows the status, what plays, why and what to change in full (a stereo
-  preset on a mono track now also says to use a stereo track), the host,
+  preset on a mono track now also says to use a stereo track, as the log's
+  start line does), the host,
   filter, settings and software details, and has Copy diagnostics (the report
   and this instance's recent log lines, as text) and Show log (the log file
   in the Finder). It does not load filters or change settings yet. No sound

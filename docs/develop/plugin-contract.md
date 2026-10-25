@@ -194,8 +194,16 @@ format.
   caller, with a property-change notification for 64000 wherever the Status
   parameter's event is sent. They are internal between the unit and its own
   window, which ship together, so they are not permanent identities.
-  `kAudioUnitProperty_CocoaUI` names the window's factory class in the
-  component bundle; the factory and view class names carry the version.
+  `kAudioUnitProperty_CocoaUI` names the window's factory class in this
+  image's own component bundle; the factory and view class names carry the
+  version. Unlike the editor plan's rule that the window copies reports
+  pushed to it ([threads](../project/plans/2026-10-24-plugin-editor.md#threads),
+  rule 2), the AU window reads 64000 itself, as Audio Unit views do: twice a
+  second while its window is on screen, on the main thread. Each read builds
+  the report under the unit's control lock, so a slow state restore on
+  another thread delays the window's next read until it ends. While faults
+  go on, a read takes them in (and logs them) at most every 10 seconds, once
+  Render's Fault is explained.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size

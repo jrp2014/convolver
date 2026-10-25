@@ -9,6 +9,7 @@
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -150,8 +151,11 @@ class Effect final : public ausdk::AUBase {
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
     // AU-6, under `control_`: the report as it stands; `faults` receives the
-    // explanation of faults counted since the last look, to log.
+    // explanation of faults counted since the last look, to log. The window
+    // reads it twice a second, so while faults go on it takes them in at most
+    // every report_fault_interval, once Render's Fault is explained.
     HostReport report_locked(std::string& faults);
+    static constexpr std::chrono::seconds report_fault_interval{10};
     // AU-7: stores a Gain or Mix value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
 
@@ -171,6 +175,8 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> committed_;
     HostStatusLine status_;          // Under control_.
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
+    std::chrono::steady_clock::time_point
+        report_faults_at_{}; // Last report_locked() look; under control_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

@@ -225,13 +225,15 @@ no file of its own: it writes to the host's log.
 
 ### The Audio Unit's window
 
-When you open the Audio Unit in a host (in GarageBand, the plug-in's button
-in the track's Plug-ins area), it shows a window of its own. If the host
-shows its generic sliders instead, choose the plug-in's own view in the
-plug-in window, where the host offers the choice. The window has:
+The Audio Unit offers hosts a window of its own (`auval` lists it as a Cocoa
+view). Hosts that show plug-in views open it from the plug-in's slot; if a
+host shows its generic sliders instead, choose the plug-in's own view in the
+plug-in window, where the host offers the choice. GarageBand has not been
+checked with the window yet. The window has:
 
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
-  as in the log) and the host program.
+  as in the log) and the program that runs the plug-in (for a host that runs
+  plug-ins in a separate process, that process's name).
 - **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
   the same as the Status parameter, written out and coloured.
 - **What plays, why, and what to change**, in full, as the log explains it.
@@ -249,11 +251,12 @@ plug-in window, where the host offers the choice. The window has:
 - **Copy diagnostics** puts all of this, with this instance's recent lines
   from the Convolver log, on the clipboard as plain text, ready to paste into
   a report.
-- **Show log** selects the log file in the Finder (in a sandboxed host such
-  as GarageBand, the copy inside the host's container).
+- **Show log** selects the log file in the Finder (in a sandboxed host, the
+  copy inside the host's container).
 
-The text can be selected and copied, and VoiceOver reads the status and the
-text. The window updates while it is open. It does not yet load filters or
+The text can be selected and copied. The controls are standard macOS ones
+with names for VoiceOver, which has not been tried with the window yet. The
+window updates while it is on screen. It does not yet load filters or
 change settings: load presets from the host's preset menu, and use the
 host's generic controls for Gain and Mix.
 

@@ -542,8 +542,12 @@ Four CTest tests run when the adapter is built (label `au`):
   (types, read-only, change notifications) for a stereo preset on a mono
   track, then the view the factory makes, attached to an off-screen window:
   its status and text before and after the fix, Copy diagnostics (onto a
-  private pasteboard) and the accessibility names (AppKit sets the buttons'
-  roles itself and need not report them on a runner). The AU workflow's `auval -strict` step also requires `Cocoa Views Available: 1`.
+  private pasteboard), the accessibility names (AppKit sets the buttons'
+  roles itself and need not report them on a runner), and that a closed
+  window stops reading the unit. Then faults: invalid input rendered, the
+  report says Fault and keeps Render's Fault value, and repeated reads, as an
+  open window makes, log the faults once. The AU workflow's `auval -strict`
+  step also requires `Cocoa Views Available: 1`.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.

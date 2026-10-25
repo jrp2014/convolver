@@ -81,9 +81,15 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     _explanationView.drawsBackground = YES;
     _explanationView.backgroundColor = [NSColor textBackgroundColor];
     _explanationView.textContainerInset = NSMakeSize(6, 6);
+    // Apple's recipe for a text view in a scroll view, so long text (a list
+    // .cfg explains every candidate) grows the view and scrolls.
+    _explanationView.minSize = NSMakeSize(0, NSHeight(scroll_.contentView.bounds));
+    _explanationView.maxSize = NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX);
     _explanationView.autoresizingMask = NSViewWidthSizable;
     _explanationView.verticallyResizable = YES;
     _explanationView.horizontallyResizable = NO;
+    _explanationView.textContainer.containerSize =
+        NSMakeSize(NSWidth(scroll_.contentView.bounds), CGFLOAT_MAX);
     _explanationView.textContainer.widthTracksTextView = YES;
     _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to change";
     scroll_.documentView = _explanationView;
@@ -118,8 +124,9 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     [timer_ invalidate];
 }
 
-// Rereads the report only while the view is in a window: the host may
-// dispose of the unit once it has closed the window.
+// The timer runs while the view is in a window and reads only while that
+// window is on screen (refreshIfShown): the host may dispose of the unit once
+// it has closed the window, which need not remove the view.
 - (void)viewDidMoveToWindow {
     [super viewDidMoveToWindow];
     [timer_ invalidate];
@@ -131,10 +138,18 @@ NSTextField* label(NSFont* font, NSColor* colour) {
                                     repeats:YES
                                       block:^(NSTimer* timer) {
                                         static_cast<void>(timer);
-                                        [weakSelf refresh];
+                                        [weakSelf refreshIfShown];
                                       }];
     [[NSRunLoop mainRunLoop] addTimer:timer_ forMode:NSRunLoopCommonModes];
     [self refresh];
+}
+
+- (BOOL)refreshIfShown {
+    NSWindow* window = self.window;
+    if (!window.visible || !(window.occlusionState & NSWindowOcclusionStateVisible))
+        return NO;
+    [self refresh];
+    return YES;
 }
 
 - (void)refresh {

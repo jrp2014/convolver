@@ -60,12 +60,10 @@ std::string explanation(const HostFilter& filter, const HostReportFacts& facts) 
             text = "No filter is loaded.";
         text += " The host has not started the plug-in yet.";
     }
-    // GarageBand runs effects with one channel on a mono track, which is the
-    // usual way to meet this (jrp's first GarageBand run, 25 October 2026).
-    if (failure && failure->kind == HostFailureKind::channels && host && host->inputs == 1 &&
-        host->outputs == 1 && failure->inputs > 1)
-        text += " Hosts run an effect with one channel on a mono track (GarageBand does): put "
-                "Convolver on a stereo track instead.";
+    // playing_words() gives the mono-track hint for a silent failure; a
+    // refused replacement gets it here.
+    if (failure && !failure->silent && host)
+        text += mono_track_hint(*failure, *host);
     if (filter.faults().any())
         text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
     if (!filter.filter() && !failure && !filter.failed())

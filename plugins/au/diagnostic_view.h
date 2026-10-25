@@ -30,10 +30,14 @@ typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics;
-// Reads the report now. The view also rereads it twice a second while it is
-// in a window, which catches faults the audio thread signals without telling
-// anyone.
+// Reads the report now.
 - (void)refresh;
+// What the view does twice a second while it is in a window, which catches
+// faults the audio thread signals without telling anyone: reads the report
+// only while the window is on screen, so a host that keeps a closed or
+// hidden window does not have it polled, and may dispose of the unit then.
+// Returns whether it read.
+- (BOOL)refreshIfShown;
 // What a user reads and presses, for the tests.
 @property(readonly, nonatomic) NSTextField* titleField;
 @property(readonly, nonatomic) NSTextField* statusField;

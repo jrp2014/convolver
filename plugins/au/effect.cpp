@@ -9,6 +9,7 @@
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <dlfcn.h>
 #include <exception>
 #include <span>
 #include <stdexcept>
@@ -95,10 +96,40 @@ CFStringRef cf_string(const std::string& text) {
                                    static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
 }
 
-// AU-6: the component bundle that holds the window's classes. Not found when
-// the unit was registered in-process without its bundle (the AU tests).
+// AU-6: the component bundle that holds the window's classes: the bundle of
+// this very image, because with two Convolver builds loaded in one host the
+// shared identifier may name the other one, whose classes have other names.
+// Not found when the unit was registered in-process without its bundle (the
+// AU tests). Worked out once and kept for the life of the process.
+CFBundleRef own_bundle() {
+    static const int anchor = 0;
+    Dl_info info{};
+    if (!dladdr(&anchor, &info) || !info.dli_fname)
+        return nullptr;
+    // The executable is BUNDLE/Contents/MacOS/NAME.
+    auto url = CFURLCreateFromFileSystemRepresentation(
+        nullptr, reinterpret_cast<const UInt8*>(info.dli_fname),
+        static_cast<CFIndex>(std::strlen(info.dli_fname)), false);
+    for (int level = 0; level < 3 && url; ++level) {
+        const auto up = CFURLCreateCopyDeletingLastPathComponent(nullptr, url);
+        CFRelease(url);
+        url = up;
+    }
+    if (!url)
+        return nullptr;
+    auto bundle = CFBundleCreate(nullptr, url);
+    CFRelease(url);
+    const auto id = bundle ? CFBundleGetIdentifier(bundle) : nullptr;
+    if (bundle &&
+        (!id || CFStringCompare(id, CFSTR(CONVOLVER_AU_BUNDLE_ID), 0) != kCFCompareEqualTo)) {
+        CFRelease(bundle);
+        bundle = nullptr;
+    }
+    return bundle;
+}
 CFBundleRef view_bundle() {
-    return CFBundleGetBundleWithIdentifier(CFSTR(CONVOLVER_AU_BUNDLE_ID));
+    static const CFBundleRef bundle = own_bundle();
+    return bundle;
 }
 
 bool same(const HostLayout& a, const HostLayout& b) {
@@ -243,8 +274,18 @@ HostReport Effect::report_locked(std::string& faults) {
     // As for the Status text: faults Render signalled are explained here,
     // and Gain or Mix may have changed on another thread. Only an update
     // that has observed new faults rewrites the Status value, which Render
-    // may have just set to Fault (refresh_status_text).
-    faults = observe_faults();
+    // may have just set to Fault (refresh_status_text). A Fault Render wrote
+    // that is not explained yet is taken in at once; faults that go on after
+    // it at most every report_fault_interval, so an open window does not log
+    // a line twice a second (the independent review).
+    const auto now = std::chrono::steady_clock::now();
+    const bool unexplained = status_.status != HostStatus::fault &&
+                             Globals()->GetParameter(status_parameter) ==
+                                 static_cast<AudioUnitParameterValue>(HostStatus::fault);
+    if (unexplained || now - report_faults_at_ >= report_fault_interval) {
+        faults = observe_faults();
+        report_faults_at_ = now;
+    }
     if (faults.empty())
         refresh_status_text();
     else
@@ -267,7 +308,10 @@ HostReport Effect::report() {
         std::lock_guard lock(control_);
         r = report_locked(faults);
     }
-    log_faults(faults);
+    if (!faults.empty()) { // As when a host reads the Status text.
+        log_faults(faults);
+        notify_status();
+    }
     return r;
 }
 

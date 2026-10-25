@@ -12,15 +12,19 @@
 #else
 #import <AudioUnit/AUCocoaUIView.h>
 #endif
-#import "diagnostic_view.h"
 #include "au/au_host.hpp"
+#import "diagnostic_view.h"
 #include <atomic>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <limits>
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #define CONVOLVER_TEXT_OF(x) #x
 #define CONVOLVER_TEXT(x) CONVOLVER_TEXT_OF(x)
@@ -140,17 +144,19 @@ void properties(const PrivateLog& log) {
     check(unit.initialize(), "mono initialization");
     require(report_changes.load() > before, "no report change after initialization");
     r = report(unit);
-    require([r[@"status"] isEqualToString:@"2"] && [r[@"status name"] isEqualToString:@"Load failed"],
+    require([r[@"status"] isEqualToString:@"2"] &&
+                [r[@"status name"] isEqualToString:@"Load failed"],
             "mono track: " + text(r[@"status name"]));
-    for (const char* part :
-         {"plays silence", "Give the plug-in 2 inputs and 2 outputs", "put Convolver on a stereo track"})
+    for (const char* part : {"plays silence", "Give the plug-in 2 inputs and 2 outputs",
+                             "put Convolver on a stereo track"})
         require(contains(r[@"explanation"], part), "mono track explanation lacks \"" +
                                                        std::string(part) +
                                                        "\": " + text(r[@"explanation"]));
     require(contains(r[@"details"], "Host: 44100 Hz, 1 in, 1 out, blocks of up to 512 frames"),
             "mono track details: " + text(r[@"details"]));
     require(r[@"summary"].length > 0, "no summary");
-    require([r[@"log path"] isEqualToString:@(log.path().c_str())], "log path " + text(r[@"log path"]));
+    require([r[@"log path"] isEqualToString:@(log.path().c_str())],
+            "log path " + text(r[@"log path"]));
 
     // Copy diagnostics: the report and this instance's log lines, including
     // the start line that explains the silence.
@@ -169,7 +175,8 @@ void properties(const PrivateLog& log) {
 void window() {
     Unit unit;
     Class factory_class = NSClassFromString(@CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
-    require(factory_class != nil, "no view factory class " CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
+    require(factory_class != nil,
+            "no view factory class " CONVOLVER_TEXT(CONVOLVER_AU_VIEW_FACTORY));
     require([factory_class conformsToProtocol:@protocol(AUCocoaUIBase)],
             "the factory is not an AUCocoaUIBase");
     id<AUCocoaUIBase> factory = [[factory_class alloc] init];
@@ -235,9 +242,67 @@ void window() {
     require([view.statusField.stringValue isEqualToString:@"Playing"],
             "window status after the fix " + text(view.statusField.stringValue));
 
-    // Closed before the unit goes, as hosts do; the view stops reading it.
-    [view removeFromSuperview];
+    // A host may close the window and keep the view in it: the twice-a-second
+    // read stops, so the unit can be disposed of (the independent review).
     [host close];
+    require(![view refreshIfShown], "a closed window still reads the unit");
+    [view removeFromSuperview];
+    unit.uninitialize();
+}
+
+AudioUnitParameterValue status_value(Unit& unit) {
+    AudioUnitParameterValue value = -1;
+    check(
+        AudioUnitGetParameter(unit.get(), au::status_parameter, kAudioUnitScope_Global, 0, &value),
+        "Status value");
+    return value;
+}
+std::size_t count(const std::string& text, const std::string& part) {
+    std::size_t n = 0;
+    for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
+        ++n;
+    return n;
+}
+std::string read_file(const std::string& path) {
+    std::ifstream in(path);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// Faults Render counts: the report explains them and keeps Render's Fault,
+// and an open window polling it logs them once, not on every read.
+void faults(const PrivateLog& log) {
+    Unit unit;
+    check(unit.load(state_of(identity(44100, 2))), "stereo preset");
+    check(unit.configure(44100, 2, 2, 512), "stereo formats");
+    check(unit.initialize(), "stereo initialization");
+    std::vector<std::vector<float>> in(2, std::vector<float>(512, 0.f)),
+        out(2, std::vector<float>(512, 0.f));
+    in[0][0] = std::numeric_limits<float>::quiet_NaN();
+    const float* ins[] = {in[0].data(), in[1].data()};
+    float* outs[] = {out[0].data(), out[1].data()};
+    const auto render = [&] {
+        bool silent = false;
+        check(unit.render(ins, outs, 512, false, silent), "invalid-input render");
+    };
+    const char* logged = "The host sent invalid samples";
+    const auto fault = static_cast<AudioUnitParameterValue>(HostStatus::fault);
+    render();
+    require(status_value(unit) == fault, "Render did not signal Fault");
+    auto r = report(unit);
+    require([r[@"status name"] isEqualToString:@"Fault"] && contains(r[@"explanation"], logged),
+            "fault report: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
+    require(status_value(unit) == fault, "reading the report cleared Fault");
+    require(count(read_file(log.path()), logged) == 1, "fault not logged once");
+    // Faults that go on, read as an open window does.
+    for (int i = 0; i < 6; ++i) {
+        render();
+        r = report(unit);
+    }
+    require([r[@"status name"] isEqualToString:@"Fault"] && status_value(unit) == fault,
+            "Fault lost while faults go on");
+    require(count(read_file(log.path()), logged) == 1,
+            "polling logged the faults again: " +
+                std::to_string(count(read_file(log.path()), logged)));
     unit.uninitialize();
 }
 } // namespace
@@ -249,6 +314,7 @@ int main() {
             PrivateLog log;
             properties(log);
             window();
+            faults(log);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
             return 1;

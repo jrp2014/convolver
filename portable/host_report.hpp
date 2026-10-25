@@ -34,7 +34,8 @@ struct HostReportFacts {
 struct HostReport {
     HostStatusLine status;   // What the Status parameter shows.
     std::string status_name; // Its value's name, such as "Load failed".
-    // "Convolver 0.6.0, Audio Unit #2 in GarageBand": which instance this is.
+    // "Convolver 0.6.0, Audio Unit #2 in REAPER": which instance this is, in the
+    // program that runs it (a host's separate plug-in process where it has one).
     std::string title;
     // In full: what plays, why, and what to change. Several sentences.
     std::string explanation;

@@ -88,6 +88,17 @@ void cases() {
          {"does not suit the host", "plays silence", "Give the plug-in 2 inputs and 2 outputs",
           "load a filter made for 1 input and 1 output", "put Convolver on a stereo track"},
          {"load a Convolver preset"}},
+        // The independent review: a stereo track cannot fix a 6-channel filter.
+        {"6-channel filter on a mono track",
+         [&] {
+             HostFilter f(8);
+             f.load(HostState{filter(44100, 6)}, std::nullopt);
+             static_cast<void>(f.activate(mono));
+             return host_report(f, facts(mono));
+         },
+         HostStatus::load_failed,
+         {"Give the plug-in 6 inputs and 6 outputs"},
+         {"stereo track"}},
         {"wrong rate",
          [] {
              HostFilter f(8);
@@ -264,11 +275,27 @@ void diagnostics() {
     set_log_variable(earlier);
     std::filesystem::remove_all(folder);
 }
+// The log's start line gives the same corrective action as the window.
+void log_agrees() {
+    const HostLayout mono{44100, 1, 1};
+    HostFilter f(8);
+    f.load(HostState{filter(44100, 2)}, std::nullopt);
+    static_cast<void>(f.activate(mono));
+    const auto line = started_line(f, mono, 512);
+    require(
+        contains(line, "put Convolver on a stereo track") &&
+            contains(host_report(f, facts(mono)).explanation, "put Convolver on a stereo track"),
+        "log line lacks the mono-track hint: " + line);
+    const auto hint = std::string("put Convolver on a stereo track");
+    const auto& explained = host_report(f, facts(mono)).explanation;
+    require(explained.find(hint) == explained.rfind(hint), "hint given twice: " + explained);
+}
 } // namespace
 
 int main() {
     try {
         cases();
+        log_agrees();
         diagnostics();
     } catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << "\n";

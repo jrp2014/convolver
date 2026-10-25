@@ -165,6 +165,17 @@ std::string settings_words(const HostSettings& s, bool equal_counts) {
     return std::string(gain) + mix;
 }
 
+std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {
+    // GarageBand runs effects with one channel on a mono track (jrp's first
+    // GarageBand run, 25 October 2026). Only a stereo filter is fixed by a
+    // stereo track.
+    if (failure.kind != HostFailureKind::channels || host.inputs != 1 || host.outputs != 1 ||
+        failure.inputs != 2 || failure.outputs != 2)
+        return {};
+    return " Hosts run an effect with one channel on a mono track (GarageBand does): put "
+           "Convolver on a stereo track instead.";
+}
+
 std::string playing_words(const HostFilter& filter, const HostLayout& host,
                           const HostSettings& used) {
     // PLUG-10: with equal counts, Mix's dry share plays even when no filter
@@ -177,7 +188,7 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
         return s.unchanged ? std::string("unchanged") : "at " + s.level;
     };
     if (const auto& f = filter.failure(); f && f->silent) {
-        auto line = f->message;
+        auto line = f->message + mono_track_hint(*f, host);
         if (const auto s = sound(false); !s.silent) {
             char mix[32] = {};
             std::snprintf(mix, sizeof mix, "%g%%", 100 * std::clamp(used.mix, 0.0, 1.0));

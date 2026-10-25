@@ -74,6 +74,11 @@ std::string settings_words(const HostSettings&, bool equal_counts);
 // host's rate, channels and block size; the editor report (PLUG-9) uses it
 // too, so the window and the log say the same.
 std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
+// " Hosts run an effect with one channel on a mono track ...": for a stereo
+// filter (2 in, 2 out) refused by a host running the plug-in with 1 in and
+// 1 out, the usual way to meet it; empty otherwise. playing_words() ends a
+// silent failure with it.
+std::string mono_track_hint(const HostFailure&, const HostLayout& host);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them

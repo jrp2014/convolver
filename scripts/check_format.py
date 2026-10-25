@@ -25,7 +25,7 @@ PATHSPECS = (
     'include/*.hpp', 'include/*.h',
     'portable/*.hpp', 'portable/*.cpp', 'portable/*.h',
     'plugins/*.hpp', 'plugins/*.cpp', 'plugins/*.h', 'plugins/*.mm',
-    'tests/*.hpp', 'tests/*.cpp', 'tests/*.h',
+    'tests/*.hpp', 'tests/*.cpp', 'tests/*.h', 'tests/*.mm',
     ':!:portable/third_party/', ':!:tests/regression/',
 )
 INSTALL_HINT = """\
