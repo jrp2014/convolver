@@ -224,14 +224,17 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
     const CGFloat text =
         ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
     const CGFloat shown = MIN(MAX(text, 40), most_text);
-    scroll_.frame = NSMakeRect(margin, textTop_, width - 2 * margin, shown);
     const CGFloat buttons = textTop_ + shown + 16;
     const CGFloat log_width = MAX(NSWidth(_logButton.frame), 100);
     const CGFloat copy_width = MAX(NSWidth(_diagnosticsButton.frame), 150);
+    // The view's size first: resizing it moves the subviews by their
+    // autoresizing masks (kept for hosts that resize the window), and the
+    // frames below are where they belong at this size.
+    [self setFrameSize:NSMakeSize(width, buttons + button_height + margin)];
+    scroll_.frame = NSMakeRect(margin, textTop_, width - 2 * margin, shown);
     _logButton.frame = NSMakeRect(width - margin - log_width, buttons, log_width, button_height);
     _diagnosticsButton.frame =
         NSMakeRect(NSMinX(_logButton.frame) - 12 - copy_width, buttons, copy_width, button_height);
-    [self setFrameSize:NSMakeSize(width, buttons + button_height + margin)];
 }
 
 - (BOOL)isFlipped {

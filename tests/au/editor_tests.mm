@@ -235,13 +235,19 @@ void window() {
     require(contains(view.titleField.stringValue, "Audio Unit #"),
             "window title " + text(view.titleField.stringValue));
     // The buttons sit under the text, at the bottom right, inside the view.
+    const auto frames = [&] {
+        return "view " + text(NSStringFromRect(view.frame)) + ", text " +
+               text(NSStringFromRect(view.explanationView.enclosingScrollView.frame)) +
+               ", Copy diagnostics " + text(NSStringFromRect(view.diagnosticsButton.frame)) +
+               ", Show log " + text(NSStringFromRect(view.logButton.frame));
+    };
     const auto bottom = NSMaxY(view.diagnosticsButton.frame);
     require(view.isFlipped && NSMaxX(view.logButton.frame) <= NSWidth(view.frame) &&
                 NSMinX(view.diagnosticsButton.frame) > NSWidth(view.frame) / 3 &&
                 bottom <= NSHeight(view.frame) && NSHeight(view.frame) - bottom <= 24 &&
                 NSMinY(view.diagnosticsButton.frame) >=
                     NSMaxY(view.explanationView.enclosingScrollView.frame),
-            "button layout");
+            "button layout: " + frames());
 
     // Accessibility: named controls (VoiceOver reads the label or title).
     // AppKit supplies the buttons' role itself, and on a CI runner with no
