@@ -22,24 +22,41 @@ class PolicyTests(unittest.TestCase):
     def test_repository_policy(self):
         self.contract.validate_policy(self.policy, ROOT)
 
-    def test_missing_pin(self):
-        policy = copy.deepcopy(self.policy)
-        del policy['dependencies']['fftw']['sha256']
-        with self.assertRaisesRegex(ValueError, 'sha256'):
-            self.contract.validate_policy(policy, ROOT)
-
-    def test_mutable_sdk_submodule(self):
-        policy = copy.deepcopy(self.policy)
-        policy['dependencies']['vst3-base']['revision'] = 'main'
-        with self.assertRaisesRegex(ValueError, 'revision'):
-            self.contract.validate_policy(policy, ROOT)
-
-    def test_mutable_format_sdk(self):
-        for name in ('lv2', 'audiounitsdk'):
+    def test_pinned_version_is_refused(self):
+        # CI-6: the policy says where a dependency comes from; builds resolve
+        # and record the release (scripts/release/resolve.py).
+        for key in ('sha256', 'revision', 'version'):
             policy = copy.deepcopy(self.policy)
-            del policy['dependencies'][name]['revision']
-            with self.assertRaisesRegex(ValueError, f'{name}: missing immutable revision'):
+            policy['dependencies']['fftw'][key] = 'x'
+            with self.assertRaisesRegex(ValueError, f'does not pin a {key}'):
                 self.contract.validate_policy(policy, ROOT)
+
+    def test_missing_upstream(self):
+        policy = copy.deepcopy(self.policy)
+        del policy['dependencies']['lv2']['upstream']
+        with self.assertRaisesRegex(ValueError, 'lv2: missing https upstream'):
+            self.contract.validate_policy(policy, ROOT)
+
+    def test_submodule_fetched_by_commit(self):
+        policy = copy.deepcopy(self.policy)
+        policy['dependencies']['vst3-base']['url'] = 'https://example.org/vst3_base-{version}.tar.gz'
+        with self.assertRaisesRegex(ValueError, 'vst3-base: a submodule archive is fetched by commit'):
+            self.contract.validate_policy(policy, ROOT)
+        policy = copy.deepcopy(self.policy)
+        policy['dependencies']['vst3-base']['submodule_of'] = 'vst3-cmake'
+        with self.assertRaisesRegex(ValueError, 'submodule_of must name a top-level dependency'):
+            self.contract.validate_policy(policy, ROOT)
+
+    def test_records_name_exact_releases(self):
+        record = {'version': '1.18.10', 'revision': '5' * 40, 'url': 'https://example.org/lv2.tar.gz',
+                  'sha256': '0' * 64, 'license': 'ISC', 'archive': 'lv2.tar.gz', 'directory': 'lv2'}
+        self.contract.validate_records({'lv2': record})
+        for key, value, message in (('sha256', 'x', 'sha256'), ('revision', 'main', 'immutable revision'),
+                                    ('url', 'http://example.org', 'URL')):
+            with self.assertRaisesRegex(ValueError, message):
+                self.contract.validate_records({'lv2': dict(record, **{key: value})})
+        with self.assertRaisesRegex(ValueError, 'no record for dependencies'):
+            self.contract.with_records(self.policy, {'lv2': record})
 
     def test_unknown_format(self):
         policy = copy.deepcopy(self.policy)
@@ -47,7 +64,7 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'formats'):
             self.contract.validate_policy(policy, ROOT)
 
-    def test_missing_format_pin(self):
+    def test_missing_format_dependency(self):
         policy = copy.deepcopy(self.policy)
         del policy['dependencies']['audiounitsdk']
         with self.assertRaisesRegex(ValueError, 'missing or unexpected'):

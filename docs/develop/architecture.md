@@ -35,7 +35,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 | Build, exports and feature switches | [`CMakeLists.txt`](../../CMakeLists.txt), [`CMakePresets.json`](../../CMakePresets.json), [`cmake/`](../../cmake/) | Static core/host/io components; see [package guide](library.md) |
 | Version generation | [`VERSION`](../../VERSION), [`version_source.py`](../../scripts/version_source.py), [`ConvolverBuildVersion.cmake`](../../cmake/ConvolverBuildVersion.cmake) | One numeric version source; Git identity added to build strings |
 | Shared fixtures and plug-in comparisons | [`examples/first-use/`](../../examples/first-use/README.md), [`fixtures.py`](../../tests/plugins/fixtures.py); [`harness.hpp`](../../tests/plugins/harness.hpp), [`oracle.hpp`](../../tests/native/oracle.hpp) | Test-only; each adapter's test implements `Adapter` over its own host API ([PLUG-2](testing.md#plug-in-comparisons-plug-2)) |
-| Plug-in distribution | [`release-policy.json`](../../packaging/release-policy.json), [`scripts/release/`](../../scripts/release/), [`ConvolverPluginPackaging.cmake`](../../cmake/ConvolverPluginPackaging.cmake), [release workflow](../../.github/workflows/release.yml); format tool pins in the [LV2](../../.github/workflows/lv2.yml) and [Audio Unit](../../.github/workflows/au.yml) workflows; weekly [update check](../../.github/workflows/updates.yml) (`check_updates.py`) | Optional (`CONVOLVER_PACKAGE_PLUGINS`); pinned dependencies (SDKs marked with the formats that use them), staging, installers and gates; tests in `tests/release/` |
+| Plug-in distribution | [`release-policy.json`](../../packaging/release-policy.json), [`scripts/release/`](../../scripts/release/), [`ConvolverPluginPackaging.cmake`](../../cmake/ConvolverPluginPackaging.cmake), [release workflow](../../.github/workflows/release.yml); `resolve.py` and `upstream.py` find each dependency's newest release and record it, `sources.py` fetches and checks the archives (format tools are resolved in the [VST3](../../.github/workflows/vst3.yml), [LV2](../../.github/workflows/lv2.yml) and [Audio Unit](../../.github/workflows/au.yml) workflows too) | Optional (`CONVOLVER_PACKAGE_PLUGINS`); where each dependency comes from (SDKs marked with the formats that use them), staging, installers and gates; tests in `tests/release/` |
 
 ## Processing data flow
 
@@ -138,10 +138,10 @@ neither an audio-device layer nor a resampler. Replacing it would need a
 concrete format, packaging or correctness benefit and matching real-file tests.
 
 Plug-in adapters use each format's own headers (VST3 SDK, AudioUnitSDK, `lv2`)
-rather than a framework; the pins are in
-[build from source](build.md#pinned-format-dependencies). Keep standard C++20
+rather than a framework; builds take each one's newest release
+([build from source](build.md#supporting-libraries)). Keep standard C++20
 facilities where suitable (the Audio Unit target alone is C++23, for
-AudioUnitSDK 1.4.0) and platform-specific operations at the I/O, FFT or host
+AudioUnitSDK, which has needed it since 1.4.0) and platform-specific operations at the I/O, FFT or host
 boundary. A new library or language standard should earn its deployment cost.
 Alternative FFT implementations are investigations in
 [TODO](../../TODO.md#fft-libraries-and-performance), not implicit fallbacks.

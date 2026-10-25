@@ -60,7 +60,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 
 | Page | Kind | What it covers |
 | --- | --- | --- |
-| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs, pinned dependencies and the preview recipe |
+| [Build from source](develop/build.md) | How-to | Every build: dependencies, presets, FFT backend, Windows, options, VST3, AU and LV2 SDKs, supporting libraries and the preview recipe |
 | [Library guide](develop/library.md) | How-to | Using the libraries from another CMake project; the engine API and resource limits |
 | [Implementation map](develop/architecture.md) | Background | Source responsibilities, invariants, change-to-test map |
 | [Plug-in adapter contract](develop/plugin-contract.md) | Reference | What every plug-in adapter must do: failed loads, restoration, replacement, bypass, threads, host state, preset files |
@@ -105,7 +105,7 @@ paths.
 | `docs/configuration-compatibility.md` | [`docs/use/other-programs.md`](use/other-programs.md) |
 | `docs/vst3.md`, `docs/au.md`, `docs/lv2.md` | [`docs/use/plugins.md`](use/plugins.md) and [`docs/use/install.md`](use/install.md); their tests are in [testing](develop/testing.md#plug-in-format-tests) |
 | `docs/plugins/index.md`, `install.md`, `quickstart.md`, `troubleshooting.md` | [`docs/use/README.md`](use/README.md), [`install.md`](use/install.md), [`first-sound-in-a-host.md`](use/first-sound-in-a-host.md), [`troubleshooting.md`](use/troubleshooting.md) |
-| `docs/plugins/build.md`, `docs/plugins/hosts.md` | [`docs/develop/build.md`](develop/build.md#pinned-preview-recipe), [`docs/develop/host-testing.md`](develop/host-testing.md) |
+| `docs/plugins/build.md`, `docs/plugins/hosts.md` | [`docs/develop/build.md`](develop/build.md#preview-recipe), [`docs/develop/host-testing.md`](develop/host-testing.md) |
 | `REVIEW.md`, `docs/release-readiness.md`, `docs/modernization.md` | [`docs/project/status.md`](project/status.md); dependency choices in the [implementation map](develop/architecture.md#dependency-choices); the old review is [archived](archive/reviews/2026-10-20-repository-review.md) |
 | `docs/releases/developer-preview.md` | [`docs/develop/releasing.md`](develop/releasing.md); the record is [archived](archive/releases/README.md) |
 | `docs/history.md`, `docs/convolverPipe.md`, `docs/plans/` | The same names in `docs/project/` |

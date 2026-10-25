@@ -37,8 +37,14 @@ void host_log(const char* format, const std::string& message, bool problem = tru
 // stays true.
 bool host_log_written() noexcept;
 // What ran, for support: Convolver's version, the FFT backend and its
-// version, the CPU kernels, the process ID and the host program.
+// version, the CPU kernels, the plug-in SDK it was built with (when the
+// adapter has said), the process ID and the host program.
 std::string execution_line();
+// The format SDK the adapter was built with, such as "VST3 SDK
+// 3.8.1_build_84, commit 3cdf9ca5d1f5" (CONVOLVER_SDK_DESCRIPTION from the
+// build, CI-6), for execution_line(). Call it before the first host_log();
+// `description` must live as long as the process (a string literal).
+void set_host_log_sdk(const char* description) noexcept;
 // The lines every adapter logs, so that the log reads the same for each
 // format. After an accepted load: what was loaded and, for a saved failed
 // load, why it plays silence; `host_known` says whether it was checked

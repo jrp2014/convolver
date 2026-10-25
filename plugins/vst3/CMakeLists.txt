@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.25)
-set(CONVOLVER_VST3_SDK "" CACHE PATH "VST3 SDK 3.8.1 source directory with submodules")
-set(CONVOLVER_PLUGINVAL "" CACHE FILEPATH "Optional pluginval 2 executable for host-compatibility tests")
+set(CONVOLVER_VST3_SDK "" CACHE PATH "VST3 SDK source directory with submodules (docs/develop/build.md)")
+set(CONVOLVER_PLUGINVAL "" CACHE FILEPATH "Optional pluginval executable for host-compatibility tests (the acceptance test needs pluginval 2)")
 set(CONVOLVER_PLUGINVAL_ARGS "" CACHE STRING "Extra options for pluginval validate (a CMake list)")
 if(NOT EXISTS "${CONVOLVER_VST3_SDK}/public.sdk/source/vst/vstaudioeffect.h")
-    message(FATAL_ERROR "Set CONVOLVER_VST3_SDK to SDK 3.8.1 with base/cmake/pluginterfaces/public.sdk submodules")
+    message(FATAL_ERROR "Set CONVOLVER_VST3_SDK to the VST3 SDK with its base, cmake, pluginterfaces and "
+        "public.sdk submodules; scripts/release/sources.py --latest --fetch ... unpacks the newest release "
+        "(docs/develop/build.md#supporting-libraries)")
 endif()
 # The SDK's Windows host tools use LoadLibraryW, which does not search the
 # plug-in's directory for dependent DLLs. Keep the plug-in independent of the
@@ -47,6 +49,9 @@ set(SDK_ROOT "${CONVOLVER_VST3_SDK}")
 set(public_sdk_SOURCE_DIR "${SDK_ROOT}/public.sdk")
 set(pluginterfaces_SOURCE_DIR "${SDK_ROOT}/pluginterfaces")
 smtg_detect_xcode_version()
+# The exact SDK, for the Convolver log (CI-6).
+include("${PROJECT_SOURCE_DIR}/cmake/ConvolverSdkDescription.cmake")
+convolver_sdk_description("VST3 SDK" "${CONVOLVER_VST3_SDK}")
 # SDK entry-point/package helpers are loaded by its project.
 # CONVOLVER_DEBUG_SYMBOLS on Linux: the SDK's Release strip keeps the symbols
 # (cmake/ConvolverDebugSymbols.cmake).
@@ -190,6 +195,8 @@ if(CONVOLVER_BUILD_IO)
                 "${CONVOLVER_PLUGINVAL}" "${bundle}" "$<TARGET_FILE:convolver_vst3_preset>")
             set_tests_properties(vst3.pluginval vst3.pluginval.acceptance
                 PROPERTIES LABELS "vst3;real-libraries;pluginval" TIMEOUT 600)
+            # pluginval 1 has no `test` command, so the acceptance test skips itself.
+            set_tests_properties(vst3.pluginval.acceptance PROPERTIES SKIP_RETURN_CODE 77)
         endif()
     endif()
 endif()

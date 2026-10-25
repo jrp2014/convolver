@@ -11,12 +11,17 @@ share.
   acceptance <pluginval> <bundle> <preset-tool>
              Loads real filters through the host's state call, renders audio
              at awkward block sizes, and compares the result with a direct
-             double-precision convolution.
+             double-precision convolution. Needs pluginval 2's `test`
+             command; with pluginval 1 it is skipped (exit code 77).
+
+pluginval 1 and 2 take different command lines; the version is read from
+`pluginval --version`.
 """
 import json
 import math
 import os
 import pathlib
+import re
 import shutil
 import struct
 import subprocess
@@ -40,6 +45,27 @@ def run_pluginval(pluginval, arguments, **kwargs):
         command = [xvfb, '--auto-servernum', *command]
     print('+', ' '.join(command), flush=True)
     return subprocess.run(command, **kwargs)
+
+
+SKIPPED = 77  # CTest's SKIP_RETURN_CODE for this test.
+
+
+def major_version(pluginval):
+    """pluginval's major version, from `pluginval --version` ("pluginval - 1.0.4")."""
+    output = subprocess.run([pluginval, '--version'], capture_output=True, text=True, timeout=120,
+                            check=False).stdout
+    match = re.search(r'(\d+)\.\d+', output)
+    if not match:
+        sys.exit(f'cannot read a version from `{pluginval} --version`: {output.strip()!r}')
+    return int(match[1])
+
+
+def validate_command(major, bundle, extra):
+    """pluginval 2 has a `validate` command; pluginval 1 takes options and --validate."""
+    options = ['--strictness-level', '10', '--skip-gui-tests', *extra]
+    if major >= 2:
+        return ['validate', *options, bundle]
+    return [*options, '--validate', bundle]
 
 
 def component_state(preset):
@@ -154,11 +180,17 @@ def main():
     mode = sys.argv[1]
     if mode == 'validate':
         pluginval, bundle, *extra = sys.argv[2:]
-        result = run_pluginval(pluginval, ['validate', '--strictness-level', '10',
-                                           '--skip-gui-tests', *extra, bundle])
+        major = major_version(pluginval)
+        print(f'pluginval {major}.x', flush=True)
+        result = run_pluginval(pluginval, validate_command(major, bundle, extra))
         sys.exit(result.returncode)
     if mode == 'acceptance':
         pluginval, bundle, preset_tool = sys.argv[2:]
+        major = major_version(pluginval)
+        if major < 2:
+            print(f'Skipped: pluginval {major} has no `test` command, which renders audio from a preset; '
+                  'this test needs pluginval 2 (docs/develop/testing.md#pluginval).')
+            sys.exit(SKIPPED)
         acceptance(pluginval, pathlib.Path(bundle), preset_tool)
         return
     sys.exit(f'unknown mode {mode}')

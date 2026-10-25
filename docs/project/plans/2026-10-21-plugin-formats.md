@@ -28,7 +28,7 @@ more thought before any work starts.
 - **Three formats, three parallel streams.** Each adapter depends only on
   `Convolver::host`, so they can proceed independently once a little shared
   groundwork (FFT safety, a common test harness, one preset tool, one layout
-  and identity list, pinned format dependencies) is in place. All three follow
+  and identity list, recorded format dependencies) is in place. All three follow
   one [contract](#shared-adapter-contract) for failed loads, initial
   restoration and channel layouts. See [parallel development](#parallel-development).
 - **LV2** is the native plug-in format on Linux: Ardour, Qtractor, Carla,
@@ -164,8 +164,9 @@ plumbing) is small, and the existing VST3 adapter is about 500 lines over
 
 The LV2 adapter therefore uses the `lv2` headers (C, ISC, Ubuntu 24.04 ships
 1.18.10) and, for tests only, `lilv` (0.24.22) to load it as a host would.
-PLUG-6 pinned these versions (22 October 2026); see
-[pinned format dependencies](../../develop/build.md#pinned-format-dependencies).
+PLUG-6 pinned these versions (22 October 2026); CI-6 replaced the pins with
+the newest releases, recorded per build; see
+[supporting libraries](../../develop/build.md#supporting-libraries).
 
 Apache-2.0, AudioUnitSDK's licence, is compatible with GPLv3 but not with
 GPLv2. That affects how the AU component may be distributed; see
@@ -184,7 +185,7 @@ behaviour identical:
 | PLUG-3 | One preset tool, `convolver-preset`, writing `.vstpreset`, `.aupreset` and LV2 preset bundles from the same encoded host state. It builds without the VST3 SDK, so AU and LV2 builds do not need it; `.vstpreset` output either uses the SDK when present or a small writer of the documented format, tested against the SDK's reader. `convolver-vst3-preset` keeps working with the same arguments and output, for existing scripts. Implemented 22 October 2026 (PR #32); the [presets guide](../../use/presets.md) describes the files, including the AU key and LV2 state property chosen that day | Users convert a `.cfg` the same way for every format |
 | PLUG-4 | One list of supported channel layouts, with [channel meaning](../../develop/plugin-identities.md#channel-layouts) defined, and a registry of permanent identities (VST3 class IDs, AU type/subtype/manufacturer codes, LV2 URIs) | Identities can never change after release, and stricter layout checks must not break saved projects |
 | PLUG-5 | One release pipeline (REL-1) producing VST3, LV2 and AU together. First comes an [unsigned preview](#unsigned-previews-and-production) with a defined publication step; signing and notarization, done once for both Mac formats, are the later production gate | Avoids three release processes |
-| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../../develop/build.md#pinned-format-dependencies)) | Builds and validator results must be reproducible before adapters depend on them |
+| PLUG-6 | Pin format dependencies: AudioUnitSDK (commit and checksum, like the VST3 SDK), the `lv2` headers, and the test-only `lilv` and `lv2lint`, in `packaging/release-policy.json` for shipped code and in CI for test tools. **Done 22 October 2026:** AudioUnitSDK 1.4.0 (C++23; jrp chose it over the C++20 1.3.0), `lv2` 1.18.10, `lilv` 0.24.22, `lv2lint` 0.16.2 ([pins](../../develop/build.md#supporting-libraries); since CI-6, 24 October 2026, builds take the newest releases instead) | Builds and validator results must be reproducible before adapters depend on them |
 
 After that the streams are separate and can be worked on at the same time, by
 different people or threads:
@@ -651,7 +652,7 @@ the AUv2 entry points against Apple's system headers without AudioUnitSDK.
 
 ## Build and distribution
 
-- CMake option `CONVOLVER_BUILD_LV2` (off by default), needing only the pinned
+- CMake option `CONVOLVER_BUILD_LV2` (off by default), needing only the
   `lv2` headers (PLUG-6, done); `lilv` only when tests are on. The `.ttl` files are
   generated from `VERSION` and the layout list. Neither LV2 nor AU builds need
   the VST3 SDK, and the shared preset tool (PLUG-3) builds without it.
