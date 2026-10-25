@@ -13,6 +13,7 @@
 #include <exception>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace convolver::au {
@@ -160,6 +161,15 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
                "convolver-preset.";
     return {};
 }
+// A numbered line without its "Request 3: " prefix; any other line whole.
+std::string_view unnumbered(std::string_view line) {
+    constexpr std::string_view prefix = "Request ";
+    if (line.substr(0, prefix.size()) != prefix)
+        return line;
+    const auto end = line.find(": ", prefix.size());
+    return end == std::string_view::npos ? line : line.substr(end + 2);
+}
+
 } // namespace
 
 Effect::Effect(AudioComponentInstance instance)
@@ -198,7 +208,11 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
 void Effect::log(const std::string& message, bool problem) noexcept {
     try {
         std::lock_guard lock(logging_);
-        if (message.empty() || message == logged_)
+        // The same line again is left out, even under a new request number:
+        // GarageBand restored one preset five times in a second on a mono
+        // track, and five identical failures pushed the useful lines out of
+        // Copy diagnostics (jrp's run of AU-6).
+        if (message.empty() || unnumbered(message) == unnumbered(logged_))
             return;
         host_log(tag_.c_str(), message, problem);
         logged_ = message;

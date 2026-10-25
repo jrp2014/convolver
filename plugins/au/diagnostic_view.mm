@@ -2,8 +2,16 @@
 #import "diagnostic_view.h"
 
 namespace {
-constexpr CGFloat margin = 16;
+// The usual macOS panel layout (jrp's GarageBand run: the first version
+// filled whatever size the host offered and left most of it blank). A fixed
+// width, a height that fits the text, label and value rows for the details,
+// and the buttons at the bottom right.
+constexpr CGFloat width = 560;
+constexpr CGFloat margin = 20;
 constexpr CGFloat button_height = 32;
+constexpr CGFloat label_column = 76; // Where the detail values start.
+constexpr CGFloat text_top = 64;
+constexpr CGFloat most_text = 480; // Longer text scrolls (a list .cfg explains every candidate).
 constexpr NSTimeInterval refresh_interval = 0.5;
 
 NSString* field(NSDictionary<NSString*, NSString*>* report, NSString* key) {
@@ -34,6 +42,54 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     text.lineBreakMode = NSLineBreakByTruncatingTail;
     return text;
 }
+
+// The explanation, then each "Label: value" line of the details as a row:
+// the label in the secondary colour, the value aligned after it, wrapped
+// lines indented under the value.
+NSAttributedString* styled(NSString* explanation, NSString* details) {
+    NSFont* font = [NSFont systemFontOfSize:[NSFont systemFontSize]];
+    NSMutableParagraphStyle* prose = [[NSMutableParagraphStyle alloc] init];
+    prose.paragraphSpacing = 10;
+    NSMutableAttributedString* text = [[NSMutableAttributedString alloc]
+        initWithString:[explanation stringByAppendingString:@"\n"]
+            attributes:@{
+                NSFontAttributeName : font,
+                NSForegroundColorAttributeName : [NSColor labelColor],
+                NSParagraphStyleAttributeName : prose
+            }];
+    NSMutableParagraphStyle* row = [[NSMutableParagraphStyle alloc] init];
+    row.tabStops = @[ [[NSTextTab alloc] initWithTextAlignment:NSTextAlignmentLeft
+                                                      location:label_column
+                                                       options:@{}] ];
+    row.headIndent = label_column;
+    row.paragraphSpacing = 3;
+    for (NSString* line in [details componentsSeparatedByString:@"\n"]) {
+        if (line.length == 0)
+            continue;
+        const NSRange colon = [line rangeOfString:@": "];
+        NSString* name =
+            colon.location == NSNotFound ? @"" : [line substringToIndex:colon.location];
+        NSString* value =
+            colon.location == NSNotFound ? line : [line substringFromIndex:NSMaxRange(colon)];
+        [text appendAttributedString:[[NSAttributedString alloc]
+                                         initWithString:[name stringByAppendingString:@"\t"]
+                                             attributes:@{
+                                                 NSFontAttributeName : font,
+                                                 NSForegroundColorAttributeName :
+                                                     [NSColor secondaryLabelColor],
+                                                 NSParagraphStyleAttributeName : row
+                                             }]];
+        [text appendAttributedString:[[NSAttributedString alloc]
+                                         initWithString:[value stringByAppendingString:@"\n"]
+                                             attributes:@{
+                                                 NSFontAttributeName : font,
+                                                 NSForegroundColorAttributeName :
+                                                     [NSColor labelColor],
+                                                 NSParagraphStyleAttributeName : row
+                                             }]];
+    }
+    return text;
+}
 } // namespace
 
 @implementation CONVOLVER_DIAGNOSTIC_VIEW {
@@ -48,72 +104,88 @@ NSTextField* label(NSFont* font, NSColor* colour) {
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics {
-    self = [super initWithFrame:frame];
+    // The view's own size: the frame gives only its position.
+    self = [super initWithFrame:NSMakeRect(NSMinX(frame), NSMinY(frame), width, 240)];
     if (!self)
         return nil;
     _pasteboard = [NSPasteboard generalPasteboard];
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
-    const CGFloat width = NSWidth(frame) - 2 * margin, height = NSHeight(frame);
+    const CGFloat inner = width - 2 * margin;
 
     _titleField = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize]],
                         [NSColor secondaryLabelColor]);
-    _titleField.frame = NSMakeRect(margin, 12, width, 16);
+    _titleField.frame = NSMakeRect(margin, 14, inner, 16);
     _titleField.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     [self addSubview:_titleField];
 
-    _statusField = label([NSFont boldSystemFontOfSize:15], [NSColor labelColor]);
-    _statusField.frame = NSMakeRect(margin, 32, width, 22);
+    _statusField = label([NSFont boldSystemFontOfSize:17], [NSColor labelColor]);
+    _statusField.frame = NSMakeRect(margin, 32, inner, 24);
     _statusField.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     _statusField.accessibilityLabel = @"Status";
     [self addSubview:_statusField];
 
-    const CGFloat top = 62, bottom = button_height + 2 * margin;
-    scroll_ = [[NSScrollView alloc]
-        initWithFrame:NSMakeRect(margin, top, width, MAX(height - top - bottom, 40))];
+    // No border or box: the text reads as part of the panel. It scrolls only
+    // when it is longer than most_text.
+    scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(margin, text_top, inner, 100)];
     scroll_.hasVerticalScroller = YES;
-    scroll_.borderType = NSBezelBorder;
+    scroll_.autohidesScrollers = YES;
+    scroll_.borderType = NSNoBorder;
+    scroll_.drawsBackground = NO;
     scroll_.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _explanationView = [[NSTextView alloc] initWithFrame:scroll_.contentView.bounds];
     _explanationView.editable = NO;
     _explanationView.selectable = YES;
-    _explanationView.richText = NO;
-    _explanationView.drawsBackground = YES;
-    _explanationView.backgroundColor = [NSColor textBackgroundColor];
-    _explanationView.textContainerInset = NSMakeSize(6, 6);
-    // Apple's recipe for a text view in a scroll view, so long text (a list
-    // .cfg explains every candidate) grows the view and scrolls.
-    _explanationView.minSize = NSMakeSize(0, NSHeight(scroll_.contentView.bounds));
+    _explanationView.richText = YES; // Styled details; still read-only.
+    _explanationView.drawsBackground = NO;
+    _explanationView.textContainerInset = NSZeroSize;
+    _explanationView.textContainer.lineFragmentPadding = 0;
+    // Apple's recipe for a text view in a scroll view.
+    _explanationView.minSize = NSMakeSize(0, 0);
     _explanationView.maxSize = NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX);
     _explanationView.autoresizingMask = NSViewWidthSizable;
     _explanationView.verticallyResizable = YES;
     _explanationView.horizontallyResizable = NO;
-    _explanationView.textContainer.containerSize =
-        NSMakeSize(NSWidth(scroll_.contentView.bounds), CGFLOAT_MAX);
+    _explanationView.textContainer.containerSize = NSMakeSize(inner, CGFLOAT_MAX);
     _explanationView.textContainer.widthTracksTextView = YES;
     _explanationView.accessibilityLabel = @"What Convolver plays, why, and what to change";
     scroll_.documentView = _explanationView;
     [self addSubview:scroll_];
 
-    const CGFloat buttons = height - margin - button_height;
+    // The buttons at the bottom right, Show log rightmost.
+    _logButton = [NSButton buttonWithTitle:@"Show log" target:self action:@selector(showLog:)];
+    _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
     _diagnosticsButton = [NSButton buttonWithTitle:@"Copy diagnostics"
                                             target:self
                                             action:@selector(putDiagnosticsOnPasteboard:)];
-    _diagnosticsButton.frame = NSMakeRect(margin, buttons, 160, button_height);
-    _diagnosticsButton.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
     _diagnosticsButton.toolTip =
         @"Copies this report and Convolver's recent log lines, ready to paste "
         @"into a problem report.";
-    [self addSubview:_diagnosticsButton];
-
-    _logButton = [NSButton buttonWithTitle:@"Show log" target:self action:@selector(showLog:)];
-    _logButton.frame = NSMakeRect(margin + 168, buttons, 120, button_height);
-    _logButton.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
-    _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
-    [self addSubview:_logButton];
+    for (NSButton* button in @[ _diagnosticsButton, _logButton ]) {
+        button.autoresizingMask = NSViewMinYMargin | NSViewMinXMargin;
+        [self addSubview:button];
+    }
 
     [self refresh];
     return self;
+}
+
+// Fits the height to the text (up to most_text, then it scrolls) and puts
+// the buttons under it. Hosts that follow the view's size resize the window.
+- (void)fit {
+    NSLayoutManager* layout = _explanationView.layoutManager;
+    [layout ensureLayoutForTextContainer:_explanationView.textContainer];
+    const CGFloat text =
+        ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
+    const CGFloat shown = MIN(MAX(text, 40), most_text);
+    scroll_.frame = NSMakeRect(margin, text_top, width - 2 * margin, shown);
+    const CGFloat buttons = text_top + shown + 16;
+    const CGFloat log_width = MAX(NSWidth(_logButton.frame), 100);
+    const CGFloat copy_width = MAX(NSWidth(_diagnosticsButton.frame), 150);
+    _logButton.frame = NSMakeRect(width - margin - log_width, buttons, log_width, button_height);
+    _diagnosticsButton.frame =
+        NSMakeRect(NSMinX(_logButton.frame) - 12 - copy_width, buttons, copy_width, button_height);
+    [self setFrameSize:NSMakeSize(width, buttons + button_height + margin)];
 }
 
 - (BOOL)isFlipped {
@@ -154,30 +226,31 @@ NSTextField* label(NSFont* font, NSColor* colour) {
 
 - (void)refresh {
     NSDictionary<NSString*, NSString*>* report = report_ ? report_() : nil;
-    NSString* text;
+    NSString *explanation, *details;
     if (!report) {
         _titleField.stringValue = @"Convolver";
         _statusField.stringValue = @"Not available";
         _statusField.textColor = [NSColor labelColor];
-        text = @"Convolver could not read its report from the plug-in. The Convolver log has the "
-               @"details.";
+        explanation = @"Convolver could not read its report from the plug-in. The Convolver log "
+                      @"has the details.";
+        details = @"";
         logPath_ = nil;
     } else {
         _titleField.stringValue = field(report, @"title");
         _statusField.stringValue = field(report, @"status name");
         _statusField.textColor = status_colour(field(report, @"status").integerValue);
         _statusField.toolTip = field(report, @"summary");
-        text = [NSString
-            stringWithFormat:@"%@\n\n%@", field(report, @"explanation"), field(report, @"details")];
+        explanation = field(report, @"explanation");
+        details = field(report, @"details");
         logPath_ = field(report, @"log path");
     }
     _logButton.enabled = logPath_.length > 0;
+    NSString* text = [NSString stringWithFormat:@"%@\n\n%@", explanation, details];
     if ([text isEqualToString:shown_])
         return;
     shown_ = text;
-    _explanationView.string = text;
-    _explanationView.font = [NSFont systemFontOfSize:[NSFont systemFontSize]];
-    _explanationView.textColor = [NSColor labelColor];
+    [_explanationView.textStorage setAttributedString:styled(explanation, details)];
+    [self fit];
 }
 
 - (void)putDiagnosticsOnPasteboard:(id)sender {

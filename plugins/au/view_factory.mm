@@ -36,11 +36,13 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
     return 0;
 }
 
+// The view sizes itself to its text; the host's preferred size is not used
+// (GarageBand offers a large one, which left most of the window blank).
 - (NSView*)uiViewForAudioUnit:(AudioUnit)unit withSize:(NSSize)size {
+    static_cast<void>(size);
     if (!unit)
         return nil;
-    const NSRect frame = NSMakeRect(0, 0, size.width >= 400 ? size.width : 560,
-                                    size.height >= 300 ? size.height : 380);
+    const NSRect frame = NSZeroRect;
     ConvolverReportSource report = ^NSDictionary<NSString*, NSString*>*(void) {
         id value = CFBridgingRelease(property_value(unit, convolver::au::report_property));
         return [value isKindOfClass:[NSDictionary class]] ? value : nil;

@@ -78,6 +78,17 @@ NSString* diagnostics(Unit& unit) {
     return text;
 }
 
+std::size_t count(const std::string& text, const std::string& part) {
+    std::size_t n = 0;
+    for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
+        ++n;
+    return n;
+}
+std::string read_file(const std::string& path) {
+    std::ifstream in(path);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
 // The Convolver log goes to a file of this process's own while it exists.
 class PrivateLog {
   public:
@@ -166,6 +177,14 @@ void properties(const PrivateLog& log) {
                 contains(copied, "Recent Convolver log lines for Audio Unit #") &&
                 contains(copied, "Started at 44100 Hz, 1 in, 1 out"),
             "diagnostics:\n" + text(copied));
+    // GarageBand restored the same preset five times in a second on a mono
+    // track: the identical failure is logged once, not once per request.
+    const char* refused = "Filter not loaded, so Convolver plays silence";
+    const auto before_repeats = count(read_file(log.path()), refused);
+    for (int i = 0; i < 4; ++i)
+        static_cast<void>(unit.load(state_of(identity(44100, 2))));
+    require(count(read_file(log.path()), refused) <= before_repeats + 1,
+            "repeated identical failures logged:\n" + read_file(log.path()));
     AudioUnitRemovePropertyListenerWithUserData(unit.get(), au::report_property, report_changed,
                                                 nullptr);
     unit.uninitialize();
@@ -183,7 +202,14 @@ void window() {
     NSView* made = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(0, 0)];
     require([made isKindOfClass:[CONVOLVER_DIAGNOSTIC_VIEW class]], "no Convolver view");
     CONVOLVER_DIAGNOSTIC_VIEW* view = (CONVOLVER_DIAGNOSTIC_VIEW*)made;
-    require(NSWidth(view.frame) >= 400 && NSHeight(view.frame) >= 300, "window too small");
+    // Fitted to its text, whatever size the host offers (jrp's GarageBand
+    // run: the first version filled a large window and left it mostly blank).
+    require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 150 &&
+                NSHeight(view.frame) <= 400,
+            "empty window size " + std::to_string(NSWidth(view.frame)) + " x " +
+                std::to_string(NSHeight(view.frame)));
+    NSView* offered = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(1270, 1120)];
+    require(NSEqualSizes(offered.frame.size, view.frame.size), "the host's size was used");
 
     NSWindow* host = [[NSWindow alloc] initWithContentRect:view.frame
                                                  styleMask:NSWindowStyleMaskTitled
@@ -204,10 +230,18 @@ void window() {
             "window status " + text(view.statusField.stringValue));
     require(contains(view.explanationView.string, text(r[@"explanation"]).c_str()) &&
                 contains(view.explanationView.string, "put Convolver on a stereo track") &&
-                contains(view.explanationView.string, "Host: 44100 Hz, 1 in, 1 out"),
+                contains(view.explanationView.string, "Host\t44100 Hz, 1 in, 1 out"),
             "window text:\n" + text(view.explanationView.string));
     require(contains(view.titleField.stringValue, "Audio Unit #"),
             "window title " + text(view.titleField.stringValue));
+    // The buttons sit under the text, at the bottom right, inside the view.
+    const auto bottom = NSMaxY(view.diagnosticsButton.frame);
+    require(view.isFlipped && NSMaxX(view.logButton.frame) <= NSWidth(view.frame) &&
+                NSMinX(view.diagnosticsButton.frame) > NSWidth(view.frame) / 3 &&
+                bottom <= NSHeight(view.frame) && NSHeight(view.frame) - bottom <= 24 &&
+                NSMinY(view.diagnosticsButton.frame) >=
+                    NSMaxY(view.explanationView.enclosingScrollView.frame),
+            "button layout");
 
     // Accessibility: named controls (VoiceOver reads the label or title).
     // AppKit supplies the buttons' role itself, and on a CI runner with no
@@ -257,17 +291,6 @@ AudioUnitParameterValue status_value(Unit& unit) {
         "Status value");
     return value;
 }
-std::size_t count(const std::string& text, const std::string& part) {
-    std::size_t n = 0;
-    for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
-        ++n;
-    return n;
-}
-std::string read_file(const std::string& path) {
-    std::ifstream in(path);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 // Faults Render counts: the report explains them and keeps Render's Fault,
 // and an open window polling it logs them once, not on every read.
 void faults(const PrivateLog& log) {

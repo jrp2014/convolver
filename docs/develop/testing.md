@@ -540,8 +540,10 @@ Four CTest tests run when the adapter is built (label `au`):
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
-  track, then the view the factory makes, attached to an off-screen window:
-  its status and text before and after the fix, Copy diagnostics (onto a
+  track (and a preset restored again and again, whose identical failure is
+  logged once), then the view the factory makes, attached to an off-screen
+  window: its size fitted to the text whatever size the host offers, the
+  buttons at the bottom right, its status and text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
   window stops reading the unit. Then faults: invalid input rendered, the

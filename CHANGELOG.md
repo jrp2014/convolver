@@ -42,6 +42,9 @@ Until 1.0 the C++ API may change between minor versions.
   -76 dB, mix 56.1% wet"), not as the host's slider set them ("-75.967 dB",
   "56.1413%"); a value too small for one decimal keeps two significant
   digits.
+- Audio Unit: a failure identical to the line just logged is not logged
+  again under a new request number (GarageBand restored one preset five
+  times in a second on a mono track).
 
 ### Fixed
 
