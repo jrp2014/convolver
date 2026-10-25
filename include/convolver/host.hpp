@@ -144,9 +144,18 @@ std::string fault_message(const HostFaults&);
 // What HostFilter::observe() found. `current`: faults met by the filter that
 // plays now, which faults() (and so the status) shows. `earlier`: faults
 // counted before an accepted load replaced the filter they met, while the new
-// one was prepared; logged, but never shown.
-struct HostFaultReport {
+// one was prepared; logged, but never shown. `held`: the status shows a load
+// failure, which comes before Fault (HostFilter::failure_shown()), so it does
+// not show `current` either.
+// The HostFaults it derives from count every fault that no earlier call
+// returned (current plus earlier), which is what observe() returned in 0.5.0,
+// so code that takes the result as HostFaults still compiles and gets the
+// same counts. Not an aggregate, so that brace-initialising it from two
+// HostFaults cannot silently fill the base instead of `current`.
+struct HostFaultReport : HostFaults {
+    HostFaultReport() = default;
     HostFaults current, earlier;
+    bool held = false;
     bool any() const noexcept {
         return current.any() || earlier.any();
     }
@@ -256,7 +265,8 @@ class HostFilter {
     // again for a new processor, so call this before discarding the old one,
     // and before load(): an accepted load clears faults(). Faults counted
     // between the last call and an accepted load (while it was prepared) are
-    // returned as `earlier`, for the log, and not added to faults().
+    // returned as `earlier`, for the log, and not added to faults(). `held`
+    // is failure_shown().
     HostFaultReport observe(const HostFaults& totals) noexcept;
 
   private:

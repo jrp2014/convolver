@@ -926,6 +926,15 @@ void status_and_log() {
         play_invalid(held);
         require(held.getParameterCount() == 0 && status() == convolver::HostStatus::load_failed,
                 "Fault written over Load failed");
+        // Nor does the log say Fault shows (jrp's review of 0.5.2).
+        {
+            const auto shows_fault = count(log_text(), "The status shows Fault");
+            MemoryStream explained;
+            require(p.getState(&explained) == kResultOk &&
+                        contains(log_text(), "The status shows Load failed instead of Fault") &&
+                        count(log_text(), "The status shows Fault") == shows_fault,
+                    "the log says the status shows Fault over Load failed");
+        }
         require(p.setState(stream(good).get()) == kResultOk, "good after refusal");
         ParameterChanges released(4);
         play_invalid(released);

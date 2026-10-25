@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -985,7 +986,12 @@ void processing_faults() {
             "every fault explained");
     HostFilter g(8);
     g.load(HostState{mono()}, layout);
-    static_cast<void>(g.observe(every));
+    // 0.5.0's interface still compiles and counts the same (the 0.5.2 review):
+    // observe() returned HostFaults then.
+    static_assert(std::is_convertible_v<HostFaultReport, HostFaults>);
+    const HostFaults as_in_0_5_0 = g.observe(every);
+    require(as_in_0_5_0.rejected_input == 3 && as_in_0_5_0.total() == 7,
+            "observe() as 0.5.0 returned it");
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");
@@ -1021,6 +1027,8 @@ void processing_faults() {
     require(window.earlier.rejected_input == 1 && !window.current.any() && !h.faults().any() &&
                 host_status(h, layout).status == HostStatus::playing,
             "a fault counted while the replacement was prepared is shown against it");
+    require(window.rejected_input == 1 && window.total() == 1 && !window.held,
+            "0.5.0's counts are current plus earlier");
     // Its log text must not claim the status shows it.
     const auto earlier = fault_message(window);
     require(earlier.find("does not show these") != std::string::npos &&
@@ -1048,6 +1056,16 @@ void processing_faults() {
     p.hold_fault_signal(h.failure_shown());
     play(nan);
     require(!p.fault_to_signal() && p.faults_since_clear(), "Fault signalled over Load failed");
+    // Nor does the log say Fault shows (the 0.5.2 review).
+    const auto held = h.observe(p.faults());
+    require(held.held && held.current.rejected_input == 1 && !held.earlier.any() &&
+                host_status(h, layout).status == HostStatus::load_failed,
+            "a fault after a rejected replacement");
+    const auto held_text = fault_message(held);
+    require(held_text.find("status shows Load failed instead of Fault") != std::string::npos &&
+                held_text.find("status shows Fault") == std::string::npos &&
+                held_text.find("invalid samples") != std::string::npos,
+            "the log says the status shows Fault over Load failed");
     h.load(HostState{mono()}, layout, {}, {}, &p);
     require(!h.failure_shown(), "an accepted load clears failure_shown");
     p.hold_fault_signal(h.failure_shown());

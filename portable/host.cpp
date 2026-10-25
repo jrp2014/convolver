@@ -360,6 +360,10 @@ HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
     faults_ += report.current;
     report.earlier = unshown_; // Counted before the accepted load: explained, not shown.
     unshown_ = {};
+    report.held = failure_shown();
+    // 0.5.0's result: every fault no earlier call returned.
+    static_cast<HostFaults&>(report) = report.current;
+    report += report.earlier;
     return report;
 }
 
@@ -398,6 +402,17 @@ std::string fault_message(const HostFaults& f) {
            "plug-in.";
 }
 
+namespace {
+// The current filter's faults while the status shows Load failed, which comes
+// first (the 0.5.2 review: the log said Fault was shown).
+std::string held_fault_message(const HostFaults& f) {
+    return "While audio played, Convolver met a problem in it." + fault_details(f) +
+           " The status shows Load failed instead of Fault, because a load failure comes "
+           "first; these faults are cleared when a filter is loaded or the host restarts the "
+           "plug-in.";
+}
+} // namespace
+
 std::string fault_message(const HostFaultReport& r) {
     std::string text;
     if (r.earlier.any())
@@ -406,7 +421,8 @@ std::string fault_message(const HostFaultReport& r) {
                fault_details(r.earlier) +
                " The new filter starts afresh, so the status does not show these.";
     if (r.current.any())
-        text += (text.empty() ? "" : " ") + fault_message(r.current);
+        text += (text.empty() ? "" : " ") +
+                (r.held ? held_fault_message(r.current) : fault_message(r.current));
     return text;
 }
 

@@ -202,6 +202,8 @@ format.
   returns the new ones, which adapters log with `fault_message()`;
   `HostFilter::faults()` keeps them until an accepted load or `activate()`,
   and `host_status()` shows them as Fault unless a load failure is shown.
+  While one is shown, the report says so (`held`), and its log text says
+  that the status shows Load failed instead of Fault.
   One baseline serves both sides (jrp's review of 0.4.43): an adapter passes
   its `HostProcessor` to `HostFilter::load()`, which, when it accepts the
   filter, takes one snapshot of the counts (`HostProcessor::clear_faults()`)

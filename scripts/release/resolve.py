@@ -77,22 +77,46 @@ def download(url, target, attempts=3):
     raise RuntimeError(f'cannot download {url}: {getattr(error, "reason", error)}')
 
 
+def _sidecar(path):
+    """The text of a cache sidecar file, or None if there is none."""
+    return path.read_text(encoding='utf-8').strip() if path.is_file() else None
+
+
 def fetch_archive(url, cache, name, fetcher=download):
     """The archive at url, in cache under name. An archive already there is
     reused only if it came from the same URL (the URLs name an exact commit or
-    release, so their contents do not change)."""
+    release, so their contents do not change) and still has the checksum it
+    had when it was downloaded. Most dependencies have no published checksum,
+    so that first download's checksum is the one trusted: a cached archive
+    whose bytes have changed since is refused rather than recorded under a new
+    checksum. One cached without a checksum (by an older version of this
+    script) is downloaded again."""
     cache.mkdir(parents=True, exist_ok=True)
     path = cache / name
     origin = cache / (name + '.url')
-    if path.is_file() and origin.is_file() and origin.read_text(encoding='utf-8').strip() == url:
-        return path
+    checksum = cache / (name + '.sha256')
+    if path.is_file() and _sidecar(origin) == url:
+        first = _sidecar(checksum)
+        if first:
+            actual = sha256(path)
+            if actual != first:
+                raise RuntimeError(f'the cached {path} has changed since it was downloaded from {url}: its '
+                                   f'SHA-256 is now {actual}, not {first}. Delete it, with {origin.name} and '
+                                   f'{checksum.name}, to download it again')
+            return path
     with tempfile.NamedTemporaryFile(dir=cache, delete=False) as temporary:
         partial = Path(temporary.name)
     try:
         fetcher(url, partial)
+        downloaded = sha256(partial)
+        # The sidecars go first, so an interrupted download never leaves an
+        # archive described by another one's URL and checksum.
+        origin.unlink(missing_ok=True)
+        checksum.unlink(missing_ok=True)
         partial.replace(path)
     finally:
         partial.unlink(missing_ok=True)
+    checksum.write_text(downloaded + '\n', encoding='utf-8')
     origin.write_text(url + '\n', encoding='utf-8')
     return path
 
