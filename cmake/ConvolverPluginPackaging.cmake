@@ -99,6 +99,9 @@ if(CONVOLVER_BUILD_TESTS)
         ${validator_argument} --probe "$<TARGET_FILE:convolver_vst3_package_probe>")
     set_tests_properties(release.stage PROPERTIES LABELS "packaging;vst3;real-libraries" TIMEOUT 180)
     add_dependencies(check convolver_plugin_examples convolver_vst3_package_probe)
+    # release.stage carries the vst3 label and installs the whole distribution.
+    add_dependencies(convolver_vst3_suite convolver_vst3_package_probe convolver_plugin_examples
+        convolver_packaged_guides ${convolver_packaged_tools})
 endif()
 set(CPACK_PACKAGE_NAME Convolver)
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")

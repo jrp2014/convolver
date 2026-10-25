@@ -78,6 +78,11 @@ Apple SDKs. CI upgrades the standalone clang-tidy package before each analysis
 run and prints its version. Fix real diagnostics rather than adding blanket suppressions. These tools are development dependencies;
 library consumers need neither tool.
 
+`scripts/clang_tidy.py` takes the same `-p` and file list and analyses the
+files side by side, one per CPU (`--jobs N` to change it). It prints each
+file's output whole, in the order given, lists the files that failed, and
+fails if any did; CI runs the portable list this way.
+
 ### When a new Clang release turns CI red
 
 Because the tools are not pinned, a new release can fail CI on code that
@@ -135,8 +140,9 @@ The local hooks also check maintained Markdown links and the repository rules
 guidance, licence lines and the top-level layout), and run both checkers'
 regression tests on every invocation. A further hook checks the
 [permanent plug-in identities](docs/develop/plugin-identities.md#changing-the-registry),
-and another tests which files let a pull request
-[skip the builds](docs/develop/testing.md#documentation-only-pull-requests). They use only Python's standard library
+another tests which files let a pull request
+[skip the builds](docs/develop/testing.md#documentation-only-pull-requests),
+and another tests the parallel clang-tidy runner. They use only Python's standard library
 and can be run independently:
 
 ```sh
@@ -146,6 +152,7 @@ python3 scripts/check_repository.py
 python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
 python3 tests/ci_scope_tests.py
+python3 tests/clang_tidy_tests.py
 ```
 
 [Repository checks](docs/develop/workflow.md#automated-checks) lists each rule and what

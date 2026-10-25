@@ -96,7 +96,7 @@ if(CONVOLVER_BUILD_TESTS)
         target_link_libraries(convolver_au_harness PRIVATE convolver_au_adapter convolver_presets Convolver::io)
         add_test(NAME au.harness COMMAND convolver_au_harness "${PROJECT_BINARY_DIR}/first-use/fixtures.txt")
         set_tests_properties(au.harness PROPERTIES LABELS "au;real-libraries;plug2"
-            TIMEOUT 300 FIXTURES_REQUIRED first_use_renders)
+            TIMEOUT 300 FIXTURES_REQUIRED first_use_renders COST 60)
         list(APPEND au_test_targets convolver_au_harness)
     endif()
     # PLUG-7: lifecycle sequences against the reference model.
@@ -104,7 +104,8 @@ if(CONVOLVER_BUILD_TESTS)
         "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp" "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
     target_link_libraries(convolver_au_lifecycle PRIVATE convolver_au_adapter convolver_presets)
     add_test(NAME au.lifecycle COMMAND convolver_au_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
-    set_tests_properties(au.lifecycle PROPERTIES LABELS "au;real-libraries;plug7" TIMEOUT 600)
+    # COST: the longest tests start first under ctest --parallel (CI-9).
+    set_tests_properties(au.lifecycle PROPERTIES LABELS "au;real-libraries;plug7" TIMEOUT 600 COST 25)
     list(APPEND au_test_targets convolver_au_lifecycle)
     foreach(target IN ITEMS convolver_au_tests convolver_au_harness convolver_au_lifecycle)
         if(TARGET ${target})
@@ -113,6 +114,15 @@ if(CONVOLVER_BUILD_TESTS)
         endif()
     endforeach()
     add_dependencies(check ${au_test_targets})
+    # CI-9: everything the au.* tests and their examples.first_use fixture run,
+    # so a job that runs only `ctest -L au` can build this rather than every
+    # test (as convolver_lv2_tests does for LV2). A new test's target joins
+    # au_test_targets above.
+    add_custom_target(convolver_au_suite)
+    add_dependencies(convolver_au_suite ${au_test_targets})
+    if(TARGET convolver_cli)
+        add_dependencies(convolver_au_suite convolver_cli)
+    endif()
     # DIAG-1: tests write the Convolver log in the build folder, never the user's.
     set_property(TEST au.adapter au.bundle APPEND PROPERTY ENVIRONMENT
         "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")

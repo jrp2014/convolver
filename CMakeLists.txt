@@ -522,6 +522,19 @@ if(CONVOLVER_BUILD_TESTS)
         list(TRANSFORM consumer_cases PREPEND packaging.consumer.)
         set_tests_properties(${consumer_cases} PROPERTIES FIXTURES_REQUIRED consumer_package)
     endif()
+    # CI-9: ctest --parallel starts the costliest ready tests first, so the
+    # long ones do not start late and finish last. Each COST is about the
+    # test's longest time in CI, in seconds (macOS Debug with sanitizers, 25
+    # October 2026). Fixture setups still run before the tests that need them.
+    # A name not defined in this build is skipped, so rename tests here too.
+    set(test_costs compatibility.corpus 45 native.fft_planning 40 native.limits 28
+        native.kernel_divergence 25 native.cli 22 native.host_settings 20 native.host_lifecycle 20)
+    while(test_costs)
+        list(POP_FRONT test_costs test_name test_cost)
+        if(TEST ${test_name})
+            set_tests_properties(${test_name} PROPERTIES COST ${test_cost})
+        endif()
+    endwhile()
     add_custom_target(check COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure -C "$<CONFIG>"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" USES_TERMINAL VERBATIM)
     if(CONVOLVER_BUILD_NATIVE)

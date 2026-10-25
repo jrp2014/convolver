@@ -643,6 +643,34 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
+- [ ] **CI-10 — One Linux source build for candidates.** The Linux candidate
+  builds and tests the supplied source archive, then rebuilds it with
+  networking disabled (94–129 s on 25 October 2026). Build the candidate itself
+  from the verified archive in a fresh, network-disabled environment, and drop
+  the second build only once every assertion, packaging check and generator it
+  covers is kept. From jrp's CI analysis of 25 October 2026; no coverage may be
+  lost. See [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [ ] **CI-11 — FFT backend configurations as parallel jobs.** The native
+  macOS job builds and tests FFTW, core-only, Accelerate and Ooura one after
+  another (8–9.5 minutes). Run them as separate jobs, keeping every test and
+  the cross-backend output comparisons (`backend_equivalence.py`, which needs
+  two builds' CLIs). It shortens the wait, though extra setup may cost more
+  runner minutes and macOS runners are limited to 5 at once
+  ([CI triggers](docs/develop/testing.md#ci-triggers)). From jrp's CI analysis
+  of 25 October 2026.
+- [ ] **CI-12 — Fuzz campaigns side by side.** The four 60-second libFuzzer
+  campaigns run one after another (about 245 s). Run independent campaigns
+  concurrently where the runner has the CPUs, keeping each campaign's time
+  budget, and check that each still reaches its usual execution count; four
+  campaigns sharing one CPU would lose coverage. From jrp's CI analysis of 25
+  October 2026. See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [ ] **CI-13 — Run only the affected format's workflows.** A pull request
+  that changes only one format's adapter (for example only `plugins/au/` and
+  its tests) could skip the other formats' workflows, as documentation-only
+  pull requests skip builds (CI-1); shared code and `main` still run
+  everything. Needs a dependency map from files to workflows, with tests like
+  `tests/ci_scope_tests.py`. From jrp's CI analysis of 25 October 2026; later
+  than CI-10 to CI-12.
 
 ## Documented limitations
 
@@ -714,6 +742,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85,
+  from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
+  build only what their tests run, long tests carry a CTest `COST` so they
+  start first, and the portable clang-tidy files are analysed side by side;
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
