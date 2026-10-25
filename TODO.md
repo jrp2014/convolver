@@ -364,6 +364,11 @@ means a patched FFmpeg build with `--enable-gpl`.
   and W64, FLAC's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` tag, CAF and AIFF channel
   layouts). Check what libsndfile can write and what readers honour first; a
   rejected layout must fail as WAV does, not fall back to a default.
+- [ ] **IO-7 — Dither defaults by output resolution.** TPDF dither on by
+  default below 20 significant bits (pcm8, pcm16, `--valid-bits` 17–19), off
+  from 20 bits up but still available; warn when `ninth-order` shaping is used
+  away from 44.1 or 48 kHz. jrp's decision of 25 October 2026, after
+  measurements showed dither and shaping audible only below 20 bits.
 - [ ] **IO-2 — Optional offline IR resampling.** Only add as an explicit operation
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
