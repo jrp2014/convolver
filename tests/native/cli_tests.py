@@ -99,9 +99,14 @@ def integer_format_tests(d):
     # Below 20 bits TPDF dither is the default, and the note says so.
     p=call(base+['--output-format','wav-pcm24','--valid-bits','19'])
     assert b'19-bit output: adding triangular (TPDF) dither' in p.stderr, p.stderr
-    plain_default=wave_fields(dst)[4]
+    dithered_default=wave_fields(dst)[4]
     call(base+['--output-format','wav-pcm24','--valid-bits','19','--dither','triangular'])
-    assert wave_fields(dst)[4]==plain_default
+    assert wave_fields(dst)[4]==dithered_default
+    # At 20 valid bits the default is plain rounding, the same as --dither none.
+    assert not call(base+['--output-format','wav-pcm24','--valid-bits','20']).stderr
+    plain_default=wave_fields(dst)[4]
+    call(base+['--output-format','wav-pcm24','--valid-bits','20','--dither','none'])
+    assert wave_fields(dst)[4]==plain_default and plain_default!=dithered_default
 
 def automatic_gain_tests(d):
     """--gain-db auto/no-clip apply the attenuation estimates and report them."""
@@ -412,6 +417,18 @@ def main():
                              (['--noise-shaping','second-order'],b'Use third-order'),
                              (['--noise-shaping','sony-sbm'],b'at least 3 dB less audible')):
             p=call(base+removed,ok=False); assert why in p.stderr, p.stderr
+        # Shaping alone still adds the default dither, and says so.
+        p=call(base+['--noise-shaping','ninth-order'])
+        assert b'adding triangular (TPDF) dither' in p.stderr, p.stderr
+        # The advice follows the sample rate: none at 8 kHz, where the default is
+        # best; simple shaping with high-pass dither at 96 kHz.
+        for rate, advice in ((8000, None),
+                             (96000, b'--dither triangular-highpass --noise-shaping simple would keep the noise about 16 dB')):
+            r_ir=d/'rate-ir.wav'; r_src=d/'rate-in.wav'
+            pcm(r_ir,[13107],rate=rate); pcm(r_src,[((i*379)%12001)-6000 for i in range(4000)],rate=rate)
+            p=call(['--filter',r_ir,'--input',r_src,'--output',dst,'--output-format','wav-pcm16'])
+            assert b'adding triangular (TPDF) dither' in p.stderr, p.stderr
+            assert (advice in p.stderr) if advice else (b'would keep' not in p.stderr), (rate, p.stderr)
         for extra in (['--dither','bogus'],['--dither-seed','-1'],['--dither-seed','x'],
                       ['--output-format','wav-float','--dither','triangular'],
                       ['--output-format','raw-float','--dither','triangular'],

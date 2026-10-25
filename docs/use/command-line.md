@@ -16,7 +16,7 @@ To build it, see [build from source](../develop/build.md).
   W64, AIFF, CAF, FLAC and raw files, in 8- to 32-bit integer or 32- and 64-bit
   float. Integer output below 20 bits (pcm8, pcm16) gets triangular dither
   unless you give `--dither none`; from 20 bits it is plainly rounded, because
-  dither would be inaudible there. Convolver says when a dither or
+  plain rounding is already inaudible there. Convolver says when a dither or
   noise-shaping choice is pointless or clearly beaten at the sample rate.
 - `--gain-db` takes a fixed decibel value, `auto` (noise-based estimate) or
   `no-clip` (worst-case filter bound). Neither estimate is a limiter.
@@ -175,7 +175,7 @@ significant bits B (the container's, or `--valid-bits`):
 | Significant bits | Default | Why |
 | --- | --- | --- |
 | Fewer than 20 (pcm8, pcm16, `--valid-bits` 17 to 19) | `--dither triangular` | Without dither, fades, reverb tails and quiet passages are rounded into distortion that follows the signal. At 16 bits that distortion, or the hiss that replaces it, reaches the threshold of hearing with peaks at about 105 dB SPL |
-| 20 or more (pcm24, pcm32, `--valid-bits` 20 or more) | `--dither none` | Plain rounding is already at least 8 dB below the threshold of hearing with peaks at 120 dB SPL, so dither and shaping only add noise. From float, 32-bit rounding is exact above -48 dBFS |
+| 20 or more (pcm24, pcm32, `--valid-bits` 20 or more) | `--dither none` | Plain rounding stays about 8 dB or more below the threshold of hearing with peaks at 120 dB SPL (measured at 44.1 to 96 kHz), so dither and shaping only add noise. From float, 32-bit rounding is exact above -48 dBFS |
 
 `--dither` selects `triangular` (independent TPDF, error power 1/4 LSB² at
 every signal level), `triangular-highpass` (the historical engine's
@@ -212,7 +212,7 @@ the note saying that dither was added. The best choices measured:
 | Sample rate | Best choice | Less audible than plain triangular dither |
 | --- | --- | --- |
 | 8 to 16 kHz | `--dither triangular` (the default) | 0 dB; shaping makes noise worse at these rates |
-| 22.05 kHz | `--dither triangular` (the default) | 0 dB; nothing gains 3 dB |
+| 22.05 kHz | `--dither triangular-highpass --noise-shaping third-order` | 3 dB, too little to be suggested |
 | 32 kHz | `--dither triangular --noise-shaping third-order` | 5 dB |
 | 44.1 and 48 kHz | `--dither triangular-highpass --noise-shaping ninth-order` | 17 to 18 dB |
 | 64 kHz | `--dither triangular-highpass --noise-shaping ninth-order` | 17 dB |
@@ -222,9 +222,9 @@ Three of the historical engine's choices are no longer offered, because
 another always does better, and naming them is an error that says why:
 `rectangular` dither leaves noise that rises and falls with the signal (noise
 modulation), which triangular dither removes for 1.8 dB more noise;
-`second-order` shaping gives the same result as `third-order` (within 0.6 dB
-at every rate); and `sony-sbm` is at least 3 dB more audible than another
-choice at every rate. The library's `Quantizer` keeps all of them.
+`second-order` shaping gives the same result as `third-order` (within 1 dB);
+and `sony-sbm` is at least 3 dB more audible than another choice. Both were
+measured with either dither at every rate in the table above, 8 to 384 kHz. The library's `Quantizer` keeps all of them.
 
 #### How the advice was measured
 

@@ -122,13 +122,13 @@ NoiseShaping parse_noise_shaping(std::string_view name) {
     if (name == "second-order")
         throw std::invalid_argument(
             "--noise-shaping second-order is no longer offered: third-order gives the same "
-            "result (within 0.6 dB at every sample rate). Use third-order");
+            "result (within 1 dB at every sample rate measured, 8 to 384 kHz). Use third-order");
     if (name == "sony-sbm")
         throw std::invalid_argument(
             "--noise-shaping sony-sbm is no longer offered: at every sample rate another choice "
-            "keeps the noise at least 3 dB less audible (for example ninth-order at 44.1 and 48 "
-            "kHz, simple from 88.2 kHz). Convolver points to a better choice for your sample "
-            "rate when it renders");
+            "keeps the noise at least 3 dB less audible (measured from 8 to 384 kHz; for example "
+            "ninth-order at 44.1 and 48 kHz, simple from 88.2 kHz). Leave it out and Convolver "
+            "will name a better choice for your sample rate if there is one");
     throw std::invalid_argument("unsupported noise shaping: " + std::string(name) +
                                 " (choose none, simple, third-order or ninth-order)");
 }
@@ -199,14 +199,19 @@ QuantizationPlan plan_quantization(unsigned container_bits, unsigned valid_bits,
             " output turns fades, reverb tails and quiet passages into distortion instead of "
             "steady hiss, which can be heard at high playback levels. Leave --dither at its "
             "default, triangular, unless you need plain rounding");
-    } else if (audible && !dither && !shaping) {
+    } else if (audible && !dither) {
+        // Say so whenever dither was added without being asked for, with or
+        // without --noise-shaping.
         std::string text = depth + " output: adding triangular (TPDF) dither, the default below " +
                            std::to_string(inaudible_bits) + " bits (--dither none turns it off)";
-        if (const auto b = better(d, s, sample_rate))
-            text += ". At " + rate + ", " + options_text(b->first.dither, b->first.shaping) +
-                    " would keep the noise about " + db(b->second) + " dB less audible";
+        if (!shaping)
+            if (const auto b = better(d, s, sample_rate))
+                text += ". At " + rate + ", " + options_text(b->first.dither, b->first.shaping) +
+                        " would keep the noise about " + db(b->second) + " dB less audible";
         plan.notes.push_back(text);
-    } else if (audible) {
+    }
+    // A choice made explicitly is compared with the others at this rate.
+    if (audible && d != Dither::none && (dither || shaping)) {
         if (const auto b = better(d, s, sample_rate))
             plan.notes.push_back("warning: at " + rate + ", " +
                                  options_text(b->first.dither, b->first.shaping) +

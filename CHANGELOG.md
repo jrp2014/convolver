@@ -16,8 +16,8 @@ Until 1.0 the C++ API may change between minor versions.
   17 to 19) now gets triangular (TPDF) dither unless `--dither none` is given,
   so fades and quiet passages turn into steady hiss rather than distortion.
   This changes the bytes of such files. From 20 bits output is still plainly
-  rounded, since dither would be inaudible there. A note on stderr says when
-  dither was added.
+  rounded, since plain rounding is already inaudible there. A note on stderr
+  says when dither was added.
 - CLI: Convolver now warns when dither or noise shaping is pointless (from 20
   bits) or when another choice keeps the noise at least 3 dB less audible at
   the output sample rate, and names that choice.
