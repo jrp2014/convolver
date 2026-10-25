@@ -179,7 +179,9 @@ void properties(const PrivateLog& log) {
             "diagnostics:\n" + text(copied));
     // GarageBand restored the same preset five times in a second on a mono
     // track: the identical failure is logged once, not once per request.
-    const char* refused = "Filter not loaded, so Convolver plays silence";
+    // A refused load while the saved filter is kept: "Filter not loaded; the
+    // previous filter is kept. …".
+    const char* refused = "Filter not loaded";
     const auto before_repeats = count(read_file(log.path()), refused);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
