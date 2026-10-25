@@ -77,6 +77,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: clang-tidy-runner-tests
+        name: Parallel clang-tidy runner
+        entry: python tests/clang_tidy_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: actionlint
         name: GitHub Actions and embedded ShellCheck
         entry: actionlint

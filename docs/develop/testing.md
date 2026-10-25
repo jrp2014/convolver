@@ -884,6 +884,30 @@ CTest still runs a fixture's setup when a selected test needs it, so
 configuration starts from this table: add it where it changes a result, and
 give a new build-independent check the `repository` label.
 
+### Build targets and test order
+
+A job that runs only one format's tests builds only what those tests run, with
+the CLI for the `examples.first_use` fixture:
+
+| Target | Built by | Tests |
+| --- | --- | --- |
+| `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
+| `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
+| `convolver_lv2_tests` | LV2 sanitizer jobs | `examples.first_use` and `lv2.*` |
+
+The other jobs build everything. A test whose program the target does not
+build fails with "Could not find executable", so a new plug-in test's target
+goes into its format's target (`au_test_targets` for the Audio Unit).
+
+Under `ctest --parallel`, CTest starts the tests that others need first (a
+fixture's setup), then the ready tests in decreasing `COST`. The long tests
+carry a `COST` of about their longest CI time in seconds, set where each test
+is defined, so they start at once instead of last: `vst3.lifecycle` took
+100 s on Windows and began about 20 s into the step. Static analysis runs
+[`clang_tidy.py`](../../scripts/clang_tidy.py), which analyses the same file
+list one file per CPU and lists every file that failed
+([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).
+
 ### Compiler cache
 
 The Linux and macOS jobs of the native, VST3, Audio Unit and fuzz workflows,
