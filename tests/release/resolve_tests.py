@@ -292,6 +292,28 @@ class ResolveTests(unittest.TestCase):
                                     fetcher=no_download, digest=lambda *_: None)['lv2']
             self.assertEqual(again['sha256'], first['sha256'])
 
+    def test_failed_download_keeps_the_cached_archive(self):
+        # The sidecars describe the archive beside them at every step: a
+        # download that fails leaves the earlier archive reusable.
+        calls = []
+
+        def flaky(url, target):
+            calls.append(url)
+            if url.endswith('/b'):
+                Path(target).write_bytes(b'partial')
+                raise RuntimeError('connection reset')
+            fake_fetcher(url, target)
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary)
+            resolve.fetch_archive('https://example.org/a', cache, 'x.tar.gz', flaky)
+            with self.assertRaisesRegex(RuntimeError, 'connection reset'):
+                resolve.fetch_archive('https://example.org/b', cache, 'x.tar.gz', flaky)
+            path = resolve.fetch_archive('https://example.org/a', cache, 'x.tar.gz', flaky)
+            self.assertEqual(calls, ['https://example.org/a', 'https://example.org/b'])
+            self.assertEqual(path.read_bytes(), b'https://example.org/a')
+            self.assertEqual(sorted(p.name for p in cache.iterdir()),
+                             ['x.tar.gz', 'x.tar.gz.sha256', 'x.tar.gz.url'])
+
     def test_archive_cached_without_a_checksum_is_downloaded_again(self):
         calls = []
 
@@ -349,6 +371,27 @@ class ToolTests(unittest.TestCase):
                                     fetcher=kwargs.pop('fetcher', fake_fetcher),
                                     digest=kwargs.pop('digest', lambda *args: None),
                                     prerelease=kwargs.pop('prerelease', False))
+
+    def test_changed_cached_tool_is_not_replaced_from_a_mirror(self):
+        # The independent review of the 0.5.2 fixes: the next mirror's URL
+        # differs, so it would be downloaded over the changed archive.
+        policy = {'release_tools': {'demo': {
+            'upstream': 'https://example.org/demo', 'tag_prefix': 'v',
+            'url': 'https://example.org/demo-{version}.tar.gz',
+            'mirrors': ['https://mirror.example.org/demo-{version}.tar.gz']}}}
+
+        def demo(remote):
+            return listing({'v1.0': 'a' * 40})
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = Path(temporary)
+            record, path = resolve.resolve_tool(policy, 'demo', cache, lister=demo, fetcher=fake_fetcher,
+                                                digest=lambda *args: None)
+            self.assertEqual(record['url'], 'https://example.org/demo-1.0.tar.gz')
+            path.write_bytes(b'altered')
+            with self.assertRaisesRegex(resolve.ResolveError, 'demo 1.0: the cached .* has changed'):
+                resolve.resolve_tool(policy, 'demo', cache, lister=demo, fetcher=fake_fetcher,
+                                     digest=lambda *args: None)
+            self.assertEqual(path.read_bytes(), b'altered')
 
     def test_nsis(self):
         record, path = self.tool('nsis')

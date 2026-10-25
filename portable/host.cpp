@@ -353,18 +353,21 @@ std::string times(std::uint64_t n) {
 }
 } // namespace
 
-HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
-    HostFaultReport report;
-    report.current = since(totals, observed_);
-    observed_ = totals;
-    faults_ += report.current;
-    report.earlier = unshown_; // Counted before the accepted load: explained, not shown.
-    unshown_ = {};
-    report.held = failure_shown();
+HostFaultReport::HostFaultReport(const HostFaults& current_faults, const HostFaults& earlier_faults,
+                                 bool load_failure_shown) noexcept
+    : HostFaults(current_faults), current(current_faults), earlier(earlier_faults),
+      held(load_failure_shown) {
     // 0.5.0's result: every fault no earlier call returned.
-    static_cast<HostFaults&>(report) = report.current;
-    report += report.earlier;
-    return report;
+    *this += earlier_faults;
+}
+
+HostFaultReport HostFilter::observe(const HostFaults& totals) noexcept {
+    const auto current = since(totals, observed_);
+    observed_ = totals;
+    faults_ += current;
+    const auto earlier = unshown_; // Counted before the accepted load: explained, not shown.
+    unshown_ = {};
+    return {current, earlier, failure_shown()};
 }
 
 namespace {

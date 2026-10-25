@@ -25,8 +25,11 @@ Until 1.0 the C++ API may change between minor versions.
 - Library: `HostFilter::observe()` compiles again in code written for 0.5.0,
   where it returned `HostFaults`. Its `HostFaultReport` now derives from
   `HostFaults`, counting every fault the call returns (current plus earlier),
-  so code written for 0.5.1 to 0.5.3 compiles too. Found in jrp's review of
-  0.5.2.
+  and a constructor takes `current`, `earlier` and `held` in that order, so
+  code written for 0.5.1 to 0.5.3 compiles too, braces included. Two uses
+  still do not: a pointer to `observe` as a member function returning
+  `HostFaults`, and designated initialisers of `HostFaultReport`. Found in
+  jrp's review of 0.5.2.
 - Plug-ins: after a rejected replacement, a fault in the audio was logged
   saying that the status shows Fault, while the status rightly kept showing
   Load failed. The log now says that Load failed shows instead. Found in

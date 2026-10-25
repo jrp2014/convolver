@@ -62,6 +62,11 @@ class ResolveError(ValueError):
     """One or more dependencies could not be resolved; the message lists each and why."""
 
 
+class CachedArchiveChanged(RuntimeError):
+    """A cached archive no longer has the checksum of its first download. Never
+    worked around by another URL: it is reported, so the cache can be checked."""
+
+
 def download(url, target, attempts=3):
     """Downloads url to target, retrying a flaky host twice (after 5 s, then 10 s)."""
     request = urllib.request.Request(url, headers={'User-Agent': 'convolver-release-scripts'})
@@ -100,7 +105,7 @@ def fetch_archive(url, cache, name, fetcher=download):
         if first:
             actual = sha256(path)
             if actual != first:
-                raise RuntimeError(f'the cached {path} has changed since it was downloaded from {url}: its '
+                raise CachedArchiveChanged(f'the cached {path} has changed since it was downloaded from {url}: its '
                                    f'SHA-256 is now {actual}, not {first}. Delete it, with {origin.name} and '
                                    f'{checksum.name}, to download it again')
             return path
@@ -405,6 +410,8 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
             continue
         try:
             path = fetch_archive(url, cache, archive_name, fetcher)
+        except CachedArchiveChanged as error:
+            raise ResolveError(f'{name} {version}: {error}') from error
         except (OSError, RuntimeError) as error:
             failures.append(str(error))
             continue

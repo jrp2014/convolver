@@ -992,6 +992,18 @@ void processing_faults() {
     const HostFaults as_in_0_5_0 = g.observe(every);
     require(as_in_0_5_0.rejected_input == 3 && as_in_0_5_0.total() == 7,
             "observe() as 0.5.0 returned it");
+    auto assigned = g.observe(HostFaults{});
+    assigned = every; // 0.5.0: a HostFaults result could be assigned.
+    require(assigned.total() == 7 && assigned.current.total() == 7, "HostFaults assigned");
+    // And 0.5.1's aggregate order still holds for braces.
+    HostFaults one;
+    one.invalid_call = 1;
+    const HostFaultReport braced{every, one};
+    require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 &&
+                braced.total() == 8 && !braced.held,
+            "HostFaultReport{current, earlier}");
+    require(fault_message(HostFaultReport{one}).find("host's developers") != std::string::npos,
+            "HostFaultReport{current}");
     require(host_status(g, layout).text.find("the filter failed while playing") !=
                 std::string::npos,
             "most serious fault first");

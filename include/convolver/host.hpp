@@ -149,11 +149,16 @@ std::string fault_message(const HostFaults&);
 // not show `current` either.
 // The HostFaults it derives from count every fault that no earlier call
 // returned (current plus earlier), which is what observe() returned in 0.5.0,
-// so code that takes the result as HostFaults still compiles and gets the
-// same counts. Not an aggregate, so that brace-initialising it from two
-// HostFaults cannot silently fill the base instead of `current`.
+// so code that takes the result as HostFaults (or assigns HostFaults to it)
+// still compiles and gets the same counts. The constructor fills them; they
+// do not follow later changes to `current` or `earlier`. It takes `current`,
+// `earlier` and `held` in the order of the 0.5.1 aggregate, so brace
+// initialisation from two HostFaults keeps that meaning and cannot fill the
+// base instead. Designated initialisers no longer work.
 struct HostFaultReport : HostFaults {
     HostFaultReport() = default;
+    HostFaultReport(const HostFaults& current_faults, const HostFaults& earlier_faults = {},
+                    bool load_failure_shown = false) noexcept;
     HostFaults current, earlier;
     bool held = false;
     bool any() const noexcept {
