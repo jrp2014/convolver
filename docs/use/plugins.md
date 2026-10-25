@@ -17,7 +17,9 @@ does not fit. Installing is in [install](install.md); making presets is in
   LV2 also by choosing a file), and the host saves the filter inside your
   project. A read-only Status parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
-- Latency is always 256 samples, and the host makes up for it.
+- Latency is 256 samples, and the host makes up for it. The Audio Unit has
+  [settings](#settings) for the gain, the wet/dry mix and the latency; the
+  VST3 and LV2 plug-ins do not have them yet.
 - A filter that does not fit the host's sample rate or channel counts never
   lets unfiltered audio through: a first filter that does not fit plays
   silence, and one that replaces a working filter is refused, leaving the
@@ -27,7 +29,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 [loading a filter](#loading-a-filter) ·
 [when a filter does not fit](#when-a-filter-does-not-fit) ·
 [status and the Convolver log](#status-and-the-convolver-log) ·
-[latency and tail](#latency-and-tail) · [bypass](#bypass) ·
+[settings](#settings) · [latency and tail](#latency-and-tail) · [bypass](#bypass) ·
 [replacing a filter](#replacing-a-filter) · [audio](#audio) ·
 [LV2 channel layouts](#lv2-channel-layouts) · [LV2 ports](#lv2-ports) ·
 [LV2 filter files](#lv2-filter-files) ·
@@ -44,6 +46,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Choose a `.cfg` or IR file directly | No | No | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
+| [Settings](#settings): gain, mix, latency | Not yet | Yes | Not yet |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -208,11 +211,44 @@ sends the log there instead; on macOS and Linux, setting it empty turns the file
 still points to the log; on macOS the lines are in the system log). LV2 has
 no file of its own: it writes to the host's log.
 
+## Settings
+
+The Audio Unit has four settings, which hosts show with its other parameters
+(in GarageBand and Logic, in the plug-in window's generic controls). Their
+defaults play exactly as Convolver did before the settings existed.
+
+| Setting | Values | Default | What it does |
+| --- | --- | --- | --- |
+| **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. Used when Gain mode is Set. |
+| **Gain mode** | Set, Estimate, No clipping | Set | **Set** uses Gain. **Estimate** works out, for each filter loaded, the gain that brings white noise through the filter to full scale (the old "optimum attenuation", the command line's `--gain-db auto`); music usually peaks lower. **No clipping** uses the filter's worst case, which can never clip but is often very cautious (`--gain-db no-clip`). The computed gain is applied as it is, even outside Gain's range. |
+| **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. |
+| **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 | How much Convolver delays the audio. Smaller values mean less delay and more processor load. |
+
+- Changes to Gain and Mix fade over 64 samples, so automating them does not
+  click. Gain mode and Latency are not meant for automation.
+- Choosing **Estimate** works out the estimate there and then, and again for
+  each filter loaded. It filters at least ten filter lengths of noise, so a
+  long filter takes noticeably longer to load in that mode (a fraction of a
+  second for a long 8-channel filter). If the estimate cannot be worked out,
+  the log says why and the filter plays at the Gain value.
+- A new **Latency** takes effect the next time the host starts the plug-in:
+  when it reopens the project, changes the sample rate, or otherwise
+  reinitializes it. Until then the plug-in keeps the latency it started with,
+  and the [Convolver log](#status-and-the-convolver-log) says so. The log
+  lists the settings each time the plug-in starts.
+- The host saves the settings in the project and in presets it saves itself.
+  A preset made by `convolver-preset` holds the filter only, so loading it
+  leaves the settings as they are.
+- **Settings and other formats.** The VST3 and LV2 plug-ins have no settings
+  yet, so a filter moved to them from an Audio Unit project or preset plays
+  at 0 dB, fully wet, with 256 samples of latency. The same project can
+  therefore sound different in another format.
+
 ## Latency and tail
 
-Latency is always 256 samples, whatever the host's buffer size, and the
+Latency is 256 samples by default, whatever the host's buffer size, and the
 plug-in reports it so the host can line the audio up. At 48 kHz that is about
-5.3 ms.
+5.3 ms. The Audio Unit's [Latency setting](#settings) changes it.
 
 The tail is the time the filter keeps sounding after the input stops: its
 longest response plus any delays. VST3 and the Audio Unit report it (the Audio
@@ -227,7 +263,7 @@ of a region may cut it off: render with a little silence after the audio.
 ## Bypass
 
 The host's bypass switch fades over 64 samples to the input, delayed by the
-same 256 samples so nothing jumps in time, and back. The filter keeps running
+same latency so nothing jumps in time, and back. The filter keeps running
 underneath, so switching back loses nothing.
 
 With different input and output counts, bypass fades every output to silence

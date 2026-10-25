@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/engine.hpp"
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -301,6 +302,52 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& host,
                            bool log_written = true);
 
+// PLUG-10: the settings every adapter offers as host parameters
+// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
+// it was before the settings existed.
+enum class GainMode {
+    set = 0,         // HostSettings::gain_db.
+    estimate = 1,    // estimate_attenuation()'s noise_attenuation_db for the filter.
+    no_clipping = 2, // The worst-case bound (worst_case_peak()): never clips.
+};
+inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
+// The latencies adapters offer, in frames: HostProcessor's block size.
+inline constexpr std::array<std::size_t, 7> host_block_sizes{64, 128, 256, 512, 1024, 2048, 4096};
+inline constexpr std::size_t default_host_block = 256;
+struct HostSettings {
+    // Set mode's output gain in decibels, within min_gain_db and max_gain_db.
+    double gain_db = 0;
+    GainMode gain_mode = GainMode::set;
+    // The share of the filtered signal, 0 to 1; the rest is the input delayed
+    // by the latency. Ignored (always 1) when input and output counts differ,
+    // as there is no dry signal (the bypass rule).
+    double mix = 1;
+    // The block size, and so the latency, in frames: one of host_block_sizes.
+    std::size_t block = default_host_block;
+    bool operator==(const HostSettings&) const = default;
+};
+// gain_db clamped to its range (0 if not a number), mix to 0..1 (1 if not a
+// number), and a block size that is not one of host_block_sizes replaced by
+// the default.
+HostSettings checked_settings(HostSettings);
+// The settings in words for the log, such as "latency 256 frames (5.3 ms at
+// 48000 Hz), gain 0 dB (Set), mix 100% wet". `equal_counts` false says the
+// mix does not apply.
+std::string settings_words(const HostSettings&, int sample_rate, bool equal_counts);
+
+// PLUG-10: what HostProcessor::meters() reads. The audio thread updates them
+// with relaxed atomic stores, without locking or allocating; they are not
+// saved.
+struct HostMeters {
+    float peak = 0;            // Largest |output sample| since the last reset.
+    std::uint64_t clipped = 0; // Output samples above full scale (|x| > 1).
+    std::uint64_t calls = 0;   // process() calls timed.
+    // The time process() took as a share of the audio it produced
+    // (frames / sample rate): the 99th percentile, to the 5% step above it
+    // (2 or more means twice the callback period or longer), and the largest.
+    double load_p99 = 0, load_max = 0;
+};
+
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
 // Control: construction, replace, prepare, publish, collect, destruction;
@@ -310,6 +357,9 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
+    // PLUG-10: with the settings (gain, mode, mix and block size) applied from
+    // the first frame. Computes the noise estimate when the mode is Estimate.
+    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -344,6 +394,30 @@ class HostProcessor {
     void collect() noexcept; // Retire old FFT plans off-thread.
     void reset() noexcept;
     void set_bypass(bool) noexcept;
+    // PLUG-10, audio thread, like set_bypass: Set mode's gain in decibels
+    // (clamped to min_gain_db..max_gain_db) and the mix (0 to 1, ignored for
+    // unequal counts). Each change ramps over 64 frames.
+    void set_gain_db(double) noexcept;
+    void set_mix(double) noexcept;
+    // PLUG-10, control side, serialized with replace(): the gain mode. Every
+    // filter prepared from now on carries the gains its mode needs: the
+    // worst-case bound always (cheap), the noise estimate only in Estimate
+    // mode, as it convolves ten filter lengths of noise. Switching to Estimate
+    // while a filter plays computes that filter's estimate here first, from
+    // `playing` (what was last handed to the constructor, replace() or
+    // publish(); nullptr when it was identity or silence, whose gain is 0 dB),
+    // and hands it to the audio thread, which ramps to it. Throws
+    // std::overflow_error when the estimate cannot be computed
+    // (estimate_attenuation()); the mode is still set, and the filter then
+    // plays at the Set gain. A filter prepared in Estimate mode whose estimate
+    // cannot be computed is refused by prepare() and replace().
+    void set_gain_mode(GainMode, const Configuration* playing = nullptr);
+    GainMode gain_mode() const noexcept;
+    // PLUG-10, any thread: the output meters and callback load since
+    // construction or the last reset_meters(), which the audio thread carries
+    // out at its next process() call.
+    HostMeters meters() const noexcept;
+    void reset_meters() noexcept;
     // Audio thread: the current filter ramps to silence over 64 frames and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published

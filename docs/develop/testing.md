@@ -162,6 +162,16 @@ misses all of that.
   plays is what is saved. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
+- `native.host_settings`: the [settings](plugin-contract.md#settings)
+  (PLUG-10). Default settings give output bit-identical to a processor built
+  without them, through bypass and a replacement; gain and mix from the first
+  frame against the oracle at blocks of 64 to 4096 frames and callbacks of 1
+  to 4096, printing the worst error relative to the output peak; the 64-frame
+  ramps sample by sample; clamping; Estimate and No clipping against
+  `estimate_attenuation()`, after a mode switch, a replacement and a
+  Set-mode load, and when the estimate cannot be computed; the mix with
+  unequal counts; the meters and their reset; and the log's settings words.
+  The audio thread is checked for allocation throughout.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
@@ -513,8 +523,12 @@ Three CTest tests run when the adapter is built (label `au`):
   `ClassInfo` keys, foreign, damaged, newer and failed presets with the failure
   record each leaves (read through a custom property, 64800, that exists for
   the tests only), an initialization that cannot build its processor, bypass
-  switched from another thread while rendering, the output silence flag, and no
-  C++ allocation while rendering.
+  switched from another thread while rendering, the output silence flag, no
+  C++ allocation while rendering, and the settings (AU-7): parameter info,
+  defaults and clamping, Gain, Mix, No clipping and Estimate in the audio,
+  Latency before and after initialization, and saving and restoring them
+  with `ClassInfo`, including a preset without settings, malformed parameter
+  data and a rejected preset.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.

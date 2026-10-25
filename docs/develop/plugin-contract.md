@@ -24,6 +24,8 @@ and are maintained here.
   log, LV2's status port and, later, a status display in the other formats.
 - Bypass ramps over 64 samples to the input delayed by the latency, or to
   silence when the counts differ.
+- Gain, its mode, mix and latency are host parameters whose defaults keep
+  the sound unchanged ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
   prepared elsewhere and handed over.
 
@@ -37,7 +39,7 @@ optimization in every adapter.
 Contents: [loading and failure](#loading-and-failure) ·
 [failure reasons](#failure-reasons) ·
 [initial restoration and live replacement](#initial-restoration-and-live-replacement) ·
-[bypass](#bypass) · [channel layouts](#channel-layouts) ·
+[bypass](#bypass) · [settings](#settings) · [channel layouts](#channel-layouts) ·
 [replacement and threads](#replacement-and-threads) · [host state](#host-state) ·
 [preset files](#preset-files) · [format notes](#format-notes)
 
@@ -270,6 +272,81 @@ Audio Units (`kAudioUnitProperty_BypassEffect`) the host saves and restores
 bypass itself, so those adapters do not record it and ignore the flag in a
 state from another format.
 
+## Settings
+
+PLUG-10, from the [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings),
+whose choices jrp made on 24 and 25 October 2026
+([decisions](../project/decisions.md#identities-and-file-formats)). Every
+adapter offers the same settings as host parameters, so they work in generic
+host controls, automation and host presets without a window. The defaults
+(gain 0 dB in Set mode, mix 100%, latency 256 frames) leave every output
+sample exactly as it was before the settings existed, which
+`native.host_settings` checks bit for bit.
+
+- **The shared code.** `HostSettings`, `GainMode`, `checked_settings()` and
+  `settings_words()` in [`host.hpp`](../../include/convolver/host.hpp).
+  `HostProcessor` takes the settings at construction (the block size is
+  fixed for its life); `set_gain_db()` and `set_mix()` are audio-thread calls
+  like `set_bypass()`, and each change ramps linearly over 64 frames;
+  `set_gain_mode()` is a control call.
+- **Gain** applies to the filtered signal, after convolution and before the
+  mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
+  in decibels (jrp). Set mode uses it; **Estimate** and **No clipping** use
+  the filter's `estimate_attenuation()` noise peak and its `worst_case_peak()`
+  bound, as the CLI's `--gain-db auto` and `no-clip` do, applied as they are,
+  never clamped to Gain's range and never written back to the parameter. Each
+  prepared filter carries its own computed gains, so a replacement crossfades
+  from the old filter at its gain to the new one at its own. The bound is a
+  sum of absolute taps and is computed for every filter. The noise estimate
+  convolves at least ten filter lengths of noise (35 to 650 ms in a release
+  build on x86-64 for 2 to 8 channels of 4,096 to 262,144 taps, measured on
+  25 October 2026), so it is computed only in Estimate mode: when a filter is
+  prepared in that mode, and, on a switch to Estimate, for the filter that
+  plays, on the control side, before the audio thread ramps to it. A filter
+  whose estimate cannot be computed (`std::overflow_error`) is refused when
+  prepared in Estimate mode; after a switch, it plays at the Set gain and the
+  adapter logs why.
+- **Mix** is the filtered share, 0 to 1, of the output before bypass; the
+  rest is the latency-aligned dry signal that bypass uses. With unequal input
+  and output counts there is no dry signal ([bypass](#bypass)), so the mix is
+  always 1.
+- **Latency** is `HostProcessor`'s block size, one of `host_block_sizes`
+  (64 to 4096 frames). A new value builds a new processor on the control
+  side, never on the audio thread, and the host is told the new latency.
+- **Meters** (`HostProcessor::meters()`): the output peak, the count of
+  output samples above full scale, and the time each `process()` call took as
+  a share of the audio it produced (the 99th percentile in 5% steps, and the
+  largest), written by the audio thread with relaxed atomic stores and read
+  anywhere; `reset_meters()` asks the audio thread to clear them. Not saved.
+- **Saved form:** each format's own way. The Audio Unit's parameters are
+  saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
+  in host state version 3, written only when a setting differs from its
+  default (VST3-4); LV2 will add control ports (LV2-7). A preset from
+  `convolver-preset` carries the filter only, and a state moved between
+  formats carries the filter but not the settings, as
+  [how the plug-ins behave](../use/plugins.md#settings) tells users.
+- **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Gain mode
+  (1002, indexed), Mix (1003, percent) and Latency (1004, indexed by
+  `host_block_sizes`), listed before Status; Gain mode and Latency carry
+  `kAudioUnitParameterFlag_NonRealTime`. Values a host writes are stored
+  within their ranges. Render reads Gain and Mix each call and hands them to
+  the processor. A new Gain mode set off the render thread is applied at once
+  under the control lock (computing the estimate as above); one set on the
+  render thread waits for the next control call (save, restore, a request for
+  the Status text). A new Latency takes effect at the next `Initialize`,
+  which builds the processor; uninitialized, the latency reported is the one
+  chosen, with a property-change notification, and initialized, the running
+  processor's, with a log line saying when the new value applies. Rebuilding
+  the processor while the unit renders is left to the window (AU-6), which
+  sets it from the main thread. `RestoreState` reads the parameter values
+  from "data" itself, with bounds checks (AUBase's reader has none), before
+  the filter is loaded so that it is prepared in the restored Gain mode; it
+  ignores Status and unknown IDs, keeps settings the state does not hold
+  (a `convolver-preset` preset has an empty "data"), keeps all of them when
+  "data" is malformed (and logs it), and puts the earlier values back when
+  the filter is rejected. The start line in the log lists the settings
+  (`started_line()` with `settings_words()`).
+
 ## Channel layouts
 
 What a channel means (discrete or a named speaker layout), how presets with no
@@ -283,7 +360,9 @@ counts, and a recorded output speaker mask only ever gives a notice.
 The host owns the audio device, clock and scheduling. Each callback supplies
 the next section of one continuous stream; convolution history persists
 between callbacks, and processing produces one output frame per input frame
-after the reported latency (256 samples, independent of the callback length).
+after the reported latency (the block size, 256 samples unless the
+[Latency setting](#settings) chooses another, independent of the callback
+length).
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before
@@ -358,9 +437,9 @@ loading. These names are permanent, like the
 - **AU (`.aupreset`):** an XML property list, the dictionary that Audio Units
   save as `ClassInfo`. It has Apple's standard keys (`version` 0, `type`,
   `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,
-  `name`) and an empty `data`, since the AU has no parameters, so the
-  AudioUnitSDK's own checks accept it. The encoded state is under the key
-  `convolver-state`.
+  `name`) and an empty `data`, so the AudioUnitSDK's own checks accept it
+  and the unit's [settings](#settings) keep their values when it is loaded.
+  The encoded state is under the key `convolver-state`.
 - **LV2 (`NAME.preset.lv2/`):** a preset bundle with `manifest.ttl` and
   `preset.ttl`. The preset is a `pset:Preset` that applies to the plug-in URI
   for the filter's channel counts, with one state property, the LV2 base URI
@@ -405,7 +484,8 @@ How each adapter meets the contract where its format differs:
   tail plus the 256-sample latency, measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
-  change notification when either changes; the tail stays at the longest
+  change notification when either changes (the latency follows the
+  [Latency setting](#settings)); the tail stays at the longest
   filter used until the host reinitializes the unit. Bypass is
   `kAudioUnitProperty_BypassEffect` driving `HostProcessor::set_bypass`, not
   `AUEffectBase`'s pass-through, and is saved in `ClassInfo`. The output is

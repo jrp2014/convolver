@@ -10,6 +10,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Audio Unit: Gain (−100 to +24 dB), Gain mode (Set, Estimate, No clipping),
+  Mix (0 to 100% wet) and Latency (64 to 4096 frames) parameters, saved with
+  the project. Their defaults (0 dB, Set, 100%, 256 frames) sound exactly as
+  before. Estimate and No clipping are the command line's `--gain-db auto`
+  and `no-clip`, worked out for each filter loaded.
+
 ### Changed
 
 - CLI: integer output below 20 significant bits (pcm8, pcm16, `--valid-bits`

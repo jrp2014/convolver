@@ -56,6 +56,8 @@ std::string loaded_line(const HostFilter&, bool host_known);
 std::string rejected_line(const HostFilter&);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
-// notice in full).
-std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames);
+// notice in full), and the settings in use when the adapter has them
+// (settings_words(); PLUG-10).
+std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
+                         const HostSettings* settings = nullptr);
 } // namespace convolver
