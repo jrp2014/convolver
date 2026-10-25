@@ -13,10 +13,13 @@ does not fit. Installing is in [install](install.md); making presets is in
   below lists the differences.
 - One input and one output of 1 to 8 channels each; the counts may differ,
   for example 2 in and 6 out for a crossover.
-- There is no window of its own. You choose a filter by loading a preset (in
-  LV2 also by choosing a file), and the host saves the filter inside your
-  project. A read-only Status parameter says what is playing, and the
+- You choose a filter by loading a preset (in LV2 also by choosing a file),
+  and the host saves the filter inside your project. A read-only Status
+  parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
+  The Audio Unit also has a small [window](#the-audio-units-window) that
+  shows the status, why it is silent and what to change, with Copy
+  diagnostics and Show log; the VST3 and LV2 plug-ins have no window yet.
 - Latency is always 256 samples, and the host makes up for it. The Audio
   Unit has [settings](#settings) for the gain and the wet/dry mix; the VST3
   and LV2 plug-ins do not have them yet.
@@ -133,8 +136,9 @@ How each format reports a refusal:
 
 ## Status and the Convolver log
 
-Convolver has no window of its own, so the VST3 and the Audio Unit say what
-they are doing in two places.
+The VST3 and the Audio Unit say what they are doing in two places, the Status
+parameter and the Convolver log; the Audio Unit also shows both in
+[its window](#the-audio-units-window).
 
 **The Status parameter** is a read-only parameter that hosts can list with the
 plug-in's controls, for example in their generic plug-in window or parameter
@@ -218,6 +222,40 @@ started. Setting the environment variable `CONVOLVER_LOG` to a file path
 sends the log there instead; on macOS and Linux, setting it empty turns the file off (the Status text
 still points to the log; on macOS the lines are in the system log). LV2 has
 no file of its own: it writes to the host's log.
+
+### The Audio Unit's window
+
+When you open the Audio Unit in a host (in GarageBand, the plug-in's button
+in the track's Plug-ins area), it shows a window of its own. If the host
+shows its generic sliders instead, choose the plug-in's own view in the
+plug-in window, where the host offers the choice. The window has:
+
+- **A title line** with the Convolver version, the instance (`Audio Unit #2`,
+  as in the log) and the host program.
+- **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
+  the same as the Status parameter, written out and coloured.
+- **What plays, why, and what to change**, in full, as the log explains it.
+  For example, a stereo preset on a GarageBand mono track reads: "The saved
+  filter does not suit the host, so Convolver plays silence until it does.
+  The filter has 2 inputs and 2 outputs, but the plug-in is set up with 1
+  input and 1 output. Give the plug-in 2 inputs and 2 outputs in the host's
+  track or routing settings, or load a filter made for 1 input and 1 output.
+  Hosts run an effect with one channel on a mono track (GarageBand does):
+  put Convolver on a stereo track instead."
+- **Details** below it: the host's rate, channels and block size; the filter
+  (rate, channels, paths, its longest response, and the request number the
+  log uses); Gain and Mix; latency and tail; the software (version, FFT
+  library, CPU kernels, the Audio Unit SDK); and where the log is.
+- **Copy diagnostics** puts all of this, with this instance's recent lines
+  from the Convolver log, on the clipboard as plain text, ready to paste into
+  a report.
+- **Show log** selects the log file in the Finder (in a sandboxed host such
+  as GarageBand, the copy inside the host's container).
+
+The text can be selected and copied, and VoiceOver reads the status and the
+text. The window updates while it is open. It does not yet load filters or
+change settings: load presets from the host's preset menu, and use the
+host's generic controls for Gain and Mix.
 
 ## Settings
 

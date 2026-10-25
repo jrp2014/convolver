@@ -178,6 +178,24 @@ format.
   are ignored, and the value `AUBase::SaveState` writes with the other
   parameters is ignored on restore. When the log file cannot be written
   (`host_log_written()` is false), the text says so instead of pointing to it.
+- **The editor report** (PLUG-9, [`host_report.hpp`](../../portable/host_report.hpp)):
+  for a window and its Copy diagnostics, `host_report()` gathers the status
+  and its line (`host_status()`), the full explanation of what plays, why
+  and what to change (the failure's message, or `playing_words()`, the same
+  words the log's start line uses, with any fault explanation), and labelled
+  details: host, filter, settings, latency and tail, `execution_line()` and
+  the log. `report_fields()` gives it as named text values for a format's
+  transport, `report_text()` as plain text, and `diagnostics_text()` adds
+  this instance's recent log lines (`host_log_recent()`, at most the last
+  64 KiB of the file). Built on the control side; reading the log happens
+  only when diagnostics are asked for. Audio Unit (AU-6): global custom
+  properties 64000 (the fields as a `CFDictionary` of `CFString`s) and 64001
+  (the diagnostics text as a `CFString`), read-only, values released by the
+  caller, with a property-change notification for 64000 wherever the Status
+  parameter's event is sent. They are internal between the unit and its own
+  window, which ship together, so they are not permanent identities.
+  `kAudioUnitProperty_CocoaUI` names the window's factory class in the
+  component bundle; the factory and view class names carry the version.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size

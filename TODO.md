@@ -275,6 +275,11 @@ Shared work, done once for all three formats:
   state byte-identical to `convolver-preset`'s. Table-driven tests per
   failure kind in `native.host`; the contract change in its own pull request.
   Needed for the first preview.
+  Progress (25 October 2026, PR #84): the report, `report_fields()`,
+  `report_text()` and Copy diagnostics' `diagnostics_text()` in
+  `portable/host_report.hpp`, checked per state in `native.host_report`, for
+  the Audio Unit's first window. Remaining: the file-to-state load step and
+  the settings' computed gains and meters as PLUG-10 adds them.
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -377,6 +382,14 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   shows the Status row with no value, so a stereo preset on a mono track
   played silence with no visible reason. The window must show why the
   plug-in is silent.
+  Progress (25 October 2026, PR #84): the smallest useful window, at jrp's
+  request in his review of 0.5.5: report and Copy diagnostics properties
+  (64000, 64001) with change notifications, and an AppKit view (status, the
+  full reason and what to change, details, Copy diagnostics, Show log) named
+  by `kAudioUnitProperty_CocoaUI`, with versioned class names; `au.editor`
+  and `auval` check it. Remaining: the load request property and choosing a
+  file, the settings in the window, the view shared with VST3-11, and the
+  GarageBand smoke steps (including a `.cfg` inside its sandbox).
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with

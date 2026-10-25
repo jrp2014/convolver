@@ -205,8 +205,8 @@ void window() {
     // Copy diagnostics, to a pasteboard of the test's own.
     NSPasteboard* board = [NSPasteboard pasteboardWithUniqueName];
     view.pasteboard = board;
-    require(view.copyButton.enabled, "Copy diagnostics disabled");
-    [view.copyButton performClick:nil];
+    require(view.diagnosticsButton.enabled, "Copy diagnostics disabled");
+    [view.diagnosticsButton performClick:nil];
     NSString* pasted = [board stringForType:NSPasteboardTypeString];
     require(contains(pasted, "Convolver diagnostics") &&
                 contains(pasted, "put Convolver on a stereo track") &&
@@ -217,7 +217,7 @@ void window() {
 
     // Accessibility: named controls with their roles (VoiceOver reads them).
     require([view.statusField.accessibilityLabel isEqualToString:@"Status"], "status label");
-    require([view.copyButton.accessibilityRole isEqualToString:NSAccessibilityButtonRole] &&
+    require([view.diagnosticsButton.accessibilityRole isEqualToString:NSAccessibilityButtonRole] &&
                 [view.logButton.accessibilityRole isEqualToString:NSAccessibilityButtonRole],
             "button roles");
     require(view.explanationView.accessibilityLabel.length > 0 && !view.explanationView.editable &&

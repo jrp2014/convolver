@@ -241,9 +241,14 @@ void Effect::notify_status() noexcept {
 
 HostReport Effect::report_locked(std::string& faults) {
     // As for the Status text: faults Render signalled are explained here,
-    // and Gain or Mix may have changed on another thread.
+    // and Gain or Mix may have changed on another thread. Only an update
+    // that has observed new faults rewrites the Status value, which Render
+    // may have just set to Fault (refresh_status_text).
     faults = observe_faults();
-    update_status();
+    if (faults.empty())
+        refresh_status_text();
+    else
+        update_status();
     HostReportFacts facts;
     facts.format = tag_;
     facts.host = known_layout();

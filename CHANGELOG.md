@@ -10,6 +10,21 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Audio Unit: a small window of its own (AU-6, first version), so a user can
+  see why the plug-in is silent or refused a preset without finding the log.
+  It shows the status, what plays, why and what to change in full (a stereo
+  preset on a mono track now also says to use a stereo track), the host,
+  filter, settings and software details, and has Copy diagnostics (the report
+  and this instance's recent log lines, as text) and Show log (the log file
+  in the Finder). It does not load filters or change settings yet. No sound
+  changes.
+- Library (internal to the adapters): the editor report (PLUG-9) in
+  `portable/host_report.hpp`, built from the Status line and the log's
+  wording, and `playing_words()`, the part of the log's start line that says
+  what plays, which the report shares.
+
 ### Changed
 
 - The version is now 0.6.0, a deliberate minor step for the library changes

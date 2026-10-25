@@ -38,7 +38,7 @@ typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
 @property(readonly, nonatomic) NSTextField* titleField;
 @property(readonly, nonatomic) NSTextField* statusField;
 @property(readonly, nonatomic) NSTextView* explanationView;
-@property(readonly, nonatomic) NSButton* copyButton;
+@property(readonly, nonatomic) NSButton* diagnosticsButton;
 @property(readonly, nonatomic) NSButton* logButton;
 // Where Copy diagnostics puts its text: the general pasteboard, unless a test
 // gives another.

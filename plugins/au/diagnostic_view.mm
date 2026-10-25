@@ -90,14 +90,15 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     [self addSubview:scroll_];
 
     const CGFloat buttons = height - margin - button_height;
-    _copyButton = [NSButton buttonWithTitle:@"Copy diagnostics"
-                                     target:self
-                                     action:@selector(copyDiagnostics:)];
-    _copyButton.frame = NSMakeRect(margin, buttons, 160, button_height);
-    _copyButton.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
-    _copyButton.toolTip = @"Copies this report and Convolver's recent log lines, ready to paste "
-                          @"into a problem report.";
-    [self addSubview:_copyButton];
+    _diagnosticsButton = [NSButton buttonWithTitle:@"Copy diagnostics"
+                                            target:self
+                                            action:@selector(putDiagnosticsOnPasteboard:)];
+    _diagnosticsButton.frame = NSMakeRect(margin, buttons, 160, button_height);
+    _diagnosticsButton.autoresizingMask = NSViewMinYMargin | NSViewMaxXMargin;
+    _diagnosticsButton.toolTip =
+        @"Copies this report and Convolver's recent log lines, ready to paste "
+        @"into a problem report.";
+    [self addSubview:_diagnosticsButton];
 
     _logButton = [NSButton buttonWithTitle:@"Show log" target:self action:@selector(showLog:)];
     _logButton.frame = NSMakeRect(margin + 168, buttons, 120, button_height);
@@ -164,7 +165,7 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     _explanationView.textColor = [NSColor labelColor];
 }
 
-- (void)copyDiagnostics:(id)sender {
+- (void)putDiagnosticsOnPasteboard:(id)sender {
     NSString* text = diagnostics_ ? diagnostics_() : nil;
     if (!text) {
         NSBeep();
@@ -172,11 +173,11 @@ NSTextField* label(NSFont* font, NSColor* colour) {
     }
     [_pasteboard clearContents];
     [_pasteboard setString:text forType:NSPasteboardTypeString];
-    _copyButton.title = @"Copied";
+    _diagnosticsButton.title = @"Copied";
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(2 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     weakSelf.copyButton.title = @"Copy diagnostics";
+                     weakSelf.diagnosticsButton.title = @"Copy diagnostics";
                    });
 }
 

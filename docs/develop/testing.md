@@ -172,6 +172,14 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   ramps sample by sample; clamping; the mix with unequal counts; and the
   log's settings words.
   The audio thread is checked for allocation throughout.
+- `native.host_report`: the editor report (PLUG-9), one case per state a
+  window shows (no filter, before and after the host starts; Gain −20 dB
+  with no filter; a stereo filter on a mono track; a wrong rate; a failed
+  first load at Mix 50%; a refused replacement; playing; not checked yet; a
+  fault), checking the status, the explanation's wording and what it must
+  not say, the details, the fields and the plain text; and the Copy
+  diagnostics text, which keeps only this process's lines for the instance
+  from a log written by several.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
@@ -514,7 +522,7 @@ compatibility with every DAW; see [host testing](host-testing.md).
 
 ### Audio Unit tests
 
-Three CTest tests run when the adapter is built (label `au`):
+Four CTest tests run when the adapter is built (label `au`):
 
 - `au.harness`: the PLUG-2 comparisons through the Audio Unit API, with
   filters loaded as `.aupreset` dictionaries and latency and tail converted
@@ -530,6 +538,12 @@ Three CTest tests run when the adapter is built (label `au`):
   them with `ClassInfo`, including a preset without settings, malformed
   parameter data and a rejected preset, and the Status text and start line
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
+- `au.editor`: the window (AU-6). The report and diagnostics properties
+  (types, read-only, change notifications) for a stereo preset on a mono
+  track, then the view the factory makes, attached to an off-screen window:
+  its status and text before and after the fix, Copy diagnostics (onto a
+  private pasteboard) and the accessibility names and roles. The AU
+  workflow's `auval -strict` step also requires `Cocoa Views Available: 1`.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.
