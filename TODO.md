@@ -269,12 +269,12 @@ Shared work, done once for all three formats:
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
-  `estimate_attenuation()`, computed during preparation), an optional
+  `estimate_attenuation()`, computed during preparation), a
   latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
   default 256), with 64-sample ramps; output peak, clip count and callback
   load as audio-thread counters; host state version 3 written only for
-  non-default settings; `convolver-preset --gain-db`, `--block-size` (and
-  `--mix`). Defaults leave the sound unchanged. Oracle tests with the worst
+  non-default settings; `convolver-preset --gain-db`, `--block-size` and
+  `--mix`. Defaults leave the sound unchanged. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
 
 LV2 (Linux first; also PipeWire system audio):
@@ -466,8 +466,8 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   snapshots for host browsers (`smtg_target_add_plugin_snapshots`) need the
   window first.
 - [ ] **VST3-4 — Gain, mix and latency parameters.** PLUG-10's settings as
-  VST3 parameters ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)): Gain (ID 0
-  with the 2006 VST2 mapping, or a new ID: jrp decides), Gain mode, Mix
+  VST3 parameters ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)): Gain (ID 0,
+  VST2's attenuation ID, with a new range for jrp to approve), Gain mode, Mix
   tagged `kDryWetMix` through `IParameterFunctionName`, and Latency (not
   automatable), saved in the component state, with
   `restartComponent(kLatencyChanged)` when latency changes and tests in hosts

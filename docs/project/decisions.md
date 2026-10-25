@@ -78,6 +78,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 22 October 2026 | AU presets keep Apple's standard keys and hold the state under `convolver-state`; LV2 presets hold it as an `atom:Chunk` under the base URI plus `state` | [Adapter contract](../develop/plugin-contract.md#preset-files) |
 | 23 October 2026 | The LV2 filter parameter and the saved file path share one URI, the base URI plus `filter`, which PipeWire `filter-chain` `config` entries also use | [Plug-in identities](../develop/plugin-identities.md) |
 | 24 October 2026 | Plug-in parameter IDs: VST3 Bypass 1000 and Status 1001, Audio Unit Status 1001, leaving 0 to 2 free for the old VST2 parameters | [Plug-in identities](../develop/plugin-identities.md) |
+| 25 October 2026 | The editor's Gain setting uses VST3 parameter ID 0 (the old VST2 attenuation's ID) rather than a new ID, with a new range and mapping instead of the old -200 to +200 dB; the range is approved when PLUG-10 proposes it. The editor also keeps a wet/dry Mix (the old "Effect level") | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#settings) |
 
 ## Configuration and sound
 

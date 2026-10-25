@@ -27,7 +27,7 @@ whoever then implements one of its phases.
   dropped on the window or picked from recent files, and reloaded when the
   file changes), the level (gain, with the old "optimum attenuation" estimate
   and the no-clip bound as one-click modes), the latency (the modern form of
-  the old partitions setting) and, if wanted, the wet/dry mix of the old
+  the old partitions setting) and the wet/dry mix of the old
   wrapper's "Effect level". Explain: the Status and the full explanation of
   any failure or fault, what is loaded and how the host started it, an output
   peak and clip count, the processing load, and the Convolver log, with Copy
@@ -151,7 +151,7 @@ setting they offered, and what it becomes:
 | Filter description line (all) | "2 Paths (Stereo to Stereo direct) 44.1kHz 50544 taps Lag: 25272 taps 0.57s Estimated gain: 30dB Peak gain: 70dB" | **Kept:** the status banner and Details, with the gains shown under Level |
 | **Attenuation (dB)**, ±200 in the VST2 plug-in, ±1000 in the property pages (all) | Scaled the input by 10^(dB/20); negative to avoid clipping, positive to amplify | **Kept as Gain**, the same sign and meaning as the CLI's `--gain-db` |
 | **Calculate optimum attenuation** button (property pages); estimated and peak gain in the description (VST2) | Ran the noise estimate; the peak gain was a guaranteed but "extremely conservative" bound | **Modernised:** the Estimate and No clipping modes, recomputed automatically for each filter, seeded so the estimate is the same every time (the old one varied), plus an output peak and clip count so the user sees the result |
-| **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, if jrp wants it ([decisions](#decisions-for-jrp)), with the dry path latency-aligned |
+| **Effect level (%)** (wrapper, version 2.3) | Wet/dry mix | **Kept as Mix**, with the dry path latency-aligned |
 | **Partitions** / **No of partitions** (all) | Traded latency against processor load and cache use; 0 meant plain overlap-save | **Modernised as Latency:** the engine always uses uniform partitions of B frames, so the choice is B itself, shown as delay in milliseconds, with the measured load beside it instead of the old advice to time "Calculate optimum attenuation" or run `perftest` |
 | **Tuning rigour** (Estimate, Measure, Patient, Exhaustive, Take 1 minute; `wisdom.fftw`) (all) | FFTW planning effort | **Dropped:** the plug-ins use Ooura (Linux, Windows) or Accelerate (macOS), which need no planning; the window shows the FFT library and CPU kernels instead. The CLI keeps FFTW tuning |
 | **Dither** and **noise shaping** menus (property pages) | Applied only to 8- to 24-bit integer output | **Dropped from the plug-ins:** they exchange floating-point audio with the host, which does any quantizing. The CLI keeps both |
@@ -197,13 +197,15 @@ settings existed therefore keeps sounding the same.
   preparation, off the audio thread, so the new filter arrives with its gain
   and the crossfade covers the change. The estimate convolves at least ten
   filter lengths of noise; PERF-3 measures what that adds to a load.
-- Parameter values: VST2's parameter 0 was "Attenuation" in dB, mapped
-  linearly from 0 to 1 onto -200 to +200 dB (`float2dB` in
-  `historical/convolverVST/convolverVST.cpp`), which is the same meaning as
-  `--gain-db`. Using VST3 parameter ID 0 with exactly that mapping lets
-  VST3-6 carry old automation and VST2 project values over; the window's
-  typed field and fine slider make the coarse range usable. The alternative is
-  a new ID with a narrower range (for example -100 to +24 dB). jrp chooses.
+- Parameter: VST3 ID 0, the ID VST2's "Attenuation" had, rather than a new
+  one ([decisions](../decisions.md#identities-and-file-formats)), but not the
+  2006 mapping (0 to 1 linearly onto -200 to +200 dB, `float2dB` in
+  `historical/convolverVST/convolverVST.cpp`), which is too coarse for a
+  slider or automation. PLUG-10 proposes a range suited to room correction
+  and crossovers (for example -100 to +24 dB, linear in decibels) for jrp to
+  approve, because the mapping from the host's 0 to 1 value is saved in
+  projects and automation and cannot change afterwards. The meaning is
+  `--gain-db`'s, as the 2006 attenuation's was.
 
 **Output peak and clip count** (PLUG-10). The audio thread keeps, per
 instance, the largest output magnitude and the number of samples above full
@@ -212,7 +214,7 @@ allocating, like the fault counts. The control side reads them for the
 window, the report and Copy diagnostics. They are meters, not parameters, and
 are not saved.
 
-**Mix** (PLUG-10, optional). Wet/dry from 0 to 100%, applied after the gain
+**Mix** (PLUG-10). Wet/dry from 0 to 100%, applied after the gain
 with the latency-aligned dry signal that bypass already computes, ramped like
 bypass. With unequal input and output counts there is no dry signal (the
 [bypass rule](../../develop/plugin-contract.md#bypass)), so the mix stays at
@@ -254,8 +256,8 @@ bypass. With unequal input and output counts there is no dry signal (the
   hosts restore older sessions with the new ports at their defaults. To check
   with Ardour, Carla and PipeWire `filter-chain` in LV2-7.
 - `convolver-preset` gains `--gain-db` (with `auto` and `no-clip`) and
-  `--block-size`, the CLI's own options with the same meanings, and `--mix`
-  if Mix is chosen, so presets can carry the settings.
+  `--block-size`, the CLI's own options with the same meanings, and `--mix`,
+  so presets can carry the settings.
 
 **Filter conveniences** (VST3-11, AU-6; the shared parts in PLUG-9).
 
@@ -431,8 +433,8 @@ requires. The rules for the window:
   `notify()` loads it as `setState` does. Bypass (parameter 1000) and the
   settings are edited through the controller (`beginEdit`, `performEdit`,
   `endEdit`).
-- Parameters (VST3-4): Gain (ID 0 with the 2006 mapping, or a new ID), Gain
-  mode (a list: Set, Estimate, No clipping), Mix (`kDryWetMix`, if chosen)
+- Parameters (VST3-4): Gain (ID 0, with the range PLUG-10 proposes), Gain
+  mode (a list: Set, Estimate, No clipping), Mix (`kDryWetMix`)
   and Latency (a list, not automatable), with IDs from 1002 recorded in
   `plugins/identities.json` and frozen by `tests/identities_tests.py` like
   1000 and 1001.
@@ -469,7 +471,7 @@ requires. The rules for the window:
 - The Audio Unit's licence (GPL-3.0-or-later with the AudioUnitSDK's notices)
   covers the shared view code, which stays GPL-2.0-or-later.
 
-**LV2 (LV2-7 for the settings, LV2-6 for the window, optional).**
+**LV2 (LV2-7 for the settings; LV2-6 for the window, optional).**
 
 - Settings (LV2-7): control input ports for gain, gain mode, mix and latency,
   with port symbols jrp names, after the existing ports; changing latency
@@ -608,9 +610,12 @@ for the settings or the macOS window is jrp's call.
   6-channel filter can add a noticeable part of a second to each load; PERF-3
   measures it. If it is too slow, it can run after the load on a worker,
   with the gain ramped to the new value when it is ready.
-- **Gain and old projects.** With the gain at parameter 0, a VST3-6 migration
-  could carry an old project's attenuation over; with a new ID it cannot. No
-  promise is made either way until VST3-6 defines a requirement.
+- **Gain and old projects.** Gain shares VST2's parameter ID 0 but not its
+  mapping, so if VST3-6 ever declares the VST2 plug-in compatible, hosts that
+  map VST2 parameter *n* to VST3 ID *n* would apply an old normalized
+  attenuation to the new range and get a different gain. VST3-6 must then
+  convert the value itself (in its state converter) or leave parameter
+  values out of the migration.
 - **Key handling and focus** differ by host; the smoke tests check that typing
   in the window does not trigger the host's shortcuts and vice versa.
 
@@ -625,18 +630,16 @@ Recommended answers first. None of these blocks PLUG-9.
    shared editor": the shared part is our own report code
    ([decisions](../decisions.md#direction)). Linux stays open for VST3-13.
 2. **Settings:** Gain with the Set, Estimate and No clipping modes, Latency,
-   and meters, as host parameters in every format, defaults leaving today's
-   sound unchanged; tuning rigour and dither are not brought back. Mix
-   (the old "Effect level"): recommended, as it costs little once the
-   latency-aligned dry path exists, but it is the setting a room-correction
-   user needs least.
-3. **Gain parameter:** VST3 ID 0 with the 2006 mapping (-200 to +200 dB),
-   keeping VST3-6's migration possible (recommended), or a new ID with a
-   narrower range.
+   Mix (the old "Effect level"; decided) and meters, as host parameters in
+   every format, defaults leaving today's sound unchanged; tuning rigour and
+   dither are not brought back.
+3. **Gain parameter (decided):** VST3 ID 0, with no new ID, but a new
+   mapping rather than the 2006 one ([decisions](../decisions.md#identities-and-file-formats)).
+   Its range is jrp's to approve when PLUG-10 proposes it.
 4. **Saved form:** VST3 host state version 3, written only when a setting is
    not at its default; Audio Unit and LV2 settings saved by the host as
    parameters and ports; `convolver-preset` gains `--gain-db`,
-   `--block-size` (and `--mix`). New parameter IDs and LV2 port symbols are
+   `--block-size` and `--mix`. New parameter IDs and LV2 port symbols are
    jrp's to approve when PLUG-10 proposes them.
 5. **Conveniences:** drag and drop, recent files (a small per-user file beside
    the log) and reload when the file changes (recommended, all three).
