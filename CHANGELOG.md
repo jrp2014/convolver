@@ -38,9 +38,10 @@ Until 1.0 the C++ API may change between minor versions.
   AudioUnitSDK and their tests with ASan and UBSan, as it does the core;
   before, they were only linked with the sanitizer runtimes, so the adapter's
   parameter-state parser ran uninstrumented. The VST3 adapter's tests are
-  instrumented too, and a VST3 sanitizer build turns off the SDK tools that
-  load the bundle (`CONVOLVER_VST3_RUNTIME_VALIDATION`), which cannot load an
-  instrumented one: such a build used to stop at `moduleinfotool`. Found in
+  instrumented too, and a VST3 sanitizer build no longer runs the SDK tools
+  that load the bundle (as with `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF`),
+  since they cannot load an instrumented one: such a build used to stop at
+  `moduleinfotool`. Found in
   jrp's review of 0.5.5.
 
 ## [0.5.6] - 2026-10-25

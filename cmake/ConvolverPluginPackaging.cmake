@@ -89,7 +89,8 @@ if(CONVOLVER_BUILD_TESTS)
             "${PROJECT_SOURCE_DIR}/tests/release/${release_test}_tests.py")
     endforeach()
     set(validator_argument)
-    if(CONVOLVER_VST3_RUNTIME_VALIDATION)
+    # As plugins/vst3: the SDK's validator cannot load an instrumented bundle.
+    if(CONVOLVER_VST3_RUNTIME_VALIDATION AND NOT CONVOLVER_SANITIZERS)
         set(validator_argument --validator "$<TARGET_FILE:validator>")
     endif()
     add_test(NAME release.stage COMMAND "${Python3_EXECUTABLE}"

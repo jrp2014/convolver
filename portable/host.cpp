@@ -445,8 +445,11 @@ UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
     // As HostProcessor::process() mixes them: Gain on the filtered path (the
     // input itself, or silence), and the rest of Mix as the dry input.
     const double level = (identity ? mix * gain_from_db(db) : 0.0) + (1 - mix);
+    // One decimal, or two significant digits for a change too small to show
+    // in one ("-0.0087 dB", not "-0.0 dB").
+    const double db_out = 20 * std::log10(level);
     char text[48] = {};
-    std::snprintf(text, sizeof text, "%+.1f dB", 20 * std::log10(level));
+    std::snprintf(text, sizeof text, std::abs(db_out) < .05 ? "%+.2g dB" : "%+.1f dB", db_out);
     sound.level = text;
     return sound;
 }
@@ -514,7 +517,11 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     };
     if (const auto& f = filter.failure()) {
         line.status = HostStatus::load_failed;
-        line.text = (f->silent ? silent_words(true) : "Load failed, previous filter kept: ") +
+        // A filter the adapter could not start has no processor, so nothing
+        // plays, not even Mix's dry share (the independent review).
+        line.text = (!f->silent ? "Load failed, previous filter kept: "
+                     : f->kind == HostFailureKind::activation ? std::string("Silent: ")
+                                                              : silent_words(true)) +
                     short_reason(*f, host) + details;
     } else if (filter.faults().any() && !filter.failed()) {
         line.status = HostStatus::fault;

@@ -993,7 +993,8 @@ void processing_faults() {
     require(braced.current.total() == 7 && braced.earlier.invalid_call == 1 && !braced.held &&
                 braced.any(),
             "HostFaultReport{current, earlier}");
-    require(fault_message(HostFaultReport{one}).find("host's developers") != std::string::npos,
+    require(fault_message(HostFaultReport{one, {}, false}).find("host's developers") !=
+                std::string::npos,
             "HostFaultReport{current}");
     static_cast<void>(g.observe(every));
     require(host_status(g, layout).text.find("the filter failed while playing") !=

@@ -12,8 +12,9 @@ linked guides own the behaviour.
 (0.4.44). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
-and LV2 plug-ins are implemented and tested automatically; no named host has
-been tested and no independent user has followed the instructions. The next
+and LV2 plug-ins are implemented and tested automatically. In a named host
+only jrp's first GarageBand checks of the Audio Unit have run (not yet the
+full smoke test), and no independent user has followed the instructions. The next
 milestone is end-to-end testing: an independent user installing and using an
 exact preview package, cut from the 0.6 series. Four things
 [still block it](#what-still-blocks-the-first-preview): jrp's host smoke

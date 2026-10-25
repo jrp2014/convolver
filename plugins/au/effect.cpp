@@ -199,6 +199,19 @@ void Effect::update_status() noexcept {
     }
 }
 
+// The text only, for the Gain and Mix set now. It never writes the Status
+// value: Render may have written Fault there since the last update_status(),
+// and only an update that has observed the faults may replace it (the
+// independent review).
+void Effect::refresh_status_text() noexcept {
+    try {
+        auto line = host_status(filter_, known_layout(), status_log_written_, settings());
+        if (line.status == status_.status)
+            status_.text = std::move(line.text);
+    } catch (...) { // Out of memory: the previous text stays.
+    }
+}
+
 void Effect::notify_status() noexcept {
     {
         // The status was worked out before its lines were logged: if writing
@@ -216,7 +229,7 @@ void Effect::notify_status() noexcept {
 
 HostStatusLine Effect::status() {
     std::lock_guard lock(control_);
-    update_status(); // With the Gain and Mix set now, as hosts read it.
+    refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
     return status_;
 }
 
@@ -465,9 +478,10 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             // A host showing Fault, which Render wrote, asks for its text:
             // the faults are explained here, on the host's control thread.
             faults = observe_faults();
-            // Also after a change of Gain or Mix, which a host may make on
-            // any thread without telling the control side (PLUG-10).
-            update_status();
+            if (!faults.empty())
+                update_status();
+            else // Gain or Mix may have changed, on any thread (PLUG-10).
+                refresh_status_text();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
             const auto value = request->inValue ? *request->inValue : current;
             const auto index = static_cast<long>(std::lround(value));
