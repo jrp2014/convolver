@@ -228,7 +228,9 @@ defaults play exactly as Convolver did before the settings existed.
   A preset made by `convolver-preset` holds the filter only, so loading it
   leaves the settings as they are. The
   [Convolver log](#status-and-the-convolver-log) lists the settings each
-  time the plug-in starts.
+  time the plug-in starts, and again when it restores saved settings (some
+  hosts, GarageBand among them, start the plug-in before restoring the
+  project).
 - **Settings and other formats.** The VST3 and LV2 plug-ins have no settings
   yet, so a filter moved to them from an Audio Unit project or preset plays
   at 0 dB, fully wet. The same project can therefore sound different in

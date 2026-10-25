@@ -585,6 +585,37 @@ void render_requires_initialization() {
     require(render(unit, b, 64, false, silent) == kAudioUnitErr_Uninitialized,
             "rendered without initialization");
 }
+
+// While it exists, the Convolver log goes to a file of this process's own
+// (CTest's is shared with the other AU tests).
+class PrivateLog {
+  public:
+    explicit PrivateLog(const std::string& name)
+        : path_(std::filesystem::temp_directory_path() /
+                ("convolver-au-" + name + "-" + std::to_string(std::random_device{}()) + ".log")) {
+        if (const char* configured = std::getenv("CONVOLVER_LOG"))
+            earlier_ = configured;
+        setenv("CONVOLVER_LOG", path_.c_str(), 1);
+    }
+    PrivateLog(const PrivateLog&) = delete;
+    PrivateLog& operator=(const PrivateLog&) = delete;
+    ~PrivateLog() {
+        if (earlier_)
+            setenv("CONVOLVER_LOG", earlier_->c_str(), 1);
+        else
+            unsetenv("CONVOLVER_LOG");
+        std::error_code ignored;
+        std::filesystem::remove(path_, ignored);
+    }
+    std::string text() const {
+        std::ifstream in(path_, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    }
+
+  private:
+    std::filesystem::path path_;
+    std::optional<std::string> earlier_;
+};
 } // namespace
 
 // AU-7: PLUG-10's settings as global parameters. Ranges and defaults, what
@@ -654,11 +685,17 @@ void settings_parameters() {
     require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
 
     // Saved with ClassInfo, restored into a new instance before it is
-    // initialized, and applied when it is.
+    // initialized, and applied when it is. The log line for the restore lists
+    // them, since hosts may start the unit before restoring a project.
     const auto saved = unit.class_info_now();
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
-    check(copy.restore(saved), "restore with settings");
+    {
+        PrivateLog log("settings");
+        check(copy.restore(saved), "restore with settings");
+        require(log.text().find("Restored settings: gain -6 dB, mix 50% wet.") != std::string::npos,
+                "the restore's log line does not list the settings");
+    }
     require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
             "settings not restored");
     check(copy.initialize(), "copy initialization");

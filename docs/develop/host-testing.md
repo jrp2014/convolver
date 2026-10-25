@@ -350,8 +350,11 @@ except the Audio Unit build, which runs in a source checkout.
    where the window shows Gain and Mix and how it shows their values. Set
    Gain to −12 dB: the level drops smoothly, without a click. Set Mix to 0%:
    you hear the dry track; 50% mixes the two. Save, quit and reopen the
-   project: both values come back, and the log's `Started at ...` line ends
-   with `Settings: gain -12 dB, mix 50% wet.`
+   project: both values come back, and the log's `Loaded a filter ...` line
+   after the reopening ends with
+   `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the
+   plug-in with the defaults before restoring the project, so the
+   `Started at ...` line just before it shows 0 dB and 100%).
 
 ## Production qualification
 

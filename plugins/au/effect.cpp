@@ -745,6 +745,15 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
                 message = loaded_line(filter_, host.has_value());
+                // Hosts such as GarageBand restore a project after starting the
+                // unit, so its "Started at" line shows the settings before this.
+                if (saved && std::ranges::any_of(*saved, [](const auto& p) {
+                        return p.first == gain_parameter || p.first == mix_parameter;
+                    })) {
+                    const auto counts = host ? *host : layout();
+                    message += " Restored settings: " +
+                               settings_words(settings(), counts.inputs == counts.outputs) + ".";
+                }
             }
         } catch (...) { // Out of memory for the message: it is dropped.
         }

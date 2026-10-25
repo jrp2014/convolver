@@ -294,6 +294,14 @@ cmake --build build-au --parallel
 ctest --test-dir build-au --output-on-failure
 ```
 
+Keep the build directory out of folders that iCloud Drive syncs, such as
+`~/Documents` with *Desktop & Documents Folders* turned on: the file
+attributes iCloud adds make the build's `codesign` step fail, and macOS will
+not load an unsigned component (`auval` then reports `didn't find the
+component`). The tools and tests need libsndfile (`brew install libsndfile`);
+a CMake installed outside Homebrew, such as conda's, may also need
+`-DCMAKE_PREFIX_PATH="$(brew --prefix)"` to find it.
+
 The component is `build-au/plugins/au/Convolver.component`. It links no FFT
 library (Accelerate is part of macOS); libsndfile is used only by the tools and
 tests. The AU target builds as C++23 because AudioUnitSDK needs it; the core
