@@ -10,6 +10,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Example presets: `repeat`, half the input at once and a quarter of it a
+  quarter of a second later, so the filter is easy to hear (the `echo`
+  example's 5 ms tap only colours the tone). The package now has 18 examples.
+
 ### Fixed
 
 - Supporting-library downloads (CI-6): a cached archive is reused only while
@@ -42,9 +48,6 @@ Until 1.0 the C++ API may change between minor versions.
 - Audio Unit: Gain (−100 to +24 dB) and Mix (0 to 100% wet) parameters,
   saved with the project. Their defaults (0 dB, 100%) sound exactly as
   before.
-- Example presets: `repeat`, half the input at once and a quarter of it a
-  quarter of a second later, so the filter is easy to hear (the `echo`
-  example's 5 ms tap only colours the tone). The package now has 18 examples.
 
 ## [0.5.3] - 2026-10-25
 
