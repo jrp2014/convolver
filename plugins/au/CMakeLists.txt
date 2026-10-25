@@ -121,3 +121,7 @@ if(CONVOLVER_BUILD_TESTS)
             "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
     endif()
 endif()
+
+# The adapter, the SDK (only Convolver's targets link it) and the tests.
+convolver_sanitize(convolver_ausdk convolver_au_adapter convolver_au convolver_au_tests
+    convolver_au_harness convolver_au_lifecycle)

@@ -157,7 +157,14 @@ format.
   `HostFilter::failure()`, so a refused replacement shows Load failed while
   the previous filter plays, as LV2's status port does. Before the host's
   configuration is known it is Not checked yet and names the filter's rate
-  and channels. The parameter is not automatable and is not part of the host
+  and channels. Adapters with [settings](#settings) pass them, so that the
+  line says what is heard when no filter plays (jrp's review of 0.5.5): the
+  input at the level Gain and Mix give it when no filter is loaded, and only
+  the dry signal, not "Silent", after a failed load at a Mix below 1. Before
+  the host's configuration is known it cannot tell whether a dry signal will
+  play (equal counts only), so it says "no filter plays". The Audio Unit
+  recomputes the line each time a host reads it, as Gain and Mix may have
+  changed. The parameter is not automatable and is not part of the host
   state. VST3: parameter ID 1001 (Bypass is 1000), a list parameter with `kIsReadOnly`; the
   processor sends the line to the controller in a `ConvolverStatus` message
   after every load, activation, connection, `setupProcessing` and
@@ -174,7 +181,8 @@ format.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size
-  and what plays, with the failure or speaker notice in full) and rejection
+  and what plays, with the failure or speaker notice in full, and what Gain
+  and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the
   one it wrote last, as hosts restart plug-ins often. Adapters write the file

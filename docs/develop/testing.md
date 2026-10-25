@@ -52,7 +52,9 @@ top-level `CMakeLists.txt`. It adds the executable and the CTest entry, the
 `native` and `real-libraries` labels and the timeout, and puts the executable
 in the list that receives the shared warning and sanitizer flags and that the
 `check` target builds. A test added with `add_executable` and `add_test` alone
-misses all of that.
+misses all of that. Plug-in tests are built in their format's folder under
+`plugins/`; list each there in `convolver_sanitize()`, so that the sanitizer
+build compiles it, and the adapter code it holds, with ASan and UBSan.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
@@ -268,7 +270,8 @@ LV2 tests under ASan and UBSan, `lv2.adapter` under ThreadSanitizer, and
 `lv2lint` on every plug-in ([LV2 tests](#lv2-tests)). The
 [Audio Unit](../../.github/workflows/au.yml) workflow builds the AU component
 against the newest AudioUnitSDK, runs its CTest tests and `auval -strict` on
-it ([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
+it, and runs the AU tests again in a Debug build with ASan and UBSan
+([Audio Unit tests](#audio-unit-tests)). Not every job runs every CTest
 entry: see [which configurations run which tests](#which-configurations-run-which-tests). These
 workflows and the candidate workflow also run every Monday, so a new upstream
 release of an SDK or tool is tested within a week even when Convolver has not
@@ -525,7 +528,8 @@ Three CTest tests run when the adapter is built (label `au`):
   C++ allocation while rendering, and the settings (AU-7): parameter info,
   defaults and clamping, Gain and Mix in the audio, and saving and restoring
   them with `ClassInfo`, including a preset without settings, malformed
-  parameter data and a rejected preset.
+  parameter data and a rejected preset, and the Status text and start line
+  with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), the licence files and the signature.
@@ -533,7 +537,8 @@ Three CTest tests run when the adapter is built (label `au`):
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
-installs the component for the runner's user and runs `auval -strict`. Named
+installs the component for the runner's user and runs `auval -strict`; its
+`au-sanitizers` job runs them again with ASan and UBSan. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 

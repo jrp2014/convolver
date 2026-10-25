@@ -195,7 +195,7 @@ source and records exactly which releases it used.
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
 | `CONVOLVER_PACKAGE_TESTS` | ON | Installed, relocated and source-tree C++ consumer tests |
 | `CONVOLVER_DOCUMENTATION_TESTS` | Same as I/O on first configure | Historical documentation checks; requires Python |
-| `CONVOLVER_SANITIZERS` | OFF | ASan and UBSan for native targets with GCC or Clang |
+| `CONVOLVER_SANITIZERS` | OFF | ASan and UBSan for native targets with GCC or Clang, and for the plug-in adapters and their tests (`convolver_sanitize()`): the Audio Unit's component and AudioUnitSDK too; for VST3, the adapter as its tests compile it (the bundle's own sources and the SDK are not compiled with them, but the bundle links the instrumented core), and the SDK tools that load the bundle do not run, whatever `CONVOLVER_VST3_RUNTIME_VALIDATION` says, since they cannot load an instrumented one |
 | `CONVOLVER_LEGACY_TESTS` | ON with I/O and native Clang on macOS/Linux; OFF elsewhere | Historical extraction harnesses |
 | `CONVOLVER_EQUALIZER_APO_BENCHMARK`, `CONVOLVER_EQUALIZER_APO_CONFIG` | empty | Optional Equalizer APO `Benchmark.exe` and its config folder, for `export.equalizer_apo.runtime` on Windows |
 

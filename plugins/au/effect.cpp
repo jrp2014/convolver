@@ -189,12 +189,26 @@ std::string Effect::observe_faults() noexcept {
 void Effect::update_status() noexcept {
     try {
         status_log_written_ = host_log_written();
-        status_ = host_status(filter_, known_layout(), status_log_written_);
+        // Gain and Mix change what plays without a filter (PLUG-10).
+        status_ = host_status(filter_, known_layout(), status_log_written_, settings());
         if (host_) // Render must not show Fault over a load failure.
             host_->hold_fault_signal(filter_.failure_shown());
         Globals()->SetParameter(status_parameter,
                                 static_cast<AudioUnitParameterValue>(status_.status), true);
     } catch (...) { // Out of memory: the previous status stays.
+    }
+}
+
+// The text only, for the Gain and Mix set now. It never writes the Status
+// value: Render may have written Fault there since the last update_status(),
+// and only an update that has observed the faults may replace it (the
+// independent review).
+void Effect::refresh_status_text() noexcept {
+    try {
+        auto line = host_status(filter_, known_layout(), status_log_written_, settings());
+        if (line.status == status_.status)
+            status_.text = std::move(line.text);
+    } catch (...) { // Out of memory: the previous text stays.
     }
 }
 
@@ -215,6 +229,7 @@ void Effect::notify_status() noexcept {
 
 HostStatusLine Effect::status() {
     std::lock_guard lock(control_);
+    refresh_status_text(); // With the Gain and Mix set now, as hosts read it.
     return status_;
 }
 
@@ -465,6 +480,8 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             faults = observe_faults();
             if (!faults.empty())
                 update_status();
+            else // Gain or Mix may have changed, on any thread (PLUG-10).
+                refresh_status_text();
             const auto current = static_cast<AudioUnitParameterValue>(status_.status);
             const auto value = request->inValue ? *request->inValue : current;
             const auto index = static_cast<long>(std::lround(value));

@@ -36,6 +36,20 @@ option(CONVOLVER_BUILD_LV2 "Build the optional LV2 adapter (requires the lv2 hea
 option(CONVOLVER_BUILD_AU "Build the optional Audio Unit adapter (macOS; requires AudioUnitSDK)" OFF)
 option(CONVOLVER_BUILD_NATIVE "Build the portable FFT/libsndfile core and CLI" ON)
 option(CONVOLVER_SANITIZERS "Instrument native targets with ASan and UBSan" OFF)
+# CONVOLVER_SANITIZERS for the targets each plug-in folder adds: the adapter,
+# its SDK and its tests are compiled with the same instrumentation as the core
+# (jrp's review of 0.5.5: the Audio Unit adapter was only linked with it).
+# The link options come with Convolver::host.
+function(convolver_sanitize)
+    if(CONVOLVER_SANITIZERS)
+        foreach(target IN LISTS ARGN)
+            if(TARGET ${target})
+                target_compile_options(${target} PRIVATE -fsanitize=address,undefined
+                    -fno-sanitize-recover=all -fno-omit-frame-pointer)
+            endif()
+        endforeach()
+    endif()
+endfunction()
 # PLUG-7: lifecycle sequences are enumerated up to this many operations after
 # each start; LV2, with its worker operations, has about twice as many to
 # choose from. Sanitizers make each sequence ten to twenty times slower, so

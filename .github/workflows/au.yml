@@ -113,3 +113,52 @@ jobs:
           path: test-evidence
           retention-days: 14
           if-no-files-found: ignore
+
+  # CONVOLVER_SANITIZERS=ON compiles the adapter, AudioUnitSDK and the AU
+  # tests with ASan and UBSan (jrp's review of 0.5.5: they were only linked
+  # with the runtimes). Only the AU tests run here: the core's sanitizer runs
+  # are in the native workflow, and auval cannot load an instrumented bundle.
+  au-sanitizers:
+    needs: scope
+    if: needs.scope.outputs.build == 'true'
+    runs-on: macos-15
+    env:
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Newest AudioUnitSDK
+        run: >-
+          python scripts/release/sources.py --latest --fetch
+          --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
+      - name: Tools and libraries
+        run: brew install libsndfile
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: au-sanitizers-macos-15
+          max-size: 1G
+          save: ${{ github.event_name != 'pull_request' }}
+      - name: Configure
+        run: >-
+          cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
+          -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"
+          -DCONVOLVER_LEGACY_TESTS=OFF
+      - name: Build
+        run: cmake --build build-au --parallel 3
+      - name: AU adapter, harness and lifecycle under ASan and UBSan
+        run: ctest --test-dir build-au --output-on-failure --output-junit junit.xml --parallel 3 -L au
+      - name: Collect test evidence
+        if: failure()
+        run: python scripts/ci_evidence.py test-evidence build-au
+      - name: Keep test evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          path: test-evidence
+          retention-days: 14
+          if-no-files-found: ignore

@@ -23,6 +23,16 @@ set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
 set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
 option(CONVOLVER_VST3_RUNTIME_VALIDATION "Run SDK tools that load plug-in bundles (disable when local policy rejects ad-hoc code)" ON)
+# The SDK's tools are not instrumented, so they cannot load a bundle built
+# with CONVOLVER_SANITIZERS (it links the instrumented core; its Linux build
+# stopped at moduleinfotool). The cached option keeps its value for later
+# builds without sanitizers; cmake/ConvolverPluginPackaging.cmake makes the
+# same test for release.stage's validator.
+if(CONVOLVER_SANITIZERS AND CONVOLVER_VST3_RUNTIME_VALIDATION)
+    message(STATUS "CONVOLVER_SANITIZERS: the SDK tools cannot load an instrumented bundle, "
+        "so they do not run in this build (CONVOLVER_VST3_RUNTIME_VALIDATION is ignored)")
+    set(CONVOLVER_VST3_RUNTIME_VALIDATION OFF)
+endif()
 set(SMTG_CREATE_MODULE_INFO ${CONVOLVER_VST3_RUNTIME_VALIDATION} CACHE BOOL "" FORCE)
 if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "macOS deployment target" FORCE)
@@ -230,3 +240,11 @@ if(convolver_vst3_tests_here)
     set_property(TEST ${convolver_vst3_tests_here} APPEND PROPERTY ENVIRONMENT
         "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
 endif()
+
+# The adapter as each test compiles it, and the tests. The bundle's own
+# sources and the SDK's libraries are not compiled with the sanitizers: the
+# SDK's tools (validator, moduleinfotool) link those libraries without the
+# runtimes. The bundle still links the instrumented core.
+convolver_sanitize(convolver_vst3_tests convolver_vst3_preset
+    convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
+    convolver_vst3_package_probe)

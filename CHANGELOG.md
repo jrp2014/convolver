@@ -10,11 +10,49 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Changed
+
+- The version is now 0.6.0, a deliberate minor step for the library changes
+  below (jrp, 25 October 2026: old interfaces are not kept while the API
+  settles). CMake consumers now request `find_package(Convolver 0.6)`; the
+  package keeps its same-minor compatibility policy, so a consumer asking for
+  0.5 no longer finds it.
+- Library: `HostFaultReport` is again a plain struct of `current`, `earlier`
+  and `held`. The 0.5.5 bridge to 0.5.0, where `HostFilter::observe()`
+  returned `HostFaults`, is gone: read `current` and `earlier` instead.
+- Library: `host_status()` takes the instance's `HostSettings` after
+  `log_written`; without them it describes the default Gain and Mix.
+
+### Fixed
+
+- Plug-ins: Status and the log's `Started at` line now say what Gain and Mix
+  let through when no filter is heard. With no filter at Gain −20 dB the
+  Audio Unit's Status said "audio passes unchanged" while the input played
+  20 dB lower; it now says `No filter: audio passes at -20.0 dB (Gain and
+  Mix)`. After a refused first load at Mix 50% it said "Silent" while the dry
+  half played; it now says `Load failed, only the dry signal plays: ...`, and
+  the start line says the dry signal still plays and at what level. A filter
+  playing at Mix 0% adds `Mix 0%: only the dry signal plays`. The sound is
+  unchanged. Found in jrp's review of 0.5.5.
+- Builds: `CONVOLVER_SANITIZERS=ON` now compiles the Audio Unit adapter,
+  AudioUnitSDK and their tests with ASan and UBSan, as it does the core;
+  before, they were only linked with the sanitizer runtimes, so the adapter's
+  parameter-state parser ran uninstrumented. The VST3 adapter's tests are
+  instrumented too, and a VST3 sanitizer build no longer runs the SDK tools
+  that load the bundle (as with `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF`),
+  since they cannot load an instrumented one: such a build used to stop at
+  `moduleinfotool`. Found in
+  jrp's review of 0.5.5.
+
+## [0.5.6] - 2026-10-25
+
 ### Added
 
 - Example presets: `repeat`, half the input at once and a quarter of it a
   quarter of a second later, so the filter is easy to hear (the `echo`
   example's 5 ms tap only colours the tone). The package now has 18 examples.
+
+## [0.5.5] - 2026-10-25
 
 ### Fixed
 
@@ -659,7 +697,9 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/jrp2014/convolver/compare/v0.5.5...v0.5.6
+[0.5.5]: https://github.com/jrp2014/convolver/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/jrp2014/convolver/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jrp2014/convolver/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jrp2014/convolver/compare/v0.5.1...v0.5.2

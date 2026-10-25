@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host_log.hpp"
 #include "convolver_version.hpp"
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -173,20 +174,48 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
             text += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";
         return text;
     };
-    if (const auto& f = filter.failure(); f && f->silent)
-        return with_settings(line + f->message);
+    // PLUG-10: with equal counts, Mix's dry share plays even when no filter
+    // does, and Gain changes the input that passes with no filter loaded.
+    const bool equal = host.inputs == host.outputs;
+    const HostSettings defaults;
+    const auto& used = settings ? *settings : defaults;
+    const auto sound = [&](bool identity) {
+        return equal ? unfiltered_sound(used, identity) : UnfilteredSound{true, false, {}};
+    };
+    const auto dry_words = [](const UnfilteredSound& s) {
+        return s.unchanged ? std::string("unchanged") : "at " + s.level;
+    };
+    if (const auto& f = filter.failure(); f && f->silent) {
+        line += f->message;
+        if (const auto s = sound(false); !s.silent) {
+            char mix[32] = {};
+            std::snprintf(mix, sizeof mix, "%g%%", 100 * std::clamp(used.mix, 0.0, 1.0));
+            line += std::string(" With Mix at ") + mix +
+                    " wet, though, the dry signal still plays instead of silence: the input " +
+                    dry_words(s) + ".";
+        }
+        return with_settings(line);
+    }
     if (const auto& c = filter.filter()) {
         line += "Playing " + filter_words(*c) + ".";
         if (!filter.notice().empty())
             line += " " + filter.notice();
         return with_settings(line);
     }
-    if (filter.failed())
-        return with_settings(line + "Playing silence after a failed load.");
-    return with_settings(
-        line + (host.inputs == host.outputs
-                    ? "No filter, so audio passes unchanged."
-                    : "No filter, and inputs and outputs differ, so Convolver plays silence."));
+    if (filter.failed()) {
+        const auto s = sound(false);
+        return with_settings(line + (s.silent ? "Playing silence after a failed load."
+                                              : "Playing only the dry signal after a failed "
+                                                "load: the input " +
+                                                    dry_words(s) + "."));
+    }
+    if (!equal)
+        return with_settings(
+            line + "No filter, and inputs and outputs differ, so Convolver plays silence.");
+    const auto s = sound(true);
+    return with_settings(line + (s.unchanged ? std::string("No filter, so audio passes unchanged.")
+                                             : "No filter, so audio passes at " + s.level +
+                                                   ", set by Gain and Mix."));
 }
 
 std::filesystem::path host_log_path() {

@@ -55,7 +55,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 24 October 2026 | CI runs each kind of test only where a configuration can change its result; plug-in jobs skip what an identical native or Audio Unit job runs, and the release candidates no longer run the CMake package consumers | [Testing](../develop/testing.md#which-configurations-run-which-tests) |
 | 24 October 2026 | REL-4's repository side: a README line for users of the old Windows Convolver, issue forms, and a social preview source, with the steps after publishing | [TODO](../../TODO.md) REL-4, [releasing](../develop/releasing.md#after-publishing-make-it-findable) |
 | 24 October 2026 | The old SourceForge website stays as it is for now, without a banner pointing here; the SourceForge project summary points to GitHub | [TODO](../../TODO.md) REL-4 |
-| 24 October 2026 | Start the 0.5 series before end-to-end testing, so the first preview is cut from a 0.5.x tag | [Status](status.md#next-milestone-an-independent-user-runs-a-preview), [versioning](../develop/versioning.md#minor-and-major-versions) |
+| 24 October 2026 | Start the 0.5 series before end-to-end testing, so the first preview is cut from a 0.5.x tag (replaced on 25 October 2026 by the 0.6 series, below) | [Status](status.md#next-milestone-an-independent-user-runs-a-preview), [versioning](../develop/versioning.md#minor-and-major-versions) |
+| 25 October 2026 | Start the 0.6 series rather than restore 0.5.x API compatibility, and keep no bridges to older library interfaces until the API is more stable; the project must stay internally consistent. The first preview is cut from a 0.6.x tag | [Versioning](../develop/versioning.md#minor-and-major-versions), [CHANGELOG](../../CHANGELOG.md) |
 
 ## Plug-in behaviour
 

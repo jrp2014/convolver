@@ -54,6 +54,17 @@ std::string loaded_line(const HostFilter&, bool host_known);
 // After a rejected load: HostFilter::rejection()'s message, numbered as
 // loaded_line() numbers accepted ones ("Request 3: "); empty if there is none.
 std::string rejected_line(const HostFilter&);
+// PLUG-10: what Gain and Mix let through while no filter is heard, with
+// equal input and output counts (otherwise Mix does not apply and there is
+// silence). `identity` true: no filter is loaded, so the filtered path is the
+// input itself; false: a load failed, so it is silence and only Mix's dry
+// share plays. `level` is the output's level against the input, such as
+// "-20.0 dB", empty when the sound is `silent` or `unchanged`.
+struct UnfilteredSound {
+    bool silent = false, unchanged = false;
+    std::string level;
+};
+UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
 // `equal_counts` false says the mix does not apply.
 std::string settings_words(const HostSettings&, bool equal_counts);
