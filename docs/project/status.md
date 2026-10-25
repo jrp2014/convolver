@@ -123,6 +123,7 @@ The first preview is cut from a 0.5.x tag.
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | Symbol check and low-memory fixes merged ([PR #72](https://github.com/jrp2014/convolver/pull/72)); fault state after reloads, Load failed before Fault and the guides in [PR #73](https://github.com/jrp2014/convolver/pull/73), open |
 | Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)); GarageBand's Audio Unit test (AU-4) can run at the same time but does not gate this preview, which holds no Audio Unit |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
+| Settings (gain, mix, latency) and a window in each VST3 build | jrp, 25 October 2026 | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13 | Planned ([editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items), [PR #78](https://github.com/jrp2014/convolver/pull/78)); not started |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
@@ -149,7 +150,12 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
 3. **Unclaimed work:** PLUG-5's first-preview contents (the `convolver` CLI and
    presets made from the stereo and 2→6 first-use filters, in the package) and
    the REL-2 journeys. No pull request is open for either.
-4. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
+4. **The editor's settings and VST3 windows** (jrp, 25 October 2026):
+   PLUG-9 and PLUG-10, then VST3-3 and VST3-4, then the macOS, Windows and
+   Linux windows (VST3-11 to VST3-13), as planned in the
+   [editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items).
+   Unclaimed; the largest remaining part of the preview.
+5. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
    trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
    before LV2 joins a preview.
 

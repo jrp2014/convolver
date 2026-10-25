@@ -5,10 +5,14 @@ Status: written on 24 October 2026 against Convolver `80ac07a` (0.4.45), at
 jrp's request ("I think that doing that would be helpful, not least for
 debugging"), and revised the same day after jrp asked that the window
 configure the plug-in as the old Convolver did, modernised in line with what
-the engine can do now. Nothing here is implemented. The framework is decided:
-native views ([decisions](../decisions.md#direction)); the settings, their
-saved form, scope and order wait for jrp's choices in
-[decisions for jrp](#decisions-for-jrp). Open work is tracked as PLUG-9,
+the engine can do now, and again on 25 October with jrp's choices. Nothing
+here is implemented. jrp's choices are recorded in
+[decisions for jrp](#decisions-for-jrp) and the
+[decisions log](../decisions.md#direction): native views, with VSTGUI as a
+stop-gap for the Linux VST3 window; each format's own way of saving the
+settings; and a first preview that waits for the settings and the VST3
+windows. What remains for jrp comes up as each phase proposes it: the Gain
+range, new parameter IDs and LV2 port symbols. Open work is tracked as PLUG-9,
 PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6 and
 LV2-7 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
 The rules every adapter follows stay in the
@@ -42,8 +46,8 @@ whoever then implements one of its phases.
   window exists.
 - **Framework: native views, no framework** (decided). One AppKit view on
   macOS serves VST3 and the Audio Unit (and an LV2 Cocoa UI later); a Win32
-  view serves VST3 on Windows; Linux comes last, with its toolkit decided
-  then. Native controls give screen readers, keyboard use, dark mode and
+  view serves VST3 on Windows; the Linux VST3 window uses VSTGUI as a
+  stop-gap (jrp, 25 October). Native controls give screen readers, keyboard use, dark mode and
   scaling without work of our own.
 - **Threads.** The window talks only to the controller side (the VST3 edit
   controller, AU properties and parameters, LV2 UI messages), never to the
@@ -56,8 +60,9 @@ whoever then implements one of its phases.
   preset tool (PLUG-10), then per format (VST3-3 and VST3-4, AU-7, LV2-7),
   all usable from generic host controls and tested headlessly. The macOS
   window (VST3-11, reused by the Audio Unit in AU-6) follows, because jrp's
-  test hosts are on his Mac; Windows (VST3-12), Linux (VST3-13) and an LV2 UI
-  (LV2-6) after that.
+  test hosts are on his Mac, then Windows (VST3-12) and the Linux stop-gap
+  (VST3-13). The first preview waits for the settings and the three VST3
+  windows (jrp, 25 October); an LV2 UI (LV2-6) only if Linux users ask.
 - **Testing.** Gain, mix and latency pass the double-precision oracle tests
   like any DSP change; everything the window shows is built by shared code
   that the existing headless tests check per failure kind; the windows are
@@ -274,30 +279,51 @@ asked for it on 25 October).
 - Loading a wisdom file made by `convolver --tune-fft` would remove the
   planning delay; it is left out unless asked for.
 
-**Where settings are saved.**
+**Where settings are saved.** Each format saves the settings in its own
+usual way, and the differences are documented rather than smoothed over
+(jrp, 25 October: "live with the platform defaults for now, but document the
+potential source of divergence").
 
 - VST3 saves its parameters in the component state, as it does Bypass. The
-  host state codec gains the three settings in a new version (3), written only
+  host state codec gains the settings in a new version (3), written only
   when a setting differs from its default, so every state that does not use
   them is still written as version 1 and older builds keep reading it, as the
   [host state rules](../../develop/plugin-contract.md#host-state) require.
-- Audio Units save parameters themselves in `ClassInfo`; the adapter only
+- Audio Units save parameters themselves in `ClassInfo`; the adapter
   ignores the settings' values in a state from another format, as it does
-  for bypass, unless jrp prefers presets to carry them across formats.
+  for bypass.
 - LV2 adds control input ports, which hosts save. Adding ports changes the
   plug-in's interface; the old ports keep their indices and symbols, and
   hosts restore older sessions with the new ports at their defaults. To check
   with Ardour, Carla and PipeWire `filter-chain` in LV2-7.
-- `convolver-preset` gains `--gain-db` (with `auto` and `no-clip`) and
-  `--block-size`, the CLI's own options with the same meanings, and `--mix`,
-  so presets can carry the settings.
+- `convolver-preset` gains no setting options for now: its presets carry the
+  filter only. `--gain-db`, `--block-size` and `--mix` (the CLI's own
+  options) can be added later if users want presets to carry settings.
+
+**Where the settings can diverge**, documented in
+[how the plug-ins behave](../../use/plugins.md) and in TODO's limitations
+when PLUG-10 lands, each with what the user sees:
+
+- A preset made by `convolver-preset` sets the filter only. In VST3 the
+  settings return to their defaults, because a version 1 state has none; in
+  the Audio Unit and LV2 they keep whatever values the host has, unless the
+  host also restores its own parameter values (each case checked in VST3-4,
+  AU-7 and LV2-7).
+- A state moved between formats (for example an AU preset's
+  `convolver-state` read by VST3) carries the filter but not the settings.
+- The same project can therefore play at a different gain, mix or latency in
+  another format or host. The window's Details line and the log show the
+  values in use, so a report shows the difference.
+- Hosts that restore an older LV2 session or Audio Unit preset give new
+  settings their defaults, which keep today's sound.
 
 **Filter conveniences** (VST3-11, AU-6; the shared parts in PLUG-9).
 
 - Drag and drop of a filter file onto the window.
 - Recent files, kept per user in a small text file beside the Convolver log,
   not in the project, so they are shared by every host and instance. A new
-  file Convolver writes; jrp decides.
+  file Convolver writes (agreed by jrp on 25 October, with drag and drop and
+  reload on change).
 - Reload when the file changes, while the window is open: the window checks
   the file's modification time once a second on its own timer and asks for a
   reload, which crossfades as any replacement does. For a `.cfg`, the files
@@ -323,7 +349,7 @@ keep working for twenty years: three thin native views, or one toolkit.
 | Option | Licence | Formats and systems | Accessibility | Longevity and fit | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | **Native views** behind the format's own interface: `IPlugView` (VST3), an `AUCocoaUIBase` view factory (AU), the LV2 UI extension | Ours (GPL-2.0-or-later); no new dependency | AppKit `NSView` on macOS, shared by VST3 (`kPlatformTypeNSView`), the AU's Cocoa view and an LV2 `ui:CocoaUI`; Win32 `HWND` for VST3 and LV2 `ui:WindowsUI`; Linux X11 needs its own decision (below) | Standard AppKit and Win32 controls are exposed to VoiceOver and to UI Automation (NVDA, JAWS, Narrator) by the systems themselves | AppKit and Win32 are the oldest stable GUI interfaces on their systems; the code depends on nothing that can be abandoned. Costs one view per system (estimate 400 to 700 lines each), but the content is shared code | **Chosen** |
-| VSTGUI 4.15 (Steinberg) | BSD-3-Clause ([Debian copyright file](https://metadata.ftp-master.debian.org/changelogs/main/v/vst3sdk/stable_copyright)) | Windows, macOS, Linux X11 (preliminary Wayland in 4.15, [3.8.0 notes](https://forums.steinberg.net/t/vst-3-8-0-sdk-released/1011988)); a VST3 editor class and WYSIWYG UI descriptions. Usable inside an AU Cocoa view or an LV2 UI only with glue of our own | None: "there is currently no support for accessibility in VSTGUI" (its maintainer, [November 2021](https://forums.steinberg.net/t/accessibility-with-vstgui/751087)); custom-drawn controls are invisible to screen readers | Maintained by Steinberg since 2003, released with the SDK we already pin, but a fifth SDK submodule (`vstgui4`) and a shipped dependency (with Linux libraries such as cairo, xcb and fontconfig, to be confirmed). Follows Steinberg's priorities | Second choice, mainly for Linux |
+| VSTGUI 4.15 (Steinberg) | BSD-3-Clause ([Debian copyright file](https://metadata.ftp-master.debian.org/changelogs/main/v/vst3sdk/stable_copyright)) | Windows, macOS, Linux X11 (preliminary Wayland in 4.15, [3.8.0 notes](https://forums.steinberg.net/t/vst-3-8-0-sdk-released/1011988)); a VST3 editor class and WYSIWYG UI descriptions. Usable inside an AU Cocoa view or an LV2 UI only with glue of our own | None: "there is currently no support for accessibility in VSTGUI" (its maintainer, [November 2021](https://forums.steinberg.net/t/accessibility-with-vstgui/751087)); custom-drawn controls are invisible to screen readers | Maintained by Steinberg since 2003, released with the SDK we already pin, but a fifth SDK submodule (`vstgui4`) and a shipped dependency (with Linux libraries such as cairo, xcb and fontconfig, to be confirmed). Follows Steinberg's priorities | **Linux VST3 stop-gap** (VST3-13; jrp, 25 October) |
 | DPF (DISTRHO Plugin Framework) | ISC; its own VST3 and AU code, which does not use Steinberg's SDK ([licensing](https://github.com/DISTRHO/DPF/blob/main/LICENSING.md)) | LV2, VST2, VST3, CLAP, AU, standalone; one UI class for all, drawn by its DGL widget library through pugl | None for its drawn widgets | Active, largely one maintainer. Its UI is tied to its plug-in wrapper: using DPF's editor means replacing our VST3, AU and LV2 adapters with DPF's (or maintaining a fork), redoing the contract, PLUG-7 lifecycle tests, Status parameter, LV2 worker and state handling, and first proving it keeps our permanent class IDs, AU codes, LV2 URIs and state formats | Not recommended: the shared part the fallback was meant for can be our own code |
 | pugl (window embedding) plus a drawing library | ISC, plus the drawing library's | All three formats and systems from one code base | None | Small and stable, but we would write every widget and still a file dialog per system | Not recommended |
 | A web view (WKWebView, WebView2, WebKitGTK) | Varies | Possible everywhere | Good | WebView2 is a separate runtime on Windows; WebKitGTK inside a host process is a large dependency that conflicts with hosts' own toolkits; a browser engine for a status window | Not recommended |
@@ -336,11 +362,13 @@ toolkits in plug-in UIs. The realistic choices for VST3-13 are a small X11
 view drawn with xcb (and cairo for text), or VSTGUI for Linux only, or no
 Linux window: Linux users already have LV2, whose generic host UIs show a file
 chooser for the `filter` parameter and the status port, and the VST3 Status
-parameter. Neither drawn option is accessible. The choice is made in
-VST3-13, after the macOS and Windows windows exist and HOST-1 shows whether
-Linux VST3 users need one; VSTGUI for the Linux VST3 window only is the
-leading candidate, as it saves writing a third view where no accessible
-native option exists anyway. Using VSTGUI for VST3 on every system and a
+parameter. Neither drawn option is accessible. jrp chose VSTGUI for the
+Linux VST3 window only, as a stop-gap (25 October): it saves writing a third
+view where no accessible native option exists anyway, and the first preview
+needs a window on Linux too. A native X11 view can replace it later if Linux
+users need one. VSTGUI is then a shipped dependency of the Linux VST3 build
+only (BSD-3-Clause, compatible with our GPL), so VST3-13 adds it and the
+libraries it links to the package checks and the licence notices. Using VSTGUI for VST3 on every system and a
 native view for the Audio Unit was considered and set aside: it means two
 different windows on the Mac, and VST3, the most used format, would lose
 screen readers.
@@ -525,7 +553,10 @@ requires. The rules for the window:
 
 ## Accessibility
 
-Acceptance criteria for every window phase:
+Goals for every window phase. jrp counts accessibility as highly desirable but
+not essential (25 October), so a phase that misses one records the gap in its
+pull request and in TODO instead of waiting for it. Native controls meet
+most of them without extra work:
 
 - Every control has an accessible name and role; the status and the full
   message are readable text that a screen reader reads in order and the user
@@ -546,8 +577,8 @@ Acceptance criteria for every window phase:
   host (REAPER, with the OSARA extension, is widely used by blind musicians). The
   CI tests below check names and roles automatically.
 - Linux drawn views cannot be reached by screen readers (AT-SPI comes from
-  toolkits); if VST3-13 adds one, the documentation says so and points to
-  LV2's generic UI and the log.
+  toolkits), so the VSTGUI stop-gap is not accessible; the documentation
+  says so and points to LV2's generic UI, the Status parameter and the log.
 
 ## Testing
 
@@ -557,7 +588,7 @@ display, in the existing CTest targets and CI jobs:
 | What | How | Where |
 | --- | --- | --- |
 | Gain, mix and latency | The double-precision oracle tests in `tests/native/engine_tests.cpp` and the host comparisons run with gains, mixes and each block size, reporting the worst error relative to the output peak; ramps checked sample by sample; defaults bit-identical to today's output | `native.engine`, `native.host`, the PLUG-2 harness |
-| Saved settings | State version 3 round trip; states with default settings still written as version 1, byte-identical to today's; `convolver-preset --gain-db`, `--block-size` and `--mix` write what the plug-ins read; AU and LV2 restore older sessions with defaults | `native.state`, `plugins.presets`, each format's adapter tests |
+| Saved settings | State version 3 round trip; states with default settings still written as version 1, byte-identical to today's; `convolver-preset` presets and states moved between formats give the documented settings in each format; AU and LV2 restore older sessions with defaults | `native.state`, `plugins.presets`, each format's adapter tests |
 | Latency changes | Changing latency while active: the reported latency and tail follow, the format's change notification is sent, no audio-thread allocation (the audio guard), and the PLUG-7 sequences with a latency change between steps | `vst3.lifecycle`, `au.lifecycle`, `lv2.lifecycle` |
 | Meters | Peak, clip count and timings from known signals; allocation-free under the audio guard; reset requests | `native.host` |
 | Report content and text | Table-driven: one case per `HostFailureKind`, notice, fault kind, Not checked yet, and log not writable, each checking `report_fields()` and `report_text()`; this can share DIAG-1's [diagnostics by surface](2026-10-24-diagnostics-by-surface.md) table | `native.host` |
@@ -596,7 +627,7 @@ Each phase is its own pull request, follows the
 | 2. macOS window | **VST3-11** | The AppKit view and its VST3 `IPlugView`, with drag and drop, recent files and reload on change; `editorhost`, pluginval GUI tests and the accessibility test on macOS CI; smoke steps in REAPER and Audacity; user guide section | VST3-3, VST3-4 |
 | 2 | **AU-6** (second half) | The Cocoa view factory over the same view, versioned class names; `auval` view check; GarageBand smoke steps, sandbox check | AU-6 first half, VST3-11 |
 | 3. Windows window | **VST3-12** | The Win32 view, content scaling, keyboard navigation, Windows CI view test | VST3-11 |
-| 4. Linux | **VST3-13** | Toolkit decision, then the X11 view with `IRunLoop`, or a recorded decision not to have one | VST3-12, HOST-1 evidence |
+| 4. Linux stop-gap | **VST3-13** | The window in VSTGUI for Linux VST3 only, driven by the host's `IRunLoop`; VSTGUI and its libraries in the package checks and licence notices; `editorhost` under `xvfb-run` | VST3-3, VST3-4; can run alongside VST3-11 and VST3-12 |
 | 1 | **LV2-7** | The settings as LV2 control ports, with older sessions checked in named hosts | PLUG-10 |
 | 5. LV2 (optional) | **LV2-6** | Report atoms (new URIs named by jrp), then an LV2 UI reusing the views | VST3-11/12, a need shown by Linux users |
 
@@ -610,10 +641,14 @@ change, in its own pull request, before VST3-3); the new folder for view code
 [implementation map](../../develop/architecture.md); tests in
 [testing](../../develop/testing.md).
 
-The editor does not block the next milestone, an independent user running
-the first preview. Phase 1 changes the sound only when a user changes a
-setting, so it can land before or after the preview; whether a preview waits
-for the settings or the macOS window is jrp's call.
+**The first preview waits for the settings and the VST3 windows** (jrp, 25
+October): PLUG-9, PLUG-10, VST3-3, VST3-4 and VST3-11 to VST3-13, because the
+first preview holds VST3 on macOS, Windows and Linux. The REL-2 journeys then
+load a filter from the window as well as from a preset, and the host smoke
+tests gain the window's steps. The Audio Unit and LV2 parts (AU-6, AU-7,
+LV2-7) join the previews that add those formats; PLUG-11 and LV2-6 are not
+needed for any preview. The windows can be built in parallel once VST3-3
+and VST3-4 are in, as they share the report code and differ only in views.
 
 ## Risks and open questions
 
@@ -650,19 +685,26 @@ for the settings or the macOS window is jrp's call.
   attenuation to the new range and get a different gain. VST3-6 must then
   convert the value itself (in its state converter) or leave parameter
   values out of the migration.
+- **The preview's schedule.** Three windows and the settings are now on the
+  path to the first preview, and they are the largest part of it. PLUG-9 and
+  PLUG-10 can start at once, alongside PLUG-5 and REL-2; the three windows
+  need VST3-3 and VST3-4 first.
 - **Key handling and focus** differ by host; the smoke tests check that typing
   in the window does not trigger the host's shortcuts and vice versa.
 
 ## Decisions for jrp
 
-Recommended answers first. None of these blocks PLUG-9.
+All answered by 25 October 2026 (recorded in the
+[decisions log](../decisions.md)). Still to come, as each phase proposes
+them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
 
 1. **Framework (decided):** native views (AppKit, Win32), no framework, with
    the content in shared code, rather than VSTGUI for every system (one code
    base, no accessibility, a new shipped dependency) or DPF (replaces our
    adapters). This replaces the formats plan's "DPF is the fallback for a
    shared editor": the shared part is our own report code
-   ([decisions](../decisions.md#direction)). Linux stays open for VST3-13.
+   ([decisions](../decisions.md#direction)). Linux uses VSTGUI as a
+   stop-gap (see 6).
 2. **Settings:** Gain with the Set, Estimate and No clipping modes, Latency,
    Mix (the old "Effect level"; decided) and meters, as host parameters in
    every format, defaults leaving today's sound unchanged; dither is not
@@ -671,21 +713,24 @@ Recommended answers first. None of these blocks PLUG-9.
 3. **Gain parameter (decided):** VST3 ID 0, with no new ID, but a new
    mapping rather than the 2006 one ([decisions](../decisions.md#identities-and-file-formats)).
    Its range is jrp's to approve when PLUG-10 proposes it.
-4. **Saved form:** VST3 host state version 3, written only when a setting is
-   not at its default; Audio Unit and LV2 settings saved by the host as
-   parameters and ports; `convolver-preset` gains `--gain-db`,
-   `--block-size` and `--mix`. New parameter IDs and LV2 port symbols are
-   jrp's to approve when PLUG-10 proposes them.
-5. **Conveniences:** drag and drop, recent files (a small per-user file beside
-   the log) and reload when the file changes (recommended, all three).
-6. **Order:** settings first (PLUG-9, PLUG-10, then each format), then the
-   macOS window shared by VST3 and the Audio Unit, then Windows, then decide
-   Linux; LV2's UI only if Linux users ask.
-7. **The chosen path:** shown for the current session and written to the log,
-   not saved with the project. Saving it for display would add VST3 controller
-   state and an AU `ClassInfo` key, a format change.
-8. **Accessibility:** the criteria above (screen reader names and order,
-   keyboard use, typed fields beside sliders, no colour-only status) are
-   acceptance criteria for each window phase, checked with VoiceOver in REAPER.
-9. **Previews:** the first preview does not wait for the settings or the
-   window.
+4. **Saved form (decided):** each format's own way for now: VST3 host
+   state version 3, written only when a setting is not at its default;
+   Audio Unit and LV2 settings saved by the host as parameters and ports;
+   no setting options in `convolver-preset` yet. The places where settings
+   can diverge between formats and hosts are documented
+   ([where the settings can diverge](#settings)). New parameter IDs and LV2
+   port symbols are jrp's to approve when PLUG-10 proposes them.
+5. **Conveniences (decided):** drag and drop, recent files (a small per-user
+   file beside the log) and reload when the file changes, all three.
+6. **Order (decided):** settings first (PLUG-9, PLUG-10, then each format),
+   then the macOS window shared by VST3 and the Audio Unit, then Windows;
+   the Linux VST3 window in VSTGUI as a stop-gap; LV2's UI only if Linux
+   users ask.
+7. **The chosen path (decided):** shown for the current session and written
+   to the log, not saved with the project. Saving it for display would add
+   VST3 controller state and an AU `ClassInfo` key, a format change.
+8. **Accessibility (decided):** highly desirable, not essential. The goals
+   above are checked in each window phase (VoiceOver in REAPER), and gaps are
+   recorded rather than blocking.
+9. **Previews (decided):** the first preview waits for the settings and the
+   three VST3 windows.

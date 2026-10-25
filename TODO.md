@@ -55,13 +55,14 @@ boundary and C++20 in the core.
 | 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source) at the same sitting if convenient | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 gates the first preview; AU-4 does not, since that preview holds no Audio Unit. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
-| 4. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
-| 5. Later previews | **LV2-3** to **LV2-5**, **AU-3** to **AU-5**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| 4. Settings and windows | The **HOST-2** editor's VST3 path, which jrp wants in the first preview (25 October 2026): **PLUG-9** and **PLUG-10**, then **VST3-3** and **VST3-4**, then the windows **VST3-11** (macOS), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 5. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 6. Later previews | **LV2-3** to **LV2-5**, **AU-3** to **AU-5**, with the editor's **AU-6**, **AU-7** and **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in PR #73, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
 | Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
-| Requested, not blocking the preview | The **HOST-2** editor: **PLUG-9** and **PLUG-10** first, then **VST3-3**, **VST3-4**, **AU-6**, **AU-7**, **LV2-7** and the optional **PLUG-11**, then the macOS window (**VST3-11**) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items); the order and whether a preview waits are jrp's choices in that plan. |
+| Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2 to VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
 
 DOC-2 automation and the CFG-1, IO-1, IO-2, IO-5, GAIN-1 and ROBUST-1/2 items
@@ -150,6 +151,10 @@ is superseded.
   views (decided) over shared report code, with gain, latency and mix as host
   parameters, in phases PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to
   VST3-13, AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
+  Progress (25 October 2026): jrp's choices recorded; the first preview waits
+  for the settings and the VST3 windows (macOS, Windows, and Linux in VSTGUI
+  as a stop-gap); settings saved in each format's own way, with the
+  divergence documented.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
   synchronous dual-mode audio effect (MFT plus DMO) for Windows Media Player
@@ -273,8 +278,12 @@ Shared work, done once for all three formats:
   latency-aligned wet/dry mix, and a chosen block size (64 to 4096 frames,
   default 256), with 64-sample ramps; output peak, clip count and callback
   load as audio-thread counters; host state version 3 written only for
-  non-default settings; `convolver-preset --gain-db`, `--block-size` and
-  `--mix`. Defaults leave the sound unchanged. Oracle tests with the worst
+  non-default settings; each format saves the settings its own way, and
+  where they can diverge (presets from `convolver-preset` carry the filter
+  only; states moved between formats keep the filter, not the settings) is
+  documented in `docs/use/plugins.md` and listed here as a limitation
+  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
+  Needed for the first preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), asked for by jrp on 25 October 2026:
@@ -503,10 +512,13 @@ below are candidates; adopt each only with adapter, validator and pluginval test
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
-- [ ] **VST3-13 — Editor window on Linux.** Decide first between a small X11
-  view (xcb and cairo, through the host's `IRunLoop`), VSTGUI for Linux only,
-  or no Linux window (LV2's generic UIs and the Status parameter cover it),
-  using HOST-1 evidence; VSTGUI for Linux only is the leading candidate ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)).
+- [ ] **VST3-13 — Editor window on Linux.** The window in VSTGUI, for the
+  Linux VST3 build only, as a stop-gap (jrp, 25 October 2026), driven by the
+  host's `IRunLoop`; VSTGUI (BSD-3-Clause) and the libraries it links added
+  to the package checks and licence notices; opened by `editorhost` under
+  `xvfb-run`. Not reachable by screen readers, which the guide says. A native
+  X11 view can replace it later if Linux users need one
+  ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
