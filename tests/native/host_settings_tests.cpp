@@ -263,6 +263,14 @@ void settings_text() {
             "settings words: " + settings_words(s, true));
     require(settings_words(s, false).find("no dry signal") != std::string::npos,
             "settings words for unequal counts");
+    // GarageBand's sliders give values like these (jrp's run of AU-6).
+    for (const auto& [settings, words] :
+         {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},
+          std::pair{HostSettings{-12.04, .508}, "gain -12 dB, mix 50.8% wet"},
+          std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 100% wet"},
+          std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
+        require(settings_words(settings, true) == words,
+                "settings words: " + settings_words(settings, true));
     HostFilter filter;
     const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
     require(line.find("Settings: gain -6 dB, mix 50% wet.") != std::string::npos,

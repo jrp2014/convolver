@@ -228,12 +228,13 @@ no file of its own: it writes to the host's log.
 The Audio Unit offers hosts a window of its own (`auval` lists it as a Cocoa
 view). Hosts that show plug-in views open it from the plug-in's slot; if a
 host shows its generic sliders instead, choose the plug-in's own view in the
-plug-in window, where the host offers the choice. GarageBand has not been
-checked with the window yet. The window has:
+plug-in window, where the host offers the choice. GarageBand opens it from
+the plug-in's button in the track's Plug-ins area. The window has:
 
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
-  as in the log) and the program that runs the plug-in (for a host that runs
-  plug-ins in a separate process, that process's name).
+  as in the log) and the program that runs the plug-in, or "the host's
+  plug-in process" when the host runs plug-ins in Apple's separate service,
+  as GarageBand does (the Software detail names that process).
 - **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
   the same as the Status parameter, written out and coloured.
 - **What plays, why, and what to change**, in full, as the log explains it.

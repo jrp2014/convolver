@@ -38,6 +38,10 @@ Until 1.0 the C++ API may change between minor versions.
   returned `HostFaults`, is gone: read `current` and `earlier` instead.
 - Library: `host_status()` takes the instance's `HostSettings` after
   `log_written`; without them it describes the default Gain and Mix.
+- The log and the plug-in window give Gain and Mix to one decimal ("gain
+  -76 dB, mix 56.1% wet"), not as the host's slider set them ("-75.967 dB",
+  "56.1413%"); a value too small for one decimal keeps two significant
+  digits.
 
 ### Fixed
 

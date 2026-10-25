@@ -86,8 +86,13 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     r.status = host_status(filter, facts.host, facts.log_written, facts.settings);
     r.status_name = host_status_names.at(static_cast<std::size_t>(r.status.status));
     const auto program = host_program_name();
+    // Out of process (GarageBand, Logic) the program is Apple's hosting
+    // service, which names no host; the Software detail still gives it.
+    const bool service = program.rfind("AUHostingService", 0) == 0;
     r.title = "Convolver " CONVOLVER_VERSION_STRING ", " + facts.format +
-              (program.empty() ? "" : " in " + program);
+              (program.empty() ? ""
+               : service       ? std::string(" in the host's plug-in process")
+                               : " in " + program);
     r.explanation = explanation(filter, facts);
 
     const auto& host = facts.host;

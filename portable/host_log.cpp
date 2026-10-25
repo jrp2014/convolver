@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -154,15 +155,25 @@ std::string rejected_line(const HostFilter& filter) {
     return r ? request_words(r->request) + r->message : std::string();
 }
 
+namespace {
+// A setting as people read it: to one decimal ("-76 dB", "56.1%", not
+// GarageBand's slider values "-75.967 dB" and "56.1413%"), or two
+// significant digits for a value too small to show in one ("-0.01 dB").
+std::string setting(double value) {
+    char text[32] = {};
+    if (value != 0 && std::abs(value) < .05)
+        std::snprintf(text, sizeof text, "%.2g", value);
+    else
+        std::snprintf(text, sizeof text, "%g", std::round(value * 10) / 10 + 0.0);
+    return text;
+}
+} // namespace
+
 std::string settings_words(const HostSettings& s, bool equal_counts) {
-    char gain[32] = {};
-    std::snprintf(gain, sizeof gain, "gain %g dB", s.gain_db);
+    const auto gain = "gain " + setting(s.gain_db) + " dB";
     if (!equal_counts)
-        return std::string(gain) +
-               ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    char mix[32] = {};
-    std::snprintf(mix, sizeof mix, ", mix %g%% wet", 100 * s.mix);
-    return std::string(gain) + mix;
+        return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
+    return gain + ", mix " + setting(100 * s.mix) + "% wet";
 }
 
 std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {
@@ -190,9 +201,8 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     if (const auto& f = filter.failure(); f && f->silent) {
         auto line = f->message + mono_track_hint(*f, host);
         if (const auto s = sound(false); !s.silent) {
-            char mix[32] = {};
-            std::snprintf(mix, sizeof mix, "%g%%", 100 * std::clamp(used.mix, 0.0, 1.0));
-            line += std::string(" With Mix at ") + mix +
+            const auto mix = setting(100 * std::clamp(used.mix, 0.0, 1.0)) + "%";
+            line += " With Mix at " + mix +
                     " wet, though, the dry signal still plays instead of silence: the input " +
                     dry_words(s) + ".";
         }
