@@ -6,8 +6,10 @@ jrp's request ("I think that doing that would be helpful, not least for
 debugging"), and revised the same day after jrp asked that the window
 configure the plug-in as the old Convolver did, modernised in line with what
 the engine can do now, and again on 25 October as jrp answered its
-questions. Nothing
-here is implemented. jrp's choices are recorded in
+questions. PLUG-10's settings in the shared code and the Audio Unit's
+parameters (AU-7) were implemented on 25 October 2026 (PR #80; the
+[contract's settings](../../develop/plugin-contract.md#settings)), Audio Unit
+first because jrp starts testing in GarageBand; the rest is not implemented. jrp's choices are recorded in
 [decisions for jrp](#decisions-for-jrp) and the
 [decisions log](../decisions.md#direction): native views, with VSTGUI as a
 stop-gap for the Linux VST3 window; each format's own way of saving the

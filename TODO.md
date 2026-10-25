@@ -289,6 +289,11 @@ Shared work, done once for all three formats:
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)). Defaults leave the sound unchanged.
   Needed for the first preview. Oracle tests with the worst
   error relative to the peak; the contract change in its own pull request.
+  Progress (25 October 2026, PR #80): the settings and meters in
+  `HostProcessor`, the contract's [settings](docs/develop/plugin-contract.md#settings)
+  and the divergence in [how the plug-ins behave](docs/use/plugins.md#settings),
+  with the Audio Unit's parameters (AU-7). Host state version 3, which only
+  VST3 writes, remains and lands with VST3-4.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
@@ -353,11 +358,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (`kAudioUnitProperty_CocoaUI`) over the VST3-11 view, with class names that
   carry the version; `auval` lists the view; GarageBand smoke steps, including
   a `.cfg` chosen inside its sandbox ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
-  Needed for the first preview.
-- [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
-  mode, mix and latency as global parameters (IDs beside Status 1001 in
-  `plugins/identities.json`), latency indexed and not automatable, with
-  latency and tail change notifications ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#per-format)).
+  A Latency change from the window applies at once, swapping the processor
+  without stopping the render thread (AU-7 applies it at the next
+  initialization).
   Needed for the first preview.
 
 ## FFmpeg integration
@@ -607,6 +610,7 @@ with compatibility tests; linked IDs point to open work above.
 
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
+| Plug-in settings (gain, mix, latency) only in the Audio Unit so far; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; VST3-4 and LV2-7 add the settings there. The Audio Unit's Latency applies at its next initialization. | [Settings](docs/use/plugins.md#settings) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
@@ -641,6 +645,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `ClassInfo` under `convolver-state`, and `.aupreset` files from the preset
   tool; loading one from a named host's preset menu is checked under AU-4;
   [presets](docs/use/presets.md).
+- [x] **AU-7 — Settings as Audio Unit parameters.** 25 October 2026, PR #80:
+  Gain, Gain mode, Mix and Latency; Latency applies at the next
+  initialization; [settings](docs/use/plugins.md#settings),
+  [contract](docs/develop/plugin-contract.md#settings).
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:

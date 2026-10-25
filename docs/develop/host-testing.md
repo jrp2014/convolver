@@ -346,6 +346,17 @@ except the Audio Unit build, which runs in a source checkout.
    Hz. ...` (or only `Load failed`); the full reason is in the system log (the `log show` command in
    [preparation](#prepare-the-mac), or the Console application, searching
    for "Convolver").
+9. The [settings](../use/plugins.md#settings), with the echo playing. Record
+   where the window shows Gain, Gain mode, Mix and Latency and how it shows
+   their values. Set Gain to −12 dB: the level drops smoothly, without a
+   click. Set Mix to 0%: you hear the dry track; 50% mixes the two. Set Gain
+   mode to No clipping, then Estimate: the level changes to the computed
+   gain each time, and the Convolver log has a line `Gain mode set to ...`.
+   Set Latency to 1024 frames: the log says it takes effect at the next
+   start; save, quit, reopen, and check that the log's `Started at ...` line
+   ends with `Settings: latency 1024 frames ...` and that the track still
+   lines up with the others. Check that the four values came back with the
+   project.
 
 ## Production qualification
 

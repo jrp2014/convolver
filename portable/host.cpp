@@ -574,7 +574,7 @@ struct HostProcessor::Impl {
     static_assert(std::atomic<Prepared*>::is_always_lock_free);
     static_assert(std::atomic<std::size_t>::is_always_lock_free);
     static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
-    const int rate;
+    // Members are grouped by size (8, 4, then 1 byte) to avoid padding.
     const std::size_t inputs, outputs, maximum, block;
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
@@ -587,7 +587,6 @@ struct HostProcessor::Impl {
     // The fault total at the last clear_faults() (control writes), and at the
     // last fault_signalled() (audio thread writes).
     std::atomic<std::uint64_t> faults_cleared{0}, faults_signalled{0};
-    std::atomic<bool> signal_held{false};
     std::uint64_t fault_total() const noexcept {
         return rejected_input.load(std::memory_order_relaxed) +
                output_overflow.load(std::memory_order_relaxed) +
@@ -600,41 +599,41 @@ struct HostProcessor::Impl {
     }
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
-    float dry_mix = 0;
+    // Publications up to this number were made before mute(): adopting one
+    // keeps the silence. Only a filter published after it ends the silence.
+    std::uint64_t muted_through = 0;
     // PLUG-10. The mode is written on the control side; Set's gain and the
     // mix on the audio thread. `gain` and `mix` ramp to their targets over 64
     // frames; the filter being faded out keeps the gain it had.
-    std::atomic<GainMode> mode{GainMode::set};
     // A noise estimate handed over by set_gain_mode(): estimate_key() of the
     // publication number in the high half, the gain's float bits in the low;
     // 0 before any.
     std::atomic<std::uint64_t> handed_estimate{0};
     double set_db = 0;
-    float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0, previous_gain = 1;
-    float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
     std::size_t gain_ramp = 0, mix_ramp = 0;
     // Meters, written by the audio thread only (reset on request).
-    std::atomic<float> peak{0};
     std::atomic<std::uint64_t> clipped{0}, calls{0};
-    std::atomic<float> load_max{0};
     std::array<std::atomic<std::uint64_t>, load_steps> load_counts{};
-    std::atomic<bool> meters_reset{false};
+    const int rate;
+    std::atomic<GainMode> mode{GainMode::set};
+    float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0, previous_gain = 1;
+    float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
+    std::atomic<float> peak{0}, load_max{0};
     static_assert(std::atomic<float>::is_always_lock_free);
     static_assert(std::atomic<GainMode>::is_always_lock_free);
+    float dry_mix = 0;
     // mute(): the current filter's level ramps to 0; the level of the filter
     // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
     // an unmuted filter's output is unchanged.
     float level = 1, previous_level = 1;
+    std::atomic<bool> signal_held{false}, meters_reset{false};
     bool muted = false, previous_muted = false;
-    // Publications up to this number were made before mute(): adopting one
-    // keeps the silence. Only a filter published after it ends the silence.
-    std::uint64_t muted_through = 0;
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_,
          const HostSettings& settings = {})
-        : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
-          maximum(maximum_), block(block_) {
+        : inputs(c.input_channels), outputs(c.output_channels), maximum(maximum_), block(block_),
+          rate(c.sample_rate) {
         if (!inputs || !outputs || inputs > 256 || outputs > 256 || !maximum ||
             maximum > (1U << 20) || std::max(inputs, outputs) * maximum > (1U << 24))
             throw std::invalid_argument("invalid host channel count or callback capacity");
