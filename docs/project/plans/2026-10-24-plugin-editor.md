@@ -10,8 +10,8 @@ here is implemented. jrp's choices are recorded in
 [decisions for jrp](#decisions-for-jrp) and the
 [decisions log](../decisions.md#direction): native views, with VSTGUI as a
 stop-gap for the Linux VST3 window; each format's own way of saving the
-settings; and a first preview that waits for the settings and the VST3
-windows. What remains for jrp comes up as each phase proposes it: the Gain
+settings; and a first preview that waits for the settings and the windows
+of VST3 and the Audio Unit, which joins that preview. What remains for jrp comes up as each phase proposes it: the Gain
 range, new parameter IDs and LV2 port symbols. Open work is tracked as PLUG-9,
 PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7, LV2-6 and
 LV2-7 in [TODO](../../../TODO.md#plug-ins-vst3-lv2-and-au); HOST-2 is the umbrella item.
@@ -61,8 +61,9 @@ whoever then implements one of its phases.
   all usable from generic host controls and tested headlessly. The macOS
   window (VST3-11, reused by the Audio Unit in AU-6) follows, because jrp's
   test hosts are on his Mac, then Windows (VST3-12) and the Linux stop-gap
-  (VST3-13). The first preview waits for the settings and the three VST3
-  windows (jrp, 25 October); an LV2 UI (LV2-6) only if Linux users ask.
+  (VST3-13). The first preview waits for the settings and the windows of
+  VST3 and the Audio Unit, which jrp moved into that preview (25 October);
+  an LV2 UI (LV2-6) only if Linux users ask.
 - **Testing.** Gain, mix and latency pass the double-precision oracle tests
   like any DSP change; everything the window shows is built by shared code
   that the existing headless tests check per failure kind; the windows are
@@ -641,12 +642,13 @@ change, in its own pull request, before VST3-3); the new folder for view code
 [implementation map](../../develop/architecture.md); tests in
 [testing](../../develop/testing.md).
 
-**The first preview waits for the settings and the VST3 windows** (jrp, 25
-October): PLUG-9, PLUG-10, VST3-3, VST3-4 and VST3-11 to VST3-13, because the
-first preview holds VST3 on macOS, Windows and Linux. The REL-2 journeys then
-load a filter from the window as well as from a preset, and the host smoke
-tests gain the window's steps. The Audio Unit and LV2 parts (AU-6, AU-7,
-LV2-7) join the previews that add those formats; PLUG-11 and LV2-6 are not
+**The first preview waits for the settings and the windows** (jrp, 25
+October): PLUG-9, PLUG-10, VST3-3, VST3-4 and VST3-11 to VST3-13 for VST3 on
+macOS, Windows and Linux, and AU-6 and AU-7 for the Audio Unit, which jrp
+moved into the first preview the same day (with its own AU-3 to AU-5). The
+REL-2 journeys then load a filter from the window as well as from a preset,
+and the host smoke tests (HOST-1, and AU-4 in GarageBand) gain the window's
+steps. LV2-7 joins the preview that adds LV2; PLUG-11 and LV2-6 are not
 needed for any preview. The windows can be built in parallel once VST3-3
 and VST3-4 are in, as they share the report code and differ only in views.
 
@@ -685,10 +687,12 @@ and VST3-4 are in, as they share the report code and differ only in views.
   attenuation to the new range and get a different gain. VST3-6 must then
   convert the value itself (in its state converter) or leave parameter
   values out of the migration.
-- **The preview's schedule.** Three windows and the settings are now on the
-  path to the first preview, and they are the largest part of it. PLUG-9 and
-  PLUG-10 can start at once, alongside PLUG-5 and REL-2; the three windows
-  need VST3-3 and VST3-4 first.
+- **The preview's schedule.** The settings, three VST3 windows and the Audio
+  Unit (its view, parameters, validation and packaging) are now on the path
+  to the first preview, and they are the largest part of it. PLUG-9 and
+  PLUG-10 can start at once, alongside PLUG-5 and REL-2; the windows need
+  VST3-3, VST3-4 and AU-7 first. GarageBand offers only stereo effects at
+  44.1 kHz, so the Audio Unit's 2→6 journey needs a second host.
 - **Key handling and focus** differ by host; the smoke tests check that typing
   in the window does not trigger the host's shortcuts and vice versa.
 
@@ -733,4 +737,5 @@ them: the Gain range (PLUG-10), new parameter IDs and LV2 port symbols.
    above are checked in each window phase (VoiceOver in REAPER), and gaps are
    recorded rather than blocking.
 9. **Previews (decided):** the first preview waits for the settings and the
-   three VST3 windows.
+   three VST3 windows, and holds the Audio Unit with its settings and the
+   shared macOS window (both 25 October).

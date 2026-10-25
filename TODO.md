@@ -40,9 +40,10 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.5 series and holds the VST3 plug-in, the `convolver` CLI and the
-preset tool; LV2 and AU join later previews once their own journeys are
-demonstrated. What still blocks it, with the evidence, is in
+cut from the 0.5 series and holds the VST3 plug-in, the Audio Unit (macOS),
+the `convolver` CLI and the preset tool, with the editor's settings and window
+in both plug-in formats (jrp, 25 October 2026); LV2 joins a later preview once
+its own journeys are demonstrated. What still blocks it, with the evidence, is in
 [status](docs/project/status.md#what-still-blocks-the-first-preview).
 Finishing a dependable product matters more than another substantial
 refactor: move code into shared layers only when two formats need the same
@@ -53,11 +54,11 @@ boundary and C++20 in the core.
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault (PR #73, open) | Merged with `main` green, then a passing "Plug-in distribution candidates" run on `main`. PR #73 comes before the host tests: without it a Fault can hide why a preset was refused. |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source) at the same sitting if convenient | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 gates the first preview; AU-4 does not, since that preview holds no Audio Unit. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too (jrp, 25 October 2026). Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
-| 4. Settings and windows | The **HOST-2** editor's VST3 path, which jrp wants in the first preview (25 October 2026): **PLUG-9** and **PLUG-10**, then **VST3-3** and **VST3-4**, then the windows **VST3-11** (macOS), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit (25 October 2026): **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.5.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
-| 6. Later previews | **LV2-3** to **LV2-5**, **AU-3** to **AU-5**, with the editor's **AU-6**, **AU-7** and **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
+| 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in PR #73, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
 | Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
@@ -152,8 +153,9 @@ is superseded.
   parameters, in phases PLUG-9, PLUG-10, PLUG-11, VST3-3, VST3-4, VST3-11 to
   VST3-13, AU-6, AU-7, LV2-6 and LV2-7, with decisions for jrp.
   Progress (25 October 2026): jrp's choices recorded; the first preview waits
-  for the settings and the VST3 windows (macOS, Windows, and Linux in VSTGUI
-  as a stop-gap); settings saved in each format's own way, with the
+  for the settings and the windows (VST3 on macOS, Windows, and Linux in
+  VSTGUI as a stop-gap; the Audio Unit, which joins the first preview, with
+  the shared macOS window); settings saved in each format's own way, with the
   divergence documented.
 - [ ] **HOST-3 — Windows Media Foundation transform (parked).** Needs more
   thought before any work starts. Wrap the engine as a
@@ -260,7 +262,8 @@ Shared work, done once for all three formats:
   "VST is a registered trademark of Steinberg Media Technologies GmbH." in the
   documentation and packages, and the VST Compatible logo where they require
   it; [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)), with
-  wording jrp approves. LV2 and AU join later previews.
+  wording jrp approves; and the Audio Unit component (AU-5), which jrp moved
+  into the first preview on 25 October 2026. LV2 joins a later preview.
 - [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
   report value in `Convolver::host` built on the control side (status, full
@@ -338,7 +341,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   GarageBand is jrp's first Audio Unit host, with a
   [smoke test](docs/develop/host-testing.md#garageband-audio-unit) limited to
   44.1 kHz stereo. Not yet run.
-- [ ] **AU-5 — Release.** Unsigned preview component under PLUG-5 (ad-hoc
+- [ ] **AU-5 — Release.** In the first preview (jrp, 25 October 2026).
+  Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
 - [ ] **AU-6 — Editor window.** Custom properties (IDs from 64000) for the

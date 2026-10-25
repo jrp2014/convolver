@@ -94,8 +94,8 @@ not fit its input instead of saving and presets.
 
 | Journey | Filter | Surfaces | Status |
 | --- | --- | --- | --- |
-| Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 in a named host; CLI | CLI commands run in CI (`examples.first_use`). The preview package has no preset made from this filter yet. Not demonstrated. |
-| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 in a named host; CLI | CLI commands run in CI. No 2→6 preset in the package yet. Not demonstrated. |
+| Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI (`examples.first_use`). The preview package has no preset made from this filter yet. Not demonstrated. |
+| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI. No 2→6 preset in the package yet. GarageBand offers only stereo effects, so the Audio Unit's 2→6 journey needs another host (AU-4 names one). Not demonstrated. |
 | Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI. The package has no CLI yet; the first preview will ship it (PLUG-5). Not demonstrated. |
 
 Recovering from a wrong preset is the step to watch. VST3 keeps the working
@@ -111,8 +111,10 @@ record.
 From jrp's [guidance of 22 October 2026](../review-2026-10/release-readiness-guidance-2026-10-22.md):
 an independent user successfully installs and uses an exact preview package,
 with the lifecycle regression fixed and the advertised workflows demonstrated.
-The first preview holds VST3, the `convolver` CLI and the preset tool; LV2
-and AU join later previews once their own journeys are demonstrated.
+The first preview holds VST3, the Audio Unit (macOS), the `convolver` CLI and
+the preset tool, with the editor's settings and window in both plug-in
+formats (jrp, 25 October 2026; until then the Audio Unit was to join a later
+preview). LV2 joins a later preview once its own journeys are demonstrated.
 
 The first preview is cut from a 0.5.x tag.
 
@@ -121,9 +123,10 @@ The first preview is cut from a 0.5.x tag.
 | Reset during a transition no longer plays the old filter | jrp's milestone | VST3-7 follow-up ([PR #40](https://github.com/jrp2014/convolver/pull/40)) | Done, 23 October 2026 |
 | Lifecycle sequences checked against a reference model | Proposed with the milestone, so the next defect of this kind is caught | PLUG-7 | Done ([PR #58](https://github.com/jrp2014/convolver/pull/58)); `au.lifecycle` runs in macOS CI only |
 | The edge cases from jrp's review of 0.4.43 fixed | jrp's review | DIAG-1, ROBUST-4 | Symbol check and low-memory fixes merged ([PR #72](https://github.com/jrp2014/convolver/pull/72)); fault state after reloads, Load failed before Fault and the guides in [PR #73](https://github.com/jrp2014/convolver/pull/73), open |
-| Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)); GarageBand's Audio Unit test (AU-4) can run at the same time but does not gate this preview, which holds no Audio Unit |
+| Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
+| The Audio Unit validated, smoke-tested in a named host and in the package | jrp, 25 October 2026 | AU-3, AU-4, AU-5 | `auval -strict` runs in CI; pluginval for the component, GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) and the component in the package remain |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
-| Settings (gain, mix, latency) and a window in each VST3 build | jrp, 25 October 2026 | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13 | Planned ([editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items), [PR #78](https://github.com/jrp2014/convolver/pull/78)); not started |
+| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp, 25 October 2026 | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Planned ([editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items), [PR #78](https://github.com/jrp2014/convolver/pull/78)); not started |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
@@ -145,15 +148,17 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
    the log. Then a "Plug-in distribution candidates" run must pass on `main`.
 2. **jrp's time on his Mac** for the HOST-1 smoke tests in REAPER and
    Audacity. They need only the latest candidate artifact, not the CLI, so they
-   can start once the fix is merged. GarageBand's Audio Unit test (AU-4) can
-   run at the same sitting but does not gate this preview.
+   can start once the fix is merged. GarageBand's Audio Unit test (AU-4), at
+   the same sitting, now gates this preview too.
 3. **Unclaimed work:** PLUG-5's first-preview contents (the `convolver` CLI and
    presets made from the stereo and 2→6 first-use filters, in the package) and
    the REL-2 journeys. No pull request is open for either.
-4. **The editor's settings and VST3 windows** (jrp, 25 October 2026):
-   PLUG-9 and PLUG-10, then VST3-3 and VST3-4, then the macOS, Windows and
-   Linux windows (VST3-11 to VST3-13), as planned in the
-   [editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items).
+4. **The editor's settings and windows, and the Audio Unit** (jrp, 25
+   October 2026): PLUG-9 and PLUG-10, then VST3-3, VST3-4, AU-7 and AU-6's
+   properties, then the macOS window shared by VST3 and the Audio Unit, and
+   the Windows and Linux windows (VST3-11 to VST3-13, AU-6), as planned in
+   the [editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items);
+   and the Audio Unit's validation, guide and package (AU-3 to AU-5).
    Unclaimed; the largest remaining part of the preview.
 5. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
    trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
