@@ -773,7 +773,15 @@ against the current program as well as checking links.
 
 [The fuzz guide](../../tests/fuzz/README.md) describes the four harnesses and corpus
 replay. CI runs each libFuzzer target for 60 seconds on pull requests and
-`main`, with ASan/UBSan and resource bounds. A manual workflow run defaults to
+`main`, with ASan/UBSan and resource bounds. The campaigns run side by side,
+at most one per physical core, so each keeps a core to itself for its whole
+budget; each log ends with the campaign's `Done N runs` count. The Linux
+runner's 4 CPUs are 2 cores with 2 hardware threads each, so two campaigns
+run at a time and the step takes about 2 minutes instead of 4. On 27 October
+2026 four at once gave each campaign about half its executions on `main`
+(`config_text` 194k against 447k); two at once gave 426k, and
+`config_list` 86k against 56k, `host_state` 1751k against 1640k and
+`ir_file` 121k against 161k. A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
 smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.

@@ -658,12 +658,6 @@ so the preset file path is not needed).
   runner minutes and macOS runners are limited to 5 at once
   ([CI triggers](docs/develop/testing.md#ci-triggers)). From jrp's CI analysis
   of 25 October 2026.
-- [ ] **CI-12 — Fuzz campaigns side by side.** The four 60-second libFuzzer
-  campaigns run one after another (about 245 s). Run independent campaigns
-  concurrently where the runner has the CPUs, keeping each campaign's time
-  budget, and check that each still reaches its usual execution count; four
-  campaigns sharing one CPU would lose coverage. From jrp's CI analysis of 25
-  October 2026. See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [ ] **CI-13 — Run only the affected format's workflows.** A pull request
   that changes only one format's adapter (for example only `plugins/au/` and
   its tests) could skip the other formats' workflows, as documentation-only
@@ -747,6 +741,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   build only what their tests run, long tests carry a CTest `COST` so they
   start first, and the portable clang-tidy files are analysed side by side;
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86, from
+  jrp's CI analysis: two campaigns at a time, one per core of the Linux
+  runner's two, each keeping its 60 seconds and about its usual executions;
+  the step went from 244 s to 122 s;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86: builds and
   tests used 2 of the 4 CPUs on the Linux and Windows runners; they now use
   all of them; the macOS Accelerate and Ooura builds went from about 120 s

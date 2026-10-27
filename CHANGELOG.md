@@ -37,6 +37,10 @@ Until 1.0 the C++ API may change between minor versions.
   Accelerate and Ooura builds took 65 to 82 seconds instead of about 120;
   whole workflows vary too much from run to run to show a firm gain. See
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- Continuous integration (CI-12): the four 60-second fuzz campaigns run two at
+  a time, one per core of the Linux runner, so the step takes about 2 minutes
+  instead of 4 and each campaign keeps about its usual number of executions.
+  See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 
 ### Fixed
 
