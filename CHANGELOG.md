@@ -30,6 +30,12 @@ Until 1.0 the C++ API may change between minor versions.
   2026 the Linux VST3 jobs went from 76 s and 67 s to 39 s and 52 s and
   clang-tidy from 70 s to 49 s. See
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- Continuous integration (CI-10): the Linux release candidate is built from
+  the corresponding-source archive with networking disabled and CMake's
+  default generator (Unix Makefiles), replacing the second, offline build of
+  the same archive; the macOS candidates still use Ninja. Candidate builds
+  also set `FETCHCONTENT_FULLY_DISCONNECTED`. See
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 - Continuous integration (CI-14): builds and tests use every CPU of the
   runner (4 on the Linux and Windows runners, which ran 2 at a time before),
   through the new `use-every-cpu` action; the release scripts use the

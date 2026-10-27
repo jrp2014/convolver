@@ -793,8 +793,12 @@ Linux x64 and both macOS architectures. It checks runtime dependency closure,
 source inventories, final ZIP relocation, the packaged guide's executable
 examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
 copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
-changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
-the supplied source with networking disabled. See the
+changed-directory upgrades and locked-file uninstall recovery. The Linux
+candidate is built with networking disabled, from the archive alone, with
+CMake's default generator (Unix Makefiles); the macOS candidates use Ninja and
+Windows Visual Studio (CI-10). Until 27 October 2026 a second, offline build of
+the same archive with `tests/release/source_build.py` did this on Linux; the
+script remains for [local checks](build.md#preview-recipe). See the
 [qualification record](releasing.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
@@ -907,7 +911,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | Tests | Run in | Not run in |
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
-| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit, the release candidates and the offline rebuild (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
+| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
 | Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 

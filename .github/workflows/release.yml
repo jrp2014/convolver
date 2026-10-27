@@ -135,13 +135,22 @@ jobs:
         run: >-
           python tests/release/windows_installer.py
           --nsis "${{ steps.nsis.outputs.makensis }}"
+      # CI-10: the Linux candidate is built with networking disabled (a new
+      # network namespace, back as the runner user), as anyone building the
+      # corresponding source would, so no second offline build is needed.
       - name: Build and verify Unix candidate
         if: runner.os != 'Windows'
-        run: >-
-          python scripts/release/candidate.py
-          --archive build/source/Convolver-source.tar.gz
-          --platform "$CANDIDATE_PLATFORM"
-          --work build/candidate --output build/assets
+        run: |
+          command=(python scripts/release/candidate.py
+            --archive build/source/Convolver-source.tar.gz
+            --platform "$CANDIDATE_PLATFORM"
+            --work build/candidate --output build/assets)
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo -E unshare --net -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups \
+              env PATH="$PATH" HOME="$HOME" "${command[@]}"
+          else
+            "${command[@]}"
+          fi
       - name: Build and verify Windows candidate
         if: runner.os == 'Windows'
         run: >-
@@ -150,13 +159,6 @@ jobs:
           --platform windows-x86_64
           --work build/candidate --output build/assets
           --nsis "${{ steps.nsis.outputs.makensis }}"
-      - name: Rebuild supplied source with networking disabled
-        if: runner.os == 'Linux'
-        run: >-
-          sudo unshare --net -- "$(command -v python)"
-          tests/release/source_build.py
-          --archive build/source/Convolver-source.tar.gz
-          --cmake "$(command -v cmake)"
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         run: python scripts/release/resolve.py explain-failure

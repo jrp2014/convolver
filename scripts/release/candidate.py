@@ -91,10 +91,15 @@ def build(archive, identifier, work, output, cmake, nsis=None):
                  '-DCONVOLVER_FFT_BACKEND=' + candidate['backend'], '-DCONVOLVER_LEGACY_TESTS=OFF',
                  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0',
                  # DIAG-1: matching debugging symbols, kept outside the package.
-                 '-DCONVOLVER_DEBUG_SYMBOLS=ON']
+                 '-DCONVOLVER_DEBUG_SYMBOLS=ON',
+                 # Everything comes from the archive; nothing may be downloaded.
+                 '-DFETCHCONTENT_FULLY_DISCONNECTED=ON']
+    # Linux keeps CMake's default generator (Unix Makefiles), which someone
+    # building the corresponding source gets; macOS uses Ninja, so the
+    # candidates cover both (CI-10).
     if platform.system() == 'Windows':
         configure += ['-A', 'x64']
-    else:
+    elif platform.system() == 'Darwin':
         configure += ['-G', 'Ninja']
     run(configure)
     run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', CPUS])

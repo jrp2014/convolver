@@ -643,13 +643,6 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
-- [ ] **CI-10 — One Linux source build for candidates.** The Linux candidate
-  builds and tests the supplied source archive, then rebuilds it with
-  networking disabled (94–129 s on 25 October 2026). Build the candidate itself
-  from the verified archive in a fresh, network-disabled environment, and drop
-  the second build only once every assertion, packaging check and generator it
-  covers is kept. From jrp's CI analysis of 25 October 2026; no coverage may be
-  lost. See [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 - [ ] **CI-11 — FFT backend configurations as parallel jobs.** The native
   macOS job builds and tests FFTW, core-only, Accelerate and Ooura one after
   another (8–9.5 minutes). Run them as separate jobs, keeping every test and
@@ -734,6 +727,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   build only what their tests run, long tests carry a CTest `COST` so they
   start first, and the portable clang-tidy files are analysed side by side;
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-10 — One Linux source build for candidates.** 27 October 2026,
+  PR #86, from jrp's CI analysis: the Linux candidate is built from the
+  verified archive with networking disabled and CMake's default generator, so
+  the second, offline build is gone; `source_build.py` stays for local checks
+  (CI no longer runs it);
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 - [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86, from
   jrp's CI analysis: two campaigns at a time, one per core of the Linux
   runner's two, each keeping its 60 seconds and about its usual executions;
