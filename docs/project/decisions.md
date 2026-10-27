@@ -12,7 +12,8 @@ and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
 jrp decides, record it here with its date; no other page carries decision
 notes or their dates ([workflow](../develop/workflow.md#while-working)). A
-change users will notice also goes in the [changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
+change users will notice, and every finished TODO item, also goes in the
+[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -127,3 +128,4 @@ were recorded in the repository; this log is their first written record.
 | 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md) |
 | 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md#decisions) |
 | 24 October 2026 | Decision notes and their dates appear only in this log, not as "(owner's decision, *date*)" on other pages | [Workflow](../develop/workflow.md#while-working) |
+| 27 October 2026 | Every finished TODO item gets a changelog entry naming its ID in the pull request that finishes it, contributor-only items included | [Workflow](../develop/workflow.md#recording-progress-in-todo) |

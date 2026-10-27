@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build an unsigned candidate from an exact source archive, then test its ZIP."""
 import argparse
+import os
 import json
 from pathlib import Path
 import platform
@@ -17,6 +18,9 @@ import resolve
 from sources import extract
 from symbols import check as check_symbols
 from verify_artifact import inventory, verify_files
+
+# Builds and tests use every CPU the machine has.
+CPUS = str(os.cpu_count() or 2)
 
 
 def run(command, **kwargs):
@@ -87,17 +91,22 @@ def build(archive, identifier, work, output, cmake, nsis=None):
                  '-DCONVOLVER_FFT_BACKEND=' + candidate['backend'], '-DCONVOLVER_LEGACY_TESTS=OFF',
                  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0',
                  # DIAG-1: matching debugging symbols, kept outside the package.
-                 '-DCONVOLVER_DEBUG_SYMBOLS=ON']
+                 '-DCONVOLVER_DEBUG_SYMBOLS=ON',
+                 # Everything comes from the archive; nothing may be downloaded.
+                 '-DFETCHCONTENT_FULLY_DISCONNECTED=ON']
+    # Linux keeps CMake's default generator (Unix Makefiles), which someone
+    # building the corresponding source gets; macOS uses Ninja, so the
+    # candidates cover both (CI-10).
     if platform.system() == 'Windows':
         configure += ['-A', 'x64']
-    else:
+    elif platform.system() == 'Darwin':
         configure += ['-G', 'Ninja']
     run(configure)
-    run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', '2'])
+    run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', CPUS])
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     # The CMake development package is not shipped: its consumers run in the native
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
-    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2',
+    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', CPUS,
          '-LE', 'consumer'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])

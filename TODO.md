@@ -643,34 +643,6 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
-- [ ] **CI-10 — One Linux source build for candidates.** The Linux candidate
-  builds and tests the supplied source archive, then rebuilds it with
-  networking disabled (94–129 s on 25 October 2026). Build the candidate itself
-  from the verified archive in a fresh, network-disabled environment, and drop
-  the second build only once every assertion, packaging check and generator it
-  covers is kept. From jrp's CI analysis of 25 October 2026; no coverage may be
-  lost. See [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
-- [ ] **CI-11 — FFT backend configurations as parallel jobs.** The native
-  macOS job builds and tests FFTW, core-only, Accelerate and Ooura one after
-  another (8–9.5 minutes). Run them as separate jobs, keeping every test and
-  the cross-backend output comparisons (`backend_equivalence.py`, which needs
-  two builds' CLIs). It shortens the wait, though extra setup may cost more
-  runner minutes and macOS runners are limited to 5 at once
-  ([CI triggers](docs/develop/testing.md#ci-triggers)). From jrp's CI analysis
-  of 25 October 2026.
-- [ ] **CI-12 — Fuzz campaigns side by side.** The four 60-second libFuzzer
-  campaigns run one after another (about 245 s). Run independent campaigns
-  concurrently where the runner has the CPUs, keeping each campaign's time
-  budget, and check that each still reaches its usual execution count; four
-  campaigns sharing one CPU would lose coverage. From jrp's CI analysis of 25
-  October 2026. See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
-- [ ] **CI-13 — Run only the affected format's workflows.** A pull request
-  that changes only one format's adapter (for example only `plugins/au/` and
-  its tests) could skip the other formats' workflows, as documentation-only
-  pull requests skip builds (CI-1); shared code and `main` still run
-  everything. Needs a dependency map from files to workflows, with tests like
-  `tests/ci_scope_tests.py`. From jrp's CI analysis of 25 October 2026; later
-  than CI-10 to CI-12.
 
 ## Documented limitations
 
@@ -746,6 +718,33 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
   build only what their tests run, long tests carry a CTest `COST` so they
   start first, and the portable clang-tidy files are analysed side by side;
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-10 — One Linux source build for candidates.** 27 October 2026,
+  PR #86, from jrp's CI analysis: the Linux candidate is built from the
+  verified archive with networking disabled and CMake's default generator, so
+  the second, offline build is gone; `source_build.py` stays for local checks
+  (CI no longer runs it);
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [x] **CI-11 — FFT backend configurations as parallel jobs.** Closed
+  without the split, 27 October 2026, PR #86, by jrp's choice: once builds used
+  every CPU (CI-14) the macOS job's Accelerate and Ooura builds took about
+  65–82 s instead of 120 s, and one commit already starts 6 macOS jobs against
+  the account's limit of 5, so more macOS jobs would make the candidates queue
+  longer; [CI triggers](docs/develop/testing.md#ci-triggers).
+- [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86, from
+  jrp's CI analysis: two campaigns at a time, one per core of the Linux
+  runner's two, each keeping its 60 seconds and about its usual executions;
+  the step went from 244 s to 122 s;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-13 — Run only the affected format's workflows.** 27 October 2026,
+  PR #86, from jrp's CI analysis: a pull request that changes only one plug-in
+  format's own files (or one workflow file) runs Lint and that format's
+  workflows; a test keeps every other file from depending on a format's files;
+  [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
+- [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86: builds and
+  tests used 2 of the 4 CPUs on the Linux and Windows runners; they now use
+  all of them; the macOS Accelerate and Ooura builds went from about 120 s
+  to 65–82 s (whole workflows vary too much between runs to show more);
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).

@@ -22,6 +22,41 @@ Until 1.0 the C++ API may change between minor versions.
   returned `HostFaults`, is gone: read `current` and `earlier` instead.
 - Library: `host_status()` takes the instance's `HostSettings` after
   `log_written`; without them it describes the default Gain and Mix.
+- Continuous integration (CI-9): the Linux VST3 jobs and the Audio Unit
+  sanitizer job build only what their tests run (the new
+  `convolver_vst3_suite` and `convolver_au_suite` targets), the long tests
+  carry a CTest `COST` so they start first, and `scripts/clang_tidy.py`
+  analyses the portable files side by side. No test was dropped; on 25 October
+  2026 the Linux VST3 jobs went from 76 s and 67 s to 39 s and 52 s and
+  clang-tidy from 70 s to 49 s. See
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- Continuous integration (CI-10): the Linux release candidate is built from
+  the corresponding-source archive with networking disabled and CMake's
+  default generator (Unix Makefiles), replacing the second, offline build of
+  the same archive; the macOS candidates still use Ninja. Candidate builds
+  also set `FETCHCONTENT_FULLY_DISCONNECTED`. See
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- Continuous integration (CI-11): the native macOS job keeps its FFT
+  backends in one job instead of splitting them, since the macOS runner limit
+  would make the release candidates wait longer. See
+  [CI triggers](docs/develop/testing.md#ci-triggers).
+- Continuous integration (CI-14): builds and tests use every CPU of the
+  runner (4 on the Linux and Windows runners, which ran 2 at a time before),
+  through the new `use-every-cpu` action; the release scripts use the
+  machine's CPU count. No test was dropped. On 27 October 2026 the macOS
+  Accelerate and Ooura builds took 65 to 82 seconds instead of about 120;
+  whole workflows vary too much from run to run to show a firm gain. See
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- Continuous integration (CI-12): the four 60-second fuzz campaigns run two at
+  a time, one per core of the Linux runner, so the step takes about 2 minutes
+  instead of 4 and each campaign keeps about its usual number of executions.
+  See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- Continuous integration (CI-13): a pull request that changes only one plug-in
+  format's adapter and tests (`plugins/au/` and `tests/au/`, for example), or
+  only one workflow file, runs Lint and that format's workflows and skips the
+  others; VST3 changes also run the candidates. Pushes to `main` still run
+  everything. See
+  [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
 
 ### Fixed
 
