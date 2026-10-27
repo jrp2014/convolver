@@ -36,6 +36,10 @@ Until 1.0 the C++ API may change between minor versions.
   the same archive; the macOS candidates still use Ninja. Candidate builds
   also set `FETCHCONTENT_FULLY_DISCONNECTED`. See
   [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- Continuous integration (CI-11): the native macOS job keeps its FFT
+  backends in one job instead of splitting them, since the macOS runner limit
+  would make the release candidates wait longer. See
+  [CI triggers](docs/develop/testing.md#ci-triggers).
 - Continuous integration (CI-14): builds and tests use every CPU of the
   runner (4 on the Linux and Windows runners, which ran 2 at a time before),
   through the new `use-every-cpu` action; the release scripts use the

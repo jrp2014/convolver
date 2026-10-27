@@ -643,14 +643,6 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
-- [ ] **CI-11 — FFT backend configurations as parallel jobs.** The native
-  macOS job builds and tests FFTW, core-only, Accelerate and Ooura one after
-  another (8–9.5 minutes). Run them as separate jobs, keeping every test and
-  the cross-backend output comparisons (`backend_equivalence.py`, which needs
-  two builds' CLIs). It shortens the wait, though extra setup may cost more
-  runner minutes and macOS runners are limited to 5 at once
-  ([CI triggers](docs/develop/testing.md#ci-triggers)). From jrp's CI analysis
-  of 25 October 2026.
 
 ## Documented limitations
 
@@ -733,6 +725,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   the second, offline build is gone; `source_build.py` stays for local checks
   (CI no longer runs it);
   [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [x] **CI-11 — FFT backend configurations as parallel jobs.** Closed
+  without the split, 27 October 2026, PR #86, by jrp's choice: once builds used
+  every CPU (CI-14) the macOS job's Accelerate and Ooura builds took about
+  65–82 s instead of 120 s, and one commit already starts 6 macOS jobs against
+  the account's limit of 5, so more macOS jobs would make the candidates queue
+  longer; [CI triggers](docs/develop/testing.md#ci-triggers).
 - [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86, from
   jrp's CI analysis: two campaigns at a time, one per core of the Linux
   runner's two, each keeping its 60 seconds and about its usual executions;

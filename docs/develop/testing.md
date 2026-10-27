@@ -836,7 +836,11 @@ re-running an older commit's run cancels the current one.
 
 This keeps the queue short. On the owner's Free plan GitHub runs at most 20
 jobs at once across the account's repositories, and only 5 on macOS, and one
-commit starts about 24 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
+commit starts 28 jobs, 6 of them on macOS (27 October 2026). So more macOS
+jobs do not shorten the wait, and the native macOS job's FFT backends stay in
+one job: splitting them (CI-11, not done) would only make the candidates queue
+longer.
+When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
 
