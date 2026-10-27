@@ -65,6 +65,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -166,11 +168,11 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
-        run: cmake --build build-vst3 --config Release --parallel 2 ${{ matrix.targets }}
+        run: cmake --build build-vst3 --config Release ${{ matrix.targets }}
       - name: VST3 validator, pluginval and the VST3 tests
         run: >-
           ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
-          --parallel 2 ${{ matrix.tests }}
+          ${{ matrix.tests }}
       # The newest pluginval beta or release candidate, when one is newer than
       # the release above: what it reports is a warning in the summary, not a
       # failure, since a pre-release only signposts what is coming. The one

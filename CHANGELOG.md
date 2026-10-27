@@ -30,6 +30,13 @@ Until 1.0 the C++ API may change between minor versions.
   2026 the Linux VST3 jobs went from 76 s and 67 s to 39 s and 52 s and
   clang-tidy from 70 s to 49 s. See
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- Continuous integration (CI-14): builds and tests use every CPU of the
+  runner (4 on the Linux and Windows runners, which ran 2 at a time before),
+  through the new `use-every-cpu` action; the release scripts use the
+  machine's CPU count. No test was dropped. On 27 October 2026 the macOS
+  Accelerate and Ooura builds took 65 to 82 seconds instead of about 120;
+  whole workflows vary too much from run to run to show a firm gain. See
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 
 ### Fixed
 

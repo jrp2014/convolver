@@ -4,6 +4,7 @@
 The policy passed in carries resolved records (contract.with_records): the
 exact releases resolve.py chose, or a source manifest recorded."""
 import argparse
+import os
 import json
 from pathlib import Path
 import platform
@@ -13,6 +14,9 @@ import sys
 from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
 import resolve
 from sources import unpack_dependencies
+
+# Builds and tests use every CPU the machine has.
+CPUS = str(os.cpu_count() or 2)
 
 
 def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',)):
@@ -43,7 +47,7 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
             continue
         output = work / ('build-' + name)
         subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
-        subprocess.run([cmake, '--build', str(output), '--config', 'Release', '--parallel', '2'], check=True)
+        subprocess.run([cmake, '--build', str(output), '--config', 'Release', '--parallel', CPUS], check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
     inventory = {name: {key: value for key, value in dep.items()
                         if key in ('version', 'tag', 'revision', 'url', 'sha256', 'license')}

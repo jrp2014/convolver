@@ -747,6 +747,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   build only what their tests run, long tests carry a CTest `COST` so they
   start first, and the portable clang-tidy files are analysed side by side;
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86: builds and
+  tests used 2 of the 4 CPUs on the Linux and Windows runners; they now use
+  all of them; the macOS Accelerate and Ooura builds went from about 120 s
+  to 65–82 s (whole workflows vary too much between runs to show more);
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

@@ -52,6 +52,8 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -79,12 +81,12 @@ jobs:
           cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_AU=ON
           "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK" -DCONVOLVER_LEGACY_TESTS=OFF
       - name: Build the component, CLI and tests
-        run: cmake --build build-au --parallel 3
+        run: cmake --build build-au
       - name: Core, CLI, AU adapter and PLUG-2 harness
         # The repository checks and package consumers run in the native jobs
         # (docs/develop/testing.md#which-configurations-run-which-tests).
         run: >-
-          ctest --test-dir build-au --output-on-failure --output-junit junit.xml --parallel 3
+          ctest --test-dir build-au --output-on-failure --output-junit junit.xml
           -LE 'repository|consumer'
       - name: Install for this user
         run: |
@@ -127,6 +129,8 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -149,9 +153,9 @@ jobs:
           -DCONVOLVER_LEGACY_TESTS=OFF
       # Only what the au.* tests run (CI-9).
       - name: Build
-        run: cmake --build build-au --parallel 3 --target convolver_au_suite
+        run: cmake --build build-au --target convolver_au_suite
       - name: AU adapter, harness and lifecycle under ASan and UBSan
-        run: ctest --test-dir build-au --output-on-failure --output-junit junit.xml --parallel 3 -L au
+        run: ctest --test-dir build-au --output-on-failure --output-junit junit.xml -L au
       - name: Collect test evidence
         if: failure()
         run: python scripts/ci_evidence.py test-evidence build-au

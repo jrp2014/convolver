@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build an unsigned candidate from an exact source archive, then test its ZIP."""
 import argparse
+import os
 import json
 from pathlib import Path
 import platform
@@ -17,6 +18,9 @@ import resolve
 from sources import extract
 from symbols import check as check_symbols
 from verify_artifact import inventory, verify_files
+
+# Builds and tests use every CPU the machine has.
+CPUS = str(os.cpu_count() or 2)
 
 
 def run(command, **kwargs):
@@ -93,11 +97,11 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     else:
         configure += ['-G', 'Ninja']
     run(configure)
-    run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', '2'])
+    run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', CPUS])
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     # The CMake development package is not shipped: its consumers run in the native
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
-    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', '2',
+    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', CPUS,
          '-LE', 'consumer'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])

@@ -46,6 +46,8 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
       # Compiler cache: pull requests restore it; main and manual runs also
@@ -63,7 +65,7 @@ jobs:
           -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_DOCUMENTATION_TESTS=OFF
       - name: Build fuzz targets
         run: >
-          cmake --build build-fuzz --parallel 2
+          cmake --build build-fuzz
           --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
       - name: Run each target
         env:

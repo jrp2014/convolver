@@ -902,6 +902,16 @@ not find executable", a Python-driven test its own error), so a new plug-in
 test's target goes into its format's target (`au_test_targets` for the Audio
 Unit).
 
+Every build and test job uses all the runner's CPUs: the local
+[`use-every-cpu`](../../.github/actions/use-every-cpu/action.yml) action sets
+`CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` to the CPU count
+(4 on GitHub's Linux and Windows runners for public repositories, 3 on
+`macos-latest`), so the workflows call `cmake --build` and `ctest` without a
+count. The LV2 jobs build with Ninja and a bare `--parallel`, which uses
+Ninja's own default, also every CPU. The release scripts (`candidate.py`, `build_dependencies.py`,
+`source_build.py`) pass the machine's CPU count themselves. The CMake presets
+keep `jobs: 2` for local builds; CI passes the count to the core-only preset.
+
 Under `ctest --parallel`, CTest starts the tests that others need first (a
 fixture's setup), then the ready tests in decreasing `COST`. The long tests
 carry a `COST` of about their longest CI time in seconds, so they start at

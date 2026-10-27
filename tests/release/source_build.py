@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build a supplied source tree in a fresh directory; never fetch implicitly."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/release'))
 from contract import load_policy, sha256, with_records
 from sources import extract
 from build_dependencies import build as build_dependencies
+
+# Builds and tests use every CPU the machine has.
+CPUS = str(os.cpu_count() or 2)
 
 
 def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_dir=None):
@@ -26,10 +30,10 @@ def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_di
         if exclude_validator:
             configure += ['-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF']
         subprocess.run(configure, check=True)
-        subprocess.run([cmake, '--build', str(build), '--config', 'Release', '--parallel', '2'], check=True)
+        subprocess.run([cmake, '--build', str(build), '--config', 'Release', '--parallel', CPUS], check=True)
         ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
         # As in the candidate build, the unshipped CMake package's consumers are left to native CI.
-        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure', '--parallel', '2',
+        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure', '--parallel', CPUS,
                    '-LE', 'consumer']
         if exclude_validator:
             print('SDK bundle validator explicitly excluded; this is NOT release evidence.', flush=True)

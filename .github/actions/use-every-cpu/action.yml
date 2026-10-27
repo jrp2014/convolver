@@ -1,0 +1,19 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Use every CPU
+description: >-
+  Sets CMAKE_BUILD_PARALLEL_LEVEL and CTEST_PARALLEL_LEVEL to the runner's CPU
+  count, so `cmake --build` and `ctest` without --parallel use every CPU
+  (docs/develop/testing.md#build-targets-and-test-order).
+runs:
+  using: composite
+  steps:
+    - name: Count the CPUs
+      shell: bash
+      run: |
+        cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || sysctl -n hw.logicalcpu)
+        echo "Builds and tests run $cpus at a time."
+        {
+          echo "CMAKE_BUILD_PARALLEL_LEVEL=$cpus"
+          echo "CTEST_PARALLEL_LEVEL=$cpus"
+        } >> "$GITHUB_ENV"
