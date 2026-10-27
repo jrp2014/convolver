@@ -22,6 +22,14 @@ Until 1.0 the C++ API may change between minor versions.
   returned `HostFaults`, is gone: read `current` and `earlier` instead.
 - Library: `host_status()` takes the instance's `HostSettings` after
   `log_written`; without them it describes the default Gain and Mix.
+- Continuous integration (CI-9): the Linux VST3 jobs and the Audio Unit
+  sanitizer job build only what their tests run (the new
+  `convolver_vst3_suite` and `convolver_au_suite` targets), the long tests
+  carry a CTest `COST` so they start first, and `scripts/clang_tidy.py`
+  analyses the portable files side by side. No test was dropped; on 25 October
+  2026 the Linux VST3 jobs went from 76 s and 67 s to 39 s and 52 s and
+  clang-tidy from 70 s to 49 s. See
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
 
 ### Fixed
 
