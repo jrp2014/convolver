@@ -658,13 +658,6 @@ so the preset file path is not needed).
   runner minutes and macOS runners are limited to 5 at once
   ([CI triggers](docs/develop/testing.md#ci-triggers)). From jrp's CI analysis
   of 25 October 2026.
-- [ ] **CI-13 — Run only the affected format's workflows.** A pull request
-  that changes only one format's adapter (for example only `plugins/au/` and
-  its tests) could skip the other formats' workflows, as documentation-only
-  pull requests skip builds (CI-1); shared code and `main` still run
-  everything. Needs a dependency map from files to workflows, with tests like
-  `tests/ci_scope_tests.py`. From jrp's CI analysis of 25 October 2026; later
-  than CI-10 to CI-12.
 
 ## Documented limitations
 
@@ -746,6 +739,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   runner's two, each keeping its 60 seconds and about its usual executions;
   the step went from 244 s to 122 s;
   [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-13 — Run only the affected format's workflows.** 27 October 2026,
+  PR #86, from jrp's CI analysis: a pull request that changes only one plug-in
+  format's own files (or one workflow file) runs Lint and that format's
+  workflows; a test keeps every other file from depending on a format's files;
+  [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
 - [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86: builds and
   tests used 2 of the 4 CPUs on the Linux and Windows runners; they now use
   all of them; the macOS Accelerate and Ooura builds went from about 120 s

@@ -24,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests that change only documentation skip the builds and tests
+  # Pull requests that change only documentation, or only another plug-in
+  # format's or workflow's own files (CI-13), skip the builds and tests
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
@@ -35,7 +36,7 @@ jobs:
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+        run: python3 scripts/ci_scope.py --workflow fuzz --github-output "$GITHUB_OUTPUT"
 
   libfuzzer:
     needs: scope

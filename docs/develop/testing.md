@@ -871,6 +871,30 @@ require a job that always reports: a skipped matrix job shows under its
 unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
 forever on a documentation-only pull request.
 
+### Pull requests for one plug-in format
+
+A pull request that changes only one format's own files, apart from
+documentation, runs Lint and that format's workflows; the `scope` job of every
+other workflow skips it (CI-13). A change to one workflow file alone runs that
+workflow. Anything else in the same pull request runs everything.
+
+| Files changed | Workflows that build and test |
+| --- | --- |
+| `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
+| `plugins/au/`, `tests/au/` | Audio Unit |
+| `plugins/lv2/`, `tests/lv2/` | LV2 |
+| `.github/workflows/NAME.yml` | that workflow |
+
+The shared parts are not a format's files: the PLUG-2 harness in
+`tests/plugins/`, `plugins/identities.json` (Lint checks the identities on
+every pull request) and `tests/vst3/fft_symbols.py`, which the LV2 tests run
+too. `tests/ci_scope_tests.py` keeps the map honest: outside a format's
+folders and its workflow, only the files it lists, each with its reason, may
+name that format's files or its `CONVOLVER_BUILD_` option, and CI may use no
+CMake preset but `core-only`. When another build starts using a format's file,
+add the file to `SHARED` in `ci_scope.py` or the workflow to
+`FORMAT_WORKFLOWS`.
+
 ### Which configurations run which tests
 
 A local build runs every CTest entry. CI runs each kind of test only where

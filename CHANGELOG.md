@@ -41,6 +41,12 @@ Until 1.0 the C++ API may change between minor versions.
   a time, one per core of the Linux runner, so the step takes about 2 minutes
   instead of 4 and each campaign keeps about its usual number of executions.
   See [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- Continuous integration (CI-13): a pull request that changes only one plug-in
+  format's adapter and tests (`plugins/au/` and `tests/au/`, for example), or
+  only one workflow file, runs Lint and that format's workflows and skips the
+  others; VST3 changes also run the candidates. Pushes to `main` still run
+  everything. See
+  [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
 
 ### Fixed
 
