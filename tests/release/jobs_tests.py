@@ -3,9 +3,11 @@
 
 Builds and tests use every CPU by default (CI-14); `--jobs N` lowers that for
 a machine with less memory. These tests check the default, the validation, the
-option on each script, and that the dependency build passes the limit to CMake.
+option on each script, and that the dependency build and the source build
+pass the limit to CMake and CTest.
 """
 import argparse
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -68,6 +70,21 @@ class JobsTests(unittest.TestCase):
                 builds = [call.args[0] for call in run.call_args_list if '--build' in call.args[0]]
                 self.assertEqual(len(builds), 1)
                 self.assertEqual(builds[0][-2:], ['--parallel', expected])
+
+    def test_source_build_passes_the_limit(self):
+        spec = importlib.util.spec_from_file_location('source_build', ROOT / 'tests/release/source_build.py')
+        source_build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(source_build)
+        for jobs, expected in ((None, str(os.cpu_count() or 2)), (3, '3')):
+            with self.subTest(jobs=jobs), mock.patch.object(source_build.subprocess, 'run') as run:
+                source_build.run(ROOT, Path('sdk'), Path('prefix'), 'OOURA', 'cmake', jobs=jobs)
+                commands = [call.args[0] for call in run.call_args_list]
+                builds = [command for command in commands if '--build' in command]
+                tests = [command for command in commands if '--test-dir' in command]
+                self.assertEqual((len(builds), len(tests)), (1, 1))
+                for command in builds + tests:
+                    index = command.index('--parallel')
+                    self.assertEqual(command[index + 1], expected)
 
 
 if __name__ == '__main__':
