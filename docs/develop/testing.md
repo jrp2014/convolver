@@ -962,7 +962,10 @@ Every build and test job uses all the runner's CPUs: the local
 `macos-latest`), so the workflows call `cmake --build` and `ctest` without a
 count. The LV2 jobs build with Ninja and a bare `--parallel`, which uses
 Ninja's own default, also every CPU. The release scripts (`candidate.py`, `build_dependencies.py`,
-`source_build.py`) pass the machine's CPU count themselves. The CMake presets
+`source_build.py`) pass the machine's CPU count themselves, unless their
+`--jobs` option sets a lower limit for a local build (CI-16,
+[preview recipe](build.md#preview-recipe)); `tests/release/jobs_tests.py`
+checks the option. The CMake presets
 keep `jobs: 2` for local builds; CI passes the count to the core-only preset.
 
 Under `ctest --parallel`, CTest starts the tests that others need first (a

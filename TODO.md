@@ -643,12 +643,6 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
-- [ ] **CI-16 — A `--jobs` limit for release builds.** The release scripts
-  (`candidate.py`, `build_dependencies.py`, `source_build.py`) build and test
-  with every CPU (CI-14), which suits hosted runners but can exhaust memory on
-  a smaller local machine. Add a `--jobs N` option; the default stays every
-  CPU. From the external review of PR #86 (27 October 2026). See
-  [preview recipe](docs/develop/build.md#preview-recipe).
 
 ## Documented limitations
 
@@ -758,6 +752,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   failing campaign, a missing status file and the concurrency limit with
   stand-in fuzzers;
   [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-16 — A `--jobs` limit for release builds.** 28 October 2026,
+  PR #87, from the external review of PR #86: `candidate.py`,
+  `build_dependencies.py` and `source_build.py` take `--jobs N`; the default
+  stays every CPU; [preview recipe](docs/develop/build.md#preview-recipe).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

@@ -65,6 +65,11 @@ Until 1.0 the C++ API may change between minor versions.
   an earlier local run can no longer stand in for a campaign that recorded
   none. From the external review of PR #86. See
   [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- Release scripts (CI-16): `candidate.py`, `build_dependencies.py` and
+  `tests/release/source_build.py` take `--jobs N`, which limits their builds
+  and tests to N jobs at once for a machine with less memory; without it they
+  still use every CPU. From the external review of PR #86. See
+  [preview recipe](docs/develop/build.md#preview-recipe).
 
 ### Fixed
 

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build a supplied source tree in a fresh directory; never fetch implicitly."""
 import argparse
-import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,13 +10,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/release'))
 from contract import load_policy, sha256, with_records
 from sources import extract
-from build_dependencies import build as build_dependencies
-
-# Builds and tests use every CPU the machine has.
-CPUS = str(os.cpu_count() or 2)
+from build_dependencies import add_jobs_option, build as build_dependencies, parallel
 
 
-def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_dir=None):
+def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_dir=None, jobs=None):
     with tempfile.TemporaryDirectory(prefix='convolver-source-build-') as temporary:
         build = Path(temporary) / 'build'
         configure = [cmake, '-S', str(source), '-B', str(build),
@@ -30,11 +26,11 @@ def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_di
         if exclude_validator:
             configure += ['-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF']
         subprocess.run(configure, check=True)
-        subprocess.run([cmake, '--build', str(build), '--config', 'Release', '--parallel', CPUS], check=True)
+        subprocess.run([cmake, '--build', str(build), '--config', 'Release'] + parallel(jobs), check=True)
         ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
         # As in the candidate build, the unshipped CMake package's consumers are left to native CI.
-        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure', '--parallel', CPUS,
-                   '-LE', 'consumer']
+        command = [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure'] + parallel(jobs) + [
+            '-LE', 'consumer']
         if exclude_validator:
             print('SDK bundle validator explicitly excluded; this is NOT release evidence.', flush=True)
         subprocess.run(command, check=True)
@@ -50,6 +46,7 @@ if __name__ == '__main__':
                         help='CONVOLVER_FFT_BACKEND; AUTO is Ooura, or Accelerate on macOS, for plug-in builds')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--exclude-validator', action='store_true')
+    add_jobs_option(parser)
     args = parser.parse_args()
     if args.archive:
         with tempfile.TemporaryDirectory(prefix='convolver-offline-source-') as temporary:
@@ -66,9 +63,10 @@ if __name__ == '__main__':
                                   manifest['dependencies'])
             work = root / 'dependencies-build'
             sdk, prefix = build_dependencies(policy, source / 'dependencies', work, args.cmake, fetch=False,
-                                             backend=args.backend)
-            run(source / 'convolver', sdk, prefix, args.backend, args.cmake, args.exclude_validator, work / 'licenses')
+                                             backend=args.backend, jobs=args.jobs)
+            run(source / 'convolver', sdk, prefix, args.backend, args.cmake, args.exclude_validator, work / 'licenses',
+                args.jobs)
     else:
         if not args.sdk or not args.prefix:
             parser.error('--sdk and --prefix are required without --archive')
-        run(args.source, args.sdk, args.prefix, args.backend, args.cmake, args.exclude_validator)
+        run(args.source, args.sdk, args.prefix, args.backend, args.cmake, args.exclude_validator, jobs=args.jobs)

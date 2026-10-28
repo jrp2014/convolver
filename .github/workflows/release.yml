@@ -57,6 +57,7 @@ jobs:
           python tests/release/resolve_tests.py
           python tests/release/docs_tests.py
           python tests/release/symbols_tests.py
+          python tests/release/jobs_tests.py
       # CI-6: each dependency's newest release; source-manifest.json and the
       # job summary record exactly which (version, tag, commit, checksum).
       - name: Assemble corresponding source
