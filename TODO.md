@@ -643,14 +643,6 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
-- [ ] **CI-15 — Test the fuzz scheduler's failure paths.** The fuzz
-  workflow's step that runs the campaigns side by side (CI-12) must fail when
-  any campaign fails, including one whose exit status was never recorded, and
-  must never run more campaigns at once than its limit. Successful CI runs
-  exercise none of this. Move the scheduler into a script and test a failing
-  campaign, a missing status file and the concurrency limit with stand-in
-  fuzzers. From the external review of PR #86 (27 October 2026). See
-  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [ ] **CI-16 — A `--jobs` limit for release builds.** The release scripts
   (`candidate.py`, `build_dependencies.py`, `source_build.py`) build and test
   with every CPU (CI-14), which suits hosted runners but can exhaust memory on
@@ -760,6 +752,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   all of them; the macOS Accelerate and Ooura builds went from about 120 s
   to 65–82 s (whole workflows vary too much between runs to show more);
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-15 — Test the fuzz scheduler's failure paths.** 28 October 2026,
+  PR #87, from the external review of PR #86: the scheduler is
+  `scripts/fuzz_campaigns.sh`, and `tests/fuzz/scheduler_tests.py` checks a
+  failing campaign, a missing status file and the concurrency limit with
+  stand-in fuzzers;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

@@ -786,6 +786,19 @@ run at a time and the step takes about 2 minutes instead of 4. On 27 October
 smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
 
+[`fuzz_campaigns.sh`](../../scripts/fuzz_campaigns.sh) is the scheduler: it
+copies the seeds, starts the campaigns, waits whenever as many run as the
+limit (`--jobs`, by default the physical cores `lscpu` reports), and then
+prints each campaign's exit status and last log lines. The step fails if any
+campaign fails, or if one leaves no status file because it was killed
+before it could write one; a status file left by an earlier run in the same
+output folder is removed first. It needs bash 4.3 or later (for `wait -n`).
+[`scheduler_tests.py`](../../tests/fuzz/scheduler_tests.py) runs it with
+stand-in fuzzers (shell scripts, nothing compiled) and checks a failing
+campaign, a missing status file, a missing fuzzer and seed folder, and that
+no more campaigns than the limit run at once (CI-15); pre-commit runs it
+when either file changes, so Lint runs it on every pull request.
+
 ## Plug-in candidate checks
 
 The read-only candidate workflow builds native preview archives on Windows x64,

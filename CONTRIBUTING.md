@@ -142,8 +142,11 @@ regression tests on every invocation. A further hook checks the
 [permanent plug-in identities](docs/develop/plugin-identities.md#changing-the-registry),
 another tests which files let a pull request
 [skip the builds](docs/develop/testing.md#documentation-only-pull-requests),
-and another tests the parallel clang-tidy runner. They use only Python's standard library
-and can be run independently:
+another tests the parallel clang-tidy runner, and another, whenever
+`scripts/fuzz_campaigns.sh` or its test changes, the
+[fuzz scheduler](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns)'s
+failure paths (it needs bash 4.3 or later and is skipped on macOS's bash 3.2).
+They use only Python's standard library and can be run independently:
 
 ```sh
 python3 scripts/check_doc_links.py
@@ -153,6 +156,7 @@ python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
 python3 tests/ci_scope_tests.py
 python3 tests/clang_tidy_tests.py
+python3 tests/fuzz/scheduler_tests.py
 ```
 
 [Repository checks](docs/develop/workflow.md#automated-checks) lists each rule and what

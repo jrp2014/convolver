@@ -34,7 +34,9 @@ build-fuzz/fuzz_config_text corpus tests/fuzz/regressions/config_text \
 
 Fuzz into a scratch corpus directory, not `seeds/`, so libFuzzer's new inputs do
 not end up in the repository. CI (`.github/workflows/fuzz.yml`) runs each target
-for 60 seconds with these options; a manual run of the workflow takes a longer
+for 60 seconds with these options, side by side through
+`scripts/fuzz_campaigns.sh` (`--seconds 600` runs the same campaigns locally;
+`scheduler_tests.py` tests it); a manual run of the workflow takes a longer
 duration per target, and failing inputs are kept as the `fuzz-findings` artifact.
 
 ## When a fuzzer finds something

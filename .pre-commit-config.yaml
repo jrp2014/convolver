@@ -77,6 +77,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: fuzz-scheduler-tests
+        name: Fuzz campaign scheduler failure paths
+        entry: python tests/fuzz/scheduler_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/fuzz_campaigns\.sh|tests/fuzz/scheduler_tests\.py)$
       - id: clang-tidy-runner-tests
         name: Parallel clang-tidy runner
         entry: python tests/clang_tidy_tests.py
