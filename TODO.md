@@ -643,6 +643,20 @@ so the preset file path is not needed).
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
+- [ ] **CI-15 — Test the fuzz scheduler's failure paths.** The fuzz
+  workflow's step that runs the campaigns side by side (CI-12) must fail when
+  any campaign fails, including one whose exit status was never recorded, and
+  must never run more campaigns at once than its limit. Successful CI runs
+  exercise none of this. Move the scheduler into a script and test a failing
+  campaign, a missing status file and the concurrency limit with stand-in
+  fuzzers. From the external review of PR #86 (27 October 2026). See
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [ ] **CI-16 — A `--jobs` limit for release builds.** The release scripts
+  (`candidate.py`, `build_dependencies.py`, `source_build.py`) build and test
+  with every CPU (CI-14), which suits hosted runners but can exhaust memory on
+  a smaller local machine. Add a `--jobs N` option; the default stays every
+  CPU. From the external review of PR #86 (27 October 2026). See
+  [preview recipe](docs/develop/build.md#preview-recipe).
 
 ## Documented limitations
 
