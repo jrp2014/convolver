@@ -42,6 +42,8 @@
 build/
 Build/
 build-*/
+# Local fuzz campaigns (scripts/fuzz_campaigns.sh's default output)
+fuzz-out/
 
 # CMake generated files
 CMakeFiles/

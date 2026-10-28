@@ -30,13 +30,37 @@ needs_value() {
   fi
 }
 
+# The default limit and where it came from: physical cores from lscpu (Linux;
+# hardware threads of one core count once) or sysctl (macOS), else the CPU
+# count, else 1. Prints "COUNT DESCRIPTION".
+count_cores() {
+  local count
+  count=$(lscpu --parse=CORE,SOCKET 2>/dev/null | grep -v '^#' | sort -u | wc -l)
+  count=$((count))
+  if [ "$count" -ge 1 ]; then
+    echo "$count physical cores (lscpu)"
+    return
+  fi
+  count=$(sysctl -n hw.physicalcpu 2>/dev/null)
+  if [[ $count =~ ^[1-9][0-9]*$ ]]; then
+    echo "$count physical cores (sysctl)"
+    return
+  fi
+  count=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+  if [[ $count =~ ^[1-9][0-9]*$ ]]; then
+    echo "$count CPUs (getconf; physical cores unknown, so hardware threads count as cores)"
+    return
+  fi
+  echo "1 (no CPU count found; give --jobs)"
+}
+
 # `wait -n` needs bash 4.3 (macOS ships 3.2; use a newer bash there).
 if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 3 ]; }; then
   echo "error: $0 needs bash 4.3 or later (for wait -n); this is bash $BASH_VERSION" >&2
   exit 2
 fi
 
-source_dir=$(cd "$(dirname "$0")/.." && pwd)
+source_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 build='build-fuzz'
 output='fuzz-out'
 seconds=60
@@ -62,10 +86,8 @@ if ! [[ $seconds =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 if [ -z "$limit" ]; then
-  # Distinct (core, socket) pairs; hardware threads of one core count once.
-  limit=$(lscpu --parse=CORE,SOCKET 2>/dev/null | grep -v '^#' | sort -u | wc -l)
-  limit=$((limit))
-  [ "$limit" -ge 1 ] || limit=1
+  read -r limit counted <<< "$(count_cores)"
+  echo "Campaign limit: $limit $counted"
   lscpu 2>/dev/null | grep -E '^(CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)):' || true
 elif ! [[ $limit =~ ^[1-9][0-9]*$ ]]; then
   echo "error: --jobs must be a whole number, 1 or more, not '$limit'" >&2

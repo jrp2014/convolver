@@ -78,13 +78,15 @@ class SchedulerTests(unittest.TestCase):
         program.write_text(text)
         program.chmod(program.stat().st_mode | stat.S_IXUSR)
 
-    def run_scheduler(self, *arguments, jobs='2', sleep='0', targets=TARGETS):
+    def run_scheduler(self, *arguments, jobs='2', sleep='0', targets=TARGETS, path=None):
         command = ['bash', str(SCRIPT), '--build', str(self.build), '--output', str(self.output),
                    '--source', str(self.source), '--seconds', '7']
         if jobs is not None:
             command += ['--jobs', jobs]
         command += list(arguments) + list(targets)
         environment = dict(os.environ, RECORD=str(self.record), SLEEP=sleep)
+        if path:
+            environment['PATH'] = path
         return subprocess.run(command, capture_output=True, text=True, env=environment, timeout=120)
 
     def concurrency(self):
@@ -167,6 +169,31 @@ class SchedulerTests(unittest.TestCase):
         result = self.run_scheduler(jobs=None)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertRegex(result.stdout, r'Running [1-9][0-9]* campaigns at a time')
+
+    def test_default_limit_sources(self):
+        # Stand-ins for lscpu, sysctl and getconf, first on PATH. lscpu's
+        # parsable output lists one line per hardware thread: 4 threads on
+        # 2 cores give 2 campaigns at a time, as on GitHub's Linux runner.
+        lscpu_two_cores = 'printf "# CORE,SOCKET\\n0,0\\n0,0\\n1,0\\n1,0\\n"'
+        cases = (
+            ({'lscpu': lscpu_two_cores}, 'Running 2 campaigns', '2 physical cores (lscpu)'),
+            ({'sysctl': 'echo 3'}, 'Running 3 campaigns', '3 physical cores (sysctl)'),
+            ({'getconf': 'echo 5'}, 'Running 5 campaigns', '5 CPUs (getconf'),
+            ({}, 'Running 1 campaigns', 'no CPU count found'),
+        )
+        for working, running, described in cases:
+            with self.subTest(described=described):
+                tools = self.root / 'tools'
+                shutil.rmtree(tools, ignore_errors=True)
+                tools.mkdir()
+                for tool in ('lscpu', 'sysctl', 'getconf'):
+                    program = tools / tool
+                    program.write_text('#!/bin/sh\n' + working.get(tool, 'exit 1') + '\n')
+                    program.chmod(0o755)
+                result = self.run_scheduler(jobs=None, path=f'{tools}{os.pathsep}{os.environ["PATH"]}')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(running + ' at a time', result.stdout)
+                self.assertIn(described, result.stdout)
 
     def test_rejects_bad_numbers(self):
         for option, value in (('--jobs', '0'), ('--jobs', 'two'), ('--seconds', '-5'), ('--seconds', '')):
