@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Build an unsigned candidate from an exact source archive, then test its ZIP."""
 import argparse
-import os
 import json
 from pathlib import Path
 import platform
@@ -11,17 +10,13 @@ import sys
 import tarfile
 import tempfile
 import zipfile
-from build_dependencies import build as build_dependencies
+from build_dependencies import add_jobs_option, build as build_dependencies, parallel
 from contract import load_policy, platform_policy, sha256, with_records
 from installers import prepare
 import resolve
 from sources import extract
 from symbols import check as check_symbols
 from verify_artifact import inventory, verify_files
-
-# Builds and tests use every CPU the machine has.
-CPUS = str(os.cpu_count() or 2)
-
 
 def run(command, **kwargs):
     subprocess.run([str(arg) for arg in command], check=True, **kwargs)
@@ -59,7 +54,7 @@ def keep_symbols(build_dir, stage, symbols, identifier, commit, version, system=
         'See docs/develop/releasing.md#debugging-symbols.\n')
 
 
-def build(archive, identifier, work, output, cmake, nsis=None):
+def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     if work.exists() or output.exists():
         raise ValueError('candidate work/output directories must be new')
     work.mkdir(parents=True)
@@ -82,7 +77,7 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     if platform.system() != candidate['os']:
         raise ValueError('candidate must be built on its target OS')
     deps = work / 'deps'
-    sdk, prefix = build_dependencies(policy, bundle / 'dependencies', deps, cmake, architecture=candidate['architecture'] if platform.system() == 'Darwin' else None, backend=candidate['backend'])
+    sdk, prefix = build_dependencies(policy, bundle / 'dependencies', deps, cmake, architecture=candidate['architecture'] if platform.system() == 'Darwin' else None, backend=candidate['backend'], jobs=jobs)
     build_dir = work / 'build'
     configure = [cmake, '-S', source, '-B', build_dir, '-DCMAKE_BUILD_TYPE=Release',
                  '-DCONVOLVER_BUILD_VST3=ON', '-DCONVOLVER_PACKAGE_PLUGINS=ON',
@@ -102,12 +97,12 @@ def build(archive, identifier, work, output, cmake, nsis=None):
     elif platform.system() == 'Darwin':
         configure += ['-G', 'Ninja']
     run(configure)
-    run([cmake, '--build', build_dir, '--config', 'Release', '--parallel', CPUS])
+    run([cmake, '--build', build_dir, '--config', 'Release'] + parallel(jobs))
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     # The CMake development package is not shipped: its consumers run in the native
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
-    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', '--parallel', CPUS,
-         '-LE', 'consumer'])
+    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure'] + parallel(jobs) +
+        ['-LE', 'consumer'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     keep_symbols(build_dir, stage, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
@@ -188,6 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--nsis', type=Path)
+    add_jobs_option(parser)
     args = parser.parse_args()
     build(args.archive.resolve(), args.platform, args.work.resolve(), args.output.resolve(), args.cmake,
-          args.nsis.resolve() if args.nsis else None)
+          args.nsis.resolve() if args.nsis else None, args.jobs)

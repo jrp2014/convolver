@@ -72,40 +72,13 @@ jobs:
       # so each keeps a core of its own for its whole time budget: four at once
       # on the runner's 4 CPUs gave each about half its usual executions
       # (docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns). The
-      # step fails if any campaign does; each log's last lines include its
-      # "Done N runs".
+      # step fails if any campaign fails or leaves no exit status;
+      # tests/fuzz/scheduler_tests.py tests that (CI-15). Each log's last lines
+      # include its "Done N runs".
       - name: Run each target
         env:
           SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '60' }}
-        run: |
-          cores=$(lscpu --parse=CORE,SOCKET | grep -v '^#' | sort -u | wc -l)
-          [ "$cores" -ge 1 ] || cores=1
-          lscpu | grep -E '^(CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)):' || true
-          echo "Running $cores campaigns at a time."
-          mkdir -p fuzz-out
-          for target in config_text config_list host_state ir_file; do
-            while [ "$(jobs -pr | wc -l)" -ge "$cores" ]; do
-              wait -n || true
-            done
-            mkdir -p "fuzz-out/corpus/$target"
-            cp tests/fuzz/seeds/$target/* "fuzz-out/corpus/$target/"
-            (
-              status=0
-              ./build-fuzz/fuzz_$target "fuzz-out/corpus/$target" tests/fuzz/regressions/$target \
-                -max_total_time="$SECONDS_PER_TARGET" -max_len=65536 -timeout=2 -rss_limit_mb=512 \
-                -artifact_prefix="fuzz-out/$target-" > "fuzz-out/$target.log" 2>&1 || status=$?
-              echo "$status" > "fuzz-out/$target.status"
-            ) &
-          done
-          wait
-          status=0
-          for target in config_text config_list host_state ir_file; do
-            result=$(cat "fuzz-out/$target.status" 2>/dev/null || echo 'no status')
-            echo "== fuzz_$target exited with $result"
-            tail -5 "fuzz-out/$target.log"
-            [ "$result" = 0 ] || status=1
-          done
-          exit $status
+        run: scripts/fuzz_campaigns.sh --build build-fuzz --output fuzz-out --seconds "$SECONDS_PER_TARGET"
       - name: Keep crash inputs and logs
         if: failure()
         uses: actions/upload-artifact@v7

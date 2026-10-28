@@ -15,13 +15,34 @@ from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_record
 import resolve
 from sources import unpack_dependencies
 
-# Builds and tests use every CPU the machine has.
-CPUS = str(os.cpu_count() or 2)
+def parallel(jobs=None):
+    """The `--parallel` arguments of a build or test run: `jobs` at once, or
+    by default every CPU the machine has (CI-14). The release scripts' `--jobs`
+    sets a lower limit for a machine with less memory (CI-16)."""
+    return ['--parallel', str(jobs or os.cpu_count() or 2)]
 
 
-def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',)):
+def jobs_argument(text):
+    """argparse type of `--jobs`: a whole number, 1 or more."""
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise argparse.ArgumentTypeError(f'must be a whole number, 1 or more, not {text!r}')
+    return value
+
+
+def add_jobs_option(parser):
+    parser.add_argument('--jobs', type=jobs_argument, metavar='N',
+                        help='Build and test with at most N jobs at once (default: every CPU)')
+
+
+def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',),
+          jobs=None):
     """Only the dependencies of the given plug-in formats are unpacked and their
-    notices shipped; FFTW only when the FFT backend is FFTW."""
+    notices shipped; FFTW only when the FFT backend is FFTW. `jobs` limits the
+    parallel build (default: every CPU)."""
     work = work.resolve()
     source = work / 'sources'
     source.mkdir(parents=True, exist_ok=True)
@@ -47,7 +68,7 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
             continue
         output = work / ('build-' + name)
         subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
-        subprocess.run([cmake, '--build', str(output), '--config', 'Release', '--parallel', CPUS], check=True)
+        subprocess.run([cmake, '--build', str(output), '--config', 'Release'] + parallel(jobs), check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
     inventory = {name: {key: value for key, value in dep.items()
                         if key in ('version', 'tag', 'revision', 'url', 'sha256', 'license')}
@@ -86,6 +107,7 @@ if __name__ == '__main__':
                         help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW')
     parser.add_argument('--formats', nargs='+', choices=sorted(PLUGIN_FORMATS), default=['vst3'],
                         help='Plug-in formats of the build that follows; only their SDKs are unpacked')
+    add_jobs_option(parser)
     args = parser.parse_args()
     policy = load_policy(args.policy)
     if args.latest:
@@ -104,4 +126,4 @@ if __name__ == '__main__':
     used = used_dependencies(policy, args.formats, args.backend)
     policy = dict(policy, dependencies={name: rule for name, rule in policy['dependencies'].items() if name in used})
     build(with_records(policy, records), args.cache, args.work, args.cmake, args.fetch, args.architecture,
-          args.backend, args.formats)
+          args.backend, args.formats, args.jobs)

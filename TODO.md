@@ -746,6 +746,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   all of them; the macOS Accelerate and Ooura builds went from about 120 s
   to 65–82 s (whole workflows vary too much between runs to show more);
   [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-15 — Test the fuzz scheduler's failure paths.** 28 October 2026,
+  PR #87, from the external review of PR #86: the scheduler is
+  `scripts/fuzz_campaigns.sh`, and `tests/fuzz/scheduler_tests.py` checks a
+  failing campaign, a missing status file and the concurrency limit with
+  stand-in fuzzers;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-16 — A `--jobs` limit for release builds.** 28 October 2026,
+  PR #87, from the external review of PR #86: `candidate.py`,
+  `build_dependencies.py` and `source_build.py` take `--jobs N`; the default
+  stays every CPU; [preview recipe](docs/develop/build.md#preview-recipe).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

@@ -57,6 +57,19 @@ Until 1.0 the C++ API may change between minor versions.
   others; VST3 changes also run the candidates. Pushes to `main` still run
   everything. See
   [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
+- Continuous integration (CI-15): the fuzz workflow's scheduler moved from the
+  workflow into `scripts/fuzz_campaigns.sh`, and `tests/fuzz/scheduler_tests.py`
+  (in pre-commit) runs it with stand-in fuzzers to check that a failing
+  campaign, one that leaves no exit status, or a missing fuzzer fails the step,
+  and that no more campaigns run at once than the limit. A status file left by
+  an earlier local run can no longer stand in for a campaign that recorded
+  none. From the external review of PR #86. See
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- Release scripts (CI-16): `candidate.py`, `build_dependencies.py` and
+  `tests/release/source_build.py` take `--jobs N`, which limits their builds
+  and tests to N jobs at once for a machine with less memory; without it they
+  still use every CPU. From the external review of PR #86. See
+  [preview recipe](docs/develop/build.md#preview-recipe).
 
 ### Fixed
 
