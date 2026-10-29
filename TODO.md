@@ -759,6 +759,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88,
   from a Skylos scan: 11 unused imports in the release scripts and four test
   scripts; [lint checks](CONTRIBUTING.md#lint-checks).
+- [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026,
+  PR #88: ruff 0.17.3 in pre-commit and lint CI, configured in `ruff.toml`;
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

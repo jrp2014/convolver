@@ -28,6 +28,7 @@ TOP_LEVEL = {
     '.clang-format-ignore',
     '.clang-tidy',
     '.github',
+    '.git-blame-ignore-revs',
     '.gitattributes',
     '.gitignore',
     '.markdownlint-cli2.yaml',

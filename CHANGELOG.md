@@ -75,6 +75,12 @@ Until 1.0 the C++ API may change between minor versions.
   four test scripts, found by a Skylos scan on 29 October 2026 and confirmed
   with ruff. No behaviour changes. See
   [lint checks](CONTRIBUTING.md#lint-checks).
+- Python tools (CI-18): pre-commit, and so lint CI, now formats the maintained
+  Python scripts and tests with ruff 0.17.3 (120 columns, single quotes) and
+  lints them with its pyflakes and pycodestyle error rules, so an unused
+  import or undefined name fails Lint. All 77 files were reformatted once, in
+  a layout-only commit that `.git-blame-ignore-revs` lets `git blame` skip.
+  See [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 
 ### Fixed
 

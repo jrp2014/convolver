@@ -83,6 +83,30 @@ files side by side, one per CPU (`--jobs N` to change it). It prints each
 file's output whole, in the order given, lists the files that failed, and
 fails if any did; CI runs the portable list this way.
 
+### Python formatting and lint
+
+`ruff.toml` sets the style for the maintained Python scripts and tests: ruff's
+formatter with 120 columns and single quotes, and its pyflakes and pycodestyle
+error rules (unused imports and names, undefined names, misplaced imports,
+syntax errors). pre-commit runs `ruff check --fix` and `ruff format` with the
+ruff release pinned in `.pre-commit-config.yaml`, so lint CI fails on an unused
+import or a formatting difference. For a manual run, install the same version
+in the [lint environment](#lint-checks):
+
+```sh
+python -m pip install ruff==0.17.3
+ruff check .
+ruff format .
+```
+
+An import that must follow a `sys.path` change carries `# noqa: E402`. The
+historical sources and the dated evidence under `docs/review-2026-10/` are
+excluded. `.git-blame-ignore-revs` lists the first reformat, so `git blame`
+on GitHub skips it; locally, run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once. To update ruff,
+change the pinned `rev`, run `pre-commit run --all-files` and commit any
+layout changes on their own, as for clang-format below.
+
 ### When a new Clang release turns CI red
 
 Because the tools are not pinned, a new release can fail CI on code that
@@ -120,8 +144,9 @@ downloads the tools; subsequent runs reuse their isolated environments.
 Refresh the formatter environment as described above when upgrading.
 
 The configuration runs the latest stable packaged clang-format on the portable C++ sources (see
-[formatting](#formatting-and-analysis)), ShellCheck, markdownlint-cli2, strict
-yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
+[formatting](#formatting-and-analysis)), ruff on the Python (see
+[Python formatting and lint](#python-formatting-and-lint)), ShellCheck,
+markdownlint-cli2, strict yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
 workflows. Hooks that fix files, such as clang-format, report "files were
 modified by this hook"; review and stage the changes, then run again. Claude
 Code cloud sessions update their Clang tools in `~/.cache/convolver-lint/bin/`,
