@@ -91,9 +91,11 @@ except those it lists, each with its reason. The exceptions are rules that
 contradict the formatter, type annotations and docstring conventions the
 scripts do not use, pytest rules (the tests use unittest), function-size
 limits, and a few that suit tests only, such as `assert`. Where one line has
-to break a rule, it carries `# noqa: CODE` and a reason. pre-commit runs `ruff check --fix` and `ruff format` with the latest stable
-ruff, installed when the hook environment is created, so lint CI fails on an
-unused import or a formatting difference. Like the Clang tools, ruff is not
+to break a rule, it carries `# noqa: CODE` and a reason. An import that must
+follow a `sys.path` change carries `# noqa: E402`, which needs no further
+reason. pre-commit runs `ruff check --fix` and `ruff format` with the latest
+stable ruff, installed when the hook environment is created, so lint CI fails
+on any rule the fixes cannot resolve or on a formatting difference. Like the Clang tools, ruff is not
 pinned: CI resolves the newest release before restoring its cache, and cloud
 sessions refresh the hook environment when it changes. Refresh a local one
 after a ruff release with `pre-commit clean`. For a manual run, install ruff in
@@ -113,7 +115,8 @@ excluded. `.git-blame-ignore-revs` lists the layout-only reformats, so
 ### When a new Clang or ruff release turns CI red
 
 Because the tools are not pinned, a new release can fail CI on code that
-nobody changed. That is accepted (owner's decision, 24 October 2026); handle
+nobody changed. That is accepted (owner's decisions, 24 October 2026 for Clang
+and 29 October 2026 for ruff); handle
 it by which tool failed:
 
 - **clang-format** changes layout only, never behaviour. Apply the
@@ -130,7 +133,9 @@ it by which tool failed:
   `pre-commit run ruff-format --all-files` (or apply the `lint-fixes` patch),
   commit the result on its own as `style: apply ruff X.Y.Z layout`, and add
   that commit's hash to `.git-blame-ignore-revs`.
-- **ruff check** adds rules within the families `ruff.toml` selects. Fix the
+- **ruff check** turns on every rule the release makes stable, since
+  `ruff.toml` selects all of them; most minor releases add some, so expect
+  this more often than with clang-tidy. Fix the
   code in its own commit. If a diagnostic is a false positive, suppress that
   line with `# noqa: CODE` and a reason; if the new rule does not suit the
   project, add it to the ignore list in `ruff.toml` with the reason.
@@ -160,7 +165,7 @@ The configuration runs the latest stable packaged clang-format on the portable C
 markdownlint-cli2, strict yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
 workflows. Hooks that fix files, such as clang-format, report "files were
 modified by this hook"; review and stage the changes, then run again. Claude
-Code cloud sessions update their Clang tools in `~/.cache/convolver-lint/bin/`,
+Code cloud sessions update their Clang tools and ruff in `~/.cache/convolver-lint/bin/`,
 refresh the formatter hook environment and install the Git hook automatically
 (`.claude/hooks/session-start.sh`), so their commits run these checks.
 Historical source, recovered documentation and archived review evidence are
