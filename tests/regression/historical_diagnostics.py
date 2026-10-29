@@ -4,6 +4,7 @@
 
 Extract only the ordered bad/fail clauses; parsing and Windows I/O are not run.
 """
+
 import argparse
 import os
 from pathlib import Path
@@ -25,17 +26,28 @@ def main():
             # The historical tree was called convolver/ before 21 October 2026.
             shown = subprocess.run(['git', 'show', args.revision + ':' + relative], cwd=ROOT, capture_output=True)
             if shown.returncode != 0:
-                shown = subprocess.run(['git', 'show', args.revision + ':convolver/convolution/' + name],
-                                       cwd=ROOT, capture_output=True, check=True)
+                shown = subprocess.run(
+                    ['git', 'show', args.revision + ':convolver/convolution/' + name],
+                    cwd=ROOT,
+                    capture_output=True,
+                    check=True,
+                )
             text = shown.stdout.decode()
         else:
             text = (ROOT / relative).read_text()
         pattern = r'else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}\s*else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}'
         clauses = re.search(pattern, text, re.S).group()
         clauses = clauses.replace('config_()', 'stream').replace('config()', 'stream')
-        clauses = re.sub(r'throw (?:channelPaths|convolutionList)Exception\("([^"]+)", \w+\);', r'return "\1";', clauses)
-        methods.append('std::string classify' + str(index) + '(std::istream& stream) { if(false) {} ' + clauses + ' return "ok"; }')
-    code = '#include <sstream>\n#include <iostream>\n#include <string>\n' + '\n'.join(methods) + r'''
+        clauses = re.sub(
+            r'throw (?:channelPaths|convolutionList)Exception\("([^"]+)", \w+\);', r'return "\1";', clauses
+        )
+        methods.append(
+            'std::string classify' + str(index) + '(std::istream& stream) { if(false) {} ' + clauses + ' return "ok"; }'
+        )
+    code = (
+        '#include <sstream>\n#include <iostream>\n#include <string>\n'
+        + '\n'.join(methods)
+        + r"""
 int main() {
     int count=0;
     for(auto classify : {classify0, classify1}) {
@@ -51,11 +63,24 @@ int main() {
     }
     std::cout<<"PASS "<<count<<" historical diagnostic cases\n";
 }
-'''
+"""
+    )
     with tempfile.TemporaryDirectory(prefix='convolver-diagnostics-') as tmp:
-        cpp = Path(tmp) / 'test.cpp'; exe = Path(tmp) / 'test'
+        cpp = Path(tmp) / 'test.cpp'
+        exe = Path(tmp) / 'test'
         cpp.write_text(code)
-        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++11', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', str(cpp), '-o', str(exe)], check=True)
+        subprocess.run(
+            [
+                os.environ.get('CXX', 'clang++'),
+                '-std=c++11',
+                '-fsanitize=address,undefined',
+                '-fno-sanitize-recover=all',
+                str(cpp),
+                '-o',
+                str(exe),
+            ],
+            check=True,
+        )
         return subprocess.run([str(exe)]).returncode
 
 

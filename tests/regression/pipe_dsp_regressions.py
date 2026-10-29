@@ -5,18 +5,20 @@
 Uses the portable FFTW-compatible DFT adapter from core_regressions; this tests
 DSP/tail agreement, not Windows stdin or libsndfile codecs.
 """
+
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import sys
+
 sys.dont_write_bytecode = True
-import core_regressions
+import core_regressions  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
-HARNESS = r'''
+HARNESS = r"""
 static int checks=0;
 static double worst_error=0;
 static void run(DWORD parts, DWORD taps, DWORD count, bool plain) {
@@ -74,7 +76,7 @@ int main() {
         return 0;
     } catch(const std::exception& e) {std::cerr<<e.what()<<'\n'; return 1;}
 }
-'''
+"""
 
 
 def main():
@@ -83,12 +85,26 @@ def main():
     code += (ROOT / 'historical/convolverPipe/pipe_helpers.h').read_text().replace('#pragma once', '')
     code += HARNESS
     with tempfile.TemporaryDirectory(prefix='convolver-pipe-dsp-') as tmp:
-        source = Path(tmp) / 'test.cpp'; executable = Path(tmp) / 'test'
+        source = Path(tmp) / 'test.cpp'
+        executable = Path(tmp) / 'test'
         source.write_text(code)
-        subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O1', '-g', '-fms-extensions',
-                        '-Wno-unknown-pragmas', '-Wno-ignored-attributes',
-                        '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
-                        str(source), '-o', str(executable)], check=True)
+        subprocess.run(
+            [
+                os.environ.get('CXX', 'clang++'),
+                '-std=c++17',
+                '-O1',
+                '-g',
+                '-fms-extensions',
+                '-Wno-unknown-pragmas',
+                '-Wno-ignored-attributes',
+                '-fsanitize=address,undefined',
+                '-fno-sanitize-recover=all',
+                str(source),
+                '-o',
+                str(executable),
+            ],
+            check=True,
+        )
         return subprocess.run([str(executable)]).returncode
 
 

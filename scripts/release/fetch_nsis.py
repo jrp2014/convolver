@@ -5,6 +5,7 @@ Downloads it into --output, unpacks it, records what was used in
 --output/nsis.json and the job summary, and prints makensis.exe's path (also
 as makensis= in --github-output). --version picks another release.
 """
+
 import argparse
 import json
 from pathlib import Path

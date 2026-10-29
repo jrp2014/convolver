@@ -8,6 +8,7 @@ links. Dated archives/plans are not scanned as current instructions, but a link
 to one must still resolve. This is intentionally not a full Markdown renderer
 or an external-URL availability check.
 """
+
 import argparse
 import html
 from html.parser import HTMLParser
@@ -45,16 +46,16 @@ class HtmlAnchors(HTMLParser):
         self.anchors = set()
 
     def handle_starttag(self, tag, attrs):
-        self.anchors.update(value for name, value in attrs
-                            if value and (name == 'id' or (tag == 'a' and name == 'name')))
+        self.anchors.update(
+            value for name, value in attrs if value and (name == 'id' or (tag == 'a' and name == 'name'))
+        )
 
 
 def anchors(path):
     text = path.read_text(encoding='utf-8')
     parser = HtmlAnchors()
     is_markdown = path.suffix.lower() == '.md'
-    html_text = '\n'.join(re.sub(r'(`+).*?\1', '', line)
-                          for _, line in prose_lines(text)) if is_markdown else text
+    html_text = '\n'.join(re.sub(r'(`+).*?\1', '', line) for _, line in prose_lines(text)) if is_markdown else text
     parser.feed(html_text)
     found = parser.anchors
     if not is_markdown:
@@ -66,8 +67,7 @@ def anchors(path):
         label = re.sub(r'<[^>]+>', '', heading.group(1))
         label = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', label)
         label = html.unescape(label).lower().replace('`', '')
-        slug = ''.join(c for c in label if c in '-_' or
-                       unicodedata.category(c)[0] not in {'P', 'S'})
+        slug = ''.join(c for c in label if c in '-_' or unicodedata.category(c)[0] not in {'P', 'S'})
         slug = slug.replace(' ', '-')
         candidate, index = slug, 0
         while candidate in found:

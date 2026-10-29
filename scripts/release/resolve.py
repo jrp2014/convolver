@@ -29,6 +29,7 @@ python3 scripts/release/resolve.py checkout --destination DIR [NAME ...]   (test
 python3 scripts/release/resolve.py packages PACKAGE ...   (installed Debian packages, for the summary)
 python3 scripts/release/resolve.py explain-failure [--suspect NAME]   (after a failed CI step)
 """
+
 import argparse
 import datetime
 import json
@@ -54,8 +55,7 @@ POLICY = ROOT / 'packaging/release-policy.json'
 # build and credit its dependency.
 NOTE_FIELDS = ('newer_prerelease', 'prerelease_tried')
 RULE_FIELDS = ('upstream', 'archive', 'directory', 'license', 'notice', 'formats', 'submodule_of', 'path')
-HELP = ('Builds use the newest upstream release of each dependency '
-        '(docs/develop/build.md#supporting-libraries).')
+HELP = 'Builds use the newest upstream release of each dependency (docs/develop/build.md#supporting-libraries).'
 
 
 class ResolveError(ValueError):
@@ -105,9 +105,11 @@ def fetch_archive(url, cache, name, fetcher=download):
         if first:
             actual = sha256(path)
             if actual != first:
-                raise CachedArchiveChanged(f'the cached {path} has changed since it was downloaded from {url}: its '
-                                   f'SHA-256 is now {actual}, not {first}. Delete it, with {origin.name} and '
-                                   f'{checksum.name}, to download it again')
+                raise CachedArchiveChanged(
+                    f'the cached {path} has changed since it was downloaded from {url}: its '
+                    f'SHA-256 is now {actual}, not {first}. Delete it, with {origin.name} and '
+                    f'{checksum.name}, to download it again'
+                )
             return path
     with tempfile.NamedTemporaryFile(dir=cache, delete=False) as temporary:
         partial = Path(temporary.name)
@@ -159,13 +161,22 @@ def _record(rule, version, tag, revision, chosen, cache, fetcher, digest):
         if published:
             against = 'the digest GitHub publishes for the asset'
     record = {key: rule[key] for key in RULE_FIELDS if key in rule}
-    record.update(version=version, tag=tag, revision=revision, url=url, sha256=actual, chosen=chosen,
-                  checked_against=against)
+    record.update(
+        version=version, tag=tag, revision=revision, url=url, sha256=actual, chosen=chosen, checked_against=against
+    )
     return record
 
 
-def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, links=upstream.gitlinks,
-            fetcher=download, digest=None):
+def resolve(
+    policy,
+    cache,
+    names=None,
+    wanted=None,
+    lister=upstream.ls_remote,
+    links=upstream.gitlinks,
+    fetcher=download,
+    digest=None,
+):
     """Records for the named dependencies (all by default), each the newest
     release, or the version `wanted` names for it; every archive is fetched
     into cache. Raises ResolveError naming every dependency that failed."""
@@ -178,8 +189,10 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
         raise ResolveError(f'--version names dependencies that are not being resolved: {sorted(unknown)}')
     submodules = sorted(name for name in wanted if 'submodule_of' in rules[name])
     if submodules:
-        raise ResolveError(f'--version cannot choose {", ".join(submodules)}: a submodule follows its SDK; '
-                           f'choose {rules[submodules[0]]["submodule_of"]}\'s version instead')
+        raise ResolveError(
+            f'--version cannot choose {", ".join(submodules)}: a submodule follows its SDK; '
+            f"choose {rules[submodules[0]]['submodule_of']}'s version instead"
+        )
     records, errors = {}, []
     parents = {}
     for name in sorted(n for n in names if 'submodule_of' not in rules[n]):
@@ -208,19 +221,25 @@ def resolve(policy, cache, names=None, wanted=None, lister=upstream.ls_remote, l
             path = rule['path']
             try:
                 if path not in commits:
-                    raise ValueError(f'{parent} {tag} has no submodule at {path}; the SDK\'s layout changed, '
-                                     'so the release policy and the build need updating')
+                    raise ValueError(
+                        f"{parent} {tag} has no submodule at {path}; the SDK's layout changed, "
+                        'so the release policy and the build need updating'
+                    )
                 found = submodule_url(rules[parent]['upstream'], urls.get(path, ''))
                 if not upstream.same_repository(found, rule['upstream']):
-                    raise ValueError(f'{parent} {tag} takes {path} from {found or "nowhere"}, '
-                                     f'not {rule["upstream"]}; update the release policy')
-                records[name] = _record(rule, version, tag, commits[path], f'{chosen}, from {parent} {tag}',
-                                        cache, fetcher, digest)
+                    raise ValueError(
+                        f'{parent} {tag} takes {path} from {found or "nowhere"}, '
+                        f'not {rule["upstream"]}; update the release policy'
+                    )
+                records[name] = _record(
+                    rule, version, tag, commits[path], f'{chosen}, from {parent} {tag}', cache, fetcher, digest
+                )
             except (OSError, RuntimeError, ValueError) as error:
                 errors.append(f'{name}: {error}')
     if errors:
-        raise ResolveError('Cannot resolve every dependency to an upstream release:\n  ' + '\n  '.join(errors) +
-                           '\n' + HELP)
+        raise ResolveError(
+            'Cannot resolve every dependency to an upstream release:\n  ' + '\n  '.join(errors) + '\n' + HELP
+        )
     validate_records(records)
     return records
 
@@ -239,8 +258,11 @@ def _note_prerelease(record, rule, tags):
 
 def prerelease_notes(records):
     """Markdown lines naming the newer pre-releases that were not used."""
-    notes = [f'- {name}: `{record["newer_prerelease"]}` (not used; builds and formal tests use '
-             f'{record["version"]})' for name, record in sorted(records.items()) if record.get('newer_prerelease')]
+    notes = [
+        f'- {name}: `{record["newer_prerelease"]}` (not used; builds and formal tests use {record["version"]})'
+        for name, record in sorted(records.items())
+        if record.get('newer_prerelease')
+    ]
     return ('\nNewer pre-releases upstream:\n\n' + '\n'.join(notes) + '\n') if notes else ''
 
 
@@ -251,16 +273,20 @@ def warn_prereleases(records):
         return
     for name, record in sorted(records.items()):
         if record.get('newer_prerelease') and not record.get('prerelease_tried'):
-            print(f'::warning title=Newer {name} pre-release::{name} {record["newer_prerelease"]} is out upstream; '
-                  f'builds and formal tests use {record["version"]}. Check its release notes for changes to come.')
+            print(
+                f'::warning title=Newer {name} pre-release::{name} {record["newer_prerelease"]} is out upstream; '
+                f'builds and formal tests use {record["version"]}. Check its release notes for changes to come.'
+            )
     sys.stdout.flush()
 
 
 def without_notes(records):
     """The records without what only describes upstream at resolution time
     (a newer pre-release), which would be stale in a lock file or manifest."""
-    return {name: {key: value for key, value in record.items() if key not in NOTE_FIELDS}
-            for name, record in records.items()}
+    return {
+        name: {key: value for key, value in record.items() if key not in NOTE_FIELDS}
+        for name, record in records.items()
+    }
 
 
 def lock(records, resolved_at=None):
@@ -281,14 +307,19 @@ def load_records(path):
 
 def markdown(records, heading='Dependencies used'):
     """The records as a Markdown table, for a job summary or a terminal."""
-    lines = [f'### {heading}', '',
-             '| Dependency | Version | Tag | Commit | Archive SHA-256 | Chosen |',
-             '| --- | --- | --- | --- | --- | --- |']
+    lines = [
+        f'### {heading}',
+        '',
+        '| Dependency | Version | Tag | Commit | Archive SHA-256 | Chosen |',
+        '| --- | --- | --- | --- | --- | --- |',
+    ]
     for name in sorted(records):
         record = records[name]
-        lines.append(f'| [{name}]({record["url"]}) | {record["version"]} | `{record.get("tag", "-")}` | '
-                     f'`{record.get("revision", "-")}` | `{record["sha256"]}` | {record.get("chosen", "recorded")}'
-                     f'{"; matches GitHub digest" if record.get("checked_against", "").startswith("the digest") else ""} |')
+        lines.append(
+            f'| [{name}]({record["url"]}) | {record["version"]} | `{record.get("tag", "-")}` | '
+            f'`{record.get("revision", "-")}` | `{record["sha256"]}` | {record.get("chosen", "recorded")}'
+            f'{"; matches GitHub digest" if record.get("checked_against", "").startswith("the digest") else ""} |'
+        )
     return '\n'.join(lines) + '\n' + prerelease_notes(records)
 
 
@@ -318,9 +349,10 @@ def parse_wanted(values):
 
 def _published_digest(repository, tag, asset):
     """The sha256 GitHub publishes for a release asset, or None if it cannot be read."""
-    request = urllib.request.Request(f'https://api.github.com/repos/{repository}/releases/tags/{tag}',
-                                     headers={'Accept': 'application/vnd.github+json',
-                                              'User-Agent': 'convolver-release-scripts'})
+    request = urllib.request.Request(
+        f'https://api.github.com/repos/{repository}/releases/tags/{tag}',
+        headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'convolver-release-scripts'},
+    )
     token = os.environ.get('GITHUB_TOKEN')
     if token:
         request.add_header('Authorization', f'Bearer {token}')
@@ -331,7 +363,7 @@ def _published_digest(repository, tag, asset):
         return None
     for item in release.get('assets', []):
         if item.get('name') == asset and str(item.get('digest', '')).startswith('sha256:'):
-            return item['digest'][len('sha256:'):]
+            return item['digest'][len('sha256:') :]
     return None
 
 
@@ -341,12 +373,23 @@ def _distinfo(url, fetcher):
         path = Path(temporary) / 'distinfo'
         fetcher(url, path)
         text = path.read_text(encoding='utf-8', errors='replace')
-    return {match[1]: match[2] for match in
-            re.finditer(r'^SHA256 \([^)]*?-(\d[\w.]*)\.tar\.\w+\) = ([0-9a-f]{64})$', text, re.MULTILINE)}
+    return {
+        match[1]: match[2]
+        for match in re.finditer(r'^SHA256 \([^)]*?-(\d[\w.]*)\.tar\.\w+\) = ([0-9a-f]{64})$', text, re.MULTILINE)
+    }
 
 
-def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream.ls_remote, fetcher=download,
-                 digest=_published_digest, prerelease=False):
+def resolve_tool(
+    policy,
+    name,
+    cache,
+    os_name=None,
+    wanted=None,
+    lister=upstream.ls_remote,
+    fetcher=download,
+    digest=_published_digest,
+    prerelease=False,
+):
     """(record, archive path) for a release or test tool from the policy.
 
     With prerelease, the newest beta or release candidate that is newer than
@@ -378,8 +421,9 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
             raise ResolveError(f'{name}: cannot list the releases at {rule["upstream"]}: {error}\n{HELP}') from error
         known = _distinfo_or_empty(rule['distinfo'], fetcher)
         if not known:
-            raise ResolveError(f'{name}: {rule["upstream"]} did not answer ({error}), and {rule["distinfo"]} '
-                               'lists no release either') from error
+            raise ResolveError(
+                f'{name}: {rule["upstream"]} did not answer ({error}), and {rule["distinfo"]} lists no release either'
+            ) from error
         version = max(known, key=upstream.version_key)
         tag, revision = rule.get('tag_prefix', '') + version, ''
         expected, against = known[version], 'FreeBSD ports distinfo'
@@ -391,8 +435,9 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
         if os_name not in rule['assets']:
             raise ResolveError(f'{name}: no download for {os_name!r}; the policy lists {sorted(rule["assets"])}')
         asset = rule['assets'][os_name]
-    urls = [template.format(version=version, tag=tag, asset=asset)
-            for template in [rule['url'], *rule.get('mirrors', [])]]
+    urls = [
+        template.format(version=version, tag=tag, asset=asset) for template in [rule['url'], *rule.get('mirrors', [])]
+    ]
     archive_name = asset or posixpath.basename(urllib.parse.urlsplit(urls[0]).path)
     if rule.get('github_release'):
         expected = digest(rule['github_release'], tag, asset)
@@ -420,8 +465,15 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
             failures.append(f'{url}: checksum {actual} differs from {against} ({expected})')
             path.unlink()
             continue
-        record = {'version': version, 'tag': tag, 'url': url, 'sha256': actual, 'chosen': chosen,
-                  'checked_against': against, 'upstream': rule['upstream']}
+        record = {
+            'version': version,
+            'tag': tag,
+            'url': url,
+            'sha256': actual,
+            'chosen': chosen,
+            'checked_against': against,
+            'upstream': rule['upstream'],
+        }
         if revision:
             record['revision'] = revision
         if newer:
@@ -433,8 +485,21 @@ def resolve_tool(policy, name, cache, os_name=None, wanted=None, lister=upstream
 
 
 def _clone(remote, tag, directory):
-    upstream._git(['-c', 'advice.detachedHead=false', 'clone', '--quiet', '--depth', '1', '--branch', tag,
-                   remote, str(directory)], timeout=600)
+    upstream._git(
+        [
+            '-c',
+            'advice.detachedHead=false',
+            'clone',
+            '--quiet',
+            '--depth',
+            '1',
+            '--branch',
+            tag,
+            remote,
+            str(directory),
+        ],
+        timeout=600,
+    )
     return upstream._git(['rev-parse', 'HEAD'], cwd=directory).strip()
 
 
@@ -459,9 +524,13 @@ def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=
             commit = cloner(rule['upstream'], tag, Path(destination) / name)
             if commit != revision:
                 raise ValueError(f'the clone of {tag} is at {commit}, but the tag points at {revision}')
-            records[name] = {'version': version, 'tag': tag, 'revision': revision, 'url': rule['upstream'],
-                             'chosen': 'newest pre-release, newer than the newest release' if found
-                             else 'newest release'}
+            records[name] = {
+                'version': version,
+                'tag': tag,
+                'revision': revision,
+                'url': rule['upstream'],
+                'chosen': 'newest pre-release, newer than the newest release' if found else 'newest release',
+            }
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
             errors.append(f'{name}: {error}')
     if errors:
@@ -470,11 +539,16 @@ def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=
 
 
 def checkout_markdown(records):
-    lines = ['### Newest upstream sources (advisory build)', '', '| Source | Version | Tag | Commit |',
-             '| --- | --- | --- | --- |']
+    lines = [
+        '### Newest upstream sources (advisory build)',
+        '',
+        '| Source | Version | Tag | Commit |',
+        '| --- | --- | --- | --- |',
+    ]
     for name, record in records.items():
-        lines.append(f'| [{name}]({record["url"]}) | {record["version"]} | `{record["tag"]}` | '
-                     f'`{record["revision"]}` |')
+        lines.append(
+            f'| [{name}]({record["url"]}) | {record["version"]} | `{record["tag"]}` | `{record["revision"]}` |'
+        )
     return '\n'.join(lines) + '\n' + prerelease_notes(records)
 
 
@@ -486,19 +560,31 @@ def _distinfo_or_empty(url, fetcher):
 
 
 def tool_markdown(name, record):
-    return (f'### {name} used\n\n{name} {record["version"]} (tag `{record["tag"]}`'
-            + (f', commit `{record["revision"]}`' if record.get('revision') else '') +
-            f'), from {record["url"]}, SHA-256 `{record["sha256"]}`, checked against '
-            f'{record["checked_against"]}; chosen: {record["chosen"]}.\n'
-            + (f'\nA newer pre-release exists upstream: `{record["newer_prerelease"]}` (not used here).\n'
-               if record.get('newer_prerelease') else ''))
+    return (
+        f'### {name} used\n\n{name} {record["version"]} (tag `{record["tag"]}`'
+        + (f', commit `{record["revision"]}`' if record.get('revision') else '')
+        + f'), from {record["url"]}, SHA-256 `{record["sha256"]}`, checked against '
+        f'{record["checked_against"]}; chosen: {record["chosen"]}.\n'
+        + (
+            f'\nA newer pre-release exists upstream: `{record["newer_prerelease"]}` (not used here).\n'
+            if record.get('newer_prerelease')
+            else ''
+        )
+    )
 
 
 def packages_markdown(names, query=None):
     """The installed versions of Debian packages, as a Markdown table."""
-    query = query or (lambda packages: subprocess.run(
-        ['dpkg-query', '-W', '-f', '${Package}\t${Version}\n', *packages], capture_output=True, text=True,
-        check=True).stdout)
+    query = query or (
+        lambda packages: (
+            subprocess.run(
+                ['dpkg-query', '-W', '-f', '${Package}\t${Version}\n', *packages],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+        )
+    )
     lines = ['### Ubuntu packages used', '', '| Package | Version |', '| --- | --- |']
     for line in sorted(query(names).splitlines()):
         package, _, version = line.partition('\t')
@@ -517,30 +603,35 @@ def failure_explanation(suspect=None):
         'release, for example `python3 scripts/release/sources.py --latest --fetch --version '
         f'{suspect or "NAME"}=OLD_VERSION --cache build/downloads --destination build/sources '
         f'{suspect or "NAME"}`, and then adapt Convolver to the new release in a pull request '
-        '(docs/develop/build.md#when-a-new-release-breaks-the-build).\n')
+        '(docs/develop/build.md#when-a-new-release-breaks-the-build).\n'
+    )
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0],
-                                     epilog='See docs/develop/build.md#supporting-libraries.')
+    parser = argparse.ArgumentParser(
+        description=__doc__.splitlines()[0], epilog='See docs/develop/build.md#supporting-libraries.'
+    )
     parser.add_argument('--policy', type=Path, default=POLICY)
     commands = parser.add_subparsers(dest='command', required=True)
     deps = commands.add_parser('dependencies', help='resolve SDKs and libraries and write a lock file')
     deps.add_argument('--cache', type=Path, required=True, help='directory for the downloaded archives')
     deps.add_argument('--lock', type=Path, required=True, help='lock file to write')
-    deps.add_argument('--version', action='append', metavar='NAME=VERSION',
-                      help='use this release instead of the newest (repeatable)')
+    deps.add_argument(
+        '--version', action='append', metavar='NAME=VERSION', help='use this release instead of the newest (repeatable)'
+    )
     deps.add_argument('names', nargs='*', help='dependency names from the policy (default: all)')
     tool = commands.add_parser('tool', help='download the newest release of a tool')
     tool.add_argument('name')
     tool.add_argument('--cache', type=Path, required=True)
     tool.add_argument('--os', dest='os_name', help='Linux, macOS or Windows, for tools with one download per OS')
     tool.add_argument('--version', help='use this release instead of the newest')
-    tool.add_argument('--github-output', type=Path,
-                      help='append available=, archive=, version= and sha256= here')
-    tool.add_argument('--prerelease', action='store_true',
-                      help='the newest beta or release candidate newer than the newest release, for an advisory '
-                           'run; reports available=false when there is none')
+    tool.add_argument('--github-output', type=Path, help='append available=, archive=, version= and sha256= here')
+    tool.add_argument(
+        '--prerelease',
+        action='store_true',
+        help='the newest beta or release candidate newer than the newest release, for an advisory '
+        'run; reports available=false when there is none',
+    )
     sources = commands.add_parser('checkout', help='clone the newest release of test sources (advisory builds)')
     sources.add_argument('--destination', type=Path, required=True)
     sources.add_argument('--github-output', type=Path, help='append NAME=DIRECTORY here')
@@ -556,8 +647,10 @@ def main(argv=None):
     if args.command == 'explain-failure':
         report(failure_explanation(args.suspect))
         if os.environ.get('GITHUB_ACTIONS') == 'true':
-            print('::notice title=Newest releases::This run built with the newest upstream releases; if '
-                  'Convolver did not change, see the job summary for what to check.')
+            print(
+                '::notice title=Newest releases::This run built with the newest upstream releases; if '
+                'Convolver did not change, see the job summary for what to check.'
+            )
         return 0
     policy = load_policy(args.policy)
     try:
@@ -576,11 +669,14 @@ def main(argv=None):
         else:
             if args.prerelease and args.version:
                 raise ResolveError('--prerelease takes the newest pre-release; it cannot be combined with --version')
-            record, path = resolve_tool(policy, args.name, args.cache.resolve(), args.os_name, args.version,
-                                        prerelease=args.prerelease)
+            record, path = resolve_tool(
+                policy, args.name, args.cache.resolve(), args.os_name, args.version, prerelease=args.prerelease
+            )
             if record is None:
-                report(f'### {args.name} pre-release\n\nNo pre-release of {args.name} is newer than its newest '
-                       'release, so there is nothing more to try.\n')
+                report(
+                    f'### {args.name} pre-release\n\nNo pre-release of {args.name} is newer than its newest '
+                    'release, so there is nothing more to try.\n'
+                )
             else:
                 report(tool_markdown(args.name, record))
                 warn_prereleases({args.name: record})
@@ -589,8 +685,10 @@ def main(argv=None):
                     if record is None:
                         output.write('available=false\n')
                     else:
-                        output.write(f'available=true\narchive={path.as_posix()}\nversion={record["version"]}\n'
-                                     f'sha256={record["sha256"]}\n')
+                        output.write(
+                            f'available=true\narchive={path.as_posix()}\nversion={record["version"]}\n'
+                            f'sha256={record["sha256"]}\n'
+                        )
     except ResolveError as error:
         print(f'error: {error}', file=sys.stderr)
         return 1

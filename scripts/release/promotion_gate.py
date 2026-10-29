@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Validate exact candidate assets and reviewed evidence before promotion."""
+
 import argparse
 import json
 from pathlib import Path
@@ -14,13 +15,19 @@ def check_qualification(record, platform, policy, digest):
         raise ValueError('production macOS artifacts must be notarized')
     for kind in policy['required_production_evidence']:
         evidence = record.get('evidence', {}).get(kind, {})
-        if (evidence.get('result') != 'passed' or evidence.get('artifact_sha256') != digest or
-                not evidence.get('record', '').startswith('https://')):
+        if (
+            evidence.get('result') != 'passed'
+            or evidence.get('artifact_sha256') != digest
+            or not evidence.get('record', '').startswith('https://')
+        ):
             raise ValueError('missing/failed/stale production evidence: ' + kind)
     host = record['evidence']['host']
-    if (not all(host.get(key) for key in ('host', 'host_version', 'os_build')) or
-            host.get('architecture') != platform['architecture'] or
-            set(host.get('sample_rates', [])) != {44100, 48000, 96000} or set(host.get('channels', [])) != {1, 2}):
+    if (
+        not all(host.get(key) for key in ('host', 'host_version', 'os_build'))
+        or host.get('architecture') != platform['architecture']
+        or set(host.get('sample_rates', [])) != {44100, 48000, 96000}
+        or set(host.get('channels', [])) != {1, 2}
+    ):
         raise ValueError('host evidence lacks required platform/rate/layout coverage')
 
 
@@ -47,7 +54,9 @@ def check(candidate, policy, root, production=False):
     records = candidate.get('platforms', [])
     if len(records) != len(expected) or {p.get('id') for p in records} != set(expected):
         raise ValueError('missing/duplicate/unexpected platform in candidate')
-    if {name for name, asset in assets.items() if asset['kind'] == 'binary'} != {p['artifact'].format(version=policy['version']) for p in policy['platforms']}:
+    if {name for name, asset in assets.items() if asset['kind'] == 'binary'} != {
+        p['artifact'].format(version=policy['version']) for p in policy['platforms']
+    }:
         raise ValueError('unclassified or missing platform binary asset')
     qualified_installers = set()
     for record in records:
@@ -69,8 +78,9 @@ def check(candidate, policy, root, production=False):
         for installer in installers:
             if installer in qualified_installers or assets.get(installer, {}).get('kind') != 'installer':
                 raise ValueError('invalid/duplicate installer association')
-            check_qualification(record.get('installer_evidence', {}).get(installer, {}),
-                                platform, policy, assets[installer]['sha256'])
+            check_qualification(
+                record.get('installer_evidence', {}).get(installer, {}), platform, policy, assets[installer]['sha256']
+            )
             qualified_installers.add(installer)
     if production and {name for name, asset in assets.items() if asset['kind'] == 'installer'} != qualified_installers:
         raise ValueError('unqualified installer asset')
@@ -81,10 +91,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
+    parser.add_argument(
+        '--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
+    )
     parser.add_argument('--production', action='store_true')
     args = parser.parse_args()
     files = check(json.loads(args.candidate.read_text()), load_policy(args.policy), args.root, args.production)
-    print('Production gate passed' if args.production else 'Developer-preview integrity gate passed (not production qualification)')
+    print(
+        'Production gate passed'
+        if args.production
+        else 'Developer-preview integrity gate passed (not production qualification)'
+    )
     for name in files:
         print(name)

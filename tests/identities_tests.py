@@ -12,6 +12,7 @@ Three kinds of check:
 
 Run from anywhere: python3 tests/identities_tests.py [--root DIR].
 """
+
 import argparse
 import json
 import os
@@ -51,22 +52,72 @@ FROZEN = {
 # A published fixed layout's id is part of its LV2 URI: entries may be added, never
 # changed or removed.
 FROZEN_LAYOUTS = {
-    'discrete-1-1': (1, 1), 'discrete-2-2': (2, 2), 'discrete-1-2': (1, 2),
-    'discrete-2-4': (2, 4), 'discrete-2-6': (2, 6), 'discrete-2-8': (2, 8),
-    'discrete-6-6': (6, 6), 'discrete-8-8': (8, 8),
+    'discrete-1-1': (1, 1),
+    'discrete-2-2': (2, 2),
+    'discrete-1-2': (1, 2),
+    'discrete-2-4': (2, 4),
+    'discrete-2-6': (2, 6),
+    'discrete-2-8': (2, 8),
+    'discrete-6-6': (6, 6),
+    'discrete-8-8': (8, 8),
 }
 # WAVE_FORMAT_EXTENSIBLE speaker bits 0-17 (ksmedia.h), the meaning of a channel mask.
-WAV_SPEAKERS = ['FL', 'FR', 'FC', 'LFE', 'BL', 'BR', 'FLC', 'FRC', 'BC', 'SL', 'SR',
-                'TC', 'TFL', 'TFC', 'TFR', 'TBL', 'TBC', 'TBR']
+WAV_SPEAKERS = [
+    'FL',
+    'FR',
+    'FC',
+    'LFE',
+    'BL',
+    'BR',
+    'FLC',
+    'FRC',
+    'BC',
+    'SL',
+    'SR',
+    'TC',
+    'TFL',
+    'TFC',
+    'TFR',
+    'TBL',
+    'TBC',
+    'TBR',
+]
 # Apple's AudioChannelBitmap names for the same bits (CoreAudioBaseTypes.h).
-AU_SPEAKERS = ['Left', 'Right', 'Center', 'LFEScreen', 'LeftSurround', 'RightSurround',
-               'LeftCenter', 'RightCenter', 'CenterSurround', 'LeftSurroundDirect',
-               'RightSurroundDirect', 'TopCenterSurround', 'VerticalHeightLeft',
-               'VerticalHeightCenter', 'VerticalHeightRight', 'TopBackLeft',
-               'TopBackCenter', 'TopBackRight']
+AU_SPEAKERS = [
+    'Left',
+    'Right',
+    'Center',
+    'LFEScreen',
+    'LeftSurround',
+    'RightSurround',
+    'LeftCenter',
+    'RightCenter',
+    'CenterSurround',
+    'LeftSurroundDirect',
+    'RightSurroundDirect',
+    'TopCenterSurround',
+    'VerticalHeightLeft',
+    'VerticalHeightCenter',
+    'VerticalHeightRight',
+    'TopBackLeft',
+    'TopBackCenter',
+    'TopBackRight',
+]
 # Channel designations in LV2 port-groups (lv2/port-groups.lv2/port-groups.ttl).
-LV2_CHANNELS = {'left', 'right', 'center', 'side', 'centerLeft', 'centerRight', 'sideLeft',
-                'sideRight', 'rearLeft', 'rearRight', 'rearCenter', 'lowFrequencyEffects'}
+LV2_CHANNELS = {
+    'left',
+    'right',
+    'center',
+    'side',
+    'centerLeft',
+    'centerRight',
+    'sideLeft',
+    'sideRight',
+    'rearLeft',
+    'rearRight',
+    'rearCenter',
+    'lowFrequencyEffects',
+}
 # The 2005-2006 VST2 plug-in's parameter indices (historical/convolverVST/convolverVST.h).
 # A host replacing it with the VST3 maps VST2 index n to VST3 parameter ID n unless the
 # plug-in remaps it (VST3-6), so new parameters stay clear of them (owner's decision,
@@ -74,8 +125,13 @@ LV2_CHANNELS = {'left', 'right', 'center', 'side', 'centerLeft', 'centerRight', 
 VST2_PARAMETERS = ('Attenuation dB', 'Partitions', 'Planning rigour')
 REVERSE_DNS = re.compile(r'^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*){2,}$')
 # Files allowed to spell identities out: the registry, this test and dated records.
-COPIES_ALLOWED = ('plugins/identities.json', 'tests/identities_tests.py', 'CHANGELOG.md',
-                  'packaging/macos/Distribution.xml', 'packaging/windows/installer.nsi')
+COPIES_ALLOWED = (
+    'plugins/identities.json',
+    'tests/identities_tests.py',
+    'CHANGELOG.md',
+    'packaging/macos/Distribution.xml',
+    'packaging/windows/installer.nsi',
+)
 RECORDS = ('historical/', 'docs/', 'TODO.md')
 
 
@@ -101,7 +157,7 @@ def check_rules(registry, errors):
     # The build pastes these values into C++ string literals and Info.plist.
     for path, value in strings(registry):
         if path != ('about',) and not all(' ' <= c <= '~' and c not in '"<>&' for c in value):
-            errors.append(f"{'.'.join(path)}: printable ASCII without quotes, <, > or &")
+            errors.append(f'{".".join(path)}: printable ASCII without quotes, <, > or &')
     if registry.get('schema') != 1:
         errors.append('schema must be 1; a new schema needs this test updated')
     au = registry['au']
@@ -123,12 +179,16 @@ def check_rules(registry, errors):
     vst3_parameters = [registry['vst3'][k] for k in ('bypass_parameter_id', 'status_parameter_id')]
     au_names = ('status', 'mix')
     au_parameters = [au[f'{k}_parameter_id'] for k in au_names]
-    for name, pid in [*zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
-                      *((f'au {k}', p) for k, p in zip(au_names, au_parameters))]:
+    for name, pid in [
+        *zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
+        *((f'au {k}', p) for k, p in zip(au_names, au_parameters)),
+    ]:
         # VST3 reserves IDs from 0x80000000 for hosts (vsttypes.h).
         if not isinstance(pid, int) or not len(VST2_PARAMETERS) <= pid <= 0x7FFFFFFF:
-            errors.append(f'{name} parameter ID {pid!r}: a whole number from '
-                          f'{len(VST2_PARAMETERS)} (clear of the VST2 parameters) to 0x7FFFFFFF')
+            errors.append(
+                f'{name} parameter ID {pid!r}: a whole number from '
+                f'{len(VST2_PARAMETERS)} (clear of the VST2 parameters) to 0x7FFFFFFF'
+            )
     # Gain takes the VST2 Attenuation's index on purpose (jrp, 25 October 2026),
     # with a new range; VST3-6 must convert old values if it maps VST2 projects.
     if au['gain_parameter_id'] != VST2_PARAMETERS.index('Attenuation dB'):
@@ -137,8 +197,11 @@ def check_rules(registry, errors):
         errors.append('VST3 parameter IDs must differ')
     if len({au['gain_parameter_id'], *au_parameters}) != len(au_parameters) + 1:
         errors.append('AU parameter IDs must differ')
-    bundles = [registry['vst3']['macos_bundle_id'], registry['au']['macos_bundle_id'],
-               *registry['macos_installer'].values()]
+    bundles = [
+        registry['vst3']['macos_bundle_id'],
+        registry['au']['macos_bundle_id'],
+        *registry['macos_installer'].values(),
+    ]
     for bundle in bundles:
         if not REVERSE_DNS.match(bundle):
             errors.append(f'{bundle}: macOS identifiers are lowercase reverse-DNS names')
@@ -167,7 +230,7 @@ def check_rules(registry, errors):
                 errors.append(f'fixed layout {lid}: {side} must be discrete or named')
         if layout['inputs'] != layout['outputs'] and not channels['unequal_counts']:
             errors.append(f'fixed layout {lid}: unequal counts are not supported')
-        if lid.startswith('discrete-') and lid != f"discrete-{layout['inputs']}-{layout['outputs']}":
+        if lid.startswith('discrete-') and lid != f'discrete-{layout["inputs"]}-{layout["outputs"]}':
             errors.append(f'fixed layout {lid}: a discrete id names its counts')
     speakers = registry['speakers']
     for bit, speaker in enumerate(speakers):
@@ -179,7 +242,7 @@ def check_rules(registry, errors):
         if bit < len(AU_SPEAKERS) and speaker['au'] != 'kAudioChannelBit_' + AU_SPEAKERS[bit]:
             errors.append(f'speaker bit {bit}: AU bit is kAudioChannelBit_{AU_SPEAKERS[bit]}')
         if speaker['lv2'] and speaker['lv2'] not in LV2_CHANNELS:
-            errors.append(f"speaker bit {bit}: {speaker['lv2']} is not an LV2 port-groups channel")
+            errors.append(f'speaker bit {bit}: {speaker["lv2"]} is not an LV2 port-groups channel')
     if len(speakers) != len(WAV_SPEAKERS):
         errors.append(f'speakers: list the {len(WAV_SPEAKERS)} WAV bits the CLI understands')
     lv2 = [s['lv2'] for s in speakers if s['lv2']]
@@ -191,14 +254,17 @@ def check_frozen(registry, errors):
     for path, value in FROZEN.items():
         actual = lookup(registry, path)
         if actual != value:
-            errors.append(f"{'.'.join(path)} is {actual!r}, frozen as {value!r}. Released "
-                          'identities never change; see docs/develop/plugin-identities.md')
-    layouts = {layout['id']: (layout['inputs'], layout['outputs'])
-               for layout in registry['fixed_layouts']}
+            errors.append(
+                f'{".".join(path)} is {actual!r}, frozen as {value!r}. Released '
+                'identities never change; see docs/develop/plugin-identities.md'
+            )
+    layouts = {layout['id']: (layout['inputs'], layout['outputs']) for layout in registry['fixed_layouts']}
     for lid, counts in FROZEN_LAYOUTS.items():
         if layouts.get(lid) != counts:
-            errors.append(f'fixed layout {lid} {counts} changed or removed; add new entries '
-                          'instead (its id is part of a published LV2 URI)')
+            errors.append(
+                f'fixed layout {lid} {counts} changed or removed; add new entries '
+                'instead (its id is part of a published LV2 URI)'
+            )
     for lid in sorted(set(layouts) - set(FROZEN_LAYOUTS)):
         errors.append(f'fixed layout {lid} is new: add it to FROZEN_LAYOUTS in this test too')
     if 1 not in registry['host_state']['versions']:
@@ -210,19 +276,28 @@ def check_consumers(root, registry, errors):
     distribution = (root / 'packaging/macos/Distribution.xml').read_text(encoding='utf-8')
     refs = set(re.findall(r'<pkg-ref id="([^"]+)"', distribution))
     if refs != set(installer.values()):
-        errors.append('packaging/macos/Distribution.xml: pkg-ref ids must be exactly '
-                      f'{sorted(installer.values())}, found {sorted(refs)}')
+        errors.append(
+            'packaging/macos/Distribution.xml: pkg-ref ids must be exactly '
+            f'{sorted(installer.values())}, found {sorted(refs)}'
+        )
     nsis = (root / 'packaging/windows/installer.nsi').read_text(encoding='utf-8')
     windows = registry['windows_installer']
-    own = {key for key in re.findall(r'HKLM "(Software\\[^"]+)"', nsis, re.I)
-           if not key.lower().startswith('software\\microsoft\\')}
+    own = {
+        key
+        for key in re.findall(r'HKLM "(Software\\[^"]+)"', nsis, re.I)
+        if not key.lower().startswith('software\\microsoft\\')
+    }
     if own != {windows['registry_key']}:
-        errors.append('packaging/windows/installer.nsi: every HKLM key outside Microsoft\\ must be '
-                      f"{windows['registry_key']!r}, found {sorted(own)}")
+        errors.append(
+            'packaging/windows/installer.nsi: every HKLM key outside Microsoft\\ must be '
+            f'{windows["registry_key"]!r}, found {sorted(own)}'
+        )
     uninstall = set(re.findall(r'CurrentVersion\\Uninstall\\([^"]+)"', nsis))
     if uninstall != {windows['uninstall_key']}:
-        errors.append(f"packaging/windows/installer.nsi: uninstall keys {sorted(uninstall)}, "
-                      f"registry {windows['uninstall_key']!r}")
+        errors.append(
+            f'packaging/windows/installer.nsi: uninstall keys {sorted(uninstall)}, '
+            f'registry {windows["uninstall_key"]!r}'
+        )
     plist = (root / 'plugins/vst3/Info.plist.in').read_text(encoding='utf-8')
     if '<string>${CONVOLVER_ID_VST3_BUNDLE}</string>' not in plist:
         errors.append('plugins/vst3/Info.plist.in: CFBundleIdentifier must be ${CONVOLVER_ID_VST3_BUNDLE}')
@@ -240,19 +315,22 @@ def tracked_files(root):
     are) would get an empty list from Git, so Git is used only for its own top.
     """
     try:
-        top = subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root,
-                             capture_output=True, check=True).stdout.decode().strip()
+        top = (
+            subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root, capture_output=True, check=True)
+            .stdout.decode()
+            .strip()
+        )
         if Path(top).resolve() == root.resolve():
-            listed = subprocess.run(['git', 'ls-files', '-z'], cwd=root, capture_output=True,
-                                    check=True).stdout.decode('utf-8')
+            listed = subprocess.run(['git', 'ls-files', '-z'], cwd=root, capture_output=True, check=True).stdout.decode(
+                'utf-8'
+            )
             return [name for name in listed.split('\0') if name and (root / name).is_file()]
     except (OSError, subprocess.CalledProcessError):
         pass
     files = []
     for directory, folders, names in os.walk(root):
         # Skip version control and any CMake build tree (generated copies live there).
-        folders[:] = [f for f in folders if f != '.git'
-                      and not (Path(directory) / f / 'CMakeCache.txt').exists()]
+        folders[:] = [f for f in folders if f != '.git' and not (Path(directory) / f / 'CMakeCache.txt').exists()]
         files += [(Path(directory) / n).relative_to(root).as_posix() for n in names]
     return files
 
@@ -262,8 +340,12 @@ def check_copies(root, registry, errors):
     patterns = []
     for cid in (registry['vst3']['processor_class_id'], registry['vst3']['controller_class_id']):
         patterns.append(re.compile(cid[:8], re.I))  # First FUID word in any spelling.
-    for bundle in (registry['vst3']['macos_bundle_id'], registry['au']['macos_bundle_id'],
-                   *registry['macos_installer'].values(), 'org.convolver.'):
+    for bundle in (
+        registry['vst3']['macos_bundle_id'],
+        registry['au']['macos_bundle_id'],
+        *registry['macos_installer'].values(),
+        'org.convolver.',
+    ):
         patterns.append(re.compile(re.escape(bundle)))
     patterns.append(re.compile(re.escape(registry['lv2']['base_uri'])))
     # Every text file: sources in any language, Turtle, plists, workflows.
@@ -277,8 +359,10 @@ def check_copies(root, registry, errors):
         text = data.decode('utf-8', errors='replace')
         for pattern in patterns:
             if pattern.search(text):
-                errors.append(f'{name}: contains {pattern.pattern!r}; read it from '
-                              'plugins/identities.json (cmake/ConvolverIdentities.cmake) instead')
+                errors.append(
+                    f'{name}: contains {pattern.pattern!r}; read it from '
+                    'plugins/identities.json (cmake/ConvolverIdentities.cmake) instead'
+                )
 
 
 def check(root):
@@ -296,7 +380,8 @@ def self_test():
     root = Path(__file__).resolve().parents[1]
     registry = json.loads((root / 'plugins/identities.json').read_text(encoding='utf-8'))
     cases = [
-        (('au', 'manufacturer'), 'conv'), (('au', 'subtype'), 'Conv1'),
+        (('au', 'manufacturer'), 'conv'),
+        (('au', 'subtype'), 'Conv1'),
         (('vst3', 'processor_class_id'), '73a81329e6484adf9da7d731a8c94201'),
         (('vst3', 'macos_bundle_id'), 'org.convolver.vst3'),
         (('lv2', 'base_uri'), 'http://example.org/convolver#'),
@@ -315,8 +400,7 @@ def self_test():
     check_frozen(mutated, errors)
     assert errors, 'changed fixed layout was not caught'
     mutated = json.loads(json.dumps(registry))
-    mutated['fixed_layouts'].append(dict(mutated['fixed_layouts'][0], id='discrete-4-4',
-                                         inputs=4, outputs=4))
+    mutated['fixed_layouts'].append(dict(mutated['fixed_layouts'][0], id='discrete-4-4', inputs=4, outputs=4))
     errors = []
     check_frozen(mutated, errors)
     assert errors, 'unfrozen new layout was not caught'

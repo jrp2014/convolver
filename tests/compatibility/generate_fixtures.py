@@ -8,6 +8,7 @@ signals are deterministic. Only the Python standard library is used.
 
 Usage: generate_fixtures.py OUTPUT_DIRECTORY [CASE_ID ...]
 """
+
 import json
 from pathlib import Path
 import struct
@@ -41,9 +42,22 @@ def write_wav(path, rate, channels, fmt):
     else:
         raise ValueError('unknown fixture format: ' + fmt)
     count = len(channels)
-    header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + len(payload), b'WAVE', b'fmt ',
-                         16, tag, count, rate, rate * count * width, count * width, width * 8,
-                         b'data', len(payload))
+    header = struct.pack(
+        '<4sI4s4sIHHIIHH4sI',
+        b'RIFF',
+        36 + len(payload),
+        b'WAVE',
+        b'fmt ',
+        16,
+        tag,
+        count,
+        rate,
+        rate * count * width,
+        count * width,
+        width * 8,
+        b'data',
+        len(payload),
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(header + payload)
 

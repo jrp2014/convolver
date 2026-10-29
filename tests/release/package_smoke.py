@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Check a staged distribution after relocation; optionally run SDK tools."""
+
 import argparse
 import json
 from pathlib import Path
@@ -20,15 +21,23 @@ def staged_tool(root, name):
 
 def check(root, validator=None, probe=None):
     root = Path(root).resolve()
-    for name in ('VST3/Convolver.vst3', 'presets/examples.json', 'docs/use/README.md',
-                 'docs/use/first-sound-in-a-host.md', 'docs/use/presets.md', 'docs/use/equalizer-apo.md',
-                 'licenses/Convolver.txt', 'VERSION.txt'):
+    for name in (
+        'VST3/Convolver.vst3',
+        'presets/examples.json',
+        'docs/use/README.md',
+        'docs/use/first-sound-in-a-host.md',
+        'docs/use/presets.md',
+        'docs/use/equalizer-apo.md',
+        'licenses/Convolver.txt',
+        'VERSION.txt',
+    ):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
     tool, exporter = (staged_tool(root, name) for name in ('convolver-preset', 'convolver-equalizer-apo'))
     assert not list((root / 'bin').glob('convolver-vst3-preset*')), 'the old converter name is for source builds only'
     from documentation_examples import check as check_documentation
+
     check_documentation(root)
     examples = json.loads((root / 'presets/examples.json').read_text())
     assert len(examples) == 18, 'expected mono/stereo x three rates x identity/echo/repeat'
@@ -56,13 +65,17 @@ def check(root, validator=None, probe=None):
             commands = (export / 'convolver.txt').read_text(encoding='utf-8')
             assert 'Convolution:' in commands and list(export.glob('ir-*.wav')), 'incomplete Equalizer APO export'
             result = subprocess.run([str(exporter), str(folder / 'filter.cfg'), str(export)], capture_output=True)
-            assert result.returncode and (export / 'convolver.txt').read_text(encoding='utf-8') == commands, \
+            assert result.returncode and (export / 'convolver.txt').read_text(encoding='utf-8') == commands, (
                 'exporter replaced an existing folder'
+            )
             for source in folder.glob('*.wav'):
                 source.unlink()
             (folder / 'filter.cfg').unlink()
             if probe:
-                subprocess.run([str(probe), str(output), str(example['rate']), str(example['channels']), example['kind']], check=True)
+                subprocess.run(
+                    [str(probe), str(output), str(example['rate']), str(example['channels']), example['kind']],
+                    check=True,
+                )
         bad = relocated / 'malformed.cfg'
         bad.write_text('not a configuration\n')
         result = subprocess.run([str(tool), str(bad), str(relocated / 'bad.vstpreset')], capture_output=True)
@@ -71,9 +84,19 @@ def check(root, validator=None, probe=None):
         result = subprocess.run([str(exporter), str(bad), str(relocated / 'bad export')], capture_output=True)
         assert result.returncode and not (relocated / 'bad export').exists(), 'malformed input left an export'
         if platform.system() == 'Darwin':
-            subprocess.run(['codesign', '--verify', '--deep', '--strict', str(relocated / 'VST3/Convolver.vst3')], check=True)
+            subprocess.run(
+                ['codesign', '--verify', '--deep', '--strict', str(relocated / 'VST3/Convolver.vst3')], check=True
+            )
         if validator:
-            subprocess.run([sys.executable, str(Path(__file__).resolve().parents[1] / 'vst3/validate_bundle.py'), str(validator), str(relocated / 'VST3/Convolver.vst3')], check=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve().parents[1] / 'vst3/validate_bundle.py'),
+                    str(validator),
+                    str(relocated / 'VST3/Convolver.vst3'),
+                ],
+                check=True,
+            )
     print('Relocated tools, embedded examples and requested SDK checks passed')
 
 

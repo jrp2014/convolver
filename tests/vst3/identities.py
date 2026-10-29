@@ -9,6 +9,7 @@
 
 Usage: identities.py REGISTRY SDK_DIR BUNDLE [--require-moduleinfo]
 """
+
 import argparse
 import json
 from pathlib import Path
@@ -50,20 +51,23 @@ def main():
     bits = speaker_bits(header)
     for speaker in registry['speakers']:
         if bits.get(speaker['vst3']) != speaker['bit']:
-            errors.append(f"{speaker['vst3']} is bit {bits.get(speaker['vst3'])} in the SDK, "
-                          f"but WAV {speaker['wav']} is bit {speaker['bit']}")
+            errors.append(
+                f'{speaker["vst3"]} is bit {bits.get(speaker["vst3"])} in the SDK, '
+                f'but WAV {speaker["wav"]} is bit {speaker["bit"]}'
+            )
 
     vst3 = registry['vst3']
     info_path = args.bundle / 'Contents/Resources/moduleinfo.json'
     if info_path.is_file():
         info = module_info(info_path)
         factory = info['Factory Info']
-        if (factory['Vendor'], factory['URL']) != (registry['vendor']['name'],
-                                                   registry['vendor']['url']):
+        if (factory['Vendor'], factory['URL']) != (registry['vendor']['name'], registry['vendor']['url']):
             errors.append('moduleinfo.json: factory vendor or URL differs from the registry')
         classes = {c['Category']: c['CID'].upper() for c in info['Classes']}
-        wanted = {'Audio Module Class': vst3['processor_class_id'],
-                  'Component Controller Class': vst3['controller_class_id']}
+        wanted = {
+            'Audio Module Class': vst3['processor_class_id'],
+            'Component Controller Class': vst3['controller_class_id'],
+        }
         if classes != wanted:
             errors.append(f'moduleinfo.json: classes {classes}, registry {wanted}')
     elif args.require_moduleinfo:
@@ -76,8 +80,7 @@ def main():
         with plist_path.open('rb') as handle:
             identifier = plistlib.load(handle).get('CFBundleIdentifier')
         if identifier != vst3['macos_bundle_id']:
-            errors.append(f'Info.plist: CFBundleIdentifier {identifier!r}, '
-                          f"registry {vst3['macos_bundle_id']!r}")
+            errors.append(f'Info.plist: CFBundleIdentifier {identifier!r}, registry {vst3["macos_bundle_id"]!r}')
 
     for error in errors:
         print(error, file=sys.stderr)

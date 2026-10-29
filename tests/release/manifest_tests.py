@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Release policy rejects ambiguous or incomplete candidate contracts."""
+
 import copy
 import importlib.util
 from pathlib import Path
@@ -47,11 +48,21 @@ class PolicyTests(unittest.TestCase):
             self.contract.validate_policy(policy, ROOT)
 
     def test_records_name_exact_releases(self):
-        record = {'version': '1.18.10', 'revision': '5' * 40, 'url': 'https://example.org/lv2.tar.gz',
-                  'sha256': '0' * 64, 'license': 'ISC', 'archive': 'lv2.tar.gz', 'directory': 'lv2'}
+        record = {
+            'version': '1.18.10',
+            'revision': '5' * 40,
+            'url': 'https://example.org/lv2.tar.gz',
+            'sha256': '0' * 64,
+            'license': 'ISC',
+            'archive': 'lv2.tar.gz',
+            'directory': 'lv2',
+        }
         self.contract.validate_records({'lv2': record})
-        for key, value, message in (('sha256', 'x', 'sha256'), ('revision', 'main', 'immutable revision'),
-                                    ('url', 'http://example.org', 'URL')):
+        for key, value, message in (
+            ('sha256', 'x', 'sha256'),
+            ('revision', 'main', 'immutable revision'),
+            ('url', 'http://example.org', 'URL'),
+        ):
             with self.assertRaisesRegex(ValueError, message):
                 self.contract.validate_records({'lv2': dict(record, **{key: value})})
         with self.assertRaisesRegex(ValueError, 'no record for dependencies'):
@@ -76,8 +87,7 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(used(self.policy, ('vst3',), 'FFTW'), vst3 | {'libsndfile', 'fftw'})
         self.assertEqual(used(self.policy, ('lv2',), 'OOURA'), {'lv2', 'libsndfile'})
         self.assertEqual(used(self.policy, ('au',), 'ACCELERATE'), {'audiounitsdk', 'libsndfile'})
-        self.assertEqual(used(self.policy, ('vst3', 'lv2', 'au'), 'AUTO'),
-                         vst3 | {'lv2', 'audiounitsdk', 'libsndfile'})
+        self.assertEqual(used(self.policy, ('vst3', 'lv2', 'au'), 'AUTO'), vst3 | {'lv2', 'audiounitsdk', 'libsndfile'})
         with self.assertRaisesRegex(ValueError, 'unknown plug-in formats'):
             used(self.policy, ('clap',))
 

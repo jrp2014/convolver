@@ -9,6 +9,7 @@ reader below, must hold the filter the .cfg describes.
 
 Usage: preset_tests.py CONVOLVER_PRESET
 """
+
 import base64
 import json
 from pathlib import Path
@@ -41,6 +42,7 @@ def run(*args, ok=True):
 
 
 # --- Independent readers ------------------------------------------------------
+
 
 def decode_state(data):
     """Version-1 host state (portable/state.cpp), as a dictionary."""
@@ -81,14 +83,14 @@ def read_vstpreset(path):
     magic, version, class_id, list_offset = struct.unpack_from('<4si32sq', data)
     assert magic == b'VST3' and version == 1
     assert class_id.decode() == REGISTRY['vst3']['processor_class_id']
-    assert data[list_offset:list_offset + 4] == b'List'
+    assert data[list_offset : list_offset + 4] == b'List'
     (count,) = struct.unpack_from('<i', data, list_offset + 4)
     assert count == 1 and len(data) == list_offset + 8 + 20 * count
     chunk, offset, size = struct.unpack_from('<4sqq', data, list_offset + 8)
     assert chunk == b'Comp' and offset == 48 and offset + size == list_offset
     (length,) = struct.unpack_from('<I', data, offset)
     assert length == size - 4
-    return data[offset + 4:offset + 4 + length]
+    return data[offset + 4 : offset + 4 + length]
 
 
 def read_aupreset(path, name):
@@ -101,8 +103,9 @@ def read_aupreset(path, name):
     assert plist['manufacturer'] == four_char(au['manufacturer'])
     assert plist['name'] == name, plist['name']
     assert plist['data'] == b'', 'AUBase parameter data: empty, so settings keep their values'
-    assert set(plist) == {'version', 'type', 'subtype', 'manufacturer', 'name', 'data',
-                          'convolver-state'}, sorted(plist)
+    assert set(plist) == {'version', 'type', 'subtype', 'manufacturer', 'name', 'data', 'convolver-state'}, sorted(
+        plist
+    )
     return plist['convolver-state']
 
 
@@ -117,20 +120,30 @@ def read_lv2(bundle, name, layout):
     assert sorted(p.name for p in bundle.iterdir()) == ['manifest.ttl', 'preset.ttl']
     manifest = (bundle / 'manifest.ttl').read_text(encoding='utf-8')
     preset = (bundle / 'preset.ttl').read_text(encoding='utf-8')
-    assert re.search(r'<preset\.ttl>\s+a pset:Preset ;\s+lv2:appliesTo <' + re.escape(plugin) +
-                     r'> ;\s+rdfs:seeAlso <preset\.ttl> \.', manifest), manifest
+    assert re.search(
+        r'<preset\.ttl>\s+a pset:Preset ;\s+lv2:appliesTo <'
+        + re.escape(plugin)
+        + r'> ;\s+rdfs:seeAlso <preset\.ttl> \.',
+        manifest,
+    ), manifest
     assert f'lv2:appliesTo <{plugin}> ;' in preset
     assert turtle_label(preset) == name
-    match = re.search(r'state:state \[\s+<' + re.escape(base + 'state') +
-                      r'> "([A-Za-z0-9+/=]*)"\^\^xsd:base64Binary\s+\] \.', preset)
+    match = re.search(
+        r'state:state \[\s+<' + re.escape(base + 'state') + r'> "([A-Za-z0-9+/=]*)"\^\^xsd:base64Binary\s+\] \.', preset
+    )
     assert match, preset
     if shutil.which('serdi'):
         # A real Turtle parser: both files parse, and the triples say what we expect.
         for file in ('manifest.ttl', 'preset.ttl'):
-            subprocess.run(['serdi', '-q', '-i', 'turtle', '-o', 'ntriples',
-                            str(bundle / file)], check=True, capture_output=True)
-        triples = subprocess.run(['serdi', '-i', 'turtle', '-o', 'ntriples', str(bundle / 'preset.ttl')],
-                                 check=True, capture_output=True, text=True).stdout
+            subprocess.run(
+                ['serdi', '-q', '-i', 'turtle', '-o', 'ntriples', str(bundle / file)], check=True, capture_output=True
+            )
+        triples = subprocess.run(
+            ['serdi', '-i', 'turtle', '-o', 'ntriples', str(bundle / 'preset.ttl')],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
         assert f'<http://lv2plug.in/ns/lv2core#appliesTo> <{plugin}>' in triples
         assert f'<{base}state> "{match.group(1)}"^^<http://www.w3.org/2001/XMLSchema#base64Binary>' in triples
     return base64.b64decode(match.group(1), validate=True)
@@ -138,13 +151,13 @@ def read_lv2(bundle, name, layout):
 
 # --- Fixtures -------------------------------------------------------------------
 
+
 def write_pcm16(path, rate, channels):
     with wave.open(str(path), 'wb') as wav:
         wav.setnchannels(len(channels))
         wav.setsampwidth(2)
         wav.setframerate(rate)
-        wav.writeframes(b''.join(struct.pack(f'<{len(channels)}h', *frame)
-                                 for frame in zip(*channels)))
+        wav.writeframes(b''.join(struct.pack(f'<{len(channels)}h', *frame) for frame in zip(*channels)))
 
 
 def read_float_wav(path):
@@ -167,8 +180,8 @@ def check_crossover(state):
         expected = responses[band]
         while expected and expected[-1] == 0:
             expected = expected[:-1]
-        assert path['impulse'][:len(expected)] == expected, f'path {band} response'
-        assert not any(path['impulse'][len(expected):])
+        assert path['impulse'][: len(expected)] == expected, f'path {band} response'
+        assert not any(path['impulse'][len(expected) :])
         assert path['inputs'] == [(band // 3, 1.0)], path['inputs']
         assert path['outputs'] == [(band, 0.5 if band in (2, 5) else 1.0)], path['outputs']
 
@@ -183,9 +196,11 @@ def main():
         out = run(CROSSOVER / 'filter.cfg', *(root / n for n in names)).stdout
         assert out.count('Created self-contained') == 3, out
         assert REGISTRY['lv2']['base_uri'] + 'discrete-2-6' in out, out
-        states = [read_vstpreset(root / names[0]),
-                  read_aupreset(root / names[1], 'Crossover'),
-                  read_lv2(root / names[2], 'Crossover', 'discrete-2-6')]
+        states = [
+            read_vstpreset(root / names[0]),
+            read_aupreset(root / names[1], 'Crossover'),
+            read_lv2(root / names[2], 'Crossover', 'discrete-2-6'),
+        ]
         assert states[0] == states[1] == states[2], 'one encoded state in every format'
         check_crossover(decode_state(states[0]))
         print('Crossover (2->6) as VST3, AU and LV2 presets with identical state')
@@ -195,8 +210,7 @@ def main():
         work = root / 'work'
         work.mkdir()
         write_pcm16(work / 'ir ü.wav', 44100, [[16384, -8192, 4096], [0, 32767, -32768]])
-        (work / 'mono.cfg').write_text('44100 1 2 0\n0\n0 0\nir ü.wav\n1\n0\n0.25 1\n',
-                                       encoding='utf-8')
+        (work / 'mono.cfg').write_text('44100 1 2 0\n0\n0 0\nir ü.wav\n1\n0\n0.25 1\n', encoding='utf-8')
         run('--name', 'Raum «ü» <A&B> "q" \\', work / 'mono.cfg', root / 'Fork.vstpreset')
         # A raw filter is embedded as f32le, and the tool says so.
         (work / 'drc.pcm').write_bytes(b'\0\0\0\x3f')
@@ -211,8 +225,9 @@ def main():
         c = decode_state(fork)['configuration']
         # One input forked to two outputs: route 0.25 is output 0 at gain 0.25.
         assert (c['rate'], c['inputs'], c['outputs']) == (44100, 1, 2)
-        assert c['paths'] == [{'impulse': [0.0, 32767 / 32768, -1.0],
-                               'inputs': [(0, 1.0)], 'outputs': [(0, 0.25), (1, 1.0)]}], c['paths']
+        assert c['paths'] == [
+            {'impulse': [0.0, 32767 / 32768, -1.0], 'inputs': [(0, 1.0)], 'outputs': [(0, 0.25), (1, 1.0)]}
+        ], c['paths']
         print('Converted a .vstpreset to AU and LV2 without the original files')
 
         # Names: the default, and any text, escaped in XML and Turtle.
@@ -222,9 +237,11 @@ def main():
         read_lv2(root / 'n.preset.lv2', name, 'discrete-2-6')
 
         # Refusals leave nothing behind, and explain themselves.
-        (root / 'three.cfg').write_text('48000 3 3 0\n0 0 0\n0 0 0\n'
-                                        + ''.join(f'{CROSSOVER / "crossover.wav"}\n{i}\n{i}\n{i}\n'
-                                                  for i in range(3)), encoding='utf-8')
+        (root / 'three.cfg').write_text(
+            '48000 3 3 0\n0 0 0\n0 0 0\n'
+            + ''.join(f'{CROSSOVER / "crossover.wav"}\n{i}\n{i}\n{i}\n' for i in range(3)),
+            encoding='utf-8',
+        )
         before = sorted(p.name for p in root.iterdir())
         result = run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.preset.lv2', ok=False)
         assert '2->6' in result.stderr and '3 inputs' in result.stderr, result.stderr
@@ -246,8 +263,7 @@ def main():
         assert '--name' in result.stderr, result.stderr
         # A failure part-way (a missing folder) removes what the run wrote,
         # names the output, and reports nothing as created.
-        result = run(CROSSOVER / 'filter.cfg', root / 'f.vstpreset', root / 'nodir' / 'f.aupreset',
-                     ok=False)
+        result = run(CROSSOVER / 'filter.cfg', root / 'f.vstpreset', root / 'nodir' / 'f.aupreset', ok=False)
         assert 'Created' not in result.stdout, result.stdout
         assert 'f.aupreset' in result.stderr and 'No presets were kept' in result.stderr, result.stderr
         assert sorted(p.name for p in root.iterdir()) == before, 'refusals wrote nothing'
@@ -255,8 +271,10 @@ def main():
         # file system allows; an AU or LV2 name comes from the first of those.
         if sys.platform.startswith('linux'):
             target = bytes(root) + b'/R\xe4um\tx.vstpreset'
-            done = subprocess.run([TOOL, str(CROSSOVER / 'filter.cfg').encode(), target,
-                                   bytes(root / 'Named.aupreset')], capture_output=True)
+            done = subprocess.run(
+                [TOOL, str(CROSSOVER / 'filter.cfg').encode(), target, bytes(root / 'Named.aupreset')],
+                capture_output=True,
+            )
             assert done.returncode == 0, done.stderr
             read_aupreset(root / 'Named.aupreset', 'Named')
             Path(target.decode('utf-8', 'surrogateescape')).unlink()

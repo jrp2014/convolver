@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Shared release contracts. No third-party Python packages are required."""
+
 import hashlib
 import json
 from pathlib import Path
@@ -18,8 +19,17 @@ def sha256(path):
 # by builds of those plug-in formats; the others (FFTW, libsndfile) by every
 # build. The policy says where each comes from; resolve.py picks the newest
 # release and records it (CI-6).
-REQUIRED_DEPENDENCIES = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk',
-                         'lv2', 'audiounitsdk', 'fftw', 'libsndfile'}
+REQUIRED_DEPENDENCIES = {
+    'vst3sdk',
+    'vst3-base',
+    'vst3-cmake',
+    'vst3-pluginterfaces',
+    'vst3-public-sdk',
+    'lv2',
+    'audiounitsdk',
+    'fftw',
+    'libsndfile',
+}
 PLUGIN_FORMATS = {'vst3', 'lv2', 'au'}
 
 
@@ -30,9 +40,11 @@ def used_dependencies(policy, formats=('vst3',), backend='AUTO'):
     unknown = set(formats) - PLUGIN_FORMATS
     if unknown:
         raise ValueError(f'unknown plug-in formats: {sorted(unknown)}')
-    return {name for name, dep in policy['dependencies'].items()
-            if (name != 'fftw' or backend == 'FFTW') and
-            (dep.get('formats') is None or set(dep['formats']) & set(formats))}
+    return {
+        name
+        for name, dep in policy['dependencies'].items()
+        if (name != 'fftw' or backend == 'FFTW') and (dep.get('formats') is None or set(dep['formats']) & set(formats))
+    }
 
 
 def load_policy(path):
@@ -104,8 +116,10 @@ def _validate_source(name, rule, archive=True):
         raise ValueError(f'{name}: missing tag_prefix or tag_pattern')
     for key in ('sha256', 'revision', 'version'):
         if key in rule:
-            raise ValueError(f'{name}: the policy does not pin a {key}; builds resolve the newest release '
-                             '(scripts/release/resolve.py)')
+            raise ValueError(
+                f'{name}: the policy does not pin a {key}; builds resolve the newest release '
+                '(scripts/release/resolve.py)'
+            )
 
 
 def _validate_rule(name, rule, rules):
@@ -149,9 +163,17 @@ def with_records(policy, records):
     validate_records(records)
     # A newer pre-release is noted at resolution time only; it is not part of
     # what a build used, so it stays out of manifests.
-    return dict(policy, dependencies={name: {key: value for key, value in records[name].items()
-                                             if key not in ('newer_prerelease', 'prerelease_tried')}
-                                      for name in policy['dependencies']})
+    return dict(
+        policy,
+        dependencies={
+            name: {
+                key: value
+                for key, value in records[name].items()
+                if key not in ('newer_prerelease', 'prerelease_tried')
+            }
+            for name in policy['dependencies']
+        },
+    )
 
 
 def platform_policy(policy, identifier):

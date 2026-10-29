@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Production promotion must fail closed on incomplete or changed evidence."""
+
 import copy
 import importlib.util
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
-from contract import load_policy, sha256
+from contract import load_policy, sha256  # noqa: E402
 
 
 class GateTests(unittest.TestCase):
@@ -26,14 +28,41 @@ class GateTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.policy = load_policy(ROOT / 'packaging/release-policy.json')
         self.policy['production_enabled'] = True
-        self.candidate = {'schema': 1, 'version': self.policy['version'], 'source_commit': 'a'*40, 'assets': [], 'platforms': []}
+        self.candidate = {
+            'schema': 1,
+            'version': self.policy['version'],
+            'source_commit': 'a' * 40,
+            'assets': [],
+            'platforms': [],
+        }
         self.add_asset('source.tar.gz', 'source')
         for platform in self.policy['platforms']:
             name = platform['artifact'].format(version=self.policy['version'])
             digest = self.add_asset(name, 'binary')
-            evidence = {kind: {'result': 'passed', 'artifact_sha256': digest, 'record': 'https://example.org/qualification/1'} for kind in self.policy['required_production_evidence']}
-            evidence['host'].update(host='REAPER', host_version='test-fixture', os_build='fixture', architecture=platform['architecture'], sample_rates=[44100,48000,96000], channels=[1,2])
-            self.candidate['platforms'].append({'id': platform['id'], 'artifact': name, 'source_commit': 'a'*40, 'source': 'source.tar.gz', 'notices': True, 'signed': True, 'notarized': True, 'evidence': evidence})
+            evidence = {
+                kind: {'result': 'passed', 'artifact_sha256': digest, 'record': 'https://example.org/qualification/1'}
+                for kind in self.policy['required_production_evidence']
+            }
+            evidence['host'].update(
+                host='REAPER',
+                host_version='test-fixture',
+                os_build='fixture',
+                architecture=platform['architecture'],
+                sample_rates=[44100, 48000, 96000],
+                channels=[1, 2],
+            )
+            self.candidate['platforms'].append(
+                {
+                    'id': platform['id'],
+                    'artifact': name,
+                    'source_commit': 'a' * 40,
+                    'source': 'source.tar.gz',
+                    'notices': True,
+                    'signed': True,
+                    'notarized': True,
+                    'evidence': evidence,
+                }
+            )
             record = self.candidate['platforms'][-1]
             record['installers'] = []
             record['installer_evidence'] = {}
@@ -100,7 +129,7 @@ class GateTests(unittest.TestCase):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 
     def test_evidence_for_different_bytes(self):
-        self.candidate['platforms'][0]['evidence']['clean_install']['artifact_sha256'] = 'f'*64
+        self.candidate['platforms'][0]['evidence']['clean_install']['artifact_sha256'] = 'f' * 64
         with self.assertRaisesRegex(ValueError, 'clean_install'):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 

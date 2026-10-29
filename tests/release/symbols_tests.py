@@ -6,6 +6,7 @@ machine; where a compiler and the platform's symbol tools are present, real
 binaries are checked too (Linux: objcopy; macOS: dsymutil). DIAG-1, from jrp's
 review of 0.4.43.
 """
+
 from pathlib import Path
 import platform
 import shutil
@@ -22,6 +23,7 @@ import symbols  # noqa: E402
 
 
 # Synthetic files -----------------------------------------------------------
+
 
 def elf(build_id=None, debuglink=None, debug_info=None, nobits_debug_info=False):
     """A minimal 64-bit little-endian ELF file with the given sections."""
@@ -42,30 +44,40 @@ def elf(build_id=None, debuglink=None, debug_info=None, nobits_debug_info=False)
         offset = 64 + len(body)
         if kind != 8:
             body += contents
-        headers.append(struct.pack('<IIQQQQIIQQ', names.index(name.encode() + b'\0'), kind, 0, 0,
-                                   offset, len(contents), 0, 0, 1, 0))
+        headers.append(
+            struct.pack(
+                '<IIQQQQIIQQ', names.index(name.encode() + b'\0'), kind, 0, 0, offset, len(contents), 0, 0, 1, 0
+            )
+        )
     shoff = 64 + len(body)
-    header = (b'\x7fELF\x02\x01\x01' + b'\0' * 9 + struct.pack('<HHIQQQIHHHHHH', 3, 62, 1, 0, 0, shoff, 0,
-                                                                64, 0, 0, 64, len(headers), len(headers) - 1))
+    header = (
+        b'\x7fELF\x02\x01\x01'
+        + b'\0' * 9
+        + struct.pack('<HHIQQQIHHHHHH', 3, 62, 1, 0, 0, shoff, 0, 64, 0, 0, 64, len(headers), len(headers) - 1)
+    )
     return header + body + b''.join(headers)
 
 
-def macho(uuid, dwarf_size=0, cputype=0x0100000c):
+def macho(uuid, dwarf_size=0, cputype=0x0100000C):
     """A thin 64-bit Mach-O file with an LC_UUID and, optionally, __DWARF,__debug_info."""
-    commands = struct.pack('<II16s', 0x1b, 24, uuid)
+    commands = struct.pack('<II16s', 0x1B, 24, uuid)
     if dwarf_size:
         data_offset = 32 + len(commands) + 72 + 80
-        section = struct.pack('<16s16sQQIIIIIIII', b'__debug_info', b'__DWARF', 0, dwarf_size,
-                              data_offset, 0, 0, 0, 0, 0, 0, 0)
-        commands += struct.pack('<II16sQQQQiiII', 0x19, 72 + 80, b'__DWARF', 0, 0, data_offset,
-                                dwarf_size, 7, 3, 1, 0) + section
-    header = struct.pack('<IiiIIIII', 0xfeedfacf, cputype, 0, 10 if dwarf_size else 2, 2 if dwarf_size else 1,
-                         len(commands), 0, 0)
+        section = struct.pack(
+            '<16s16sQQIIIIIIII', b'__debug_info', b'__DWARF', 0, dwarf_size, data_offset, 0, 0, 0, 0, 0, 0, 0
+        )
+        commands += (
+            struct.pack('<II16sQQQQiiII', 0x19, 72 + 80, b'__DWARF', 0, 0, data_offset, dwarf_size, 7, 3, 1, 0)
+            + section
+        )
+    header = struct.pack(
+        '<IiiIIIII', 0xFEEDFACF, cputype, 0, 10 if dwarf_size else 2, 2 if dwarf_size else 1, len(commands), 0, 0
+    )
     return header + commands + b'\xab' * dwarf_size
 
 
 def universal(*slices):
-    out = struct.pack('>II', 0xcafebabe, len(slices))
+    out = struct.pack('>II', 0xCAFEBABE, len(slices))
     offset = 8 + 20 * len(slices)
     offset += -offset % 4096
     body = b''
@@ -86,16 +98,21 @@ def pe(guid, age, pdb_path):
     section_data = debug + record
     directories = [(0, 0)] * 16
     directories[6] = (0x1000, 28)
-    optional = struct.pack('<H', 0x20b) + b'\0' * 106 + struct.pack('<I', 16) + b''.join(
-        struct.pack('<II', *d) for d in directories)
+    optional = (
+        struct.pack('<H', 0x20B)
+        + b'\0' * 106
+        + struct.pack('<I', 16)
+        + b''.join(struct.pack('<II', *d) for d in directories)
+    )
     head = bytearray(raw)
     head[0:2] = b'MZ'
-    head[0x3c:0x40] = struct.pack('<I', 0x40)
+    head[0x3C:0x40] = struct.pack('<I', 0x40)
     head[0x40:0x44] = b'PE\0\0'
     head[0x44:0x58] = struct.pack('<HHIIIHH', 0x8664, 1, 0, 0, 0, optional_size, 0x22)
-    head[0x58:0x58 + optional_size] = optional
-    head[sections_at:sections_at + 40] = struct.pack('<8sIIIIIIHHI', b'.rdata', len(section_data), 0x1000,
-                                                     len(section_data), raw, 0, 0, 0, 0, 0x40000040)
+    head[0x58 : 0x58 + optional_size] = optional
+    head[sections_at : sections_at + 40] = struct.pack(
+        '<8sIIIIIIHHI', b'.rdata', len(section_data), 0x1000, len(section_data), raw, 0, 0, 0, 0, 0x40000040
+    )
     return bytes(head) + section_data
 
 
@@ -112,14 +129,19 @@ def pdb(guid, age, modules=64, dbi=True):
     for stream in streams:
         count = (len(stream) + block - 1) // block if stream else 0
         lists.append(list(range(next_block, next_block + count)))
-        data += b''.join(stream[i * block:(i + 1) * block].ljust(block, b'\0') for i in range(count))
+        data += b''.join(stream[i * block : (i + 1) * block].ljust(block, b'\0') for i in range(count))
         next_block += count
     directory = struct.pack('<I', len(streams))
-    directory += b''.join(struct.pack('<I', 0xffffffff if s is None else len(s)) for s in streams)
+    directory += b''.join(struct.pack('<I', 0xFFFFFFFF if s is None else len(s)) for s in streams)
     directory += b''.join(struct.pack(f'<{len(b)}I', *b) for b in lists)
     superblock = symbols.MSF_MAGIC + struct.pack('<IIIIII', block, 1, next_block, len(directory), 0, 2)
-    return (superblock.ljust(block, b'\0') + b'\0' * block + struct.pack('<I', 3).ljust(block, b'\0')
-            + directory.ljust(block, b'\0') + data)
+    return (
+        superblock.ljust(block, b'\0')
+        + b'\0' * block
+        + struct.pack('<I', 3).ljust(block, b'\0')
+        + directory.ljust(block, b'\0')
+        + data
+    )
 
 
 class SymbolTests(unittest.TestCase):
@@ -170,8 +192,9 @@ class SymbolTests(unittest.TestCase):
         self.linux()
         debug = elf(b'\x99' * 20, debug_info=b'\1' * 32)
         self.write(self.kept / 'convolver-preset.debug', debug)
-        self.write(self.stage / 'bin/convolver-preset',
-                   elf(b'\x22' * 20, ('convolver-preset.debug', zlib.crc32(debug))))
+        self.write(
+            self.stage / 'bin/convolver-preset', elf(b'\x22' * 20, ('convolver-preset.debug', zlib.crc32(debug)))
+        )
         self.fails('Linux', 'another build')
 
     def test_linux_no_debugging_information(self):
@@ -179,8 +202,9 @@ class SymbolTests(unittest.TestCase):
         for nobits in (False, True):
             debug = elf(b'\x22' * 20, debug_info=b'' if not nobits else b'\0' * 8, nobits_debug_info=nobits)
             self.write(self.kept / 'convolver-preset.debug', debug)
-            self.write(self.stage / 'bin/convolver-preset',
-                       elf(b'\x22' * 20, ('convolver-preset.debug', zlib.crc32(debug))))
+            self.write(
+                self.stage / 'bin/convolver-preset', elf(b'\x22' * 20, ('convolver-preset.debug', zlib.crc32(debug)))
+            )
             self.fails('Linux', 'no debugging information')
 
     def test_linux_debuglink(self):
@@ -237,10 +261,12 @@ class SymbolTests(unittest.TestCase):
     def test_darwin_universal(self):
         self.darwin()
         a, b = b'\x0a' * 16, b'\x0b' * 16
-        self.write(self.stage / 'bin/convolver-preset',
-                   universal((macho(a, cputype=0x01000007), 0x01000007), (macho(b), 0x0100000c)))
+        self.write(
+            self.stage / 'bin/convolver-preset',
+            universal((macho(a, cputype=0x01000007), 0x01000007), (macho(b), 0x0100000C)),
+        )
         dwarf = self.kept / 'convolver-preset.dSYM/Contents/Resources/DWARF/convolver-preset'
-        dwarf.write_bytes(universal((macho(a, 64, 0x01000007), 0x01000007), (macho(b, 64), 0x0100000c)))
+        dwarf.write_bytes(universal((macho(a, 64, 0x01000007), 0x01000007), (macho(b, 64), 0x0100000C)))
         found = symbols.check(self.kept, self.stage, 'Darwin')
         self.assertIn('(arm64)', found['convolver-preset.dSYM'])
         self.assertIn('(x86_64)', found['convolver-preset.dSYM'])
@@ -313,8 +339,7 @@ class SymbolTests(unittest.TestCase):
             debug = self.kept / name
             # As cmake/ConvolverDebugSymbols.cmake does.
             subprocess.run(['objcopy', '--only-keep-debug', str(binary), str(debug)], check=True)
-            subprocess.run(['objcopy', '--strip-debug', f'--add-gnu-debuglink={debug}', str(binary)],
-                           check=True)
+            subprocess.run(['objcopy', '--strip-debug', f'--add-gnu-debuglink={debug}', str(binary)], check=True)
             built[name] = binary
         found = symbols.check(self.kept, self.stage, 'Linux')
         self.assertRegex(found['convolver-preset.debug'], r'^GNU build ID [0-9a-f]{40}$')

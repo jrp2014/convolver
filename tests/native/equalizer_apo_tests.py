@@ -25,6 +25,7 @@ APO release instead of installing it.
 
 Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO [--benchmark BENCHMARK.EXE --config FOLDER]
 """
+
 import argparse
 import os
 from pathlib import Path
@@ -63,7 +64,9 @@ BLOCK = 480
 
 # Windows' default speaker masks for a channel count (ChannelHelper.cpp).
 DEFAULT_NAMES = {
-    1: ['C'], 2: ['L', 'R'], 4: ['L', 'R', 'RL', 'RR'],
+    1: ['C'],
+    2: ['L', 'R'],
+    4: ['L', 'R', 'RL', 'RR'],
     6: ['L', 'R', 'C', 'LFE', 'SL', 'SR'],
     8: ['L', 'R', 'C', 'LFE', 'RL', 'RR', 'SL', 'SR'],
 }
@@ -82,8 +85,7 @@ class EqualizerApo:
         self.device_channels = channels
         self.names = DEFAULT_NAMES.get(channels, [str(c + 1) for c in range(channels)])[:]
         self.selection = self.names[:]
-        self.variables = {'sampleRate': float(rate), 'outputChannelCount': channels,
-                          'inputChannelCount': channels}
+        self.variables = {'sampleRate': float(rate), 'outputChannelCount': channels, 'inputChannelCount': channels}
         self.filters = []  # (kind, data) in load order
         self.load(Path(path))
 
@@ -142,6 +144,7 @@ class EqualizerApo:
     def unknown(self, key):
         def fail(value, path):
             raise ModelError(f'unexpected command {key}: {value}')
+
         return fail
 
     def command_Eval(self, value, path):
@@ -220,14 +223,13 @@ class EqualizerApo:
             # export's If lines must make it impossible, so the model fails.
             raise ModelError(f'{file.name} is {rate} Hz on a {self.rate} Hz device')
         taps = [[(k, v) for k, v in enumerate(c) if v] for c in channels]
-        self.filters.append(('convolution', [(name, taps[i % len(taps)])
-                                             for i, name in enumerate(self.selection)]))
+        self.filters.append(('convolution', [(name, taps[i % len(taps)]) for i, name in enumerate(self.selection)]))
 
     # --- Processing ------------------------------------------------------------
     def process(self, inputs):
         frames = len(inputs[0])
-        signal = {name: list(inputs[c]) for c, name in enumerate(self.names[:self.device_channels])}
-        for name in self.names[self.device_channels:]:
+        signal = {name: list(inputs[c]) for c, name in enumerate(self.names[: self.device_channels])}
+        for name in self.names[self.device_channels :]:
             signal[name] = [0.0] * frames
         for kind, data in self.filters:
             if kind == 'copy':
@@ -255,8 +257,7 @@ class EqualizerApo:
                             y[n] += tap * x[n - k]
                     signal[name] = y
         # The audio engine receives 32-bit floats.
-        return [[fixtures.to_float32(v) for v in signal[name]]
-                for name in self.names[:self.device_channels]]
+        return [[fixtures.to_float32(v) for v in signal[name]] for name in self.names[: self.device_channels]]
 
 
 class Runtime:
@@ -266,14 +267,16 @@ class Runtime:
 
     def __init__(self, benchmark, config):
         import winreg  # noqa: PLC0415  (Windows only)
+
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\EqualizerAPO') as key:
             registered = Path(winreg.QueryValueEx(key, 'ConfigPath')[0])
         if registered.resolve() != config.resolve():
-            raise SystemExit(f'ConfigPath is {registered}, not {config}: refusing to replace '
-                             'the configuration of an Equalizer APO installation')
+            raise SystemExit(
+                f'ConfigPath is {registered}, not {config}: refusing to replace '
+                'the configuration of an Equalizer APO installation'
+            )
         existing = config / 'config.txt'
-        if existing.exists() and not existing.read_text(encoding='utf-8',
-                                                        errors='replace').startswith(self.MARKER):
+        if existing.exists() and not existing.read_text(encoding='utf-8', errors='replace').startswith(self.MARKER):
             raise SystemExit(f'{existing} was not written by this test; use an empty folder')
         self.benchmark = benchmark
         self.config = config
@@ -293,9 +296,23 @@ class Runtime:
         source = self.scratch / f'input-{self.runs}.wav'
         result = self.scratch / f'output-{self.runs}.wav'
         fixtures.write_float_wav(source, rate, inputs)
-        run = subprocess.run([str(self.benchmark), '--nopause', '--verbose',
-                              '--batchsize', str(BLOCK), '-i', str(source), '-o', str(result)],
-                             capture_output=True, text=True, errors='replace', timeout=120)
+        run = subprocess.run(
+            [
+                str(self.benchmark),
+                '--nopause',
+                '--verbose',
+                '--batchsize',
+                str(BLOCK),
+                '-i',
+                str(source),
+                '-o',
+                str(result),
+            ],
+            capture_output=True,
+            text=True,
+            errors='replace',
+            timeout=120,
+        )
         log = run.stdout + run.stderr
         if run.returncode != 0 or not result.exists():
             raise AssertionError(f'Benchmark.exe failed ({run.returncode}):\n{log}')
@@ -313,8 +330,9 @@ class Runtime:
         actual, log = self.process(f'Include: {include}', rate, inputs)
         error = fixtures.worst_error(actual, wanted)
         if error > tolerance:
-            raise AssertionError(f'{label}: Equalizer APO worst error {error:.3g}\n'
-                                 f'{differences(actual, wanted, tolerance)}\n{log}')
+            raise AssertionError(
+                f'{label}: Equalizer APO worst error {error:.3g}\n{differences(actual, wanted, tolerance)}\n{log}'
+            )
         print(f'{label}: Equalizer APO worst error {error:.3g}')
 
 
@@ -327,12 +345,14 @@ def differences(actual, wanted, tolerance=RUNTIME_TOLERANCE):
             lines.append(f'channel {channel}: matches')
             continue
         n = max(over, key=lambda i: abs(a[i] - b[i]))
-        lines.append(f'channel {channel}: {len(over)} of {len(a)} frames differ, '
-                     f'first at {over[0]}, last at {over[-1]}, worst at {n} '
-                     f'(got {a[n]:.6f}, wanted {b[n]:.6f}); '
-                     f'frames {over[0]}..{over[0] + 7} got '
-                     f'{[round(v, 5) for v in a[over[0]:over[0] + 8]]} wanted '
-                     f'{[round(v, 5) for v in b[over[0]:over[0] + 8]]}')
+        lines.append(
+            f'channel {channel}: {len(over)} of {len(a)} frames differ, '
+            f'first at {over[0]}, last at {over[-1]}, worst at {n} '
+            f'(got {a[n]:.6f}, wanted {b[n]:.6f}); '
+            f'frames {over[0]}..{over[0] + 7} got '
+            f'{[round(v, 5) for v in a[over[0] : over[0] + 8]]} wanted '
+            f'{[round(v, 5) for v in b[over[0] : over[0] + 8]]}'
+        )
     return '\n'.join(lines)
 
 
@@ -340,7 +360,7 @@ def read_wav(path):
     """Planar samples of a 32-bit float or 16-bit PCM WAV."""
     data = Path(path).read_bytes()
     fmt = data.find(b'fmt ')
-    tag, _, _, _, _, bits = struct.unpack('<HHIIHH', data[fmt + 8:fmt + 24])
+    tag, _, _, _, _, bits = struct.unpack('<HHIIHH', data[fmt + 8 : fmt + 24])
     if bits == 32:
         return fixtures.read_float_wav(path)
     with wave.open(str(path), 'rb') as file:
@@ -357,6 +377,7 @@ RUNTIME = None  # Set in main() when --benchmark is given.
 
 
 # --- Helpers ---------------------------------------------------------------------
+
 
 def run(*args, ok=True):
     result = subprocess.run([TOOL, *map(str, args)], capture_output=True, text=True)
@@ -394,9 +415,14 @@ def silent(label, folder, rate, device, frames=200):
     assert not any(kind == 'convolution' for kind, _ in model.filters), label
     print(f'{label}: silent')
     if RUNTIME:
-        RUNTIME.check(label, folder.resolve() / 'convolver.txt', rate,
-                      [fixtures.noise(frames, 700 + c) for c in range(device)],
-                      [[0.0] * frames for _ in range(device)], tolerance=0.0)
+        RUNTIME.check(
+            label,
+            folder.resolve() / 'convolver.txt',
+            rate,
+            [fixtures.noise(frames, 700 + c) for c in range(device)],
+            [[0.0] * frames for _ in range(device)],
+            tolerance=0.0,
+        )
 
 
 def write_cfg(path, text):
@@ -404,6 +430,7 @@ def write_cfg(path, text):
 
 
 # --- Tests -----------------------------------------------------------------------
+
 
 def test_first_use(work):
     """The documented examples, on a device with their channels and with more."""
@@ -416,8 +443,7 @@ def test_first_use(work):
         expected = fixtures.read_float_wav(EXAMPLES / name / 'expected.wav')
         used = max(description['inputs'], description['outputs'])
         for device in (used, used + 2):
-            check(f'{name} on {device} channels', folder, fixtures.RATE, device, inputs,
-                  expected, used)
+            check(f'{name} on {device} channels', folder, fixtures.RATE, device, inputs, expected, used)
         # Another sample rate, or a device too large to silence channel by
         # channel, gets silence rather than unfiltered audio.
         for rate, device in ((44100, used), (fixtures.RATE, 33)):
@@ -428,10 +454,8 @@ def test_list(work):
     """Every list entry, selected by rate and device channels; routes and delays."""
     folder = work / 'list'
     folder.mkdir()
-    a = [fixtures.sparse_ir(40, [(0, 0.75), (9, -0.25)]),
-         fixtures.sparse_ir(40, [(0, 0.5), (39, 0.125)])]
-    b = [fixtures.sparse_ir(64, [(0, 0.5), (3, 0.25), (63, -0.125)]),
-         fixtures.sparse_ir(64, [(2, -0.5), (17, 0.375)])]
+    a = [fixtures.sparse_ir(40, [(0, 0.75), (9, -0.25)]), fixtures.sparse_ir(40, [(0, 0.5), (39, 0.125)])]
+    b = [fixtures.sparse_ir(64, [(0, 0.5), (3, 0.25), (63, -0.125)]), fixtures.sparse_ir(64, [(2, -0.5), (17, 0.375)])]
     c = fixtures.sparse_ir(33, [(0, 1.0), (32, -0.5)])
     fixtures.write_float_wav(folder / 'a.wav', 44100, a)
     fixtures.write_float_wav(folder / 'b.wav', 48000, b)
@@ -439,12 +463,10 @@ def test_list(work):
     write_cfg(folder / 'a.cfg', '44100 2 2 3\n0 0\n0 0\na.wav\n0\n0\n0\na.wav\n1\n1\n1\n')
     # 3 -> 2 downmix: input 1 delayed 0.5 ms, output 0 delayed 1 ms; mixed and
     # inverted routes ("-0" is channel 0 inverted), one IR shared by two paths.
-    write_cfg(folder / 'b.cfg',
-              '48000 3 2 0\n0 0.5 0\n1 0\n'
-              'b.wav\n0\n0 2.5\n0\n'
-              'b.wav\n1\n1\n1 0.25\n'
-              'b.wav\n0\n-2\n1.5\n'
-              'b.wav\n1\n-0\n-1.125\n')
+    write_cfg(
+        folder / 'b.cfg',
+        '48000 3 2 0\n0 0.5 0\n1 0\nb.wav\n0\n0 2.5\n0\nb.wav\n1\n1\n1 0.25\nb.wav\n0\n-2\n1.5\nb.wav\n1\n-0\n-1.125\n',
+    )
     # Same rate and device channels as b.cfg: Equalizer APO cannot tell them apart.
     write_cfg(folder / 'd.cfg', '48000 2 3 0\n0 0\n0 0 0\nb.wav\n0\n0\n2\n')
     write_cfg(folder / 'list.txt', 'a.cfg\nb.cfg\nc.wav\nd.cfg\n')
@@ -456,24 +478,28 @@ def test_list(work):
     assert len(list(out.glob('*.wav'))) == 5
 
     frames = 300
+
     def signal(channels, seed):
-        return [[fixtures.to_float32(v) for v in fixtures.noise(frames, seed + k)]
-                for k in range(channels)]
+        return [[fixtures.to_float32(v) for v in fixtures.noise(frames, seed + k)] for k in range(channels)]
 
     def oracle(inputs, paths, outputs, input_delays=None, output_delays=None):
         rendered = fixtures.render(inputs, paths, outputs, input_delays, output_delays)
         return [channel[:frames] for channel in rendered]
 
     x2 = signal(2, 300)
-    a_paths = [dict(ir=a[0], inputs=[(0, 1.0)], outputs=[(0, 1.0)]),
-               dict(ir=a[1], inputs=[(1, 1.0)], outputs=[(1, 1.0)])]
+    a_paths = [
+        dict(ir=a[0], inputs=[(0, 1.0)], outputs=[(0, 1.0)]),
+        dict(ir=a[1], inputs=[(1, 1.0)], outputs=[(1, 1.0)]),
+    ]
     check('list: a.cfg at 44.1 kHz', out, 44100, 2, x2, oracle(x2, a_paths, 2), 2)
 
     x3 = signal(3, 400)
-    b_paths = [dict(ir=b[0], inputs=[(0, 1.0), (2, 0.5)], outputs=[(0, 1.0)]),
-               dict(ir=b[1], inputs=[(1, 1.0)], outputs=[(1, 1.0), (0, 0.25)]),
-               dict(ir=b[0], inputs=[(2, -1.0)], outputs=[(1, 0.5)]),
-               dict(ir=b[1], inputs=[(0, -1.0)], outputs=[(1, -0.125)])]
+    b_paths = [
+        dict(ir=b[0], inputs=[(0, 1.0), (2, 0.5)], outputs=[(0, 1.0)]),
+        dict(ir=b[1], inputs=[(1, 1.0)], outputs=[(1, 1.0), (0, 0.25)]),
+        dict(ir=b[0], inputs=[(2, -1.0)], outputs=[(1, 0.5)]),
+        dict(ir=b[1], inputs=[(0, -1.0)], outputs=[(1, -0.125)]),
+    ]
     b_expected = oracle(x3, b_paths, 2, [0, 24, 0], [48, 0])
     check('list: b.cfg at 48 kHz, 3 channels', out, 48000, 3, x3, b_expected, 3)
     # A 4-channel device has no exact match; b.cfg is the first that fits.
@@ -499,14 +525,11 @@ def test_choice_and_include(work):
     config = work / 'config'
     config.mkdir()
     run(folder / 'list.txt', config / 'room')
-    stereo, crossover = (fixtures.read_float_wav(EXAMPLES / n / 'expected.wav')
-                         for n in ('stereo', 'crossover'))
+    stereo, crossover = (fixtures.read_float_wav(EXAMPLES / n / 'expected.wav') for n in ('stereo', 'crossover'))
     inputs = fixtures.read_float_wav(EXAMPLES / 'stereo/input.wav')
     crossover_inputs = fixtures.read_float_wav(EXAMPLES / 'crossover/input.wav')
-    check('choice: 4 channels get the stereo entry', config / 'room', fixtures.RATE, 4, inputs,
-          stereo, 2)
-    check('choice: 8 channels get the crossover', config / 'room', fixtures.RATE, 8,
-          crossover_inputs, crossover, 6)
+    check('choice: 4 channels get the stereo entry', config / 'room', fixtures.RATE, 4, inputs, stereo, 2)
+    check('choice: 8 channels get the crossover', config / 'room', fixtures.RATE, 8, crossover_inputs, crossover, 6)
 
     # As installed: the export included from config.txt between other commands.
     write_cfg(config / 'config.txt', 'Channel: 1\nInclude: room\\convolver.txt\nPreamp: -6 dB\n')
@@ -527,13 +550,14 @@ def test_choice_and_include(work):
         padded = [c + [0.0] * (len(wanted[0]) - len(c)) for c in inputs]
         try:
             actual, log = RUNTIME.process(
-                'Channel: 1\nInclude: convolver-test-room\\convolver.txt\nPreamp: -6 dB',
-                fixtures.RATE, padded)
+                'Channel: 1\nInclude: convolver-test-room\\convolver.txt\nPreamp: -6 dB', fixtures.RATE, padded
+            )
         finally:
             shutil.rmtree(installed, ignore_errors=True)
         error = fixtures.worst_error(actual, wanted)
-        assert error <= RUNTIME_TOLERANCE, (f'include: Equalizer APO worst error {error:.3g}\n'
-                                            f'{differences(actual, wanted)}\n{log}')
+        assert error <= RUNTIME_TOLERANCE, (
+            f'include: Equalizer APO worst error {error:.3g}\n{differences(actual, wanted)}\n{log}'
+        )
         print(f'include: Equalizer APO worst error {error:.3g}')
 
 
@@ -591,8 +615,10 @@ def main():
     finally:
         if RUNTIME:
             RUNTIME.close()
-    print('Equalizer APO export: all checks passed' +
-          (f', {RUNTIME.runs} of them also in Equalizer APO' if RUNTIME else ''))
+    print(
+        'Equalizer APO export: all checks passed'
+        + (f', {RUNTIME.runs} of them also in Equalizer APO' if RUNTIME else '')
+    )
 
 
 if __name__ == '__main__':

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Python formatting and lint for the maintained scripts and tests (CI-18).
+# pre-commit runs both; see CONTRIBUTING.md#python-formatting-and-lint.
+
+# The oldest Python the build supports (docs/develop/build.md).
+target-version = "py38"
+# Close to the existing scripts, so the first reformat stayed small.
+line-length = 120
+# Recovered sources and dated evidence are kept as they were written.
+extend-exclude = [
+    "archives",
+    "docs/archive",
+    "docs/historical",
+    "docs/review-2026-10",
+    "historical",
+    "review",
+    "source",
+]
+
+[format]
+# Most existing strings use single quotes.
+quote-style = "single"
+
+[lint]
+# Pyflakes (unused imports and names, undefined names) and pycodestyle's
+# error checks: ruff's long-standing default set, named so that a ruff
+# upgrade does not add rules by itself.
+select = ["E4", "E7", "E9", "F"]

@@ -40,8 +40,7 @@ def cache_value(cache, name):
 
 def collect(build, out):
     copied = []
-    patterns = ['Testing/Temporary/LastTest*.log', 'junit.xml', 'CMakeCache.txt',
-                '**/convolver-tests.log']
+    patterns = ['Testing/Temporary/LastTest*.log', 'junit.xml', 'CMakeCache.txt', '**/convolver-tests.log']
     for pattern in patterns:
         for found in sorted(build.glob(pattern)):
             if not found.is_file():
@@ -76,8 +75,7 @@ def main(argv):
         cache = build / 'CMakeCache.txt'
         if cache.is_file():
             compiler = cache_value(cache, 'CMAKE_CXX_COMPILER')
-            identity.append(f'{name}: build type {cache_value(cache, "CMAKE_BUILD_TYPE")}, '
-                            f'compiler {compiler}')
+            identity.append(f'{name}: build type {cache_value(cache, "CMAKE_BUILD_TYPE")}, compiler {compiler}')
             if compiler:
                 version = run([compiler, '--version'])
                 identity.append('  ' + (version.splitlines()[0] if version else '(no version)'))

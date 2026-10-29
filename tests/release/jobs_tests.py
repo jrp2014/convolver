@@ -6,6 +6,7 @@ a machine with less memory. These tests check the default, the validation, the
 option on each script, and that the dependency build and the source build
 pass the limit to CMake and CTest.
 """
+
 import argparse
 import importlib.util
 import os
@@ -45,12 +46,14 @@ class JobsTests(unittest.TestCase):
     def test_each_script_offers_jobs(self):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
-                shown = subprocess.run([sys.executable, str(script), '--help'], capture_output=True, text=True,
-                                       timeout=60)
+                shown = subprocess.run(
+                    [sys.executable, str(script), '--help'], capture_output=True, text=True, timeout=60
+                )
                 self.assertEqual(shown.returncode, 0, shown.stderr)
                 self.assertIn('--jobs N', shown.stdout)
-                refused = subprocess.run([sys.executable, str(script), '--jobs', '0'], capture_output=True,
-                                         text=True, timeout=60)
+                refused = subprocess.run(
+                    [sys.executable, str(script), '--jobs', '0'], capture_output=True, text=True, timeout=60
+                )
                 self.assertEqual(refused.returncode, 2, refused.stderr)
                 self.assertIn("--jobs: must be a whole number, 1 or more, not '0'", refused.stderr)
 
@@ -62,11 +65,12 @@ class JobsTests(unittest.TestCase):
             (source / 'libsndfile/COPYING').write_text('licence')
 
         for jobs, expected in ((None, str(os.cpu_count() or 2)), (2, '2')):
-            with self.subTest(jobs=jobs), tempfile.TemporaryDirectory() as temporary, \
-                    mock.patch.object(build_dependencies, 'unpack_dependencies', unpack), \
-                    mock.patch.object(build_dependencies.subprocess, 'run') as run:
-                build_dependencies.build(policy, Path(temporary) / 'cache', Path(temporary) / 'work',
-                                         backend='OOURA', jobs=jobs)
+            with self.subTest(jobs=jobs), tempfile.TemporaryDirectory() as temporary, mock.patch.object(
+                build_dependencies, 'unpack_dependencies', unpack
+            ), mock.patch.object(build_dependencies.subprocess, 'run') as run:
+                build_dependencies.build(
+                    policy, Path(temporary) / 'cache', Path(temporary) / 'work', backend='OOURA', jobs=jobs
+                )
                 builds = [call.args[0] for call in run.call_args_list if '--build' in call.args[0]]
                 self.assertEqual(len(builds), 1)
                 self.assertEqual(builds[0][-2:], ['--parallel', expected])

@@ -95,38 +95,45 @@ int main(int argc, char** argv) {
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--source", type=Path,
-        default=Path(__file__).resolve().parents[2]
-        / "historical/convolution/channelpaths.cpp",
-        help="channelpaths.cpp to test, including an untouched archived copy",
+        '--source',
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / 'historical/convolution/channelpaths.cpp',
+        help='channelpaths.cpp to test, including an untouched archived copy',
     )
     args = parser.parse_args()
     source = args.source.read_text()
-    start = source.index("\t\t// Calculate the gain for each output channel")
-    end = source.index("\n#if defined(DEBUG)", start)
+    start = source.index('\t\t// Calculate the gain for each output channel')
+    end = source.index('\n#if defined(DEBUG)', start)
     gain_loops = source[start:end]
     failures = 0
-    with tempfile.TemporaryDirectory(prefix="convolver-gain-") as scratch:
+    with tempfile.TemporaryDirectory(prefix='convolver-gain-') as scratch:
         scratch = Path(scratch)
-        cpp = scratch / "gain_regressions.cpp"
-        binary = scratch / "gain_regressions"
-        cpp.write_text(HARNESS.replace("@GAIN_LOOPS@", gain_loops))
+        cpp = scratch / 'gain_regressions.cpp'
+        binary = scratch / 'gain_regressions'
+        cpp.write_text(HARNESS.replace('@GAIN_LOOPS@', gain_loops))
         subprocess.run(
-            [os.environ.get("CXX", "clang++"), "-std=c++11", "-O1", "-g",
-             "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
-             str(cpp), "-o", str(binary)],
+            [
+                os.environ.get('CXX', 'clang++'),
+                '-std=c++11',
+                '-O1',
+                '-g',
+                '-fsanitize=address,undefined',
+                '-fno-sanitize-recover=all',
+                '-fno-omit-frame-pointer',
+                str(cpp),
+                '-o',
+                str(binary),
+            ],
             check=True,
         )
-        for scenario, label in enumerate(("later path has fewer outputs",
-                                          "later path has more outputs")):
-            result = subprocess.run([str(binary), str(scenario)],
-                                    capture_output=True, text=True)
-            print(f"{'PASS' if result.returncode == 0 else 'FAIL'}: {label}")
+        for scenario, label in enumerate(('later path has fewer outputs', 'later path has more outputs')):
+            result = subprocess.run([str(binary), str(scenario)], capture_output=True, text=True)
+            print(f'{"PASS" if result.returncode == 0 else "FAIL"}: {label}')
             if result.returncode:
                 failures += 1
                 print(result.stdout + result.stderr)
     return 1 if failures else 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

@@ -8,6 +8,7 @@ IR samples). The CLI is never used to produce expectations.
 
 Usage: run_corpus.py CONVOLVER_EXE [CASE_ID ...]
 """
+
 import json
 import math
 import os
@@ -41,7 +42,7 @@ def wave_channel_mask(path):
         tag, size = struct.unpack_from('<4sI', data, pos)
         if tag == b'fmt ':
             fmt = struct.unpack_from('<H', data, pos + 8)[0]
-            return struct.unpack_from('<I', data, pos + 28)[0] if fmt == 0xfffe else None
+            return struct.unpack_from('<I', data, pos + 28)[0] if fmt == 0xFFFE else None
         pos += 8 + size + (size & 1)
     raise AssertionError('missing fmt chunk')
 
@@ -56,7 +57,7 @@ def read_float_wav(path):
             fmt, channels = struct.unpack_from('<HH', data, pos + 8)
             assert fmt in (3, 65534), 'expected float WAV output, format %d' % fmt
         elif tag == b'data':
-            payload = data[pos + 8:pos + 8 + size]
+            payload = data[pos + 8 : pos + 8 + size]
         pos += 8 + size + (size & 1)
     assert channels and payload is not None, 'missing fmt or data chunk'
     return channels, struct.unpack('<%df' % (len(payload) // 4), payload)
@@ -86,8 +87,7 @@ def reference(case, inputs):
             for t, v in enumerate(inputs[c]):
                 mix[t + in_delay[c]] += g * v
         paths.append((mix, h, p['outputs']))
-    length = 1 + max(len(m) + len(h) - 2 + max(out_delay[o] for o, _ in outs)
-                     for m, h, outs in paths)
+    length = 1 + max(len(m) + len(h) - 2 + max(out_delay[o] for o, _ in outs) for m, h, outs in paths)
     out = [[0.0] * length for _ in range(exp['output_channels'])]
     for mix, h, outs in paths:
         y = [0.0] * (len(mix) + len(h) - 1)
@@ -103,30 +103,38 @@ def reference(case, inputs):
 
 def compare(case_id, actual, expected, frames, offset):
     channels = len(expected)
-    assert len(actual) == (frames + offset) * channels, (
-        '%s: %d output frames, expected %d' % (case_id, len(actual) // channels, frames + offset))
+    assert len(actual) == (frames + offset) * channels, '%s: %d output frames, expected %d' % (
+        case_id,
+        len(actual) // channels,
+        frames + offset,
+    )
     for ch, values in enumerate(expected):
         for t, v in enumerate(values[frames:]):
-            assert abs(v) < 1e-12, '%s: reference signal beyond declared frame count at %d' % (
-                case_id, frames + t)
+            assert abs(v) < 1e-12, '%s: reference signal beyond declared frame count at %d' % (case_id, frames + t)
     for t in range(frames + offset):
         for ch in range(channels):
             a = actual[t * channels + ch]
             e = expected[ch][t - offset] if t >= offset and t - offset < len(expected[ch]) else 0.0
             bound = 2e-5 * (1 + max(abs(a), abs(e)))
-            assert math.isfinite(a) and abs(a - e) <= bound, (
-                '%s: frame %d channel %d got %r expected %r' % (case_id, t, ch, a, e))
+            assert math.isfinite(a) and abs(a - e) <= bound, '%s: frame %d channel %d got %r expected %r' % (
+                case_id,
+                t,
+                ch,
+                a,
+                e,
+            )
 
 
 def run(exe, args, cwd, data=None, chunk=None):
     if chunk is None:
         return subprocess.run([exe, *args], cwd=cwd, input=data, capture_output=True, timeout=120)
-    with subprocess.Popen([exe, *args], cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE) as p:
+    with subprocess.Popen(
+        [exe, *args], cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ) as p:
         # stdout is drained after all writes; outputs here are far below pipe capacity
         # only for short inputs, so keep the corpus's RAW cases small.
         for i in range(0, len(data), chunk):
-            p.stdin.write(data[i:i + chunk])
+            p.stdin.write(data[i : i + chunk])
             p.stdin.flush()
         p.stdin.close()
         p.stdin = None
@@ -136,8 +144,17 @@ def run(exe, args, cwd, data=None, chunk=None):
 
 def portable(exe, case, filter_arg, cwd, spec):
     """The portable-paths profile reports exactly the expected warnings."""
-    args = ['--validate', filter_arg, '--json', '--profile', 'portable-paths', '--sample-rate',
-            str(spec['rate']), '--input-channels', str(spec['channels'])]
+    args = [
+        '--validate',
+        filter_arg,
+        '--json',
+        '--profile',
+        'portable-paths',
+        '--sample-rate',
+        str(spec['rate']),
+        '--input-channels',
+        str(spec['channels']),
+    ]
     p = run(exe, args, cwd)
     report = json.loads(p.stdout.decode('utf-8'))
     warnings = sorted(d['code'] for d in report['diagnostics'] if d['severity'] == 'warning')
@@ -152,8 +169,21 @@ def portable(exe, case, filter_arg, cwd, spec):
 def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
     """The inspection report must describe the same graph the render produced."""
     spec = case['input']
-    p = run(exe, ['--inspect', filter_arg, '--json', '--sample-rate', str(spec['rate']),
-                  '--input-channels', str(spec['channels']), '--block-size', str(block)], cwd)
+    p = run(
+        exe,
+        [
+            '--inspect',
+            filter_arg,
+            '--json',
+            '--sample-rate',
+            str(spec['rate']),
+            '--input-channels',
+            str(spec['channels']),
+            '--block-size',
+            str(block),
+        ],
+        cwd,
+    )
     report = json.loads(p.stdout.decode('utf-8'))
     cid, expect = case['id'], case['expect']
     assert report['schema_version'] == 1, cid
@@ -163,8 +193,7 @@ def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
         codes = manifest['error_codes'][expect['error']]
         assert p.returncode == 1 and not report['valid'], '%s: inspection accepted it' % cid
         found = [d['code'] for d in report['diagnostics'] if d['severity'] == 'error']
-        assert found and found[0] in codes, '%s: diagnostic codes %r, expected one of %r' % (
-            cid, found, codes)
+        assert found and found[0] in codes, '%s: diagnostic codes %r, expected one of %r' % (cid, found, codes)
         return
     assert p.returncode == 0 and report['valid'], '%s: %s' % (cid, report['diagnostics'])
     selected = report['selection']['selected']
@@ -181,13 +210,15 @@ def inspect(exe, case, root, filter_arg, cwd, manifest, block=17):
         for side in ('inputs', 'outputs'):
             routes = [[r['channel'], r['gain']] for r in got[side]]
             assert len(routes) == len(want[side]) and all(
-                a[0] == b[0] and abs(a[1] - b[1]) < 1e-6 for a, b in zip(routes, want[side])), (
-                cid, side, routes)
+                a[0] == b[0] and abs(a[1] - b[1]) < 1e-6 for a, b in zip(routes, want[side])
+            ), (cid, side, routes)
     timing = leaf['timing']
     assert timing['latency_frames'] == block, cid
-    assert timing['tail_frames'] == expect['frames'] - spec['frames'], (
-        '%s: inspected tail %d, rendered tail %d' % (cid, timing['tail_frames'],
-                                                     expect['frames'] - spec['frames']))
+    assert timing['tail_frames'] == expect['frames'] - spec['frames'], '%s: inspected tail %d, rendered tail %d' % (
+        cid,
+        timing['tail_frames'],
+        expect['frames'] - spec['frames'],
+    )
 
 
 def check_case(exe, manifest, case, root):
@@ -206,13 +237,11 @@ def check_case(exe, manifest, case, root):
     if 'error' in expect:
         if output.exists():
             output.unlink()
-        p = run(exe, ['--filter', filter_arg, '--input', str(root / 'input.wav'),
-                      '--output', str(output)], cwd)
+        p = run(exe, ['--filter', filter_arg, '--input', str(root / 'input.wav'), '--output', str(output)], cwd)
         stderr = p.stderr.decode('utf-8', 'replace')
         pattern = manifest['error_patterns'][expect['error']]
         assert p.returncode == 1, '%s: exit %d, expected 1\n%s' % (case['id'], p.returncode, stderr)
-        assert re.search(pattern, stderr), '%s: diagnostic %r does not match %r' % (
-            case['id'], stderr, pattern)
+        assert re.search(pattern, stderr), '%s: diagnostic %r does not match %r' % (case['id'], stderr, pattern)
         assert not output.exists(), '%s: failed render created output' % case['id']
         inspect(exe, case, root, filter_arg, cwd, manifest)
         return 'diagnosed ' + expect['error']
@@ -226,35 +255,63 @@ def check_case(exe, manifest, case, root):
             if 'stdin_chunk_bytes' in case:
                 spec = case['input']
                 frames = len(inputs[0])
-                raw = struct.pack('<%df' % (frames * spec['channels']),
-                                  *[inputs[c][f] for f in range(frames)
-                                    for c in range(spec['channels'])])
-                p = run(exe, ['--filter', filter_arg, '--input', '-', '--raw-input',
-                              str(spec['rate']), str(spec['channels']), '--output', '-',
-                              '--output-format', 'raw-float', *extra], cwd, raw,
-                        case['stdin_chunk_bytes'])
+                raw = struct.pack(
+                    '<%df' % (frames * spec['channels']),
+                    *[inputs[c][f] for f in range(frames) for c in range(spec['channels'])],
+                )
+                p = run(
+                    exe,
+                    [
+                        '--filter',
+                        filter_arg,
+                        '--input',
+                        '-',
+                        '--raw-input',
+                        str(spec['rate']),
+                        str(spec['channels']),
+                        '--output',
+                        '-',
+                        '--output-format',
+                        'raw-float',
+                        *extra,
+                    ],
+                    cwd,
+                    raw,
+                    case['stdin_chunk_bytes'],
+                )
                 assert p.returncode == 0, '%s: %s' % (case['id'], p.stderr.decode('utf-8', 'replace'))
                 actual = struct.unpack('<%df' % (len(p.stdout) // 4), p.stdout)
             else:
-                p = run(exe, ['--filter', filter_arg, '--input', str(root / 'input.wav'),
-                              '--output', str(output), *extra], cwd)
-                assert p.returncode == 0, '%s block %d: %s' % (
-                    case['id'], block, p.stderr.decode('utf-8', 'replace'))
+                p = run(
+                    exe,
+                    ['--filter', filter_arg, '--input', str(root / 'input.wav'), '--output', str(output), *extra],
+                    cwd,
+                )
+                assert p.returncode == 0, '%s block %d: %s' % (case['id'], block, p.stderr.decode('utf-8', 'replace'))
                 channels, actual = read_float_wav(output)
-                assert channels == expect['output_channels'], (
-                    '%s: %d output channels' % (case['id'], channels))
-            compare('%s block %d %s' % (case['id'], block, mode), actual, expected,
-                    expect['frames'], offset)
+                assert channels == expect['output_channels'], '%s: %d output channels' % (case['id'], channels)
+            compare('%s block %d %s' % (case['id'], block, mode), actual, expected, expect['frames'], offset)
             runs += 1
     if case.get('speaker_map'):
         # Opt-in labels: the header carries the configuration's mask, samples unchanged.
-        p = run(exe, ['--filter', filter_arg, '--input', str(root / 'input.wav'),
-                      '--output', str(output), '--speaker-map', 'config'], cwd)
+        p = run(
+            exe,
+            [
+                '--filter',
+                filter_arg,
+                '--input',
+                str(root / 'input.wav'),
+                '--output',
+                str(output),
+                '--speaker-map',
+                'config',
+            ],
+            cwd,
+        )
         assert p.returncode == 0, '%s speaker map: %s' % (case['id'], p.stderr.decode())
         mask = wave_channel_mask(output)
         assert mask == expect['channel_mask'], '%s: speaker mask %r' % (case['id'], mask)
-        compare('%s speaker map' % case['id'], read_float_wav(output)[1], expected,
-                expect['frames'], 0)
+        compare('%s speaker map' % case['id'], read_float_wav(output)[1], expected, expect['frames'], 0)
         runs += 1
     elif output.exists():
         assert wave_channel_mask(output) is None, '%s: unrequested speaker mask' % case['id']
@@ -281,8 +338,7 @@ def main(argv):
             if case['label'] == 'consumer-verified':
                 assert all(case.get(k) for k in ('consumer', 'revision', 'date', 'evidence_type'))
             try:
-                print('%-34s %s' % (case['id'], check_case(exe, manifest, case,
-                                                           Path(temp) / case['id'])))
+                print('%-34s %s' % (case['id'], check_case(exe, manifest, case, Path(temp) / case['id'])))
             except AssertionError as e:
                 failures += 1
                 print('FAIL %s' % e)

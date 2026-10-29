@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Check the preserved website offline; no homes.zip or third-party packages."""
+
 from collections import Counter
 import hashlib
 from html.parser import HTMLParser
@@ -15,9 +16,11 @@ ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = Path('docs/historical/convolver-4.4')
 MANIFEST = Path('docs/review-2026-10/archive-documentation.json')
 AUDIT = Path('docs/review-2026-10/sourceforge-documentation-check.json')
-PAGES = set('binaural commands comparewavs config configegs convolvercmd '
-            'convolverpipe download feedback index links makeir news perftest '
-            'troubleshooting usage vst zoom'.split())
+PAGES = set(
+    'binaural commands comparewavs config configegs convolvercmd '
+    'convolverpipe download feedback index links makeir news perftest '
+    'troubleshooting usage vst zoom'.split()
+)
 PAGES = {name + '.html' for name in PAGES}
 CSS_URL = re.compile(r'url\(\s*[\"\']?([^\)\"\']*)[\"\']?\s*\)', re.I)
 
@@ -68,16 +71,14 @@ def check_files(root, entries):
     paths = set()
     for entry in entries:
         relative = PurePosixPath(entry['path'])
-        require(not relative.is_absolute() and '..' not in relative.parts,
-                'unsafe manifest path: ' + str(relative))
+        require(not relative.is_absolute() and '..' not in relative.parts, 'unsafe manifest path: ' + str(relative))
         path = contained(base, root / relative)
         require(path not in paths, 'duplicate manifest path: ' + str(relative))
         paths.add(path)
         require(path.is_file(), 'missing archived file: ' + str(relative))
         data = path.read_bytes()
         require(len(data) == entry['bytes'], 'length mismatch: ' + str(relative))
-        require(hashlib.sha256(data).hexdigest() == entry['sha256'],
-                'SHA256 mismatch: ' + str(relative))
+        require(hashlib.sha256(data).hexdigest() == entry['sha256'], 'SHA256 mismatch: ' + str(relative))
     return paths
 
 
@@ -109,18 +110,16 @@ def check_links(base, paths):
             continue
         # Root-relative website paths are relative to the archived site root.
         name = unquote(parsed.path)
-        target = (base / name.lstrip('/') if name.startswith('/')
-                  else source.parent / name) if name else source
+        target = (base / name.lstrip('/') if name.startswith('/') else source.parent / name) if name else source
         target = contained(base, target)
-        require(target in paths and target.is_file(),
-                'missing local target: %s -> %s' % (source.name, url))
+        require(target in paths and target.is_file(), 'missing local target: %s -> %s' % (source.name, url))
         counts['local'] += 1
         if parsed.fragment and target.suffix.lower() == '.html':
-            require(unquote(parsed.fragment) in pages[target].anchors,
-                    'missing fragment: %s -> %s' % (source.name, url))
+            require(
+                unquote(parsed.fragment) in pages[target].anchors, 'missing fragment: %s -> %s' % (source.name, url)
+            )
             counts['fragments'] += 1
-    inventory = Counter((path.relative_to(base).as_posix(), attr, url)
-                        for path, attr, url in links)
+    inventory = Counter((path.relative_to(base).as_posix(), attr, url) for path, attr, url in links)
     return counts, inventory
 
 
@@ -129,23 +128,27 @@ def check_archive(root):
     require(len(manifest['files']) == 99, 'expected 99 preserved files')
     paths = check_files(root, manifest['files'])
     base = (root / ARCHIVE).resolve()
-    require({p.relative_to(base).as_posix() for p in paths if p.suffix == '.html'} == PAGES,
-            'original 18-page inventory changed')
+    require(
+        {p.relative_to(base).as_posix() for p in paths if p.suffix == '.html'} == PAGES,
+        'original 18-page inventory changed',
+    )
     # README.md is the modern provenance note, not an archived website file.
-    actual = {contained(base, p) for p in base.rglob('*')
-              if p.is_file() and p != base / 'README.md'}
+    actual = {contained(base, p) for p in base.rglob('*') if p.is_file() and p != base / 'README.md'}
     require(actual == paths, 'archive contains files absent from the manifest')
     counts, inventory = check_links(base, paths)
-    recorded = Counter((link['from'], link['attribute'], link['url'])
-                       for link in manifest['links'])
+    recorded = Counter((link['from'], link['attribute'], link['url']) for link in manifest['links'])
     require(inventory == recorded, 'parsed reference inventory differs from manifest')
     # This checks the saved audit against the preserved pages, not the live site.
     audit = json.loads((root / AUDIT).read_text())
-    require(len(audit['pages']) == 18 and {p['page'] for p in audit['pages']} == PAGES,
-            'saved SourceForge audit page inventory changed')
+    require(
+        len(audit['pages']) == 18 and {p['page'] for p in audit['pages']} == PAGES,
+        'saved SourceForge audit page inventory changed',
+    )
     for page in audit['pages']:
-        require(hashlib.sha256((base / page['page']).read_bytes()).hexdigest()
-                == page['archive_sha256'], 'saved audit hash mismatch: ' + page['page'])
+        require(
+            hashlib.sha256((base / page['page']).read_bytes()).hexdigest() == page['archive_sha256'],
+            'saved audit hash mismatch: ' + page['page'],
+        )
     return counts
 
 
@@ -155,15 +158,18 @@ def check_failure_detection():
         root = Path(temp)
         base = root / ARCHIVE
         base.mkdir(parents=True)
-        fixtures = {'index.html': b'<a href="other.html#anchor">link</a><link href="a.css">',
-                    'other.html': b'<a name="anchor"></a><img src="image.gif">',
-                    'a.css': b'body {background: url("image.gif")}',
-                    'image.gif': b'GIF89a'}
+        fixtures = {
+            'index.html': b'<a href="other.html#anchor">link</a><link href="a.css">',
+            'other.html': b'<a name="anchor"></a><img src="image.gif">',
+            'a.css': b'body {background: url("image.gif")}',
+            'image.gif': b'GIF89a',
+        }
         entries = []
         for name, data in fixtures.items():
             (base / name).write_bytes(data)
-            entries.append({'path': (ARCHIVE / name).as_posix(), 'bytes': len(data),
-                            'sha256': hashlib.sha256(data).hexdigest()})
+            entries.append(
+                {'path': (ARCHIVE / name).as_posix(), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+            )
         paths = check_files(root, entries)
         check_links(base, paths)
 
@@ -200,10 +206,11 @@ def main():
     except (ValueError, OSError, KeyError, TypeError) as error:
         print('FAIL: documentation: ' + str(error), file=sys.stderr)
         return 1
-    print('PASS: documentation: 99 file lengths/SHA256, 18 pages, '
-          '%d local references, %d fragments; %d external references skipped; '
-          '%d failure-detection checks' %
-          (counts['local'], counts['fragments'], counts['external'], negative_checks))
+    print(
+        'PASS: documentation: 99 file lengths/SHA256, 18 pages, '
+        '%d local references, %d fragments; %d external references skipped; '
+        '%d failure-detection checks' % (counts['local'], counts['fragments'], counts['external'], negative_checks)
+    )
     return 0
 
 

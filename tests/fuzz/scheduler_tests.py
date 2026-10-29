@@ -9,6 +9,7 @@ fuzzer fail the step, that the other campaigns still run, and that no more
 campaigns run at once than the limit. Each stand-in is a small shell script
 named like a fuzz target; nothing is compiled.
 """
+
 import os
 from pathlib import Path
 import shutil
@@ -23,7 +24,7 @@ TARGETS = ('alpha', 'beta', 'gamma', 'delta')
 
 # Each stand-in notes its arguments, marks itself running for SLEEP seconds,
 # notes how many campaigns were running then, and ends as BEHAVIOUR says.
-STAND_IN = r'''#!/usr/bin/env bash
+STAND_IN = r"""#!/usr/bin/env bash
 name=$(basename "$0")
 printf '%s\n' "$@" > "$RECORD/$name.args"
 mkdir "$RECORD/running/$name"
@@ -39,15 +40,16 @@ case "$BEHAVIOUR" in
   kill-recorder) kill -9 "$PPID"; exit 0 ;;
 esac
 exit 0
-'''
+"""
 
 
 def bash_supports_wait_n():
     bash = shutil.which('bash')
     if os.name != 'posix' or not bash:
         return False
-    version = subprocess.run([bash, '-c', 'echo "${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}"'],
-                             capture_output=True, text=True).stdout.split()
+    version = subprocess.run(
+        [bash, '-c', 'echo "${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}"'], capture_output=True, text=True
+    ).stdout.split()
     return len(version) == 2 and (int(version[0]), int(version[1])) >= (4, 3)
 
 
@@ -79,8 +81,18 @@ class SchedulerTests(unittest.TestCase):
         program.chmod(program.stat().st_mode | stat.S_IXUSR)
 
     def run_scheduler(self, *arguments, jobs='2', sleep='0', targets=TARGETS, path=None):
-        command = ['bash', str(SCRIPT), '--build', str(self.build), '--output', str(self.output),
-                   '--source', str(self.source), '--seconds', '7']
+        command = [
+            'bash',
+            str(SCRIPT),
+            '--build',
+            str(self.build),
+            '--output',
+            str(self.output),
+            '--source',
+            str(self.source),
+            '--seconds',
+            '7',
+        ]
         if jobs is not None:
             command += ['--jobs', jobs]
         command += list(arguments) + list(targets)
@@ -100,10 +112,18 @@ class SchedulerTests(unittest.TestCase):
             self.assertIn('Done 2 runs', (self.output / f'{target}.log').read_text())
             self.assertEqual((self.output / 'corpus' / target / 'input').read_text(), target)
         # The arguments the workflow has always passed, with the time budget.
-        self.assertEqual((self.record / 'fuzz_alpha.args').read_text().splitlines(), [
-            str(self.output / 'corpus/alpha'), str(self.source / 'tests/fuzz/regressions/alpha'),
-            '-max_total_time=7', '-max_len=65536', '-timeout=2', '-rss_limit_mb=512',
-            f'-artifact_prefix={self.output}/alpha-'])
+        self.assertEqual(
+            (self.record / 'fuzz_alpha.args').read_text().splitlines(),
+            [
+                str(self.output / 'corpus/alpha'),
+                str(self.source / 'tests/fuzz/regressions/alpha'),
+                '-max_total_time=7',
+                '-max_len=65536',
+                '-timeout=2',
+                '-rss_limit_mb=512',
+                f'-artifact_prefix={self.output}/alpha-',
+            ],
+        )
 
     def test_failing_campaign_fails_the_step(self):
         self.stand_in('beta', 'fail')

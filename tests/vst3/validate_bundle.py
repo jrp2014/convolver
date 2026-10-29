@@ -3,6 +3,7 @@
 
 Usage: validate_bundle.py VALIDATOR [VALIDATOR_OPTIONS...] BUNDLE
 """
+
 import platform
 import re
 import subprocess
