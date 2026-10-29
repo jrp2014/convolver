@@ -135,10 +135,11 @@ it by which tool failed:
   that commit's hash to `.git-blame-ignore-revs`.
 - **ruff check** turns on every rule the release makes stable, since
   `ruff.toml` selects all of them; most minor releases add some, so expect
-  this more often than with clang-tidy. Fix the
-  code in its own commit. If a diagnostic is a false positive, suppress that
-  line with `# noqa: CODE` and a reason; if the new rule does not suit the
-  project, add it to the ignore list in `ruff.toml` with the reason.
+  this more often than with clang-tidy. Fix the code in its own commit and
+  say what the rule found. Do not add a new rule to the ignore list in
+  `ruff.toml` to make Lint pass (jrp, 29 October 2026). If one diagnostic is
+  a false positive, suppress that line with `# noqa: CODE` and a reason; a
+  rule that seems wrong for the whole project is a question for jrp.
 
 ## Lint checks
 
