@@ -758,7 +758,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   stays every CPU; [preview recipe](docs/develop/build.md#preview-recipe).
 - [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88,
   from a Skylos scan: 11 unused imports in the release scripts and four test
-  scripts; [lint checks](CONTRIBUTING.md#lint-checks).
+  scripts; [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026,
   PR #88: ruff 0.17.3 in pre-commit and lint CI, configured in `ruff.toml`;
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).

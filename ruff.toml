@@ -7,14 +7,12 @@ target-version = "py38"
 # Close to the existing scripts, so the first reformat stayed small.
 line-length = 120
 # Recovered sources and dated evidence are kept as they were written.
+# Anchored with ./ so that only these top-level folders match.
 extend-exclude = [
-    "archives",
-    "docs/archive",
-    "docs/historical",
-    "docs/review-2026-10",
-    "historical",
-    "review",
-    "source",
+    "./docs/archive",
+    "./docs/historical",
+    "./docs/review-2026-10",
+    "./historical",
 ]
 
 [format]

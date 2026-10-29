@@ -88,7 +88,7 @@ fails if any did; CI runs the portable list this way.
 `ruff.toml` sets the style for the maintained Python scripts and tests: ruff's
 formatter with 120 columns and single quotes, and its pyflakes and pycodestyle
 error rules (unused imports and names, undefined names, misplaced imports,
-syntax errors). pre-commit runs `ruff check --fix` and `ruff format` with the
+statement errors such as a bare `except` or `== None`, and syntax errors). pre-commit runs `ruff check --fix` and `ruff format` with the
 ruff release pinned in `.pre-commit-config.yaml`, so lint CI fails on an unused
 import or a formatting difference. For a manual run, install the same version
 in the [lint environment](#lint-checks):
@@ -104,8 +104,9 @@ historical sources and the dated evidence under `docs/review-2026-10/` are
 excluded. `.git-blame-ignore-revs` lists the first reformat, so `git blame`
 on GitHub skips it; locally, run
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` once. To update ruff,
-change the pinned `rev`, run `pre-commit run --all-files` and commit any
-layout changes on their own, as for clang-format below.
+change the pinned `rev`, run `pre-commit run --all-files`, commit any layout
+changes on their own, as for clang-format below, and add that commit's hash to
+`.git-blame-ignore-revs`.
 
 ### When a new Clang release turns CI red
 

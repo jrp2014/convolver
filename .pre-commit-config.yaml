@@ -19,6 +19,8 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+        # Python files only: not the Python examples inside Markdown.
+        types_or: [python, pyi]
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0
     hooks:
