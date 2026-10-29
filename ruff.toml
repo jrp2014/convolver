@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Python formatting and lint for the maintained scripts and tests (CI-18).
+# pre-commit runs both; see CONTRIBUTING.md#python-formatting-and-lint.
+
+# The oldest Python the build supports (docs/develop/build.md).
+target-version = "py38"
+# Close to the existing scripts, so the first reformat stayed small.
+line-length = 120
+# Recovered sources and dated evidence are kept as they were written.
+# Anchored with ./ so that only these top-level folders match.
+extend-exclude = [
+    "./docs/archive",
+    "./docs/historical",
+    "./docs/review-2026-10",
+    "./historical",
+]
+
+[format]
+# Most existing strings use single quotes.
+quote-style = "single"
+
+[lint]
+# Every stable rule, less the families and rules below. Each new ruff release
+# turns on the rules it makes stable, from any linter, so it can turn Lint red
+# (CONTRIBUTING.md#when-a-new-clang-or-ruff-release-turns-ci-red).
+select = ["ALL"]
+ignore = [
+    # The formatter owns layout and quotes; these rules contradict it.
+    "COM812", "COM819", "D206", "D300", "E111", "E114", "E117", "Q", "W191",
+    # The scripts carry no type annotations or docstring conventions.
+    "ANN", "D",
+    # Files carry SPDX lines rather than copyright notices.
+    "CPY001",
+    # Standalone scripts and tests, not packages.
+    "INP001",
+    # Command-line tools report on standard output.
+    "T201",
+    # Tools are run by name with argument lists, never through a shell.
+    "S603", "S607",
+    # The tests use unittest, not pytest.
+    "PT",
+    # Error messages are written where they are raised.
+    "EM101", "EM102", "TRY003",
+    # Sample counts, sizes and tolerances read better inline.
+    "PLR2004",
+    # Function size and branching: functions are split when a responsibility grows
+    # (AGENTS.md), not to meet a count.
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
+    # Raising inside a try block to share its error report is deliberate.
+    "TRY301",
+]
+# Benchmark tables print speed-ups with a multiplication sign.
+allowed-confusables = ["×"]
+
+[lint.per-file-ignores]
+# Tests assert, use seeded pseudo-random data and fixed fake paths, import the
+# modules they test once their paths are set up, and give stand-ins the
+# signatures and names of what they replace.
+"tests/**" = ["ARG", "N802", "PLC0415", "S101", "S108", "S311"]

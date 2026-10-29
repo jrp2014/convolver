@@ -83,10 +83,40 @@ files side by side, one per CPU (`--jobs N` to change it). It prints each
 file's output whole, in the order given, lists the files that failed, and
 fails if any did; CI runs the portable list this way.
 
-### When a new Clang release turns CI red
+### Python formatting and lint
+
+`ruff.toml` sets the style for the maintained Python scripts and tests: ruff's
+formatter with 120 columns and single quotes, and every stable lint rule
+except those it lists, each with its reason. The exceptions are rules that
+contradict the formatter, type annotations and docstring conventions the
+scripts do not use, pytest rules (the tests use unittest), function-size
+limits, and a few that suit tests only, such as `assert`. Where one line has
+to break a rule, it carries `# noqa: CODE` and a reason. An import that must
+follow a `sys.path` change carries `# noqa: E402`, which needs no further
+reason. pre-commit runs `ruff check --fix` and `ruff format` with the latest
+stable ruff, installed when the hook environment is created, so lint CI fails
+on any rule the fixes cannot resolve or on a formatting difference. Like the Clang tools, ruff is not
+pinned: CI resolves the newest release before restoring its cache, and cloud
+sessions refresh the hook environment when it changes. Refresh a local one
+after a ruff release with `pre-commit clean`. For a manual run, install ruff in
+the [lint environment](#lint-checks):
+
+```sh
+python -m pip install --upgrade ruff
+ruff check .
+ruff format .
+```
+
+The historical sources and the dated evidence under `docs/review-2026-10/` are
+excluded. `.git-blame-ignore-revs` lists the layout-only reformats, so
+`git blame` on GitHub skips them; locally, run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
+
+### When a new Clang or ruff release turns CI red
 
 Because the tools are not pinned, a new release can fail CI on code that
-nobody changed. That is accepted (owner's decision, 24 October 2026); handle
+nobody changed. That is accepted (owner's decisions, 24 October 2026 for Clang
+and 29 October 2026 for ruff); handle
 it by which tool failed:
 
 - **clang-format** changes layout only, never behaviour. Apply the
@@ -99,6 +129,17 @@ it by which tool failed:
   code in its own commit and say what the diagnostic found. If a diagnostic is
   a false positive, suppress that one line with `// NOLINT(check-name)` and a
   reason; do not turn the check off.
+- **ruff format** changes layout only. Run `pre-commit clean` and
+  `pre-commit run ruff-format --all-files` (or apply the `lint-fixes` patch),
+  commit the result on its own as `style: apply ruff X.Y.Z layout`, and add
+  that commit's hash to `.git-blame-ignore-revs`.
+- **ruff check** turns on every rule the release makes stable, since
+  `ruff.toml` selects all of them; most minor releases add some, so expect
+  this more often than with clang-tidy. Fix the code in its own commit and
+  say what the rule found. Do not add a new rule to the ignore list in
+  `ruff.toml` to make Lint pass (jrp, 29 October 2026). If one diagnostic is
+  a false positive, suppress that line with `# noqa: CODE` and a reason; a
+  rule that seems wrong for the whole project is a question for jrp.
 
 ## Lint checks
 
@@ -120,11 +161,12 @@ downloads the tools; subsequent runs reuse their isolated environments.
 Refresh the formatter environment as described above when upgrading.
 
 The configuration runs the latest stable packaged clang-format on the portable C++ sources (see
-[formatting](#formatting-and-analysis)), ShellCheck, markdownlint-cli2, strict
-yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
+[formatting](#formatting-and-analysis)), ruff on the Python (see
+[Python formatting and lint](#python-formatting-and-lint)), ShellCheck,
+markdownlint-cli2, strict yamllint, and actionlint with ShellCheck for Bash embedded in GitHub Actions
 workflows. Hooks that fix files, such as clang-format, report "files were
 modified by this hook"; review and stage the changes, then run again. Claude
-Code cloud sessions update their Clang tools in `~/.cache/convolver-lint/bin/`,
+Code cloud sessions update their Clang tools and ruff in `~/.cache/convolver-lint/bin/`,
 refresh the formatter hook environment and install the Git hook automatically
 (`.claude/hooks/session-start.sh`), so their commits run these checks.
 Historical source, recovered documentation and archived review evidence are

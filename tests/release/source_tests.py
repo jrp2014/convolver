@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Untrusted or incomplete sources cannot enter a corresponding-source build."""
+
 import hashlib
 import importlib.util
-from pathlib import Path
+import io
 import sys
 import tarfile
 import tempfile
-import io
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -30,9 +31,8 @@ class SourceTests(unittest.TestCase):
                 self.sources.verify(file, {'sha256': '0' * 64})
 
     def test_missing_archive_no_implicit_fetch(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(ValueError, 'missing'):
-                self.sources.acquire({'archive': 'absent.tar.gz', 'sha256': '0'*64}, Path(temporary), False)
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(ValueError, 'missing'):
+            self.sources.acquire({'archive': 'absent.tar.gz', 'sha256': '0' * 64}, Path(temporary), fetch=False)
 
     def test_path_escape(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,8 +117,13 @@ class SourceTests(unittest.TestCase):
             self.assertEqual((root / 'out/root/A').read_bytes(), b'legal')
 
     def test_unsafe_links(self):
-        cases = (('root/escape', '../../outside'), ('root/absolute', '/etc/passwd'),
-                 ('root/directory', 'LICENSES'), ('root/missing', 'absent'), ('root/drive', 'C:/x'))
+        cases = (
+            ('root/escape', '../../outside'),
+            ('root/absolute', '/etc/passwd'),
+            ('root/directory', 'LICENSES'),
+            ('root/missing', 'absent'),
+            ('root/drive', 'C:/x'),
+        )
         for name, link in cases:
             with self.subTest(link=link), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)

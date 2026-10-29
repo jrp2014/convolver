@@ -5,13 +5,15 @@ Downloads it into --output, unpacks it, records what was used in
 --output/nsis.json and the job summary, and prints makensis.exe's path (also
 as makensis= in --github-output). --version picks another release.
 """
+
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import resolve
 from candidate import extract_zip
 from contract import load_policy
-import resolve
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--output', type=Path, required=True)

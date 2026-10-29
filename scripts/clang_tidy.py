@@ -9,6 +9,7 @@ status is 1 if any failed. The checks are those of .clang-tidy, unchanged.
 
     python3 scripts/clang_tidy.py -p build portable/engine.cpp portable/host.cpp
 """
+
 import argparse
 import concurrent.futures
 import os
@@ -20,18 +21,23 @@ import time
 
 def analyse(executable, build, source):
     started = time.monotonic()
-    result = subprocess.run([executable, '-p', build, source], stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, check=False)
+    result = subprocess.run(
+        [executable, '-p', build, source], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False
+    )
     return result.returncode, result.stdout.decode('utf-8', errors='replace'), time.monotonic() - started
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n', 1)[0])
     parser.add_argument('-p', dest='build', required=True, help='build directory with compile_commands.json')
-    parser.add_argument('--jobs', type=int, default=os.cpu_count() or 2,
-                        help='files analysed at once (default: the number of CPUs)')
-    parser.add_argument('--clang-tidy', default=os.environ.get('CLANG_TIDY', 'clang-tidy'),
-                        help='clang-tidy executable (default: $CLANG_TIDY, else clang-tidy on PATH)')
+    parser.add_argument(
+        '--jobs', type=int, default=os.cpu_count() or 2, help='files analysed at once (default: the number of CPUs)'
+    )
+    parser.add_argument(
+        '--clang-tidy',
+        default=os.environ.get('CLANG_TIDY', 'clang-tidy'),
+        help='clang-tidy executable (default: $CLANG_TIDY, else clang-tidy on PATH)',
+    )
     parser.add_argument('sources', nargs='+')
     args = parser.parse_args(argv)
     executable = shutil.which(args.clang_tidy)

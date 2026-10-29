@@ -12,17 +12,18 @@ python3 scripts/release/sources.py --lock source-manifest.json --fetch --cache D
 Each unpacked directory gets a .convolver-source.json with its record, which
 the plug-in builds read to name the SDK they were built with.
 """
+
 import argparse
 import json
-from pathlib import Path, PurePosixPath
 import posixpath
 import shutil
 import sys
 import tarfile
 import tempfile
-from contract import load_policy, sha256, with_records
-import resolve
+from pathlib import Path, PurePosixPath
 
+import resolve
+from contract import load_policy, sha256, with_records
 
 STAMP = '.convolver-source.json'
 
@@ -30,11 +31,13 @@ STAMP = '.convolver-source.json'
 def verify(path, dependency):
     actual = sha256(path)
     if actual != dependency['sha256']:
-        raise ValueError(f'source hash mismatch: {Path(path).name} is {actual}, but the record says '
-                         f'{dependency["sha256"]} ({dependency.get("url", "no URL recorded")})')
+        raise ValueError(
+            f'source hash mismatch: {Path(path).name} is {actual}, but the record says '
+            f'{dependency["sha256"]} ({dependency.get("url", "no URL recorded")})'
+        )
 
 
-def acquire(dependency, cache, fetch=False):
+def acquire(dependency, cache, *, fetch=False):
     """The recorded archive from cache, downloaded first when fetch allows;
     its checksum must match the record."""
     path = cache / dependency['archive']
@@ -71,8 +74,13 @@ def extract(archive, destination):
         for member in members:
             path = PurePosixPath(member.name)
             source = member if member.isfile() else _link_source(member, regular) if member.issym() else None
-            if (path.is_absolute() or '..' in path.parts or '\\' in member.name or
-                    ':' in member.name or not (source or member.isdir())):
+            if (
+                path.is_absolute()
+                or '..' in path.parts
+                or '\\' in member.name
+                or ':' in member.name
+                or not (source or member.isdir())
+            ):
                 raise ValueError(f'unsafe source archive member: {member.name}')
             target = destination / Path(*path.parts)
             try:
@@ -92,22 +100,23 @@ def extract(archive, destination):
                 target.chmod(source_member.mode & 0o777)
 
 
-def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
+def unpack_dependencies(policy, cache, destination, *, fetch=False, names=None):
     """Unpack every dependency the policy's resolved records name, or only
     those in names (see contract.with_records)."""
     if names is not None and not set(names) <= set(policy['dependencies']):
         raise ValueError(f'unknown dependencies: {sorted(set(names) - set(policy["dependencies"]))}')
     # Parent SDK before its submodules; never trust an old extracted tree.
-    ordered = sorted(((name, dep) for name, dep in policy['dependencies'].items() if names is None or name in names),
-                     key=lambda item: item[1]['directory'].count('/'))
+    ordered = sorted(
+        ((name, dep) for name, dep in policy['dependencies'].items() if names is None or name in names),
+        key=lambda item: item[1]['directory'].count('/'),
+    )
     for name, dependency in ordered:
-        archive = acquire(dependency, cache, fetch)
+        archive = acquire(dependency, cache, fetch=fetch)
         target = destination / dependency['directory']
         stamp = target / STAMP
         if stamp.exists():
             if json.loads(stamp.read_text(encoding='utf-8')).get('sha256') != dependency['sha256']:
-                raise ValueError(f'{name}: {target} holds other sources than the record; use a fresh '
-                                 'work directory')
+                raise ValueError(f'{name}: {target} holds other sources than the record; use a fresh work directory')
             continue
         if target.exists() and any(target.iterdir()):
             raise ValueError(f'{name}: unverified nonempty source directory')
@@ -123,18 +132,25 @@ def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
+    parser.add_argument(
+        '--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
+    )
     parser.add_argument('--cache', type=Path, required=True, help='Directory of downloaded archives')
     parser.add_argument('--destination', type=Path, required=True, help='Directory to unpack into')
     parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing archives')
     which = parser.add_mutually_exclusive_group(required=True)
     which.add_argument('--latest', action='store_true', help='Resolve each to its newest release (needs --fetch)')
     which.add_argument('--lock', type=Path, help='A lock file or source manifest to rebuild exactly')
-    parser.add_argument('--version', action='append', metavar='NAME=VERSION',
-                        help='With --latest: use this release instead of the newest (repeatable)')
+    parser.add_argument(
+        '--version',
+        action='append',
+        metavar='NAME=VERSION',
+        help='With --latest: use this release instead of the newest (repeatable)',
+    )
     parser.add_argument('--record', type=Path, help='Also write the records used to this lock file')
-    parser.add_argument('--github-output', type=Path,
-                        help='Append NAME=DIRECTORY (with forward slashes) for each named dependency here')
+    parser.add_argument(
+        '--github-output', type=Path, help='Append NAME=DIRECTORY (with forward slashes) for each named dependency here'
+    )
     parser.add_argument('names', nargs='+', help='Dependency names from the policy, such as lv2 or audiounitsdk')
     args = parser.parse_args(argv)
     policy = load_policy(args.policy)
@@ -155,7 +171,7 @@ def main(argv=None):
             raise ValueError(f'{args.lock} has no record for {sorted(missing)}')
         resolved = with_records(dict(policy, dependencies={n: policy['dependencies'][n] for n in names}), records)
         args.destination.mkdir(parents=True, exist_ok=True)
-        unpack_dependencies(resolved, cache, args.destination.resolve(), args.fetch, set(names))
+        unpack_dependencies(resolved, cache, args.destination.resolve(), fetch=args.fetch, names=set(names))
     except ValueError as error:
         print(f'error: {error}', file=sys.stderr)
         return 1
@@ -167,11 +183,11 @@ def main(argv=None):
     resolve.report(resolve.markdown(records))
     resolve.warn_prereleases(records)
     for name in sorted(args.names):
-        print(f"{name} {records[name]['version']}: {args.destination / records[name]['directory']}")
+        print(f'{name} {records[name]["version"]}: {args.destination / records[name]["directory"]}')
     if args.github_output:
         with args.github_output.open('a', encoding='utf-8') as output:
             for name in sorted(args.names):
-                output.write(f"{name}={(args.destination.resolve() / records[name]['directory']).as_posix()}\n")
+                output.write(f'{name}={(args.destination.resolve() / records[name]["directory"]).as_posix()}\n')
     return 0
 
 

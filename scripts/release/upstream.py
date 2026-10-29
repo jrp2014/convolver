@@ -7,13 +7,16 @@ and a release's version is read from its tag: by the rule's `tag_prefix`
 with dots (NSIS's "v313" is 3.13). See resolve.py for how a release becomes an
 exact, recorded source.
 """
+
 import re
 import subprocess
 import tempfile
 import time
 
-VERSION = re.compile(r'(?P<number>\d+(?:\.\d+)*)(?:[._-]build[._-](?P<build>\d+))?'
-                     r'(?:[._-]?(?P<suffix>alpha|beta|rc|pre|pl)(?P<suffix_number>\d*))?$')
+VERSION = re.compile(
+    r'(?P<number>\d+(?:\.\d+)*)(?:[._-]build[._-](?P<build>\d+))?'
+    r'(?:[._-]?(?P<suffix>alpha|beta|rc|pre|pl)(?P<suffix_number>\d*))?$'
+)
 # Pre-releases sort below the release, by stage (alpha, then beta, then
 # release candidate; "pre" is taken as a release candidate, as PEP 440 does),
 # and patch levels (FFTW's -plN) above it. FINAL is the rank of a release.
@@ -48,7 +51,7 @@ def parse_ls_remote(output):
         commit, ref = line.split('\t', 1)
         if not ref.startswith('refs/tags/'):
             continue
-        name = ref[len('refs/tags/'):]
+        name = ref[len('refs/tags/') :]
         if name.endswith('^{}'):
             tags[name[:-3]] = commit
         else:
@@ -56,9 +59,8 @@ def parse_ls_remote(output):
     return tags
 
 
-def _git(arguments, timeout=180, cwd=None):
-    result = subprocess.run(['git', *arguments], capture_output=True, text=True, timeout=timeout,
-                            check=False, cwd=cwd)
+def git(arguments, timeout=180, cwd=None):
+    result = subprocess.run(['git', *arguments], capture_output=True, text=True, timeout=timeout, check=False, cwd=cwd)
     if result.returncode:
         lines = result.stderr.strip().splitlines()
         raise RuntimeError(lines[-1] if lines else f'git {arguments[0]} exited with {result.returncode}')
@@ -69,7 +71,7 @@ def ls_remote(remote, attempts=3):
     """Lists a remote's tags, retrying a flaky host twice (after 5 s, then 10 s)."""
     for attempt in range(attempts):
         try:
-            return _git(['ls-remote', '--tags', remote], timeout=120)
+            return git(['ls-remote', '--tags', remote], timeout=120)
         except subprocess.TimeoutExpired as timeout:
             error = RuntimeError(f'no answer within {timeout.timeout} s')
         except RuntimeError as failure:
@@ -87,7 +89,7 @@ def tag_version(rule, tag):
         version = '.'.join(group for group in match.groups() if group) if match else None
     else:
         prefix = rule.get('tag_prefix', '')
-        version = tag[len(prefix):] if tag.startswith(prefix) else None
+        version = tag[len(prefix) :] if tag.startswith(prefix) else None
     return version if version and version_key(version) is not None else None
 
 
@@ -106,8 +108,10 @@ def newest(rule, tags, wanted=None):
     found = releases(rule, tags)
     if wanted is not None:
         if wanted not in found:
-            raise ValueError(f'no release {wanted} among the tags of {rule["upstream"]} '
-                             f'(releases found: {", ".join(sorted(found, key=version_key)[-5:]) or "none"})')
+            raise ValueError(
+                f'no release {wanted} among the tags of {rule["upstream"]} '
+                f'(releases found: {", ".join(sorted(found, key=version_key)[-5:]) or "none"})'
+            )
         version = wanted
     elif not found:
         raise ValueError(f'no release tags found at {rule["upstream"]} ({_describe_tags(rule)})')
@@ -143,13 +147,18 @@ def gitlinks(remote, tag, paths):
     """The commits a tag's tree records for its submodules at `paths`, and the
     submodule URLs from its .gitmodules, without downloading file contents."""
     with tempfile.TemporaryDirectory(prefix='convolver-gitlinks-') as temporary:
-        _git(['init', '--quiet', '--bare', temporary])
-        _git(['remote', 'add', 'origin', remote], cwd=temporary)
-        _git(['fetch', '--quiet', '--depth', '1', '--filter=blob:none', 'origin',
-              f'refs/tags/{tag}:refs/tags/{tag}'], timeout=300, cwd=temporary)
-        tree = _git(['ls-tree', f'refs/tags/{tag}', '--', *paths], cwd=temporary)
-        modules = _git(['config', '--blob', f'refs/tags/{tag}:.gitmodules', '--get-regexp',
-                        r'^submodule\..*\.(path|url)$'], cwd=temporary)
+        git(['init', '--quiet', '--bare', temporary])
+        git(['remote', 'add', 'origin', remote], cwd=temporary)
+        git(
+            ['fetch', '--quiet', '--depth', '1', '--filter=blob:none', 'origin', f'refs/tags/{tag}:refs/tags/{tag}'],
+            timeout=300,
+            cwd=temporary,
+        )
+        tree = git(['ls-tree', f'refs/tags/{tag}', '--', *paths], cwd=temporary)
+        modules = git(
+            ['config', '--blob', f'refs/tags/{tag}:.gitmodules', '--get-regexp', r'^submodule\..*\.(path|url)$'],
+            cwd=temporary,
+        )
     commits = {}
     for line in tree.splitlines():
         meta, path = line.split('\t', 1)
@@ -167,7 +176,9 @@ def gitlinks(remote, tag, paths):
 
 def same_repository(first, second):
     """True when two Git URLs name the same repository (ignoring .git and a final slash)."""
+
     def normal(url):
         url = url.strip().rstrip('/')
         return (url[:-4] if url.endswith('.git') else url).lower()
+
     return normal(first) == normal(second)

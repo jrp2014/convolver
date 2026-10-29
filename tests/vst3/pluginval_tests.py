@@ -17,6 +17,7 @@ share.
 pluginval 1 and 2 take different command lines; the version is read from
 `pluginval --version`.
 """
+
 import json
 import math
 import os
@@ -31,8 +32,15 @@ import tempfile
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'plugins'))
 # The shared PLUG-2 helpers: WAV files, deterministic noise and the direct oracle.
-from fixtures import (LATENCY, TOLERANCE, direct_convolution, noise,  # noqa: E402
-                      read_float_wav, sparse_ir, write_float_wav)
+from fixtures import (  # noqa: E402
+    LATENCY,
+    TOLERANCE,
+    direct_convolution,
+    noise,
+    read_float_wav,
+    sparse_ir,
+    write_float_wav,
+)
 
 
 def run_pluginval(pluginval, arguments, **kwargs):
@@ -44,7 +52,8 @@ def run_pluginval(pluginval, arguments, **kwargs):
             sys.exit('pluginval needs DISPLAY or xvfb-run on Linux')
         command = [xvfb, '--auto-servernum', *command]
     print('+', ' '.join(command), flush=True)
-    return subprocess.run(command, **kwargs)
+    check = kwargs.pop('check', False)
+    return subprocess.run(command, check=check, **kwargs)
 
 
 SKIPPED = 77  # CTest's SKIP_RETURN_CODE for this test.
@@ -52,8 +61,7 @@ SKIPPED = 77  # CTest's SKIP_RETURN_CODE for this test.
 
 def major_version(pluginval):
     """pluginval's major version, from `pluginval --version` ("pluginval - 1.0.4")."""
-    output = subprocess.run([pluginval, '--version'], capture_output=True, text=True, timeout=120,
-                            check=False).stdout
+    output = subprocess.run([pluginval, '--version'], capture_output=True, text=True, timeout=120, check=False).stdout
     match = re.search(r'(\d+)\.\d+', output)
     if not match:
         sys.exit(f'cannot read a version from `{pluginval} --version`: {output.strip()!r}')
@@ -73,12 +81,12 @@ def component_state(preset):
     data = preset.read_bytes()
     assert data[:4] == b'VST3', preset
     offset = struct.unpack('<q', data[40:48])[0]
-    assert data[offset:offset + 4] == b'List', preset
-    for index in range(struct.unpack('<i', data[offset + 4:offset + 8])[0]):
-        entry = data[offset + 8 + 20 * index:offset + 28 + 20 * index]
+    assert data[offset : offset + 4] == b'List', preset
+    for index in range(struct.unpack('<i', data[offset + 4 : offset + 8])[0]):
+        entry = data[offset + 8 + 20 * index : offset + 28 + 20 * index]
         start, size = struct.unpack('<qq', entry[4:])
         if entry[:4] == b'Comp':
-            return data[start:start + size]
+            return data[start : start + size]
     raise AssertionError(f'{preset}: no component state')
 
 
@@ -93,8 +101,9 @@ def juce_state(component):
     bits = int.from_bytes(component, 'little')
     count = (len(component) * 8 + 5) // 6
     encoded = f'{len(component)}.' + ''.join(alphabet[(bits >> (6 * i)) & 63] for i in range(count))
-    text = (f'<?xml version="1.0" encoding="UTF-8"?> <VST3PluginState><IComponent>{encoded}'
-            '</IComponent></VST3PluginState>').encode() + b'\0'
+    text = (
+        f'<?xml version="1.0" encoding="UTF-8"?> <VST3PluginState><IComponent>{encoded}</IComponent></VST3PluginState>'
+    ).encode() + b'\0'
     return struct.pack('<II', 0x21324356, len(text) - 1) + text
 
 
@@ -104,8 +113,10 @@ CASES = [
         'name': 'stereo-wav',
         'rate': 48000,
         'block_size': 300,  # Not a multiple of the 256-sample partition.
-        'ir': [[(0, 0.5), (1, -0.25), (100, 0.25), (700, 0.0625), (2000, -0.125)],
-               [(0, 0.375), (37, 0.125), (255, -0.25), (256, 0.1875), (3000, 0.03125)]],
+        'ir': [
+            [(0, 0.5), (1, -0.25), (100, 0.25), (700, 0.0625), (2000, -0.125)],
+            [(0, 0.375), (37, 0.125), (255, -0.25), (256, 0.1875), (3000, 0.03125)],
+        ],
         'filter': 'ir.wav',
         'routes': [(0, 0, 0), (1, 1, 1)],
     },
@@ -114,11 +125,9 @@ CASES = [
         'name': 'crossfeed-cfg',
         'rate': 44100,
         'block_size': 61,  # Smaller than a partition; partitions straddle callbacks.
-        'ir': [[(0, 0.75), (5, -0.125), (300, 0.0625)],
-               [(20, 0.25), (513, -0.0625), (1500, 0.03125)]],
+        'ir': [[(0, 0.75), (5, -0.125), (300, 0.0625)], [(20, 0.25), (513, -0.0625), (1500, 0.03125)]],
         'filter': 'crossfeed.cfg',
-        'config': '44100 2 2 0\n0 0\n0 0\nir.wav\n0\n0\n0\nir.wav\n0\n1\n1\n'
-                  'ir.wav\n1\n0\n1\nir.wav\n1\n1\n0\n',
+        'config': '44100 2 2 0\n0 0\n0 0\nir.wav\n0\n0\n0\nir.wav\n0\n1\n1\nir.wav\n1\n0\n1\nir.wav\n1\n1\n0\n',
         'routes': [(0, 0, 0), (1, 1, 0), (0, 1, 1), (1, 0, 1)],
     },
 ]
@@ -156,8 +165,9 @@ def acceptance(pluginval, bundle, preset_tool):
             (root / 'case.json').write_text(json.dumps(config, indent=2))
 
             # The first run records what the host rendered; check that against the oracle.
-            run_pluginval(pluginval, ['test', '--plugin', str(bundle), '--record-missing',
-                                      str(root / 'case.json')], check=True)
+            run_pluginval(
+                pluginval, ['test', '--plugin', str(bundle), '--record-missing', str(root / 'case.json')], check=True
+            )
             rendered = read_float_wav(root / 'rendered.wav')
             routes = [(source, target, case['ir'][channel]) for source, target, channel in case['routes']]
             expected = direct_convolution(inputs, routes, len(rendered[0]))
@@ -165,14 +175,15 @@ def acceptance(pluginval, bundle, preset_tool):
             assert len(rendered[0]) >= frames + length + LATENCY - 1, len(rendered[0])
             worst = max(abs(a - b) for out, ref in zip(rendered, expected) for a, b in zip(out, ref))
             assert all(math.isfinite(v) for out in rendered for v in out)
-            print(f"{case['name']}: {len(rendered)} channels x {len(rendered[0])} frames at "
-                  f"block size {case['block_size']}, worst error {worst:.3g}")
-            assert worst < TOLERANCE, f"{case['name']}: error {worst} exceeds {TOLERANCE}"
+            print(
+                f'{case["name"]}: {len(rendered)} channels x {len(rendered[0])} frames at '
+                f'block size {case["block_size"]}, worst error {worst:.3g}'
+            )
+            assert worst < TOLERANCE, f'{case["name"]}: error {worst} exceeds {TOLERANCE}'
             worst_overall = max(worst_overall, worst)
 
             # A second render must reproduce the first exactly (fresh instance, same state).
-            run_pluginval(pluginval, ['test', '--plugin', str(bundle), str(root / 'case.json')],
-                          check=True)
+            run_pluginval(pluginval, ['test', '--plugin', str(bundle), str(root / 'case.json')], check=True)
     print(f'pluginval acceptance: worst error against direct convolution {worst_overall:.3g}')
 
 
@@ -188,8 +199,10 @@ def main():
         pluginval, bundle, preset_tool = sys.argv[2:]
         major = major_version(pluginval)
         if major < 2:
-            print(f'Skipped: pluginval {major} has no `test` command, which renders audio from a preset; '
-                  'this test needs pluginval 2 (docs/develop/testing.md#pluginval).')
+            print(
+                f'Skipped: pluginval {major} has no `test` command, which renders audio from a preset; '
+                'this test needs pluginval 2 (docs/develop/testing.md#pluginval).'
+            )
             sys.exit(SKIPPED)
         acceptance(pluginval, pathlib.Path(bundle), preset_tool)
         return

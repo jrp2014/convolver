@@ -24,11 +24,12 @@ request whose changed files cannot be listed. See
 docs/develop/testing.md#documentation-only-pull-requests and
 #pull-requests-for-one-plug-in-format.
 """
+
 import argparse
 import os
-from pathlib import PurePosixPath
 import subprocess
 import sys
+from pathlib import Path, PurePosixPath
 
 # Pages whose commands the examples.first_use CTest entry runs as written
 # (tests/plugins/fixtures.py DOCUMENTED), and the archive and records that the
@@ -72,8 +73,7 @@ WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
 
 
 def matches(path, entries):
-    return any(path.startswith(entry) if entry.endswith('/') else path == entry
-               for entry in entries)
+    return any(path.startswith(entry) if entry.endswith('/') else path == entry for entry in entries)
 
 
 def classify(path):
@@ -92,7 +92,7 @@ def classify(path):
             return 'format:' + name
     folder, _, file = path.rpartition('/')
     if folder == '.github/workflows' and file.endswith('.yml'):
-        return 'workflow:' + file[:-len('.yml')]
+        return 'workflow:' + file[: -len('.yml')]
     return 'code'
 
 
@@ -131,13 +131,17 @@ def changed_files():
     would change. Returns None when that cannot be worked out.
     """
     try:
-        parents = subprocess.run(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'],
-                                 check=True, capture_output=True, text=True).stdout.split()
+        parents = subprocess.run(
+            ['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], check=True, capture_output=True, text=True
+        ).stdout.split()
         if len(parents) != 3:
             return None
-        output = subprocess.run(['git', '-c', 'core.quotePath=false', 'diff', '--name-only', '--no-renames',
-                                 'HEAD^1', 'HEAD'],
-                                check=True, capture_output=True, text=True).stdout
+        output = subprocess.run(
+            ['git', '-c', 'core.quotePath=false', 'diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD'],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
     return [line for line in output.splitlines() if line]
@@ -145,10 +149,14 @@ def changed_files():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n', 1)[0])
-    parser.add_argument('--event', default=os.environ.get('GITHUB_EVENT_NAME', ''),
-                        help='GitHub event name (default: $GITHUB_EVENT_NAME)')
-    parser.add_argument('--workflow', choices=WORKFLOWS,
-                        help='the workflow asking, by file name (default: any workflow)')
+    parser.add_argument(
+        '--event',
+        default=os.environ.get('GITHUB_EVENT_NAME', ''),
+        help='GitHub event name (default: $GITHUB_EVENT_NAME)',
+    )
+    parser.add_argument(
+        '--workflow', choices=WORKFLOWS, help='the workflow asking, by file name (default: any workflow)'
+    )
     parser.add_argument('--github-output', help='append build=… and package=… here')
     parser.add_argument('paths', nargs='*', help='changed paths, instead of asking git')
     args = parser.parse_args(argv)
@@ -159,29 +167,30 @@ def main(argv=None):
         paths, reason = None, f'"{args.event or "local"}" runs always test everything'
     else:
         paths = changed_files()
-        reason = ('cannot list the changed files' if paths is None
-                  else f'{len(paths)} changed file(s)')
+        reason = 'cannot list the changed files' if paths is None else f'{len(paths)} changed file(s)'
     answer = decide(paths, args.workflow) if paths is not None else {'build': True, 'package': True}
 
-    lines = [f'CI scope: {reason}.']
-    for path in paths or []:
-        lines.append(f'  {classify(path):13} {path}')
+    lines = [f'CI scope: {reason}.', *(f'  {classify(path):13} {path}' for path in paths or [])]
     workflows = needed(paths) if paths is not None else None
     if workflows is not None and not workflows:
-        lines.append('Only documentation changed: lint runs; builds and tests are skipped'
-                     + ('; the packaged guide is checked by the candidate workflow.'
-                        if answer['package'] else '.'))
+        lines.append(
+            'Only documentation changed: lint runs; builds and tests are skipped'
+            + ('; the packaged guide is checked by the candidate workflow.' if answer['package'] else '.')
+        )
     elif workflows is not None:
-        lines.append("Only one plug-in format's or one workflow's own files changed (CI-13); "
-                     'these workflows build and test: ' + ', '.join(sorted(workflows)) + '.')
+        lines.append(
+            "Only one plug-in format's or one workflow's own files changed (CI-13); "
+            'these workflows build and test: ' + ', '.join(sorted(workflows)) + '.'
+        )
         if args.workflow:
-            lines.append(f'This workflow ({args.workflow}) '
-                         + ('runs.' if answer['build'] or answer['package'] else 'is skipped.'))
+            lines.append(
+                f'This workflow ({args.workflow}) '
+                + ('runs.' if answer['build'] or answer['package'] else 'is skipped.')
+            )
     print('\n'.join(lines))
     if args.github_output:
-        with open(args.github_output, 'a', encoding='utf-8') as stream:
-            for key, value in answer.items():
-                stream.write(f'{key}={str(value).lower()}\n')
+        with Path(args.github_output).open('a', encoding='utf-8') as stream:
+            stream.writelines(f'{key}={str(value).lower()}\n' for key, value in answer.items())
     return 0
 
 

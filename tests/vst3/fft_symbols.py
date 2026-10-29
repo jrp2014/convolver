@@ -7,6 +7,7 @@ A plug-in must never export FFTW symbols: a host or another plug-in could bind
 to them. Unless the build deliberately chose FFTW, it must not import FFTW
 either. Exit code 77 means the platform's symbol tool was not found (skipped).
 """
+
 import platform
 import re
 import shutil
@@ -17,8 +18,9 @@ FFTW = re.compile(r'\b_?fftwf?_\w+')
 
 
 def run(command):
-    return subprocess.run(command, check=True, text=True, errors='replace',
-                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
+    return subprocess.run(
+        command, check=True, text=True, errors='replace', stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    ).stdout
 
 
 def symbols(binary):
@@ -44,8 +46,11 @@ def symbols(binary):
         libraries = re.findall(r'^\s+([\w.\-]+\.dll)\s*$', imported, re.MULTILINE | re.IGNORECASE)
     else:
         return None
-    return (sorted(set(FFTW.findall(exported))), sorted(set(FFTW.findall(imported))),
-            [name for name in libraries if 'fftw' in name.lower()])
+    return (
+        sorted(set(FFTW.findall(exported))),
+        sorted(set(FFTW.findall(imported))),
+        [name for name in libraries if 'fftw' in name.lower()],
+    )
 
 
 def main():

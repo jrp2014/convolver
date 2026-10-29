@@ -6,17 +6,18 @@ A stand-in clang-tidy (a small Python script) records its arguments; files
 named bad*.cpp fail. The concurrency test has each run wait until all of them
 have started, so it passes only if they really run side by side.
 """
+
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/clang_tidy.py'
 
-FAKE = textwrap.dedent('''\
+FAKE = textwrap.dedent("""\
     import os, sys, time
     from pathlib import Path
     build, source = sys.argv[2], sys.argv[3]
@@ -34,7 +35,7 @@ FAKE = textwrap.dedent('''\
     if Path(source).name.startswith('bad'):
         print(f'{source}:1:1: error: a finding [some-check]')
         sys.exit(1)
-''')
+""")
 
 
 @unittest.skipIf(os.name == 'nt', 'the stand-in clang-tidy is a script with a #! line')
@@ -53,8 +54,13 @@ class ClangTidyRunnerTests(unittest.TestCase):
 
     def run_script(self, *arguments, wait_for=0):
         environment = dict(os.environ, FAKE_MARKS=str(self.marks), FAKE_WAIT_FOR=str(wait_for))
-        return subprocess.run([sys.executable, str(SCRIPT), '--clang-tidy', str(self.fake), '-p', 'build-x',
-                               *arguments], env=environment, capture_output=True, text=True, check=False)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), '--clang-tidy', str(self.fake), '-p', 'build-x', *arguments],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
     def test_every_file_is_analysed_and_printed_in_order(self):
         sources = [f'portable/file{n}.cpp' for n in range(6)]
@@ -80,8 +86,12 @@ class ClangTidyRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_missing_clang_tidy_is_an_error(self):
-        result = subprocess.run([sys.executable, str(SCRIPT), '--clang-tidy', 'no-such-clang-tidy', '-p', 'build',
-                                 'portable/engine.cpp'], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), '--clang-tidy', 'no-such-clang-tidy', '-p', 'build', 'portable/engine.cpp'],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         self.assertEqual(result.returncode, 2)
         self.assertIn('cannot find no-such-clang-tidy', result.stderr)
 

@@ -40,8 +40,7 @@ def cache_value(cache, name):
 
 def collect(build, out):
     copied = []
-    patterns = ['Testing/Temporary/LastTest*.log', 'junit.xml', 'CMakeCache.txt',
-                '**/convolver-tests.log']
+    patterns = ['Testing/Temporary/LastTest*.log', 'junit.xml', 'CMakeCache.txt', '**/convolver-tests.log']
     for pattern in patterns:
         for found in sorted(build.glob(pattern)):
             if not found.is_file():
@@ -61,10 +60,15 @@ def main(argv):
     output.mkdir(parents=True, exist_ok=True)
     identity = [
         f'commit: {run(["git", "rev-parse", "HEAD"])}',
-        f'workflow: {os.environ.get("GITHUB_WORKFLOW", "")} / job {os.environ.get("GITHUB_JOB", "")}'
-        f' / run {os.environ.get("GITHUB_RUN_ID", "")} attempt {os.environ.get("GITHUB_RUN_ATTEMPT", "")}',
-        f'runner: {os.environ.get("RUNNER_OS", "")} {os.environ.get("RUNNER_ARCH", "")}, image '
-        f'{os.environ.get("ImageOS", "")} {os.environ.get("ImageVersion", "")}',
+        (
+            f'workflow: {os.environ.get("GITHUB_WORKFLOW", "")} / job {os.environ.get("GITHUB_JOB", "")}'
+            f' / run {os.environ.get("GITHUB_RUN_ID", "")} attempt {os.environ.get("GITHUB_RUN_ATTEMPT", "")}'
+        ),
+        (
+            f'runner: {os.environ.get("RUNNER_OS", "")} {os.environ.get("RUNNER_ARCH", "")}, image '
+            # GitHub's runner image variables are named in mixed case.
+            f'{os.environ.get("ImageOS", "")} {os.environ.get("ImageVersion", "")}'  # noqa: SIM112
+        ),
         f'platform: {platform.platform()} ({platform.machine()})',
     ]
     for name in argv[2:]:
@@ -76,8 +80,7 @@ def main(argv):
         cache = build / 'CMakeCache.txt'
         if cache.is_file():
             compiler = cache_value(cache, 'CMAKE_CXX_COMPILER')
-            identity.append(f'{name}: build type {cache_value(cache, "CMAKE_BUILD_TYPE")}, '
-                            f'compiler {compiler}')
+            identity.append(f'{name}: build type {cache_value(cache, "CMAKE_BUILD_TYPE")}, compiler {compiler}')
             if compiler:
                 version = run([compiler, '--version'])
                 identity.append('  ' + (version.splitlines()[0] if version else '(no version)'))

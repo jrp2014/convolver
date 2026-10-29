@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Alternate baseline/vDSP in one Release binary; retain every measurement."""
+
 import argparse
 import csv
 import io
@@ -16,8 +17,11 @@ args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 for kind, executable, cases in [
     ('engine', 'convolver_benchmark', [(str(i),) for i in range(19)]),
-    ('kernel', 'convolver_mac_benchmark', [('65', '4'), ('129', '128'),
-        ('257', '16'), ('257', '256'), ('257', '512'), ('1025', '64'), ('257', '2048')]),
+    (
+        'kernel',
+        'convolver_mac_benchmark',
+        [('65', '4'), ('129', '128'), ('257', '16'), ('257', '256'), ('257', '512'), ('1025', '64'), ('257', '2048')],
+    ),
 ]:
     with (args.output / (kind + '.csv')).open('w', newline='') as output:
         writer = None
@@ -36,7 +40,7 @@ for kind, executable, cases in [
                         raise RuntimeError('benchmark selected wrong kernel: ' + completed.stdout)
                     row = {'repeat': repeat, 'pair_position': position, **row}
                     if writer is None:
-                        writer = csv.DictWriter(output, fieldnames=list(row), lineterminator="\n")
+                        writer = csv.DictWriter(output, fieldnames=list(row), lineterminator='\n')
                         writer.writeheader()
                     writer.writerow(row)
                     output.flush()

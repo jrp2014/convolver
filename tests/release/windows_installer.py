@@ -1,26 +1,30 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise actual NSIS upgrade and locked-file recovery on a disposable CI runner."""
+
 import argparse
 import ctypes
-from ctypes import wintypes
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import winreg
+from ctypes import wintypes
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
-from contract import load_policy
-from installers import prepare
+from contract import load_policy  # noqa: E402
+from installers import prepare  # noqa: E402
 
 
-def run(command, success=True):
+def run(command, *, success=True):
     arguments = [str(arg) for arg in command]
     # NSIS parses these final tail arguments itself, including unquoted spaces.
-    invocation = (subprocess.list2cmdline(arguments[:-1]) + ' ' + arguments[-1]
-                  if arguments[-1].startswith(('/D=', '_?=')) else arguments)
-    result = subprocess.run(invocation, timeout=90)
+    invocation = (
+        subprocess.list2cmdline(arguments[:-1]) + ' ' + arguments[-1]
+        if arguments[-1].startswith(('/D=', '_?='))
+        else arguments
+    )
+    result = subprocess.run(invocation, timeout=90, check=False)
     if (result.returncode == 0) != success:
         raise AssertionError(f'unexpected installer status {result.returncode}: {command}')
 
@@ -28,7 +32,9 @@ def run(command, success=True):
 def check(nsis):
     # Never target a user's existing installation. CI runners are disposable.
     try:
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\Convolver', 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY):
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, r'Software\Convolver', 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+        ):
             raise RuntimeError('refusing installer tests over an existing installation')
     except FileNotFoundError:
         pass
@@ -60,7 +66,15 @@ def check(nsis):
         assert not (old / 'bin/tool.exe').exists(), 'old owned tool survived upgrade'
         assert custom.read_bytes() == b'user' and plugin.exists()
         kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-        kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        kernel.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
         kernel.CreateFileW.restype = wintypes.HANDLE
         kernel.CloseHandle.argtypes = [wintypes.HANDLE]
         handle = kernel.CreateFileW(str(plugin), 0x80000000, 0, None, 3, 0, None)
@@ -69,7 +83,9 @@ def check(nsis):
         try:
             run([new / 'Uninstall.exe', '/S', '_?=' + str(new)], success=False)
             assert plugin.exists() and (new / 'Uninstall.exe').exists()
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\Convolver', 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY):
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r'Software\Convolver', 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+            ):
                 pass
         finally:
             kernel.CloseHandle(handle)

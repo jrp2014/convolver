@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Collect per-platform candidate receipts without rebuilding any artifact."""
+
 import argparse
 import json
 from pathlib import Path
+
 from contract import load_policy
 from promotion_gate import check
 
@@ -24,10 +26,18 @@ for receipt in sorted(args.root.glob('*-candidate.json')):
         assets[asset['name']] = asset
 if len(commits) != 1:
     raise ValueError('candidate must have one source commit')
-result = dict(schema=1, version=policy['version'], source_commit=commits.pop(), assets=list(assets.values()), platforms=platforms)
+result = {
+    'schema': 1,
+    'version': policy['version'],
+    'source_commit': commits.pop(),
+    'assets': list(assets.values()),
+    'platforms': platforms,
+}
 check(result, policy, args.root)
 if args.output.exists():
     raise ValueError('candidate output already exists')
 args.output.write_text(json.dumps(result, indent=2) + '\n')
-(args.root / 'SHA256SUMS').write_text(''.join(f'{asset["sha256"]}  {asset["name"]}\n' for asset in sorted(assets.values(), key=lambda a: a['name'])))
+(args.root / 'SHA256SUMS').write_text(
+    ''.join(f'{asset["sha256"]}  {asset["name"]}\n' for asset in sorted(assets.values(), key=lambda a: a['name']))
+)
 print('Complete developer-preview candidate collected; production gates remain incomplete')

@@ -18,6 +18,7 @@ on Linux). Nothing else should run meanwhile. Add a variant with
 source tree (an earlier commit from `git archive`, say), for example
 --variant 'O3-baseline=-O3 -DNDEBUG|baseline'.
 """
+
 import argparse
 import csv
 import io
@@ -39,8 +40,9 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[3])
 parser.add_argument('--compiler', default='c++')
 parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE'])
-parser.add_argument('--variant', action='append',
-                    help='NAME=FLAGS[|lto][|baseline][|source=DIR]; replaces the defaults')
+parser.add_argument(
+    '--variant', action='append', help='NAME=FLAGS[|lto][|baseline][|source=DIR]; replaces the defaults'
+)
 parser.add_argument('--no-avx2-kernels', action='store_true', help='configure with CONVOLVER_AVX2_KERNELS=OFF')
 parser.add_argument('--cases', default='10,11,12,13,14,15,16,17,18')
 parser.add_argument('--rounds', type=int, default=5)
@@ -62,19 +64,37 @@ for spec in args.variant or DEFAULT_VARIANTS:
         extras.remove(extra)
     unknown = set(extras) - {'lto', 'baseline'}
     if unknown:
-        parser.error(f'unknown variant option {sorted(unknown)[0]} in {spec}')
+        parser.error(f'unknown variant option {min(unknown)} in {spec}')
     avx2 = not (args.no_avx2_kernels or 'baseline' in extras)
     build = args.work / name
-    subprocess.run(['cmake', '-S', str(source), '-B', str(build), '-DCMAKE_BUILD_TYPE=Release',
-                    '-DCMAKE_CXX_COMPILER=' + args.compiler, '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
-                    '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
-                    '-DCONVOLVER_FFT_BACKEND=' + args.backend, '-DCONVOLVER_BUILD_IO=OFF',
-                    '-DCONVOLVER_BUILD_CLI=OFF', '-DBUILD_TESTING=OFF', '-DCONVOLVER_BUILD_BENCHMARKS=ON',
-                    '-DCONVOLVER_LEGACY_TESTS=OFF', '-DCONVOLVER_DOCUMENTATION_TESTS=OFF',
-                    '-DCONVOLVER_AVX2_KERNELS=' + ('ON' if avx2 else 'OFF')],
-                   check=True, stdout=subprocess.DEVNULL)
-    subprocess.run(['cmake', '--build', str(build), '--target', 'convolver_benchmark', '--config', 'Release'],
-                   check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        [
+            'cmake',
+            '-S',
+            str(source),
+            '-B',
+            str(build),
+            '-DCMAKE_BUILD_TYPE=Release',
+            '-DCMAKE_CXX_COMPILER=' + args.compiler,
+            '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
+            '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
+            '-DCONVOLVER_FFT_BACKEND=' + args.backend,
+            '-DCONVOLVER_BUILD_IO=OFF',
+            '-DCONVOLVER_BUILD_CLI=OFF',
+            '-DBUILD_TESTING=OFF',
+            '-DCONVOLVER_BUILD_BENCHMARKS=ON',
+            '-DCONVOLVER_LEGACY_TESTS=OFF',
+            '-DCONVOLVER_DOCUMENTATION_TESTS=OFF',
+            '-DCONVOLVER_AVX2_KERNELS=' + ('ON' if avx2 else 'OFF'),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ['cmake', '--build', str(build), '--target', 'convolver_benchmark', '--config', 'Release'],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
     found = [p for p in build.rglob('convolver_benchmark*') if p.is_file() and p.suffix in ('', '.exe')]
     binaries[name] = found[0]
 
@@ -87,8 +107,9 @@ for repeat in range(args.rounds):
         names = list(binaries)
         order.shuffle(names)
         for name in names:
-            result = subprocess.run(pin + [str(binaries[name]), str(case), str(args.seconds)],
-                                    capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                [*pin, str(binaries[name]), str(case), str(args.seconds)], capture_output=True, text=True, check=True
+            )
             row = next(csv.DictReader(io.StringIO(result.stdout)))
             row.update(variant=name, compiler=args.compiler, round=repeat + 1)
             rows.append(row)
@@ -102,6 +123,10 @@ print(f'Median ns/frame, and speedup over {base} (above 1 is faster)')
 print('| Case | ' + ' | '.join(binaries) + ' |')
 print('| --- |' + ' ---: |' * len(binaries))
 for case in dict.fromkeys(row['case'] for row in rows):
-    median = {name: statistics.median(float(row['ns_per_frame']) for row in rows
-                                      if row['case'] == case and row['variant'] == name) for name in binaries}
+    median = {
+        name: statistics.median(
+            float(row['ns_per_frame']) for row in rows if row['case'] == case and row['variant'] == name
+        )
+        for name in binaries
+    }
     print(f'| {case} | ' + ' | '.join(f'{median[n]:.0f} ({median[base] / median[n]:.2f}×)' for n in binaries) + ' |')

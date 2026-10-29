@@ -70,6 +70,23 @@ Until 1.0 the C++ API may change between minor versions.
   and tests to N jobs at once for a machine with less memory; without it they
   still use every CPU. From the external review of PR #86. See
   [preview recipe](docs/develop/build.md#preview-recipe).
+- Python tools (CI-17): removed 11 unused imports from the release scripts
+  (`build_sources.py`, `candidate.py`, `symbols.py`, `verify_artifact.py`) and
+  four test scripts, found by a Skylos scan on 29 October 2026 and confirmed
+  with ruff. No behaviour changes. See
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- Python tools (CI-18): pre-commit, and so lint CI, now formats the maintained
+  Python scripts and tests with the latest stable ruff (120 columns, single
+  quotes) and lints them with every stable ruff rule except a short, explained
+  list in `ruff.toml`. All 77 files were reformatted once, in a layout-only
+  commit that `.git-blame-ignore-revs` lets `git blame` skip; the code then
+  changed to meet the rules: f-strings instead of `%` formatting, explicit
+  `check=False` on `subprocess.run`, keyword-only boolean options in the
+  release and version scripts (`fetch=`, `push=`, `production=` and others), `Path.open`,
+  comprehensions, sorted imports, and executable scripts that have a `#!`
+  line. Like the Clang tools, ruff is not pinned, so a new release can turn
+  Lint red. No behaviour changes. See
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 
 ### Fixed
 

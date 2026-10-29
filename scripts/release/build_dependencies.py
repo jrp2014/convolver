@@ -3,17 +3,20 @@
 
 The policy passed in carries resolved records (contract.with_records): the
 exact releases resolve.py chose, or a source manifest recorded."""
+
 import argparse
-import os
 import json
-from pathlib import Path
+import os
 import platform
 import shutil
 import subprocess
 import sys
-from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
+from pathlib import Path
+
 import resolve
+from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
 from sources import unpack_dependencies
+
 
 def parallel(jobs=None):
     """The `--parallel` arguments of a build or test run: `jobs` at once, or
@@ -34,12 +37,17 @@ def jobs_argument(text):
 
 
 def add_jobs_option(parser):
-    parser.add_argument('--jobs', type=jobs_argument, metavar='N',
-                        help='Build and test with at most N jobs at once (default: every CPU)')
+    parser.add_argument(
+        '--jobs',
+        type=jobs_argument,
+        metavar='N',
+        help='Build and test with at most N jobs at once (default: every CPU)',
+    )
 
 
-def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',),
-          jobs=None):
+def build(
+    policy, cache, work, cmake='cmake', *, fetch=False, architecture=None, backend='FFTW', formats=('vst3',), jobs=None
+):
     """Only the dependencies of the given plug-in formats are unpacked and their
     notices shipped; FFTW only when the FFT backend is FFTW. `jobs` limits the
     parallel build (default: every CPU)."""
@@ -47,32 +55,63 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
     source = work / 'sources'
     source.mkdir(parents=True, exist_ok=True)
     used = used_dependencies(policy, formats, backend)
-    unpack_dependencies(policy, cache.resolve(), source, fetch, names=used)
+    unpack_dependencies(policy, cache.resolve(), source, fetch=fetch, names=used)
     prefix = work / 'prefix'
-    common = ['-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF',
-              '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DCMAKE_INSTALL_LIBDIR=lib',
-              '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL', '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
-              '-DCMAKE_INSTALL_PREFIX=' + str(prefix)]
+    common = [
+        '-DCMAKE_BUILD_TYPE=Release',
+        '-DBUILD_SHARED_LIBS=OFF',
+        '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
+        '-DCMAKE_INSTALL_LIBDIR=lib',
+        '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL',
+        '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
+        '-DCMAKE_INSTALL_PREFIX=' + str(prefix),
+    ]
     if platform.system() == 'Darwin':
         common += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0']
         if architecture:
             common += ['-DCMAKE_OSX_ARCHITECTURES=' + architecture]
     libraries = (
-        ('fftw', ['-DENABLE_FLOAT=ON', '-DBUILD_TESTS=OFF', '-DENABLE_SSE=OFF',
-                  '-DENABLE_SSE2=OFF', '-DENABLE_AVX=OFF', '-DENABLE_AVX2=OFF',
-                  '-DENABLE_OPENMP=OFF', '-DENABLE_THREADS=OFF']),
-        ('libsndfile', ['-DBUILD_TESTING=OFF', '-DBUILD_PROGRAMS=OFF', '-DBUILD_EXAMPLES=OFF',
-                       '-DENABLE_EXTERNAL_LIBS=OFF', '-DENABLE_MPEG=OFF', '-DENABLE_CPACK=OFF']))
+        (
+            'fftw',
+            [
+                '-DENABLE_FLOAT=ON',
+                '-DBUILD_TESTS=OFF',
+                '-DENABLE_SSE=OFF',
+                '-DENABLE_SSE2=OFF',
+                '-DENABLE_AVX=OFF',
+                '-DENABLE_AVX2=OFF',
+                '-DENABLE_OPENMP=OFF',
+                '-DENABLE_THREADS=OFF',
+            ],
+        ),
+        (
+            'libsndfile',
+            [
+                '-DBUILD_TESTING=OFF',
+                '-DBUILD_PROGRAMS=OFF',
+                '-DBUILD_EXAMPLES=OFF',
+                '-DENABLE_EXTERNAL_LIBS=OFF',
+                '-DENABLE_MPEG=OFF',
+                '-DENABLE_CPACK=OFF',
+            ],
+        ),
+    )
     for name, options in libraries:
         if name not in used:
             continue
         output = work / ('build-' + name)
-        subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
-        subprocess.run([cmake, '--build', str(output), '--config', 'Release'] + parallel(jobs), check=True)
+        subprocess.run([cmake, '-S', str(source / name), '-B', str(output), *common, *options], check=True)
+        subprocess.run([cmake, '--build', str(output), '--config', 'Release', *parallel(jobs)], check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
-    inventory = {name: {key: value for key, value in dep.items()
-                        if key in ('version', 'tag', 'revision', 'url', 'sha256', 'license')}
-                 for name, dep in policy['dependencies'].items() if name in used}
+    inventory = {
+        name: {
+            key: value
+            for key, value in dep.items()
+            if key in ('version', 'tag', 'revision', 'url', 'sha256', 'license')
+        }
+        for name, dep in policy['dependencies'].items()
+        if name in used
+    }
     licenses = work / 'licenses'
     licenses.mkdir(exist_ok=True)
     for name, dep in policy['dependencies'].items():
@@ -94,7 +133,9 @@ def build(policy, cache, work, cmake='cmake', fetch=False, architecture=None, ba
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
+    parser.add_argument(
+        '--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
+    )
     parser.add_argument('--cache', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--fetch', action='store_true', help='Explicitly allow downloads of missing archives')
@@ -103,10 +144,19 @@ if __name__ == '__main__':
     which.add_argument('--lock', type=Path, help='A lock file or source manifest to rebuild exactly')
     parser.add_argument('--cmake', default='cmake')
     parser.add_argument('--architecture', choices=['arm64', 'x86_64'])
-    parser.add_argument('--backend', choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'], default='AUTO',
-                        help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW')
-    parser.add_argument('--formats', nargs='+', choices=sorted(PLUGIN_FORMATS), default=['vst3'],
-                        help='Plug-in formats of the build that follows; only their SDKs are unpacked')
+    parser.add_argument(
+        '--backend',
+        choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'],
+        default='AUTO',
+        help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW',
+    )
+    parser.add_argument(
+        '--formats',
+        nargs='+',
+        choices=sorted(PLUGIN_FORMATS),
+        default=['vst3'],
+        help='Plug-in formats of the build that follows; only their SDKs are unpacked',
+    )
     add_jobs_option(parser)
     args = parser.parse_args()
     policy = load_policy(args.policy)
@@ -115,8 +165,9 @@ if __name__ == '__main__':
             parser.error('--latest downloads the archives; add --fetch')
         try:
             # Only what this build uses, so an unused host cannot fail it.
-            records = resolve.resolve(policy, args.cache.resolve(),
-                                      used_dependencies(policy, args.formats, args.backend))
+            records = resolve.resolve(
+                policy, args.cache.resolve(), used_dependencies(policy, args.formats, args.backend)
+            )
         except resolve.ResolveError as error:
             sys.exit(f'error: {error}')
     else:
@@ -125,5 +176,14 @@ if __name__ == '__main__':
     resolve.warn_prereleases(records)
     used = used_dependencies(policy, args.formats, args.backend)
     policy = dict(policy, dependencies={name: rule for name, rule in policy['dependencies'].items() if name in used})
-    build(with_records(policy, records), args.cache, args.work, args.cmake, args.fetch, args.architecture,
-          args.backend, args.formats, args.jobs)
+    build(
+        with_records(policy, records),
+        args.cache,
+        args.work,
+        args.cmake,
+        fetch=args.fetch,
+        architecture=args.architecture,
+        backend=args.backend,
+        formats=args.formats,
+        jobs=args.jobs,
+    )
