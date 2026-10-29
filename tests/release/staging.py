@@ -2,9 +2,10 @@
 """Install only PluginDistribution to a private prefix, then relocate it."""
 
 import argparse
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
+
 from package_smoke import check
 
 parser = argparse.ArgumentParser(description=__doc__)

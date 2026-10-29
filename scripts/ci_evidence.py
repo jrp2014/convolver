@@ -60,10 +60,15 @@ def main(argv):
     output.mkdir(parents=True, exist_ok=True)
     identity = [
         f'commit: {run(["git", "rev-parse", "HEAD"])}',
-        f'workflow: {os.environ.get("GITHUB_WORKFLOW", "")} / job {os.environ.get("GITHUB_JOB", "")}'
-        f' / run {os.environ.get("GITHUB_RUN_ID", "")} attempt {os.environ.get("GITHUB_RUN_ATTEMPT", "")}',
-        f'runner: {os.environ.get("RUNNER_OS", "")} {os.environ.get("RUNNER_ARCH", "")}, image '
-        f'{os.environ.get("ImageOS", "")} {os.environ.get("ImageVersion", "")}',
+        (
+            f'workflow: {os.environ.get("GITHUB_WORKFLOW", "")} / job {os.environ.get("GITHUB_JOB", "")}'
+            f' / run {os.environ.get("GITHUB_RUN_ID", "")} attempt {os.environ.get("GITHUB_RUN_ATTEMPT", "")}'
+        ),
+        (
+            f'runner: {os.environ.get("RUNNER_OS", "")} {os.environ.get("RUNNER_ARCH", "")}, image '
+            # GitHub's runner image variables are named in mixed case.
+            f'{os.environ.get("ImageOS", "")} {os.environ.get("ImageVersion", "")}'  # noqa: SIM112
+        ),
         f'platform: {platform.platform()} ({platform.machine()})',
     ]
     for name in argv[2:]:

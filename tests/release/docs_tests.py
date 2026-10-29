@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Packaged guide copies keep shipped links relative and send the rest online."""
 
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))

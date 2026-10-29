@@ -3,8 +3,9 @@
 
 import argparse
 import json
-from pathlib import Path
 import re
+from pathlib import Path
+
 from contract import load_policy, sha256
 
 
@@ -31,7 +32,7 @@ def check_qualification(record, platform, policy, digest):
         raise ValueError('host evidence lacks required platform/rate/layout coverage')
 
 
-def check(candidate, policy, root, production=False):
+def check(candidate, policy, root, *, production=False):
     if candidate.get('schema') != 1 or candidate.get('version') != policy['version']:
         raise ValueError('candidate version/schema mismatch')
     commit = candidate.get('source_commit', '')
@@ -96,7 +97,9 @@ if __name__ == '__main__':
     )
     parser.add_argument('--production', action='store_true')
     args = parser.parse_args()
-    files = check(json.loads(args.candidate.read_text()), load_policy(args.policy), args.root, args.production)
+    files = check(
+        json.loads(args.candidate.read_text()), load_policy(args.policy), args.root, production=args.production
+    )
     print(
         'Production gate passed'
         if args.production

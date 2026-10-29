@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Behaviour tests for scripts/check_repository.py, on small synthetic trees."""
 
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 CHECKER = Path(__file__).resolve().parents[1] / 'scripts' / 'check_repository.py'
 SPDX_MD = '<!-- SPDX-License-Identifier: GPL-2.0-or-later -->\n'
@@ -46,7 +46,9 @@ class RepositoryChecks(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='utf-8')
-            return subprocess.run([sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True)
+            return subprocess.run(
+                [sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True, check=False
+            )
 
     def assertBroken(self, result, *fragments):
         self.assertEqual(result.returncode, 1, result.stdout)
@@ -79,8 +81,8 @@ class RepositoryChecks(unittest.TestCase):
 
     def test_plan_rules(self):
         index = (
-            SPDX_MD
-            + '[Plan](project/plans/2026-10-21-formats.md)\n[Bad](project/plans/notes.md)\n[Done](project/plans/2026-10-18-old.md)\n'
+            SPDX_MD + '[Plan](project/plans/2026-10-21-formats.md)\n[Bad](project/plans/notes.md)\n'
+            '[Done](project/plans/2026-10-18-old.md)\n'
         )
         result = self.run_check(
             {

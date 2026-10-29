@@ -11,12 +11,12 @@ named like a fuzz target; nothing is compiled.
 """
 
 import os
-from pathlib import Path
 import shutil
 import stat
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'scripts/fuzz_campaigns.sh'
@@ -48,7 +48,7 @@ def bash_supports_wait_n():
     if os.name != 'posix' or not bash:
         return False
     version = subprocess.run(
-        [bash, '-c', 'echo "${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}"'], capture_output=True, text=True
+        [bash, '-c', 'echo "${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}"'], capture_output=True, text=True, check=False
     ).stdout.split()
     return len(version) == 2 and (int(version[0]), int(version[1])) >= (4, 3)
 
@@ -99,7 +99,7 @@ class SchedulerTests(unittest.TestCase):
         environment = dict(os.environ, RECORD=str(self.record), SLEEP=sleep)
         if path:
             environment['PATH'] = path
-        return subprocess.run(command, capture_output=True, text=True, env=environment, timeout=120)
+        return subprocess.run(command, capture_output=True, text=True, env=environment, timeout=120, check=False)
 
     def concurrency(self):
         return [int(line) for line in (self.record / 'concurrency').read_text().split()]
@@ -219,7 +219,7 @@ class SchedulerTests(unittest.TestCase):
         for option, value in (('--jobs', '0'), ('--jobs', 'two'), ('--seconds', '-5'), ('--seconds', '')):
             with self.subTest(option=option, value=value):
                 command = ['bash', str(SCRIPT), '--source', str(self.source), option, value, 'alpha']
-                result = subprocess.run(command, capture_output=True, text=True, timeout=30, cwd=self.root)
+                result = subprocess.run(command, capture_output=True, text=True, timeout=30, cwd=self.root, check=False)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertFalse((self.record / 'concurrency').exists())
 

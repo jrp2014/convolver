@@ -8,12 +8,12 @@ have started, so it passes only if they really run side by side.
 """
 
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/clang_tidy.py'
 

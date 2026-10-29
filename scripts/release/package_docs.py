@@ -9,9 +9,9 @@ version tag when the commit is unknown).
 """
 
 import argparse
-from pathlib import Path, PurePosixPath
 import posixpath
 import re
+from pathlib import Path, PurePosixPath
 
 LINK = re.compile(r'\]\(([^)\s]+)\)')
 DEFAULT_REPOSITORY = 'https://github.com/jrp2014/convolver'

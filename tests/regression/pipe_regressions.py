@@ -8,10 +8,10 @@ core_regressions.py separately exercises the production convolution kernels.
 """
 
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -20,7 +20,7 @@ ROOT = HERE.parents[1]
 def main():
     source = (ROOT / 'historical/convolverPipe/convolverPipe.cpp').read_text()
     # Remove platform includes only, preserving the complete real entry point.
-    source = re.sub(r'^#include.*$', '', source, flags=re.M)
+    source = re.sub(r'^#include.*$', '', source, flags=re.MULTILINE)
     helpers = (ROOT / 'historical/convolverPipe/pipe_helpers.h').read_text()
     helpers = helpers.replace('#pragma once', '')
     harness = (
@@ -45,7 +45,7 @@ def main():
             ],
             check=True,
         )
-        return subprocess.run([str(binary)]).returncode
+        return subprocess.run([str(binary)], check=False).returncode
 
 
 if __name__ == '__main__':

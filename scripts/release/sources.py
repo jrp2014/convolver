@@ -15,15 +15,15 @@ the plug-in builds read to name the SDK they were built with.
 
 import argparse
 import json
-from pathlib import Path, PurePosixPath
 import posixpath
 import shutil
 import sys
 import tarfile
 import tempfile
-from contract import load_policy, sha256, with_records
-import resolve
+from pathlib import Path, PurePosixPath
 
+import resolve
+from contract import load_policy, sha256, with_records
 
 STAMP = '.convolver-source.json'
 
@@ -37,7 +37,7 @@ def verify(path, dependency):
         )
 
 
-def acquire(dependency, cache, fetch=False):
+def acquire(dependency, cache, *, fetch=False):
     """The recorded archive from cache, downloaded first when fetch allows;
     its checksum must match the record."""
     path = cache / dependency['archive']
@@ -100,7 +100,7 @@ def extract(archive, destination):
                 target.chmod(source_member.mode & 0o777)
 
 
-def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
+def unpack_dependencies(policy, cache, destination, *, fetch=False, names=None):
     """Unpack every dependency the policy's resolved records name, or only
     those in names (see contract.with_records)."""
     if names is not None and not set(names) <= set(policy['dependencies']):
@@ -111,7 +111,7 @@ def unpack_dependencies(policy, cache, destination, fetch=False, names=None):
         key=lambda item: item[1]['directory'].count('/'),
     )
     for name, dependency in ordered:
-        archive = acquire(dependency, cache, fetch)
+        archive = acquire(dependency, cache, fetch=fetch)
         target = destination / dependency['directory']
         stamp = target / STAMP
         if stamp.exists():
@@ -171,7 +171,7 @@ def main(argv=None):
             raise ValueError(f'{args.lock} has no record for {sorted(missing)}')
         resolved = with_records(dict(policy, dependencies={n: policy['dependencies'][n] for n in names}), records)
         args.destination.mkdir(parents=True, exist_ok=True)
-        unpack_dependencies(resolved, cache, args.destination.resolve(), args.fetch, set(names))
+        unpack_dependencies(resolved, cache, args.destination.resolve(), fetch=args.fetch, names=set(names))
     except ValueError as error:
         print(f'error: {error}', file=sys.stderr)
         return 1

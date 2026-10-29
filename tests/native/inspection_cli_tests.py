@@ -5,17 +5,17 @@ escaping and determinism. Standard library only."""
 
 import json
 import os
-from pathlib import Path
 import struct
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 EXE = str(Path(sys.argv[1]).resolve())
 
 
 def wav(path, values, rate=48000, channels=1):
-    data = struct.pack('<%df' % len(values), *values)
+    data = struct.pack(f'<{len(values)}f', *values)
     path.write_bytes(
         struct.pack(
             '<4sI4s4sIHHIIHH4sI',
@@ -38,7 +38,7 @@ def wav(path, values, rate=48000, channels=1):
 
 
 def call(args, code, cwd=None):
-    p = subprocess.run([EXE, *args], capture_output=True, cwd=cwd)
+    p = subprocess.run([EXE, *args], capture_output=True, cwd=cwd, check=False)
     assert p.returncode == code, (args, p.returncode, p.stdout, p.stderr)
     return p
 
@@ -236,7 +236,7 @@ def main():
         assert b'latency 256 frames, tail 26 frames' in p.stdout
 
         # Profiles add warnings; only --warnings-as-errors makes them fail.
-        (d / 'abs.cfg').write_text('48000 1 1 0\n0\n0\n%s\n0\n0\n0\n' % (d / 'ir.wav').resolve().as_posix())
+        (d / 'abs.cfg').write_text('48000 1 1 0\n0\n0\n{}\n0\n0\n0\n'.format((d / 'ir.wav').resolve().as_posix()))
         p = call(['--validate', str(d / 'abs.cfg'), '--profile', 'portable-paths'], 0)
         assert b'[absolute-reference]' in p.stderr and p.stdout.startswith(b'valid: ')
         assert not call(['--validate', str(d / 'abs.cfg')], 0).stderr
@@ -277,13 +277,13 @@ def main():
         if sys.platform.startswith('linux'):
             # Linux filenames are bytes; invalid UTF-8 must not produce malformed JSON.
             bad = os.fsencode(d) + b'/bad\xff.cfg'
-            with open(bad, 'w') as f:
+            with Path(os.fsdecode(bad)).open('w') as f:
                 f.write('48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n')
-            p = subprocess.run([EXE, '--inspect', bad, '--json'], capture_output=True)
+            p = subprocess.run([EXE, '--inspect', bad, '--json'], capture_output=True, check=False)
             data = json.loads(p.stdout.decode('utf-8'))
             assert '�' in data['selection']['path']
             assert any(x['code'] == 'invalid-utf8' for x in data['diagnostics'])
-            os.unlink(bad)
+            Path(os.fsdecode(bad)).unlink()
             (d / (odd + '.cfg')).unlink()
         else:
             (d / (odd + '.cfg')).unlink()

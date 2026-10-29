@@ -86,10 +86,12 @@ fails if any did; CI runs the portable list this way.
 ### Python formatting and lint
 
 `ruff.toml` sets the style for the maintained Python scripts and tests: ruff's
-formatter with 120 columns and single quotes, and its pyflakes and pycodestyle
-error rules (unused imports and names, undefined names, misplaced imports,
-statement errors such as a bare `except` or `== None`, and syntax errors).
-pre-commit runs `ruff check --fix` and `ruff format` with the latest stable
+formatter with 120 columns and single quotes, and every stable lint rule
+except those it lists, each with its reason. The exceptions are rules that
+contradict the formatter, type annotations and docstring conventions the
+scripts do not use, pytest rules (the tests use unittest), function-size
+limits, and a few that suit tests only, such as `assert`. Where one line has
+to break a rule, it carries `# noqa: CODE` and a reason. pre-commit runs `ruff check --fix` and `ruff format` with the latest stable
 ruff, installed when the hook environment is created, so lint CI fails on an
 unused import or a formatting difference. Like the Clang tools, ruff is not
 pinned: CI resolves the newest release before restoring its cache, and cloud

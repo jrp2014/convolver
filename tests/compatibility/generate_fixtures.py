@@ -10,15 +10,15 @@ Usage: generate_fixtures.py OUTPUT_DIRECTORY [CASE_ID ...]
 """
 
 import json
-from pathlib import Path
 import struct
 import sys
+from pathlib import Path
 
 MANIFEST = Path(__file__).resolve().with_name('cases.json')
 
 
 def load_manifest(path=MANIFEST):
-    with open(path, encoding='utf-8') as f:
+    with Path(path).open(encoding='utf-8') as f:
         manifest = json.load(f)
     if manifest.get('schema') != 1:
         raise ValueError('unsupported corpus manifest schema')
@@ -31,14 +31,11 @@ def write_wav(path, rate, channels, fmt):
     fmt 'pcm16' takes integers (full scale 32768); 'float' takes floats.
     """
     frames = max((len(c) for c in channels), default=0)
-    data = []
-    for f in range(frames):
-        for c in channels:
-            data.append(c[f] if f < len(c) else 0)
+    data = [c[f] if f < len(c) else 0 for f in range(frames) for c in channels]
     if fmt == 'pcm16':
-        tag, width, payload = 1, 2, struct.pack('<%dh' % len(data), *data)
+        tag, width, payload = 1, 2, struct.pack(f'<{len(data)}h', *data)
     elif fmt == 'float':
-        tag, width, payload = 3, 4, struct.pack('<%df' % len(data), *data)
+        tag, width, payload = 3, 4, struct.pack(f'<{len(data)}f', *data)
     else:
         raise ValueError('unknown fixture format: ' + fmt)
     count = len(channels)

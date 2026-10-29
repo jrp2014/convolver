@@ -64,7 +64,7 @@ for spec in args.variant or DEFAULT_VARIANTS:
         extras.remove(extra)
     unknown = set(extras) - {'lto', 'baseline'}
     if unknown:
-        parser.error(f'unknown variant option {sorted(unknown)[0]} in {spec}')
+        parser.error(f'unknown variant option {min(unknown)} in {spec}')
     avx2 = not (args.no_avx2_kernels or 'baseline' in extras)
     build = args.work / name
     subprocess.run(
@@ -108,7 +108,7 @@ for repeat in range(args.rounds):
         order.shuffle(names)
         for name in names:
             result = subprocess.run(
-                pin + [str(binaries[name]), str(case), str(args.seconds)], capture_output=True, text=True, check=True
+                [*pin, str(binaries[name]), str(case), str(args.seconds)], capture_output=True, text=True, check=True
             )
             row = next(csv.DictReader(io.StringIO(result.stdout)))
             row.update(variant=name, compiler=args.compiler, round=repeat + 1)

@@ -31,10 +31,9 @@ python3 scripts/release/resolve.py explain-failure [--suspect NAME]   (after a f
 """
 
 import argparse
-import datetime
+import datetime as dt
 import json
 import os
-from pathlib import Path
 import posixpath
 import re
 import shutil
@@ -45,9 +44,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
-from contract import load_policy, sha256, validate_records
 import upstream
+from contract import load_policy, sha256, validate_records
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / 'packaging/release-policy.json'
@@ -62,21 +62,23 @@ class ResolveError(ValueError):
     """One or more dependencies could not be resolved; the message lists each and why."""
 
 
-class CachedArchiveChanged(RuntimeError):
+class CachedArchiveChangedError(RuntimeError):
     """A cached archive no longer has the checksum of its first download. Never
     worked around by another URL: it is reported, so the cache can be checked."""
 
 
 def download(url, target, attempts=3):
     """Downloads url to target, retrying a flaky host twice (after 5 s, then 10 s)."""
-    request = urllib.request.Request(url, headers={'User-Agent': 'convolver-release-scripts'})
+    # contract.py accepts only https:// download URLs in the release policy.
+    request = urllib.request.Request(url, headers={'User-Agent': 'convolver-release-scripts'})  # noqa: S310
     for attempt in range(attempts):
         try:
-            with urllib.request.urlopen(request, timeout=300) as response, target.open('wb') as output:
+            with urllib.request.urlopen(request, timeout=300) as response, target.open('wb') as output:  # noqa: S310
                 shutil.copyfileobj(response, output)
-            return
         except (OSError, urllib.error.URLError) as failure:
             error = failure
+        else:
+            return
         if attempt + 1 < attempts:
             time.sleep(5 * 2**attempt)
     raise RuntimeError(f'cannot download {url}: {getattr(error, "reason", error)}')
@@ -105,7 +107,7 @@ def fetch_archive(url, cache, name, fetcher=download):
         if first:
             actual = sha256(path)
             if actual != first:
-                raise CachedArchiveChanged(
+                raise CachedArchiveChangedError(
                     f'the cached {path} has changed since it was downloaded from {url}: its '
                     f'SHA-256 is now {actual}, not {first}. Delete it, with {origin.name} and '
                     f'{checksum.name}, to download it again'
@@ -291,7 +293,7 @@ def without_notes(records):
 
 def lock(records, resolved_at=None):
     """A lock file's contents: what was resolved and when."""
-    resolved_at = resolved_at or datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    resolved_at = resolved_at or dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     return {'schema': 1, 'resolved_at': resolved_at, 'dependencies': without_notes(records)}
 
 
@@ -329,7 +331,7 @@ def report(text):
     sys.stdout.flush()
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary:
-        with open(summary, 'a', encoding='utf-8') as stream:
+        with Path(summary).open('a', encoding='utf-8') as stream:
             stream.write(text + '\n')
 
 
@@ -357,7 +359,7 @@ def _published_digest(repository, tag, asset):
     if token:
         request.add_header('Authorization', f'Bearer {token}')
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 (a fixed https:// URL)
             release = json.load(response)
     except (OSError, urllib.error.URLError, ValueError):
         return None
@@ -388,6 +390,7 @@ def resolve_tool(
     lister=upstream.ls_remote,
     fetcher=download,
     digest=_published_digest,
+    *,
     prerelease=False,
 ):
     """(record, archive path) for a release or test tool from the policy.
@@ -455,7 +458,7 @@ def resolve_tool(
             continue
         try:
             path = fetch_archive(url, cache, archive_name, fetcher)
-        except CachedArchiveChanged as error:
+        except CachedArchiveChangedError as error:
             raise ResolveError(f'{name} {version}: {error}') from error
         except (OSError, RuntimeError) as error:
             failures.append(str(error))
@@ -485,7 +488,7 @@ def resolve_tool(
 
 
 def _clone(remote, tag, directory):
-    upstream._git(
+    upstream.git(
         [
             '-c',
             'advice.detachedHead=false',
@@ -500,7 +503,7 @@ def _clone(remote, tag, directory):
         ],
         timeout=600,
     )
-    return upstream._git(['rev-parse', 'HEAD'], cwd=directory).strip()
+    return upstream.git(['rev-parse', 'HEAD'], cwd=directory).strip()
 
 
 def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=_clone):
@@ -510,7 +513,7 @@ def checkout(policy, destination, names=None, lister=upstream.ls_remote, cloner=
     pre-release newer than the newest release is taken: it is what such a job
     is for."""
     rules = policy.get('test_sources', {})
-    names = list(rules) if not names else names
+    names = names or list(rules)
     unknown = sorted(set(names) - set(rules))
     if unknown:
         raise ResolveError(f'unknown test sources: {unknown} (the release policy has {sorted(rules)})')

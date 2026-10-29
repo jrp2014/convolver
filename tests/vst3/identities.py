@@ -12,17 +12,17 @@ Usage: identities.py REGISTRY SDK_DIR BUNDLE [--require-moduleinfo]
 
 import argparse
 import json
-from pathlib import Path
 import plistlib
 import re
 import sys
+from pathlib import Path
 
 
 def speaker_bits(header):
     """Map each `const Speaker kSpeakerX = 1 << n;` (or alias) to its bit."""
     bits = {}
-    for name, value in re.findall(r'const\s+Speaker\s+(kSpeaker\w+)\s*=\s*([^;]+);', header):
-        value = value.strip()
+    for name, text in re.findall(r'const\s+Speaker\s+(kSpeaker\w+)\s*=\s*([^;]+);', header):
+        value = text.strip()
         shift = re.fullmatch(r'1\s*<<\s*(\d+)', value)
         if shift:
             bits[name] = int(shift.group(1))
@@ -49,12 +49,12 @@ def main():
 
     header = (args.sdk / 'pluginterfaces/vst/vstspeaker.h').read_text(encoding='utf-8')
     bits = speaker_bits(header)
-    for speaker in registry['speakers']:
-        if bits.get(speaker['vst3']) != speaker['bit']:
-            errors.append(
-                f'{speaker["vst3"]} is bit {bits.get(speaker["vst3"])} in the SDK, '
-                f'but WAV {speaker["wav"]} is bit {speaker["bit"]}'
-            )
+    errors.extend(
+        f'{speaker["vst3"]} is bit {bits.get(speaker["vst3"])} in the SDK, '
+        f'but WAV {speaker["wav"]} is bit {speaker["bit"]}'
+        for speaker in registry['speakers']
+        if bits.get(speaker['vst3']) != speaker['bit']
+    )
 
     vst3 = registry['vst3']
     info_path = args.bundle / 'Contents/Resources/moduleinfo.json'

@@ -5,9 +5,9 @@
 import argparse
 import csv
 import io
-from pathlib import Path
 import statistics
 import subprocess
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('fftw', type=Path, help='benchmark binary built with FFTW')

@@ -3,19 +3,18 @@
 """Real-library planning, fresh-process wisdom reuse and file protection."""
 
 import math
-from pathlib import Path
 import struct
 import subprocess
 import sys
 import tempfile
 import wave
-
+from pathlib import Path
 
 exe = str(Path(sys.argv[1]).resolve())
 
 
 def run(*args, ok=True):
-    p = subprocess.run([exe, *map(str, args)], capture_output=True, timeout=60)
+    p = subprocess.run([exe, *map(str, args)], capture_output=True, timeout=60, check=False)
     assert (p.returncode == 0) == ok, (args, p.returncode, p.stderr.decode())
     return p
 

@@ -19,11 +19,11 @@ with tempfile.TemporaryDirectory() as directory:
     preset = root / 'filter ü.vstpreset'
     subprocess.run([sys.argv[1], str(impulse), str(preset)], check=True)
     original = preset.read_bytes()
-    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True)
+    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     impulse.unlink()
     subprocess.run([sys.argv[2], str(preset)], check=True)
-    result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True)
+    result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     print('Preset embeds filters and survives removal of original IR')
 
@@ -42,7 +42,9 @@ with tempfile.TemporaryDirectory() as directory:
 
     def make(name, *options):
         target = root / name
-        return subprocess.run([tool, *options, str(root / 'list.txt'), str(target)], capture_output=True), target
+        return subprocess.run(
+            [tool, *options, str(root / 'list.txt'), str(target)], capture_output=True, check=False
+        ), target
 
     result, upmix = make('upmix.vstpreset', '--sample-rate', '48000', '--output-channels', '6')
     assert result.returncode == 0, result.stderr
@@ -59,7 +61,7 @@ with tempfile.TemporaryDirectory() as directory:
         result, target = make('rejected.vstpreset', *options)
         assert result.returncode != 0 and not target.exists(), options
     result = subprocess.run(
-        [tool, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')], capture_output=True, text=True
+        [tool, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')], capture_output=True, text=True, check=False
     )
     assert result.returncode != 0 and '1 to 8' in result.stderr, result.stderr
     print('Preset selection by channel counts and multichannel limits')

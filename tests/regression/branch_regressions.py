@@ -13,11 +13,10 @@ Use --revision 61592a3 to reproduce the pre-fix failures from Git.
 
 import argparse
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 HARNESS = r"""
 #include <cmath>
@@ -228,6 +227,7 @@ def main():
                     ['git', 'show', args.revision + ':' + folder + '/' + name],
                     cwd=args.source_root,
                     capture_output=True,
+                    check=False,
                 )
                 if shown.returncode == 0:
                     return shown.stdout.decode('latin1').replace('\r\n', '\n')
@@ -241,7 +241,7 @@ def main():
         header = read('fft/fftsg_h.h')
         # Serial FFT arithmetic stays verbatim; the shipped header otherwise
         # unconditionally enables Windows threads and includes windows.h.
-        header, count = re.subn(r'^#define USE_CDFT_WINTHREADS[^\n]*', '', header, flags=re.M)
+        header, count = re.subn(r'^#define USE_CDFT_WINTHREADS[^\n]*', '', header, flags=re.MULTILINE)
         if count != 1:
             raise ValueError('expected one Windows threading definition')
         (scratch / 'fftsg_h.h').write_text(header)
@@ -265,7 +265,7 @@ def main():
         )
         failed = False
         for group in ('routes', 'display', 'dither', 'ooura'):
-            result = subprocess.run([str(binary), group], capture_output=True, text=True)
+            result = subprocess.run([str(binary), group], capture_output=True, text=True, check=False)
             print(f'{"PASS" if result.returncode == 0 else "FAIL"}: {group}')
             if result.returncode:
                 failed = True

@@ -760,7 +760,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   from a Skylos scan: 11 unused imports in the release scripts and four test
   scripts; [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026,
-  PR #88: ruff 0.17.3 in pre-commit and lint CI, configured in `ruff.toml`;
+  PR #88: the latest stable ruff in pre-commit and lint CI, with every stable
+  rule but a few listed in `ruff.toml`;
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).

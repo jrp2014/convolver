@@ -10,11 +10,11 @@ pass the limit to CMake and CTest.
 import argparse
 import importlib.util
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,12 +47,16 @@ class JobsTests(unittest.TestCase):
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 shown = subprocess.run(
-                    [sys.executable, str(script), '--help'], capture_output=True, text=True, timeout=60
+                    [sys.executable, str(script), '--help'], capture_output=True, text=True, timeout=60, check=False
                 )
                 self.assertEqual(shown.returncode, 0, shown.stderr)
                 self.assertIn('--jobs N', shown.stdout)
                 refused = subprocess.run(
-                    [sys.executable, str(script), '--jobs', '0'], capture_output=True, text=True, timeout=60
+                    [sys.executable, str(script), '--jobs', '0'],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
                 )
                 self.assertEqual(refused.returncode, 2, refused.stderr)
                 self.assertIn("--jobs: must be a whole number, 1 or more, not '0'", refused.stderr)

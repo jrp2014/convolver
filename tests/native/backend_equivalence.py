@@ -4,13 +4,13 @@
 
 import json
 import math
-from pathlib import Path
 import random
 import struct
 import subprocess
 import sys
 import tempfile
 import wave
+from pathlib import Path
 
 
 def compare(first, second):
@@ -24,11 +24,11 @@ def compare(first, second):
             ir = [rng.randrange(-2000, 2001) for _ in range(length * 2)]
             with wave.open(str(root / 'ir.wav'), 'wb') as f:
                 f.setparams((2, 2, 48000, 0, 'NONE', 'not compressed'))
-                f.writeframes(struct.pack('<%dh' % len(ir), *ir))
+                f.writeframes(struct.pack(f'<{len(ir)}h', *ir))
             config = root / 'matrix.cfg'
             config.write_text('48000 3 4 0\n0 .1 .3\n.2 0 .4 .1\nir.wav\n0\n-0 1.5\n0 2.5\nir.wav\n1\n1 2.25\n-1 3\n')
             frames = 3 * block + 7
-            raw = struct.pack('<%df' % (frames * 3), *[rng.uniform(-0.5, 0.5) for _ in range(frames * 3)])
+            raw = struct.pack(f'<{frames * 3}f', *[rng.uniform(-0.5, 0.5) for _ in range(frames * 3)])
             for keep in (False, True):
                 args = [
                     '--filter',
@@ -52,7 +52,7 @@ def compare(first, second):
                     for exe in (first, second)
                 ]
                 assert len(outputs[0]) == len(outputs[1]) and len(outputs[0]) % 16 == 0, 'frame count mismatch'
-                values = [struct.unpack('<%df' % (len(data) // 4), data) for data in outputs]
+                values = [struct.unpack(f'<{len(data) // 4}f', data) for data in outputs]
                 for a, b in zip(*values):
                     error = abs(a - b)
                     assert math.isfinite(a) and math.isfinite(b) and error <= 2e-5 * (1 + max(abs(a), abs(b))), (

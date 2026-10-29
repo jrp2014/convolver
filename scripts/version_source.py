@@ -3,11 +3,10 @@
 """Commit and tag the next source version from a clean, full main checkout."""
 
 import argparse
-from pathlib import Path
 import re
 import subprocess
 import sys
-
+from pathlib import Path
 
 VERSION_PATTERN = r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
 # Keep the definition here rather than duplicating it in workflow path filters.
@@ -36,7 +35,7 @@ def version_tuple(value):
     return tuple(map(int, value.split('.')))
 
 
-def version_source(push=False):
+def version_source(*, push=False):
     if git('rev-parse', '--show-prefix'):
         raise ValueError('Run from the repository root')
     if git('branch', '--show-current') != 'main':
@@ -88,7 +87,7 @@ def main():
     parser.add_argument('--push', action='store_true', help='atomically push main and its new tag to origin')
     args = parser.parse_args()
     try:
-        version_source(args.push)
+        version_source(push=args.push)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         detail = error.stderr if isinstance(error, subprocess.CalledProcessError) else str(error)
         print('Versioning failed: ' + detail, file=sys.stderr)

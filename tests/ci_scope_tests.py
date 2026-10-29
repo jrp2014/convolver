@@ -4,12 +4,12 @@
 
 import importlib.util
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts' / 'ci_scope.py'
@@ -21,14 +21,14 @@ UNGATED = {'lint.yml'}  # Runs for every change, documentation included.
 # A Git hook's GIT_DIR or GIT_INDEX_FILE would point the scratch repository's
 # commands at the real one.
 CLEAN = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
-OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.M)
-GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.M)
+OVERRIDE = re.compile(r'^    if:.*(always|cancelled)\(\)', re.MULTILINE)
+GATE = re.compile(r"^    if: needs\.scope\.outputs\.(build|package) == 'true'$", re.MULTILINE)
 
 
 def jobs(text):
     """Top-level job names and their text, from a workflow file."""
     body = text.split('\njobs:\n', 1)[1]
-    parts = re.split(r'^  ([A-Za-z0-9_-]+):\n', body, flags=re.M)
+    parts = re.split(r'^  ([A-Za-z0-9_-]+):\n', body, flags=re.MULTILINE)
     return dict(zip(parts[1::2], parts[2::2]))
 
 
@@ -111,11 +111,11 @@ class Classification(unittest.TestCase):
     def test_documentation_the_build_tests_reads(self):
         """Pages that CTest entries read must never count as documentation only."""
         fixtures = (ROOT / 'tests/plugins/fixtures.py').read_text(encoding='utf-8')
-        block = re.search(r'^DOCUMENTED = \((.*?)\)$', fixtures, re.M | re.S).group(1)
+        block = re.search(r'^DOCUMENTED = \((.*?)\)$', fixtures, re.MULTILINE | re.DOTALL).group(1)
         documented = re.findall(r"REPOSITORY / '([^']+)'", block)
         self.assertTrue(documented)
         regressions = (ROOT / 'tests/regression/documentation_regressions.py').read_text(encoding='utf-8')
-        records = re.findall(r"^[A-Z]+ = Path\('([^']+)'\)", regressions, re.M)
+        records = re.findall(r"^[A-Z]+ = Path\('([^']+)'\)", regressions, re.MULTILINE)
         self.assertEqual(len(records), 3)
         # The archive is a folder; any file in it counts.
         records = [r if r.endswith('.json') else r + '/index.html' for r in records]
@@ -127,8 +127,8 @@ class Classification(unittest.TestCase):
         packaging = (ROOT / 'cmake/ConvolverPluginPackaging.cmake').read_text(encoding='utf-8')
         installed = re.findall(r'\$\{PROJECT_SOURCE_DIR\}/([^"\s]+\.md)', packaging)
         self.assertIn('docs/use/*.md', installed)
-        for path in installed:
-            path = path.replace('*', 'guide')
+        for pattern in installed:
+            path = pattern.replace('*', 'guide')
             with self.subTest(path=path):
                 self.assertNotEqual(ci_scope.classify(path), 'documentation')
 
@@ -140,7 +140,7 @@ class Workflows(unittest.TestCase):
         skip it. Every other job needs scope or a job that does."""
         for workflow in sorted(WORKFLOWS.glob('*.yml')):
             text = workflow.read_text(encoding='utf-8')
-            trigger = re.search(r'^  pull_request:\n((?:    .*\n)*)', text, re.M)
+            trigger = re.search(r'^  pull_request:\n((?:    .*\n)*)', text, re.MULTILINE)
             if workflow.name in UNGATED or not trigger or 'paths' in trigger.group(1):
                 continue
             with self.subTest(workflow=workflow.name):
@@ -155,7 +155,7 @@ class Workflows(unittest.TestCase):
                 for name, body in found.items():
                     if name == 'scope':
                         continue
-                    needs = re.search(r'^    needs: (\S+)$', body, re.M)
+                    needs = re.search(r'^    needs: (\S+)$', body, re.MULTILINE)
                     self.assertIsNotNone(needs, f'{name} must need scope or another job')
                     if needs.group(1) == 'scope':
                         self.assertRegex(body, GATE, name)
@@ -225,11 +225,12 @@ class FormatIsolation(unittest.TestCase):
                 r'(?:plugins|tests)/' + name + r'\b|(?<![\w./-])' + name + r'/'
                 r'|CONVOLVER_BUILD_' + name.upper() + r'\b'
             )
-            own = folders + (f'.github/workflows/{name}.yml',)
+            own = (*folders, f'.github/workflows/{name}.yml')
             found = set()
-            for path, text in files:
+            for path, contents in files:
                 if path.startswith(own) or path in ('scripts/ci_scope.py', 'tests/ci_scope_tests.py'):
                     continue
+                text = contents
                 for shared in ci_scope.SHARED:
                     text = text.replace(shared, '')
                 if pattern.search(text):

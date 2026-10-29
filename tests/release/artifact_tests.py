@@ -2,10 +2,10 @@
 """Reject dependency leaks, incorrect architecture and changed package bytes."""
 
 import importlib.util
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -65,9 +65,8 @@ class ArtifactTests(unittest.TestCase):
                 self.verifier.verify_files(root, {})
 
     def test_source_archive_required(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(ValueError, 'source archive'):
-                self.verifier.source_record(Path(temporary) / 'missing.tar.gz')
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(ValueError, 'source archive'):
+            self.verifier.source_record(Path(temporary) / 'missing.tar.gz')
 
     def test_old_libc_floor(self):
         with self.assertRaisesRegex(ValueError, 'GLIBC'):

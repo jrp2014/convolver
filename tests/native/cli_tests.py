@@ -5,12 +5,12 @@
 import math
 import os
 import re
-from pathlib import Path
 import struct
 import subprocess
 import sys
 import tempfile
 import wave
+from pathlib import Path
 
 EXE = str(Path(sys.argv[1]).resolve())
 
@@ -20,7 +20,7 @@ def pcm(path, values, channels=1, rate=48000):
         f.setnchannels(channels)
         f.setsampwidth(2)
         f.setframerate(rate)
-        f.writeframes(struct.pack('<%dh' % len(values), *values))
+        f.writeframes(struct.pack(f'<{len(values)}h', *values))
 
 
 def floats(path):
@@ -37,7 +37,7 @@ def floats(path):
             payload = data[pos + 8 : pos + 8 + size]
         pos += 8 + size + (size & 1)
     assert payload is not None
-    return channels, rate, list(struct.unpack('<%df' % (len(payload) // 4), payload))
+    return channels, rate, list(struct.unpack(f'<{len(payload) // 4}f', payload))
 
 
 def near(actual, expected):
@@ -46,8 +46,8 @@ def near(actual, expected):
         assert math.isfinite(a) and abs(a - b) <= 3e-5 + 3e-5 * abs(b), (i, a, b)
 
 
-def call(args, ok=True, data=None):
-    p = subprocess.run([EXE, *map(str, args)], input=data, capture_output=True)
+def call(args, *, ok=True, data=None):
+    p = subprocess.run([EXE, *map(str, args)], input=data, capture_output=True, check=False)
     assert (p.returncode == 0) == ok, (args, p.returncode, p.stderr.decode(errors='replace'))
     return p
 
@@ -91,7 +91,7 @@ def integer_format_tests(d):
     pcm(ir, [32767])
     pcm(src, [(((i * 379) % 12001) - 6000) for i in range(3000)])
     base = ['--filter', ir, '--input', src, '--output', dst]
-    call(base + ['--output-format', 'wav-pcm8', '--dither', 'none'])
+    call([*base, '--output-format', 'wav-pcm8', '--dither', 'none'])
     fmt, bits, valid, mask, payload = wave_fields(dst)
     assert (fmt, bits, valid) == (1, 8, 8) and len(payload) == 3000
     exact = [(((i * 379) % 12001) - 6000) * 32767 / 32768 / 256 for i in range(3000)]
@@ -99,8 +99,8 @@ def integer_format_tests(d):
     for fmt_name, container in (('wav-pcm24', 24), ('wav-pcm32', 32)):
         for shaping in ('simple', 'third-order', 'ninth-order'):
             call(
-                base
-                + [
+                [
+                    *base,
                     '--output-format',
                     fmt_name,
                     '--valid-bits',
@@ -120,25 +120,25 @@ def integer_format_tests(d):
             assert all(v % (1 << (container - 16)) == 0 for v in values)
             assert values != [0] * len(values)
     # From 20 bits dither is off by default, still available, and called pointless.
-    p = call(base + ['--output-format', 'wav-pcm24', '--dither', 'triangular'])
+    p = call([*base, '--output-format', 'wav-pcm24', '--dither', 'triangular'])
     fmt, bits, valid, mask, _ = wave_fields(dst)
     assert (fmt, bits, valid) == (1, 24, 24)
     assert b'pointless at 24 significant bits' in p.stderr, p.stderr
-    p = call(base + ['--output-format', 'wav-pcm24', '--valid-bits', '20', '--noise-shaping', 'simple'])
+    p = call([*base, '--output-format', 'wav-pcm24', '--valid-bits', '20', '--noise-shaping', 'simple'])
     assert b'pointless at 20 significant bits' in p.stderr, p.stderr
-    p = call(base + ['--output-format', 'wav-pcm32', '--dither', 'triangular'])
+    p = call([*base, '--output-format', 'wav-pcm32', '--dither', 'triangular'])
     assert b'exact above -48 dBFS' in p.stderr, p.stderr
-    assert not call(base + ['--output-format', 'wav-pcm24']).stderr
+    assert not call([*base, '--output-format', 'wav-pcm24']).stderr
     # Below 20 bits TPDF dither is the default, and the note says so.
-    p = call(base + ['--output-format', 'wav-pcm24', '--valid-bits', '19'])
+    p = call([*base, '--output-format', 'wav-pcm24', '--valid-bits', '19'])
     assert b'19-bit output: adding triangular (TPDF) dither' in p.stderr, p.stderr
     dithered_default = wave_fields(dst)[4]
-    call(base + ['--output-format', 'wav-pcm24', '--valid-bits', '19', '--dither', 'triangular'])
+    call([*base, '--output-format', 'wav-pcm24', '--valid-bits', '19', '--dither', 'triangular'])
     assert wave_fields(dst)[4] == dithered_default
     # At 20 valid bits the default is plain rounding, the same as --dither none.
-    assert not call(base + ['--output-format', 'wav-pcm24', '--valid-bits', '20']).stderr
+    assert not call([*base, '--output-format', 'wav-pcm24', '--valid-bits', '20']).stderr
     plain_default = wave_fields(dst)[4]
-    call(base + ['--output-format', 'wav-pcm24', '--valid-bits', '20', '--dither', 'none'])
+    call([*base, '--output-format', 'wav-pcm24', '--valid-bits', '20', '--dither', 'none'])
     assert wave_fields(dst)[4] == plain_default and plain_default != dithered_default
 
 
@@ -174,11 +174,11 @@ def output_selection_tests(d):
     base = ['--filter', d / 'os-list.txt', '--input', src, '--output', dst]
     call(base)
     assert floats(dst)[0] == 3
-    call(base + ['--output-channels', '1'])
+    call([*base, '--output-channels', '1'])
     assert floats(dst)[0] == 1
-    call(base + ['--output-channels', '3'])
+    call([*base, '--output-channels', '3'])
     assert floats(dst)[0] == 3
-    p = call(base + ['--output-channels', '2'], ok=False)
+    p = call([*base, '--output-channels', '2'], ok=False)
     assert b'output channel count' in p.stderr, p.stderr
 
 
@@ -195,7 +195,7 @@ def repeatability_tests(d):
     pcm(src, [(i * 104729) % 30001 - 15000 for i in range(2 * 3000)], channels=2)
     cfg = d / 'rep.cfg'
     cfg.write_text(
-        '48000 2 6 3f\n0 0\n0 0 0 0 0 0\n' + ''.join('rep-ir.wav\n0\n%d\n%d.%d\n' % (o % 2, o, o + 1) for o in range(6))
+        '48000 2 6 3f\n0 0\n0 0 0 0 0 0\n' + ''.join(f'rep-ir.wav\n0\n{o % 2}\n{o}.{o + 1}\n' for o in range(6))
     )
     first = None
     for run in range(20):
@@ -204,7 +204,7 @@ def repeatability_tests(d):
         if first is None:
             first = samples
         differing = sum(a != b for a, b in zip(samples, first))
-        assert samples == first, 'run %d differs from run 0 in %d of %d samples' % (run, differing, len(first))
+        assert samples == first, f'run {run} differs from run 0 in {differing} of {len(first)} samples'
 
 
 def speaker_map_tests(d):
@@ -219,8 +219,8 @@ def speaker_map_tests(d):
         # Input 0 feeds output o with weight 0.(o+1), so each channel is distinguishable.
         cfg = d / 'sm.cfg'
         cfg.write_text(
-            '48000 2 %d %x\n0 0\n%s\n' % (outputs, mask, ' '.join('0' * outputs))
-            + ''.join('sm-ir.wav\n0\n0\n%d.%d\n' % (o, o + 1) for o in range(outputs))
+            f'48000 2 {outputs} {mask:x}\n0 0\n{" ".join("0" * outputs)}\n'
+            + ''.join(f'sm-ir.wav\n0\n0\n{o}.{o + 1}\n' for o in range(outputs))
         )
         return cfg
 
@@ -230,10 +230,10 @@ def speaker_map_tests(d):
         call(base)
         plain = out.read_bytes()
         assert channel_mask(out) is None
-        call(base + ['--speaker-map', 'config'])
+        call([*base, '--speaker-map', 'config'])
         assert channel_mask(out) == mask, hex(channel_mask(out) or 0)
         if fmt == 'wav-float':
-            ch, rate, labelled = floats(out)
+            ch, _rate, labelled = floats(out)
             assert ch == outputs
             out.write_bytes(plain)
             assert floats(out)[2] == labelled, 'labels must not reorder samples'
@@ -272,10 +272,10 @@ def container_tests(d):
         out = d / ('ct.' + name.split('-')[0])
         out.unlink(missing_ok=True)
         if name.startswith('flac') and not flac:
-            p = call(base + ['--output', out, '--output-format', name], ok=False, data=raw)
+            p = call([*base, '--output', out, '--output-format', name], ok=False, data=raw)
             assert b'without FLAC support' in p.stderr and not out.exists(), p.stderr
             continue
-        call(base + ['--output', out, '--output-format', name], data=raw)
+        call([*base, '--output', out, '--output-format', name], data=raw)
         assert out.read_bytes()[:4] == magic[name.split('-')[0]], name
     # The original format names still write the same files as before.
     for name, subtype, size in (
@@ -286,7 +286,7 @@ def container_tests(d):
         ('wav-float', 3, 4),
     ):
         out = d / 'legacy.wav'
-        call(base + ['--output', out, '--output-format', name], data=raw)
+        call([*base, '--output', out, '--output-format', name], data=raw)
         b = out.read_bytes()
         assert b[:4] == b'RIFF' and b[8:16] == b'WAVEfmt ', name
         assert struct.unpack('<HHIIHH', b[20:36]) == (subtype, 1, 48000, 48000 * size, size, 8 * size), name
@@ -298,7 +298,7 @@ def container_tests(d):
         ('raw-double', 'f64le', 8),
     ):
         plain = ['--dither', 'none'] if name == 'raw-pcm16' else []
-        p = call(base + ['--output', '-', '--output-format', name] + plain, data=raw)
+        p = call([*base, '--output', '-', '--output-format', name, *plain], data=raw)
         assert len(p.stdout) == 4 * size, (name, len(p.stdout))
         back = call(
             [
@@ -320,7 +320,7 @@ def container_tests(d):
         )
         near(struct.unpack('<4f', back.stdout), [0.125, -0.0625, 0.03125, -0.25])  # filtered twice
     assert (
-        call(base + ['--output', '-', '--output-format', 'raw-pcm16', '--dither', 'none'], data=raw).stdout[:2]
+        call([*base, '--output', '-', '--output-format', 'raw-pcm16', '--dither', 'none'], data=raw).stdout[:2]
         == b'\0\x20'
     )
     # s16 and s24 files whose size is not a multiple of 4 bytes keep every frame,
@@ -344,12 +344,12 @@ def container_tests(d):
             '--output-format',
             'raw-float',
         ]
-        p = call(args + ['--input', f])
+        p = call([*args, '--input', f])
         assert len(p.stdout) == 4 * n, (fmt, len(p.stdout))
-        with open(f, 'rb') as seekable:  # stdin redirected from a file
-            p = subprocess.run([EXE, *map(str, args), '--input', '-'], stdin=seekable, capture_output=True)
+        with Path(f).open('rb') as seekable:  # stdin redirected from a file
+            p = subprocess.run([EXE, *map(str, args), '--input', '-'], stdin=seekable, capture_output=True, check=False)
         assert p.returncode == 0 and len(p.stdout) == 4 * n, (fmt, p.returncode, len(p.stdout))
-        call(args + ['--input', '-'], data=f.read_bytes() + b'\0', ok=False)  # incomplete frame
+        call([*args, '--input', '-'], data=f.read_bytes() + b'\0', ok=False)  # incomplete frame
     # Big-endian input in each type.
     for fmt, packed in (
         ('s16be', struct.pack('>4h', 16384, -8192, 4096, -32768)),
@@ -390,11 +390,11 @@ def container_tests(d):
         ['--output-format', 'aiff-pcm24', '--valid-bits', '20'],
     ):
         out.unlink(missing_ok=True)
-        call(base + ['--output', out, *bad], ok=False, data=raw)
+        call([*base, '--output', out, *bad], ok=False, data=raw)
         assert not out.exists(), bad
     call(['--filter', ir, '--input', d / 'ct.aiff', '--raw-format', 's16le', '--output', out], ok=False)
     # A non-raw stream on stdout names the raw formats.
-    p = call(base + ['--output', '-', '--output-format', 'aiff-pcm16'], ok=False, data=raw)
+    p = call([*base, '--output', '-', '--output-format', 'aiff-pcm16'], ok=False, data=raw)
     assert b'raw output format' in p.stderr, p.stderr
     # Without FLAC, a FLAC input or IR says what is missing and what to do.
     if b'no FLAC output' in call(['--version']).stdout:
@@ -419,6 +419,7 @@ def container_tests(d):
                 [EXE, '--filter', str(ir), '--input', str(fifo), '--output', str(d / 'ct-fifo.wav')],
                 capture_output=True,
                 timeout=20,
+                check=False,
             )
             writer.wait(timeout=20)
             assert p.returncode != 0 and b'built without FLAC' not in p.stderr, p.stderr
@@ -529,7 +530,7 @@ def main():
             channels, rate, y = floats(dst)
             assert (channels, rate) == (1, 48000)
             near(y, expected)
-            call(base + ['--keep-latency'])
+            call([*base, '--keep-latency'])
             near(floats(dst)[2], ([0.0] * 8 + expected) if count else [])
         # Delay/routing/negative-zero and relative IR path, distinct I/O counts.
         pcm(ir, [16384, 8192])
@@ -565,14 +566,14 @@ def main():
         ]
         p = call(args, data=raw)
         near(struct.unpack('<4f', p.stdout), [0.125, -0.1875, 0.25, 0.1875])
-        p = call(args + ['--gain-db', '6.020599913279624'], data=raw)
+        p = call([*args, '--gain-db', '6.020599913279624'], data=raw)
         near(struct.unpack('<4f', p.stdout), [0.25, -0.375, 0.5, 0.375])
         # EOF after full/partial read buffers must retain every frame and tail.
         for count in (0, 1, 4096, 4097):
-            payload = struct.pack('<%df' % count, *([0.25] * count))
+            payload = struct.pack(f'<{count}f', *([0.25] * count))
             p = call(args, data=payload)
             expected = ([0.125] + [0.1875] * (count - 1) + [0.0625]) if count else []
-            near(struct.unpack('<%df' % (len(p.stdout) // 4), p.stdout), expected)
+            near(struct.unpack(f'<{len(p.stdout) // 4}f', p.stdout), expected)
         # Normal pipe EOF must not hide incomplete samples or nonfinite input.
         for payload in (b'\0', raw + b'\0', struct.pack('<f', float('nan'))):
             call(args, ok=False, data=payload)
@@ -618,6 +619,7 @@ def main():
                 ],
                 stdin=redirected,
                 capture_output=True,
+                check=False,
             )
         assert p.returncode != 0 and raw_path.read_bytes() == raw
         # PCM16 output has TPDF dither by default; --dither none rounds plainly;
@@ -628,11 +630,11 @@ def main():
         def shorts(path):
             with wave.open(str(path), 'rb') as f:
                 assert f.getsampwidth() == 2
-                return struct.unpack('<%dh' % f.getnframes(), f.readframes(f.getnframes()))
+                return struct.unpack(f'<{f.getnframes()}h', f.readframes(f.getnframes()))
 
         base = ['--filter', ir, '--input', src, '--output', dst, '--output-format', 'wav-pcm16']
         exact = [(((i * 379) % 12001) - 6000) * 13107 / 32768 for i in range(4000)]
-        p = call(base + ['--dither', 'none'])
+        p = call([*base, '--dither', 'none'])
         plain = shorts(dst)
         assert b'without dither, 16-bit output' in p.stderr, p.stderr
         assert all(a == math.floor(b + 0.5) for a, b in zip(plain, exact) if abs(b % 1 - 0.5) > 0.01)
@@ -640,21 +642,21 @@ def main():
         first = shorts(dst)
         assert b'16-bit output: adding triangular (TPDF) dither' in p.stderr, p.stderr
         assert b'triangular-highpass --noise-shaping ninth-order' in p.stderr, p.stderr
-        call(base + ['--dither', 'triangular'])
+        call([*base, '--dither', 'triangular'])
         assert shorts(dst) == first
-        call(base + ['--dither', 'triangular', '--dither-seed', '0'])
+        call([*base, '--dither', 'triangular', '--dither-seed', '0'])
         assert shorts(dst) == first and first != plain
         assert all(abs(a - b) <= 1.5 for a, b in zip(first, exact))
-        call(base + ['--dither', 'triangular', '--dither-seed', '1'])
+        call([*base, '--dither', 'triangular', '--dither-seed', '1'])
         assert shorts(dst) != first
-        call(base + ['--dither', 'triangular-highpass'])
+        call([*base, '--dither', 'triangular-highpass'])
         assert all(abs(a - b) <= 1.5 for a, b in zip(shorts(dst), exact))
         # A choice another beats clearly at this rate (48 kHz) points to it;
         # the best choice draws no warning.
-        p = call(base + ['--noise-shaping', 'simple'])
+        p = call([*base, '--noise-shaping', 'simple'])
         assert b'warning: at 48000 Hz, --dither triangular-highpass --noise-shaping ninth-order' in p.stderr, p.stderr
-        assert not call(base + ['--dither', 'triangular-highpass', '--noise-shaping', 'ninth-order']).stderr
-        p = call(base + ['--output-format', 'wav-float', '--dither-seed', '4'])
+        assert not call([*base, '--dither', 'triangular-highpass', '--noise-shaping', 'ninth-order']).stderr
+        p = call([*base, '--output-format', 'wav-float', '--dither-seed', '4'])
         assert b'--dither-seed has no effect' in p.stderr, p.stderr
         # Options another always beats are refused with the reason and the alternative.
         for removed, why in (
@@ -665,7 +667,7 @@ def main():
             p = call(base + removed, ok=False)
             assert why in p.stderr, p.stderr
         # Shaping alone still adds the default dither, and says so.
-        p = call(base + ['--noise-shaping', 'ninth-order'])
+        p = call([*base, '--noise-shaping', 'ninth-order'])
         assert b'adding triangular (TPDF) dither' in p.stderr, p.stderr
         # The advice follows the sample rate: none at 8 kHz, where the default is
         # best; simple shaping with high-pass dither at 96 kHz.
@@ -693,14 +695,14 @@ def main():
             ['--output-format', 'wav-pcm8', '--valid-bits', '9'],
             ['--output-format', 'wav-float', '--valid-bits', '16'],
         ):
-            call(['--filter', ir, '--input', src, '--output', dst] + extra, ok=False)
+            call(['--filter', ir, '--input', src, '--output', dst, *extra], ok=False)
         call(['--filter', ir, '--input', src, '--output', dst, '--dither', 'none'])
         integer_format_tests(d)
         automatic_gain_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size', '0'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):
-            call(['--filter', ir, '--input', src, '--output', dst] + extra, ok=False)
+            call(['--filter', ir, '--input', src, '--output', dst, *extra], ok=False)
         call(['--filter', ir, '--input', src, '--output', src], ok=False)
         call(['--filter', ir, '--input', '-', '--output', dst], ok=False, data=raw)
         call(['--filter', ir, '--input', '-', '--raw-input', '44100', '1', '--output', dst], ok=False, data=raw)
@@ -712,7 +714,10 @@ def main():
         pcm(d / 'v-ir.wav', [16384])
         pcm(d / 'v-in.wav', [1000, -1000])
         p = subprocess.run(
-            [EXE, '--filter', 'v-ir.wav', '--input', 'v-in.wav', '--output', '--validate'], cwd=d, capture_output=True
+            [EXE, '--filter', 'v-ir.wav', '--input', 'v-in.wav', '--output', '--validate'],
+            cwd=d,
+            capture_output=True,
+            check=False,
         )
         assert p.returncode == 0 and (d / '--validate').is_file(), p.stderr
     print('PASS: native CLI files, matrices, EOF, gain, errors and real RAW pipes')

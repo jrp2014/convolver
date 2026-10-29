@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Behavior tests for maintained documentation's local-link checker."""
 
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 CHECKER = Path(__file__).resolve().parents[1] / 'scripts' / 'check_doc_links.py'
 
@@ -19,7 +19,9 @@ class DocumentationLinks(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='utf-8')
-            return subprocess.run([sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True)
+            return subprocess.run(
+                [sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True, check=False
+            )
 
     def test_links_anchors_and_ignored_examples(self):
         result = self.run_check(

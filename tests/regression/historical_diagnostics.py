@@ -7,10 +7,10 @@ Extract only the ordered bad/fail clauses; parsing and Windows I/O are not run.
 
 import argparse
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -24,7 +24,9 @@ def main():
         relative = 'historical/convolution/' + name
         if args.revision:
             # The historical tree was called convolver/ before 21 October 2026.
-            shown = subprocess.run(['git', 'show', args.revision + ':' + relative], cwd=ROOT, capture_output=True)
+            shown = subprocess.run(
+                ['git', 'show', args.revision + ':' + relative], cwd=ROOT, capture_output=True, check=False
+            )
             if shown.returncode != 0:
                 shown = subprocess.run(
                     ['git', 'show', args.revision + ':convolver/convolution/' + name],
@@ -35,8 +37,9 @@ def main():
             text = shown.stdout.decode()
         else:
             text = (ROOT / relative).read_text()
-        pattern = r'else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}\s*else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}'
-        clauses = re.search(pattern, text, re.S).group()
+        clause = r'else if \(config_?\(\)\.(?:fail|bad)\(\)\)\s*\{.*?\}'
+        pattern = clause + r'\s*' + clause
+        clauses = re.search(pattern, text, re.DOTALL).group()
         clauses = clauses.replace('config_()', 'stream').replace('config()', 'stream')
         clauses = re.sub(
             r'throw (?:channelPaths|convolutionList)Exception\("([^"]+)", \w+\);', r'return "\1";', clauses
@@ -81,7 +84,7 @@ int main() {
             ],
             check=True,
         )
-        return subprocess.run([str(exe)]).returncode
+        return subprocess.run([str(exe)], check=False).returncode
 
 
 if __name__ == '__main__':

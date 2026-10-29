@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Run the portable tests of the canonical historical/ tree. No extra Python packages."""
 
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 scripts = (
@@ -21,10 +21,10 @@ scripts = (
 failed = []
 for script in scripts:
     print('\nRunning ' + script, flush=True)
-    result = subprocess.run([sys.executable, str(HERE / script)])
+    result = subprocess.run([sys.executable, str(HERE / script)], check=False)
     if result.returncode:
         failed.append(script)
 if failed:
     print('FAILED: ' + ', '.join(failed))
     raise SystemExit(1)
-print('\nPASS: all %d portable regression suites' % len(scripts))
+print(f'\nPASS: all {len(scripts)} portable regression suites')

@@ -7,10 +7,10 @@ DSP/tail agreement, not Windows stdin or libsndfile codecs.
 """
 
 import os
-from pathlib import Path
 import subprocess
-import tempfile
 import sys
+import tempfile
+from pathlib import Path
 
 sys.dont_write_bytecode = True
 import core_regressions  # noqa: E402
@@ -105,7 +105,7 @@ def main():
             ],
             check=True,
         )
-        return subprocess.run([str(executable)]).returncode
+        return subprocess.run([str(executable)], check=False).returncode
 
 
 if __name__ == '__main__':

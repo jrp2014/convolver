@@ -59,7 +59,7 @@ def parse_ls_remote(output):
     return tags
 
 
-def _git(arguments, timeout=180, cwd=None):
+def git(arguments, timeout=180, cwd=None):
     result = subprocess.run(['git', *arguments], capture_output=True, text=True, timeout=timeout, check=False, cwd=cwd)
     if result.returncode:
         lines = result.stderr.strip().splitlines()
@@ -71,7 +71,7 @@ def ls_remote(remote, attempts=3):
     """Lists a remote's tags, retrying a flaky host twice (after 5 s, then 10 s)."""
     for attempt in range(attempts):
         try:
-            return _git(['ls-remote', '--tags', remote], timeout=120)
+            return git(['ls-remote', '--tags', remote], timeout=120)
         except subprocess.TimeoutExpired as timeout:
             error = RuntimeError(f'no answer within {timeout.timeout} s')
         except RuntimeError as failure:
@@ -147,15 +147,15 @@ def gitlinks(remote, tag, paths):
     """The commits a tag's tree records for its submodules at `paths`, and the
     submodule URLs from its .gitmodules, without downloading file contents."""
     with tempfile.TemporaryDirectory(prefix='convolver-gitlinks-') as temporary:
-        _git(['init', '--quiet', '--bare', temporary])
-        _git(['remote', 'add', 'origin', remote], cwd=temporary)
-        _git(
+        git(['init', '--quiet', '--bare', temporary])
+        git(['remote', 'add', 'origin', remote], cwd=temporary)
+        git(
             ['fetch', '--quiet', '--depth', '1', '--filter=blob:none', 'origin', f'refs/tags/{tag}:refs/tags/{tag}'],
             timeout=300,
             cwd=temporary,
         )
-        tree = _git(['ls-tree', f'refs/tags/{tag}', '--', *paths], cwd=temporary)
-        modules = _git(
+        tree = git(['ls-tree', f'refs/tags/{tag}', '--', *paths], cwd=temporary)
+        modules = git(
             ['config', '--blob', f'refs/tags/{tag}:.gitmodules', '--get-regexp', r'^submodule\..*\.(path|url)$'],
             cwd=temporary,
         )

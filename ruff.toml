@@ -20,7 +20,38 @@ extend-exclude = [
 quote-style = "single"
 
 [lint]
-# Pyflakes (unused imports and names, undefined names) and pycodestyle's
-# error checks: ruff's long-standing default set, named so that a ruff
-# upgrade does not add rules by itself.
-select = ["E4", "E7", "E9", "F"]
+# Every stable rule, less the families and rules below. A new ruff release can
+# add rules to these families (CONTRIBUTING.md#when-a-new-clang-or-ruff-release-turns-ci-red).
+select = ["ALL"]
+ignore = [
+    # The formatter owns layout and quotes; these rules contradict it.
+    "COM812", "COM819", "D206", "D300", "E111", "E114", "E117", "ISC002", "Q", "W191",
+    # The scripts carry no type annotations or docstring conventions.
+    "ANN", "D",
+    # Files carry SPDX lines rather than copyright notices.
+    "CPY001",
+    # Standalone scripts and tests, not packages.
+    "INP001",
+    # Command-line tools report on standard output.
+    "T201",
+    # Tools are run by name with argument lists, never through a shell.
+    "S603", "S607",
+    # The tests use unittest, not pytest.
+    "PT",
+    # Error messages are written where they are raised.
+    "EM101", "EM102", "TRY003",
+    # Sample counts, sizes and tolerances read better inline.
+    "PLR2004",
+    # Function size and branching: Skylos reports these; splitting is separate work.
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
+    # Raising inside a try block to share its error report is deliberate.
+    "TRY301",
+]
+# Benchmark tables print speed-ups with a multiplication sign.
+allowed-confusables = ["×"]
+
+[lint.per-file-ignores]
+# Tests assert, use seeded pseudo-random data and fixed fake paths, reach into the
+# modules they test, import them once their paths are set up, and give stand-ins
+# the signatures and names of what they replace.
+"tests/**" = ["ARG", "N802", "PLC0415", "S101", "S108", "S311", "SLF001"]

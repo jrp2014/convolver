@@ -3,12 +3,12 @@
 
 import argparse
 import json
-from pathlib import Path
-import shutil
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 
 def staged_tool(root, name):
@@ -51,7 +51,9 @@ def check(root, validator=None, probe=None):
             output = folder / 'converted ü.vstpreset'
             subprocess.run([str(tool), str(folder / 'impulse.wav'), str(output)], check=True)
             original = output.read_bytes()
-            result = subprocess.run([str(tool), str(folder / 'impulse.wav'), str(output)], capture_output=True)
+            result = subprocess.run(
+                [str(tool), str(folder / 'impulse.wav'), str(output)], capture_output=True, check=False
+            )
             assert result.returncode and output.read_bytes() == original, 'converter overwrote existing preset'
             config_output = folder / 'from config.vstpreset'
             subprocess.run([str(tool), str(folder / 'filter.cfg'), str(config_output)], check=True)
@@ -64,7 +66,9 @@ def check(root, validator=None, probe=None):
             subprocess.run([str(exporter), str(folder / 'filter.cfg'), str(export)], check=True, capture_output=True)
             commands = (export / 'convolver.txt').read_text(encoding='utf-8')
             assert 'Convolution:' in commands and list(export.glob('ir-*.wav')), 'incomplete Equalizer APO export'
-            result = subprocess.run([str(exporter), str(folder / 'filter.cfg'), str(export)], capture_output=True)
+            result = subprocess.run(
+                [str(exporter), str(folder / 'filter.cfg'), str(export)], capture_output=True, check=False
+            )
             assert result.returncode and (export / 'convolver.txt').read_text(encoding='utf-8') == commands, (
                 'exporter replaced an existing folder'
             )
@@ -78,10 +82,14 @@ def check(root, validator=None, probe=None):
                 )
         bad = relocated / 'malformed.cfg'
         bad.write_text('not a configuration\n')
-        result = subprocess.run([str(tool), str(bad), str(relocated / 'bad.vstpreset')], capture_output=True)
+        result = subprocess.run(
+            [str(tool), str(bad), str(relocated / 'bad.vstpreset')], capture_output=True, check=False
+        )
         assert result.returncode and b'invalid configuration' in result.stderr, result.stderr
         assert not (relocated / 'bad.vstpreset').exists(), 'malformed input left an output'
-        result = subprocess.run([str(exporter), str(bad), str(relocated / 'bad export')], capture_output=True)
+        result = subprocess.run(
+            [str(exporter), str(bad), str(relocated / 'bad export')], capture_output=True, check=False
+        )
         assert result.returncode and not (relocated / 'bad export').exists(), 'malformed input left an export'
         if platform.system() == 'Darwin':
             subprocess.run(

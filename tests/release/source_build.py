@@ -2,19 +2,20 @@
 """Build a supplied source tree in a fresh directory; never fetch implicitly."""
 
 import argparse
-from pathlib import Path
-import subprocess
-import tempfile
 import json
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts/release'))
+from build_dependencies import add_jobs_option, parallel
+from build_dependencies import build as build_dependencies
 from contract import load_policy, sha256, with_records
 from sources import extract
-from build_dependencies import add_jobs_option, build as build_dependencies, parallel
 
 
-def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_dir=None, jobs=None):
+def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license_dir=None, jobs=None):
     with tempfile.TemporaryDirectory(prefix='convolver-source-build-') as temporary:
         build = Path(temporary) / 'build'
         configure = [
@@ -37,14 +38,20 @@ def run(source, sdk, prefix, backend, cmake, exclude_validator=False, license_di
         if exclude_validator:
             configure += ['-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF']
         subprocess.run(configure, check=True)
-        subprocess.run([cmake, '--build', str(build), '--config', 'Release'] + parallel(jobs), check=True)
+        subprocess.run([cmake, '--build', str(build), '--config', 'Release', *parallel(jobs)], check=True)
         ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
         # As in the candidate build, the unshipped CMake package's consumers are left to native CI.
-        command = (
-            [ctest, '--test-dir', str(build), '-C', 'Release', '--output-on-failure']
-            + parallel(jobs)
-            + ['-LE', 'consumer']
-        )
+        command = [
+            ctest,
+            '--test-dir',
+            str(build),
+            '-C',
+            'Release',
+            '--output-on-failure',
+            *parallel(jobs),
+            '-LE',
+            'consumer',
+        ]
         if exclude_validator:
             print('SDK bundle validator explicitly excluded; this is NOT release evidence.', flush=True)
         subprocess.run(command, check=True)
@@ -93,11 +100,19 @@ if __name__ == '__main__':
                 prefix,
                 args.backend,
                 args.cmake,
-                args.exclude_validator,
-                work / 'licenses',
-                args.jobs,
+                exclude_validator=args.exclude_validator,
+                license_dir=work / 'licenses',
+                jobs=args.jobs,
             )
     else:
         if not args.sdk or not args.prefix:
             parser.error('--sdk and --prefix are required without --archive')
-        run(args.source, args.sdk, args.prefix, args.backend, args.cmake, args.exclude_validator, jobs=args.jobs)
+        run(
+            args.source,
+            args.sdk,
+            args.prefix,
+            args.backend,
+            args.cmake,
+            exclude_validator=args.exclude_validator,
+            jobs=args.jobs,
+        )

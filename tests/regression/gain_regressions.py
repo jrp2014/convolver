@@ -10,10 +10,9 @@ or the full Windows application.
 
 import argparse
 import os
-from pathlib import Path
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 HARNESS = r"""
 #include <cmath>
@@ -106,8 +105,8 @@ def main():
     end = source.index('\n#if defined(DEBUG)', start)
     gain_loops = source[start:end]
     failures = 0
-    with tempfile.TemporaryDirectory(prefix='convolver-gain-') as scratch:
-        scratch = Path(scratch)
+    with tempfile.TemporaryDirectory(prefix='convolver-gain-') as temporary:
+        scratch = Path(temporary)
         cpp = scratch / 'gain_regressions.cpp'
         binary = scratch / 'gain_regressions'
         cpp.write_text(HARNESS.replace('@GAIN_LOOPS@', gain_loops))
@@ -127,7 +126,7 @@ def main():
             check=True,
         )
         for scenario, label in enumerate(('later path has fewer outputs', 'later path has more outputs')):
-            result = subprocess.run([str(binary), str(scenario)], capture_output=True, text=True)
+            result = subprocess.run([str(binary), str(scenario)], capture_output=True, text=True, check=False)
             print(f'{"PASS" if result.returncode == 0 else "FAIL"}: {label}')
             if result.returncode:
                 failures += 1

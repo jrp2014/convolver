@@ -27,9 +27,9 @@ docs/develop/testing.md#documentation-only-pull-requests and
 
 import argparse
 import os
-from pathlib import PurePosixPath
 import subprocess
 import sys
+from pathlib import Path, PurePosixPath
 
 # Pages whose commands the examples.first_use CTest entry runs as written
 # (tests/plugins/fixtures.py DOCUMENTED), and the archive and records that the
@@ -170,9 +170,7 @@ def main(argv=None):
         reason = 'cannot list the changed files' if paths is None else f'{len(paths)} changed file(s)'
     answer = decide(paths, args.workflow) if paths is not None else {'build': True, 'package': True}
 
-    lines = [f'CI scope: {reason}.']
-    for path in paths or []:
-        lines.append(f'  {classify(path):13} {path}')
+    lines = [f'CI scope: {reason}.', *(f'  {classify(path):13} {path}' for path in paths or [])]
     workflows = needed(paths) if paths is not None else None
     if workflows is not None and not workflows:
         lines.append(
@@ -191,9 +189,8 @@ def main(argv=None):
             )
     print('\n'.join(lines))
     if args.github_output:
-        with open(args.github_output, 'a', encoding='utf-8') as stream:
-            for key, value in answer.items():
-                stream.write(f'{key}={str(value).lower()}\n')
+        with Path(args.github_output).open('a', encoding='utf-8') as stream:
+            stream.writelines(f'{key}={str(value).lower()}\n' for key, value in answer.items())
     return 0
 
 

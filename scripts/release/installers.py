@@ -3,9 +3,10 @@
 
 import argparse
 import json
-from pathlib import Path, PurePosixPath
 import shlex
 import shutil
+from pathlib import Path, PurePosixPath
+
 from contract import load_policy
 
 
@@ -106,18 +107,18 @@ def prepare(stage, output, system, policy):
         write_uninstaller(mapping, output / 'uninstall.sh')
         shutil.copy2(output / 'uninstall.sh', output / 'tools-payload/uninstall.sh')
         # Prevent macOS Installer relocating the bundle to an old test build.
-        import plistlib
+        import plistlib  # noqa: PLC0415 (only macOS packages need it)
 
         with (output / 'component.plist').open('wb') as stream:
             plistlib.dump(
                 [
-                    dict(
-                        BundleHasStrictIdentifier=True,
-                        BundleIsRelocatable=False,
-                        BundleIsVersionChecked=True,
-                        BundleOverwriteAction='upgrade',
-                        RootRelativeBundlePath='Convolver.vst3',
-                    )
+                    {
+                        'BundleHasStrictIdentifier': True,
+                        'BundleIsRelocatable': False,
+                        'BundleIsVersionChecked': True,
+                        'BundleOverwriteAction': 'upgrade',
+                        'RootRelativeBundlePath': 'Convolver.vst3',
+                    }
                 ],
                 stream,
             )

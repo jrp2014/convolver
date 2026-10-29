@@ -6,10 +6,10 @@ import copy
 import hashlib
 import io
 import json
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,12 +86,12 @@ def links(remote, tag, paths):
 class VersionTests(unittest.TestCase):
     def test_version_order(self):
         ordered = ['1.0.29', '1.1.0beta2', '1.1.0', '1.2.2', '2.0.0-beta1', '2.0.0-beta3', '2.0.0']
-        self.assertEqual(sorted(reversed(ordered), key=upstream.version_key), ordered)
+        self.assertEqual(sorted(ordered, key=upstream.version_key), ordered)
         self.assertLess(upstream.version_key('3.8.0_build_66'), upstream.version_key('3.8.1_build_84'))
         self.assertLess(upstream.version_key('3.8.1_build_84'), upstream.version_key('3.8.1_build_90'))
         self.assertIsNone(upstream.version_key('vstsdk370_31_07_2020_build_116'))
         fftw = ['3.3.11-rc5', '3.3.11', '3.3.11-pl1', '3.3.12']
-        self.assertEqual(sorted(reversed(fftw), key=upstream.version_key), fftw)
+        self.assertEqual(sorted(fftw, key=upstream.version_key), fftw)
         self.assertTrue(upstream.is_final('3.3.11-pl1'))
         self.assertLess(upstream.version_key('3.06.1'), upstream.version_key('3.13'))
 
@@ -109,7 +109,7 @@ class VersionTests(unittest.TestCase):
             '2.0.0-pl1',
             '2.0.1-alpha1',
         ]
-        self.assertEqual(sorted(reversed(ordered), key=upstream.version_key), ordered)
+        self.assertEqual(sorted(ordered, key=upstream.version_key), ordered)
         self.assertEqual(
             sorted(['1.1.0rc1', '1.1.0beta2', '1.1.0alpha3'], key=upstream.version_key),
             ['1.1.0alpha3', '1.1.0beta2', '1.1.0rc1'],
@@ -147,7 +147,7 @@ class VersionTests(unittest.TestCase):
 
     def test_tag_pattern(self):
         rule = {'upstream': 'x', 'tag_pattern': r'v(3)(\d\d)(\d?)'}
-        tags = {tag: commit for tag, commit in TAGS['https://github.com/kichik/nsis'].items()}
+        tags = dict(TAGS['https://github.com/kichik/nsis'].items())
         self.assertEqual(upstream.newest(rule, tags), ('3.13', 'v313', 'e' * 40))
         self.assertEqual(upstream.tag_version(rule, 'v3061'), '3.06.1')
         self.assertIsNone(upstream.tag_version(rule, 'v2.46'))

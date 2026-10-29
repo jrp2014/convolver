@@ -28,7 +28,7 @@ def main():
     bundle = Path(sys.argv[2])
     version = sys.argv[3]
     contents = bundle / 'Contents'
-    with open(contents / 'Info.plist', 'rb') as f:
+    with (contents / 'Info.plist').open('rb') as f:
         info = plistlib.load(f)
 
     au = registry['au']

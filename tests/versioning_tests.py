@@ -2,14 +2,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise automatic versioning in disposable Git repositories."""
 
-from pathlib import Path
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/version_source.py'
 
@@ -44,10 +43,7 @@ class GitFixture(unittest.TestCase):
 
     def run_version(self, *args, ok=True):
         result = subprocess.run(
-            [sys.executable, str(SCRIPT), *args],
-            cwd=self.repo,
-            text=True,
-            capture_output=True,
+            [sys.executable, str(SCRIPT), *args], cwd=self.repo, text=True, capture_output=True, check=False
         )
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         if not ok:

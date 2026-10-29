@@ -7,7 +7,6 @@ binaries are checked too (Linux: objcopy; macOS: dsymutil). DIAG-1, from jrp's
 review of 0.4.43.
 """
 
-from pathlib import Path
 import platform
 import shutil
 import struct
@@ -16,16 +15,16 @@ import sys
 import tempfile
 import unittest
 import zlib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
 import symbols  # noqa: E402
 
-
 # Synthetic files -----------------------------------------------------------
 
 
-def elf(build_id=None, debuglink=None, debug_info=None, nobits_debug_info=False):
+def elf(build_id=None, debuglink=None, debug_info=None, *, nobits_debug_info=False):
     """A minimal 64-bit little-endian ELF file with the given sections."""
     sections = []
     if build_id is not None:
@@ -116,7 +115,7 @@ def pe(guid, age, pdb_path):
     return bytes(head) + section_data
 
 
-def pdb(guid, age, modules=64, dbi=True):
+def pdb(guid, age, modules=64, *, dbi=True):
     """A minimal MSF 7.00 file: streams 0-3, with the information and DBI streams.
 
     Blocks: 0 superblock, 1 free-block map, 2 block map, 3 directory, then streams.

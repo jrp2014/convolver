@@ -12,7 +12,6 @@ Usage: preset_tests.py CONVOLVER_PRESET
 
 import base64
 import json
-from pathlib import Path
 import plistlib
 import re
 import shutil
@@ -21,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import wave
+from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 REGISTRY = json.loads((REPOSITORY / 'plugins/identities.json').read_text(encoding='utf-8'))
@@ -33,7 +33,7 @@ def four_char(code):
 
 
 def run(*args, ok=True):
-    result = subprocess.run([TOOL, *map(str, args)], capture_output=True, text=True)
+    result = subprocess.run([TOOL, *map(str, args)], capture_output=True, text=True, check=False)
     if ok and result.returncode != 0:
         raise AssertionError(f'{args}: {result.stderr}')
     if not ok and result.returncode == 0:
@@ -69,9 +69,7 @@ def decode_state(data):
         c['paths'] = []
         for _ in range(word()):
             impulse = [sample() for _ in range(word())]
-            routes = []
-            for _ in range(2):
-                routes.append([(word(), sample()) for _ in range(word())])
+            routes = [[(word(), sample()) for _ in range(word())] for _ in range(2)]
             c['paths'].append({'impulse': impulse, 'inputs': routes[0], 'outputs': routes[1]})
         state['configuration'] = c
     assert position == len(words), 'no trailing words'
@@ -274,6 +272,7 @@ def main():
             done = subprocess.run(
                 [TOOL, str(CROSSOVER / 'filter.cfg').encode(), target, bytes(root / 'Named.aupreset')],
                 capture_output=True,
+                check=False,
             )
             assert done.returncode == 0, done.stderr
             read_aupreset(root / 'Named.aupreset', 'Named')

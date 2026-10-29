@@ -2,27 +2,42 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Check the preserved website offline; no homes.zip or third-party packages."""
 
-from collections import Counter
 import hashlib
-from html.parser import HTMLParser
 import json
-from pathlib import Path, PurePosixPath
 import re
 import sys
 import tempfile
+from collections import Counter
+from html.parser import HTMLParser
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = Path('docs/historical/convolver-4.4')
 MANIFEST = Path('docs/review-2026-10/archive-documentation.json')
 AUDIT = Path('docs/review-2026-10/sourceforge-documentation-check.json')
-PAGES = set(
-    'binaural commands comparewavs config configegs convolvercmd '
-    'convolverpipe download feedback index links makeir news perftest '
-    'troubleshooting usage vst zoom'.split()
-)
+PAGES = {
+    'binaural',
+    'commands',
+    'comparewavs',
+    'config',
+    'configegs',
+    'convolvercmd',
+    'convolverpipe',
+    'download',
+    'feedback',
+    'index',
+    'links',
+    'makeir',
+    'news',
+    'perftest',
+    'troubleshooting',
+    'usage',
+    'vst',
+    'zoom',
+}
 PAGES = {name + '.html' for name in PAGES}
-CSS_URL = re.compile(r'url\(\s*[\"\']?([^\)\"\']*)[\"\']?\s*\)', re.I)
+CSS_URL = re.compile(r'url\(\s*[\"\']?([^\)\"\']*)[\"\']?\s*\)', re.IGNORECASE)
 
 
 def require(condition, message):
@@ -103,7 +118,7 @@ def check_links(base, paths):
             references = [('css-url', v.strip()) for v in CSS_URL.findall(text)]
         links.extend((path, attr, url) for attr, url in references)
     counts = Counter()
-    for source, attribute, url in links:
+    for source, _attribute, url in links:
         parsed = urlsplit(url.strip())
         if parsed.scheme or parsed.netloc:
             counts['external'] += 1
@@ -112,12 +127,10 @@ def check_links(base, paths):
         name = unquote(parsed.path)
         target = (base / name.lstrip('/') if name.startswith('/') else source.parent / name) if name else source
         target = contained(base, target)
-        require(target in paths and target.is_file(), 'missing local target: %s -> %s' % (source.name, url))
+        require(target in paths and target.is_file(), f'missing local target: {source.name} -> {url}')
         counts['local'] += 1
         if parsed.fragment and target.suffix.lower() == '.html':
-            require(
-                unquote(parsed.fragment) in pages[target].anchors, 'missing fragment: %s -> %s' % (source.name, url)
-            )
+            require(unquote(parsed.fragment) in pages[target].anchors, f'missing fragment: {source.name} -> {url}')
             counts['fragments'] += 1
     inventory = Counter((path.relative_to(base).as_posix(), attr, url) for path, attr, url in links)
     return counts, inventory
@@ -208,8 +221,9 @@ def main():
         return 1
     print(
         'PASS: documentation: 99 file lengths/SHA256, 18 pages, '
-        '%d local references, %d fragments; %d external references skipped; '
-        '%d failure-detection checks' % (counts['local'], counts['fragments'], counts['external'], negative_checks)
+        f'{counts["local"]} local references, {counts["fragments"]} fragments; '
+        f'{counts["external"]} external references skipped; '
+        f'{negative_checks} failure-detection checks'
     )
     return 0
 

@@ -8,10 +8,10 @@ from anywhere: python3 scripts/check_repository.py [--root DIR].
 """
 
 import argparse
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 # Dated records and preserved copies: never rewritten, so not held to these rules.
 RECORDS = ('historical/', 'docs/historical/', 'docs/archive/', 'docs/review-2026-10/')
@@ -61,7 +61,7 @@ TOP_LEVEL = {
 SPDX_SUFFIXES = {'.c', '.cpp', '.h', '.hpp', '.mm', '.py', '.sh', '.ps1', '.cmake', '.yml', '.yaml'}
 SPDX_EXEMPT = ('portable/third_party/', 'tests/fuzz/seeds/', 'tests/fuzz/regressions/', 'docs/benchmarks/')
 
-TODO_DEFINITION = re.compile(r'^- \[([ xX])\] \*\*([A-Z][A-Z0-9]*-\d+) — ', re.M)
+TODO_DEFINITION = re.compile(r'^- \[([ xX])\] \*\*([A-Z][A-Z0-9]*-\d+) — ', re.MULTILINE)
 PLAN_NAME = re.compile(r'^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 CODE_SPAN = re.compile(r'`([^`\n]+)`')
 
@@ -186,9 +186,9 @@ def check_plans(root, files, defined, errors):
     if archive.exists():
         index = read(root, 'docs/archive/plans/README.md')
         for name in files:
-            if name.startswith('docs/archive/plans/') and name.endswith('.md') and not name.endswith('/README.md'):
-                if '(' + name.rsplit('/', 1)[1] not in index:
-                    errors.append(f'{name}: archived plan missing from docs/archive/plans/README.md')
+            archived = name.startswith('docs/archive/plans/') and name.endswith('.md')
+            if archived and not name.endswith('/README.md') and '(' + name.rsplit('/', 1)[1] not in index:
+                errors.append(f'{name}: archived plan missing from docs/archive/plans/README.md')
 
 
 def path_like(token):
@@ -232,13 +232,13 @@ def check_spdx(root, files, errors):
         suffix = Path(name).suffix.lower()
         wanted = (
             suffix in SPDX_SUFFIXES
-            or name in {'CMakeLists.txt'}
+            or name == 'CMakeLists.txt'
             or name.endswith('/CMakeLists.txt')
             or name in maintained_markdown([name])
         )
         if not wanted:
             continue
-        with open(root / name, encoding='utf-8', errors='replace') as handle:
+        with (root / name).open(encoding='utf-8', errors='replace') as handle:
             head = ''.join(handle.readline() for _ in range(5))
         if 'SPDX-License-Identifier:' not in head:
             errors.append(f'{name}: add an SPDX-License-Identifier line (GPL-2.0-or-later) in the first lines')
@@ -255,7 +255,7 @@ def check_layout(root, files, errors):
         if not any(name.startswith(f'tests/{adapter}/') for name in files):
             errors.append(f'plugins/{adapter}/: adapter has no tests in tests/{adapter}/')
         guide = 'docs/use/plugins.md'
-        if guide not in files or not re.search(rf'\b{re.escape(adapter)}\b', read(root, guide), re.I):
+        if guide not in files or not re.search(rf'\b{re.escape(adapter)}\b', read(root, guide), re.IGNORECASE):
             errors.append(
                 f'plugins/{adapter}/: adapter is not described in {guide}; add it to the '
                 f'formats table there (the page must name {adapter.upper()})'

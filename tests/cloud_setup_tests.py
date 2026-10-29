@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Cloud bootstrap keeps the commit hook when optional Clang downloads fail."""
 
-from pathlib import Path
 import os
 import shlex
 import shutil
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,7 +41,7 @@ class CloudSetupTests(unittest.TestCase):
             script = root / '.claude/hooks/session-start.sh'
             script.parent.mkdir(parents=True)
             script.write_text('set -euo pipefail\n' + source + '\ninstall_lint_hook || true\n')
-            result = subprocess.run(['bash', str(script)], capture_output=True, text=True)
+            result = subprocess.run(['bash', str(script)], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('Could not update the Clang tools', result.stderr)
             self.assertTrue(marker.exists(), 'Clang download failure prevented Git-hook setup')

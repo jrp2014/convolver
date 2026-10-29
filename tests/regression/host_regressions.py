@@ -11,11 +11,10 @@ Use --source to test another sample.h with the same API.
 
 import argparse
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -40,7 +39,8 @@ def source_fragments(text, dither):
     fragments = fragments.replace('__declspec(novtable)', '').replace('__single_inheritance', '')
     fragments = fragments.replace(
         'public:\n\tVSTIO',
-        'public:\n\tusing SampleIO<T>::input_sample_convertor_;\n\tusing SampleIO<T>::output_sample_convertor_;\n\tVSTIO',
+        'public:\n\tusing SampleIO<T>::input_sample_convertor_;\n'
+        '\tusing SampleIO<T>::output_sample_convertor_;\n\tVSTIO',
     )
     quantization = section(dither, 'template <typename T>\nclass Dither', '//  \n')
     quantization += section(dither, 'template <typename T, typename IntType>\nstruct NoiseShape', '// SimpleShaping')
@@ -112,7 +112,7 @@ def main():
                 check=True,
             )
             for case in cases:
-                result = subprocess.run([str(executable), case], capture_output=True, text=True)
+                result = subprocess.run([str(executable), case], capture_output=True, text=True, check=False)
                 status = 'PASS' if result.returncode == 0 else 'FAIL'
                 print(f'{status} {build}: {case}', flush=True)
                 if result.returncode:

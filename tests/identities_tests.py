@@ -16,10 +16,10 @@ Run from anywhere: python3 tests/identities_tests.py [--root DIR].
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 # Released or reserved identities. Hosts store them in projects, presets and
 # installer receipts. Change one only by an owner's decision, recorded in
@@ -147,10 +147,10 @@ def strings(value, path=()):
         yield path, value
     elif isinstance(value, dict):
         for key, item in value.items():
-            yield from strings(item, path + (key,))
+            yield from strings(item, (*path, key))
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            yield from strings(item, path + (str(index),))
+            yield from strings(item, (*path, str(index)))
 
 
 def check_rules(registry, errors):
@@ -284,7 +284,7 @@ def check_consumers(root, registry, errors):
     windows = registry['windows_installer']
     own = {
         key
-        for key in re.findall(r'HKLM "(Software\\[^"]+)"', nsis, re.I)
+        for key in re.findall(r'HKLM "(Software\\[^"]+)"', nsis, re.IGNORECASE)
         if not key.lower().startswith('software\\microsoft\\')
     }
     if own != {windows['registry_key']}:
@@ -337,16 +337,18 @@ def tracked_files(root):
 
 def check_copies(root, registry, errors):
     """Sources must read identities from the registry, never repeat them."""
-    patterns = []
-    for cid in (registry['vst3']['processor_class_id'], registry['vst3']['controller_class_id']):
-        patterns.append(re.compile(cid[:8], re.I))  # First FUID word in any spelling.
-    for bundle in (
+    # The first FUID word of each class ID, in any spelling.
+    patterns = [
+        re.compile(cid[:8], re.IGNORECASE)
+        for cid in (registry['vst3']['processor_class_id'], registry['vst3']['controller_class_id'])
+    ]
+    bundles = (
         registry['vst3']['macos_bundle_id'],
         registry['au']['macos_bundle_id'],
         *registry['macos_installer'].values(),
         'org.convolver.',
-    ):
-        patterns.append(re.compile(re.escape(bundle)))
+    )
+    patterns.extend(re.compile(re.escape(bundle)) for bundle in bundles)
     patterns.append(re.compile(re.escape(registry['lv2']['base_uri'])))
     # Every text file: sources in any language, Turtle, plists, workflows.
     # AU codes such as Conv are too common to search for; review catches those.

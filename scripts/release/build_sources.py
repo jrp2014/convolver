@@ -9,17 +9,18 @@ tag, commit, URL and checksum of each archive."""
 import argparse
 import gzip
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tarfile
 import tempfile
-from contract import load_policy, sha256, with_records
+from pathlib import Path
+
 import resolve
+from contract import load_policy, sha256, with_records
 from sources import acquire, extract
 
 
-def assemble(policy_path, cache, output, fetch=False, revision='HEAD', lock=None, wanted=None, resolver=None):
+def assemble(policy_path, cache, output, *, fetch=False, revision='HEAD', lock=None, wanted=None, resolver=None):
     root = policy_path.resolve().parents[1]
     policy = load_policy(policy_path)
     commit = subprocess.check_output(['git', '-C', str(root), 'rev-parse', revision + '^{commit}'], text=True).strip()
@@ -58,20 +59,20 @@ def assemble(policy_path, cache, output, fetch=False, revision='HEAD', lock=None
         archives.mkdir()
         inventory = {}
         for name, dependency in policy['dependencies'].items():
-            archive = acquire(dependency, cache, fetch)
+            archive = acquire(dependency, cache, fetch=fetch)
             target = archives / dependency['archive']
             target.write_bytes(archive.read_bytes())
             if sha256(target) != dependency['sha256']:
                 raise ValueError(f'{name}: archive changed while being copied')
             inventory[name] = dependency
-        manifest = dict(
-            schema=2,
-            source_commit=commit,
-            version=policy['version'],
-            resolved_at=resolved_at,
-            dependencies=inventory,
-            files={p.relative_to(source).as_posix(): sha256(p) for p in sorted(source.rglob('*')) if p.is_file()},
-        )
+        manifest = {
+            'schema': 2,
+            'source_commit': commit,
+            'version': policy['version'],
+            'resolved_at': resolved_at,
+            'dependencies': inventory,
+            'files': {p.relative_to(source).as_posix(): sha256(p) for p in sorted(source.rglob('*')) if p.is_file()},
+        }
         (source / 'source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open('xb') as raw, gzip.GzipFile(
@@ -87,7 +88,7 @@ def assemble(policy_path, cache, output, fetch=False, revision='HEAD', lock=None
                 else:
                     tar.addfile(info)
     resolve.report(resolve.markdown(policy['dependencies'], 'Dependencies in the corresponding source'))
-    print(json.dumps(dict(archive=output.name, sha256=sha256(output), source_commit=commit)))
+    print(json.dumps({'archive': output.name, 'sha256': sha256(output), 'source_commit': commit}))
 
 
 if __name__ == '__main__':
@@ -114,10 +115,10 @@ if __name__ == '__main__':
             args.policy,
             args.cache.resolve(),
             args.output.resolve(),
-            args.fetch,
-            args.revision,
-            args.lock,
-            resolve.parse_wanted(args.version),
+            fetch=args.fetch,
+            revision=args.revision,
+            lock=args.lock,
+            wanted=resolve.parse_wanted(args.version),
         )
     except ValueError as error:
         sys.exit(f'error: {error}')

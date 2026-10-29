@@ -3,16 +3,18 @@
 
 import argparse
 import json
-from pathlib import Path
 import platform
 import shutil
 import subprocess
 import sys
 import zipfile
-from build_dependencies import add_jobs_option, build as build_dependencies, parallel
+from pathlib import Path
+
+import resolve
+from build_dependencies import add_jobs_option, parallel
+from build_dependencies import build as build_dependencies
 from contract import load_policy, platform_policy, sha256, with_records
 from installers import prepare
-import resolve
 from sources import extract
 from symbols import check as check_symbols
 
@@ -122,11 +124,11 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     elif platform.system() == 'Darwin':
         configure += ['-G', 'Ninja']
     run(configure)
-    run([cmake, '--build', build_dir, '--config', 'Release'] + parallel(jobs))
+    run([cmake, '--build', build_dir, '--config', 'Release', *parallel(jobs)])
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     # The CMake development package is not shipped: its consumers run in the native
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
-    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure'] + parallel(jobs) + ['-LE', 'consumer'])
+    run([ctest, '--test-dir', build_dir, '-C', 'Release', '--output-on-failure', *parallel(jobs), '-LE', 'consumer'])
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     keep_symbols(build_dir, stage, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
@@ -258,29 +260,29 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     sidecar = output / (identifier + '-artifact-manifest.json')
     shutil.copyfile(artifact_manifest, sidecar)
     assets = [
-        dict(name=p.name, sha256=sha256(p), kind=kind)
+        {'name': p.name, 'sha256': sha256(p), 'kind': kind}
         for p, kind in [(zip_path, 'binary'), (source_archive, 'source'), (sidecar, 'manifest')]
         + ([(installer, 'installer')] if installer else [])
     ]
-    record = dict(
-        id=identifier,
-        artifact=zip_path.name,
-        source_commit=manifest['source_commit'],
-        source=source_archive.name,
-        notices=True,
-        signed=False,
-        notarized=False,
-        evidence={},
-        automated='passed',
-        source_rebuild='passed',
-        final_archive='passed',
-        installers=[installer.name] if installer else [],
-        installer_evidence={},
-        dependencies={
+    record = {
+        'id': identifier,
+        'artifact': zip_path.name,
+        'source_commit': manifest['source_commit'],
+        'source': source_archive.name,
+        'notices': True,
+        'signed': False,
+        'notarized': False,
+        'evidence': {},
+        'automated': 'passed',
+        'source_rebuild': 'passed',
+        'final_archive': 'passed',
+        'installers': [installer.name] if installer else [],
+        'installer_evidence': {},
+        'dependencies': {
             name: {key: dep[key] for key in ('version', 'revision', 'sha256')}
             for name, dep in policy['dependencies'].items()
         },
-    )
+    }
     if nsis_version:
         record['installer_compiler'] = {'reported': 'NSIS ' + nsis_version}
         # fetch_nsis.py's record: release, URL and checksum of the archive.
@@ -289,13 +291,13 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
             record['installer_compiler'].update(json.loads(fetched.read_text(encoding='utf-8')))
     (output / (identifier + '-candidate.json')).write_text(
         json.dumps(
-            dict(
-                schema=1,
-                version=policy['version'],
-                source_commit=manifest['source_commit'],
-                assets=assets,
-                platform=record,
-            ),
+            {
+                'schema': 1,
+                'version': policy['version'],
+                'source_commit': manifest['source_commit'],
+                'assets': assets,
+                'platform': record,
+            },
             indent=2,
         )
         + '\n'

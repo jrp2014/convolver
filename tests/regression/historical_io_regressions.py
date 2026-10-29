@@ -11,11 +11,11 @@ empty-handle cleanup fixes; the newer explicit status/close tests are omitted.
 
 import argparse
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import zipfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SUFFIX = '/My Documents/Visual Studio 2008/Projects/convolver/convolver-/convolution/'
@@ -124,7 +124,7 @@ def main():
                 check=True,
             )
             for case in cases:
-                result = subprocess.run([str(executable), case], capture_output=True, text=True)
+                result = subprocess.run([str(executable), case], capture_output=True, text=True, check=False)
                 print(f'{"PASS" if result.returncode == 0 else "FAIL"} {build}: {case}', flush=True)
                 if result.returncode:
                     failures += 1

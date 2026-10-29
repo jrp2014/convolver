@@ -10,11 +10,10 @@ Requires the review branch delay-line API (not the original 4.3 release API).
 
 import argparse
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -26,7 +25,10 @@ def generate(revision):
             # The historical tree was called convolver/ before 21 October 2026.
             for folder in ('historical', 'convolver'):
                 shown = subprocess.run(
-                    ['git', 'show', revision + ':' + folder + '/convolution/' + name], cwd=ROOT, capture_output=True
+                    ['git', 'show', revision + ':' + folder + '/convolution/' + name],
+                    cwd=ROOT,
+                    capture_output=True,
+                    check=False,
                 )
                 if shown.returncode == 0:
                     return shown.stdout.decode('latin1').replace('\r\n', '\n')
@@ -39,7 +41,8 @@ def generate(revision):
     # C++ dependent-base lookup and two unused legacy accessors need syntax repair.
     fast = fast.replace(
         'struct FastArray : AlignedArray<T>\n{',
-        'struct FastArray : AlignedArray<T>\n{\nusing AlignedArray<T>::first_; using AlignedArray<T>::size_; using AlignedArray<T>::bsize_;',
+        'struct FastArray : AlignedArray<T>\n{\n'
+        'using AlignedArray<T>::first_; using AlignedArray<T>::size_; using AlignedArray<T>::bsize_;',
     )
     fast = fast.replace('rangecheck(i);', 'rangecheck(n);').replace('static void rangecheck', 'void rangecheck')
     fast = fast.replace('for(pointer p = first_; p != last)', 'for(pointer p = first_; p != last;)')
@@ -58,8 +61,8 @@ void Zero(PartitionedBuffer& x) { for(auto& a:x) Zero(a); }
 """
     )
     ffthelp = read('ffthelp.cpp')
-    table = re.search(r'const DWORD OptimalDFT::OptimalDFTSize\[\].*?\};', ffthelp, re.S).group()
-    filter_header = re.sub(r'^(#include.*|#pragma once)$', '', read('filter.h'), flags=re.M)
+    table = re.search(r'const DWORD OptimalDFT::OptimalDFTSize\[\].*?\};', ffthelp, re.DOTALL).group()
+    filter_header = re.sub(r'^(#include.*|#pragma once)$', '', read('filter.h'), flags=re.MULTILINE)
     filter_body = read('filter.cpp')
     filter_body = filter_body[filter_body.index('Filter::Filter') :]
     conv_header = read('convolution.h')
@@ -128,7 +131,7 @@ def main():
             ],
             check=True,
         )
-        return subprocess.run([str(binary), args.case]).returncode
+        return subprocess.run([str(binary), args.case], check=False).returncode
 
 
 if __name__ == '__main__':

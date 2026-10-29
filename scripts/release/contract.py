@@ -3,8 +3,8 @@
 
 import hashlib
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 def sha256(path):
@@ -100,7 +100,7 @@ def validate_policy(policy, source=None):
             raise ValueError('tested platform requires evidence')
 
 
-def _validate_source(name, rule, archive=True):
+def _validate_source(name, rule, *, archive=True):
     """Where a dependency or tool comes from: its repository, how its tags name
     releases, and its archive's URL."""
     if not str(rule.get('upstream', '')).startswith('https://'):

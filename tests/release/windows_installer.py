@@ -3,12 +3,12 @@
 
 import argparse
 import ctypes
-from ctypes import wintypes
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import winreg
+from ctypes import wintypes
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -16,7 +16,7 @@ from contract import load_policy  # noqa: E402
 from installers import prepare  # noqa: E402
 
 
-def run(command, success=True):
+def run(command, *, success=True):
     arguments = [str(arg) for arg in command]
     # NSIS parses these final tail arguments itself, including unquoted spaces.
     invocation = (
@@ -24,7 +24,7 @@ def run(command, success=True):
         if arguments[-1].startswith(('/D=', '_?='))
         else arguments
     )
-    result = subprocess.run(invocation, timeout=90)
+    result = subprocess.run(invocation, timeout=90, check=False)
     if (result.returncode == 0) != success:
         raise AssertionError(f'unexpected installer status {result.returncode}: {command}')
 

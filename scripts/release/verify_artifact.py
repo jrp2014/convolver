@@ -3,11 +3,12 @@
 
 import argparse
 import json
-from pathlib import Path
 import platform
 import re
 import subprocess
 import tarfile
+from pathlib import Path
+
 from contract import load_policy, platform_policy, sha256, used_dependencies, with_records
 
 
@@ -67,9 +68,12 @@ def source_manifest(archive):
 
 def source_record(archive):
     source = source_manifest(archive)
-    return dict(
-        name=archive.name, sha256=sha256(archive), source_commit=source['source_commit'], version=source['version']
-    )
+    return {
+        'name': archive.name,
+        'sha256': sha256(archive),
+        'source_commit': source['source_commit'],
+        'version': source['version'],
+    }
 
 
 def used_records(policy, archive, backend):
@@ -199,7 +203,7 @@ def main():
         ):
             raise ValueError('actual build, source archive and policy disagree')
         if build['configuration'] != 'Release' or re.search(
-            r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.I
+            r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.IGNORECASE
         ):
             raise ValueError('nonportable release build flags or configuration')
         notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
@@ -219,20 +223,20 @@ def main():
         ):
             if not (root / required).is_file():
                 raise ValueError(f'missing release content: {required}')
-        manifest = dict(
-            schema=1,
-            version=policy['version'],
-            platform=args.platform,
-            source_commit=build['source_commit'],
-            backend=candidate['backend'],
-            channel='developer-preview',
-            source=source,
-            build=build,
-            build_os=platform.platform(),
-            dependencies=used_records(policy, args.source_archive, candidate['backend']),
-            binaries=inspect(root, candidate, policy),
-            files=inventory(root),
-        )
+        manifest = {
+            'schema': 1,
+            'version': policy['version'],
+            'platform': args.platform,
+            'source_commit': build['source_commit'],
+            'backend': candidate['backend'],
+            'channel': 'developer-preview',
+            'source': source,
+            'build': build,
+            'build_os': platform.platform(),
+            'dependencies': used_records(policy, args.source_archive, candidate['backend']),
+            'binaries': inspect(root, candidate, policy),
+            'files': inventory(root),
+        }
         args.manifest.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     else:
         manifest = json.loads(args.manifest.read_text(encoding='utf-8'))

@@ -5,15 +5,16 @@ The policy passed in carries resolved records (contract.with_records): the
 exact releases resolve.py chose, or a source manifest recorded."""
 
 import argparse
-import os
 import json
-from pathlib import Path
+import os
 import platform
 import shutil
 import subprocess
 import sys
-from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
+from pathlib import Path
+
 import resolve
+from contract import PLUGIN_FORMATS, load_policy, used_dependencies, with_records
 from sources import unpack_dependencies
 
 
@@ -45,7 +46,7 @@ def add_jobs_option(parser):
 
 
 def build(
-    policy, cache, work, cmake='cmake', fetch=False, architecture=None, backend='FFTW', formats=('vst3',), jobs=None
+    policy, cache, work, cmake='cmake', *, fetch=False, architecture=None, backend='FFTW', formats=('vst3',), jobs=None
 ):
     """Only the dependencies of the given plug-in formats are unpacked and their
     notices shipped; FFTW only when the FFT backend is FFTW. `jobs` limits the
@@ -54,7 +55,7 @@ def build(
     source = work / 'sources'
     source.mkdir(parents=True, exist_ok=True)
     used = used_dependencies(policy, formats, backend)
-    unpack_dependencies(policy, cache.resolve(), source, fetch, names=used)
+    unpack_dependencies(policy, cache.resolve(), source, fetch=fetch, names=used)
     prefix = work / 'prefix'
     common = [
         '-DCMAKE_BUILD_TYPE=Release',
@@ -99,8 +100,8 @@ def build(
         if name not in used:
             continue
         output = work / ('build-' + name)
-        subprocess.run([cmake, '-S', str(source / name), '-B', str(output)] + common + options, check=True)
-        subprocess.run([cmake, '--build', str(output), '--config', 'Release'] + parallel(jobs), check=True)
+        subprocess.run([cmake, '-S', str(source / name), '-B', str(output), *common, *options], check=True)
+        subprocess.run([cmake, '--build', str(output), '--config', 'Release', *parallel(jobs)], check=True)
         subprocess.run([cmake, '--install', str(output), '--config', 'Release'], check=True)
     inventory = {
         name: {
@@ -180,9 +181,9 @@ if __name__ == '__main__':
         args.cache,
         args.work,
         args.cmake,
-        args.fetch,
-        args.architecture,
-        args.backend,
-        args.formats,
-        args.jobs,
+        fetch=args.fetch,
+        architecture=args.architecture,
+        backend=args.backend,
+        formats=args.formats,
+        jobs=args.jobs,
     )

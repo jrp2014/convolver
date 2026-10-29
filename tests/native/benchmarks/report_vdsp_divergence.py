@@ -7,9 +7,9 @@ collecting failures to inspect all nine workloads, including the 512k filters.
 """
 
 import argparse
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('build', type=Path)
@@ -25,8 +25,10 @@ replacements = [
     ),
     (
         '        std::cout << "kernel divergence tests passed\\n";',
-        '        std::cout << "Diagnostic-only continuation; failed gates: " << failures << "\\n";\n'
-        '        return failures ? 1 : 0;',
+        (
+            '        std::cout << "Diagnostic-only continuation; failed gates: " << failures << "\\n";\n'
+            '        return failures ? 1 : 0;'
+        ),
     ),
 ]
 for before, after in replacements:
@@ -54,4 +56,4 @@ with tempfile.TemporaryDirectory(prefix='convolver-vdsp-') as temporary:
         ],
         check=True,
     )
-    raise SystemExit(subprocess.run([str(binary)]).returncode)
+    raise SystemExit(subprocess.run([str(binary)], check=False).returncode)

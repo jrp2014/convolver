@@ -11,11 +11,11 @@ or an external-URL availability check.
 
 import argparse
 import html
-from html.parser import HTMLParser
-from pathlib import Path
 import re
 import sys
 import unicodedata
+from html.parser import HTMLParser
+from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 EXCLUDED = {'archive', 'historical', 'review-2026-10'}

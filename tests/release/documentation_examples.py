@@ -2,13 +2,12 @@
 """Execute the packaged guide's marked examples and check its links."""
 
 import argparse
-from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 TOOLS = ('convolver-preset', 'convolver-equalizer-apo')
 
@@ -27,7 +26,7 @@ def check(package):
         text = page.read_text(encoding='utf-8')
         examples += [
             (page.name, command)
-            for command in re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.S)
+            for command in re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.DOTALL)
         ]
     used = {shlex.split(command)[0] for _, command in examples}
     for tool in TOOLS:

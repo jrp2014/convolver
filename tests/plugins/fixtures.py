@@ -24,7 +24,6 @@ Only the standard library is used.
 """
 
 import argparse
-from pathlib import Path
 import math
 import re
 import shlex
@@ -32,6 +31,7 @@ import shutil
 import struct
 import subprocess
 import sys
+from pathlib import Path
 
 LATENCY = 256  # Frames every adapter reports; the CLI trims them.
 TOLERANCE = 1e-5  # Single-precision FFT convolution against the double oracle.
@@ -65,7 +65,7 @@ def write_float_wav(path, rate, channels):
     Path(path).write_bytes(float_wav_bytes(rate, channels))
 
 
-def read_float_wav(path, with_rate=False):
+def read_float_wav(path, *, with_rate=False):
     """Planar samples of a 32-bit float WAV, including WAVE_FORMAT_EXTENSIBLE."""
     data = Path(path).read_bytes()
     assert data[:4] == b'RIFF' and data[8:12] == b'WAVE', path
@@ -202,15 +202,15 @@ def fixtures():
     # Mono: an IR file is the whole filter. Direct sound, a short reflection and
     # three later echoes of alternating sign.
     mono_ir = sparse_ir(2001, [(0, 0.5), (1, -0.25), (100, 0.25), (700, 0.0625), (2000, -0.125)])
-    result['mono'] = dict(
-        filter='impulse.wav',
-        inputs=1,
-        outputs=1,
-        files={'impulse.wav': float_wav_bytes(RATE, [mono_ir])},
-        paths=[dict(ir=mono_ir, inputs=[(0, 1.0)], outputs=[(0, 1.0)])],
-        input_delays=[0],
-        output_delays=[0],
-    )
+    result['mono'] = {
+        'filter': 'impulse.wav',
+        'inputs': 1,
+        'outputs': 1,
+        'files': {'impulse.wav': float_wav_bytes(RATE, [mono_ir])},
+        'paths': [{'ir': mono_ir, 'inputs': [(0, 1.0)], 'outputs': [(0, 1.0)]}],
+        'input_delays': [0],
+        'output_delays': [0],
+    }
 
     # Stereo: different responses per side, plus left fed into the right output
     # through IR channel 1 at gain 0.5, and the right output delayed by 1 ms.
@@ -230,19 +230,19 @@ def fixtures():
         '// cross-feed: route 0.5 is input 0 at gain 0.5, through IR channel 1 to output 1\n'
         'room.wav\n1\n0.5\n1\n'
     )
-    result['stereo'] = dict(
-        filter='filter.cfg',
-        inputs=2,
-        outputs=2,
-        files={'room.wav': float_wav_bytes(RATE, [left, right]), 'filter.cfg': stereo_cfg.encode('utf-8')},
-        paths=[
-            dict(ir=left, inputs=[(0, 1.0)], outputs=[(0, 1.0)]),
-            dict(ir=right, inputs=[(1, 1.0)], outputs=[(1, 1.0)]),
-            dict(ir=right, inputs=[(0, 0.5)], outputs=[(1, 1.0)]),
+    result['stereo'] = {
+        'filter': 'filter.cfg',
+        'inputs': 2,
+        'outputs': 2,
+        'files': {'room.wav': float_wav_bytes(RATE, [left, right]), 'filter.cfg': stereo_cfg.encode('utf-8')},
+        'paths': [
+            {'ir': left, 'inputs': [(0, 1.0)], 'outputs': [(0, 1.0)]},
+            {'ir': right, 'inputs': [(1, 1.0)], 'outputs': [(1, 1.0)]},
+            {'ir': right, 'inputs': [(0, 0.5)], 'outputs': [(1, 1.0)]},
         ],
-        input_delays=[0, 0],
-        output_delays=[0, _delay_frames(1)],
-    )
+        'input_delays': [0, 0],
+        'output_delays': [0, _delay_frames(1)],
+    }
 
     # Crossover (2 -> 6): each side splits into low, mid and high bands that add
     # back to a delayed impulse. Low is a wide binomial low-pass (about 1 kHz at
@@ -275,24 +275,24 @@ def fixtures():
         'crossover.wav\n4\n1\n4\n'
         'crossover.wav\n5\n1\n5.5\n'
     )
-    result['crossover'] = dict(
-        filter='filter.cfg',
-        inputs=2,
-        outputs=6,
-        files={'crossover.wav': float_wav_bytes(RATE, crossover_irs), 'filter.cfg': crossover_cfg.encode('utf-8')},
-        paths=[
-            dict(ir=crossover_irs[0], inputs=[(0, 1.0)], outputs=[(0, 1.0)]),
-            dict(ir=crossover_irs[1], inputs=[(0, 1.0)], outputs=[(1, 1.0)]),
-            dict(ir=crossover_irs[2], inputs=[(0, 1.0)], outputs=[(2, 0.5)]),
-            dict(ir=crossover_irs[3], inputs=[(1, 1.0)], outputs=[(3, 1.0)]),
-            dict(ir=crossover_irs[4], inputs=[(1, 1.0)], outputs=[(4, 1.0)]),
-            dict(ir=crossover_irs[5], inputs=[(1, 1.0)], outputs=[(5, 0.5)]),
+    result['crossover'] = {
+        'filter': 'filter.cfg',
+        'inputs': 2,
+        'outputs': 6,
+        'files': {'crossover.wav': float_wav_bytes(RATE, crossover_irs), 'filter.cfg': crossover_cfg.encode('utf-8')},
+        'paths': [
+            {'ir': crossover_irs[0], 'inputs': [(0, 1.0)], 'outputs': [(0, 1.0)]},
+            {'ir': crossover_irs[1], 'inputs': [(0, 1.0)], 'outputs': [(1, 1.0)]},
+            {'ir': crossover_irs[2], 'inputs': [(0, 1.0)], 'outputs': [(2, 0.5)]},
+            {'ir': crossover_irs[3], 'inputs': [(1, 1.0)], 'outputs': [(3, 1.0)]},
+            {'ir': crossover_irs[4], 'inputs': [(1, 1.0)], 'outputs': [(4, 1.0)]},
+            {'ir': crossover_irs[5], 'inputs': [(1, 1.0)], 'outputs': [(5, 0.5)]},
         ],
-        input_delays=[0, 0],
-        output_delays=[0, 0, _delay_frames(0.5), 0, 0, _delay_frames(0.5)],
-    )
+        'input_delays': [0, 0],
+        'output_delays': [0, 0, _delay_frames(0.5), 0, 0, _delay_frames(0.5)],
+    }
 
-    for seed_base, (name, fixture) in enumerate(result.items()):
+    for seed_base, (_name, fixture) in enumerate(result.items()):
         inputs = [noise(INPUT_FRAMES, 10 * (seed_base + 1) + c) for c in range(fixture['inputs'])]
         inputs = [[to_float32(v) for v in channel] for channel in inputs]
         fixture['input'] = inputs
@@ -339,13 +339,15 @@ def documented_commands(pages=DOCUMENTED):
     commands = []
     for page in pages:
         text = page.read_text(encoding='utf-8')
-        blocks = re.findall(re.escape(MARKER) + r'\s*```sh\n(.*?)\n```', text, re.S)
+        blocks = re.findall(re.escape(MARKER) + r'\s*```sh\n(.*?)\n```', text, re.DOTALL)
         if not blocks:
             raise ValueError(f'{page}: no first-use examples marked with {MARKER}')
-        for block in blocks:
-            for line in block.splitlines():
-                if line.strip() and not line.lstrip().startswith('#'):
-                    commands.append((page, shlex.split(line)))
+        commands.extend(
+            (page, shlex.split(line))
+            for block in blocks
+            for line in block.splitlines()
+            if line.strip() and not line.lstrip().startswith('#')
+        )
     return commands
 
 
@@ -394,7 +396,7 @@ def run_documented(cli, work, examples):
         raise ValueError(
             f'no documented render for {sorted(missing)}; document one in {DOCUMENTED[1].relative_to(REPOSITORY)}'
         )
-    with open(work / 'fixtures.txt', 'w', encoding='utf-8', newline='\n') as listing:
+    with (work / 'fixtures.txt').open('w', encoding='utf-8', newline='\n') as listing:
         for name in FIXTURE_NAMES:
             listing.write('\t'.join([name, *(str(p) for p in renders[name])]) + '\n')
     print(f'Documented first-use commands passed; worst error against the oracle {worst:.3g}')

@@ -28,7 +28,6 @@ Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO [--benchmark BENCHMARK.EXE
 
 import argparse
 import os
-from pathlib import Path
 import re
 import shutil
 import struct
@@ -36,6 +35,7 @@ import subprocess
 import sys
 import tempfile
 import wave
+from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPOSITORY / 'tests/plugins'))
@@ -90,7 +90,7 @@ class EqualizerApo:
         self.load(Path(path))
 
     # --- Loading ---------------------------------------------------------------
-    def index(self, word, allow_new=False):
+    def index(self, word, *, allow_new=False):
         if word[:1].isdigit():
             number = int(re.match(r'\d+', word).group()) - 1
             if 0 <= number < len(self.names):
@@ -115,8 +115,8 @@ class EqualizerApo:
 
     def load(self, path):
         skipping = []  # one flag per open If: True when that If is false
-        for line in path.read_text(encoding='utf-8').split('\n'):
-            line = line.rstrip('\r')
+        for raw in path.read_text(encoding='utf-8').split('\n'):
+            line = raw.rstrip('\r')
             if ':' not in line:
                 if line.strip() and not line.lstrip().startswith('#'):
                     raise ModelError(f'line without a command: {line!r}')
@@ -266,7 +266,7 @@ class Runtime:
     MARKER = '# Written by equalizer_apo_tests.py; replaced on every run.'
 
     def __init__(self, benchmark, config):
-        import winreg  # noqa: PLC0415  (Windows only)
+        import winreg
 
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\EqualizerAPO') as key:
             registered = Path(winreg.QueryValueEx(key, 'ConfigPath')[0])
@@ -312,6 +312,7 @@ class Runtime:
             text=True,
             errors='replace',
             timeout=120,
+            check=False,
         )
         log = run.stdout + run.stderr
         if run.returncode != 0 or not result.exists():
@@ -360,7 +361,7 @@ def read_wav(path):
     """Planar samples of a 32-bit float or 16-bit PCM WAV."""
     data = Path(path).read_bytes()
     fmt = data.find(b'fmt ')
-    tag, _, _, _, _, bits = struct.unpack('<HHIIHH', data[fmt + 8 : fmt + 24])
+    _tag, _, _, _, _, bits = struct.unpack('<HHIIHH', data[fmt + 8 : fmt + 24])
     if bits == 32:
         return fixtures.read_float_wav(path)
     with wave.open(str(path), 'rb') as file:
@@ -380,7 +381,7 @@ RUNTIME = None  # Set in main() when --benchmark is given.
 
 
 def run(*args, ok=True):
-    result = subprocess.run([TOOL, *map(str, args)], capture_output=True, text=True)
+    result = subprocess.run([TOOL, *map(str, args)], capture_output=True, text=True, check=False)
     if ok and result.returncode != 0:
         raise AssertionError(f'{args}: {result.stderr}')
     if not ok and result.returncode == 0:
@@ -488,17 +489,17 @@ def test_list(work):
 
     x2 = signal(2, 300)
     a_paths = [
-        dict(ir=a[0], inputs=[(0, 1.0)], outputs=[(0, 1.0)]),
-        dict(ir=a[1], inputs=[(1, 1.0)], outputs=[(1, 1.0)]),
+        {'ir': a[0], 'inputs': [(0, 1.0)], 'outputs': [(0, 1.0)]},
+        {'ir': a[1], 'inputs': [(1, 1.0)], 'outputs': [(1, 1.0)]},
     ]
     check('list: a.cfg at 44.1 kHz', out, 44100, 2, x2, oracle(x2, a_paths, 2), 2)
 
     x3 = signal(3, 400)
     b_paths = [
-        dict(ir=b[0], inputs=[(0, 1.0), (2, 0.5)], outputs=[(0, 1.0)]),
-        dict(ir=b[1], inputs=[(1, 1.0)], outputs=[(1, 1.0), (0, 0.25)]),
-        dict(ir=b[0], inputs=[(2, -1.0)], outputs=[(1, 0.5)]),
-        dict(ir=b[1], inputs=[(0, -1.0)], outputs=[(1, -0.125)]),
+        {'ir': b[0], 'inputs': [(0, 1.0), (2, 0.5)], 'outputs': [(0, 1.0)]},
+        {'ir': b[1], 'inputs': [(1, 1.0)], 'outputs': [(1, 1.0), (0, 0.25)]},
+        {'ir': b[0], 'inputs': [(2, -1.0)], 'outputs': [(1, 0.5)]},
+        {'ir': b[1], 'inputs': [(0, -1.0)], 'outputs': [(1, -0.125)]},
     ]
     b_expected = oracle(x3, b_paths, 2, [0, 24, 0], [48, 0])
     check('list: b.cfg at 48 kHz, 3 channels', out, 48000, 3, x3, b_expected, 3)
@@ -506,7 +507,7 @@ def test_list(work):
     check('list: b.cfg at 48 kHz, 4 channels', out, 48000, 4, x3, b_expected, 3)
 
     x1 = signal(1, 500)
-    c_paths = [dict(ir=c, inputs=[(0, 1.0)], outputs=[(0, 1.0)])]
+    c_paths = [{'ir': c, 'inputs': [(0, 1.0)], 'outputs': [(0, 1.0)]}]
     check('list: c.wav at 48 kHz, 1 channel', out, 48000, 1, x1, oracle(x1, c_paths, 1), 1)
     # Stereo at 48 kHz: c.wav fits (filters channel 1); channel 2 is silent.
     check('list: c.wav at 48 kHz, 2 channels', out, 48000, 2, x1, oracle(x1, c_paths, 1), 1)
@@ -599,7 +600,7 @@ def test_refusals(work):
 
 
 def main():
-    global RUNTIME
+    global RUNTIME  # noqa: PLW0603 (set once from the command line)
     if OPTIONS.benchmark or OPTIONS.config:
         if not (OPTIONS.benchmark and OPTIONS.config):
             ARGUMENTS.error('--benchmark and --config go together')

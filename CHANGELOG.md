@@ -76,11 +76,17 @@ Until 1.0 the C++ API may change between minor versions.
   with ruff. No behaviour changes. See
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - Python tools (CI-18): pre-commit, and so lint CI, now formats the maintained
-  Python scripts and tests with ruff 0.17.3 (120 columns, single quotes) and
-  lints them with its pyflakes and pycodestyle error rules, so an unused
-  import or undefined name fails Lint. All 77 files were reformatted once, in
-  a layout-only commit that `.git-blame-ignore-revs` lets `git blame` skip.
-  See [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+  Python scripts and tests with the latest stable ruff (120 columns, single
+  quotes) and lints them with every stable ruff rule except a short, explained
+  list in `ruff.toml`. All 77 files were reformatted once, in a layout-only
+  commit that `.git-blame-ignore-revs` lets `git blame` skip; the code then
+  changed to meet the rules: f-strings instead of `%` formatting, explicit
+  `check=False` on `subprocess.run`, keyword-only boolean options in the
+  release scripts (`fetch=`, `push=`, `production=` and others), `Path.open`,
+  comprehensions, sorted imports, and executable scripts that have a `#!`
+  line. Like the Clang tools, ruff is not pinned, so a new release can turn
+  Lint red. No behaviour changes. See
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 
 ### Fixed
 
