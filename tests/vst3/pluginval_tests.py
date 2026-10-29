@@ -52,7 +52,8 @@ def run_pluginval(pluginval, arguments, **kwargs):
             sys.exit('pluginval needs DISPLAY or xvfb-run on Linux')
         command = [xvfb, '--auto-servernum', *command]
     print('+', ' '.join(command), flush=True)
-    return subprocess.run(command, **kwargs, check=False)
+    check = kwargs.pop('check', False)
+    return subprocess.run(command, check=check, **kwargs)
 
 
 SKIPPED = 77  # CTest's SKIP_RETURN_CODE for this test.
