@@ -26,7 +26,6 @@ APO release instead of installing it.
 Usage: equalizer_apo_tests.py CONVOLVER_EQUALIZER_APO [--benchmark BENCHMARK.EXE --config FOLDER]
 """
 import argparse
-import math
 import os
 from pathlib import Path
 import re

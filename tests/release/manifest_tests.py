@@ -2,7 +2,6 @@
 """Release policy rejects ambiguous or incomplete candidate contracts."""
 import copy
 import importlib.util
-import json
 from pathlib import Path
 import unittest
 

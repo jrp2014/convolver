@@ -7,8 +7,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tarfile
-import tempfile
 import zipfile
 from build_dependencies import add_jobs_option, build as build_dependencies, parallel
 from contract import load_policy, platform_policy, sha256, with_records
@@ -16,7 +14,6 @@ from installers import prepare
 import resolve
 from sources import extract
 from symbols import check as check_symbols
-from verify_artifact import inventory, verify_files
 
 def run(command, **kwargs):
     subprocess.run([str(arg) for arg in command], check=True, **kwargs)

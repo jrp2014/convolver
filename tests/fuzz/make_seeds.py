@@ -5,7 +5,6 @@
 Usage: make_seeds.py [OUTPUT_DIRECTORY]   (default: tests/fuzz/seeds)
 host_state seeds are produced by the C++ encoder and are kept as committed files.
 """
-import json
 from pathlib import Path
 import sys
 

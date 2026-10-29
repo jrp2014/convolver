@@ -7,7 +7,6 @@ sources again. source-manifest.json records exactly what went in: version,
 tag, commit, URL and checksum of each archive."""
 import argparse
 import gzip
-import io
 import json
 from pathlib import Path
 import subprocess

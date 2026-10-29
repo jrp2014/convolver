@@ -19,7 +19,6 @@ debugging payload:
 DIAG-1, from jrp's review of 0.4.43: before this, only the names were checked,
 so an empty `.debug` file or a `.dSYM` holding only `Info.plist` passed.
 """
-from pathlib import Path
 import struct
 import uuid as uuids
 import zlib

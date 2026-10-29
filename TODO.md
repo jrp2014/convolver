@@ -756,6 +756,9 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   PR #87, from the external review of PR #86: `candidate.py`,
   `build_dependencies.py` and `source_build.py` take `--jobs N`; the default
   stays every CPU; [preview recipe](docs/develop/build.md#preview-recipe).
+- [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88,
+  from a Skylos scan: 11 unused imports in the release scripts and four test
+  scripts; [lint checks](CONTRIBUTING.md#lint-checks).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

@@ -70,6 +70,11 @@ Until 1.0 the C++ API may change between minor versions.
   and tests to N jobs at once for a machine with less memory; without it they
   still use every CPU. From the external review of PR #86. See
   [preview recipe](docs/develop/build.md#preview-recipe).
+- Python tools (CI-17): removed 11 unused imports from the release scripts
+  (`build_sources.py`, `candidate.py`, `symbols.py`, `verify_artifact.py`) and
+  four test scripts, found by a Skylos scan on 29 October 2026 and confirmed
+  with ruff. No behaviour changes. See
+  [lint checks](CONTRIBUTING.md#lint-checks).
 
 ### Fixed
 

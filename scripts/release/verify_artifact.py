@@ -2,7 +2,7 @@
 """Inspect native binaries and seal/verify a staged release file inventory."""
 import argparse
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import platform
 import re
 import subprocess

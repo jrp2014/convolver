@@ -2,7 +2,6 @@
 """Production promotion must fail closed on incomplete or changed evidence."""
 import copy
 import importlib.util
-import json
 from pathlib import Path
 import sys
 import tempfile
