@@ -88,27 +88,27 @@ fails if any did; CI runs the portable list this way.
 `ruff.toml` sets the style for the maintained Python scripts and tests: ruff's
 formatter with 120 columns and single quotes, and its pyflakes and pycodestyle
 error rules (unused imports and names, undefined names, misplaced imports,
-statement errors such as a bare `except` or `== None`, and syntax errors). pre-commit runs `ruff check --fix` and `ruff format` with the
-ruff release pinned in `.pre-commit-config.yaml`, so lint CI fails on an unused
-import or a formatting difference. For a manual run, install the same version
-in the [lint environment](#lint-checks):
+statement errors such as a bare `except` or `== None`, and syntax errors).
+pre-commit runs `ruff check --fix` and `ruff format` with the latest stable
+ruff, installed when the hook environment is created, so lint CI fails on an
+unused import or a formatting difference. Like the Clang tools, ruff is not
+pinned: CI resolves the newest release before restoring its cache, and cloud
+sessions refresh the hook environment when it changes. Refresh a local one
+after a ruff release with `pre-commit clean`. For a manual run, install ruff in
+the [lint environment](#lint-checks):
 
 ```sh
-python -m pip install ruff==0.17.3
+python -m pip install --upgrade ruff
 ruff check .
 ruff format .
 ```
 
-An import that must follow a `sys.path` change carries `# noqa: E402`. The
-historical sources and the dated evidence under `docs/review-2026-10/` are
-excluded. `.git-blame-ignore-revs` lists the first reformat, so `git blame`
-on GitHub skips it; locally, run
-`git config blame.ignoreRevsFile .git-blame-ignore-revs` once. To update ruff,
-change the pinned `rev`, run `pre-commit run --all-files`, commit any layout
-changes on their own, as for clang-format below, and add that commit's hash to
-`.git-blame-ignore-revs`.
+The historical sources and the dated evidence under `docs/review-2026-10/` are
+excluded. `.git-blame-ignore-revs` lists the layout-only reformats, so
+`git blame` on GitHub skips them; locally, run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
 
-### When a new Clang release turns CI red
+### When a new Clang or ruff release turns CI red
 
 Because the tools are not pinned, a new release can fail CI on code that
 nobody changed. That is accepted (owner's decision, 24 October 2026); handle
@@ -124,6 +124,14 @@ it by which tool failed:
   code in its own commit and say what the diagnostic found. If a diagnostic is
   a false positive, suppress that one line with `// NOLINT(check-name)` and a
   reason; do not turn the check off.
+- **ruff format** changes layout only. Run `pre-commit clean` and
+  `pre-commit run ruff-format --all-files` (or apply the `lint-fixes` patch),
+  commit the result on its own as `style: apply ruff X.Y.Z layout`, and add
+  that commit's hash to `.git-blame-ignore-revs`.
+- **ruff check** adds rules within the families `ruff.toml` selects. Fix the
+  code in its own commit. If a diagnostic is a false positive, suppress that
+  line with `# noqa: CODE` and a reason; if the new rule does not suit the
+  project, add it to the ignore list in `ruff.toml` with the reason.
 
 ## Lint checks
 
