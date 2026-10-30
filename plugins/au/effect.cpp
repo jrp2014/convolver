@@ -328,6 +328,11 @@ HostReport Effect::report_locked(std::string& faults) {
     facts.tail_frames = tail_.load();
     facts.log_written = status_log_written_;
     facts.chooses_files = true; // Choose Filter in the window (load_property).
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    facts.file_reader = sndfile_version();
+#else
+    facts.file_reader = "macOS AudioToolbox";
+#endif
     return host_report(filter_, facts);
 }
 
@@ -984,8 +989,14 @@ OSStatus Effect::load_file(const std::string& path) {
     }
     FilterFileFailure why;
     // macOS's reader, not libsndfile, so the component needs nothing beyond
-    // macOS (jrp's decision, 30 October 2026).
-    auto next = read_filter_file(path, host, detail::audio_toolbox_files(), why);
+    // macOS (jrp's decision, 30 October 2026); CONVOLVER_AU_FILE_READER=LIBSNDFILE
+    // builds the fallback.
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    const auto& reader = detail::libsndfile_files();
+#else
+    const auto& reader = detail::audio_toolbox_files();
+#endif
+    auto next = read_filter_file(path, host, reader, why);
     bool accepted = false;
     if (!next) {
         log_faults(reject(why.kind, why.message, request));

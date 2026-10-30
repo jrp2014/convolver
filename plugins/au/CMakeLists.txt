@@ -34,10 +34,38 @@ add_library(convolver_au_adapter STATIC effect.cpp)
 target_include_directories(convolver_au_adapter PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
 # Filter files chosen in the window are read with macOS's AudioToolbox, not
-# libsndfile (jrp's decision, 30 October 2026): the component links nothing
-# beyond macOS, which tests/au/bundle_tests.py checks.
+# libsndfile (jrp's decision, 30 October 2026), so the component links nothing
+# beyond macOS, which tests/au/bundle_tests.py checks. LIBSNDFILE reads them
+# as the other platforms and the tools do, as a fallback; the component then
+# needs libsndfile wherever it runs (jrp, 30 October 2026).
+set(CONVOLVER_AU_FILE_READER "AUDIOTOOLBOX" CACHE STRING
+    "How the Audio Unit reads filter files: AUDIOTOOLBOX (macOS's own) or LIBSNDFILE")
+set_property(CACHE CONVOLVER_AU_FILE_READER PROPERTY STRINGS AUDIOTOOLBOX LIBSNDFILE)
+string(TOUPPER "${CONVOLVER_AU_FILE_READER}" au_file_reader)
+if(au_file_reader STREQUAL "AUDIOTOOLBOX")
+    set(au_reader_library convolver_audio_toolbox)
+elseif(au_file_reader STREQUAL "LIBSNDFILE")
+    if(NOT TARGET convolver_io)
+        message(FATAL_ERROR "CONVOLVER_AU_FILE_READER=LIBSNDFILE needs CONVOLVER_BUILD_IO")
+    endif()
+    set(au_reader_library convolver_io)
+    message(WARNING "CONVOLVER_AU_FILE_READER=LIBSNDFILE: the component links libsndfile, which "
+        "every Mac that loads it must have. Use AUDIOTOOLBOX for components you distribute.")
+else()
+    message(FATAL_ERROR "CONVOLVER_AU_FILE_READER must be AUDIOTOOLBOX or LIBSNDFILE")
+endif()
+message(STATUS "Audio Unit file reader: ${au_file_reader}")
 target_link_libraries(convolver_au_adapter PUBLIC convolver_ausdk Convolver::host
-    convolver_filter_file convolver_audio_toolbox)
+    convolver_filter_file ${au_reader_library})
+# Public: the window test reads with the same reader.
+target_compile_definitions(convolver_au_adapter PUBLIC "CONVOLVER_AU_READER_${au_file_reader}=1")
+# What au.bundle accepts: only macOS's libraries, unless a fallback (this
+# reader, or CONVOLVER_FFT_BACKEND=FFTW) links another.
+if(au_file_reader STREQUAL "AUDIOTOOLBOX" AND NOT fft_backend STREQUAL "FFTW")
+    set(au_bundle_libraries system-only)
+else()
+    set(au_bundle_libraries any-libraries)
+endif()
 target_compile_options(convolver_au_adapter PRIVATE -Wall -Wextra -Wpedantic)
 set_target_properties(convolver_au_adapter PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
@@ -107,7 +135,8 @@ if(CONVOLVER_BUILD_TESTS)
     add_test(NAME au.adapter COMMAND convolver_au_tests)
     # The bundle: identities from the registry, one exported symbol, notices, signature.
     add_test(NAME au.bundle COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/au/bundle_tests.py"
-        "${PROJECT_SOURCE_DIR}/plugins/identities.json" "$<TARGET_BUNDLE_DIR:convolver_au>" "${PROJECT_VERSION}")
+        "${PROJECT_SOURCE_DIR}/plugins/identities.json" "$<TARGET_BUNDLE_DIR:convolver_au>" "${PROJECT_VERSION}"
+        ${au_bundle_libraries})
     set_tests_properties(au.adapter au.bundle PROPERTIES LABELS "au;real-libraries" TIMEOUT 180)
     set(au_test_targets convolver_au convolver_au_tests)
     # PLUG-2: the shared harness, against the oracle and the CLI renders that

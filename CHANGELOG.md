@@ -27,7 +27,9 @@ Until 1.0 the C++ API may change between minor versions.
   Audio Unit reads sound files with macOS's own AudioToolbox, so the
   component still links nothing beyond macOS (jrp, 30 October 2026);
   `native.audio_toolbox` checks that it reads every format the tests write
-  to the same samples as libsndfile. While the host restores a filter on
+  to the same samples as libsndfile. A build with
+  `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE` reads them with libsndfile instead,
+  as a fallback; the window's Software detail names the reader. While the host restores a filter on
   another thread the window shows the last report rather than waiting. No
   sound changes.
 - Library (internal to the adapters): the editor report (PLUG-9) in

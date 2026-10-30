@@ -23,8 +23,8 @@ def fail(message):
 
 
 def main():
-    if len(sys.argv) != 4:
-        sys.exit('usage: bundle_tests.py IDENTITIES.json Convolver.component VERSION')
+    if len(sys.argv) != 5 or sys.argv[4] not in {'system-only', 'any-libraries'}:
+        sys.exit('usage: bundle_tests.py IDENTITIES.json Convolver.component VERSION system-only|any-libraries')
     registry = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
     bundle = Path(sys.argv[2])
     version = sys.argv[3]
@@ -66,6 +66,8 @@ def main():
 
     # Only macOS's own libraries, plus a sanitizer build's runtime: anything
     # else would have to be installed on every Mac that loads the component.
+    # A build with a fallback (CONVOLVER_AU_FILE_READER=LIBSNDFILE or
+    # CONVOLVER_FFT_BACKEND=FFTW) passes any-libraries and only lists them.
     linked = subprocess.run(
         ['otool', '-L', str(executable)], check=True, capture_output=True, text=True
     ).stdout.splitlines()
@@ -74,7 +76,9 @@ def main():
     for line in linked:
         library = line.strip().split(' (')[0]
         if not library.startswith(('/System/Library/', '/usr/lib/')) and 'libclang_rt.' not in library:
-            fail(f'the executable links {library}, which is not part of macOS')
+            if sys.argv[4] == 'system-only':
+                fail(f'the executable links {library}, which is not part of macOS')
+            print(f'note: links {library} (a fallback build: every Mac that loads it needs this library)')
 
     licenses = contents / 'Resources' / 'licenses'
     for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt'):

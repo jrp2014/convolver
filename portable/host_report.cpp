@@ -127,6 +127,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     auto software = execution_line();
     if (software.starts_with("Session: "))
         software.erase(0, 9);
+    if (!facts.file_reader.empty())
+        software += "; filter files read with " + facts.file_reader;
     r.details.emplace_back("Software", software);
 
     r.log_written = facts.log_written;

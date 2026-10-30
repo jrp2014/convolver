@@ -184,6 +184,7 @@ source and records exactly which releases it used.
 | `CONVOLVER_PLUGINVAL`, `CONVOLVER_PLUGINVAL_ARGS` | empty | Optional pluginval executable and extra options for the host-compatibility tests |
 | `CONVOLVER_BUILD_AU` | OFF | Audio Unit adapter (macOS); see [Audio Unit](#audio-unit) |
 | `CONVOLVER_AU_SDK` | empty | AudioUnitSDK source folder |
+| `CONVOLVER_AU_FILE_READER` | AUDIOTOOLBOX | How the Audio Unit reads the filter files chosen in its window: `AUDIOTOOLBOX` (macOS's own) or `LIBSNDFILE` (as the tools and the other platforms read them; needs I/O, and the component then needs libsndfile wherever it runs); see [Audio Unit](#audio-unit) |
 | `CONVOLVER_BUILD_LV2` | OFF | LV2 adapter; see [LV2](#lv2) |
 | `CONVOLVER_PACKAGE_PLUGINS` | OFF | Stage the VST3 bundle, tools and examples for distribution |
 | `CONVOLVER_DISTRIBUTION_LICENSE_DIR` | empty | Dependency notices from `build_dependencies.py`, for packaging |
@@ -305,7 +306,15 @@ a CMake installed outside Homebrew, such as conda's, may also need
 The component is `build-au/plugins/au/Convolver.component`. It links only
 macOS's own libraries (`au.bundle` checks this with `otool -L`): Accelerate
 for the FFT, and AudioToolbox to read the filter files chosen in its window.
-libsndfile is used only by the tools and tests. The AU target builds as C++23 because AudioUnitSDK needs it; the core
+libsndfile is used only by the tools and tests.
+
+Both have fallbacks to the libraries the other platforms use:
+`-DCONVOLVER_FFT_BACKEND=FFTW` ([plug-in builds](fft-backends.md#plug-in-builds))
+and `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE`, which reads filter files exactly
+as `convolver-preset` does. CMake warns for each, since the component then
+links a library every Mac that loads it must have; `au.bundle` lists those
+libraries instead of failing. The Audio Unit workflow's sanitizer job builds
+both fallbacks. The AU target builds as C++23 because AudioUnitSDK needs it; the core
 and other formats stay C++20.
 
 ### LV2

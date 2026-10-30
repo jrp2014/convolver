@@ -154,6 +154,15 @@ std::string loaded_path(Unit& unit) {
     return text(path);
 }
 
+// The reader the unit was built with (CONVOLVER_AU_FILE_READER).
+const detail::SoundFiles& unit_reader() {
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    return detail::libsndfile_files();
+#else
+    return detail::audio_toolbox_files();
+#endif
+}
+
 // A file chosen as the window chooses one, without the window.
 OSStatus choose(Unit& unit, const std::string& path) {
     NSString* name = @(path.c_str()); // Held for the call.
@@ -454,8 +463,7 @@ void files() {
             "the details do not name the file:\n" + text(r[@"details"]));
     require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
     require(encode_host_state(unit.saved()) ==
-                encode_host_state(
-                    filter_file_state(stereo, {44100, 2, 2}, detail::audio_toolbox_files())),
+                encode_host_state(filter_file_state(stereo, {44100, 2, 2}, unit_reader())),
             "the saved state differs from the shared file step's (native.audio_toolbox checks "
             "that it matches convolver-preset's)");
 

@@ -576,13 +576,16 @@ Four CTest tests run when the adapter is built (label `au`):
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
   (`ConvolverAUFactory`), only macOS's own libraries linked (`otool -L`; a
-  sanitizer build's runtime aside), the licence files and the signature.
+  sanitizer build's runtime aside; a build with a fallback library only
+  lists them), the licence files and the signature.
 
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
 installs the component for the runner's user and runs `auval -strict`; its
-`au-sanitizers` job runs them again with ASan and UBSan. Named
+`au-sanitizers` job runs them again with ASan and UBSan, built with the
+fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
+so that they keep working. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 

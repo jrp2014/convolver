@@ -32,6 +32,9 @@ struct HostReportFacts {
     // The format's window can load a filter file (the Audio Unit's Choose
     // Filter), so an empty instance is told about it as well as presets.
     bool chooses_files = false;
+    // How that window reads sound files, for the Software detail, such as
+    // "macOS AudioToolbox"; empty when the format reads none.
+    std::string file_reader;
 };
 
 struct HostReport {

@@ -74,7 +74,14 @@ void cases() {
              HostFilter f(8);
              auto x = facts(stereo);
              x.chooses_files = true;
-             return host_report(f, x);
+             x.file_reader = "macOS AudioToolbox";
+             auto r = host_report(f, x);
+             for (const auto& [name, value] : r.details)
+                 if (name == "Software" &&
+                     value.find("; filter files read with macOS AudioToolbox") == std::string::npos)
+                     throw std::runtime_error("the Software detail does not name the reader: " +
+                                              value);
+             return r;
          },
          HostStatus::no_filter,
          {"choose a filter file (Choose Filter", "load a Convolver preset"},
