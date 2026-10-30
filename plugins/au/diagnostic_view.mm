@@ -115,7 +115,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSString* shown_; // The explanation and details last shown, so a refresh keeps a selection.
     NSString* logPath_;
     NSArray<NSDictionary<NSString*, id>*>* settings_;
-    CGFloat textTop_; // Under the settings.
+    CGFloat textTop_;    // Under the settings.
+    NSInteger dragging_; // The slider the user is dragging, or -1.
+    NSUInteger choosing_,
+        requests_;       // The pending Choose Filter request (0: none), the last number.
+    NSOpenPanel* panel_; // Its dialog, while one is open.
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -131,6 +135,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
     loader_ = [loader copy];
+    dragging_ = -1;
     const CGFloat inner = width - 2 * margin;
 
     _titleField = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize]],
@@ -276,6 +281,20 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (void)dealloc {
     [timer_ invalidate];
+    [panel_ cancel:nil];
+}
+
+// Forgets a pending Choose Filter request and closes its dialog.
+- (void)stopChoosing {
+    choosing_ = 0;
+    NSOpenPanel* panel = panel_;
+    panel_ = nil;
+    [panel cancel:nil];
+}
+
+- (void)windowWillClose:(NSNotification*)notification {
+    static_cast<void>(notification);
+    [self stopChoosing];
 }
 
 // The timer runs while the view is in a window and reads only while that
@@ -285,8 +304,17 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [super viewDidMoveToWindow];
     [timer_ invalidate];
     timer_ = nil;
+    // A file chosen for another window, or none, is not loaded.
+    [self stopChoosing];
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSWindowWillCloseNotification
+                                                  object:nil];
     if (!self.window)
         return;
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(windowWillClose:)
+                                                 name:NSWindowWillCloseNotification
+                                               object:self.window];
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
     timer_ = [NSTimer timerWithTimeInterval:refresh_interval
                                     repeats:YES
@@ -298,9 +326,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self refresh];
 }
 
-- (BOOL)refreshIfShown {
+- (BOOL)shown {
     NSWindow* window = self.window;
-    if (!window.visible || !(window.occlusionState & NSWindowOcclusionStateVisible))
+    return window.visible && (window.occlusionState & NSWindowOcclusionStateVisible);
+}
+
+- (BOOL)refreshIfShown {
+    if (![self shown])
         return NO;
     [self refresh];
     return YES;
@@ -321,11 +353,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _settingSliders[i].accessibilityValueDescription = text;
 }
 
-// The user moved a slider: the format passes the value to the host.
+// The user moved a slider: the format passes the value to the host. While
+// the mouse drags this slider, readSettings leaves it where the user puts it.
 - (void)settingChanged:(NSSlider*)slider {
     const auto i = static_cast<NSUInteger>(slider.tag);
     if (i >= settings_.count)
         return;
+    const NSEventType event = NSApp.currentEvent.type;
+    dragging_ =
+        event == NSEventTypeLeftMouseDown || event == NSEventTypeLeftMouseDragged ? slider.tag : -1;
     NSDictionary<NSString*, id>* setting = settings_[i];
     ConvolverSettingSetter set = setting[@"set"];
     if (set)
@@ -334,10 +370,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 // The settings as the host has them now (automation, its own controls),
-// except while the user is dragging a slider.
+// except the slider the user is dragging (jrp's review: a button held
+// anywhere else must not freeze them).
 - (void)readSettings {
-    const BOOL dragging = [NSEvent pressedMouseButtons] != 0;
+    if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0)
+        dragging_ = -1; // The drag ended without a final action.
     for (NSUInteger i = 0; i < settings_.count; ++i) {
+        const BOOL dragging = dragging_ == static_cast<NSInteger>(i);
         ConvolverSettingGetter get = settings_[i][@"get"];
         const double value = get ? get() : NAN;
         if (std::isnan(value)) {
@@ -388,10 +427,31 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return accepted;
 }
 
-// The system's file dialog, run modally: a sheet would attach to the host's
-// window, which a plug-in does not own.
+- (NSUInteger)startChoosing {
+    [self stopChoosing];
+    choosing_ = ++requests_;
+    return choosing_;
+}
+
+- (BOOL)finishChoosing:(NSUInteger)request URL:(NSURL*)url {
+    if (request == 0 || request != choosing_)
+        return NO; // Forgotten: the window closed, or a newer request replaced it.
+    choosing_ = 0;
+    panel_ = nil;
+    if (!url.fileURL || !self.window)
+        return NO;
+    if ([self loadFile:url.path])
+        return YES;
+    NSBeep();
+    return NO;
+}
+
+// The system's file dialog, as its own window: a sheet would attach to the
+// host's window, which a plug-in does not own.
 - (void)chooseFilter:(id)sender {
+    const NSUInteger request = [self startChoosing];
     NSOpenPanel* panel = [NSOpenPanel openPanel];
+    panel_ = panel;
     panel.canChooseFiles = YES;
     panel.canChooseDirectories = NO;
     panel.allowsMultipleSelection = NO;
@@ -399,15 +459,16 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         @"Choose a Convolver configuration (.cfg) or a sound file to use as the filter.";
     panel.prompt = @"Load";
     // Not runModal: a modal loop inside the plug-in would stall the host's
-    // own window events (plan, threads rule 4). The window may close before
-    // the panel does, so the handler holds it weakly.
+    // own window events (plan, threads rule 4). The view may go before the
+    // panel does, so the handler holds it weakly; and the window may close
+    // first, which forgets the request (finishChoosing:URL:).
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
+    __weak NSOpenPanel* weakPanel = panel;
     [panel beginWithCompletionHandler:^(NSModalResponse response) {
       CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
-      if (!view || response != NSModalResponseOK || !panel.URL.fileURL)
-          return;
-      if (![view loadFile:panel.URL.path])
-          NSBeep();
+      NSURL* url = response == NSModalResponseOK ? weakPanel.URL : nil;
+      if (view)
+          [view finishChoosing:request URL:url];
     }];
 }
 

@@ -434,7 +434,8 @@ void window() {
 // convolver-preset uses, so the saved state is the one that step gives for
 // the same rate and channels; a file that does not suit the unit is refused
 // with its name and the reason, the previous filter still playing, and an
-// empty unit stays silent.
+// empty unit stays silent. A dialog that answers after its window closed, or
+// after a newer one opened, loads nothing.
 void files() {
     TemporaryFolder folder;
     const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav";
@@ -480,6 +481,39 @@ void files() {
     require(![view loadFile:@(missing.c_str())], "a missing file accepted");
     require(contains(report(unit)[@"explanation"], missing.c_str()),
             "missing file: " + text(report(unit)[@"explanation"]));
+
+    // Choose Filter's dialog answers later, perhaps after the window has
+    // closed and the host has begun disposing of the unit (jrp's review).
+    // Only the pending request loads its file, once, while the view is in
+    // an open window. Driven without a dialog or the mouse.
+    const auto again = folder / "again.wav", late = folder / "late.wav";
+    write_wav(again, 44100, 2, 8);
+    write_wav(late, 44100, 2, 8);
+    const auto url = [](const std::filesystem::path& path) {
+        return [NSURL fileURLWithPath:@(path.c_str())];
+    };
+    require(![view finishChoosing:[view startChoosing] URL:url(again)],
+            "a file was loaded for a view in no window");
+    NSWindow* host = [[NSWindow alloc] initWithContentRect:view.frame
+                                                 styleMask:NSWindowStyleMaskTitled
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:NO];
+    host.releasedWhenClosed = NO;
+    [host.contentView addSubview:view];
+    const auto older = [view startChoosing], newer = [view startChoosing];
+    require(![view finishChoosing:older URL:url(late)] && loaded_path(unit) == stereo.string(),
+            "a request replaced by a newer one loaded its file");
+    require([view finishChoosing:newer URL:url(again)] && loaded_path(unit) == again.string(),
+            "the pending request did not load its file: " + loaded_path(unit));
+    require(![view finishChoosing:newer URL:url(late)] && loaded_path(unit) == again.string(),
+            "a request loaded a second file");
+    require(![view finishChoosing:[view startChoosing] URL:nil], "a cancelled dialog loaded");
+    const auto pending = [view startChoosing];
+    [host close]; // The host keeps the closed window and the view in it.
+    require(view.window == host, "the closed window no longer holds the view");
+    require(![view finishChoosing:pending URL:url(late)] && loaded_path(unit) == again.string(),
+            "a dialog answered after the window closed loaded its file");
+    [view removeFromSuperview];
     unit.uninitialize();
 
     // On an empty unit a refused first file leaves it silent, as a first

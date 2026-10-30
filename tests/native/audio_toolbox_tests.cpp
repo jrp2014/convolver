@@ -193,6 +193,45 @@ void run(const fs::path& dir) {
                 std::string(name) + ": libsndfile refuses it as '" + expected +
                     "', the reader under test as '" + got + "'");
     }
+    // A file refused after it was opened is closed again (jrp's review: each
+    // refused filter left a descriptor open). Twenty refusals of a WAV whose
+    // header claims 800 kHz, counting the descriptors open before and after.
+    {
+        std::ifstream whole(dir / "pcm16.wav", std::ios::binary);
+        std::string bytes((std::istreambuf_iterator<char>(whole)), {});
+        const std::uint32_t rate = 800000; // Little-endian, at the WAV header's offset 24.
+        for (int b = 0; b < 4; ++b)
+            bytes[24 + b] = static_cast<char>((rate >> (8 * b)) & 0xffU);
+        text_file(dir / "fast.wav", bytes);
+    }
+    const auto open_descriptors = [] {
+        std::size_t n = 0;
+        for ([[maybe_unused]] const auto& entry : fs::directory_iterator("/dev/fd"))
+            ++n;
+        return n;
+    };
+    const auto before = open_descriptors();
+    for (int i = 0; i < 20; ++i) {
+        std::string message;
+        try {
+            reader.open(dir / "fast.wav");
+        } catch (const std::exception& e) {
+            message = e.what();
+        }
+#ifdef __APPLE__
+        // The rate is checked after ExtAudioFileOpenURL, the path that leaked.
+        const bool after_opening = message.find("800000") != std::string::npos;
+#else
+        const bool after_opening = !message.empty();
+#endif
+        require(after_opening,
+                "fast.wav is refused for its rate, after it was opened: '" + message + "'");
+    }
+    const auto after = open_descriptors();
+    std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
+              << '\n';
+    require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
+                                 " before, " + std::to_string(after) + " after");
     // The reader's own message names the missing file.
     try {
         load(dir / "missing.cfg", reader);

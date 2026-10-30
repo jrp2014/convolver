@@ -153,7 +153,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   both, sample for sample (the test prints the largest difference, in units
   of the last place; 32-bit integers may differ by one); a missing,
   truncated, damaged, incomplete raw or wrong-rate filter must be refused
-  with the same diagnostic code by both.
+  with the same diagnostic code by both. A WAV whose header claims 800 kHz,
+  which the reader opens and then refuses, is refused 20 times without
+  leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
@@ -564,7 +566,12 @@ Four CTest tests run when the adapter is built (label `au`):
   details and the load property name it, and the saved state equals
   `filter_file_state()`'s with the same reader; a mono WAV and a missing
   file are refused with the file named, the stereo filter still playing
-  and saved; on an empty unit a refused first file leaves it silent. Then
+  and saved; on an empty unit a refused first file leaves it silent. The
+  dialog's answer is driven in two steps (`startChoosing`,
+  `finishChoosing:URL:`), without a dialog or the mouse: only the pending
+  request loads, once, while the view is in an open window; a request
+  replaced by a newer one, a cancelled dialog, and an answer arriving after
+  the host closed the window (keeping the view in it) load nothing. Then
   responsiveness: report reads while another thread restores a
   2 × 6 000 000-tap filter (whose preparation holds the control lock) must
   each take under a fifth of the restore and under 50 ms; the test prints

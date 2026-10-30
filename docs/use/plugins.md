@@ -47,6 +47,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | How to get it | Preview package, or build | Build from source | Build from source |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
+| Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
 | Choose a `.cfg` or IR file directly | No | [Yes](#the-audio-units-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
@@ -247,7 +248,7 @@ the plug-in's button in the track's Plug-ins area. The window has:
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own
-  controls). The window does not yet mark the start and end of a drag, so a
+  controls), except the one you are dragging. The window does not yet mark the start and end of a drag, so a
   host recording automation from it may record each step separately; not
   yet tried in GarageBand.
 - **What plays, why, and what to change**, in full, as the log explains it.
@@ -261,7 +262,8 @@ the plug-in's button in the track's Plug-ins area. The window has:
 - **Details** below it: the host's rate, channels and block size; the filter
   (rate, channels, paths, its longest response, and the request number the
   log uses); Gain and Mix; latency and tail; the software (version, FFT
-  library, CPU kernels, the Audio Unit SDK); and where the log is.
+  library, CPU kernels, the Audio Unit SDK, and what reads the filter files);
+  and where the log is.
 - **Choose Filter…** opens the file dialog for a `.cfg` file, a
   configuration list or a sound file; dropping the file on the window does
   the same. The Audio Unit reads sound files with macOS's own reader, so
@@ -280,7 +282,8 @@ the plug-in's button in the track's Plug-ins area. The window has:
   reopening, the Filter detail says it came from the saved project. The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
-  moment. Not yet tried in GarageBand, which runs plug-ins in a sandbox: a
+  moment. Closing Convolver's window while the file dialog is open closes
+  the dialog too, and nothing is loaded. Not yet tried in GarageBand, which runs plug-ins in a sandbox: a
   `.cfg` there may not be allowed to read the WAV files beside it, and the
   explanation then says permission was denied. A preset always works.
 - **Copy diagnostics** puts all of this, with this instance's recent lines

@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace convolver::detail {
@@ -97,16 +98,18 @@ class ToolboxFile final : public SoundFile {
             static_cast<CFIndex>(native.size()), false);
         if (!url)
             throw std::runtime_error(opening + "the path is not valid");
-        const OSStatus opened = ExtAudioFileOpenURL(url, &file_);
+        // Held by file_ from here on, so every refusal below disposes of it
+        // (jrp's review: a file refused after opening was left open).
+        const OSStatus opened = ExtAudioFileOpenURL(url, &file_.ref);
         CFRelease(url);
         if (opened != noErr) {
-            file_ = nullptr;
+            file_.ref = nullptr;
             throw std::runtime_error(opening + explain(opened));
         }
         AudioStreamBasicDescription format{};
         UInt32 size = sizeof format;
-        if (const auto status = ExtAudioFileGetProperty(file_, kExtAudioFileProperty_FileDataFormat,
-                                                        &size, &format))
+        if (const auto status = ExtAudioFileGetProperty(
+                file_.ref, kExtAudioFileProperty_FileDataFormat, &size, &format))
             throw std::runtime_error(opening + explain(status));
         const double rate = format.mSampleRate;
         if (!(rate >= 1 && rate <= 768000) || rate != std::floor(rate))
@@ -129,18 +132,14 @@ class ToolboxFile final : public SoundFile {
         client.mFramesPerPacket = 1;
         client.mBytesPerFrame = client.mBytesPerPacket = 4 * format.mChannelsPerFrame;
         if (const auto status = ExtAudioFileSetProperty(
-                file_, kExtAudioFileProperty_ClientDataFormat, sizeof client, &client))
+                file_.ref, kExtAudioFileProperty_ClientDataFormat, sizeof client, &client))
             throw std::runtime_error(opening + explain(status));
         SInt64 frames = 0;
         size = sizeof frames;
-        if (ExtAudioFileGetProperty(file_, kExtAudioFileProperty_FileLengthFrames, &size,
+        if (ExtAudioFileGetProperty(file_.ref, kExtAudioFileProperty_FileLengthFrames, &size,
                                     &frames) == noErr &&
             frames >= 0)
             frames_ = static_cast<std::size_t>(frames);
-    }
-    ~ToolboxFile() override {
-        if (file_)
-            ExtAudioFileDispose(file_);
     }
     ToolboxFile(const ToolboxFile&) = delete;
     ToolboxFile& operator=(const ToolboxFile&) = delete;
@@ -151,7 +150,7 @@ class ToolboxFile final : public SoundFile {
         return frames_;
     }
     std::size_t read(std::span<float> data) override {
-        if (!file_)
+        if (!file_.ref)
             throw std::logic_error("audio reader is closed");
         const auto channels = info_.channels;
         if (data.size() % channels)
@@ -165,7 +164,7 @@ class ToolboxFile final : public SoundFile {
         buffers.mBuffers[0].mNumberChannels = static_cast<UInt32>(channels);
         buffers.mBuffers[0].mDataByteSize = frames * 4 * static_cast<UInt32>(channels);
         buffers.mBuffers[0].mData = data.data();
-        if (const auto status = ExtAudioFileRead(file_, &frames, &buffers))
+        if (const auto status = ExtAudioFileRead(file_.ref, &frames, &buffers))
             throw std::runtime_error("audio read failed: " + explain(status));
         for (std::size_t i = 0; i < std::size_t{frames} * channels; ++i)
             if (!std::isfinite(data[i]))
@@ -173,16 +172,25 @@ class ToolboxFile final : public SoundFile {
         return frames;
     }
     void close() override {
-        if (file_) {
-            const auto status = ExtAudioFileDispose(file_);
-            file_ = nullptr;
-            if (status)
+        if (const auto ref = std::exchange(file_.ref, nullptr))
+            if (const auto status = ExtAudioFileDispose(ref))
                 throw std::runtime_error("audio close failed: " + explain(status));
-        }
     }
 
   private:
-    ExtAudioFileRef file_ = nullptr;
+    // Owns the open file: disposed of by the destructor, which also runs
+    // when the constructor throws after opening.
+    struct Handle {
+        ExtAudioFileRef ref = nullptr;
+        Handle() = default;
+        Handle(const Handle&) = delete;
+        Handle& operator=(const Handle&) = delete;
+        ~Handle() {
+            if (ref)
+                ExtAudioFileDispose(ref);
+        }
+    };
+    Handle file_;
     AudioInfo info_{};
     std::optional<std::size_t> frames_;
 };

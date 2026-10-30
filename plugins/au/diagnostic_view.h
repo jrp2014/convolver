@@ -58,6 +58,15 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // hidden window does not have it polled, and may dispose of the unit then.
 // Returns whether it read.
 - (BOOL)refreshIfShown;
+// Choose Filter in two steps, so the tests can drive it without a dialog:
+// startChoosing records a request (and forgets any earlier one), and
+// finishChoosing:URL: loads its file only while that request is still the
+// pending one and the view is in a window. Closing the window, or the view
+// leaving it, forgets the request and cancels its dialog: the host may then
+// dispose of the unit while the dialog is still open. Returns whether the
+// file was loaded.
+- (NSUInteger)startChoosing;
+- (BOOL)finishChoosing:(NSUInteger)request URL:(nullable NSURL*)url;
 // What a user reads and presses, for the tests.
 @property(readonly, nonatomic) NSTextField* titleField;
 @property(readonly, nonatomic) NSTextField* statusField;
