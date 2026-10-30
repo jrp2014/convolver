@@ -8,6 +8,7 @@
 // Reads files: control or worker thread only, never audio processing.
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
+#include "sound_files.hpp"
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -15,10 +16,13 @@
 
 namespace convolver {
 // The filter `path` holds, chosen from a list by `selection` as the CLI
-// chooses, with its coefficients embedded. `raw_filters` receives the raw
-// filters (.pcm, .raw) it read. Throws as load_configuration() does.
+// chooses, with its coefficients embedded, its sound files read by `reader`
+// (detail::libsndfile_files() or, in the Audio Unit, audio_toolbox_files()).
+// `raw_filters` receives the raw filters (.pcm, .raw) it read. Throws as
+// load_configuration() does.
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
+                            const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters = nullptr);
 
 // Why a chosen filter file could not be used, for HostFilter::reject().
@@ -30,5 +34,6 @@ struct FilterFileFailure {
 // with `failure` filled in. A readable file made for another rate or other
 // channels is classified as such; the message names the file and explains.
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
+                                          const detail::SoundFiles& reader,
                                           FilterFileFailure& failure);
 } // namespace convolver

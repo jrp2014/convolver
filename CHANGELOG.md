@@ -23,15 +23,24 @@ Until 1.0 the C++ API may change between minor versions.
   GarageBand show it instead of their generic controls. **Choose Filter…**
   (or dropping a file on the window) loads a `.cfg`, configuration list or
   sound file directly, as the old Convolver did, read as `convolver-preset`
-  reads it, so the project then holds the same state a preset would. While
-  a filter is being prepared the window shows the last report rather than
-  waiting. No sound changes.
+  reads it, so the project then holds the same state a preset would. The
+  Audio Unit reads sound files with macOS's own AudioToolbox, so the
+  component still links nothing beyond macOS (jrp, 30 October 2026);
+  `native.audio_toolbox` checks that it reads every format the tests write
+  to the same samples as libsndfile. While the host restores a filter on
+  another thread the window shows the last report rather than waiting. No
+  sound changes.
 - Library (internal to the adapters): the editor report (PLUG-9) in
   `portable/host_report.hpp`, built from the Status line and the log's
   wording, and `playing_words()`, the part of the log's start line that says
   what plays, which the report shares; and `portable/filter_file.hpp`
   (PLUG-9), the one step from a filter file to plug-in state, now shared by
-  `convolver-preset`, the LV2 plug-in and the Audio Unit.
+  `convolver-preset`, the LV2 plug-in and the Audio Unit. The `.cfg` loader
+  moved into a private `convolver_configuration` library with no sound-file
+  library of its own (`portable/sound_files.hpp`): `Convolver::io` gives it
+  libsndfile, and the public `load_configuration()` reads as before.
+  Installed packages gain `libconvolver_configuration.a`, which
+  `Convolver::io` links.
 
 ### Changed
 

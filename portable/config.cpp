@@ -31,7 +31,7 @@ void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLo
 // Decodes a whole file into the channels whose target is set (one target per
 // file channel) and returns its frame count. Every decoded sample counts
 // against budget, used or not.
-std::size_t read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& targets,
+std::size_t read_channels(SoundFile& reader, const std::vector<std::vector<float>*>& targets,
                           std::size_t& budget, const SourceLocation& where) {
     const auto channels = reader.info().channels;
     // Reject oversized files before allocating for their samples.
@@ -366,8 +366,8 @@ bool raw_filter_name(const std::filesystem::path& path) {
 }
 // sound_file_header decides whether the content is a sound file, so a .pcm or
 // .raw file with a header is read through that header, as it always was.
-bool raw_filter(const std::filesystem::path& resolved) {
-    return raw_filter_name(resolved) && !sound_file_header(resolved);
+bool raw_filter(const std::filesystem::path& resolved, const SoundFiles& reader) {
+    return raw_filter_name(resolved) && !reader.recognised(resolved);
 }
 
 namespace {
@@ -385,7 +385,8 @@ struct DecodedFile {
 } // namespace
 
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
-                                       std::size_t& budget, RawEncoding raw_encoding) {
+                                       std::size_t& budget, const SoundFiles& reader,
+                                       RawEncoding raw_encoding) {
     std::vector<DecodedIr> result;
     const auto& parsed = doc.configuration;
     // The paths naming each file. A reference that cannot be resolved names
@@ -417,8 +418,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                               file.raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
             continue;
         }
-        std::optional<AudioReader> ir;
-        const bool raw = raw_filter(resolved);
+        std::unique_ptr<SoundFile> ir;
+        const bool raw = raw_filter(resolved, reader);
         // Appended to errors about a file whose name says raw but whose content
         // was read as a sound file, so the user knows why.
         const std::string read_as_sound =
@@ -428,10 +429,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                   "to look like a header, convert it to WAV, for example with SoX)"
                 : "";
         try {
-            if (raw)
-                ir.emplace(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding);
-            else
-                ir.emplace(resolved);
+            ir = raw ? reader.open_raw(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding)
+                     : reader.open(resolved);
         } catch (const std::exception& e) {
             std::error_code ec; // On failure absolute() returns an empty path.
             if (raw && std::filesystem::is_regular_file(resolved, ec))
@@ -439,8 +438,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                          "raw filter '" + path.ir.spelling + "': " + e.what() +
                                              " (raw filters are read as mono " +
                                              raw_encoding_name(raw_encoding) + ")");
-            // The file is there but libsndfile cannot read it (a codec its build
-            // lacks, for example): the path hint below would mislead. The code
+            // The file is there but the reader cannot read it (a codec its
+            // build lacks, for example): the path hint below would mislead. The code
             // stays missing-asset on purpose: codes are stable, and
             // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
@@ -504,7 +503,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
     return result;
 }
 
-Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
+Configuration decode_audio_filter(SoundFile& audio, std::size_t& budget,
                                   const SourceLocation& where) {
     const auto info = audio.info();
     Configuration cfg;
@@ -530,17 +529,23 @@ Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
     return cfg;
 }
 
+Resolver::Sources Resolver::from(const SoundFiles& reader) {
+    Sources files;
+    files.open_audio = [&reader](const std::filesystem::path& p) -> std::unique_ptr<SoundFile> {
+        try {
+            return reader.open(p);
+        } catch (const std::exception&) {
+            return nullptr; // Bounded text validation distinguishes configs from damaged audio.
+        }
+    };
+    return files;
+}
+
 Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list, Sources files)
     : visitor_(std::move(visitor)), on_error_(std::move(on_error)), on_list_(std::move(on_list)),
       files_(std::move(files)) {
     if (!files_.open_audio)
-        files_.open_audio = [](const std::filesystem::path& p) -> std::unique_ptr<AudioReader> {
-            try {
-                return std::make_unique<AudioReader>(p);
-            } catch (const std::exception&) {
-                return nullptr; // Bounded text validation distinguishes configs from damaged audio.
-            }
-        };
+        throw std::invalid_argument("the configuration resolver needs a sound-file reader");
     if (!files_.read_text)
         files_.read_text = read_configuration_text;
     if (!files_.canonical)
@@ -641,15 +646,9 @@ bool Resolver::visit(const std::filesystem::path& path) {
 }
 } // namespace convolver::detail
 
-namespace convolver {
-Configuration load_configuration(const std::filesystem::path& path, int expected_rate,
-                                 std::size_t expected_inputs,
-                                 std::vector<std::filesystem::path>* source_paths) {
-    return load_configuration(path, ConfigurationSelection{expected_rate, expected_inputs, 0},
-                              source_paths);
-}
+namespace convolver::detail {
 Configuration load_configuration(const std::filesystem::path& path,
-                                 const ConfigurationSelection& selection,
+                                 const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
                                  std::vector<std::filesystem::path>* raw_filters) {
     if (raw_filters)
@@ -684,8 +683,8 @@ Configuration load_configuration(const std::filesystem::path& path,
                              selection))
             return false;
         auto cfg = detail::configuration_graph(parsed);
-        const auto decoded =
-            detail::decode_impulses(*leaf.document, cfg, budget, selection.raw_filter_encoding);
+        const auto decoded = detail::decode_impulses(*leaf.document, cfg, budget, files,
+                                                     selection.raw_filter_encoding);
         if (raw_filters) {
             for (const auto& ir : decoded)
                 if (ir.raw && std::find(raw_filters->begin(), raw_filters->end(), ir.resolved) ==
@@ -696,8 +695,8 @@ Configuration load_configuration(const std::filesystem::path& path,
         return true;
     };
     detail::Resolver resolver(
-        visit, {},
-        [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; });
+        visit, {}, [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; },
+        detail::Resolver::from(files));
     if (resolver.run(path) && selected) {
         if (source_paths)
             *source_paths = resolver.sources();
@@ -706,4 +705,4 @@ Configuration load_configuration(const std::filesystem::path& path,
     throw std::runtime_error(
         detail::explain_no_match(path, list, candidates, selection, "the audio to be filtered"));
 }
-} // namespace convolver
+} // namespace convolver::detail

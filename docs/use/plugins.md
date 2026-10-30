@@ -263,16 +263,26 @@ the plug-in's button in the track's Plug-ins area. The window has:
   log uses); Gain and Mix; latency and tail; the software (version, FFT
   library, CPU kernels, the Audio Unit SDK); and where the log is.
 - **Choose Filter…** opens the file dialog for a `.cfg` file, a
-  configuration list or a sound file (WAV, AIFF and the other formats
-  libsndfile reads); dropping the file on the window does the same. A list
-  chooses its entry by the host's rate and channels, as the command-line
-  tool does. The status and explanation then say whether it plays and, if
-  not, why, naming the file; a file that does not suit the plug-in leaves
-  the previous filter playing. The project saves the filter itself, not the
-  file's path: after reopening, the Filter detail says it came from the
-  saved project. Not yet tried in GarageBand, which runs plug-ins in a
-  sandbox: a `.cfg` there may not be allowed to read the WAV files beside
-  it. A preset always works.
+  configuration list or a sound file; dropping the file on the window does
+  the same. The Audio Unit reads sound files with macOS's own reader, so
+  it needs nothing installed beside it: WAV, AIFF, CAF, W64, RF64, FLAC and
+  the other formats macOS reads, and headerless `.pcm` or `.raw` filters
+  named in a `.cfg`, as the command-line tool reads them. (A `.pcm` or
+  `.raw` file is read through a header only if it starts with one of the
+  usual container markers, such as `RIFF` or `FORM`.) A list chooses its
+  entry by the host's rate and channels, as the command-line tool does.
+  The status and explanation then say whether it plays and, if not, why,
+  naming the file. A file that does not suit the plug-in leaves the
+  previous filter playing; if no filter was playing, the plug-in stays
+  silent, as for a first preset that does not fit. Either way the project
+  then saves the outcome: the filter that plays, with the failure noted.
+  The project saves the filter itself, not the file's path: after
+  reopening, the Filter detail says it came from the saved project. The
+  file is read and the filter prepared before the window responds again,
+  so a very long filter can make the window (and the host) pause for a
+  moment. Not yet tried in GarageBand, which runs plug-ins in a sandbox: a
+  `.cfg` there may not be allowed to read the WAV files beside it, and the
+  explanation then says permission was denied. A preset always works.
 - **Copy diagnostics** puts all of this, with this instance's recent lines
   from the Convolver log, on the clipboard as plain text, ready to paste into
   a report.
@@ -281,9 +291,10 @@ the plug-in's button in the track's Plug-ins area. The window has:
 
 The text can be selected and copied. The controls are standard macOS ones
 with names for VoiceOver, which has not been tried with the window yet. The
-window updates while it is on screen. While a filter is being prepared it
-shows the last report and updates when the filter is ready. The window has
-no list of recent files and does not reload a file yet.
+window updates twice a second while it is on screen. While the host restores
+a project or preset on another thread, it shows the last report until the
+filter is ready. The window has no list of recent files and does not
+reload a file yet.
 
 ## Settings
 

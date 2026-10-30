@@ -145,6 +145,15 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   without decoding; a file named by two paths counts twice, although it is
   decoded once), 256 diagnostics plus a truncation marker, and 64 MiB of host
   state.
+- `native.audio_toolbox` (macOS only): the Audio Unit's filter-file reader,
+  macOS's AudioToolbox, against libsndfile's. WAV (16, 24 and 32-bit
+  integer, float and double), AIFF, CAF, W64, RF64 and (when libsndfile has it) FLAC filters of three
+  channels, a `.cfg` naming a WAV, a headerless `.pcm` and a WAV named
+  `.pcm`, and a configuration list must load to the same configuration from
+  both, sample for sample (the test prints the largest difference, in units
+  of the last place; 32-bit integers may differ by one); a missing,
+  truncated, damaged, incomplete raw or wrong-rate filter must be refused
+  with the same diagnostic code by both.
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
@@ -548,21 +557,26 @@ Four CTest tests run when the adapter is built (label `au`):
   text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
-  window stops reading the unit. Then filter files (Choose Filter and a
-  drop): a stereo WAV loaded through the load property plays, the details
-  and the property name it, and the saved state equals
-  `filter_file_state()`'s, what `convolver-preset` writes; a mono WAV and a
-  missing file are refused with the file named, the stereo filter still
-  playing. Then responsiveness: report reads while another thread restores
-  a 2 × 6 000 000-tap filter (whose preparation holds the control lock)
-  must each take under a fifth of the restore and under 50 ms; the test
-  prints the worst read. Then faults: invalid input rendered, the
+  window stops reading the unit. Then filter files: the Choose Filter
+  button is shown and the window accepts dropped file URLs (neither the
+  file dialog nor a drag is driven: a headless runner has no user to answer
+  them), then the view's load step, which both use: a stereo WAV plays, the
+  details and the load property name it, and the saved state equals
+  `filter_file_state()`'s with the same reader; a mono WAV and a missing
+  file are refused with the file named, the stereo filter still playing
+  and saved; on an empty unit a refused first file leaves it silent. Then
+  responsiveness: report reads while another thread restores a
+  2 × 6 000 000-tap filter (whose preparation holds the control lock) must
+  each take under a fifth of the restore and under 50 ms; the test prints
+  the worst read. A file chosen in the window is read on the main thread,
+  so this does not cover it. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an
   open window makes, log the faults once. The AU workflow's `auval -strict`
   step also requires `Cocoa Views Available: 1`.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
-  (`ConvolverAUFactory`), the licence files and the signature.
+  (`ConvolverAUFactory`), only macOS's own libraries linked (`otool -L`; a
+  sanitizer build's runtime aside), the licence files and the signature.
 
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The

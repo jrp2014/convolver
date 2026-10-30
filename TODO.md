@@ -402,13 +402,17 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `.cfg` or sound file directly): **Choose Filter…** and dropping a file on
   the window, through a load property (64002) that reads the file with
   PLUG-9's shared step and installs it as a state restore does, with a
-  `ClassInfo` change notification after it.
+  `ClassInfo` change notification after it, accepted or refused. Sound
+  files are read with macOS's AudioToolbox, not libsndfile (jrp, 30 October
+  2026), so the component links only macOS (`au.bundle` checks it);
+  `native.audio_toolbox` compares the two readers.
   The window still reads the report itself rather than copying reports
   pushed to it (the editor plan's
   [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads)), but a
   read no longer waits for a load: while a load holds the control lock it
-  returns the last report, and `au.editor` checks that reads stay prompt
-  during a slow restore on another thread. Limitation: a chosen file is
+  returns the last report (the window's next timed read shows the
+  result), and `au.editor` checks that reads stay prompt during a slow
+  restore on another thread. Limitation: a chosen file is
   read and its filter prepared on the host's main thread, so the window
   (and the host) waits for a long filter; a worker thread, as LV2 has, is
   for later.

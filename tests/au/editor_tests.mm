@@ -154,6 +154,14 @@ std::string loaded_path(Unit& unit) {
     return text(path);
 }
 
+// A file chosen as the window chooses one, without the window.
+OSStatus choose(Unit& unit, const std::string& path) {
+    NSString* name = @(path.c_str()); // Held for the call.
+    CFStringRef value = (__bridge CFStringRef)name;
+    return AudioUnitSetProperty(unit.get(), au::load_property, kAudioUnitScope_Global, 0, &value,
+                                sizeof value);
+}
+
 // The Convolver log goes to a file of this process's own while it exists.
 class PrivateLog {
   public:
@@ -411,11 +419,13 @@ void window() {
     unit.uninitialize();
 }
 
-// Choose Filter and a drop: a sound file loads through the load property
-// with the step convolver-preset uses, so the saved state is the one the
-// tool writes for the same rate and channels; a file that does not suit
-// the unit is refused with its name and the reason, the previous filter
-// still playing.
+// Filter files: the Choose Filter button and the drop registration (the
+// file dialog and a real drag need a user), then the view's load step both
+// use. A sound file loads through the load property with the step
+// convolver-preset uses, so the saved state is the one that step gives for
+// the same rate and channels; a file that does not suit the unit is refused
+// with its name and the reason, the previous filter still playing, and an
+// empty unit stays silent.
 void files() {
     TemporaryFolder folder;
     const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav";
@@ -444,8 +454,10 @@ void files() {
             "the details do not name the file:\n" + text(r[@"details"]));
     require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
     require(encode_host_state(unit.saved()) ==
-                encode_host_state(filter_file_state(stereo, {44100, 2, 2})),
-            "the saved state differs from convolver-preset's");
+                encode_host_state(
+                    filter_file_state(stereo, {44100, 2, 2}, detail::audio_toolbox_files())),
+            "the saved state differs from the shared file step's (native.audio_toolbox checks "
+            "that it matches convolver-preset's)");
 
     require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
     r = report(unit);
@@ -453,11 +465,26 @@ void files() {
                 contains(r[@"explanation"], "could not be used"),
             "mono file refusal: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
+    const auto kept = unit.failure();
+    require(kept.present && !kept.silent && unit.saved().configuration,
+            "after a refused file the stereo filter must still play and be saved");
     const auto missing = folder / "missing.cfg";
     require(![view loadFile:@(missing.c_str())], "a missing file accepted");
     require(contains(report(unit)[@"explanation"], missing.c_str()),
             "missing file: " + text(report(unit)[@"explanation"]));
     unit.uninitialize();
+
+    // On an empty unit a refused first file leaves it silent, as a first
+    // preset that does not fit does (docs/use/plugins.md).
+    Unit empty;
+    check(empty.configure(44100, 2, 2, 512), "stereo formats");
+    check(empty.initialize(), "stereo initialization");
+    require(choose(empty, mono.string()) != noErr, "a mono file accepted by an empty unit");
+    const auto first = empty.failure();
+    require(first.present && first.silent && contains(report(empty)[@"explanation"], mono.c_str()),
+            "a refused first file must leave the unit silent and say why: " +
+                text(report(empty)[@"explanation"]));
+    empty.uninitialize();
 }
 
 // TODO AU-6: a report read while a slow load holds the unit's control lock

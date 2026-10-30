@@ -4,8 +4,9 @@
 
 Its AudioComponents entry must carry the permanent codes from
 plugins/identities.json (PLUG-4), the bundle's version must follow VERSION,
-the executable must export only the factory, the licence notices must be
-inside (the component is GPL-3.0-or-later with AudioUnitSDK's Apache-2.0
+the executable must export only the factory and link only macOS's own
+libraries (no libsndfile: the window reads filter files with AudioToolbox),
+the licence notices must be inside (the component is GPL-3.0-or-later with AudioUnitSDK's Apache-2.0
 notice), and the ad-hoc signature must cover the whole bundle.
 """
 import json
@@ -51,7 +52,7 @@ def main():
     if entry.get('factoryFunction') != 'ConvolverAUFactory':
         fail('factoryFunction is not ConvolverAUFactory')
     if entry.get('sandboxSafe') is not True:
-        fail('the component must be sandbox-safe (it reads no files)')
+        fail('the component must be sandbox-safe (it reads only the files chosen in its window)')
 
     executable = contents / 'MacOS' / info['CFBundleExecutable']
     symbols = subprocess.run(['nm', '-gU', '-j', str(executable)], check=True,
@@ -60,6 +61,17 @@ def main():
     exported = sorted({s for s in symbols if not s.startswith('__mh_')})
     if exported != ['_ConvolverAUFactory']:
         fail(f'the executable must export only _ConvolverAUFactory, not {exported}')
+
+    # Only macOS's own libraries, plus a sanitizer build's runtime: anything
+    # else would have to be installed on every Mac that loads the component.
+    linked = subprocess.run(['otool', '-L', str(executable)], check=True,
+                            capture_output=True, text=True).stdout.splitlines()
+    # Lines ending in a colon name the file (and, in a universal binary, each architecture).
+    linked = [line for line in linked if line.strip() and not line.rstrip().endswith(':')]
+    for line in linked:
+        library = line.strip().split(' (')[0]
+        if not library.startswith(('/System/Library/', '/usr/lib/')) and 'libclang_rt.' not in library:
+            fail(f'the executable links {library}, which is not part of macOS')
 
     licenses = contents / 'Resources' / 'licenses'
     for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt'):
@@ -72,7 +84,7 @@ def main():
 
     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(bundle)], check=True)
     print(f"Convolver.component: {au['type']}/{au['subtype']}/{au['manufacturer']}, "
-          f'version {version} ({expected:#x}), notices present, signature valid')
+          f'version {version} ({expected:#x}), {len(linked)} macOS libraries, notices present, signature valid')
 
 
 if __name__ == '__main__':

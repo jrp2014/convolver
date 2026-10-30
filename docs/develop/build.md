@@ -302,9 +302,10 @@ component`). The tools and tests need libsndfile (`brew install libsndfile`);
 a CMake installed outside Homebrew, such as conda's, may also need
 `-DCMAKE_PREFIX_PATH="$(brew --prefix)"` to find it.
 
-The component is `build-au/plugins/au/Convolver.component`. It links no FFT
-library (Accelerate is part of macOS); libsndfile is used only by the tools and
-tests. The AU target builds as C++23 because AudioUnitSDK needs it; the core
+The component is `build-au/plugins/au/Convolver.component`. It links only
+macOS's own libraries (`au.bundle` checks this with `otool -L`): Accelerate
+for the FFT, and AudioToolbox to read the filter files chosen in its window.
+libsndfile is used only by the tools and tests. The AU target builds as C++23 because AudioUnitSDK needs it; the core
 and other formats stay C++20.
 
 ### LV2

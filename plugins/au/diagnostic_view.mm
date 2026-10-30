@@ -398,10 +398,17 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     panel.message =
         @"Choose a Convolver configuration (.cfg) or a sound file to use as the filter.";
     panel.prompt = @"Load";
-    if ([panel runModal] != NSModalResponseOK || !panel.URL.fileURL)
-        return;
-    if (![self loadFile:panel.URL.path])
-        NSBeep();
+    // Not runModal: a modal loop inside the plug-in would stall the host's
+    // own window events (plan, threads rule 4). The window may close before
+    // the panel does, so the handler holds it weakly.
+    __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
+    [panel beginWithCompletionHandler:^(NSModalResponse response) {
+      CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
+      if (!view || response != NSModalResponseOK || !panel.URL.fileURL)
+          return;
+      if (![view loadFile:panel.URL.path])
+          NSBeep();
+    }];
 }
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {

@@ -348,11 +348,12 @@ HostReport Effect::report() {
             lock.lock(); // Nothing read yet: wait this once.
         }
         r = report_locked(faults);
-    }
-    try {
-        std::lock_guard cached(report_cache_lock_);
-        report_cache_ = r;
-    } catch (...) { // Out of memory: the older copy stays.
+        // Stored under control_, so a slower reader cannot replace a newer copy.
+        try {
+            std::lock_guard cached(report_cache_lock_);
+            report_cache_ = r;
+        } catch (...) { // Out of memory: the older copy stays.
+        }
     }
     if (!faults.empty()) { // As when a host reads the Status text.
         log_faults(faults);
@@ -905,7 +906,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                     uninitialized_tail = configuration_tail_frames(*next.configuration);
                 } catch (...) {
                     filter_.reject(HostFailureKind::preparation,
-                                   "The filter could not be prepared.");
+                                   "The filter could not be prepared.", request);
                     throw;
                 }
             }
@@ -982,19 +983,23 @@ OSStatus Effect::load_file(const std::string& path) {
         host = known_layout().value_or(layout());
     }
     FilterFileFailure why;
-    auto next = read_filter_file(path, host, why);
+    // macOS's reader, not libsndfile, so the component needs nothing beyond
+    // macOS (jrp's decision, 30 October 2026).
+    auto next = read_filter_file(path, host, detail::audio_toolbox_files(), why);
+    bool accepted = false;
     if (!next) {
         log_faults(reject(why.kind, why.message, request));
         log(rejection_line());
         notify_status();
-        return kAudioUnitErr_InvalidPropertyValue;
+    } else {
+        accepted = install(std::move(*next), request, nullptr, false);
     }
-    if (!install(std::move(*next), request, nullptr, false))
-        return kAudioUnitErr_InvalidPropertyValue;
-    // The state the host saves has changed: hosts that listen for ClassInfo
-    // changes (as for a preset chosen in the plug-in) can mark the project.
+    // The state the host saves has changed either way (a refusal is recorded
+    // in it, and an empty instance then plays silence): hosts that listen for
+    // ClassInfo changes, as for a preset chosen in the plug-in, can mark the
+    // project as changed.
     PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
-    return noErr;
+    return accepted ? noErr : kAudioUnitErr_InvalidPropertyValue;
 }
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {

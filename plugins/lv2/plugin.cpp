@@ -420,7 +420,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     // The step convolver-preset uses, for this instance's rate and channels
     // (a list chooses its entry as in the CLI; PLUG-9).
     FilterFileFailure why;
-    auto next = read_filter_file(path, p.layout, why);
+    auto next = read_filter_file(path, p.layout, detail::libsndfile_files(), why);
     pause_at(p, WorkerPoint::read);
     // 1. Already overtaken: stop before recording a failure or FFT planning.
     if (r.generation < newest())
@@ -936,7 +936,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             p.log_rejection();
         const HostRequest from_file{HostFilterSource::file, *path, generation};
         FilterFileFailure why;
-        if (auto next = read_filter_file(*path, p.layout, why)) {
+        if (auto next = read_filter_file(*path, p.layout, detail::libsndfile_files(), why)) {
             try {
                 p.filter.load(std::move(*next), p.layout, install, from_file, p.host.get());
                 loaded = true;

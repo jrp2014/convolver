@@ -64,7 +64,7 @@ void canonical_errors(const fs::path& dir) {
     text_file(dir / "canonical-list.txt", "bad.cfg\ngood.cfg\n");
     text_file(dir / "good.cfg", "48000 1 1 0\n0\n0\nir.wav\n0\n0\n0\n");
     for (const auto* failing : {"bad.cfg", "ir.wav"}) {
-        Resolver::Sources files;
+        auto files = Resolver::from(libsndfile_files());
         files.canonical = [&](const fs::path& p) {
             if (p.filename() == failing)
                 throw fs::filesystem_error("canonical", p,
@@ -99,7 +99,7 @@ void canonical_errors(const fs::path& dir) {
                     "IR canonical error must carry the reference location");
         }
     }
-    Resolver::Sources files;
+    auto files = Resolver::from(libsndfile_files());
     files.canonical = [](const fs::path&) -> fs::path { throw std::bad_alloc(); };
     Resolver resolver([](const Resolver::Leaf&) { return false; },
                       [](const ConfigurationError&) { return true; }, {}, files);

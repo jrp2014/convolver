@@ -117,7 +117,8 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         } else {
             std::vector<fs::path> raw_filters;
             // The step the plug-ins use for a file chosen in their window (PLUG-9).
-            state = convolver::filter_file_state(input, selection, &raw_filters);
+            state = convolver::filter_file_state(
+                input, selection, convolver::detail::libsndfile_files(), &raw_filters);
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
                 std::cerr << "raw filter '" << utf8(raw_filter.filename())
