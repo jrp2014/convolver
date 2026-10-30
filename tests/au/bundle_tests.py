@@ -80,6 +80,15 @@ def main():
                 fail(f'the executable links {library}, which is not part of macOS')
             print(f'note: links {library} (a fallback build: every Mac that loads it needs this library)')
 
+    # otool sees only dynamic libraries: a statically linked libsndfile or FFTW
+    # would still carry its version string.
+    image = executable.read_bytes()
+    for marker, name in ((b'libsndfile-1.', 'libsndfile'), (b'fftw-3.', 'FFTW')):
+        if marker in image:
+            if sys.argv[4] == 'system-only':
+                fail(f'the executable contains {name}, which is not part of macOS')
+            print(f'note: contains {name} (a fallback build)')
+
     licenses = contents / 'Resources' / 'licenses'
     for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt'):
         if not (licenses / name).is_file():

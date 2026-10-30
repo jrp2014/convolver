@@ -7,6 +7,7 @@
 // filters are decoded here, exactly as io.cpp decodes them. Integer samples
 // become floats by the same exact scaling; tests/native/audio_toolbox_tests.cpp
 // compares the two readers on every format both read.
+#include "config_parse.hpp"
 #include "sound_files.hpp"
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -28,6 +29,8 @@ void validate(AudioInfo info) {
         info.channels > 256)
         throw std::invalid_argument("audio rate must be 1..768000 Hz and channels 1..256");
 }
+constexpr auto sandbox_hint = "a sandboxed host, such as GarageBand, lets a plug-in read only "
+                              "the files chosen in its window";
 // Carbon's file errors (MacErrors.h), which Core Audio passes on.
 constexpr OSStatus file_not_found = -43, permission_error = -54, access_denied = -5000;
 // What a Core Audio status means for someone choosing a filter file, with the
@@ -50,8 +53,7 @@ std::string explain(OSStatus status) {
     case kAudioFilePermissionsError:
     case permission_error:
     case access_denied:
-        meaning = "permission denied (a sandboxed host, such as GarageBand, lets a plug-in read "
-                  "only the files chosen in its window)";
+        meaning = std::string("permission denied (") + sandbox_hint + ")";
         break;
     case file_not_found:
         meaning = "no such file";
@@ -77,6 +79,9 @@ std::string missing(const std::filesystem::path& path) {
     std::error_code ec;
     if (std::filesystem::exists(path, ec))
         return "not a regular file";
+    // A sandbox may refuse even to say whether the file is there.
+    if (ec == std::errc::permission_denied || ec == std::errc::operation_not_permitted)
+        return std::string("permission denied (") + sandbox_hint + ")";
     if (ec && ec != std::errc::no_such_file_or_directory)
         return ec.message();
     return "no such file";
@@ -208,9 +213,7 @@ class RawFile final : public SoundFile {
                 opening + (path == "-" ? "standard input cannot be a filter" : missing(path)));
         file_.open(path, std::ios::binary);
         if (!file_)
-            throw std::runtime_error(
-                opening + "it cannot be opened (a sandboxed host, such as GarageBand, lets a "
-                          "plug-in read only the files chosen in its window)");
+            throw std::runtime_error(opening + "it cannot be opened (" + sandbox_hint + ")");
         const auto bytes = std::filesystem::file_size(path, ec);
         if (ec)
             throw std::runtime_error(opening + ec.message());
@@ -270,6 +273,15 @@ bool recognised(const std::filesystem::path& path) {
 const SoundFiles& audio_toolbox_files() {
     static const SoundFiles files{
         [](const std::filesystem::path& path) -> std::unique_ptr<SoundFile> {
+            // A .pcm or .raw file without a container marker is a headerless
+            // filter, read only as a .cfg names one (with its rate and
+            // channels). Chosen or listed directly, ExtAudioFile could take
+            // its samples for some other format and play noise as the filter
+            // (the fourth review); libsndfile refuses such a file.
+            if (raw_filter_name(path) && !recognised(path))
+                throw std::runtime_error("cannot open audio input " + path.string() +
+                                         ": a headerless .pcm or .raw filter is read only when "
+                                         "a .cfg names it, with its rate and channels");
             return std::make_unique<ToolboxFile>(path);
         },
         [](const std::filesystem::path& path, RawSpec spec,

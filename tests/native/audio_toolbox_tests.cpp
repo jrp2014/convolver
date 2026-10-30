@@ -2,8 +2,8 @@
 // AU-6: the Audio Unit reads filter files with macOS's AudioToolbox, the tools
 // with libsndfile. Every filter both can read must give the same configuration,
 // sample for sample, and the files either refuses must be refused by both,
-// with the same diagnostic code. macOS only (on other systems this file
-// compares libsndfile with itself, which only checks the test).
+// with the same diagnostic code. On other systems this file compares
+// libsndfile with itself, which only checks the test.
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
@@ -54,6 +54,38 @@ std::vector<float> samples(std::size_t channels, std::size_t frames) {
     data[1] = -1.0f;
     data[2] = 1.0f / 32768;
     return data;
+}
+// A mono IEEE-float WAV of `values`, as 32 or 64-bit samples, written by hand
+// so that it can hold values a writer would refuse.
+void float_wav(const fs::path& path, const std::vector<double>& values, int bits) {
+    std::string out;
+    const auto put = [&](std::uint64_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out += static_cast<char>((value >> (8 * i)) & 0xffU);
+    };
+    const auto width = static_cast<std::uint32_t>(bits / 8);
+    const auto data = static_cast<std::uint32_t>(values.size()) * width;
+    out += "RIFF";
+    put(4 + 26 + 12 + 8 + data, 4);
+    out += "WAVEfmt ";
+    put(18, 4);
+    put(3, 2); // IEEE float
+    put(1, 2);
+    put(48000, 4);
+    put(48000 * width, 4);
+    put(width, 2);
+    put(static_cast<std::uint64_t>(bits), 2);
+    put(0, 2);
+    out += "fact";
+    put(4, 4);
+    put(values.size(), 4);
+    out += "data";
+    put(data, 4);
+    for (const auto x : values)
+        put(bits == 32 ? std::uint64_t{std::bit_cast<std::uint32_t>(static_cast<float>(x))}
+                       : std::bit_cast<std::uint64_t>(x),
+            static_cast<int>(width));
+    text_file(path, out);
 }
 void sound_file(const fs::path& path, AudioInfo info, OutputEncoding encoding) {
     AudioWriter writer(path, info, encoding);
@@ -184,8 +216,22 @@ void run(const fs::path& dir) {
     text_file(dir / "short.pcm", "abc");
     text_file(dir / "short.cfg", "44100 1 1 0\n0\n0\nshort.pcm\n0\n0\n0\n");
     text_file(dir / "rate.cfg", "44100 1 1 0\n0\n0\npcm16.wav\n0\n0\n0\n");
-    for (const auto* name :
-         {"missing.cfg", "truncated.wav", "damaged.wav", "short.cfg", "rate.cfg"}) {
+    // Nonfinite samples, stored or made by converting a double too large
+    // for a float (the fourth review: a reader that clamped would load it).
+    float_wav(dir / "nan.wav", {0.5, std::nan(""), 0.25}, 32);
+    float_wav(dir / "huge.wav", {0.5, 1e300, 0.25}, 64);
+    // A headerless filter chosen directly rather than named in a .cfg: no
+    // reader may take its samples for some other format (the fourth review).
+    // The bytes start like an MPEG frame, the case AudioToolbox could guess.
+    {
+        std::string raw = "\xff\xfb\x90\x64"s;
+        for (const auto x : samples(1, 4096))
+            for (int b = 0; b < 4; ++b)
+                raw += static_cast<char>((std::bit_cast<std::uint32_t>(x) >> (8 * b)) & 0xffU);
+        text_file(dir / "direct.pcm", raw);
+    }
+    for (const auto* name : {"missing.cfg", "truncated.wav", "damaged.wav", "short.cfg", "rate.cfg",
+                             "nan.wav", "huge.wav", "direct.pcm"}) {
         const auto expected = refusal(dir / name, reference);
         const auto got = refusal(dir / name, reader);
         std::cout << name << ": refused as " << got << '\n';

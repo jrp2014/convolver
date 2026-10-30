@@ -271,7 +271,9 @@ the plug-in's button in the track's Plug-ins area. The window has:
   the other formats macOS reads, and headerless `.pcm` or `.raw` filters
   named in a `.cfg`, as the command-line tool reads them. (A `.pcm` or
   `.raw` file is read through a header only if it starts with one of the
-  usual container markers, such as `RIFF` or `FORM`.) A list chooses its
+  usual container markers, such as `RIFF` or `FORM`; a headerless one is
+  refused if chosen directly, since only a `.cfg` gives its rate and
+  channels.) A list chooses its
   entry by the host's rate and channels, as the command-line tool does.
   The status and explanation then say whether it plays and, if not, why,
   naming the file. A file that does not suit the plug-in leaves the

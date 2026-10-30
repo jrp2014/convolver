@@ -69,6 +69,9 @@ dependency. Its threading rules are in the [plug-in adapter contract](plugin-con
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
+The package also installs `Convolver::configuration` (`libconvolver_configuration.a`),
+the `.cfg` loader without a sound-file reader that `Convolver::io` is built on; it
+has no public headers, so link `Convolver::io` rather than it.
 Missing required components fail clearly; optional components can be inspected
 through `Convolver_core_FOUND` and `Convolver_io_FOUND`.
 `Convolver_FFT_BACKEND` reports the package's fixed backend. A consumer cannot
