@@ -2,8 +2,7 @@
 // AU-6: the Audio Unit reads filter files with macOS's AudioToolbox, the tools
 // with libsndfile. Every filter both can read must give the same configuration,
 // sample for sample, and the files either refuses must be refused by both,
-// with the same diagnostic code. On other systems this file compares
-// libsndfile with itself, which only checks the test.
+// with the same diagnostic code. macOS only, as the reader is.
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
@@ -25,11 +24,7 @@ using namespace convolver;
 using namespace std::string_literals;
 namespace {
 const detail::SoundFiles& under_test() {
-#ifdef __APPLE__
     return detail::audio_toolbox_files();
-#else
-    return detail::libsndfile_files();
-#endif
 }
 void require(bool b, const std::string& message) {
     if (!b)
@@ -250,14 +245,10 @@ void run(const fs::path& dir) {
             bytes[24 + b] = static_cast<char>((rate >> (8 * b)) & 0xffU);
         text_file(dir / "fast.wav", bytes);
     }
-    // Windows has no /dev/fd: there the refusals run, uncounted.
-    std::error_code no_fd;
-    const bool countable = fs::is_directory("/dev/fd", no_fd);
-    const auto open_descriptors = [countable] {
+    const auto open_descriptors = [] {
         std::size_t n = 0;
-        if (countable)
-            for ([[maybe_unused]] const auto& entry : fs::directory_iterator("/dev/fd"))
-                ++n;
+        for ([[maybe_unused]] const auto& entry : fs::directory_iterator("/dev/fd"))
+            ++n;
         return n;
     };
     const auto before = open_descriptors();
@@ -268,21 +259,14 @@ void run(const fs::path& dir) {
         } catch (const std::exception& e) {
             message = e.what();
         }
-#ifdef __APPLE__
         // The rate is checked after ExtAudioFileOpenURL, the path that leaked.
         const bool after_opening = message.find("800000") != std::string::npos;
-#else
-        const bool after_opening = !message.empty();
-#endif
         require(after_opening,
                 "fast.wav is refused for its rate, after it was opened: '" + message + "'");
     }
     const auto after = open_descriptors();
-    if (countable)
-        std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
-                  << '\n';
-    else
-        std::cout << "fast.wav: refused 20 times (no /dev/fd to count descriptors in)\n";
+    std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
+              << '\n';
     require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
                                  " before, " + std::to_string(after) + " after");
     // The reader's own message names the missing file.

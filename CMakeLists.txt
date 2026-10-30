@@ -354,15 +354,13 @@ if(CONVOLVER_BUILD_NATIVE)
                 SOURCES tests/native/inspection_tests.cpp LIBRARIES convolver_io)
             convolver_native_test(native.limits convolver_limits_tests
                 SOURCES tests/native/limits_tests.cpp LIBRARIES convolver_io Convolver::host)
-            # AU-6: macOS's reader, for the Audio Unit, against libsndfile's.
-            # Elsewhere libsndfile against itself, so the test keeps building.
-            set(audio_toolbox_test_libraries convolver_io)
             if(APPLE)
-                list(APPEND audio_toolbox_test_libraries convolver_audio_toolbox)
+                # AU-6: macOS's reader, for the Audio Unit, against libsndfile's.
+                # The reader exists only on macOS, so the test runs only there.
+                convolver_native_test(native.audio_toolbox convolver_audio_toolbox_tests
+                    SOURCES tests/native/audio_toolbox_tests.cpp
+                    LIBRARIES convolver_io convolver_audio_toolbox)
             endif()
-            convolver_native_test(native.audio_toolbox convolver_audio_toolbox_tests
-                SOURCES tests/native/audio_toolbox_tests.cpp
-                LIBRARIES ${audio_toolbox_test_libraries})
         endif()
         # Replay fuzz seeds and minimized regressions deterministically, without libFuzzer.
         set(fuzz_harnesses config_text config_list host_state ir_file)

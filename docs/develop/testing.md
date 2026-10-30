@@ -145,9 +145,8 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   without decoding; a file named by two paths counts twice, although it is
   decoded once), 256 diagnostics plus a truncation marker, and 64 MiB of host
   state.
-- `native.audio_toolbox`: on macOS, the Audio Unit's filter-file reader,
-  macOS's AudioToolbox, against libsndfile's (elsewhere libsndfile against
-  itself, so that the test keeps building). WAV (16, 24 and 32-bit
+- `native.audio_toolbox` (macOS only, as the reader is): the Audio Unit's
+  filter-file reader, macOS's AudioToolbox, against libsndfile's. WAV (16, 24 and 32-bit
   integer, float and double), AIFF, CAF, W64, RF64 and (when libsndfile has it) FLAC filters of three
   channels, a `.cfg` naming a WAV, a headerless `.pcm` and a WAV named
   `.pcm`, and a configuration list must load to the same configuration from
@@ -158,8 +157,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
   the same diagnostic code by both. A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
-  leaving a file descriptor open (counted in `/dev/fd`, where there is one:
-  not on Windows).
+  leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
