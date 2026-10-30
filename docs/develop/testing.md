@@ -578,7 +578,8 @@ Four CTest tests run when the adapter is built (label `au`):
   the host closed the window (keeping the view in it) load nothing. Then
   responsiveness: report reads while another thread restores a
   2 × 6 000 000-tap filter (whose preparation holds the control lock) must
-  each take under a fifth of the restore and under 50 ms; the test prints
+  each take under a fifth of the restore and under 250 ms (a read that
+  waited would take seconds; a busy runner can pause one for 50 ms); the test prints
   the worst read. A file chosen in the window is read on the main thread,
   so this does not cover it. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an

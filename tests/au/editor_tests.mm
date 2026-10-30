@@ -567,8 +567,10 @@ void responsive() {
     loader.join();
     CFRelease(plist);
     check(loaded, "slow load");
-    // A read that waited would take most of the load's time.
-    require(reads > 0 && worst < std::min(.05, load_seconds / 5),
+    // A read that waited would take most of the load's time. The limit
+    // leaves room for a busy CI runner pausing this thread: one read of
+    // 100 000 took 50.3 ms in the sanitizer job (041190a, FFTW build).
+    require(reads > 0 && worst < std::min(.25, load_seconds / 5),
             "a report read waited for the load: worst read " + std::to_string(worst) +
                 " s during a " + std::to_string(load_seconds) + " s load, " +
                 std::to_string(reads) + " reads");
