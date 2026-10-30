@@ -55,11 +55,15 @@ jobs:
             build: Release
             sanitizers: 'OFF'
             full_tests: -LE repository
+          # AUTO is Accelerate on macOS (FFT-3), which the step below
+          # builds, so the main macOS build names FFTW to keep testing it
+          # (wisdom and measured plans) and to compare the backends.
           - os: macos-latest
             cxx: clang++
             build: Debug
             sanitizers: 'ON'
             full_tests: ''
+            fft: FFTW
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
@@ -88,7 +92,7 @@ jobs:
         run: >-
           cmake -S . -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }}
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCONVOLVER_FFT_BACKEND=${{ matrix.fft || 'AUTO' }} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Build production targets and tests
         run: cmake --build build
       - name: Test
@@ -114,17 +118,21 @@ jobs:
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON
           cmake --build --preset core-only --parallel "$CMAKE_BUILD_PARALLEL_LEVEL"
           ctest --preset core-only --output-junit junit.xml --parallel "$CTEST_PARALLEL_LEVEL"
+      # The default macOS build: AUTO must choose Accelerate and need no FFTW.
       - name: Configure Accelerate
         if: runner.os == 'macOS'
         run: >-
           cmake -S . -B build-accelerate -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
-          -DCONVOLVER_FFT_BACKEND=ACCELERATE -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_LEGACY_TESTS=OFF
+          -DCONVOLVER_SANITIZERS=ON -DCONVOLVER_LEGACY_TESTS=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
       - name: Build and test Accelerate
         if: runner.os == 'macOS'
         run: |
           cmake --build build-accelerate
           ctest --test-dir build-accelerate --output-on-failure --output-junit junit.xml -LE repository
-          ./build-accelerate/convolver --version
+          version="$(./build-accelerate/convolver --version)"
+          echo "$version"
+          grep -q 'FFT backend: Accelerate' <<<"$version"
       - name: Compare FFTW and Accelerate output
         if: runner.os == 'macOS'
         run: python tests/native/backend_equivalence.py build/convolver build-accelerate/convolver

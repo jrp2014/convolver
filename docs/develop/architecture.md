@@ -122,13 +122,15 @@ callbacks meet deadlines. Report the actual checks and their limits.
 
 ## Dependency choices
 
-FFTW remains the default FFT backend unless the build includes a plug-in
-(`CONVOLVER_BUILD_VST3=ON`). Then `AUTO` picks the built-in Ooura FFT on Linux
-and Windows and Accelerate on macOS for the whole build, CLI included, because
-other code in the host process may call the same FFTW, whose planner Convolver
-cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)). Build the CLI
-separately to keep FFTW for offline rendering. Accelerate uses an Apple system
-framework; Ooura is built in and avoids a separate FFT dependency. The
+On macOS every build prefers the platform's own Accelerate framework, and the
+libraries the other platforms use remain build options
+([which libraries each build uses](build.md#which-libraries-each-build-uses)).
+On Linux and Windows FFTW is the default FFT backend unless the build includes
+a plug-in. Then `AUTO` picks the built-in Ooura FFT for the whole build, CLI
+included, because other code in the host process may call the same FFTW, whose
+planner Convolver cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)).
+Build the CLI separately to keep FFTW for offline rendering, on macOS too.
+Ooura is built in and avoids a separate FFT dependency. The
 [FFT guide](fft-backends.md) has the numerical contract and dated measurements;
 none is asserted to be fastest for every workload.
 

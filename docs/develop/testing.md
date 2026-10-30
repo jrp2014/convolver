@@ -152,7 +152,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   CLI processes against direct convolution, missing-plan failure before output
   creation, malformed/oversized caches, Unicode filenames and source protection;
   Accelerate rejects FFTW-only options. FFT and engine oracle suites also exercise
-  measured/patient plans and cached matrix processing with FFTW.
+  measured/patient plans and cached matrix processing with FFTW. These FFTW
+  checks run only in FFTW builds. Since the default on macOS is Accelerate
+  (FFT-3), the native macOS CI job selects FFTW for its main build, and a second
+  build there checks the default: it must choose Accelerate without FFTW.
 
 - `native.host`: planar/in-place float and double buffers, invalid samples,
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard;

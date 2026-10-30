@@ -6,8 +6,13 @@
 **In short:**
 
 - Choose one FFT library per build with `-DCONVOLVER_FFT_BACKEND`: **FFTW**
-  (default, every platform, supports tuned plans), **ACCELERATE** (Apple's system
+  (every platform, supports tuned plans), **ACCELERATE** (Apple's system
   framework, no extra dependency) or **OOURA** (built in, no FFT library at all).
+- The default, `AUTO`, prefers the platform's own library: **Accelerate on
+  macOS** for every build, the command-line tools included. Elsewhere it is
+  FFTW, or Ooura in a plug-in build. FFTW stays available on macOS with
+  `-DCONVOLVER_FFT_BACKEND=FFTW`, for tuned plans
+  ([which libraries each build uses](build.md#which-libraries-each-build-uses)).
 - All three give the same results within a small tested tolerance. None is
   fastest everywhere: in the dated measurements below FFTW was faster in most
   cases, by up to about 1.8 times at an awkward (non-power-of-two) block size,
@@ -40,8 +45,8 @@ Contents: [selection and contract](#selection-and-contract),
 
 | Backend | Availability | Separate FFT dependency | Planning |
 | --- | --- | --- | --- |
-| FFTW (default) | Supported macOS/Linux/Windows builds | Single-precision FFTW | Estimate, measured modes and saved wisdom |
-| Accelerate | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
+| FFTW (default on Linux and Windows, except plug-ins) | Supported macOS/Linux/Windows builds | Single-precision FFTW | Estimate, measured modes and saved wisdom |
+| Accelerate (default on macOS) | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
 | Ooura | Built into portable source | None | Prepared tables; estimate mode only |
 
 See [build commands](build.md#fft-backend) and [FFTW plan tuning](../use/command-line.md#fftw-plan-tuning). Primary references:
@@ -53,8 +58,10 @@ local Ooura modifications. Its freshness was checked on 21 October 2026 (FFT-1, 
 
 ## Selection and contract
 
-`-DCONVOLVER_FFT_BACKEND=AUTO`, the default, selects FFTW, except in plug-in
-builds (below). `-DCONVOLVER_FFT_BACKEND=FFTW` selects FFTW explicitly.
+`-DCONVOLVER_FFT_BACKEND=AUTO`, the default, selects Accelerate on Apple
+platforms ([below](#accelerate-by-default-on-macos)) and FFTW elsewhere, except
+in plug-in builds on Linux and Windows, which get Ooura ([below](#plug-in-builds)).
+`-DCONVOLVER_FFT_BACKEND=FFTW` selects FFTW explicitly.
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` selects Apple's system vDSP framework and
 requires an Apple target. `-DCONVOLVER_FFT_BACKEND=OOURA` builds a
 dependency-free FFT into the library (see below). Accelerate builds do not discover or link FFTW. Each
@@ -76,10 +83,35 @@ more spectrum/history storage; validation accounts for that before allocation.
 Planning/allocation remain outside processing. The backend does not change routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
 
+### Accelerate by default on macOS
+
+On Apple platforms `AUTO` selects **Accelerate** for every build: the
+command-line tools and libraries as well as the plug-ins (FFT-3). Accelerate is
+part of macOS, so a Mac build needs no FFT library installed and a Mac package
+ships none, and the plug-ins avoid FFTW's shared planner (below). Its results
+agree with FFTW's within the tested tolerance
+([correctness evidence](#correctness-evidence)), and it prepares filters faster
+([setup times](#processing-benchmark)).
+
+FFTW remains the fallback: configure with `-DCONVOLVER_FFT_BACKEND=FFTW` after
+`brew install fftw`. Choose it for the command-line tools when you want what
+only FFTW offers, tuned plans and saved wisdom
+([FFTW plan tuning](../use/command-line.md#fftw-plan-tuning)), or when you
+measure it faster for your filters. In the dated
+[Apple benchmark](#processing-benchmark), an FFTW built with NEON took 13–19%
+less time than Accelerate for 65536-tap filters and was 1.8 times faster at an
+awkward block size (B = 192), while Accelerate was up to 7% faster for shorter
+filters. Homebrew's FFTW is built without NEON, which cost FFTW 2–24% in the
+same Mac's measurements
+([FFTW comparisons](#fftw-implementation-and-planning-comparisons); to build
+one with NEON, see [below](#building-fftw-for-this-apple-silicon-mac)). Use
+power-of-two block sizes with Accelerate to avoid its padding.
+
 ### Plug-in builds
 
-With `CONVOLVER_BUILD_VST3=ON`, `AUTO` selects **Ooura** on Linux and Windows and
-**Accelerate** on macOS (TODO PLUG-1). A
+In a plug-in build (`CONVOLVER_BUILD_VST3`, `CONVOLVER_BUILD_LV2` or
+`CONVOLVER_BUILD_AU`), `AUTO` selects **Ooura** on Linux and Windows and
+**Accelerate** on macOS (PLUG-1). A
 plug-in runs inside a host process that may load other plug-ins, or the host
 itself, using the same FFTW. FFTW's planner is not thread-safe, and Convolver's
 planner lock only covers Convolver's own calls. Static FFTW is not enough on
@@ -207,10 +239,13 @@ Do not read these medians as a universal library ranking. The awkward B=192 case
 uses N=384 for FFTW versus N=512 for Accelerate, increasing both FFT and partition
 accumulation work. Power-of-two blocks avoid that padding penalty.
 
-Keep **FFTW as the default**. Accelerate is a useful optional Apple backend: it
-removes the separate FFT dependency, prepares filters faster in these cases, and
-is competitive in several processing workloads. Benchmark the intended routing,
-IR lengths and latency on the target machine before selecting it for speed.
+The conclusion drawn on 18 October was to keep FFTW as the default and offer
+Accelerate as an option: it removes the separate FFT dependency, prepares
+filters faster in these cases, and is competitive in several processing
+workloads. Since FFT-3 (30 October 2026) Accelerate is the macOS default and
+FFTW the option ([Accelerate by default](#accelerate-by-default-on-macos)).
+Benchmark the intended routing, IR lengths and latency on the target machine
+before choosing either for speed.
 
 Setup medians include plan construction and all filter spectra, separately timed:
 

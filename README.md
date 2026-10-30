@@ -33,8 +33,9 @@ been tested yet ([status](docs/project/status.md)).
 
 ## Try it
 
-With CMake 3.20 or later, a C++20 compiler, FFTW (single precision),
-libsndfile and Python 3.8 or later (`brew install cmake fftw libsndfile`, or
+With CMake 3.20 or later, a C++20 compiler, libsndfile, Python 3.8 or later
+and, except on macOS (which uses its own Accelerate framework), FFTW (single
+precision) (`brew install cmake libsndfile`, or
 `sudo apt-get install cmake g++ python3 libfftw3-dev libsndfile1-dev`):
 
 ```sh
