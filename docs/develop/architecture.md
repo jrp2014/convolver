@@ -122,17 +122,16 @@ callbacks meet deadlines. Report the actual checks and their limits.
 
 ## Dependency choices
 
-On macOS every build prefers the platform's own Accelerate framework, and the
-libraries the other platforms use remain build options
-([which libraries each build uses](build.md#which-libraries-each-build-uses)).
-On Linux and Windows FFTW is the default FFT backend unless the build includes
-a plug-in. Then `AUTO` picks the built-in Ooura FFT for the whole build, CLI
-included, because other code in the host process may call the same FFTW, whose
-planner Convolver cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)).
-Build the CLI separately to keep FFTW for offline rendering, on macOS too.
-Ooura is built in and avoids a separate FFT dependency. The
-[FFT guide](fft-backends.md) has the numerical contract and dated measurements;
-none is asserted to be fastest for every workload.
+[Which libraries each build uses](build.md#which-libraries-each-build-uses)
+lists the FFT and sound-file library of every build and how to change them.
+The reasons: on macOS every build prefers what macOS includes (Accelerate), so
+nothing extra is installed or shipped, and the other platforms' libraries stay
+build options. Plug-in builds never default to FFTW, because other code in the
+host process may call the same FFTW, whose planner Convolver cannot lock
+([plug-in builds](fft-backends.md#plug-in-builds)); on Linux and Windows they
+use the built-in Ooura. The [FFT guide](fft-backends.md) has the numerical
+contract and dated measurements; none is asserted to be fastest for every
+workload.
 
 [libsndfile](https://libsndfile.github.io/libsndfile/) remains the file
 decoding and encoding boundary. The core and host libraries can omit it. It is

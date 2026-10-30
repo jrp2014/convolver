@@ -99,9 +99,9 @@ only FFTW offers, tuned plans and saved wisdom
 ([FFTW plan tuning](../use/command-line.md#fftw-plan-tuning)), or when you
 measure it faster for your filters. In the dated
 [Apple benchmark](#processing-benchmark), an FFTW built with NEON took 13–19%
-less time than Accelerate for 65536-tap filters and was 1.8 times faster at an
-awkward block size (B = 192), while Accelerate was up to 7% faster for shorter
-filters. Homebrew's FFTW is built without NEON, which cost FFTW 2–24% in the
+less time than Accelerate for 65536-tap filters at B = 256 (they were equal at
+B = 1024) and was 1.8 times faster at an awkward block size (B = 192), while
+Accelerate was up to 7% faster in some cases with 4096-tap filters. Homebrew's FFTW is built without NEON, which cost FFTW 2–24% in the
 same Mac's measurements
 ([FFTW comparisons](#fftw-implementation-and-planning-comparisons); to build
 one with NEON, see [below](#building-fftw-for-this-apple-silicon-mac)). Use

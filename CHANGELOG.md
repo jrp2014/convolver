@@ -89,13 +89,13 @@ Until 1.0 the C++ API may change between minor versions.
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - Build (FFT-3): on macOS the default FFT backend (`AUTO`) is now Apple's
   Accelerate for every build, the command-line tools and libraries included,
-  as it already was for the plug-ins (jrp, 30 October 2026). A Mac build
+  as it already was for the plug-ins ([decision](docs/project/decisions.md#releases)). A Mac build
   therefore needs no FFTW installed. FFTW remains available with
   `-DCONVOLVER_FFT_BACKEND=FFTW`, and is needed for `--tune-fft`, FFTW wisdom
   and measured plans, which Accelerate builds reject. Linux and Windows are
-  unchanged. Output differs from an FFTW build by float rounding only: the
-  largest difference in the recorded comparison was 7.5e-7 of full scale,
-  about -122 dBFS, with no audible effect. The tools keep
+  unchanged. Output differs from an FFTW build by float rounding only: at
+  most 8.3e-7 of full scale in the recorded comparisons (about -122 dBFS),
+  with no audible effect. The tools keep
   libsndfile for sound files on every platform. The native macOS CI job now
   builds FFTW explicitly and checks that the default build chooses
   Accelerate without FFTW. See

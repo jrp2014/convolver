@@ -81,7 +81,7 @@ they offer.
 
 | What you build | FFT on macOS | FFT on Linux and Windows | Sound files |
 | --- | --- | --- | --- |
-| The command-line tools (`convolver`, `convolver-preset`, `convolver-equalizer-apo`) and the C++ libraries | Accelerate | FFTW | libsndfile, on every platform |
+| The command-line tools (`convolver`, `convolver-preset`, `convolver-equalizer-apo`) and the C++ libraries | Accelerate | FFTW | libsndfile, on every platform (the core library alone needs none) |
 | VST3 plug-in | Accelerate | Ooura (built in) | None: the filter arrives in a preset or the saved project |
 | Audio Unit (macOS only) | Accelerate | Not built | None: as VST3 |
 | LV2 plug-in | Accelerate | Ooura (built in) | libsndfile, for the filter file chosen in the host |
@@ -104,7 +104,9 @@ What to change, and why you might:
 
 One FFT library serves the whole build: a build that includes a plug-in uses
 the plug-in's choice for the tools as well, so build the tools separately for
-FFTW. `convolver --version` names the FFT library and libsndfile version a
+FFTW (on macOS with `-DCONVOLVER_FFT_BACKEND=FFTW`). The preview packages are
+such builds: everything in them uses Accelerate on macOS and Ooura on Linux
+and Windows ([preview recipe](#preview-recipe)). `convolver --version` names the FFT library and libsndfile version a
 binary uses. All the FFT libraries give the same results within a small tested
 tolerance ([FFT guide](fft-backends.md#correctness-evidence)).
 
