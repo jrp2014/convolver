@@ -136,7 +136,9 @@ workload.
 [libsndfile](https://libsndfile.github.io/libsndfile/) remains the file
 decoding and encoding boundary. The core and host libraries can omit it. It is
 neither an audio-device layer nor a resampler. Replacing it would need a
-concrete format, packaging or correctness benefit and matching real-file tests.
+concrete format, packaging or correctness benefit and matching real-file tests;
+macOS's AudioToolbox, considered for the tools, did not offer one
+([sound files](build.md#which-libraries-each-build-uses)).
 
 Plug-in adapters use each format's own headers (VST3 SDK, AudioUnitSDK, `lv2`)
 rather than a framework; builds take each one's newest release

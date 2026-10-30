@@ -101,6 +101,20 @@ What to change, and why you might:
   planner is not thread-safe ([plug-in builds](fft-backends.md#plug-in-builds)).
 - **Sound files:** the tools use libsndfile on macOS too, so they read and
   write the same formats on every platform. There is no option to replace it.
+  macOS's own AudioToolbox (its ExtAudioFile API) can read and write sound
+  files too, but it is not used for the tools, by choice:
+  - Reading with it alone gains nothing: the tools write every output file
+    with libsndfile, so a Mac build would still need libsndfile, and would
+    have two readers to keep in agreement.
+  - Writing with it as well would remove libsndfile from Mac builds of the
+    tools, but at the cost of a second writer used only on macOS, whose
+    formats, headers and options differ in small ways from libsndfile's,
+    with its own tests. Linux and Windows would still need libsndfile, and
+    the preview packages already ship it beside the tools, so users install
+    nothing either way.
+
+  The Audio Unit is the exception: it only reads filter files, and it must
+  load in any host with nothing installed beside it.
 
 One FFT library serves the whole build: a build that includes a plug-in uses
 the plug-in's choice for the tools as well, so build the tools separately for
