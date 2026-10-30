@@ -250,10 +250,14 @@ void run(const fs::path& dir) {
             bytes[24 + b] = static_cast<char>((rate >> (8 * b)) & 0xffU);
         text_file(dir / "fast.wav", bytes);
     }
-    const auto open_descriptors = [] {
+    // Windows has no /dev/fd: there the refusals run, uncounted.
+    std::error_code no_fd;
+    const bool countable = fs::is_directory("/dev/fd", no_fd);
+    const auto open_descriptors = [countable] {
         std::size_t n = 0;
-        for ([[maybe_unused]] const auto& entry : fs::directory_iterator("/dev/fd"))
-            ++n;
+        if (countable)
+            for ([[maybe_unused]] const auto& entry : fs::directory_iterator("/dev/fd"))
+                ++n;
         return n;
     };
     const auto before = open_descriptors();
@@ -274,8 +278,11 @@ void run(const fs::path& dir) {
                 "fast.wav is refused for its rate, after it was opened: '" + message + "'");
     }
     const auto after = open_descriptors();
-    std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
-              << '\n';
+    if (countable)
+        std::cout << "fast.wav: refused 20 times, open descriptors " << before << " then " << after
+                  << '\n';
+    else
+        std::cout << "fast.wav: refused 20 times (no /dev/fd to count descriptors in)\n";
     require(after <= before, "refused files leave descriptors open: " + std::to_string(before) +
                                  " before, " + std::to_string(after) + " after");
     // The reader's own message names the missing file.

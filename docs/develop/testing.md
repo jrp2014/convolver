@@ -158,7 +158,8 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
   the same diagnostic code by both. A WAV whose header claims 800 kHz,
   which the reader opens and then refuses, is refused 20 times without
-  leaving a file descriptor open (counted in `/dev/fd`).
+  leaving a file descriptor open (counted in `/dev/fd`, where there is one:
+  not on Windows).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
