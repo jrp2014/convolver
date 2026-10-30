@@ -113,8 +113,9 @@ What to change, and why you might:
     the preview packages already ship it beside the tools, so users install
     nothing either way.
 
-  The Audio Unit is the exception: it only reads filter files, and it must
-  load in any host with nothing installed beside it.
+  AudioToolbox pays off only where a build reads files but writes none and
+  must load with nothing installed beside it, such as a plug-in that opens
+  filter files itself.
 
 One FFT library serves the whole build: a build that includes a plug-in uses
 the plug-in's choice for the tools as well, so build the tools separately for
