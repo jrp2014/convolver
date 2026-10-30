@@ -1,8 +1,8 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Cloud sessions: install what the CMake build and tests need (CMake, FFTW,
-# libsndfile, Clang sanitizer runtimes, latest stable Clang tools, and the LV2
-# headers, lilv and serdi; CI pins the LV2 dependencies), and install
+# libsndfile, Clang sanitizer runtimes, latest stable Clang tools and ruff,
+# and the LV2 headers, lilv and serdi; CI pins the LV2 dependencies), and install
 # the pre-commit Git hook so every commit runs the lint checks, formatting
 # included. Local machines are left alone (CONTRIBUTING.md, "Lint checks").
 set -euo pipefail
@@ -43,19 +43,20 @@ install_lint_hook() {
     fi
   fi
   # Upgrade tools without letting a download failure disable the commit hook.
-  if "${venv}/bin/python" -m pip install -q --upgrade clang-format clang-tidy; then
+  if "${venv}/bin/python" -m pip install -q --upgrade clang-format clang-tidy ruff; then
     "${venv}/bin/clang-format" --version
     "${venv}/bin/clang-tidy" --version
-    # Refresh cached hook environments only when the formatter release changes.
+    "${venv}/bin/ruff" --version
+    # Refresh cached hook environments only when a formatter release changes.
     local formatter_version
-    formatter_version=$("${venv}/bin/clang-format" --version)
+    formatter_version=$("${venv}/bin/clang-format" --version; "${venv}/bin/ruff" --version)
     if [ ! -f "${venv}/formatter-version" ] || [ "$(cat "${venv}/formatter-version")" != "$formatter_version" ]; then
       if "${venv}/bin/pre-commit" clean; then
         printf '%s\n' "$formatter_version" > "${venv}/formatter-version"
       fi
     fi
   else
-    echo "Could not update the Clang tools; retaining cached hooks, not latest-tool validation." >&2
+    echo "Could not update the Clang tools and ruff; retaining cached hooks, not latest-tool validation." >&2
   fi
   cd "$(dirname "$0")/../.." || return 0
   if ! "${venv}/bin/pre-commit" install >/dev/null; then

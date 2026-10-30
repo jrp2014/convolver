@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Reject dependency leaks, incorrect architecture and changed package bytes."""
+
 import importlib.util
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
-from contract import load_policy
+from contract import load_policy  # noqa: E402
 
 
 class ArtifactTests(unittest.TestCase):
@@ -35,7 +36,11 @@ class ArtifactTests(unittest.TestCase):
 
     def test_system_dependencies(self):
         self.verifier.check_dependencies('Linux', ['libc.so.6', 'libstdc++.so.6'], self.policy)
-        self.verifier.check_dependencies('Darwin', ['/usr/lib/libSystem.B.dylib', '/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate'], self.policy)
+        self.verifier.check_dependencies(
+            'Darwin',
+            ['/usr/lib/libSystem.B.dylib', '/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate'],
+            self.policy,
+        )
 
     def test_changed_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -60,9 +65,8 @@ class ArtifactTests(unittest.TestCase):
                 self.verifier.verify_files(root, {})
 
     def test_source_archive_required(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(ValueError, 'source archive'):
-                self.verifier.source_record(Path(temporary) / 'missing.tar.gz')
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(ValueError, 'source archive'):
+            self.verifier.source_record(Path(temporary) / 'missing.tar.gz')
 
     def test_old_libc_floor(self):
         with self.assertRaisesRegex(ValueError, 'GLIBC'):

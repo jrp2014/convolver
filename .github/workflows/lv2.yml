@@ -43,7 +43,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests that change only documentation skip the builds and tests
+  # Pull requests that change only documentation, or only another plug-in
+  # format's or workflow's own files (CI-13), skip the builds and tests
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
@@ -54,7 +55,7 @@ jobs:
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+        run: python3 scripts/ci_scope.py --workflow lv2 --github-output "$GITHUB_OUTPUT"
 
   tools:
     needs: scope
@@ -197,6 +198,8 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -229,7 +232,7 @@ jobs:
           cmake --build build-lv2 --parallel --target ${{ matrix.targets }}
       - name: Test
         run: >-
-          ctest --test-dir build-lv2 --output-on-failure --output-junit junit.xml --parallel 2
+          ctest --test-dir build-lv2 --output-on-failure --output-junit junit.xml
           -R '${{ matrix.tests }}'
       - name: Explain a failure that may come from a new upstream release
         if: failure()
@@ -261,6 +264,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -308,7 +313,7 @@ jobs:
             -DCONVOLVER_LEGACY_TESTS=OFF
           cmake --build build-upstream --parallel \
             --target convolver_lv2_tests convolver_lv2_adapter convolver_preset_tool
-          ctest --test-dir build-upstream --output-on-failure --parallel 2 --no-tests=error \
+          ctest --test-dir build-upstream --output-on-failure --no-tests=error \
             -R '^(examples\.first_use|lv2\..*)$'
       - name: Report what the newest upstream lilv shows
         if: always()

@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Inspect native binaries and seal/verify a staged release file inventory."""
+
 import argparse
 import json
-from pathlib import Path, PurePosixPath
 import platform
 import re
 import subprocess
 import tarfile
+from pathlib import Path
+
 from contract import load_policy, platform_policy, sha256, used_dependencies, with_records
 
 
@@ -16,7 +18,9 @@ def check_dependencies(system, dependencies, policy):
         if system == 'Darwin':
             accepted = dependency.startswith(('/usr/lib/', '/System/Library/Frameworks/'))
         elif system == 'Windows':
-            accepted = dependency.lower() in allowed or bool(re.fullmatch(r'api-ms-win-[a-z0-9-]+\.dll', dependency.lower()))
+            accepted = dependency.lower() in allowed or bool(
+                re.fullmatch(r'api-ms-win-[a-z0-9-]+\.dll', dependency.lower())
+            )
         else:
             accepted = dependency.lower() in allowed
         if not accepted:
@@ -64,7 +68,12 @@ def source_manifest(archive):
 
 def source_record(archive):
     source = source_manifest(archive)
-    return dict(name=archive.name, sha256=sha256(archive), source_commit=source['source_commit'], version=source['version'])
+    return {
+        'name': archive.name,
+        'sha256': sha256(archive),
+        'source_commit': source['source_commit'],
+        'version': source['version'],
+    }
 
 
 def used_records(policy, archive, backend):
@@ -86,7 +95,11 @@ def inspect_binary(path, candidate, policy):
         slices = output(['lipo', '-archs', str(path)]).strip().split()
         if slices != [arch]:
             raise ValueError(f'incorrect architecture slices in {path.name}: {slices}')
-        libraries = [line.strip().split(' (', 1)[0] for line in output(['otool', '-L', str(path)]).splitlines()[1:] if line.strip()]
+        libraries = [
+            line.strip().split(' (', 1)[0]
+            for line in output(['otool', '-L', str(path)]).splitlines()[1:]
+            if line.strip()
+        ]
         loads = output(['otool', '-l', str(path)])
         rpaths = re.findall(r'cmd LC_RPATH\s+cmdsize \d+\s+path (.+?) \(offset', loads)
         if rpaths:
@@ -103,12 +116,16 @@ def inspect_binary(path, candidate, policy):
         libraries = re.findall(r'\(NEEDED\).*?\[(.*?)\]', dynamic)
         if re.search(r'\((RPATH|RUNPATH)\)', dynamic):
             raise ValueError(f'unexpected runtime search path: {path.name}')
-        record['glibc_versions'] = check_symbol_versions(output(['readelf', '--version-info', str(path)]), candidate['max_glibc'])
+        record['glibc_versions'] = check_symbol_versions(
+            output(['readelf', '--version-info', str(path)]), candidate['max_glibc']
+        )
     elif system == 'Windows':
         headers = output(['dumpbin', '/headers', str(path)])
         if arch != 'x86_64' or not re.search(r'8664 machine', headers, re.IGNORECASE):
             raise ValueError(f'incorrect PE architecture: {path.name}')
-        libraries = re.findall(r'^\s+([\w.\-]+\.dll)\s*$', output(['dumpbin', '/dependents', str(path)]), re.MULTILINE | re.IGNORECASE)
+        libraries = re.findall(
+            r'^\s+([\w.\-]+\.dll)\s*$', output(['dumpbin', '/dependents', str(path)]), re.MULTILINE | re.IGNORECASE
+        )
     else:
         raise ValueError('unsupported binary platform')
     check_dependencies(system, libraries, policy)
@@ -138,7 +155,11 @@ def inspect(root, candidate, policy):
 
 def verify(root, manifest, policy, source_archive):
     candidate = platform_policy(policy, manifest['platform'])
-    if manifest.get('schema') != 1 or manifest['version'] != policy['version'] or manifest['backend'] != candidate['backend']:
+    if (
+        manifest.get('schema') != 1
+        or manifest['version'] != policy['version']
+        or manifest['backend'] != candidate['backend']
+    ):
         raise ValueError('artifact policy mismatch')
     if source_record(source_archive) != manifest['source']:
         raise ValueError('source archive differs from artifact manifest')
@@ -153,9 +174,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--manifest', type=Path, required=True)
-    parser.add_argument('--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json')
+    parser.add_argument(
+        '--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
+    )
     parser.add_argument('--source-archive', type=Path, required=True)
-    parser.add_argument('--write', action='store_true', help='Inspect stage and create an unsigned developer-preview manifest')
+    parser.add_argument(
+        '--write', action='store_true', help='Inspect stage and create an unsigned developer-preview manifest'
+    )
     parser.add_argument('--platform')
     parser.add_argument('--build-info', type=Path)
     args = parser.parse_args()
@@ -171,20 +196,47 @@ def main():
         source = source_record(args.source_archive)
         if build.get('source_dirty', True):
             raise ValueError('cannot seal a build from a dirty source tree')
-        if build['version'] != policy['version'] or build['backend'] != candidate['backend'] or build['source_commit'] != source['source_commit']:
+        if (
+            build['version'] != policy['version']
+            or build['backend'] != candidate['backend']
+            or build['source_commit'] != source['source_commit']
+        ):
             raise ValueError('actual build, source archive and policy disagree')
-        if build['configuration'] != 'Release' or re.search(r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.I):
+        if build['configuration'] != 'Release' or re.search(
+            r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.IGNORECASE
+        ):
             raise ValueError('nonportable release build flags or configuration')
         notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
-        for required in ('licenses/Convolver.txt', 'licenses/DEPENDENCIES.json', 'licenses/libsndfile.txt', *notices, 'licenses/vst3sdk.txt', 'docs/use/README.md', 'docs/use/first-sound-in-a-host.md', 'docs/use/presets.md', 'docs/use/equalizer-apo.md', 'presets/examples.json', 'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json', 'VERSION.txt'):
+        for required in (
+            'licenses/Convolver.txt',
+            'licenses/DEPENDENCIES.json',
+            'licenses/libsndfile.txt',
+            *notices,
+            'licenses/vst3sdk.txt',
+            'docs/use/README.md',
+            'docs/use/first-sound-in-a-host.md',
+            'docs/use/presets.md',
+            'docs/use/equalizer-apo.md',
+            'presets/examples.json',
+            'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json',
+            'VERSION.txt',
+        ):
             if not (root / required).is_file():
                 raise ValueError(f'missing release content: {required}')
-        manifest = dict(schema=1, version=policy['version'], platform=args.platform, source_commit=build['source_commit'],
-                        backend=candidate['backend'], channel='developer-preview', source=source, build=build,
-                        build_os=platform.platform(), dependencies=used_records(policy, args.source_archive,
-                                                                                candidate['backend']),
-                        binaries=inspect(root, candidate, policy),
-                        files=inventory(root))
+        manifest = {
+            'schema': 1,
+            'version': policy['version'],
+            'platform': args.platform,
+            'source_commit': build['source_commit'],
+            'backend': candidate['backend'],
+            'channel': 'developer-preview',
+            'source': source,
+            'build': build,
+            'build_os': platform.platform(),
+            'dependencies': used_records(policy, args.source_archive, candidate['backend']),
+            'binaries': inspect(root, candidate, policy),
+            'files': inventory(root),
+        }
         args.manifest.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     else:
         manifest = json.loads(args.manifest.read_text(encoding='utf-8'))

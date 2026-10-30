@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Exercise generated presets through the real SDK adapter, with relocated assets."""
+
 import pathlib
 import struct
 import subprocess
@@ -18,11 +19,11 @@ with tempfile.TemporaryDirectory() as directory:
     preset = root / 'filter ü.vstpreset'
     subprocess.run([sys.argv[1], str(impulse), str(preset)], check=True)
     original = preset.read_bytes()
-    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True)
+    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     impulse.unlink()
     subprocess.run([sys.argv[2], str(preset)], check=True)
-    result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True)
+    result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     print('Preset embeds filters and survives removal of original IR')
 
@@ -41,21 +42,27 @@ with tempfile.TemporaryDirectory() as directory:
 
     def make(name, *options):
         target = root / name
-        return subprocess.run([tool, *options, str(root / 'list.txt'), str(target)],
-                              capture_output=True), target
+        return subprocess.run(
+            [tool, *options, str(root / 'list.txt'), str(target)], capture_output=True, check=False
+        ), target
 
     result, upmix = make('upmix.vstpreset', '--sample-rate', '48000', '--output-channels', '6')
     assert result.returncode == 0, result.stderr
     result, stereo = make('stereo.vstpreset', '--input-channels', '2')
     assert result.returncode == 0, result.stderr
     assert upmix.read_bytes() != stereo.read_bytes()
-    for options in (['--output-channels', '3'], ['--sample-rate', '44100'],
-                    ['--output-channels', '0'], ['--input-channels', 'x'],
-                    ['--frobnicate', '1']):
+    for options in (
+        ['--output-channels', '3'],
+        ['--sample-rate', '44100'],
+        ['--output-channels', '0'],
+        ['--input-channels', 'x'],
+        ['--frobnicate', '1'],
+    ):
         result, target = make('rejected.vstpreset', *options)
         assert result.returncode != 0 and not target.exists(), options
-    result = subprocess.run([tool, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')],
-                            capture_output=True, text=True)
+    result = subprocess.run(
+        [tool, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')], capture_output=True, text=True, check=False
+    )
     assert result.returncode != 0 and '1 to 8' in result.stderr, result.stderr
     print('Preset selection by channel counts and multichannel limits')
 
@@ -63,7 +70,10 @@ with tempfile.TemporaryDirectory() as directory:
     # both write the same bytes for the same filter and selection.
     if len(sys.argv) > 3:
         shared = root / 'shared.vstpreset'
-        subprocess.run([sys.argv[3], '--sample-rate', '48000', '--output-channels', '6',
-                        str(root / 'list.txt'), str(shared)], check=True, capture_output=True)
+        subprocess.run(
+            [sys.argv[3], '--sample-rate', '48000', '--output-channels', '6', str(root / 'list.txt'), str(shared)],
+            check=True,
+            capture_output=True,
+        )
         assert shared.read_bytes() == upmix.read_bytes()
         print('convolver-preset writes the same .vstpreset as convolver-vst3-preset')

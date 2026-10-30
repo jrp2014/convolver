@@ -76,7 +76,8 @@ plus Ooura configurations described in [testing](docs/develop/testing.md).
   matching `tests/regression/*.py` in the same change.
 - Run `pre-commit run --all-files` before **every** push, draft commits
   included. It formats the portable C++ with the latest stable clang-format (also
-  `python3 scripts/check_format.py --fix`) and runs the other lint checks;
+  `python3 scripts/check_format.py --fix`), formats and lints the Python
+  with ruff (`ruff.toml`) and runs the other lint checks;
   lint CI fails on any difference. Cloud sessions install it as a Git hook.
   Portable sources must also pass the `.clang-tidy` checks (commands in
   `CONTRIBUTING.md`).

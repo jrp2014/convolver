@@ -24,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests that change only documentation skip the builds and tests
+  # Pull requests that change only documentation, or only another plug-in
+  # format's or workflow's own files (CI-13), skip the builds and tests
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
@@ -35,7 +36,7 @@ jobs:
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+        run: python3 scripts/ci_scope.py --workflow fuzz --github-output "$GITHUB_OUTPUT"
 
   libfuzzer:
     needs: scope
@@ -46,6 +47,8 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libsndfile1-dev clang
       # Compiler cache: pull requests restore it; main and manual runs also
@@ -63,24 +66,19 @@ jobs:
           -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_DOCUMENTATION_TESTS=OFF
       - name: Build fuzz targets
         run: >
-          cmake --build build-fuzz --parallel 2
+          cmake --build build-fuzz
           --target fuzz_config_text fuzz_config_list fuzz_host_state fuzz_ir_file
+      # CI-12: the campaigns run side by side, at most one per physical core,
+      # so each keeps a core of its own for its whole time budget: four at once
+      # on the runner's 4 CPUs gave each about half its usual executions
+      # (docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns). The
+      # step fails if any campaign fails or leaves no exit status;
+      # tests/fuzz/scheduler_tests.py tests that (CI-15). Each log's last lines
+      # include its "Done N runs".
       - name: Run each target
         env:
           SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '60' }}
-        # The default shell uses pipefail, so a fuzzer failure fails the pipeline.
-        run: |
-          mkdir -p fuzz-out
-          status=0
-          for target in config_text config_list host_state ir_file; do
-            mkdir -p "fuzz-out/corpus/$target"
-            cp tests/fuzz/seeds/$target/* "fuzz-out/corpus/$target/"
-            ./build-fuzz/fuzz_$target "fuzz-out/corpus/$target" tests/fuzz/regressions/$target \
-              -max_total_time="$SECONDS_PER_TARGET" -max_len=65536 -timeout=2 -rss_limit_mb=512 \
-              -artifact_prefix="fuzz-out/$target-" 2>&1 | tee "fuzz-out/$target.log" | tail -5 \
-              || status=1
-          done
-          exit $status
+        run: scripts/fuzz_campaigns.sh --build build-fuzz --output fuzz-out --seconds "$SECONDS_PER_TARGET"
       - name: Keep crash inputs and logs
         if: failure()
         uses: actions/upload-artifact@v7

@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Generate exact IEEE float WAV fixtures and self-contained VST3 presets."""
+
 import argparse
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tests' / 'plugins'))
@@ -39,8 +40,9 @@ def generate(output, converter):
                 if preset.exists():
                     preset.unlink()  # Only this generator's own output directory.
                 subprocess.run([str(converter), str(folder / 'impulse.wav'), str(preset)], check=True)
-                examples.append(dict(name=name, rate=rate, channels=channels, kind=kind,
-                                     taps=taps, latency=256))
+                examples.append(
+                    {'name': name, 'rate': rate, 'channels': channels, 'kind': kind, 'taps': taps, 'latency': 256}
+                )
     (output / 'examples.json').write_text(json.dumps(examples, indent=2) + '\n', encoding='utf-8')
 
 

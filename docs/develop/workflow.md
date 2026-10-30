@@ -123,8 +123,9 @@ checklist says so:
   clang-tidy, as in [CONTRIBUTING](../../CONTRIBUTING.md#lint-checks).
 - **Documentation:** the guide that owns the behaviour is updated
   ([page ownership](documentation.md#one-home-for-each-topic)); a new page is in
-  the [index](../README.md); user-visible changes are in the
-  [CHANGELOG](../../CHANGELOG.md).
+  the [index](../README.md); user-visible changes and every finished TODO
+  item, contributor-only ones included, are in the
+  [CHANGELOG](../../CHANGELOG.md) under its ID.
 - **TODO:** the item is ticked with its evidence, or has a `Progress` line for
   what remains. A plan that is now fully implemented, or superseded,
   moves to [`archive/plans/`](../archive/plans/README.md)
@@ -227,7 +228,9 @@ When the item is complete, move lasting behaviour into the owning guide and
 any owner's decision into the [decisions log](../project/decisions.md). Then
 replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
 its ID and title, the date, the pull request if there was one, and a link to the page that now
-describes it. TODO keeps open work only; the one-line entry keeps the ID
+describes it. In the same pull request, add an entry naming the ID under
+`[Unreleased]` in the [CHANGELOG](../../CHANGELOG.md), even for work only
+contributors see. TODO keeps open work only; the one-line entry keeps the ID
 defined, and the [repository checks](#automated-checks) reject a TODO ID that
 is used but never defined.
 

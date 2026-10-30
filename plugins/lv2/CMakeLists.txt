@@ -90,18 +90,19 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME lv2.adapter COMMAND convolver_lv2_adapter "${lv2_bundle_dir}"
             "${PROJECT_SOURCE_DIR}/examples/first-use" "$<TARGET_FILE:convolver_preset_tool>"
             "${PROJECT_BINARY_DIR}/lv2-test")
-        set_tests_properties(lv2.adapter PROPERTIES LABELS "lv2;real-libraries" TIMEOUT 600)
+        set_tests_properties(lv2.adapter PROPERTIES LABELS "lv2;real-libraries" TIMEOUT 600 COST 185)
         # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
         # that examples.first_use leaves behind.
         add_test(NAME lv2.harness COMMAND convolver_lv2_harness "${lv2_bundle_dir}"
             "${PROJECT_BINARY_DIR}/first-use/fixtures.txt")
-        # About three minutes under ASan; sanitizer builds need the margin.
+        # About three minutes under ASan; sanitizer builds need the margin. COST
+        # (seconds in CI) has ctest --parallel start the longest tests first (CI-9).
         set_tests_properties(lv2.harness PROPERTIES LABELS "lv2;real-libraries;plug2"
-            TIMEOUT 600 FIXTURES_REQUIRED first_use_renders)
+            TIMEOUT 600 FIXTURES_REQUIRED first_use_renders COST 210)
         # PLUG-7: lifecycle sequences against the reference model.
         add_test(NAME lv2.lifecycle COMMAND convolver_lv2_lifecycle "${lv2_bundle_dir}"
             "${PROJECT_BINARY_DIR}/lv2-test" ${CONVOLVER_LV2_LIFECYCLE_LENGTH})
-        set_tests_properties(lv2.lifecycle PROPERTIES LABELS "lv2;real-libraries;plug7" TIMEOUT 600)
+        set_tests_properties(lv2.lifecycle PROPERTIES LABELS "lv2;real-libraries;plug7" TIMEOUT 600 COST 25)
         # Everything the lv2.* tests and examples.first_use (the harness's
         # fixtures) run, so CI can build these alone rather than every test.
         add_custom_target(convolver_lv2_tests)

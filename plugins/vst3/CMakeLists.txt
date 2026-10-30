@@ -192,7 +192,9 @@ if(CONVOLVER_BUILD_IO)
                 target_link_libraries(convolver_vst3_lifecycle PRIVATE "-framework Cocoa")
             endif()
             add_test(NAME vst3.lifecycle COMMAND convolver_vst3_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
-            set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300)
+            # COST: about 100 s on Windows CI, so ctest --parallel starts it first (CI-9).
+            set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300
+                COST 100)
             add_dependencies(check convolver_vst3_lifecycle)
         endif()
         add_dependencies(check convolver_vst3_preset)
@@ -210,6 +212,21 @@ if(CONVOLVER_BUILD_IO)
             set_tests_properties(vst3.pluginval.acceptance PROPERTIES SKIP_RETURN_CODE 77)
         endif()
     endif()
+endif()
+
+# CI-9: everything the vst3.* tests and their examples.first_use fixture run,
+# so a job that runs only `ctest -L vst3` can build this rather than every test
+# (as convolver_lv2_tests does for LV2). A test whose program is missing here
+# fails (CTest cannot find it, or its script reports it), so add a new test's target.
+if(CONVOLVER_BUILD_TESTS)
+    add_custom_target(convolver_vst3_suite)
+    add_dependencies(convolver_vst3_suite convolver_vst3 validator convolver_vst3_tests)
+    foreach(target IN ITEMS convolver_vst3_preset convolver_vst3_preset_format convolver_vst3_harness
+            convolver_vst3_lifecycle convolver_preset_tool convolver_cli)
+        if(TARGET ${target})
+            add_dependencies(convolver_vst3_suite ${target})
+        endif()
+    endforeach()
 endif()
 
 if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)

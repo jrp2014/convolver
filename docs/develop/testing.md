@@ -817,10 +817,33 @@ against the current program as well as checking links.
 
 [The fuzz guide](../../tests/fuzz/README.md) describes the four harnesses and corpus
 replay. CI runs each libFuzzer target for 60 seconds on pull requests and
-`main`, with ASan/UBSan and resource bounds. A manual workflow run defaults to
+`main`, with ASan/UBSan and resource bounds. The campaigns run side by side,
+at most one per physical core, so each keeps a core to itself for its whole
+budget; each log ends with the campaign's `Done N runs` count. The Linux
+runner's 4 CPUs are 2 cores with 2 hardware threads each, so two campaigns
+run at a time and the step takes about 2 minutes instead of 4. On 27 October
+2026 four at once gave each campaign about half its executions on `main`
+(`config_text` 194k against 447k); two at once gave 426k, and
+`config_list` 86k against 56k, `host_state` 1751k against 1640k and
+`ir_file` 121k against 161k. A manual workflow run defaults to
 600 seconds per target; set its `seconds` input to `60` to reproduce the
 smoke-test budget. Keep crashes
 as committed regression inputs after investigating them.
+
+[`fuzz_campaigns.sh`](../../scripts/fuzz_campaigns.sh) is the scheduler: it
+copies the seeds, starts the campaigns, waits whenever as many run as the
+limit (`--jobs`; by default the physical cores that `lscpu` or, on macOS,
+`sysctl` reports, else the CPU count, and it prints which), and then
+prints each campaign's exit status and last log lines. The step fails if any
+campaign fails, or if one leaves no status file because it was killed
+before it could write one; a status file left by an earlier run in the same
+output folder is removed first. It needs bash 4.3 or later (for `wait -n`).
+[`scheduler_tests.py`](../../tests/fuzz/scheduler_tests.py) runs it with
+stand-in fuzzers (shell scripts, nothing compiled) and checks a failing
+campaign, a missing status file, a missing fuzzer and seed folder, the
+default limit's sources, and that no more campaigns than the limit run at
+once (CI-15); pre-commit runs it
+when either file changes, so Lint runs it on every pull request.
 
 ## Plug-in candidate checks
 
@@ -829,8 +852,12 @@ Linux x64 and both macOS architectures. It checks runtime dependency closure,
 source inventories, final ZIP relocation, the packaged guide's executable
 examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
 copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
-changed-directory upgrades and locked-file uninstall recovery. Linux rebuilds
-the supplied source with networking disabled. See the
+changed-directory upgrades and locked-file uninstall recovery. The Linux
+candidate is built with networking disabled, from the archive alone, with
+CMake's default generator (Unix Makefiles); the macOS candidates use Ninja and
+Windows Visual Studio (CI-10). Until 27 October 2026 a second, offline build of
+the same archive with `tests/release/source_build.py` did this on Linux; the
+script remains for [local checks](build.md#preview-recipe). See the
 [qualification record](releasing.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
@@ -868,7 +895,11 @@ re-running an older commit's run cancels the current one.
 
 This keeps the queue short. On the owner's Free plan GitHub runs at most 20
 jobs at once across the account's repositories, and only 5 on macOS, and one
-commit starts about 24 jobs, 5 of them on macOS. When the same commit also ran for the branch push, and older
+commit starts 28 jobs, 6 of them on macOS (27 October 2026). So more macOS
+jobs do not shorten the wait, and the native macOS job's FFT backends stay in
+one job: splitting them (CI-11, not done) would only make the candidates queue
+longer.
+When the same commit also ran for the branch push, and older
 commits kept running, jobs on 22 October 2026 waited a median of 10 minutes for
 a macOS runner (up to an hour) while taking about 3 minutes to run.
 
@@ -907,6 +938,30 @@ require a job that always reports: a skipped matrix job shows under its
 unexpanded name, so a required `ubuntu-latest / clang++ / Debug` would wait
 forever on a documentation-only pull request.
 
+### Pull requests for one plug-in format
+
+A pull request that changes only one format's own files, apart from
+documentation, runs Lint and that format's workflows; the `scope` job of every
+other workflow skips it (CI-13). A change to one workflow file alone runs that
+workflow. Anything else in the same pull request runs everything.
+
+| Files changed | Workflows that build and test |
+| --- | --- |
+| `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
+| `plugins/au/`, `tests/au/` | Audio Unit |
+| `plugins/lv2/`, `tests/lv2/` | LV2 |
+| `.github/workflows/NAME.yml` | that workflow |
+
+The shared parts are not a format's files: the PLUG-2 harness in
+`tests/plugins/`, `plugins/identities.json` (Lint checks the identities on
+every pull request) and `tests/vst3/fft_symbols.py`, which the LV2 tests run
+too. `tests/ci_scope_tests.py` keeps the map honest: outside a format's
+folders and its workflow, only the files it lists, each with its reason, may
+name that format's files or its `CONVOLVER_BUILD_` option, and CI may use no
+CMake preset but `core-only`. When another build starts using a format's file,
+add the file to `SHARED` in `ci_scope.py` or the workflow to
+`FORMAT_WORKFLOWS`.
+
 ### Which configurations run which tests
 
 A local build runs every CTest entry. CI runs each kind of test only where
@@ -919,7 +974,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | Tests | Run in | Not run in |
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
-| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit, the release candidates and the offline rebuild (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
+| `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
 | Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
@@ -927,6 +982,49 @@ CTest still runs a fixture's setup when a selected test needs it, so
 `ctest -L vst3` runs `examples.first_use` before `vst3.harness`. A new CI
 configuration starts from this table: add it where it changes a result, and
 give a new build-independent check the `repository` label.
+
+### Build targets and test order
+
+Some jobs build only what their tests run. These three targets cover a
+format's whole test label, with the CLI for the `examples.first_use` fixture:
+
+| Target | Built by | Tests |
+| --- | --- | --- |
+| `convolver_vst3_suite` | VST3 on Linux | `ctest -L vst3` (with `CONVOLVER_PACKAGE_PLUGINS`, also what `release.stage` installs) |
+| `convolver_au_suite` | Audio Unit with sanitizers | `ctest -L au` |
+| `convolver_lv2_tests` | LV2 with ASan and UBSan, and the upstream lilv check | `examples.first_use` and `lv2.*` |
+
+The LV2 ThreadSanitizer job, the lv2lint bundle and the fuzz workflow name
+their few targets directly in the workflow; the other jobs build everything.
+A test whose program the target does not build fails (CTest reports "Could
+not find executable", a Python-driven test its own error), so a new plug-in
+test's target goes into its format's target (`au_test_targets` for the Audio
+Unit).
+
+Every build and test job uses all the runner's CPUs: the local
+[`use-every-cpu`](../../.github/actions/use-every-cpu/action.yml) action sets
+`CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` to the CPU count
+(4 on GitHub's Linux and Windows runners for public repositories, 3 on
+`macos-latest`), so the workflows call `cmake --build` and `ctest` without a
+count. The LV2 jobs build with Ninja and a bare `--parallel`, which uses
+Ninja's own default, also every CPU. The release scripts (`candidate.py`, `build_dependencies.py`,
+`source_build.py`) pass the machine's CPU count themselves, unless their
+`--jobs` option sets a lower limit for a local build (CI-16,
+[preview recipe](build.md#preview-recipe)); `tests/release/jobs_tests.py`
+checks the option. The CMake presets
+keep `jobs: 2` for local builds; CI passes the count to the core-only preset.
+
+Under `ctest --parallel`, CTest starts the tests that others need first (a
+fixture's setup), then the ready tests in decreasing `COST`. The long tests
+carry a `COST` of about their longest CI time in seconds, so they start at
+once instead of last. Plug-in tests set it where they are defined; the core's
+are one list in the top-level `CMakeLists.txt`, before the `check` target,
+which skips a name no longer defined, so rename a test there too. On `main` at
+b9381e4 (25 October 2026, VST3 run 40236000059), Windows `vst3.lifecycle`
+took 100 s and began 21 s into its step, which then took 122 s. Static
+analysis runs [`clang_tidy.py`](../../scripts/clang_tidy.py), which analyses
+the same file list one file per CPU and lists every file that failed
+([lint checks](../../CONTRIBUTING.md#formatting-and-analysis)).
 
 ### Compiler cache
 

@@ -12,7 +12,8 @@ and preset formats, `.cfg` syntax, licences, defaults that change the sound,
 shipped dependencies and publishing ([workflow](../develop/workflow.md)). When
 jrp decides, record it here with its date; no other page carries decision
 notes or their dates ([workflow](../develop/workflow.md#while-working)). A
-change users will notice also goes in the [changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
+change users will notice, and every finished TODO item, also goes in the
+[changelog](../../CHANGELOG.md). Changing a decision is a new decision: add a row
 and mark the old one replaced, rather than editing it.
 
 Contents: [direction](#direction) · [releases](#releases) ·
@@ -40,7 +41,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 24 October 2026 | The plug-in editor uses native views with no framework: one AppKit view on macOS for VST3 and the Audio Unit, a Win32 view on Windows, the content in shared code. Replaces DPF as the fallback for a shared editor; VSTGUI and DPF were set aside for their lack of accessibility (and, for DPF, replacing our adapters). The Linux window's toolkit is chosen in VST3-13 (decided 25 October 2026: VSTGUI as a stop-gap) | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#framework-choice) |
 | 25 October 2026 | Plug-ins built with FFTW offer FFTW planning as an optional setting (Quick by default, or Measured), with a tooltip stating the measured gain (jrp asked for "at most 6%" if that is what was found; the whole-engine tests showed 2–6%, and PLUG-11 measures short filters before the figure is fixed); released plug-ins keep Ooura or Accelerate and no planning setting. Dither is not offered in the plug-ins | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#settings) |
 | 25 October 2026 | The Linux VST3 editor window uses VSTGUI as a stop-gap (a BSD-3-Clause dependency of the Linux VST3 build only); macOS and Windows keep native views. Editor accessibility is highly desirable but not essential: gaps are recorded, not blocking. The window offers drag and drop, recent files (a per-user file beside the log) and reload on change, and does not save the chosen path with the project | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#decisions-for-jrp) |
-| 24 October 2026 | Use the latest stable Clang formatting and analysis tools, replacing the version-18 policy. Local installation on jrp's Mac is deferred. CI going red on a new release is accepted: layout changes get a separate reformat commit, new clang-tidy findings are fixed in the code | [Contributor tooling](../../CONTRIBUTING.md#formatting-and-analysis), [new releases](../../CONTRIBUTING.md#when-a-new-clang-release-turns-ci-red) |
+| 24 October 2026 | Use the latest stable Clang formatting and analysis tools, replacing the version-18 policy. Local installation on jrp's Mac is deferred. CI going red on a new release is accepted: layout changes get a separate reformat commit, new clang-tidy findings are fixed in the code | [Contributor tooling](../../CONTRIBUTING.md#formatting-and-analysis), [new releases](../../CONTRIBUTING.md#when-a-new-clang-or-ruff-release-turns-ci-red) |
+| 29 October 2026 | ruff formats and lints the maintained Python, unpinned like the Clang tools (the latest stable release), with 120 columns, single quotes and as large a rule set as is reasonable (CI-18). As with Clang, Lint going red on a new ruff release is accepted: layout changes get a separate reformat commit, and new rule findings are fixed in the code, not added to the ignore list | [Python formatting and lint](../../CONTRIBUTING.md#python-formatting-and-lint), [new releases](../../CONTRIBUTING.md#when-a-new-clang-or-ruff-release-turns-ci-red) |
 
 ## Releases
 
@@ -128,3 +130,4 @@ were recorded in the repository; this log is their first written record.
 | 23 October 2026 | Maintained pages are sorted by reader into `docs/use/`, `docs/develop/` and `docs/project/` | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md) |
 | 23 October 2026 | One plug-in page for all formats; TODO holds open work only; `REVIEW.md` is retired into [status](status.md); all of `docs/use/` ships in packages; this decisions log is kept | [Documentation by reader](../archive/plans/2026-10-23-documentation-by-reader.md#decisions) |
 | 24 October 2026 | Decision notes and their dates appear only in this log, not as "(owner's decision, *date*)" on other pages | [Workflow](../develop/workflow.md#while-working) |
+| 27 October 2026 | Every finished TODO item gets a changelog entry naming its ID in the pull request that finishes it, contributor-only items included | [Workflow](../develop/workflow.md#recording-progress-in-todo) |

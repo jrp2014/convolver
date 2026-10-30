@@ -20,6 +20,25 @@ repos:
         args: [--strict]
   - repo: local
     hooks:
+      # The latest stable ruff, installed when the environment is created
+      # (CONTRIBUTING.md#python-formatting-and-lint). Python files only, not
+      # the Python examples inside Markdown.
+      - id: ruff-check
+        name: Python lint (latest stable ruff, fixes in place)
+        entry: ruff check --fix --force-exclude
+        language: python
+        additional_dependencies:
+          - ruff
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: Python formatting (latest stable ruff, reformats in place)
+        entry: ruff format --force-exclude
+        language: python
+        additional_dependencies:
+          - ruff
+        types_or: [python, pyi]
+        require_serial: true
       - id: clang-format
         name: C++ formatting (latest stable clang-format, reformats in place)
         entry: python scripts/check_format.py --fix
@@ -74,6 +93,18 @@ repos:
       - id: ci-scope-tests
         name: CI scope for documentation-only pull requests
         entry: python tests/ci_scope_tests.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: fuzz-scheduler-tests
+        name: Fuzz campaign scheduler failure paths
+        entry: python tests/fuzz/scheduler_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/fuzz_campaigns\.sh|tests/fuzz/scheduler_tests\.py)$
+      - id: clang-tidy-runner-tests
+        name: Parallel clang-tidy runner
+        entry: python tests/clang_tidy_tests.py
         language: python
         pass_filenames: false
         always_run: true

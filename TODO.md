@@ -761,6 +761,55 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85,
+  from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
+  build only what their tests run, long tests carry a CTest `COST` so they
+  start first, and the portable clang-tidy files are analysed side by side;
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-10 — One Linux source build for candidates.** 27 October 2026,
+  PR #86, from jrp's CI analysis: the Linux candidate is built from the
+  verified archive with networking disabled and CMake's default generator, so
+  the second, offline build is gone; `source_build.py` stays for local checks
+  (CI no longer runs it);
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [x] **CI-11 — FFT backend configurations as parallel jobs.** Closed
+  without the split, 27 October 2026, PR #86, by jrp's choice: once builds used
+  every CPU (CI-14) the macOS job's Accelerate and Ooura builds took about
+  65–82 s instead of 120 s, and one commit already starts 6 macOS jobs against
+  the account's limit of 5, so more macOS jobs would make the candidates queue
+  longer; [CI triggers](docs/develop/testing.md#ci-triggers).
+- [x] **CI-12 — Fuzz campaigns side by side.** 27 October 2026, PR #86, from
+  jrp's CI analysis: two campaigns at a time, one per core of the Linux
+  runner's two, each keeping its 60 seconds and about its usual executions;
+  the step went from 244 s to 122 s;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-13 — Run only the affected format's workflows.** 27 October 2026,
+  PR #86, from jrp's CI analysis: a pull request that changes only one plug-in
+  format's own files (or one workflow file) runs Lint and that format's
+  workflows; a test keeps every other file from depending on a format's files;
+  [pull requests for one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
+- [x] **CI-14 — Use every runner CPU.** 27 October 2026, PR #86: builds and
+  tests used 2 of the 4 CPUs on the Linux and Windows runners; they now use
+  all of them; the macOS Accelerate and Ooura builds went from about 120 s
+  to 65–82 s (whole workflows vary too much between runs to show more);
+  [build targets and test order](docs/develop/testing.md#build-targets-and-test-order).
+- [x] **CI-15 — Test the fuzz scheduler's failure paths.** 28 October 2026,
+  PR #87, from the external review of PR #86: the scheduler is
+  `scripts/fuzz_campaigns.sh`, and `tests/fuzz/scheduler_tests.py` checks a
+  failing campaign, a missing status file and the concurrency limit with
+  stand-in fuzzers;
+  [fuzz smoke tests](docs/develop/testing.md#fuzz-smoke-tests-and-longer-campaigns).
+- [x] **CI-16 — A `--jobs` limit for release builds.** 28 October 2026,
+  PR #87, from the external review of PR #86: `candidate.py`,
+  `build_dependencies.py` and `source_build.py` take `--jobs N`; the default
+  stays every CPU; [preview recipe](docs/develop/build.md#preview-recipe).
+- [x] **CI-17 — Remove unused Python imports.** 29 October 2026, PR #88,
+  from a Skylos scan: 11 unused imports in the release scripts and four test
+  scripts; [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- [x] **CI-18 — Format and lint the Python with ruff.** 29 October 2026,
+  PR #88: the latest stable ruff in pre-commit and lint CI, with every stable
+  rule but a few listed in `ruff.toml`;
+  [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

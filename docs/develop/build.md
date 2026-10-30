@@ -499,6 +499,14 @@ shipped uses, run in native CI instead). Its `--backend` defaults to `AUTO`, as 
 `--sdk`, `--prefix` and `--backend` also check a fresh build against an SDK and
 dependencies you supply. A failed validator remains a release blocker.
 
+`build_dependencies.py`, `source_build.py` and `scripts/release/candidate.py`
+build and test with every CPU, as CI does. On a machine with little memory
+for its CPU count, add `--jobs N` to any of them to run at most N compile or
+test jobs at once; `--jobs 2` matches the CMake presets. The `cmake --build`
+and `ctest` commands above take the same limit as `--parallel N`, or through
+the `CMAKE_BUILD_PARALLEL_LEVEL` and `CTEST_PARALLEL_LEVEL` environment
+variables.
+
 On a Mac that rejects ad-hoc bundles, set `-DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF`
 (or `--exclude-validator` for the source smoke). This disables **both** the SDK
 validator and the moduleinfo tool's bundle loading. It leaves signature-integrity

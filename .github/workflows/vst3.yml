@@ -20,7 +20,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 jobs:
-  # Pull requests that change only documentation skip the builds and tests
+  # Pull requests that change only documentation, or only another plug-in
+  # format's or workflow's own files (CI-13), skip the builds and tests
   # (scripts/ci_scope.py, docs/develop/testing.md#documentation-only-pull-requests).
   scope:
     runs-on: ubuntu-latest
@@ -31,7 +32,7 @@ jobs:
         with:
           fetch-depth: 2
       - id: scope
-        run: python3 scripts/ci_scope.py --github-output "$GITHUB_OUTPUT"
+        run: python3 scripts/ci_scope.py --workflow vst3 --github-output "$GITHUB_OUTPUT"
   vst3:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -46,13 +47,16 @@ jobs:
         # so those run the VST3 tests alone. macos-latest has a newer
         # Xcode than the Audio Unit job's macos-15, so it keeps the suite
         # (docs/develop/testing.md#which-configurations-run-which-tests).
+        # A job that runs only the VST3 tests builds only what they run (CI-9).
         include:
           - os: ubuntu-latest
             fft: AUTO
             tests: -L vst3
+            targets: --target convolver_vst3_suite
           - os: ubuntu-latest
             fft: FFTW
             tests: -L vst3
+            targets: --target convolver_vst3_suite
           - os: macos-latest
             fft: AUTO
             tests: -LE 'repository|consumer'
@@ -62,6 +66,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      # Builds and tests use every CPU the runner has.
+      - uses: ./.github/actions/use-every-cpu
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -163,11 +169,11 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
-        run: cmake --build build-vst3 --config Release --parallel 2
+        run: cmake --build build-vst3 --config Release ${{ matrix.targets }}
       - name: VST3 validator, pluginval and the VST3 tests
         run: >-
           ctest --test-dir build-vst3 -C Release --output-on-failure --output-junit junit.xml
-          --parallel 2 ${{ matrix.tests }}
+          ${{ matrix.tests }}
       # The newest pluginval beta or release candidate, when one is newer than
       # the release above: what it reports is a warning in the summary, not a
       # failure, since a pre-release only signposts what is coming. The one

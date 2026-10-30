@@ -9,6 +9,7 @@ libraries (no libsndfile: the window reads filter files with AudioToolbox),
 the licence notices must be inside (the component is GPL-3.0-or-later with AudioUnitSDK's Apache-2.0
 notice), and the ad-hoc signature must cover the whole bundle.
 """
+
 import json
 import plistlib
 import subprocess
@@ -28,16 +29,16 @@ def main():
     bundle = Path(sys.argv[2])
     version = sys.argv[3]
     contents = bundle / 'Contents'
-    with open(contents / 'Info.plist', 'rb') as f:
+    with (contents / 'Info.plist').open('rb') as f:
         info = plistlib.load(f)
 
     au = registry['au']
     if info.get('CFBundleIdentifier') != au['macos_bundle_id']:
-        fail(f"bundle identifier {info.get('CFBundleIdentifier')!r}, expected {au['macos_bundle_id']!r}")
+        fail(f'bundle identifier {info.get("CFBundleIdentifier")!r}, expected {au["macos_bundle_id"]!r}')
     if info.get('CFBundlePackageType') != 'BNDL':
         fail('the bundle is not of type BNDL')
     if info.get('CFBundleShortVersionString') != version:
-        fail(f"bundle version {info.get('CFBundleShortVersionString')!r}, expected {version!r}")
+        fail(f'bundle version {info.get("CFBundleShortVersionString")!r}, expected {version!r}')
     components = info.get('AudioComponents')
     if not isinstance(components, list) or len(components) != 1:
         fail('Info.plist must list exactly one AudioComponents entry')
@@ -48,15 +49,16 @@ def main():
     major, minor, patch = (int(part) for part in version.split('.'))
     expected = (major << 16) | (min(minor, 255) << 8) | min(patch, 255)
     if entry.get('version') != expected:
-        fail(f"AudioComponents version {entry.get('version')!r}, expected {expected:#x}")
+        fail(f'AudioComponents version {entry.get("version")!r}, expected {expected:#x}')
     if entry.get('factoryFunction') != 'ConvolverAUFactory':
         fail('factoryFunction is not ConvolverAUFactory')
     if entry.get('sandboxSafe') is not True:
         fail('the component must be sandbox-safe (it reads only the files chosen in its window)')
 
     executable = contents / 'MacOS' / info['CFBundleExecutable']
-    symbols = subprocess.run(['nm', '-gU', '-j', str(executable)], check=True,
-                             capture_output=True, text=True).stdout.split()
+    symbols = subprocess.run(
+        ['nm', '-gU', '-j', str(executable)], check=True, capture_output=True, text=True
+    ).stdout.split()
     # The linker's own Mach-O header symbol aside, only the factory is visible.
     exported = sorted({s for s in symbols if not s.startswith('__mh_')})
     if exported != ['_ConvolverAUFactory']:
@@ -64,8 +66,9 @@ def main():
 
     # Only macOS's own libraries, plus a sanitizer build's runtime: anything
     # else would have to be installed on every Mac that loads the component.
-    linked = subprocess.run(['otool', '-L', str(executable)], check=True,
-                            capture_output=True, text=True).stdout.splitlines()
+    linked = subprocess.run(
+        ['otool', '-L', str(executable)], check=True, capture_output=True, text=True
+    ).stdout.splitlines()
     # Lines ending in a colon name the file (and, in a universal binary, each architecture).
     linked = [line for line in linked if line.strip() and not line.rstrip().endswith(':')]
     for line in linked:
@@ -83,8 +86,10 @@ def main():
         fail('AudioUnitSDK-LICENSE.txt is not the Apache License')
 
     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(bundle)], check=True)
-    print(f"Convolver.component: {au['type']}/{au['subtype']}/{au['manufacturer']}, "
-          f'version {version} ({expected:#x}), {len(linked)} macOS libraries, notices present, signature valid')
+    print(
+        f'Convolver.component: {au["type"]}/{au["subtype"]}/{au["manufacturer"]}, '
+        f'version {version} ({expected:#x}), {len(linked)} macOS libraries, notices present, signature valid'
+    )
 
 
 if __name__ == '__main__':

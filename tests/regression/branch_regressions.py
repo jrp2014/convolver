@@ -13,13 +13,12 @@ Use --revision 61592a3 to reproduce the pre-fix failures from Git.
 
 import argparse
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 
-
-HARNESS = r'''
+HARNESS = r"""
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -166,97 +165,113 @@ int main(int argc, char** argv) {
     } else return 2;
     return failures ? 1 : 0;
 }
-'''
+"""
 
 
 def body_after(source, marker):
     """Extract an existing brace-balanced body without rewriting statements."""
-    start = source.index("{", source.index(marker))
+    start = source.index('{', source.index(marker))
     depth = 1
     end = start + 1
     while depth:
-        depth += (source[end] == "{") - (source[end] == "}")
+        depth += (source[end] == '{') - (source[end] == '}')
         end += 1
-    return source[start + 1:end - 1]
+    return source[start + 1 : end - 1]
 
 
 def generate(read):
-    paths = read("convolution/channelpaths.cpp")
+    paths = read('convolution/channelpaths.cpp')
     replacements = {}
-    for kind in ("in", "out"):
-        end = paths.index(kind + "Channel.push_back")
-        start = paths.rindex("float fchannel=0;", 0, end)
-        replacements["INPUT_ROUTE" if kind == "in" else "OUTPUT_ROUTE"] = paths[start:end]
-    convolution = read("convolution/convolution.cpp")
-    marker = "const std::basic_string<TCHAR> ConvolutionList<T>::DisplayConvolutionList() const"
-    replacements["DISPLAY"] = ("template<typename T>\n" + marker + " {\n" +
-                                body_after(convolution, marker) + "\n}\n")
-    dither = read("convolution/dither.h")
+    for kind in ('in', 'out'):
+        end = paths.index(kind + 'Channel.push_back')
+        start = paths.rindex('float fchannel=0;', 0, end)
+        replacements['INPUT_ROUTE' if kind == 'in' else 'OUTPUT_ROUTE'] = paths[start:end]
+    convolution = read('convolution/convolution.cpp')
+    marker = 'const std::basic_string<TCHAR> ConvolutionList<T>::DisplayConvolutionList() const'
+    replacements['DISPLAY'] = 'template<typename T>\n' + marker + ' {\n' + body_after(convolution, marker) + '\n}\n'
+    dither = read('convolution/dither.h')
     constants = []
-    for cls, fields in (("SimpleDither", ("Q", "Qover2")),
-                        ("NoNoiseShape", ("Q_", "Qover2_", "q_"))):
+    for cls, fields in (('SimpleDither', ('Q', 'Qover2')), ('NoNoiseShape', ('Q_', 'Qover2_', 'q_'))):
         for field in fields:
-            match = re.search(r"const T\s+" + cls + r"<[^;]+>::" + field +
-                              r"\s*=.*?;", dither)
+            match = re.search(r'const T\s+' + cls + r'<[^;]+>::' + field + r'\s*=.*?;', dither)
             if not match:
-                raise ValueError(f"missing {cls}::{field}")
-            start = dither.rindex("template <", 0, match.start())
-            constants.append(dither[start:match.end()])
-    replacements["CONSTANTS"] = "\n".join(constants)
-    filters = read("convolution/filter.cpp")
-    replacements["FULL_FFT"] = body_after(filters, "if (nFrame % nHalfPartitionLength_ == 0)")
-    replacements["TAIL_FFT"] = body_after(filters, "if (nFrame % nHalfPartitionLength_ != 0)")
+                raise ValueError(f'missing {cls}::{field}')
+            start = dither.rindex('template <', 0, match.start())
+            constants.append(dither[start : match.end()])
+    replacements['CONSTANTS'] = '\n'.join(constants)
+    filters = read('convolution/filter.cpp')
+    replacements['FULL_FFT'] = body_after(filters, 'if (nFrame % nHalfPartitionLength_ == 0)')
+    replacements['TAIL_FFT'] = body_after(filters, 'if (nFrame % nHalfPartitionLength_ != 0)')
     result = HARNESS
     for key, value in replacements.items():
-        result = result.replace("@" + key + "@", value)
+        result = result.replace('@' + key + '@', value)
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path,
-                        default=Path(__file__).resolve().parents[2],
-                        help="repository root containing historical/")
-    parser.add_argument("--revision", help="read production sources from this Git revision")
+    parser.add_argument(
+        '--source-root',
+        type=Path,
+        default=Path(__file__).resolve().parents[2],
+        help='repository root containing historical/',
+    )
+    parser.add_argument('--revision', help='read production sources from this Git revision')
     args = parser.parse_args()
 
     def read(name):
         if args.revision:
             # The historical tree was called convolver/ before 21 October 2026.
-            for folder in ("historical", "convolver"):
+            for folder in ('historical', 'convolver'):
                 shown = subprocess.run(
-                    ["git", "show", args.revision + ":" + folder + "/" + name],
-                    cwd=args.source_root, capture_output=True)
+                    ['git', 'show', args.revision + ':' + folder + '/' + name],
+                    cwd=args.source_root,
+                    capture_output=True,
+                    check=False,
+                )
                 if shown.returncode == 0:
-                    return shown.stdout.decode("latin1").replace("\r\n", "\n")
-            raise SystemExit("Neither historical/ nor convolver/ has " + name + " at " + args.revision)
-        return (args.source_root / "historical" / name).read_text(encoding="latin1")
+                    return shown.stdout.decode('latin1').replace('\r\n', '\n')
+            raise SystemExit('Neither historical/ nor convolver/ has ' + name + ' at ' + args.revision)
+        return (args.source_root / 'historical' / name).read_text(encoding='latin1')
 
-    with tempfile.TemporaryDirectory(prefix="convolver-branch-") as directory:
+    with tempfile.TemporaryDirectory(prefix='convolver-branch-') as directory:
         scratch = Path(directory)
-        cpp, binary = scratch / "branch.cpp", scratch / "branch"
+        cpp, binary = scratch / 'branch.cpp', scratch / 'branch'
         cpp.write_text(generate(read))
-        header = read("fft/fftsg_h.h")
+        header = read('fft/fftsg_h.h')
         # Serial FFT arithmetic stays verbatim; the shipped header otherwise
         # unconditionally enables Windows threads and includes windows.h.
-        header, count = re.subn(r"^#define USE_CDFT_WINTHREADS[^\n]*", "", header, flags=re.M)
+        header, count = re.subn(r'^#define USE_CDFT_WINTHREADS[^\n]*', '', header, flags=re.MULTILINE)
         if count != 1:
-            raise ValueError("expected one Windows threading definition")
-        (scratch / "fftsg_h.h").write_text(header)
-        fft = scratch / "fftsg.cpp"
-        fft.write_text(read("fft/fftsg.cpp"))
-        subprocess.run([os.environ.get("CXX", "clang++"), "-std=c++11", "-O1", "-g",
-                        "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
-                        str(cpp), str(fft), "-o", str(binary)], check=True)
+            raise ValueError('expected one Windows threading definition')
+        (scratch / 'fftsg_h.h').write_text(header)
+        fft = scratch / 'fftsg.cpp'
+        fft.write_text(read('fft/fftsg.cpp'))
+        subprocess.run(
+            [
+                os.environ.get('CXX', 'clang++'),
+                '-std=c++11',
+                '-O1',
+                '-g',
+                '-fsanitize=address,undefined',
+                '-fno-sanitize-recover=all',
+                '-fno-omit-frame-pointer',
+                str(cpp),
+                str(fft),
+                '-o',
+                str(binary),
+            ],
+            check=True,
+        )
         failed = False
-        for group in ("routes", "display", "dither", "ooura"):
-            result = subprocess.run([str(binary), group], capture_output=True, text=True)
-            print(f"{'PASS' if result.returncode == 0 else 'FAIL'}: {group}")
+        for group in ('routes', 'display', 'dither', 'ooura'):
+            result = subprocess.run([str(binary), group], capture_output=True, text=True, check=False)
+            print(f'{"PASS" if result.returncode == 0 else "FAIL"}: {group}')
             if result.returncode:
                 failed = True
-                print(result.stdout + result.stderr, end="")
+                print(result.stdout + result.stderr, end='')
         return int(failed)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Execute the packaged guide's marked examples and check its links."""
+
 import argparse
-from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
 import tempfile
-
+from pathlib import Path
 
 TOOLS = ('convolver-preset', 'convolver-equalizer-apo')
 
@@ -24,8 +24,10 @@ def check(package):
     examples = []
     for page in sorted((docs / 'use').glob('*.md')):
         text = page.read_text(encoding='utf-8')
-        examples += [(page.name, command) for command in
-                     re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.S)]
+        examples += [
+            (page.name, command)
+            for command in re.findall(r'<!-- executable-example -->\s*```sh\n(.*?)\n```', text, re.DOTALL)
+        ]
     used = {shlex.split(command)[0] for _, command in examples}
     for tool in TOOLS:
         if './bin/' + tool not in used:
@@ -35,7 +37,7 @@ def check(package):
         shutil.copytree(package, root)
         for page, command in examples:
             tokens = shlex.split(command)
-            name = tokens[0][len('./bin/'):] if tokens[0].startswith('./bin/') else tokens[0]
+            name = tokens[0][len('./bin/') :] if tokens[0].startswith('./bin/') else tokens[0]
             # Plain INPUT OUTPUT... commands, so the output check below is exact.
             if name not in TOOLS or len(tokens) < 3 or any(t.startswith('-') for t in tokens[1:]):
                 raise ValueError(f'{page}: examples must run a bundled tool as TOOL INPUT OUTPUT...: {command}')
