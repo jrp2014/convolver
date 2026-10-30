@@ -895,6 +895,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     std::string message, faults;
     {
         std::lock_guard lock(control_);
+        if (const auto hook = load_started_for_tests)
+            hook();
         faults = observe_faults(); // Explained under the filter that played; a load clears them.
         const bool was_failed = filter_.failed();
         // Initialized, a prepared replacement is published to the audio thread;

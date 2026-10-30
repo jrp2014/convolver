@@ -411,19 +411,31 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads)), but a
   read no longer waits for a load: while a load holds the control lock it
   returns the last report (the window's next timed read shows the
-  result), and `au.editor` checks that reads stay prompt during a slow
-  restore on another thread. Limitation: a chosen file is
+  result), and `au.editor` checks that with a restore held open on another
+  thread. Limitation: a chosen file is
   read and its filter prepared on the host's main thread, so the window
-  (and the host) waits for a long filter; a worker thread, as LV2 has, is
-  for later.
+  (and the host) waits for a long filter; the cached report does not help
+  there; a worker thread, as LV2 has, is for later.
   Remaining: recent files and reload (the editor plan's conveniences), the
-  view shared with VST3-11, and practical checks to record: GarageBand with
-  the compact layout, the sliders and Choose Filter (a sound file, and a
-  `.cfg` inside its sandbox, whose WAV files it must be allowed to read;
-  whether GarageBand marks the project changed after a chosen file), a long
-  explanation (a list `.cfg`) scrolling, Gain and Mix automation with the
-  window open (the sliders send no begin and end gestures yet, so recording
-  automation by dragging them is untested), and VoiceOver.
+  view shared with VST3-11, a behaviour-preserving split of
+  `plugins/au/effect.cpp` (about 1,150 lines: state and loading, and
+  properties and the report, apart from lifecycle and rendering; jrp's
+  review of 30 October), and these acceptance gates (jrp, 30 October 2026),
+  each to pass and be recorded, with the GarageBand and macOS versions,
+  before AU-6 is done:
+  - [ ] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
+    sandbox whose WAV files it must be allowed to read (if refused, the
+    window must say permission was denied).
+  - [ ] Save, quit and reopen a project after choosing a file: the same
+    filter plays, and the Filter detail says it came from the project.
+  - [ ] Whether GarageBand marks the project changed after a chosen file.
+  - [ ] Gain and Mix automation with the window open (the sliders send no
+    begin and end gestures yet, so recording automation by dragging them is
+    untested).
+  - [ ] VoiceOver reads the status, the sliders and the buttons.
+  - [ ] A long explanation (a list `.cfg`) scrolls; the compact layout fits.
+  - [ ] The main-thread pause for a long chosen filter: measured and judged
+    acceptable, or moved to a worker thread.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with

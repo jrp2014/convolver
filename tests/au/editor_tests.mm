@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -529,55 +530,47 @@ void files() {
     empty.uninitialize();
 }
 
-// TODO AU-6: a report read while a slow load holds the unit's control lock
-// on another thread returns at once, with the last report, instead of
-// waiting for the load; the window then rereads when the load is done.
+// TODO AU-6: a report read while a load holds the unit's control lock on
+// another thread returns at once, with the last report, instead of waiting
+// for the load; the window then rereads when the load is done. The load is
+// held open at its start (load_started_for_tests) rather than timed, so a
+// busy runner cannot fail the test (jrp's review: the timed version failed
+// once at 50.3 ms against 50 ms).
+std::promise<void>* load_started = nullptr;
+std::shared_future<void> load_released;
 void responsive() {
     Unit unit;
     check(unit.configure(44100, 2, 2, 512), "stereo formats");
     check(unit.initialize(), "stereo initialization");
-    static_cast<void>(report(unit)); // What the window shows before the load.
-    // A long filter, so preparing it takes a while.
-    Configuration slow{44100, 2, 2, 0, {}, {}, {}};
-    for (std::size_t ch = 0; ch < 2; ++ch) {
-        std::vector<float> taps(6'000'000, 1e-6f);
-        taps[0] = .5f;
-        slow.paths.push_back({std::move(taps), {{ch, 1}}, {{ch, 1}}});
-    }
-    const auto plist = au_test::class_info(state_of(slow), "slow");
-    std::atomic<bool> done{false};
+    const auto before = text(report(unit)[@"status name"]); // What the window shows.
+    require(before == "No filter", "before the load: " + before);
+
+    std::promise<void> started, release;
+    auto load_has_started = started.get_future();
+    load_started = &started;
+    load_released = release.get_future().share();
+    au::load_started_for_tests = []() noexcept {
+        load_started->set_value();
+        load_released.wait();
+    };
+    const auto plist = au_test::class_info(state_of(identity(44100, 2)), "held");
     OSStatus loaded = noErr;
-    double load_seconds = 0;
-    std::thread loader([&] {
-        const auto start = std::chrono::steady_clock::now();
-        loaded = unit.restore(plist);
-        load_seconds =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-        done = true;
-    });
-    double worst = 0;
-    int reads = 0;
-    while (!done) {
-        const auto start = std::chrono::steady_clock::now();
-        static_cast<void>(report(unit));
-        worst = std::max(
-            worst, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
-        ++reads;
-    }
+    std::thread loader([&] { loaded = unit.restore(plist); });
+    load_has_started.wait(); // The load holds the control lock until released.
+    auto reading =
+        std::async(std::launch::async, [&] { return text(report(unit)[@"status name"]); });
+    const bool prompt = reading.wait_for(std::chrono::seconds(10)) == std::future_status::ready;
+    release.set_value(); // Whatever happened, so that nothing is left waiting.
     loader.join();
+    au::load_started_for_tests = nullptr;
     CFRelease(plist);
-    check(loaded, "slow load");
-    // A read that waited would take most of the load's time. The limit
-    // leaves room for a busy CI runner pausing this thread: one read of
-    // 100 000 took 50.3 ms in the sanitizer job (041190a, FFTW build).
-    require(reads > 0 && worst < std::min(.25, load_seconds / 5),
-            "a report read waited for the load: worst read " + std::to_string(worst) +
-                " s during a " + std::to_string(load_seconds) + " s load, " +
-                std::to_string(reads) + " reads");
-    std::cout << "worst report read during a " << load_seconds << " s load: " << worst << " s ("
-              << reads << " reads)\n";
-    require(contains(report(unit)[@"details"], "6000000"),
-            "the report after the load: " + text(report(unit)[@"details"]));
+    const auto during = reading.get();
+    check(loaded, "held load");
+    require(prompt, "a report read waited for a load that holds the control lock");
+    require(during == before, "a read during the load gave '" + during + "', not the last report");
+    const auto after = text(report(unit)[@"status name"]);
+    require(after == "Playing", "after the load: " + after);
+    std::cout << "report read during a held load: '" << during << "', then '" << after << "'\n";
     unit.uninitialize();
 }
 

@@ -574,12 +574,12 @@ Four CTest tests run when the adapter is built (label `au`):
   request loads, once, while the view is in an open window; a request
   replaced by a newer one, a cancelled dialog, and an answer arriving after
   the host closed the window (keeping the view in it) load nothing. Then
-  responsiveness: report reads while another thread restores a
-  2 × 6 000 000-tap filter (whose preparation holds the control lock) must
-  each take under a fifth of the restore and under 250 ms (a read that
-  waited would take seconds; a busy runner can pause one for 50 ms); the test prints
-  the worst read. A file chosen in the window is read on the main thread,
-  so this does not cover it. Then faults: invalid input rendered, the
+  responsiveness, without timing: a restore on another thread is held open
+  while it holds the control lock (the adapter's `load_started_for_tests`
+  hook, null in the component), and a report read must return within 10 s
+  with the last report ("No filter"); once the load is released the report
+  says Playing. A file chosen in the window is read on the main thread, so
+  this does not cover it. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an
   open window makes, log the faults once. The AU workflow's `auval -strict`
   step also requires `Cocoa Views Available: 1`.

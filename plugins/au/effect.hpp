@@ -49,6 +49,13 @@ struct TestFailure {
     char message[4096] = {};
 };
 
+// For the tests only: when set, a load (RestoreState or a chosen file) calls
+// it while holding the control lock, before preparing the filter, so that
+// au.editor can hold a load open and check that the window's report read
+// does not wait for it. Null in the component; set it only while no unit
+// is loading.
+inline void (*load_started_for_tests)() noexcept = nullptr;
+
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
 // (docs/develop/plugin-contract.md).
