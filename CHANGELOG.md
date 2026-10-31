@@ -12,6 +12,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
+  menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
+  default 256 (the old Convolver's partitions setting in modern form, and the
+  command line's `--block-size`). Smaller is less delay and more processor
+  load. It is not automatable, is saved with Gain and Mix, and takes effect
+  when the host next starts the plug-in; until then the plug-in keeps, and
+  reports, the latency it started with, and the window says which latency
+  plays and which waits. The log's settings now name the latency. The
+  default leaves the sound unchanged; the oracle tests cover gain and mix at
+  each of the seven block sizes.
 - Audio Unit: a small window of its own (AU-6, first version), so a user can
   see why the plug-in is silent or refused a preset without finding the log.
   It shows the status, what plays, why and what to change in full (a stereo
@@ -53,6 +63,13 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Library (PLUG-10): `HostSettings` gains `latency` (one of the new
+  `host_latencies`, default `default_host_latency`, 256), and
+  `HostProcessor`'s settings constructor takes the block size from it,
+  refusing any other value with `std::invalid_argument`; its separate block
+  argument is gone. `settings_words()` adds the latency, and
+  `HostReportFacts::latency_frames` is the running latency, so a report
+  explains a chosen one that waits for the next start.
 - The version is now 0.6.0, a deliberate minor step for the library changes
   below (jrp, 25 October 2026: old interfaces are not kept while the API
   settles). CMake consumers now request `find_package(Convolver 0.6)`; the

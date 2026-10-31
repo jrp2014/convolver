@@ -272,6 +272,8 @@ bypass. With unequal input and output counts there is no dry signal (the
     a control thread: at the next `Initialize`, or when the window or host
     sets it from the main thread, after which the adapter posts the latency
     and tail notifications. AU-7 chooses between the two and records it.
+    (Chosen 31 October 2026: the next `Initialize`, the simpler option;
+    [contract](../../develop/plugin-contract.md#settings).)
   - LV2 (LV2-7): `run()` compares the port with the active size and, when it
     differs, calls `schedule_work` once (allocation-free, as filter loads do).
     `work()` builds the processor, `work_response()` swaps it in, and the

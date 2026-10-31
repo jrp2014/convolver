@@ -200,10 +200,11 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
   (PLUG-10). Default settings give output bit-identical to a processor built
   without them, through bypass and a replacement; gain and mix from the first
-  frame against the oracle at blocks of 64 to 4096 frames and callbacks of 1
-  to 4096, printing the worst error relative to the output peak; the 64-frame
-  ramps sample by sample; clamping; the mix with unequal counts; and the
-  log's settings words.
+  frame against the oracle at each latency the plug-ins offer (blocks of 64
+  to 4096 frames) and callbacks of 1 to 4096, printing the worst error
+  relative to the output peak; each offered latency used and any other
+  refused; the 64-frame ramps sample by sample; clamping; the mix with
+  unequal counts; and the log's settings words.
   The audio thread is checked for allocation throughout.
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
@@ -575,13 +576,20 @@ Four CTest tests run when the adapter is built (label `au`):
   them with `ClassInfo`, including a preset without settings, malformed
   parameter data and a rejected preset, and the Status text and start line
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
+  Latency (PLUG-10): its parameter info and value names, rounding and
+  clamping, the reported latency and its notification when chosen
+  uninitialized, an impulse delayed by exactly the chosen frames, a choice
+  made while initialized leaving the reported latency and the audio alone
+  until the next initialization, and saving and restoring it.
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the text whatever size the host offers, the
   buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
-  setting its parameter, a host change moving the slider), its status and
+  setting its parameter, a host change moving the slider), the Latency menu
+  (its choices, a choice setting the parameter and the text saying it waits
+  for the next start, a host change moving the menu), its status and
   text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed

@@ -344,17 +344,17 @@ whose choices jrp made on 24 and 25 October 2026
 ([decisions](../project/decisions.md#identities-and-file-formats)). Every
 adapter offers the same settings as host parameters, so they work in generic
 host controls, automation and host presets without a window. The defaults
-(gain 0 dB, mix 100%) leave every output sample exactly as it was before the
-settings existed, which `native.host_settings` checks bit for bit. The
-first version has Gain and Mix only (jrp asked to keep it simple, 25 October
-2026); the plan's Gain modes, Latency choice and meters follow later
-([TODO PLUG-10](../../TODO.md)).
+(gain 0 dB, mix 100%, latency 256 frames) leave every output sample exactly
+as it was before the settings existed, which `native.host_settings` checks
+bit for bit. The first version had Gain and Mix only (jrp asked to keep it
+simple, 25 October 2026); Latency followed (PLUG-10, 31 October 2026), and
+the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
 
 - **The shared code.** `HostSettings` in
   [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
   the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
-  ramps linearly over 64 frames.
+  ramps linearly over 64 frames. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
@@ -363,6 +363,15 @@ first version has Gain and Mix only (jrp asked to keep it simple, 25 October
   and output counts there is no dry signal ([bypass](#bypass)), so the mix is
   always 1. Like bypass, a mix below 1 still passes its dry share while a
   failed first load plays silence (equal counts only).
+- **Latency** is the block size `HostProcessor` is built with, the engine's
+  uniform partition (the CLI's `--block-size`): one of `host_latencies`, 64 to
+  4096 frames in powers of two, default 256 (jrp). Smaller is less delay and
+  more processor load. The settings constructor refuses any other value. It
+  cannot change while a processor runs, so a new choice needs a new
+  processor, which each format builds at its own restart point (below), and
+  the host is told the new latency only once the audio has it. Not
+  automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
+  keeps the load measurement beside it for later.
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
   in host state version 3, written only when a setting differs from its
@@ -370,15 +379,25 @@ first version has Gain and Mix only (jrp asked to keep it simple, 25 October
   `convolver-preset` carries the filter only, and a state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
-- **Audio Unit (AU-7).** Global parameters Gain (0, decibels) and Mix (1003,
-  percent), listed before Status. Values a host writes are stored within
-  their ranges, and Render hands both to the processor on every call.
+- **Audio Unit (AU-7).** Global parameters Gain (0, decibels), Mix (1003,
+  percent) and Latency (1004, an index into `host_latencies` with value names
+  such as "256 frames", flagged `kAudioUnitParameterFlag_NonRealTime`),
+  listed before Status. Values a host writes are stored within their ranges
+  (Latency rounded to a whole index), and Render hands Gain and Mix to the
+  processor on every call. `Initialize` builds the processor with the chosen
+  Latency and posts the latency and tail notifications. While uninitialized,
+  `kAudioUnitProperty_Latency` reports the chosen Latency, and a change posts
+  the notification at once; while initialized it reports the running
+  processor's, and a new choice waits for the next `Initialize` (the editor
+  plan's first option: rebuilding while rendering would need a lock-free swap
+  of the whole processor). The window's report then says which latency plays
+  and which waits.
   `RestoreState` reads the parameter values from "data" itself, with bounds
   checks (AUBase's reader has none), and applies them only when the filter is
   accepted; it ignores Status and unknown IDs, keeps settings the state does
   not hold (a `convolver-preset` preset has an empty "data"), and keeps both
   when "data" is malformed (and logs it). The start line in the log lists the
-  settings (`started_line()` with `settings_words()`).
+  settings (`started_line()` with `settings_words()`), Latency included.
 
 ## Channel layouts
 
