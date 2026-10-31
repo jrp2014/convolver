@@ -87,6 +87,19 @@ Until 1.0 the C++ API may change between minor versions.
   line. Like the Clang tools, ruff is not pinned, so a new release can turn
   Lint red. No behaviour changes. See
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- Build (FFT-3): on macOS the default FFT backend (`AUTO`) is now Apple's
+  Accelerate for every build, the command-line tools and libraries included,
+  as it already was for the plug-ins ([decision](docs/project/decisions.md#releases)). A Mac build
+  therefore needs no FFTW installed. FFTW remains available with
+  `-DCONVOLVER_FFT_BACKEND=FFTW`, and is needed for `--tune-fft`, FFTW wisdom
+  and measured plans, which Accelerate builds reject. Linux and Windows are
+  unchanged. Output differs from an FFTW build by float rounding only: at
+  most 8.3e-7 of full scale in the recorded comparisons (about -122 dBFS),
+  with no audible effect. The tools keep
+  libsndfile for sound files on every platform. The native macOS CI job now
+  builds FFTW explicitly and checks that the default build chooses
+  Accelerate without FFTW. See
+  [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses).
 - Continuous integration (CI-19): the Apple silicon (`macos-arm64`) release
   candidate is built on GitHub's `macos-15` runner instead of `macos-14`.
   GitHub retires the macOS 14 image on 2 November 2026; on 30 October its

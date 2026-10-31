@@ -779,6 +779,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
+- [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89: every
+  macOS build, the command-line tools included, uses Accelerate unless built
+  with `-DCONVOLVER_FFT_BACKEND=FFTW`;
+  [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses).
 - [x] **IO-3 — More output containers.** 23 October 2026, PR #60;
   [output formats](docs/use/command-line.md#output-formats).
 - [x] **IO-4 — Raw filters and raw sample types.** 24 October 2026, PR #60;

@@ -59,9 +59,10 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure --parallel 4
 ```
 
-The default build needs CMake 3.20+, Python 3.8+, FFTW3 (single precision) and
-libsndfile. Accelerate (Apple only) or built-in Ooura can replace FFTW; see
-[backend selection](docs/develop/fft-backends.md). On Ubuntu:
+The default build needs CMake 3.20+, Python 3.8+ and libsndfile, plus FFTW3
+(single precision) on Linux and Windows. On macOS the default FFT is Apple's
+Accelerate (FFTW is an option); plug-in builds use built-in Ooura on Linux and
+Windows. See [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses). On Ubuntu:
 `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev`.
 Install the latest stable packaged Clang tools as in `CONTRIBUTING.md`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.

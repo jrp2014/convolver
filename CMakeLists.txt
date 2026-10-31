@@ -84,12 +84,14 @@ if(CONVOLVER_BUILD_NATIVE)
         message(FATAL_ERROR "CONVOLVER_BUILD_CLI requires CONVOLVER_BUILD_IO; disable CLI for a core-only build.")
     endif()
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-    # AUTO picks FFTW, except in plug-in builds: a host process may load other
+    # AUTO picks Apple's Accelerate on Apple platforms (FFT-3). Elsewhere it
+    # picks FFTW, except in plug-in builds: a host process may load other
     # plug-ins that use the same FFTW, and FFTW's planner is not thread-safe, so
-    # plug-in builds use Ooura (Accelerate on Apple). Set FFTW, ACCELERATE or
-    # OOURA explicitly to override. One backend serves every target in a build.
+    # those use Ooura. Set FFTW, ACCELERATE or OOURA explicitly to override
+    # (FFTW on Apple for wisdom and measured plans). One backend serves every
+    # target in a build.
     set(CONVOLVER_FFT_BACKEND "AUTO" CACHE STRING
-        "FFT backend: AUTO (FFTW; OOURA or ACCELERATE for plug-in builds), FFTW, ACCELERATE or OOURA")
+        "FFT backend: AUTO (ACCELERATE on Apple; elsewhere FFTW, or OOURA for plug-in builds), FFTW, ACCELERATE or OOURA")
     set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW ACCELERATE OOURA)
     string(TOUPPER "${CONVOLVER_FFT_BACKEND}" fft_backend)
     set(convolver_plugin_build OFF)
@@ -97,12 +99,12 @@ if(CONVOLVER_BUILD_NATIVE)
         set(convolver_plugin_build ON)
     endif()
     if(fft_backend STREQUAL "AUTO")
-        if(NOT convolver_plugin_build)
-            set(fft_backend "FFTW")
-        elseif(APPLE)
+        if(APPLE)
             set(fft_backend "ACCELERATE")
-        else()
+        elseif(convolver_plugin_build)
             set(fft_backend "OOURA")
+        else()
+            set(fft_backend "FFTW")
         endif()
     elseif(fft_backend STREQUAL "FFTW" AND convolver_plugin_build)
         message(WARNING "CONVOLVER_FFT_BACKEND=FFTW in a plug-in build: FFTW's planner is not "
