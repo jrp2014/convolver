@@ -42,25 +42,18 @@ CFBundleRef own_bundle() {
     if (!dladdr(&anchor, &info) || !info.dli_fname)
         return nullptr;
     // The executable is BUNDLE/Contents/MacOS/NAME.
-    auto url = CFURLCreateFromFileSystemRepresentation(
+    cf_owned<CFURLRef> url(CFURLCreateFromFileSystemRepresentation(
         nullptr, reinterpret_cast<const UInt8*>(info.dli_fname),
-        static_cast<CFIndex>(std::strlen(info.dli_fname)), false);
-    for (int level = 0; level < 3 && url; ++level) {
-        const auto up = CFURLCreateCopyDeletingLastPathComponent(nullptr, url);
-        CFRelease(url);
-        url = up;
-    }
+        static_cast<CFIndex>(std::strlen(info.dli_fname)), false));
+    for (int level = 0; level < 3 && url; ++level)
+        url.reset(CFURLCreateCopyDeletingLastPathComponent(nullptr, url.get()));
     if (!url)
         return nullptr;
-    auto bundle = CFBundleCreate(nullptr, url);
-    CFRelease(url);
-    const auto id = bundle ? CFBundleGetIdentifier(bundle) : nullptr;
-    if (bundle &&
-        (!id || CFStringCompare(id, CFSTR(CONVOLVER_AU_BUNDLE_ID), 0) != kCFCompareEqualTo)) {
-        CFRelease(bundle);
-        bundle = nullptr;
-    }
-    return bundle;
+    cf_owned<CFBundleRef> bundle(CFBundleCreate(nullptr, url.get()));
+    const auto id = bundle ? CFBundleGetIdentifier(bundle.get()) : nullptr;
+    if (!id || CFStringCompare(id, CFSTR(CONVOLVER_AU_BUNDLE_ID), 0) != kCFCompareEqualTo)
+        return nullptr;
+    return bundle.release();
 }
 
 CFBundleRef view_bundle() {
@@ -307,14 +300,14 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
         return kAudioUnitErr_InvalidProperty;
     if (!out) // Asked whether the strings exist.
         return noErr;
-    std::array<CFStringRef, status_names.size()> names{};
-    for (std::size_t i = 0; i < names.size(); ++i)
-        names[i] = CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8);
-    *out = CFArrayCreate(nullptr, reinterpret_cast<const void**>(names.data()),
-                         static_cast<CFIndex>(names.size()), &kCFTypeArrayCallBacks);
-    for (auto* name : names)
-        if (name)
-            CFRelease(name);
+    std::array<cf_owned<CFStringRef>, status_names.size()> names;
+    std::array<CFTypeRef, status_names.size()> values{};
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        names[i].reset(CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8));
+        values[i] = names[i].get();
+    }
+    *out = CFArrayCreate(nullptr, values.data(), static_cast<CFIndex>(values.size()),
+                         &kCFTypeArrayCallBacks);
     return *out ? noErr : kAudioUnitErr_InvalidProperty;
 }
 
@@ -400,20 +393,16 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             const auto r = report();
             if (id == report_property) {
                 const auto fields = report_fields(r);
-                const auto dict = CFDictionaryCreateMutable(
-                    nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                cf_owned<CFMutableDictionaryRef> dict(CFDictionaryCreateMutable(
+                    nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
                 for (const auto& [key, text] : fields) {
                     const auto k = cf_string(key), v = cf_string(text);
                     if (dict && k && v)
-                        CFDictionarySetValue(dict, k, v);
-                    if (k)
-                        CFRelease(k);
-                    if (v)
-                        CFRelease(v);
+                        CFDictionarySetValue(dict.get(), k.get(), v.get());
                 }
-                value = dict;
+                value = dict.release();
             } else {
-                value = cf_string(diagnostics_text(r, tag_));
+                value = cf_string(diagnostics_text(r, tag_)).release();
             }
         } catch (...) { // Out of memory.
         }
@@ -431,7 +420,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         } catch (...) {
             return kAudioUnitErr_InvalidPropertyValue;
         }
-        const CFStringRef value = cf_string(path);
+        const CFStringRef value = cf_string(path).release();
         if (!value)
             return kAudioUnitErr_InvalidPropertyValue;
         std::memcpy(data, &value, sizeof value); // The caller releases it.
@@ -443,17 +432,12 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             return kAudioUnitErr_InvalidProperty;
         // The class names carry the version, so two Convolver builds in one
         // host keep their own windows (Objective-C has one class namespace).
-        AudioUnitCocoaViewInfo info{
-            CFBundleCopyBundleURL(bundle),
-            {CFStringCreateWithCString(nullptr, CONVOLVER_AU_VIEW_FACTORY_NAME,
-                                       kCFStringEncodingUTF8)}};
-        if (!info.mCocoaAUViewBundleLocation || !info.mCocoaAUViewClass[0]) {
-            if (info.mCocoaAUViewBundleLocation)
-                CFRelease(info.mCocoaAUViewBundleLocation);
-            if (info.mCocoaAUViewClass[0])
-                CFRelease(info.mCocoaAUViewClass[0]);
+        cf_owned<CFURLRef> location(CFBundleCopyBundleURL(bundle));
+        cf_owned<CFStringRef> name(CFStringCreateWithCString(
+            nullptr, CONVOLVER_AU_VIEW_FACTORY_NAME, kCFStringEncodingUTF8));
+        if (!location || !name)
             return kAudioUnitErr_InvalidProperty;
-        }
+        AudioUnitCocoaViewInfo info{location.release(), {name.release()}};
         std::memcpy(data, &info, sizeof info); // The caller releases the URL and the name.
         return noErr;
     }

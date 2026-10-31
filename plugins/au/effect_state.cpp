@@ -61,10 +61,8 @@ CFStringRef state_key() {
 // The checks AUBase::RestoreState makes, before anything changes: Apple's
 // preset version and this component's subtype and manufacturer.
 std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc) {
-    const auto number = [&](const char* key, SInt32& out) {
-        const auto name = CFStringCreateWithCString(nullptr, key, kCFStringEncodingUTF8);
-        const auto value = CFDictionaryGetValue(dict, name);
-        CFRelease(name);
+    const auto number = [&](CFStringRef key, SInt32& out) {
+        const auto value = CFDictionaryGetValue(dict, key);
         return value && CFGetTypeID(value) == CFNumberGetTypeID() &&
                CFNumberGetValue(static_cast<CFNumberRef>(value), kCFNumberSInt32Type, &out);
     };
@@ -72,10 +70,11 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
     if (CFDictionaryContainsKey(dict, CFSTR(kAUPresetPartKey)))
         return "The preset holds the state of one part of a multi-part instrument, not of a "
                "whole effect. Make a Convolver preset with convolver-preset.";
-    if (!number(kAUPresetVersionKey, version) || version != 0)
+    if (!number(CFSTR(kAUPresetVersionKey), version) || version != 0)
         return "The preset is not an Audio Unit preset this plug-in can read (its version "
                "entry is missing or not 0).";
-    if (!number(kAUPresetSubtypeKey, subtype) || !number(kAUPresetManufacturerKey, manufacturer) ||
+    if (!number(CFSTR(kAUPresetSubtypeKey), subtype) ||
+        !number(CFSTR(kAUPresetManufacturerKey), manufacturer) ||
         static_cast<UInt32>(subtype) != desc.componentSubType ||
         static_cast<UInt32>(manufacturer) != desc.componentManufacturer)
         return "The preset belongs to another plug-in. Make a Convolver preset with "
@@ -133,32 +132,40 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         return result;
     // AUBase::SaveState creates a mutable dictionary.
     auto* dict = static_cast<CFMutableDictionaryRef>(const_cast<void*>(*out));
-    const auto data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(bytes.data()),
-                                   static_cast<CFIndex>(bytes.size()));
+    const cf_owned<CFDataRef> data(CFDataCreate(
+        nullptr, reinterpret_cast<const UInt8*>(bytes.data()), static_cast<CFIndex>(bytes.size())));
     if (!data) {
         CFRelease(*out);
         *out = nullptr;
         return kAudioUnitErr_InvalidPropertyValue;
     }
-    CFDictionarySetValue(dict, state_key(), data);
-    CFRelease(data);
+    CFDictionarySetValue(dict, state_key(), data.get());
     return noErr;
 }
 
-std::string Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
-                           const Configuration* carried) {
-    std::lock_guard lock(control_);
-    auto faults = observe_faults(); // Explained under the filter that played.
-    const bool was_failed = filter_.failed();
-    filter_.reject(kind, why, request, carried);
-    // An empty instance that fails its first load plays silence, not
-    // identity, without allocating: memory may have run out (ROBUST-3).
+// An empty instance that fails its first load plays silence, not identity,
+// without allocating: memory may have run out (ROBUST-3).
+void Effect::silence_failed_first_load(bool was_failed) noexcept {
     if (host_ && filter_.failed() && !was_failed)
         host_->silence();
     if (!host_ && filter_.failed())
         tail_.store(0);
-    update_status();
-    return faults;
+}
+
+void Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
+                    const Configuration* carried) {
+    std::string faults;
+    {
+        std::lock_guard lock(control_);
+        faults = observe_faults(); // Explained under the filter that played.
+        const bool was_failed = filter_.failed();
+        filter_.reject(kind, why, request, carried);
+        silence_failed_first_load(was_failed);
+        update_status();
+    }
+    log_faults(faults);
+    log(rejection_line());
+    notify_status();
 }
 
 // RestoreState's and a chosen file's common step: `next` through
@@ -206,12 +213,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 for (const auto& [id, value] : *saved)
                     store(id, value); // Status and unknown IDs are ignored.
         } catch (...) {
-            // A failed first load plays silence rather than the unfiltered
-            // input, without allocating (ROBUST-3).
-            if (host_ && filter_.failed() && !was_failed)
-                host_->silence();
-            if (!host_ && filter_.failed())
-                tail_.store(0);
+            silence_failed_first_load(was_failed);
         }
         try {
             // Why this request failed, or what was loaded (with the saved
@@ -271,9 +273,7 @@ OSStatus Effect::load_file(const std::string& path) {
     auto next = read_filter_file(path, host, reader, why);
     bool accepted = false;
     if (!next) {
-        log_faults(reject(why.kind, why.message, request, why.filter()));
-        log(rejection_line());
-        notify_status();
+        reject(why.kind, why.message, request, why.filter());
     } else {
         accepted = install(std::move(*next), request, nullptr, false);
     }
@@ -290,8 +290,7 @@ OSStatus Effect::load_file(const std::string& path) {
     if (accepted) {
         const auto name = std::filesystem::path(path).stem().string();
         if (const auto preset_name = cf_string(name.empty() ? path : name)) {
-            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name}));
-            CFRelease(preset_name);
+            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name.get()}));
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
         }
     }
@@ -300,10 +299,8 @@ OSStatus Effect::load_file(const std::string& path) {
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
-        log_faults(reject(HostFailureKind::state_unreadable,
-                          "The saved state is not an Audio Unit preset dictionary."));
-        log(rejection_line());
-        notify_status();
+        reject(HostFailureKind::state_unreadable,
+               "The saved state is not an Audio Unit preset dictionary.");
         return kAudioUnitErr_InvalidPropertyValue;
     }
     const auto dict = static_cast<CFDictionaryRef>(plist);
@@ -323,16 +320,12 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         next = decode_host_state(
             std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
     } catch (const NewerHostState& e) {
-        log_faults(reject(HostFailureKind::state_newer,
-                          std::string("The saved state could not be read: ") + e.what()));
-        log(rejection_line());
-        notify_status();
+        reject(HostFailureKind::state_newer,
+               std::string("The saved state could not be read: ") + e.what());
         return kAudioUnitErr_InvalidPropertyValue;
     } catch (const std::exception& e) {
-        log_faults(reject(HostFailureKind::state_unreadable,
-                          std::string("The saved state could not be read: ") + e.what()));
-        log(rejection_line());
-        notify_status();
+        reject(HostFailureKind::state_unreadable,
+               std::string("The saved state could not be read: ") + e.what());
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
@@ -366,12 +359,11 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     // The preset name and element names, as AUBase restores them. Its "data"
     // (parameter values) is left out: Gain and Mix were read above with bounds
     // checks, and AUBase reads that blob without them.
-    const auto copy = CFDictionaryCreateMutableCopy(nullptr, 0, dict);
+    const cf_owned<CFMutableDictionaryRef> copy(CFDictionaryCreateMutableCopy(nullptr, 0, dict));
     if (!copy)
         return noErr;
-    CFDictionaryRemoveValue(copy, CFSTR(kAUPresetDataKey));
-    static_cast<void>(AUBase::RestoreState(copy));
-    CFRelease(copy);
+    CFDictionaryRemoveValue(copy.get(), CFSTR(kAUPresetDataKey));
+    static_cast<void>(AUBase::RestoreState(copy.get()));
     return noErr;
 }
 } // namespace convolver::au

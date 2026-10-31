@@ -139,11 +139,15 @@ class Effect final : public ausdk::AUBase {
     HostLayout layout();
     std::optional<HostLayout> known_layout();
     // Records a load that failed before it reached HostFilter (unreadable or
-    // foreign state), as HostFilter::load records its own rejections.
-    // Returns the explanation of faults counted before it (observe_faults()),
-    // to log before the rejection.
-    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {},
-                       const Configuration* carried = nullptr);
+    // foreign state, or a file that could not be read), as HostFilter::load
+    // records its own rejections; then, outside the lock, logs the faults
+    // counted before it (observe_faults()) and the refusal, and notifies.
+    void reject(HostFailureKind, const std::string& why, const HostRequest& = {},
+                const Configuration* carried = nullptr);
+    // Under `control_`, after a request failed: if it was the first load to
+    // fail (`was_failed` is filter_.failed() from before it), the unit plays
+    // silence rather than the unfiltered input.
+    void silence_failed_first_load(bool was_failed) noexcept;
     // Gain and Mix as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
     // The common step of RestoreState and a chosen file: loads `next`, then
