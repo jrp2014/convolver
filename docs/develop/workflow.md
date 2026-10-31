@@ -77,7 +77,10 @@ Contents: [before you start](#before-you-start) ·
   interaction tried in the real host early. Log the state at the first
   unexplained failure before trying another fix, and put any comparison into
   one clearly described run whose logs jrp collects. Check the
-  [format notes](plugin-contract.md#format-notes) first.
+  [format notes](plugin-contract.md#format-notes) first. Where the command
+  line or an automated test can show the same thing (load times, refusal
+  messages, rendered audio), ask for that instead of steps in a host's
+  window.
 - **New dependencies:** if your work needs a new build or test dependency, add
   it in the same pull request to the CI workflow and to
   `.claude/hooks/session-start.sh`, so the next cloud session has it.
