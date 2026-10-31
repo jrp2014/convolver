@@ -7,7 +7,7 @@ implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
 **In short:** the next milestone is end-to-end testing: an independent user
-running an exact preview package from the 0.6 series. The
+running an exact preview package from the 0.7 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done on 31 October 2026), run jrp's host smoke tests (HOST-1), put the CLI
 and the journey presets in the package while writing the user journeys
@@ -40,7 +40,7 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.6 series and holds the VST3 plug-in, the Audio Unit (macOS),
+cut from the 0.7 series and holds the VST3 plug-in, the Audio Unit (macOS),
 the `convolver` CLI and the preset tool, with the editor's settings and window
 in both plug-in formats; LV2 joins a later preview once
 its own journeys are demonstrated. What still blocks it, with the evidence, is in
@@ -58,7 +58,7 @@ boundary and C++20 in the core.
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only, as soon as step 3 has its stereo preset and journey | Recorded like REL-3, with its limits stated. It finds installation, documentation, loading and reopening problems while the other windows are still being built; it does not change the first preview's contents (jrp's 25 October decision) and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
-| 5. The milestone | A candidate from a 0.6.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. The milestone | A candidate from a 0.7.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in the [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md) plan, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
@@ -352,8 +352,7 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  a 0.6.x build is minor 6, but every odd patch number is a micro version
-  LV2 reads as a development version.
+  every 0.7.x build is minor 7, which LV2 reads as a development version.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
