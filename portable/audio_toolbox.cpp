@@ -86,16 +86,20 @@ std::string missing(const std::filesystem::path& path) {
         return ec.message();
     return "no such file";
 }
+// What both readers check before opening: a regular file, not standard input.
+void require_file(const std::filesystem::path& path, const std::string& opening) {
+    std::error_code ec;
+    if (path == "-" || !std::filesystem::is_regular_file(path, ec))
+        throw std::runtime_error(
+            opening + (path == "-" ? "standard input cannot be a filter" : missing(path)));
+}
 
 // A file read through its header by ExtAudioFile, decoded to 32-bit floats.
 class ToolboxFile final : public SoundFile {
   public:
     explicit ToolboxFile(const std::filesystem::path& path) {
         const auto opening = "cannot open audio input " + path.string() + ": ";
-        std::error_code ec;
-        if (path == "-" || !std::filesystem::is_regular_file(path, ec))
-            throw std::runtime_error(
-                opening + (path == "-" ? "standard input cannot be a filter" : missing(path)));
+        require_file(path, opening);
         validate_wave(path);
         const auto& native = path.native();
         CFURLRef url = CFURLCreateFromFileSystemRepresentation(
@@ -207,13 +211,11 @@ class RawFile final : public SoundFile {
         : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)) {
         validate(spec);
         const auto opening = "cannot open audio input " + path.string() + ": ";
-        std::error_code ec;
-        if (path == "-" || !std::filesystem::is_regular_file(path, ec))
-            throw std::runtime_error(
-                opening + (path == "-" ? "standard input cannot be a filter" : missing(path)));
+        require_file(path, opening);
         file_.open(path, std::ios::binary);
         if (!file_)
             throw std::runtime_error(opening + "it cannot be opened (" + sandbox_hint + ")");
+        std::error_code ec;
         const auto bytes = std::filesystem::file_size(path, ec);
         if (ec)
             throw std::runtime_error(opening + ec.message());

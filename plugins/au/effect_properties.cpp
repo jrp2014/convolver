@@ -304,6 +304,8 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
     std::array<CFTypeRef, status_names.size()> values{};
     for (std::size_t i = 0; i < names.size(); ++i) {
         names[i].reset(CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8));
+        if (!names[i]) // Out of memory: CFArrayCreate must not be handed a null.
+            return kAudioUnitErr_InvalidProperty;
         values[i] = names[i].get();
     }
     *out = CFArrayCreate(nullptr, values.data(), static_cast<CFIndex>(values.size()),
@@ -328,32 +330,35 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
 
 OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
                                  AudioUnitElement element, UInt32& size, bool& writable) {
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+    // Convolver's own properties are all global.
+    if (scope != kAudioUnitScope_Global)
+        return AUBase::GetPropertyInfo(id, scope, element, size, writable);
+    if (id == kAudioUnitProperty_BypassEffect) {
         size = sizeof(UInt32);
         writable = true;
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == test_failure_property) {
+    if (id == test_failure_property) {
         size = sizeof(TestFailure);
         writable = false;
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {
+    if (id == kAudioUnitProperty_ParameterStringFromValue) {
         size = sizeof(AudioUnitParameterStringFromValue);
         writable = false;
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+    if (id == report_property || id == diagnostics_property) {
         size = sizeof(CFTypeRef);
         writable = false;
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == load_property) {
+    if (id == load_property) {
         size = sizeof(CFStringRef);
         writable = true;
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+    if (id == kAudioUnitProperty_CocoaUI) {
         if (!view_bundle())
             return kAudioUnitErr_InvalidProperty; // Registered without the bundle (the tests).
         size = sizeof(AudioUnitCocoaViewInfo);
@@ -365,12 +370,14 @@ OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
 
 OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, AudioUnitElement element,
                              void* data) {
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+    if (scope != kAudioUnitScope_Global)
+        return AUBase::GetProperty(id, scope, element, data);
+    if (id == kAudioUnitProperty_BypassEffect) {
         const UInt32 value = bypass_.load() ? 1 : 0;
         std::memcpy(data, &value, sizeof value);
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == test_failure_property) {
+    if (id == test_failure_property) {
         TestFailure t;
         std::lock_guard lock(control_);
         if (const auto& f = filter_.failure()) {
@@ -387,7 +394,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(data, &t, sizeof t);
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+    if (id == report_property || id == diagnostics_property) {
         CFTypeRef value = nullptr;
         try {
             const auto r = report();
@@ -411,7 +418,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(data, &value, sizeof value); // The caller releases it.
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == load_property) {
+    if (id == load_property) {
         std::string path;
         try {
             std::lock_guard lock(control_);
@@ -426,7 +433,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(data, &value, sizeof value); // The caller releases it.
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+    if (id == kAudioUnitProperty_CocoaUI) {
         const auto bundle = view_bundle();
         if (!bundle)
             return kAudioUnitErr_InvalidProperty;
@@ -441,7 +448,7 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(data, &info, sizeof info); // The caller releases the URL and the name.
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {
+    if (id == kAudioUnitProperty_ParameterStringFromValue) {
         // The Status parameter's current value reads as the unit's status
         // line; any other value (or no value: the current one) as its name.
         auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
@@ -485,7 +492,9 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
 // (unequal counts), with the filter running on underneath. Never a reset.
 OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, AudioUnitElement element,
                              const void* data, UInt32 size) {
-    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_BypassEffect) {
+    if (scope != kAudioUnitScope_Global)
+        return AUBase::SetProperty(id, scope, element, data, size);
+    if (id == kAudioUnitProperty_BypassEffect) {
         if (!data || size < sizeof(UInt32))
             return kAudioUnitErr_InvalidPropertyValue;
         UInt32 value = 0;
@@ -493,7 +502,7 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         bypass_.store(value != 0);
         return noErr;
     }
-    if (scope == kAudioUnitScope_Global && id == load_property) {
+    if (id == load_property) {
         CFStringRef path = nullptr;
         if (!data || size < sizeof path)
             return kAudioUnitErr_InvalidPropertyValue;

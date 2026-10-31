@@ -855,6 +855,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-9 — Simplify the macOS plug-in code.** 31 October 2026, PR #93,
+  jrp's request: behaviour-preserving simplifications of the AudioToolbox
+  reader, the window and the adapter's property calls, one commit each,
+  undoing no reviewed fix, plus the out-of-memory fix AU-8's review found;
+  what was left alone, and why, is listed in the pull request.
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:
