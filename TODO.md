@@ -525,6 +525,11 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `ClassInfo` ([settings](docs/use/plugins.md#settings)). Remaining, with
   PLUG-10's deferred parts: Gain mode (1002) and Latency (1004), with the
   latency change notification.
+- [ ] **AU-9 — Simplify the macOS plug-in code.** john, 31 October 2026:
+  behaviour-preserving simplification of the Audio Unit adapter, its window
+  and the AudioToolbox reader, following Apple's documented APIs, without
+  undoing any reviewed fix. One commit per change. The adapter's part
+  waits for the split of `effect.cpp` into three files.
 
 ## FFmpeg integration
 
