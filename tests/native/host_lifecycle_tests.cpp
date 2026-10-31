@@ -34,6 +34,7 @@ class Reference final : public lc::Driver {
                         Op::state_failed,
                         Op::state_b_starved,
                         Op::state_b_shortage,
+                        Op::state_malformed_starved,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -83,8 +84,9 @@ class Reference final : public lc::Driver {
         } catch (...) {
             // Contract, loading and failure: a failed first load plays
             // silence, never the unfiltered input.
+            // ROBUST-3: without allocating, as memory may have run out.
             if (processor_ && filter_->failed() && !was_failed)
-                processor_->replace(unfiltered_configuration(layout(), true));
+                processor_->silence();
             return false;
         }
     }
@@ -175,6 +177,10 @@ int main(int argc, char** argv) {
                  "start state-A play state-B-starved listen",
                  "state-A state-B-starved start listen",
                  "state-B-starved setup start listen",
+                 // ROBUST-3: memory runs out just after a failed first load
+                 // is recorded, before audio and while it plays.
+                 "start state-malformed-starved listen",
+                 "start play state-malformed-starved listen",
              })
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;

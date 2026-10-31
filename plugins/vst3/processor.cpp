@@ -335,19 +335,17 @@ tresult Processor::load_state(IBStream* stream) {
         }
         return kResultOk;
     } catch (...) {
-        // A failed first load plays silence rather than the unfiltered input.
-        if (host_ && filter_.failed() && !was_failed) {
-            try {
-                // The filter is empty, so this is what activate() would give,
-                // without restarting the fault count of a processor that counts on.
-                host_->replace(unfiltered_configuration(layout(), true));
-            } catch (...) {
-            }
-        }
+        // A failed first load plays silence rather than the unfiltered input,
+        // without allocating: memory may have run out (ROBUST-3).
+        if (host_ && filter_.failed() && !was_failed)
+            host_->silence();
         if (!host_ && filter_.failed())
             tail_.store(0);
         hold_fault_signal();
-        log(rejected_line(filter_));
+        try {
+            log(rejected_line(filter_));
+        } catch (...) { // Out of memory for the line: it is dropped.
+        }
         return kResultFalse;
     }
 }

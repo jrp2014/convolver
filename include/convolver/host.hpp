@@ -22,7 +22,18 @@ struct HostState {
     bool failed = false;
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
+// Throws std::length_error when the encoding would exceed max_host_state_bytes
+// (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
+// PLUG-12: the size in bytes encode_host_state() writes for this state,
+// counted without encoding or allocating. It may exceed max_host_state_bytes;
+// such state cannot be saved (saturates at SIZE_MAX).
+std::size_t encoded_host_state_size(const HostState&) noexcept;
+// PLUG-12: why this state is too large to save, in full sentences saying what
+// to change, or empty when it fits. HostFilter::load refuses such a filter
+// before accepting it, so a plug-in never plays a filter it cannot save, and
+// convolver-preset refuses to write it.
+std::string host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
@@ -74,6 +85,7 @@ enum class HostFailureKind {
     preparation,      // The filter could not be prepared for playing.
     activation,       // The processor could not be built when the host activated.
     saved_failure,    // The restored state records an earlier failed load.
+    too_large,        // The filter is too large to save in the plug-in's state (PLUG-12).
 };
 // Where a filter came from. Plug-ins cannot tell a preset from a saved
 // session: both arrive as state.
@@ -214,18 +226,16 @@ class HostFilter {
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
     // saved failed load (plays silence). Bypass is the adapter's to apply.
-    // Checks on the state itself always run. Checks against the host run when
-    // `host` is given (its configuration is known); `install` then receives
-    // what to play and may throw to reject, or throw SupersededRequest to
-    // abandon the request with nothing recorded or changed (a newer request
-    // has arrived). Without `host`, well-formed state
-    // is accepted and checked at activation. On rejection this records the
-    // error, keeps the accepted filter (a failed initial load if there was
-    // none) and throws std::invalid_argument with an explanation.
-    // A transaction: everything kept is built before `install` is called and
-    // nothing after it throws, so `install` must publish as its last step
-    // (prepare, which may throw, then publish, which cannot). What plays is
-    // then always what is saved, even when memory runs out.
+    // Checks on the state itself always run, including that it fits the
+    // saved-state limit (PLUG-12), so whatever is accepted can be saved. Checks against the host
+    // run when `host` is given (its configuration is known); `install` then receives what to play
+    // and may throw to reject, or throw SupersededRequest to abandon the request with nothing
+    // recorded or changed (a newer request has arrived). Without `host`, well-formed state is
+    // accepted and checked at activation. On rejection this records the error, keeps the accepted
+    // filter (a failed initial load if there was none) and throws std::invalid_argument with an
+    // explanation. A transaction: everything kept is built before `install` is called and nothing
+    // after it throws, so `install` must publish as its last step (prepare, which may throw, then
+    // publish, which cannot). What plays is then always what is saved, even when memory runs out.
     // `request` says where the state came from (numbered if 0).
     // `counting`: the processor that plays (if any). An accepted load clears
     // its fault baseline (HostProcessor::clear_faults()) and observes from the
@@ -329,10 +339,11 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
-// Control: construction, replace, prepare, publish, collect, destruction;
-// serialize these calls. Audio: process, set_bypass, reset, mute, publications; one audio
-// thread per instance. Control and audio may overlap only for replace, prepare,
-// publish and collect. Teardown requires stopped audio.
+// Control: construction, replace, prepare, publish, silence, collect,
+// destruction; serialize these calls. Audio: process, set_bypass, reset, mute,
+// publications; one audio thread per instance. Control and audio may overlap
+// only for replace, prepare, publish, silence and collect. Teardown requires
+// stopped audio.
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
@@ -378,14 +389,14 @@ class HostProcessor {
     // counts). Each change ramps over 64 frames.
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
-    // Audio thread: the current filter ramps to silence over 64 frames and
+    // Audio thread: the current filter ramps to silence over 64 frames (or is
+    // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
     // before it (still waiting for the audio thread) is silenced too. Bypass
     // still passes the dry signal. For a failure the audio thread finds
-    // itself, before the control side can publish silence: LV2's run()
-    // refusing an empty instance's first load (no worker, or a full worker
-    // queue).
+    // itself: LV2's run() refusing an empty instance's first load (no
+    // worker, or a full worker queue). The control side uses silence().
     void mute() noexcept;
     // The same for publications up to `through`, a count publications()
     // returned. An adapter that decides to mute from a flag its control side
@@ -393,6 +404,16 @@ class HostProcessor {
     // filter published after the flag was cleared is never silenced. A count
     // older than the filter already playing does nothing.
     void mute(std::uint64_t through) noexcept;
+    // Control side (ROBUST-3): mute() for a failure the control side finds,
+    // a failed first load, without allocating, locking or throwing, so the
+    // silence cannot fail when memory has run out. The audio thread mutes at
+    // the start of its next process() call, before it adopts a pending
+    // filter: one published before this call stays silent, one published
+    // after it takes over. With no audio since construction or reset, that
+    // next call is silent from its first frame; otherwise the filter ramps to
+    // silence over 64 frames. A call already running when this one is made
+    // may still play a filter it adopted.
+    void silence() noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.
     std::uint64_t publications() const noexcept;

@@ -44,13 +44,70 @@ struct Reader {
         return std::bit_cast<float>(word());
     }
 };
+std::size_t add(std::size_t a, std::size_t b) noexcept {
+    return b > std::numeric_limits<std::size_t>::max() - a ? std::numeric_limits<std::size_t>::max()
+                                                           : a + b;
+}
+// The words encode_host_state() writes, saturating.
+std::size_t encoded_words(const HostState& state) noexcept {
+    std::size_t words = 3; // Magic, version, flags.
+    if (!state.configuration)
+        return words;
+    const auto& c = *state.configuration;
+    // Rate, channels, mask; the delay counts and delays; the path count.
+    words = add(words, 4 + 1 + 1 + 1);
+    words = add(add(words, c.input_delays.size()), c.output_delays.size());
+    for (const auto& p : c.paths) {
+        // The impulse's length and samples; each route list's count, and a
+        // channel and a gain per route.
+        words = add(words, 3);
+        words = add(words, p.impulse.size());
+        words = add(add(words, p.inputs.size()), p.inputs.size());
+        words = add(add(words, p.outputs.size()), p.outputs.size());
+    }
+    return words;
+}
+std::size_t samples(const Configuration& c) noexcept {
+    std::size_t n = 0;
+    for (const auto& p : c.paths)
+        n = add(n, p.impulse.size());
+    return n;
+}
 } // namespace
+std::size_t encoded_host_state_size(const HostState& state) noexcept {
+    const auto words = encoded_words(state);
+    return words > std::numeric_limits<std::size_t>::max() / 4
+               ? std::numeric_limits<std::size_t>::max()
+               : words * 4;
+}
+std::string host_state_size_error(const HostState& state) {
+    const auto size = encoded_host_state_size(state);
+    if (size <= max_host_state_bytes)
+        return {};
+    // Each sample takes 4 bytes; the rest (rates, counts, routes) is small.
+    constexpr auto limit_samples = max_host_state_bytes / 4;
+    const auto n = state.configuration ? samples(*state.configuration) : 0;
+    return "The filter is too large to save: its " + std::to_string(n) +
+           " samples (all its impulse responses together) would take " + std::to_string(size) +
+           " bytes in the saved state, and plug-in state and presets hold at most " +
+           std::to_string(max_host_state_bytes) + " bytes (64 MiB), just under " +
+           std::to_string(limit_samples) +
+           " samples. A plug-in that played it could not save it with the project. Shorten "
+           "the impulse responses (most of a long one's end is usually silence) or use fewer "
+           "of them; the convolver command-line tool can still render with it.";
+}
 std::vector<std::byte> encode_host_state(const HostState& state) {
     if (state.configuration)
         validate_configuration(*state.configuration);
     if (state.failed && state.configuration)
         throw std::invalid_argument("a failed load holds no filter");
+    // Refused before anything is allocated; reserved exactly otherwise, so a
+    // large state is never copied while it grows.
+    const auto size = encoded_host_state_size(state);
+    if (size > max_host_state_bytes)
+        throw std::length_error("host state exceeds limit");
     Writer w;
+    w.data.reserve(size);
     w.word(magic);
     w.word(state.failed ? version : 1);
     w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0));

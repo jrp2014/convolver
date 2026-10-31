@@ -72,6 +72,10 @@ Until 1.0 the C++ API may change between minor versions.
 - Audio Unit: a failure identical to the line just logged is not logged
   again under a new request number (GarageBand restored one preset five
   times in a second on a mono track); accepted loads are always logged.
+- Library (PLUG-12, ROBUST-3): new `encoded_host_state_size()`,
+  `host_state_size_error()`, `HostFailureKind::too_large` and
+  `HostProcessor::silence()`. `encode_host_state()` refuses an oversized state
+  before allocating it and reserves the exact size otherwise.
 - Continuous integration (CI-9): the Linux VST3 jobs and the Audio Unit
   sanitizer job build only what their tests run (the new
   `convolver_vst3_suite` and `convolver_au_suite` targets), the long tests
@@ -163,6 +167,30 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (PLUG-12): a filter too large for the saved state is refused when
+  it is loaded, instead of loading and then failing every save. A `.cfg` may
+  hold 64 Mi samples, but plug-in state holds at most 64 MiB (just under
+  16,777,216 samples, all paths together), so a 16,777,216-sample WAV loaded
+  in the Audio Unit and then its `ClassInfo` could not be saved (`-10851`);
+  LV2's filter files had the same gap. `HostFilter::load` now checks the
+  encoded size before installing anything, so the previous filter, or the
+  silence of a failed first load, keeps playing and saving, and the failure
+  (new kind `HostFailureKind::too_large`) explains the limit and what to
+  change. `convolver-preset` refuses to write such a preset with the same
+  explanation. Filters within the limit sound and save as before. Found in
+  jrp's review of `6920a45`.
+- Plug-ins (ROBUST-3): when an active instance's first load failed, VST3, the
+  Audio Unit and LV2 built a silent filter to replace the unfiltered input; if
+  memory ran out at that moment, the input kept playing while the status said
+  the load had failed. They now call the new `HostProcessor::silence()`,
+  which neither allocates nor fails, and the audio thread mutes at its next
+  callback. Before any audio has played the output is silent from the first
+  sample (the 64-sample ramp of `mute()` used to let the start of the input
+  through there; LV2's run() refusing a first file met this); while audio
+  plays it ramps to silence over 64 samples, as before. Otherwise the sound
+  is unchanged. VST3's `setState` also no longer lets an out-of-memory
+  exception escape while writing the log line. Found in jrp's review of
+  `6920a45`; the lifecycle sequence `state-malformed-starved` reproduces it.
 - Plug-ins: Status and the log's `Started at` line now say what Gain and Mix
   let through when no filter is heard. With no filter at Gain −20 dB the
   Audio Unit's Status said "audio passes unchanged" while the input played

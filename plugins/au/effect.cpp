@@ -814,9 +814,13 @@ std::string Effect::error() {
     return filter_.error();
 }
 
-std::string Effect::rejection_line() {
-    std::lock_guard lock(control_);
-    return rejected_line(filter_);
+std::string Effect::rejection_line() noexcept {
+    try {
+        std::lock_guard lock(control_);
+        return rejected_line(filter_);
+    } catch (...) { // Out of memory for the line: it is dropped.
+        return {};
+    }
 }
 
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
@@ -872,15 +876,10 @@ std::string Effect::reject(HostFailureKind kind, const std::string& why, const H
     auto faults = observe_faults(); // Explained under the filter that played.
     const bool was_failed = filter_.failed();
     filter_.reject(kind, why, request, carried);
-    // An empty instance that fails its first load plays silence, not identity.
-    if (host_ && filter_.failed() && !was_failed) {
-        try {
-            // The filter is empty, so this is what activate() would give,
-            // without restarting the fault count of a processor that counts on.
-            host_->replace(unfiltered_configuration(layout(), true));
-        } catch (...) {
-        }
-    }
+    // An empty instance that fails its first load plays silence, not
+    // identity, without allocating: memory may have run out (ROBUST-3).
+    if (host_ && filter_.failed() && !was_failed)
+        host_->silence();
     if (!host_ && filter_.failed())
         tail_.store(0);
     update_status();
@@ -932,15 +931,10 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 for (const auto& [id, value] : *saved)
                     store(id, value); // Status and unknown IDs are ignored.
         } catch (...) {
-            // A failed first load plays silence rather than the unfiltered input.
-            if (host_ && filter_.failed() && !was_failed) {
-                try {
-                    // The filter is empty, so this is what activate() would give,
-                    // without restarting the fault count of a processor that counts on.
-                    host_->replace(unfiltered_configuration(layout(), true));
-                } catch (...) {
-                }
-            }
+            // A failed first load plays silence rather than the unfiltered
+            // input, without allocating (ROBUST-3).
+            if (host_ && filter_.failed() && !was_failed)
+                host_->silence();
             if (!host_ && filter_.failed())
                 tail_.store(0);
         }

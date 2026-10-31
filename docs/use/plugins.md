@@ -110,6 +110,16 @@ channel counts. Each plug-in checks it against the host:
 | No filter loaded yet, different counts | Silence |
 | The first filter does not fit, or its preset is damaged | Silence |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it |
+| The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
+
+**Size limit.** The host saves the whole filter in the project, and
+Convolver's saved state holds at most 64 MiB: just under 16,777,216 samples
+counting every impulse response in the filter together: a stereo filter with
+one impulse response per channel can be about 2.9 minutes long at 48 kHz. A larger filter is refused when it is loaded,
+with the reason in Status and the log, so a project never plays a filter it
+could not save. Shorten the impulse responses (the end of a long one is
+usually near silence), or use the [command-line renderer](command-line.md),
+which reads filters of up to 67,108,864 samples.
 
 Convolver never falls back to unfiltered audio when a filter fails: a room
 correction or crossover that quietly plays unfiltered audio can be worse than

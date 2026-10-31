@@ -710,8 +710,15 @@ and VST3-4 are in, as they share the report code and differ only in views.
   playing copy is checked in HOST-1.
 - **Slow loads on the UI thread.** A long multichannel filter is read and
   prepared on the host's thread, as a state restore is today, so the window
-  cannot repaint meanwhile. PERF-3 measures it; VST3-5 moves preparation to a
-  worker if needed, and the window then shows "Loading".
+  cannot repaint meanwhile. Since jrp's review of `6920a45` (31 October 2026)
+  this is an acceptance gate for every window, not only a risk: measured on
+  the PERF-3 supported workloads by automated tests rather than by hand in a
+  host, a load must not pause the host noticeably,
+  or preparation moves to the background first (VST3-5 for VST3, the same in
+  the Audio Unit), with the window showing "Loading". LV2's request numbers
+  and prepare-then-publish are the pattern, and the adapter owns requests,
+  overtaken requests and shutdown whether or not the window is open
+  ([loading responsiveness](../../../TODO.md#loading-responsiveness)).
 - **Report size.** A list that matches nothing explains every candidate, which
   can be long. VST3 message attributes and AU dictionaries carry it easily;
   LV2's notify port needs a size declared up front (LV2-6).
