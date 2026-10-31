@@ -145,7 +145,8 @@ is superseded.
   CLI where that makes sense. Record it as REL-3 says, and fix what it finds. It needs the stereo preset in the package
   (PLUG-5) and the stereo journey written (REL-2). It does not change what
   the first preview holds (jrp's
-  [25 October decision](docs/project/decisions.md)) and does not replace REL-3.
+  [25 October decision](docs/project/decisions.md), confirmed on 31 October)
+  and does not replace REL-3.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
