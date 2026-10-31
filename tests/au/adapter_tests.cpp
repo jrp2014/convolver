@@ -693,7 +693,8 @@ void settings_parameters() {
     {
         PrivateLog log("settings");
         check(copy.restore(saved), "restore with settings");
-        require(log.text().find("Restored settings: gain -6 dB, mix 50% wet.") != std::string::npos,
+        require(log.text().find("Restored settings: gain -6 dB, mix 50% wet, latency 256 "
+                                "frames.") != std::string::npos,
                 "the restore's log line does not list the settings");
     }
     require(parameter(copy, au::gain_parameter) == -6 && parameter(copy, au::mix_parameter) == 50,
@@ -728,6 +729,126 @@ void settings_parameters() {
     CFRelease(wrong_copy);
     CFRelease(wrong);
     CFRelease(saved);
+    copy.uninitialize();
+    unit.uninitialize();
+}
+
+// The frame at which a unit with a one-tap filter of 1 plays an impulse
+// given at frame 0, rendering blocks of 512 frames; -1 if it never does.
+long impulse_delay(Unit& unit) {
+    Buffers b(2, 2, 512);
+    bool silent = false;
+    for (int block = 0; block < 20; ++block) {
+        b.silence();
+        if (block == 0)
+            b.in[0][0] = b.in[1][0] = 1;
+        check(render(unit, b, 512, false, silent), "latency render");
+        for (std::size_t t = 0; t < 512; ++t)
+            if (std::abs(b.out[0][t]) > .5f)
+                return block * 512 + static_cast<long>(t);
+    }
+    return -1;
+}
+
+std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterValue value) {
+    AudioUnitParameterStringFromValue request{id, &value, nullptr};
+    UInt32 bytes = sizeof request;
+    check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterStringFromValue,
+                               kAudioUnitScope_Global, 0, &request, &bytes),
+          "parameter value name");
+    require(request.outString != nullptr, "parameter value name missing");
+    char text[256] = {};
+    CFStringGetCString(request.outString, text, sizeof text, kCFStringEncodingUTF8);
+    CFRelease(request.outString);
+    return text;
+}
+
+// PLUG-10, AU-7: Latency, a menu of block sizes from 64 to 4096 frames. A
+// choice made while uninitialized is reported at once, with a notification;
+// one made while the unit runs waits for the next Initialize, so the host
+// never reads a latency the audio does not have. Saved with the settings.
+void latency_parameter() {
+    Unit unit;
+    AudioUnitParameterInfo info{};
+    UInt32 size = sizeof info;
+    check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
+                               au::latency_parameter, &info, &size),
+          "Latency parameter info");
+    require(info.unit == kAudioUnitParameterUnit_Indexed && info.minValue == 0 &&
+                info.maxValue == 6 && info.defaultValue == 2 &&
+                (info.flags & kAudioUnitParameterFlag_IsWritable) &&
+                (info.flags & kAudioUnitParameterFlag_ValuesHaveStrings) &&
+                (info.flags & kAudioUnitParameterFlag_NonRealTime),
+            "Latency is not an indexed, non-real-time parameter from 0 to 6, default 2");
+    if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
+        CFRelease(info.cfNameString);
+    CFArrayRef names = nullptr;
+    size = sizeof names;
+    check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_ParameterValueStrings,
+                               kAudioUnitScope_Global, au::latency_parameter, &names, &size),
+          "Latency value strings");
+    require(names && CFArrayGetCount(names) == 7, "Latency value strings");
+    char first[32] = {};
+    CFStringGetCString(static_cast<CFStringRef>(CFArrayGetValueAtIndex(names, 0)), first,
+                       sizeof first, kCFStringEncodingUTF8);
+    CFRelease(names);
+    require(std::string(first) == "64 frames", std::string("first Latency name: ") + first);
+    require(value_name(unit, au::latency_parameter, 4) == "1024 frames",
+            "Latency 4 reads " + value_name(unit, au::latency_parameter, 4));
+    require(parameter(unit, au::latency_parameter) == 2, "Latency default");
+    // Stored as a whole index within range.
+    set_parameter(unit, au::latency_parameter, 99);
+    require(parameter(unit, au::latency_parameter) == 6, "Latency not clamped above");
+    set_parameter(unit, au::latency_parameter, -5);
+    require(parameter(unit, au::latency_parameter) == 0, "Latency not clamped below");
+    set_parameter(unit, au::latency_parameter, 2.4f);
+    require(parameter(unit, au::latency_parameter) == 2, "Latency not rounded");
+
+    Notifications seen;
+    check(AudioUnitAddPropertyListener(unit.get(), kAudioUnitProperty_Latency,
+                                       &Notifications::listener, &seen),
+          "latency listener");
+    Configuration one{48000, 2, 2, 0, {}, {}, {}};
+    for (std::size_t ch = 0; ch < 2; ++ch)
+        one.paths.push_back({{1.f}, {{ch, 1}}, {{ch, 1}}});
+    check(unit.configure(48000, 2, 2, 512), "latency formats");
+    check(unit.load(state_of(one)), "latency filter");
+    seen.count.clear();
+    set_parameter(unit, au::latency_parameter, 3);
+    require(seen.count[kAudioUnitProperty_Latency] == 1, "no notification for a new Latency");
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "uninitialized latency is not the chosen 512 frames");
+    set_parameter(unit, au::latency_parameter, 3);
+    require(seen.count[kAudioUnitProperty_Latency] == 1, "a notification without a change");
+    check(unit.initialize(), "initialization at 512 frames");
+    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
+
+    // Chosen while initialized: the running latency stays, and the host is
+    // not told of a change that has not happened.
+    seen.count.clear();
+    set_parameter(unit, au::latency_parameter, 0);
+    require(seen.count[kAudioUnitProperty_Latency] == 0 &&
+                unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "a Latency chosen while running changed the reported latency");
+    require(impulse_delay(unit) == 512, "a Latency chosen while running changed the audio");
+    unit.uninitialize();
+    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+            "uninitialized, the latency is not the chosen 64 frames");
+    check(unit.initialize(), "initialization at 64 frames");
+    require(seen.count[kAudioUnitProperty_Latency] > 0, "no notification at initialization");
+    require(impulse_delay(unit) == 64, "the audio is not delayed by 64 frames");
+
+    // Saved with the state and restored, before initialization, as reported.
+    const auto saved = unit.class_info_now();
+    Unit copy;
+    check(copy.configure(48000, 2, 2, 512), "copy formats");
+    check(copy.restore(saved), "restore with Latency");
+    CFRelease(saved);
+    require(parameter(copy, au::latency_parameter) == 0 &&
+                copy.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+            "Latency not restored");
+    check(copy.initialize(), "copy initialization");
+    require(impulse_delay(copy) == 64, "restored Latency not applied");
     copy.uninitialize();
     unit.uninitialize();
 }
@@ -767,7 +888,8 @@ void settings_in_diagnostics() {
                          "preset.",
                 "no filter at Gain -20 dB: " + shown);
         require(contains(log.text(), "No filter, so audio passes at -20.0 dB, set by Gain and "
-                                     "Mix. Settings: gain -20 dB, mix 100% wet."),
+                                     "Mix. Settings: gain -20 dB, mix 100% wet, latency 256 "
+                                     "frames."),
                 "start line at Gain -20 dB: " + log.text());
         // Changed while it plays: the next read of Status follows.
         set_parameter(unit, au::gain_parameter, 0);
@@ -826,9 +948,10 @@ void status_parameter() {
                                &size),
           "parameter list");
     // AU-7: the settings first, as generic views list them, then Status.
-    require(size == 3 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
-                ids[1] == au::mix_parameter && ids[2] == au::status_parameter,
-            "the parameters should be Gain, Mix and Status");
+    require(size == 4 * sizeof(AudioUnitParameterID) && ids[0] == au::gain_parameter &&
+                ids[1] == au::mix_parameter && ids[2] == au::latency_parameter &&
+                ids[3] == au::status_parameter,
+            "the parameters should be Gain, Mix, Latency and Status");
     AudioUnitParameterInfo info{};
     size = sizeof info;
     check(AudioUnitGetProperty(au, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
@@ -982,6 +1105,7 @@ int main() {
         failed_initialization();
         status_parameter();
         settings_parameters();
+        latency_parameter();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
         return 0;

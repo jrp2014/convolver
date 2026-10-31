@@ -71,7 +71,8 @@ UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
 // decimals as it takes (up to six) not to read as `low` or `high` when it is
 // neither ("99.96", not "100"). The window's sliders show the same text.
 std::string setting_text(double value, double low, double high);
-// PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
+// PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet, latency
+// 256 frames".
 // `equal_counts` false says the mix does not apply.
 std::string settings_words(const HostSettings&, bool equal_counts);
 // What plays under `host` and why, in full: the silent failure (with what

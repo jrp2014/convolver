@@ -35,6 +35,12 @@ std::string request_words(const HostRequest& r) {
                 : ", from a saved project or preset");
 }
 
+// PLUG-10: a Latency chosen while the processor runs at another block size
+// waits for the next start (docs/develop/plugin-contract.md#settings).
+bool latency_waits(const HostReportFacts& facts) {
+    return facts.latency_frames && facts.settings.latency != facts.latency_frames;
+}
+
 // What plays, why, and what to change, in full.
 std::string explanation(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
@@ -66,6 +72,12 @@ std::string explanation(const HostFilter& filter, const HostReportFacts& facts) 
         text += mono_track_hint(*failure, *host);
     if (filter.faults().any())
         text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
+    if (latency_waits(facts))
+        text += " Latency " + std::to_string(facts.settings.latency) +
+                " frames is chosen; it takes effect when the host next starts the plug-in (for "
+                "example when the project is reopened or the sample rate changes). Until then "
+                "the plug-in keeps " +
+                std::to_string(facts.latency_frames) + " frames.";
     if (!filter.filter() && !failure && !filter.failed())
         text += facts.chooses_files
                     ? " To filter the audio, choose a filter file (Choose Filter, or drop a .cfg "
@@ -123,7 +135,11 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
     r.details.emplace_back("Latency", std::to_string(facts.latency_frames) + " frames" +
                                           seconds(facts.latency_frames, rate) + ", tail " +
                                           std::to_string(facts.tail_frames) + " frames" +
-                                          seconds(facts.tail_frames, rate));
+                                          seconds(facts.tail_frames, rate) +
+                                          (latency_waits(facts)
+                                               ? "; " + std::to_string(facts.settings.latency) +
+                                                     " frames chosen, from the next start"
+                                               : std::string()));
     auto software = execution_line();
     if (software.starts_with("Session: "))
         software.erase(0, 9);

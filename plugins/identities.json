@@ -19,7 +19,8 @@
     "macos_bundle_id": "io.github.jrp2014.convolver.au",
     "status_parameter_id": 1001,
     "gain_parameter_id": 0,
-    "mix_parameter_id": 1003
+    "mix_parameter_id": 1003,
+    "latency_parameter_id": 1004
   },
   "lv2": {
     "base_uri": "https://github.com/jrp2014/convolver/lv2#",

@@ -378,7 +378,9 @@ void window() {
     // Gain and Mix as sliders (jrp's GarageBand run: a host that shows this
     // window no longer shows its generic sliders). Moving one sets the
     // parameter; a change from the host moves the slider.
-    require(view.settingSliders.count == 2 && view.settingValues.count == 2, "no setting sliders");
+    require(view.settingSliders.count == 2 && view.settingMenus.count == 1 &&
+                view.settingValues.count == 3,
+            "no setting sliders and menu");
     NSSlider* gain = view.settingSliders[0];
     NSSlider* mix = view.settingSliders[1];
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
@@ -417,6 +419,28 @@ void window() {
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),
           "Mix back");
     [view refresh];
+
+    // Latency as a menu of block sizes (PLUG-10). Choosing one while the unit
+    // runs sets the parameter, and the window says it waits for the next start.
+    NSPopUpButton* latency = view.settingMenus[0];
+    require(latency.numberOfItems == 7 && [latency.itemTitles[0] isEqualToString:@"64 frames"] &&
+                [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
+                latency.indexOfSelectedItem == 2 &&
+                [latency.accessibilityLabel isEqualToString:@"Latency"],
+            "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
+    [latency selectItemAtIndex:3];
+    [latency sendAction:latency.action to:latency.target];
+    check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
+          "Latency value");
+    require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
+    require(contains(view.explanationView.string, "Latency 512 frames is chosen") &&
+                contains(view.explanationView.string, "512 frames chosen, from the next start"),
+            "the window does not say when Latency applies:\n" + text(view.explanationView.string));
+    check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
+          "Latency from the host");
+    [view refresh];
+    require(latency.indexOfSelectedItem == 2 && !contains(view.explanationView.string, "is chosen"),
+            "the Latency menu did not follow the host");
 
     // Copy diagnostics, to a pasteboard of the test's own.
     NSPasteboard* board = [NSPasteboard pasteboardWithUniqueName];

@@ -59,6 +59,7 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(gain_parameter, static_cast<AudioUnitParameterValue>(defaults.gain_db));
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
+    Globals()->SetParameter(latency_parameter, default_latency_index);
 }
 
 HostLayout Effect::layout() {
@@ -99,12 +100,13 @@ OSStatus Effect::Initialize() {
             current = settings();
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or channels brings it back. Gain and Mix
-            // apply from the first frame.
-            auto next = std::make_unique<HostProcessor>(
-                filter_.activate(host), GetMaxFramesPerSlice(), current, latency_frames);
+            // apply from the first frame, and the Latency is the block size.
+            auto next = std::make_unique<HostProcessor>(filter_.activate(host),
+                                                        GetMaxFramesPerSlice(), current);
             next->set_bypass(bypass_.load());
             next->reset();
             tail_.store(next->tail_frames());
+            latency_.store(next->latency_frames());
             host_ = std::move(next);
             initialized_ = host;
             rendered_.store(false);
@@ -133,7 +135,7 @@ OSStatus Effect::Initialize() {
     notify_status();
     if (!started)
         return kAudioUnitErr_FailedInitialization;
-    timing_changed();
+    timing_changed(); // The latency may be a newly chosen one.
     return noErr;
 }
 
@@ -158,6 +160,7 @@ void Effect::Cleanup() {
         if (rendered_.load())
             committed_ = initialized_;
         host_.reset();
+        latency_.store(settings().latency); // What the next initialization uses.
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
     log_faults(faults);
@@ -211,7 +214,7 @@ UInt32 Effect::SupportedNumChannels(const AUChannelInfo** out) {
 
 Float64 Effect::GetLatency() noexcept AUSDK_RTSAFE {
     const auto rate = GetOutput0().GetStreamFormat().mSampleRate;
-    return rate > 0 ? static_cast<Float64>(latency_frames) / rate : 0;
+    return rate > 0 ? static_cast<Float64>(latency_.load()) / rate : 0;
 }
 
 Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {

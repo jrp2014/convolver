@@ -115,8 +115,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSString* shown_; // The explanation and details last shown, so a refresh keeps a selection.
     NSString* logPath_;
     NSArray<NSDictionary<NSString*, id>*>* settings_;
-    CGFloat textTop_;    // Under the settings.
-    NSInteger dragging_; // The slider the user is dragging, or -1.
+    NSArray<NSControl*>* controls_; // Each setting's slider or menu, in settings_ order.
+    CGFloat textTop_;               // Under the settings.
+    NSInteger dragging_;            // The slider the user is dragging, or -1.
     NSUInteger choosing_,
         requests_;       // The pending Choose Filter request (0: none), the last number.
     NSOpenPanel* panel_; // Its dialog, while one is open.
@@ -150,10 +151,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _statusField.accessibilityLabel = @"Status";
     [self addSubview:_statusField];
 
-    // The settings: name, slider, value. A host that shows this window shows
-    // it instead of its generic controls (jrp's GarageBand run).
+    // The settings: name, slider or menu, value. A host that shows this
+    // window shows it instead of its generic controls (jrp's GarageBand run).
     settings_ = [settings copy];
+    NSMutableArray<NSControl*>* controls = [NSMutableArray array];
     NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
+    NSMutableArray<NSPopUpButton*>* menus = [NSMutableArray array];
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
     CGFloat y = settings_top;
     for (NSUInteger i = 0; i < settings_.count; ++i, y += setting_row) {
@@ -164,18 +167,37 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         name.frame = NSMakeRect(margin, y + 4, label_column - 8, 18);
         name.autoresizingMask = NSViewMaxYMargin;
         [self addSubview:name];
-        NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
-                                            minValue:[setting[@"minimum"] doubleValue]
-                                            maxValue:[setting[@"maximum"] doubleValue]
-                                              target:self
-                                              action:@selector(settingChanged:)];
-        slider.continuous = YES;
-        slider.tag = static_cast<NSInteger>(i);
-        slider.frame =
+        const NSRect place =
             NSMakeRect(margin + label_column, y, inner - label_column - value_width - 8, 24);
-        slider.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
-        slider.accessibilityLabel = setting[@"name"];
-        [self addSubview:slider];
+        NSControl* control = nil;
+        NSArray<NSString*>* choices = setting[@"choices"];
+        if ([choices isKindOfClass:[NSArray class]]) {
+            // A choice from a list (Latency): the item's index is the value.
+            NSPopUpButton* menu = [[NSPopUpButton alloc] initWithFrame:place pullsDown:NO];
+            [menu addItemsWithTitles:choices];
+            menu.target = self;
+            menu.action = @selector(choiceMade:);
+            menu.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
+            [menu sizeToFit];
+            control = menu;
+            [menus addObject:menu];
+        } else {
+            NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
+                                                minValue:[setting[@"minimum"] doubleValue]
+                                                maxValue:[setting[@"maximum"] doubleValue]
+                                                  target:self
+                                                  action:@selector(settingChanged:)];
+            slider.continuous = YES;
+            slider.frame = place;
+            slider.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
+            control = slider;
+            [sliders addObject:slider];
+        }
+        control.tag = static_cast<NSInteger>(i);
+        control.accessibilityLabel = setting[@"name"];
+        if (NSString* tip = setting[@"tip"])
+            control.toolTip = tip;
+        [self addSubview:control];
         NSTextField* value = label([NSFont monospacedDigitSystemFontOfSize:[NSFont systemFontSize]
                                                                     weight:NSFontWeightRegular],
                                    [NSColor labelColor]);
@@ -183,10 +205,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         value.frame = NSMakeRect(width - margin - value_width, y + 4, value_width, 18);
         value.autoresizingMask = NSViewMinXMargin | NSViewMaxYMargin;
         [self addSubview:value];
-        [sliders addObject:slider];
+        [controls addObject:control];
         [values addObject:value];
     }
+    controls_ = controls;
     _settingSliders = sliders;
+    _settingMenus = menus;
     _settingValues = values;
     textTop_ = settings_.count ? y + 10 : settings_top - 2;
 
@@ -346,11 +370,31 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return [@(text.c_str()) stringByAppendingString:setting[@"unit"]];
 }
 
-// Shows `value` beside slider `i`, and gives VoiceOver the same words.
+// Shows `value` beside slider `i`, and gives VoiceOver the same words. A
+// menu shows its choice itself.
 - (void)show:(double)value at:(NSUInteger)i {
+    if ([controls_[i] isKindOfClass:[NSPopUpButton class]]) {
+        auto* menu = static_cast<NSPopUpButton*>(controls_[i]);
+        const auto index = static_cast<NSInteger>(std::lround(value));
+        if (index >= 0 && index < menu.numberOfItems && menu.indexOfSelectedItem != index)
+            [menu selectItemAtIndex:index];
+        _settingValues[i].stringValue = @"";
+        return;
+    }
     NSString* text = [self describe:value of:settings_[i]];
     _settingValues[i].stringValue = text;
-    _settingSliders[i].accessibilityValueDescription = text;
+    controls_[i].accessibilityValueDescription = text;
+}
+
+// The user chose from a menu: the format passes the item's index to the host.
+- (void)choiceMade:(NSPopUpButton*)menu {
+    const auto i = static_cast<NSUInteger>(menu.tag);
+    if (i >= settings_.count)
+        return;
+    ConvolverSettingSetter set = settings_[i][@"set"];
+    if (set)
+        set(static_cast<double>(menu.indexOfSelectedItem));
+    [self refresh]; // The report says when the new choice takes effect.
 }
 
 // The user moved a slider: the format passes the value to the host. While
@@ -380,14 +424,18 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         ConvolverSettingGetter get = settings_[i][@"get"];
         const double value = get ? get() : NAN;
         if (std::isnan(value)) {
-            _settingSliders[i].enabled = NO;
+            controls_[i].enabled = NO;
             _settingValues[i].stringValue = @"";
             continue;
         }
-        _settingSliders[i].enabled = YES;
-        if (!dragging && _settingSliders[i].doubleValue != value)
-            _settingSliders[i].doubleValue = value;
-        [self show:(dragging ? _settingSliders[i].doubleValue : value) at:i];
+        controls_[i].enabled = YES;
+        if ([controls_[i] isKindOfClass:[NSPopUpButton class]]) {
+            [self show:value at:i];
+            continue;
+        }
+        if (!dragging && controls_[i].doubleValue != value)
+            controls_[i].doubleValue = value;
+        [self show:(dragging ? controls_[i].doubleValue : value) at:i];
     }
 }
 

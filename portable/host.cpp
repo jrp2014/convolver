@@ -872,9 +872,18 @@ struct HostProcessor::Impl {
 };
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
     : impl_(std::make_unique<Impl>(c, maximum, block)) {}
+namespace {
+std::size_t offered_latency(std::size_t frames) {
+    if (std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
+        throw std::invalid_argument("the latency " + std::to_string(frames) +
+                                    " frames is not one the plug-ins offer (64 to 4096 frames, "
+                                    "in powers of two)");
+    return frames;
+}
+} // namespace
 HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings, std::size_t block)
-    : impl_(std::make_unique<Impl>(c, maximum, block, settings)) {}
+                             const HostSettings& settings)
+    : impl_(std::make_unique<Impl>(c, maximum, offered_latency(settings.latency), settings)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c);

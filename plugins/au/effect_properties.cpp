@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// The Audio Unit's parameters and properties: Gain, Mix and Status, property
+// The Audio Unit's parameters and properties: Gain, Mix, Latency and Status, property
 // dispatch, the window's report and diagnostics, status notifications and
 // the Convolver log (see effect.cpp).
 #include "convolver/io.hpp"
@@ -18,6 +18,21 @@ namespace convolver::au {
 namespace {
 // The Status parameter's values, in HostStatus order.
 constexpr auto& status_names = host_status_names;
+
+// The Latency parameter's value names, in host_latencies order.
+std::string latency_name(std::size_t frames) {
+    return std::to_string(frames) + " frames";
+}
+
+// A Latency value (an index) as a position in host_latencies: rounded,
+// within range, and the default if it is not a number.
+std::size_t latency_index(AudioUnitParameterValue value) noexcept {
+    if (std::isnan(value))
+        return static_cast<std::size_t>(default_latency_index);
+    const auto last = static_cast<AudioUnitParameterValue>(host_latencies.size() - 1);
+    return static_cast<std::size_t>(
+        std::clamp<AudioUnitParameterValue>(std::round(value), 0, last));
+}
 
 // A path from the window as the file system spells it; empty if it has none.
 std::string file_path(CFStringRef text) {
@@ -75,6 +90,7 @@ HostSettings Effect::settings() {
     HostSettings s;
     s.gain_db = Globals()->GetParameterRT(gain_parameter);
     s.mix = Globals()->GetParameterRT(mix_parameter) / 100.0;
+    s.latency = host_latencies[latency_index(Globals()->GetParameterRT(latency_parameter))];
     return s; // Within range: store() clamps every value.
 }
 
@@ -86,9 +102,19 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
                                  static_cast<AudioUnitParameterValue>(max_gain_db));
     else if (id == mix_parameter)
         value = std::isnan(value) ? 100.f : std::clamp<AudioUnitParameterValue>(value, 0, 100);
+    else if (id == latency_parameter)
+        value = static_cast<AudioUnitParameterValue>(latency_index(value));
     else
         return;
     static_cast<void>(Globals()->SetParameterOrError(id, value));
+}
+
+void Effect::follow_chosen_latency() {
+    if (IsInitialized())
+        return;
+    const auto chosen = settings().latency;
+    if (latency_.exchange(chosen) != chosen)
+        PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
 }
 
 void Effect::log(const std::string& message, bool problem) noexcept {
@@ -197,7 +223,7 @@ HostReport Effect::report_locked(std::string& faults) {
     facts.host = known_layout();
     facts.max_frames = host_ ? GetMaxFramesPerSlice() : 0;
     facts.settings = settings();
-    facts.latency_frames = latency_frames;
+    facts.latency_frames = latency_.load();
     facts.tail_frames = tail_.load();
     facts.log_written = status_log_written_;
     facts.chooses_files = true; // Choose Filter in the window (load_property).
@@ -289,6 +315,17 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.defaultValue = 100;
         info.flags = settable;
         return noErr;
+    case latency_parameter:
+        // A menu of block sizes. A change needs a new processor, built at the
+        // next Initialize, so hosts are asked not to automate it.
+        FillInParameterName(info, CFSTR("Latency"), false);
+        info.unit = kAudioUnitParameterUnit_Indexed;
+        info.minValue = 0;
+        info.maxValue = static_cast<AudioUnitParameterValue>(host_latencies.size() - 1);
+        info.defaultValue = default_latency_index;
+        info.flags = settable | kAudioUnitParameterFlag_ValuesHaveStrings |
+                     kAudioUnitParameterFlag_NonRealTime;
+        return noErr;
     default:
         return kAudioUnitErr_InvalidParameter;
     }
@@ -296,17 +333,26 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
 
 OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParameterID id,
                                           CFArrayRef* out) {
-    if (scope != kAudioUnitScope_Global || id != status_parameter)
+    if (scope != kAudioUnitScope_Global || (id != status_parameter && id != latency_parameter))
         return kAudioUnitErr_InvalidProperty;
     if (!out) // Asked whether the strings exist.
         return noErr;
-    std::array<cf_owned<CFStringRef>, status_names.size()> names;
-    std::array<CFTypeRef, status_names.size()> values{};
-    for (std::size_t i = 0; i < names.size(); ++i) {
-        names[i].reset(CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8));
-        if (!names[i]) // Out of memory: CFArrayCreate must not be handed a null.
-            return kAudioUnitErr_InvalidProperty;
-        values[i] = names[i].get();
+    std::vector<cf_owned<CFStringRef>> names;
+    std::vector<CFTypeRef> values;
+    try {
+        if (id == status_parameter)
+            for (const auto* name : status_names)
+                names.push_back(cf_string(name));
+        else
+            for (const auto frames : host_latencies)
+                names.push_back(cf_string(latency_name(frames)));
+        for (const auto& name : names) {
+            if (!name) // Out of memory: CFArrayCreate must not be handed a null.
+                return kAudioUnitErr_InvalidProperty;
+            values.push_back(name.get());
+        }
+    } catch (...) { // Out of memory.
+        return kAudioUnitErr_InvalidProperty;
     }
     *out = CFArrayCreate(nullptr, values.data(), static_cast<CFIndex>(values.size()),
                          &kCFTypeArrayCallBacks);
@@ -320,10 +366,13 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
         return AUBase::SetParameter(id, scope, element, value, offset);
     if (id == status_parameter)
         return noErr;
-    if (id != gain_parameter && id != mix_parameter)
+    if (id != gain_parameter && id != mix_parameter && id != latency_parameter)
         return kAudioUnitErr_InvalidParameter;
-    AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map")
+    AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map; a Latency "
+                          "change is reported only while uninitialized, when nothing renders")
     store(id, value);
+    if (id == latency_parameter)
+        follow_chosen_latency();
     AUSDK_RT_UNSAFE_END
     return noErr;
 }
@@ -452,6 +501,19 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         // The Status parameter's current value reads as the unit's status
         // line; any other value (or no value: the current one) as its name.
         auto* request = static_cast<AudioUnitParameterStringFromValue*>(data);
+        if (request->inParamID == latency_parameter) {
+            // A Latency value reads as its menu name (auval asks, as for any
+            // parameter whose values have strings).
+            const auto value =
+                request->inValue ? *request->inValue : Globals()->GetParameter(latency_parameter);
+            try {
+                request->outString =
+                    cf_string(latency_name(host_latencies[latency_index(value)])).release();
+            } catch (...) {
+                return kAudioUnitErr_InvalidPropertyValue;
+            }
+            return request->outString ? noErr : kAudioUnitErr_InvalidPropertyValue;
+        }
         if (request->inParamID != status_parameter)
             return kAudioUnitErr_InvalidParameter;
         std::string text, faults;

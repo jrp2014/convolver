@@ -137,7 +137,8 @@ void defaults_unchanged() {
                 "default settings changed sample " + std::to_string(i));
 }
 
-// Gain and mix from the first frame, against the oracle: output c is
+// Gain and mix from the first frame, at each latency the plug-ins offer (the
+// block size), against the oracle: output c is
 // gain * mix * filtered + (1 - mix) * input c delayed by the block size.
 void gain_and_mix_against_oracle() {
     std::mt19937 random(0x6a1);
@@ -146,12 +147,14 @@ void gain_and_mix_against_oracle() {
         double gain_db, mix;
     };
     for (const auto& k : {Case{256, 256, -6, .3}, Case{64, 100, 12, 1}, Case{1024, 333, -40, .75},
-                          Case{128, 1, 24, 0}, Case{4096, 4096, -100, .5}}) {
+                          Case{128, 1, 24, 0}, Case{4096, 4096, -100, .5}, Case{512, 480, -3, .6},
+                          Case{2048, 1000, 0, 1}}) {
         const auto c = random_filter(random, 2, 2, 3 * k.block / 2 + 5);
         HostSettings s;
         s.gain_db = k.gain_db;
         s.mix = k.mix;
-        HostProcessor host(c, k.callback, s, k.block);
+        s.latency = k.block;
+        HostProcessor host(c, k.callback, s);
         require(host.latency_frames() == k.block, "block size not used");
         const auto input = noise(random, 2 * (4 * k.block + 700));
         const auto output = play(host, input, 2, 2, k.callback);
@@ -203,7 +206,7 @@ std::vector<float> per_sample(HostProcessor& host, std::size_t frames, float lev
 
 // A change of gain or mix ramps linearly over 64 frames, never in one step.
 void ramps() {
-    HostProcessor host(tap_filter(1), 1, HostSettings{}, 64);
+    HostProcessor host(tap_filter(1), 1, HostSettings{0, 1, 64});
     per_sample(host, 200); // Past the latency: output 1.
     host.set_gain_db(-20);
     auto out = per_sample(host, 100);
@@ -241,7 +244,8 @@ void unequal_mix() {
     Configuration c{48000, 1, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}, {1, 1}}}}};
     HostSettings s;
     s.mix = 0;
-    HostProcessor host(c, 1, s, 64);
+    s.latency = 64;
+    HostProcessor host(c, 1, s);
     for (int t = 0; t < 200; ++t) {
         float in = .5f, a = 0, b = 0;
         const float* ins[] = {&in};
@@ -255,14 +259,39 @@ void unequal_mix() {
     }
 }
 
+// PLUG-10: the latency is one of the block sizes the plug-ins offer; any
+// other is refused, so an adapter cannot build a processor it does not list.
+void latency_choices() {
+    for (const auto frames : host_latencies) {
+        HostSettings s;
+        s.latency = frames;
+        HostProcessor host(tap_filter(1), 512, s);
+        require(host.latency_frames() == frames, "latency " + std::to_string(frames) + " not used");
+    }
+    for (const std::size_t frames :
+         {std::size_t{0}, std::size_t{32}, std::size_t{100}, std::size_t{8192}}) {
+        HostSettings s;
+        s.latency = frames;
+        bool refused = false;
+        try {
+            HostProcessor host(tap_filter(1), 512, s);
+        } catch (const std::invalid_argument& e) {
+            refused = std::string(e.what()).find("64 to 4096 frames") != std::string::npos;
+        }
+        require(refused, "latency " + std::to_string(frames) + " not refused with a reason");
+    }
+}
+
 void settings_text() {
-    require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet",
+    require(settings_words(HostSettings{}, true) == "gain 0 dB, mix 100% wet, latency 256 frames",
             "settings words: " + settings_words(HostSettings{}, true));
-    HostSettings s{-6, .5};
-    require(settings_words(s, true) == "gain -6 dB, mix 50% wet",
+    HostSettings s{-6, .5, 1024};
+    require(settings_words(s, true) == "gain -6 dB, mix 50% wet, latency 1024 frames",
             "settings words: " + settings_words(s, true));
-    require(settings_words(s, false).find("no dry signal") != std::string::npos,
-            "settings words for unequal counts");
+    require(settings_words(s, false) ==
+                "gain -6 dB, mix 100% wet (inputs and outputs differ, so there is no dry "
+                "signal), latency 1024 frames",
+            "settings words for unequal counts: " + settings_words(s, false));
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
          {std::pair{HostSettings{-75.967, .561413}, "gain -76 dB, mix 56.1% wet"},
@@ -270,7 +299,7 @@ void settings_text() {
           std::pair{HostSettings{-.01, .9996}, "gain -0.01 dB, mix 99.96% wet"},
           std::pair{HostSettings{-99.99, .99999}, "gain -99.99 dB, mix 99.999% wet"},
           std::pair{HostSettings{-.04, .0004}, "gain -0.04 dB, mix 0.04% wet"}})
-        require(settings_words(settings, true) == words,
+        require(settings_words(settings, true) == std::string(words) + ", latency 256 frames",
                 "settings words: " + settings_words(settings, true));
     // The window's slider text: never an exponent, never a range end it is not.
     for (const auto& [value, text] :
@@ -280,7 +309,8 @@ void settings_text() {
                 "setting text: " + setting_text(value, min_gain_db, max_gain_db));
     HostFilter filter;
     const auto line = started_line(filter, {48000, 2, 2}, 512, &s);
-    require(line.find("Settings: gain -6 dB, mix 50% wet.") != std::string::npos,
+    require(line.find("Settings: gain -6 dB, mix 50% wet, latency 1024 frames.") !=
+                std::string::npos,
             "started line without settings: " + line);
 }
 
@@ -431,7 +461,9 @@ void diagnostics_follow_settings() {
             filter.load(
                 HostState{Configuration{48000, 1, 1, 0, {}, {}, {{{.25f}, {{0, 1}}, {{0, 1}}}}}},
                 c.host);
-        HostProcessor host(filter.activate(c.host), 64, c.settings, 64);
+        auto settings = c.settings;
+        settings.latency = 64;
+        HostProcessor host(filter.activate(c.host), 64, settings);
         const auto output = play(host, std::vector<float>(2048 * c.host.inputs, .5f), c.host.inputs,
                                  c.host.outputs, 64);
         for (std::size_t i = output.size() - 64 * c.host.outputs; i < output.size(); ++i)
@@ -484,6 +516,7 @@ int main() {
         gain_and_mix_against_oracle();
         ramps();
         unequal_mix();
+        latency_choices();
         settings_text();
         diagnostics_follow_settings();
         std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n",
