@@ -177,6 +177,12 @@ Until 1.0 the C++ API may change between minor versions.
   no longer create a string per key, which could crash if memory ran out.
   `au.adapter` now also checks that a state refused before it reaches the
   filter is logged.
+- macOS plug-in source (AU-9): small simplifications with no change in
+  behaviour. The AudioToolbox reader checks for a regular file in one place,
+  the window builds its detail styles once, and the Audio Unit's property
+  calls hand other scopes to `AUBase` first instead of testing the scope on
+  every branch. One fix: the Status parameter's value names are refused,
+  rather than crashing the host, if memory runs out while they are made.
 
 ### Fixed
 

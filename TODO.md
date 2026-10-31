@@ -522,11 +522,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `ClassInfo` ([settings](docs/use/plugins.md#settings)). Remaining, with
   PLUG-10's deferred parts: Gain mode (1002) and Latency (1004), with the
   latency change notification.
-- [ ] **AU-9 — Simplify the macOS plug-in code.** john, 31 October 2026:
-  behaviour-preserving simplification of the Audio Unit adapter, its window
-  and the AudioToolbox reader, following Apple's documented APIs, without
-  undoing any reviewed fix. One commit per change. The adapter's part
-  waits for the split of `effect.cpp` into three files.
 
 ## FFmpeg integration
 
@@ -860,6 +855,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-9 — Simplify the macOS plug-in code.** 31 October 2026, PR #93,
+  jrp's request: behaviour-preserving simplifications of the AudioToolbox
+  reader, the window and the adapter's property calls, one commit each,
+  undoing no reviewed fix, plus the out-of-memory fix AU-8's review found;
+  what was left alone, and why, is listed in the pull request.
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:
