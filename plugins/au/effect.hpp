@@ -5,14 +5,19 @@
 #pragma once
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "host_report.hpp"
+#include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace convolver::au {
 // HostProcessor's fixed latency; AU reports it in seconds.
@@ -43,6 +48,13 @@ struct TestFailure {
     UInt32 inputs = 0, outputs = 0;
     char message[4096] = {};
 };
+
+// For the tests only: when set, a load (RestoreState or a chosen file) calls
+// it while holding the control lock, before preparing the filter, so that
+// au.editor can hold a load open and check that the window's report read
+// does not wait for it. Null in the component; set it only while no unit
+// is loading.
+inline void (*load_started_for_tests)() noexcept = nullptr;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
@@ -115,6 +127,8 @@ class Effect final : public ausdk::AUBase {
     HostStatusLine status();
     // AU-7: the settings the parameters hold, within their ranges.
     HostSettings settings();
+    // AU-6: the editor report, after explaining any new faults (PLUG-9).
+    HostReport report();
 
   private:
     HostLayout layout();
@@ -123,7 +137,17 @@ class Effect final : public ausdk::AUBase {
     // foreign state), as HostFilter::load records its own rejections.
     // Returns the explanation of faults counted before it (observe_faults()),
     // to log before the rejection.
-    std::string reject(HostFailureKind, const std::string& why);
+    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {},
+                       const Configuration* carried = nullptr);
+    // Gain and Mix as a saved state holds them.
+    using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
+    // The common step of RestoreState and a chosen file: loads `next`, then
+    // logs and notifies outside the lock. `saved` settings are applied if
+    // it is accepted. Returns whether it was.
+    bool install(HostState next, const HostRequest&, const SavedSettings* saved,
+                 bool settings_unreadable);
+    // AU-6: a filter file chosen in the window (load_property).
+    OSStatus load_file(const std::string& path);
     // Records an initialization that could not build the processor (PLUG-8);
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;
@@ -146,6 +170,12 @@ class Effect final : public ausdk::AUBase {
     // DIAG-1, under `control_`: takes the processor's fault counts into
     // filter_ and returns their explanation, to log; empty if none are new.
     std::string observe_faults() noexcept;
+    // AU-6, under `control_`: the report as it stands; `faults` receives the
+    // explanation of faults counted since the last look, to log. The window
+    // reads it twice a second, so while faults go on it takes them in at most
+    // every report_fault_interval, once Render's Fault is explained.
+    HostReport report_locked(std::string& faults);
+    static constexpr std::chrono::seconds report_fault_interval{10};
     // AU-7: stores a Gain or Mix value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
 
@@ -165,6 +195,11 @@ class Effect final : public ausdk::AUBase {
     std::optional<HostLayout> committed_;
     HostStatusLine status_;          // Under control_.
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
+    std::chrono::steady_clock::time_point
+        report_faults_at_{}; // Last report_locked() look; under control_.
+    // AU-6: the last report read, for a read while a load holds `control_`.
+    std::mutex report_cache_lock_;
+    std::optional<HostReport> report_cache_; // Under report_cache_lock_.
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.

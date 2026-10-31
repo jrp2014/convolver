@@ -10,6 +10,47 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Audio Unit: a small window of its own (AU-6, first version), so a user can
+  see why the plug-in is silent or refused a preset without finding the log.
+  It shows the status, what plays, why and what to change in full (a stereo
+  preset on a mono track now also says to use a stereo track, as the log's
+  start line does), the host,
+  filter, settings and software details, and has Copy diagnostics (the report
+  and this instance's recent log lines, as text) and Show log (the log file
+  in the Finder), with Gain and Mix sliders, because hosts such as
+  GarageBand show it instead of their generic controls. **Choose Filter…**
+  (or dropping a file on the window) loads a `.cfg`, configuration list or
+  sound file directly, as the old Convolver did, read as `convolver-preset`
+  reads it, so the project then holds the same state a preset would, and
+  the chosen file becomes the current preset, named after it, so hosts can
+  mark the project changed. The
+  Audio Unit reads sound files with macOS's own AudioToolbox, so the
+  component still links nothing beyond macOS (jrp, 30 October 2026);
+  `native.audio_toolbox` checks that it reads every format the tests write
+  to the same samples as libsndfile. A build with
+  `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE` reads them with libsndfile instead,
+  as a fallback; the window's Software detail names the reader. A refused
+  file's short status names its own channels or rate (jrp's GarageBand run
+  showed "the filter has 0 in, 0 out"); for a configuration list, whose
+  entries differ, it names the host's channels or rate instead. Plug-ins
+  explain a file that does not fit in terms of the host's settings and
+  loading a file in Convolver, not command-line options (Audio Unit and LV2). While the host restores a filter on
+  another thread the window shows the last report rather than waiting. No
+  sound changes.
+- Library (internal to the adapters): the editor report (PLUG-9) in
+  `portable/host_report.hpp`, built from the Status line and the log's
+  wording, and `playing_words()`, the part of the log's start line that says
+  what plays, which the report shares; and `portable/filter_file.hpp`
+  (PLUG-9), the one step from a filter file to plug-in state, now shared by
+  `convolver-preset`, the LV2 plug-in and the Audio Unit. The `.cfg` loader
+  moved into a private `convolver_configuration` library with no sound-file
+  library of its own (`portable/sound_files.hpp`): `Convolver::io` gives it
+  libsndfile, and the public `load_configuration()` reads as before.
+  Installed packages gain `libconvolver_configuration.a`, which
+  `Convolver::io` links.
+
 ### Changed
 
 - The version is now 0.6.0, a deliberate minor step for the library changes
@@ -22,6 +63,15 @@ Until 1.0 the C++ API may change between minor versions.
   returned `HostFaults`, is gone: read `current` and `earlier` instead.
 - Library: `host_status()` takes the instance's `HostSettings` after
   `log_written`; without them it describes the default Gain and Mix.
+- The log and the plug-in window give Gain and Mix to one decimal ("gain
+  -76 dB, mix 56.1% wet"), not as the host's slider set them ("-75.967 dB",
+  "56.1413%"); a value too small for one decimal keeps two significant
+  digits, and a value near the end of its range keeps the decimals that
+  show it is not the end ("99.96% wet", not "100% wet"). The window's
+  sliders show the same text.
+- Audio Unit: a failure identical to the line just logged is not logged
+  again under a new request number (GarageBand restored one preset five
+  times in a second on a mono track); accepted loads are always logged.
 - Library (PLUG-12, ROBUST-3): new `encoded_host_state_size()`,
   `host_state_size_error()`, `HostFailureKind::too_large` and
   `HostProcessor::silence()`. `encode_host_state()` refuses an oversized state

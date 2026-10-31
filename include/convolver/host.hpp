@@ -245,7 +245,11 @@ class HostFilter {
               HostRequest request = {}, HostProcessor* counting = nullptr);
     // A load that failed before decoding (malformed state, unreadable file):
     // recorded as load() records a rejection. Does not throw.
-    void reject(HostFailureKind, std::string why, HostRequest request = {});
+    // `carried`, when given, is the filter the request held (a readable file
+    // made for another rate or other channels): the failure keeps its rate
+    // and counts for the short status text. Its paths are not used.
+    void reject(HostFailureKind, std::string why, HostRequest request = {},
+                const Configuration* carried = nullptr);
     // The same, as unreadable state.
     void reject(std::string why) {
         reject(HostFailureKind::state_unreadable, std::move(why));

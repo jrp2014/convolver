@@ -308,8 +308,9 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     }
 }
 
-void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request) {
-    record(kind, std::move(why), numbered(std::move(request)), nullptr);
+void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request,
+                        const Configuration* carried) {
+    record(kind, std::move(why), numbered(std::move(request)), carried);
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {
@@ -483,9 +484,17 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
     case HostFailureKind::state_newer:
         return "the preset was saved by a newer Convolver.";
     case HostFailureKind::sample_rate:
+        if (f.sample_rate <= 0) // Not recorded: say only what is known.
+            return host ? "the filter is not for the host's " + std::to_string(host->sample_rate) +
+                              " Hz."
+                        : "the filter is for another rate.";
         return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
                (host ? ", the host runs at " + std::to_string(host->sample_rate) + " Hz." : ".");
     case HostFailureKind::channels:
+        if (f.inputs == 0 && f.outputs == 0) // Not recorded (jrp's GarageBand run).
+            return host ? "the filter does not suit the plug-in's " +
+                              ports(host->inputs, host->outputs) + "."
+                        : "the filter has other channel counts.";
         return "the filter has " + ports(f.inputs, f.outputs) +
                (host && (host->inputs != f.inputs || host->outputs != f.outputs)
                     ? ", the plug-in " + ports(host->inputs, host->outputs) + "."

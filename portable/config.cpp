@@ -31,7 +31,7 @@ void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLo
 // Decodes a whole file into the channels whose target is set (one target per
 // file channel) and returns its frame count. Every decoded sample counts
 // against budget, used or not.
-std::size_t read_channels(AudioReader& reader, const std::vector<std::vector<float>*>& targets,
+std::size_t read_channels(SoundFile& reader, const std::vector<std::vector<float>*>& targets,
                           std::size_t& budget, const SourceLocation& where) {
     const auto channels = reader.info().channels;
     // Reject oversized files before allocating for their samples.
@@ -192,11 +192,13 @@ std::string joined(const std::vector<std::string>& parts, const char* separator)
         text += (text.empty() ? "" : separator) + p;
     return text;
 }
-std::string resample_hint(int wanted, const std::string& available, bool list) {
+std::string resample_hint(int wanted, const std::string& available, bool list, bool plugin) {
     return "Convolver never resamples. " +
            std::string(list ? "Add an entry for " : "Use a filter made for ") + hertz(wanted) +
-           " (with IRs recorded or designed at that rate), or convert the audio to " + available +
-           " first." +
+           " (with IRs recorded or designed at that rate), or " +
+           (plugin ? "set the host's project or audio device to " + available
+                   : "convert the audio to " + available + " first") +
+           "." +
            (list ? ""
                  : " A configuration list can hold one configuration per sample rate and "
                    "pick the matching one automatically.");
@@ -227,8 +229,11 @@ std::string indented(const std::string& text) {
     }
     return result;
 }
+// `plugin`: the wanted properties are a plug-in host's, so the advice names
+// the host's settings, not command-line options. It names no window: the LV2
+// plug-in has none, and its host's file chooser loads the file.
 std::string explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
-                        const ConfigurationSelection& w, std::string_view subject) {
+                        const ConfigurationSelection& w, std::string_view subject, bool plugin) {
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
     std::string text;
@@ -247,14 +252,13 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     text += " It cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
             "): " + joined(diffs, "; ") + ".";
     if (w.sample_rate && w.sample_rate != c.sample_rate)
-        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false);
+        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false, plugin);
     if (w.input_channels && w.input_channels != c.input_channels) {
         if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8)
             text += "\nTo apply this mono IR to all " + std::to_string(w.input_channels) +
                     " channels, save a configuration such as the following beside " +
-                    utf8_string(c.path.filename()) +
-                    " (for example as filter.cfg) and pass it "
-                    "as the filter instead:\n" +
+                    utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
+                    (plugin ? "load it in Convolver" : "pass it as the filter") + " instead:\n" +
                     indented(mono_example(c, w.input_channels)) +
                     "Lines starting with // are comments and can be kept or removed.";
         else if (c.sound_file)
@@ -268,7 +272,21 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
                     channels(w.input_channels, "input ") +
                     ", or a configuration list containing one for each channel layout you use.";
     }
-    if (w.output_channels && w.output_channels != c.output_channels)
+    // A host always sets both counts: for a sound file whose input advice
+    // already covers equal counts, the output paragraph would only repeat it.
+    const bool covered = c.sound_file && w.input_channels != c.input_channels &&
+                         w.input_channels == w.output_channels;
+    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered)
+        text += "\nThe host gives the plug-in " + channels(w.output_channels, "output ") + ". " +
+                (c.sound_file ? "A sound-file filter always has as many outputs as inputs: use "
+                                "a configuration (.cfg) file to produce a different number, or "
+                                "give the plug-in as many outputs as inputs in the host's track "
+                                "or routing settings."
+                              : "Use a configuration with that output count (its third header "
+                                "number), or give the plug-in " +
+                                    channels(c.output_channels, "output ") +
+                                    " in the host's track or routing settings.");
+    else if (w.output_channels && w.output_channels != c.output_channels && !plugin)
         text += c.sound_file
                     ? "\n--output-channels asked for " + channels(w.output_channels, "output ") +
                           ", but a sound-file filter always has as many outputs as inputs. "
@@ -283,9 +301,10 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
 
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& w, std::string_view subject) {
+                             const ConfigurationSelection& w, std::string_view subject,
+                             bool plugin) {
     if (!list && candidates.size() == 1)
-        return explain_one(filter, candidates.front(), w, subject);
+        return explain_one(filter, candidates.front(), w, subject, plugin);
     const auto name = utf8_string(filter);
     if (candidates.empty())
         return "the configuration list " + name + " names no sound file or configuration.";
@@ -320,19 +339,24 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         for (std::size_t i = 0; i < rates.size(); ++i)
             available += (i == 0 ? "" : i + 1 == rates.size() ? " or " : ", ") + hertz(rates[i]);
         text += "\nNo entry is for " + hertz(w.sample_rate) + ". " +
-                resample_hint(w.sample_rate, available, true);
+                resample_hint(w.sample_rate, available, true, plugin);
     } else if (w.input_channels && !any([&](const SelectionCandidate& c) {
                    return matches(c.sample_rate, c.input_channels, c.output_channels,
                                   {w.sample_rate, w.input_channels, 0});
                })) {
         text += "\nNo entry takes " + channels(w.input_channels, "input ") +
                 (w.sample_rate ? " at " + hertz(w.sample_rate) : std::string()) +
-                ". Add one to the list, or use audio with a channel count an entry accepts.";
+                ". Add one to the list, or " +
+                (plugin ? "give the plug-in as many inputs as an entry takes in the host's "
+                          "track or routing settings."
+                        : "use audio with a channel count an entry accepts.");
     } else if (w.output_channels) {
         text += "\nEntries exist for the sample rate and input channels, but none produces " +
-                channels(w.output_channels, "output ") +
-                ". Add one to the list, or omit --output-channels to take the first entry "
-                "that matches the input.";
+                channels(w.output_channels, "output ") + ". Add one to the list, or " +
+                (plugin ? "give the plug-in an entry's output count in the host's track or "
+                          "routing settings."
+                        : "omit --output-channels to take the first entry that matches the "
+                          "input.");
     }
     return text;
 }
@@ -366,8 +390,8 @@ bool raw_filter_name(const std::filesystem::path& path) {
 }
 // sound_file_header decides whether the content is a sound file, so a .pcm or
 // .raw file with a header is read through that header, as it always was.
-bool raw_filter(const std::filesystem::path& resolved) {
-    return raw_filter_name(resolved) && !sound_file_header(resolved);
+bool raw_filter(const std::filesystem::path& resolved, const SoundFiles& reader) {
+    return raw_filter_name(resolved) && !reader.recognised(resolved);
 }
 
 namespace {
@@ -385,7 +409,8 @@ struct DecodedFile {
 } // namespace
 
 std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration& cfg,
-                                       std::size_t& budget, RawEncoding raw_encoding) {
+                                       std::size_t& budget, const SoundFiles& reader,
+                                       RawEncoding raw_encoding) {
     std::vector<DecodedIr> result;
     const auto& parsed = doc.configuration;
     // The paths naming each file. A reference that cannot be resolved names
@@ -417,8 +442,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                               file.raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
             continue;
         }
-        std::optional<AudioReader> ir;
-        const bool raw = raw_filter(resolved);
+        std::unique_ptr<SoundFile> ir;
+        const bool raw = raw_filter(resolved, reader);
         // Appended to errors about a file whose name says raw but whose content
         // was read as a sound file, so the user knows why.
         const std::string read_as_sound =
@@ -428,10 +453,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                   "to look like a header, convert it to WAV, for example with SoX)"
                 : "";
         try {
-            if (raw)
-                ir.emplace(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding);
-            else
-                ir.emplace(resolved);
+            ir = raw ? reader.open_raw(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding)
+                     : reader.open(resolved);
         } catch (const std::exception& e) {
             std::error_code ec; // On failure absolute() returns an empty path.
             if (raw && std::filesystem::is_regular_file(resolved, ec))
@@ -439,8 +462,8 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
                                          "raw filter '" + path.ir.spelling + "': " + e.what() +
                                              " (raw filters are read as mono " +
                                              raw_encoding_name(raw_encoding) + ")");
-            // The file is there but libsndfile cannot read it (a codec its build
-            // lacks, for example): the path hint below would mislead. The code
+            // The file is there but the reader cannot read it (a codec its
+            // build lacks, for example): the path hint below would mislead. The code
             // stays missing-asset on purpose: codes are stable, and
             // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
@@ -504,7 +527,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
     return result;
 }
 
-Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
+Configuration decode_audio_filter(SoundFile& audio, std::size_t& budget,
                                   const SourceLocation& where) {
     const auto info = audio.info();
     Configuration cfg;
@@ -530,17 +553,23 @@ Configuration decode_audio_filter(AudioReader& audio, std::size_t& budget,
     return cfg;
 }
 
+Resolver::Sources Resolver::from(const SoundFiles& reader) {
+    Sources files;
+    files.open_audio = [&reader](const std::filesystem::path& p) -> std::unique_ptr<SoundFile> {
+        try {
+            return reader.open(p);
+        } catch (const std::exception&) {
+            return nullptr; // Bounded text validation distinguishes configs from damaged audio.
+        }
+    };
+    return files;
+}
+
 Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list, Sources files)
     : visitor_(std::move(visitor)), on_error_(std::move(on_error)), on_list_(std::move(on_list)),
       files_(std::move(files)) {
     if (!files_.open_audio)
-        files_.open_audio = [](const std::filesystem::path& p) -> std::unique_ptr<AudioReader> {
-            try {
-                return std::make_unique<AudioReader>(p);
-            } catch (const std::exception&) {
-                return nullptr; // Bounded text validation distinguishes configs from damaged audio.
-            }
-        };
+        throw std::invalid_argument("the configuration resolver needs a sound-file reader");
     if (!files_.read_text)
         files_.read_text = read_configuration_text;
     if (!files_.canonical)
@@ -641,17 +670,11 @@ bool Resolver::visit(const std::filesystem::path& path) {
 }
 } // namespace convolver::detail
 
-namespace convolver {
-Configuration load_configuration(const std::filesystem::path& path, int expected_rate,
-                                 std::size_t expected_inputs,
-                                 std::vector<std::filesystem::path>* source_paths) {
-    return load_configuration(path, ConfigurationSelection{expected_rate, expected_inputs, 0},
-                              source_paths);
-}
+namespace convolver::detail {
 Configuration load_configuration(const std::filesystem::path& path,
-                                 const ConfigurationSelection& selection,
+                                 const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
-                                 std::vector<std::filesystem::path>* raw_filters) {
+                                 std::vector<std::filesystem::path>* raw_filters, bool plugin) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
@@ -684,8 +707,8 @@ Configuration load_configuration(const std::filesystem::path& path,
                              selection))
             return false;
         auto cfg = detail::configuration_graph(parsed);
-        const auto decoded =
-            detail::decode_impulses(*leaf.document, cfg, budget, selection.raw_filter_encoding);
+        const auto decoded = detail::decode_impulses(*leaf.document, cfg, budget, files,
+                                                     selection.raw_filter_encoding);
         if (raw_filters) {
             for (const auto& ir : decoded)
                 if (ir.raw && std::find(raw_filters->begin(), raw_filters->end(), ir.resolved) ==
@@ -696,14 +719,16 @@ Configuration load_configuration(const std::filesystem::path& path,
         return true;
     };
     detail::Resolver resolver(
-        visit, {},
-        [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; });
+        visit, {}, [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; },
+        detail::Resolver::from(files));
     if (resolver.run(path) && selected) {
         if (source_paths)
             *source_paths = resolver.sources();
         return std::move(*selected);
     }
-    throw std::runtime_error(
-        detail::explain_no_match(path, list, candidates, selection, "the audio to be filtered"));
+    auto explanation = detail::explain_no_match(
+        path, list, candidates, selection,
+        plugin ? "the plug-in in its host" : "the audio to be filtered", plugin);
+    throw detail::NoMatch(explanation, list, std::move(candidates));
 }
-} // namespace convolver
+} // namespace convolver::detail

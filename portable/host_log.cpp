@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +13,7 @@
 #include <mutex>
 #include <string>
 #include <system_error>
+#include <vector>
 #ifdef __APPLE__
 #include <os/log.h>
 #include <stdlib.h> // getprogname
@@ -153,32 +155,56 @@ std::string rejected_line(const HostFilter& filter) {
     return r ? request_words(r->request) + r->message : std::string();
 }
 
-std::string settings_words(const HostSettings& s, bool equal_counts) {
-    char gain[32] = {};
-    std::snprintf(gain, sizeof gain, "gain %g dB", s.gain_db);
-    if (!equal_counts)
-        return std::string(gain) +
-               ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    char mix[32] = {};
-    std::snprintf(mix, sizeof mix, ", mix %g%% wet", 100 * s.mix);
-    return std::string(gain) + mix;
+std::string setting_text(double value, double low, double high) {
+    // Two significant digits for a value too small for one decimal.
+    int decimals = 1;
+    if (value != 0 && std::abs(value) < .05)
+        decimals = std::min(6, 1 - static_cast<int>(std::floor(std::log10(std::abs(value)))));
+    const auto text = [&](int places) {
+        char buffer[48] = {};
+        std::snprintf(buffer, sizeof buffer, "%.*f", places, value);
+        std::string out = buffer;
+        if (out.find('.') != std::string::npos) {
+            out.erase(out.find_last_not_of('0') + 1);
+            if (out.back() == '.')
+                out.pop_back();
+        }
+        return out == "-0" ? std::string("0") : out;
+    };
+    // A value near either end of the range keeps enough decimals not to read
+    // as the end itself (99.96% wet is not "100% wet").
+    auto out = text(decimals);
+    for (; decimals < 6; out = text(++decimals)) {
+        const double shown = std::strtod(out.c_str(), nullptr);
+        if (!((shown == low && value != low) || (shown == high && value != high)))
+            break;
+    }
+    return out;
 }
 
-std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,
-                         const HostSettings* settings) {
-    auto line = "Started at " + std::to_string(host.sample_rate) + " Hz, " +
-                ports(host.inputs, host.outputs) + ", blocks of up to " +
-                std::to_string(max_frames) + " frames. ";
-    const auto with_settings = [&](std::string text) {
-        if (settings)
-            text += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";
-        return text;
-    };
+std::string settings_words(const HostSettings& s, bool equal_counts) {
+    const auto gain = "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
+    if (!equal_counts)
+        return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
+    return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet";
+}
+
+std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {
+    // GarageBand runs effects with one channel on a mono track (jrp's first
+    // GarageBand run, 25 October 2026). Only a stereo filter is fixed by a
+    // stereo track.
+    if (failure.kind != HostFailureKind::channels || host.inputs != 1 || host.outputs != 1 ||
+        failure.inputs != 2 || failure.outputs != 2)
+        return {};
+    return " Hosts run an effect with one channel on a mono track (GarageBand does): put "
+           "Convolver on a stereo track instead.";
+}
+
+std::string playing_words(const HostFilter& filter, const HostLayout& host,
+                          const HostSettings& used) {
     // PLUG-10: with equal counts, Mix's dry share plays even when no filter
     // does, and Gain changes the input that passes with no filter loaded.
     const bool equal = host.inputs == host.outputs;
-    const HostSettings defaults;
-    const auto& used = settings ? *settings : defaults;
     const auto sound = [&](bool identity) {
         return equal ? unfiltered_sound(used, identity) : UnfilteredSound{true, false, {}};
     };
@@ -186,36 +212,43 @@ std::string started_line(const HostFilter& filter, const HostLayout& host, std::
         return s.unchanged ? std::string("unchanged") : "at " + s.level;
     };
     if (const auto& f = filter.failure(); f && f->silent) {
-        line += f->message;
+        auto line = f->message + mono_track_hint(*f, host);
         if (const auto s = sound(false); !s.silent) {
-            char mix[32] = {};
-            std::snprintf(mix, sizeof mix, "%g%%", 100 * std::clamp(used.mix, 0.0, 1.0));
-            line += std::string(" With Mix at ") + mix +
+            const auto mix = setting_text(100 * std::clamp(used.mix, 0.0, 1.0), 0, 100) + "%";
+            line += " With Mix at " + mix +
                     " wet, though, the dry signal still plays instead of silence: the input " +
                     dry_words(s) + ".";
         }
-        return with_settings(line);
+        return line;
     }
     if (const auto& c = filter.filter()) {
-        line += "Playing " + filter_words(*c) + ".";
+        auto line = "Playing " + filter_words(*c) + ".";
         if (!filter.notice().empty())
             line += " " + filter.notice();
-        return with_settings(line);
+        return line;
     }
     if (filter.failed()) {
         const auto s = sound(false);
-        return with_settings(line + (s.silent ? "Playing silence after a failed load."
-                                              : "Playing only the dry signal after a failed "
-                                                "load: the input " +
-                                                    dry_words(s) + "."));
+        return s.silent ? "Playing silence after a failed load."
+                        : "Playing only the dry signal after a failed load: the input " +
+                              dry_words(s) + ".";
     }
     if (!equal)
-        return with_settings(
-            line + "No filter, and inputs and outputs differ, so Convolver plays silence.");
+        return "No filter, and inputs and outputs differ, so Convolver plays silence.";
     const auto s = sound(true);
-    return with_settings(line + (s.unchanged ? std::string("No filter, so audio passes unchanged.")
-                                             : "No filter, so audio passes at " + s.level +
-                                                   ", set by Gain and Mix."));
+    return s.unchanged ? std::string("No filter, so audio passes unchanged.")
+                       : "No filter, so audio passes at " + s.level + ", set by Gain and Mix.";
+}
+
+std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,
+                         const HostSettings* settings) {
+    auto line = "Started at " + std::to_string(host.sample_rate) + " Hz, " +
+                ports(host.inputs, host.outputs) + ", blocks of up to " +
+                std::to_string(max_frames) + " frames. " +
+                playing_words(filter, host, settings ? *settings : HostSettings{});
+    if (settings)
+        line += " Settings: " + settings_words(*settings, host.inputs == host.outputs) + ".";
+    return line;
 }
 
 std::filesystem::path host_log_path() {
@@ -308,6 +341,66 @@ void host_log(const char* format, const std::string& message, bool problem) noex
         }
     } catch (...) { // Out of memory: the message is dropped.
         last_written.store(false, std::memory_order_relaxed);
+    }
+}
+std::string host_program_name() {
+    return program();
+}
+
+std::string host_log_recent(const std::string& format, std::size_t max_lines) {
+    try {
+        const auto path = host_log_path();
+        if (path.empty() || max_lines == 0)
+            return {};
+        std::ifstream in(path, std::ios::binary);
+        if (!in)
+            return {};
+        constexpr std::streamoff largest_read = 64 * 1024;
+        in.seekg(0, std::ios::end);
+        const auto size = static_cast<std::streamoff>(in.tellg());
+        const auto start = size > largest_read ? size - largest_read : 0;
+        in.seekg(start);
+        std::string text(static_cast<std::size_t>(size - start), '\0');
+        in.read(text.data(), static_cast<std::streamsize>(text.size()));
+        text.resize(static_cast<std::size_t>(in.gcount()));
+        // Every line names its format and process: "... Convolver <version>
+        // <format> in <program> (process <id>): <message>", or without " in
+        // <program>" where there is none.
+        const auto process = " (process " + std::to_string(process_id()) + "): ";
+        const auto mine = [&](const std::string& line) {
+            const auto at = line.find(process);
+            if (at == std::string::npos)
+                return false;
+            if (line.compare(at + process.size(), 9, "Session: ") == 0)
+                return true;
+            const auto named = " " + format;
+            const auto tag = line.find(named + " in ");
+            return (tag != std::string::npos && tag < at) ||
+                   (at >= named.size() &&
+                    line.compare(at - named.size(), named.size(), named) == 0);
+        };
+        std::vector<std::string> lines;
+        std::size_t begin = 0;
+        if (start > 0) { // Skip the partial first line.
+            const auto newline = text.find('\n');
+            begin = newline == std::string::npos ? text.size() : newline + 1;
+        }
+        while (begin < text.size()) {
+            auto end = text.find('\n', begin);
+            if (end == std::string::npos)
+                end = text.size();
+            auto line = text.substr(begin, end - begin);
+            if (mine(line))
+                lines.push_back(std::move(line));
+            begin = end + 1;
+        }
+        const auto first = lines.size() > max_lines ? lines.size() - max_lines : 0;
+        std::string recent;
+        for (auto i = first; i < lines.size(); ++i)
+            recent += lines[i] + "\n";
+        return recent;
+    } catch (...) { // Out of memory, or the file changed while it was read.
+        return {};
     }
 }
 } // namespace convolver

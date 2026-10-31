@@ -37,10 +37,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
             return 0;
     }
     try {
-        convolver::AudioReader reader(scratch());
+        const auto reader = convolver::detail::libsndfile_files().open(scratch());
         std::size_t budget = 0;
-        const auto cfg = convolver::detail::decode_audio_filter(reader, budget, {scratch(), 0, 0});
-        if (cfg.paths.size() != reader.info().channels ||
+        const auto cfg = convolver::detail::decode_audio_filter(*reader, budget, {scratch(), 0, 0});
+        if (cfg.paths.size() != reader->info().channels ||
             budget > convolver::detail::max_decoded_samples)
             std::abort();
     } catch (const std::runtime_error&) {

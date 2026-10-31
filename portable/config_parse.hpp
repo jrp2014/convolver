@@ -3,6 +3,7 @@
 // the loader (config.cpp) and inspection (inspection.cpp). Not installed.
 #pragma once
 #include "convolver/io.hpp"
+#include "sound_files.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -12,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace convolver::detail {
@@ -141,9 +143,23 @@ struct SelectionCandidate {
 // A self-contained explanation of why no candidate matches `wanted`, naming each
 // difference and what to change. `subject` says where the wanted properties came
 // from, for example "the input audio". `list` is true when `filter` is a list.
+// `plugin`: `wanted` is a plug-in host's rate and channels, so the advice
+// names the host's settings and loading the file in Convolver, not
+// command-line options.
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& wanted, std::string_view subject);
+                             const ConfigurationSelection& wanted, std::string_view subject,
+                             bool plugin = false);
+// What load_configuration() throws when no filter in the file matches the
+// selection: the explanation, and what it was worked out from, so a plug-in
+// can say which rate or channels the file was made for.
+struct NoMatch : std::runtime_error {
+    NoMatch(const std::string& explanation, bool in_list, std::vector<SelectionCandidate> checked)
+        : std::runtime_error(explanation), list(in_list),
+          candidates(std::make_shared<const std::vector<SelectionCandidate>>(std::move(checked))) {}
+    bool list = false; // The file is a configuration list.
+    std::shared_ptr<const std::vector<SelectionCandidate>> candidates; // In entry order.
+};
 
 struct DecodedIr {
     std::filesystem::path resolved;
@@ -155,18 +171,19 @@ struct DecodedIr {
 bool raw_filter_name(const std::filesystem::path&);
 // A filter with such a name is a headerless mono file at the configuration's
 // sample rate (little-endian float32 by default, as DRC and BruteFIR write
-// them), unless libsndfile recognises its content as a sound file
+// them), unless the reader recognises its content as a sound file
 // (sound_file_header: a WAV or AU named .pcm still reads through its header).
 // Opens regular files to decide; a missing file or a named pipe counts as raw.
-bool raw_filter(const std::filesystem::path& resolved);
+bool raw_filter(const std::filesystem::path& resolved, const SoundFiles&);
 // Decode every path's selected IR channel into cfg (from configuration_graph).
 // Each file is opened and decoded once, however many paths name it (PERF-6).
 // budget counts decoded samples across one resolution operation, charging
 // every path as if its file were decoded for it alone.
 std::vector<DecodedIr> decode_impulses(const ParsedDocument&, Configuration& cfg,
-                                       std::size_t& budget, RawEncoding raw_encoding = {});
+                                       std::size_t& budget, const SoundFiles&,
+                                       RawEncoding raw_encoding = {});
 // A sound file used directly: diagonal routing, decoded coefficients.
-Configuration decode_audio_filter(AudioReader&, std::size_t& budget, const SourceLocation&);
+Configuration decode_audio_filter(SoundFile&, std::size_t& budget, const SourceLocation&);
 
 // Walks a configuration, sound file or (nested) list in entry order, with the
 // historical limits and cycle detection, and hands each leaf to a visitor.
@@ -176,7 +193,7 @@ class Resolver {
         const std::filesystem::path& path;
         const IncludeChain& chain;
         const ParsedDocument* document; // Null for a sound file.
-        AudioReader* audio;             // Null for configuration text.
+        SoundFile* audio;               // Null for configuration text.
     };
     // Return true to stop traversal (first match found).
     using Visitor = std::function<bool(const Leaf&)>;
@@ -185,15 +202,19 @@ class Resolver {
     // Lists, before their entries are visited.
     using ListObserver = std::function<void(const ParsedDocument&, const IncludeChain&)>;
 
-    // Replaceable file access, for bounded in-memory fuzzing. Empty members use
-    // the filesystem, libsndfile and read_configuration_text.
+    // Replaceable file access, for bounded in-memory fuzzing. open_audio is
+    // required: it returns null for a file that is not a sound file (from()
+    // makes one for a reader). Other empty members use the filesystem and
+    // read_configuration_text.
     struct Sources {
-        std::function<std::unique_ptr<AudioReader>(const std::filesystem::path&)> open_audio;
+        std::function<std::unique_ptr<SoundFile>(const std::filesystem::path&)> open_audio;
         std::function<std::string(const std::filesystem::path&)> read_text;
         std::function<std::filesystem::path(const std::filesystem::path&)> canonical;
         FileExists exists;
     };
-    explicit Resolver(Visitor, ErrorHandler = {}, ListObserver = {}, Sources = {});
+    // Files read with `reader`, otherwise from the filesystem.
+    static Sources from(const SoundFiles& reader);
+    explicit Resolver(Visitor, ErrorHandler, ListObserver, Sources);
     // Returns true if the visitor stopped traversal.
     bool run(const std::filesystem::path&);
     // Every configuration, list and referenced IR visited, canonical, in order.
