@@ -30,7 +30,7 @@ include("${PROJECT_SOURCE_DIR}/cmake/ConvolverSdkDescription.cmake")
 convolver_sdk_description("AudioUnitSDK" "${CONVOLVER_AU_SDK}")
 
 # The adapter itself, shared by the component and its tests.
-add_library(convolver_au_adapter STATIC effect.cpp)
+add_library(convolver_au_adapter STATIC effect.cpp effect_state.cpp effect_properties.cpp)
 target_include_directories(convolver_au_adapter PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
 # Filter files chosen in the window are read with macOS's AudioToolbox, not

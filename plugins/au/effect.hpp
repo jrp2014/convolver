@@ -8,6 +8,7 @@
 #include "host_report.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -35,6 +36,10 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 // plugins/identities.json; never change them.
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
+// The global parameters in the order GetParameterList gives them, which
+// RestoreState also notifies.
+inline constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
+                                                                     status_parameter};
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
@@ -134,11 +139,16 @@ class Effect final : public ausdk::AUBase {
     HostLayout layout();
     std::optional<HostLayout> known_layout();
     // Records a load that failed before it reached HostFilter (unreadable or
-    // foreign state), as HostFilter::load records its own rejections.
-    // Returns the explanation of faults counted before it (observe_faults()),
-    // to log before the rejection.
-    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {},
-                       const Configuration* carried = nullptr);
+    // foreign state, or a file that could not be read), as HostFilter::load
+    // records its own rejections; then, outside the lock, logs the faults
+    // counted before it (observe_faults()) and the refusal, and notifies.
+    void reject(HostFailureKind, const std::string& why, const HostRequest& = {},
+                const Configuration* carried = nullptr);
+    // Under `control_`, after a request failed: if it was the first load to
+    // fail (`was_failed` is filter_.failed() from before it), the unit plays
+    // silence rather than the unfiltered input; uninitialized, a failed
+    // filter's tail is 0.
+    void silence_failed_first_load(bool was_failed) noexcept;
     // Gain and Mix as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
     // The common step of RestoreState and a chosen file: loads `next`, then
