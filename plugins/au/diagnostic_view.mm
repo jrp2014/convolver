@@ -67,6 +67,16 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
                                                        options:@{}] ];
     row.headIndent = label_column;
     row.paragraphSpacing = 3;
+    NSDictionary* name_style = @{
+        NSFontAttributeName : font,
+        NSForegroundColorAttributeName : [NSColor secondaryLabelColor],
+        NSParagraphStyleAttributeName : row
+    };
+    NSDictionary* value_style = @{
+        NSFontAttributeName : font,
+        NSForegroundColorAttributeName : [NSColor labelColor],
+        NSParagraphStyleAttributeName : row
+    };
     for (NSString* line in [details componentsSeparatedByString:@"\n"]) {
         if (line.length == 0)
             continue;
@@ -77,20 +87,10 @@ NSAttributedString* styled(NSString* explanation, NSString* details) {
             colon.location == NSNotFound ? line : [line substringFromIndex:NSMaxRange(colon)];
         [text appendAttributedString:[[NSAttributedString alloc]
                                          initWithString:[name stringByAppendingString:@"\t"]
-                                             attributes:@{
-                                                 NSFontAttributeName : font,
-                                                 NSForegroundColorAttributeName :
-                                                     [NSColor secondaryLabelColor],
-                                                 NSParagraphStyleAttributeName : row
-                                             }]];
+                                             attributes:name_style]];
         [text appendAttributedString:[[NSAttributedString alloc]
                                          initWithString:[value stringByAppendingString:@"\n"]
-                                             attributes:@{
-                                                 NSFontAttributeName : font,
-                                                 NSForegroundColorAttributeName :
-                                                     [NSColor labelColor],
-                                                 NSParagraphStyleAttributeName : row
-                                             }]];
+                                             attributes:value_style]];
     }
     return text;
 }
