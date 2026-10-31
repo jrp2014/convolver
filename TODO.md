@@ -762,8 +762,8 @@ so the preset file path is not needed).
 An acceptance gate for the first preview (jrp's review of `6920a45`, 31
 October 2026), not an optimisation item. Every adapter except LV2 reads and
 prepares a filter on the thread that asks for it: VST3's `setState`, the
-Audio Unit's `RestoreState` and, in PR #84, the Audio Unit window's
-Choose Filter property call. Cached reports keep other readers from waiting,
+Audio Unit's `RestoreState` and, since PR #84 (merged 31 October 2026), the
+Audio Unit window's Choose Filter property call. Cached reports keep other readers from waiting,
 but not the calling thread, which may be the host's interface thread.
 Measure, on the PERF-3 supported workloads, how long that thread is held
 and whether audio drops out while a long filter loads, replaces another and
