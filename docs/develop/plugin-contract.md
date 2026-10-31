@@ -178,6 +178,56 @@ format.
   are ignored, and the value `AUBase::SaveState` writes with the other
   parameters is ignored on restore. When the log file cannot be written
   (`host_log_written()` is false), the text says so instead of pointing to it.
+- **The editor report** (PLUG-9, [`host_report.hpp`](../../portable/host_report.hpp)):
+  for a window and its Copy diagnostics, `host_report()` gathers the status
+  and its line (`host_status()`), the full explanation of what plays, why
+  and what to change (the failure's message, or `playing_words()`, the same
+  words the log's start line uses, with any fault explanation), and labelled
+  details: host, filter, settings, latency and tail, `execution_line()` and
+  the log. `report_fields()` gives it as named text values for a format's
+  transport, `report_text()` as plain text, and `diagnostics_text()` adds
+  this instance's recent log lines (`host_log_recent()`, at most the last
+  64 KiB of the file). Built on the control side; reading the log happens
+  only when diagnostics are asked for. Audio Unit (AU-6): global custom
+  properties 64000 (the fields as a `CFDictionary` of `CFString`s) and 64001
+  (the diagnostics text as a `CFString`), read-only, values released by the
+  caller, with a property-change notification for 64000 wherever the Status
+  parameter's event is sent. They are internal between the unit and its own
+  window, which ship together, so they are not permanent identities.
+  `kAudioUnitProperty_CocoaUI` names the window's factory class in this
+  image's own component bundle; the factory and view class names carry the
+  version. Unlike the editor plan's rule that the window copies reports
+  pushed to it ([threads](../project/plans/2026-10-24-plugin-editor.md#threads),
+  rule 2), the AU window reads 64000 itself, as Audio Unit views do: twice a
+  second while its window is on screen, on the main thread. A read builds
+  the report under the unit's control lock when the lock is free, and keeps
+  a copy; while a load holds the lock (a state restore or a chosen file,
+  preparing its filter), a read returns that copy at once instead of
+  waiting; the window's next timed read shows the result. Only a read
+  before any other waits. This keeps the window prompt while the host
+  restores a state on another thread; a file chosen in the window is
+  loaded on the main thread itself, so the window waits for it. Property 64002 (read and write, a `CFString`)
+  loads a filter file chosen in the window: the unit reads it with
+  `read_filter_file()` ([`filter_file.hpp`](../../portable/filter_file.hpp),
+  the step `convolver-preset` uses) and macOS's AudioToolbox rather than
+  libsndfile ([`audio_toolbox.cpp`](../../portable/audio_toolbox.cpp)), for
+  its current rate and channels, then
+  installs it through the same `HostFilter::load` as a state restore, with
+  `HostRequest{HostFilterSource::file, path}`, so the failure rules,
+  replacement and saving are unchanged and the saved state is the one the
+  tool writes. Setting it returns an error when the file was not loaded;
+  reading it gives the path of this session's accepted file load. The file
+  is read outside the control lock, on the thread that set the property
+  (the host's main thread for the window); preparing the filter runs under
+  the lock there, as a restore does. A file load, accepted or refused,
+  also sends a `ClassInfo` change notification, since the saved state
+  changes either way, for hosts that mark the project changed from it. An
+  accepted file also becomes the present preset, a user preset (number -1)
+  named after the file, with a `PresentPreset` change notification:
+  GarageBand 10.4.14 marks the project changed from that, not from
+  `ClassInfo` alone. While faults
+  go on, a read takes them in (and logs them) at most every 10 seconds, once
+  Render's Fault is explained.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
   load (`loaded_line()`), start (`started_line()`: rate, channels, block size
@@ -185,7 +235,10 @@ format.
   and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the
-  one it wrote last, as hosts restart plug-ins often. Adapters write the file
+  one it wrote last, as hosts restart plug-ins often; the Audio Unit also
+  compares failure lines without their request number, as GarageBand
+  restores one preset several times in a row (accepted loads are always
+  logged). Adapters write the file
   outside their control lock. On macOS the lines also go to the unified log.
   Control thread only. Loads and rejections are numbered by request
   (`loaded_line()`, `rejected_line()`: `Request 3: ...`), every line names the
@@ -467,6 +520,26 @@ How each adapter meets the contract where its format differs:
   marked silent only once the tail has decayed. Rejections are returned to the
   host as errors, shown by the Status parameter and written to the Convolver
   log and the unified log.
+- **Audio Unit window in a host** (the evidence is in TODO AU-6); the VST3
+  window (VST3-11) starts from these:
+  - The host may run the plug-in in a process of its own (GarageBand:
+    `AUHostingServiceXPC_arrow`). The view's window is then an
+    `NSServiceViewControllerWindow` of that process, shown at a floating
+    level, while the host keeps the keyboard. A host that runs the
+    plug-in in its own process puts the view in one of its own windows
+    instead, and the sheet then attaches there.
+  - A file dialog is a sheet on the window that holds the view, begun
+    asynchronously with `beginSheetModalForWindow:completionHandler:` as
+    Apple's
+    [file panel guide](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/UsingtheOpenandSavePanels/UsingtheOpenandSavePanels.html)
+    describes. There is no separate dialog window: in an out-of-process
+    host it cannot become key. Never `runModal`.
+  - An accepted file changes the saved state without a parameter change,
+    and a `ClassInfo` notification alone does not make GarageBand mark
+    the project changed. The file therefore also becomes the present
+    preset (a user preset, number -1, named after the file), with a
+    `PresentPreset` notification. A refused file keeps the filter, so it
+    sends only `ClassInfo`.
 - **LV2:** ports are fixed, so each channel layout is its own plug-in
   ([identities](plugin-identities.md#channel-layouts)). Bypass is the `enabled`
   port, which the host saves, so the adapter's state does not record bypass and

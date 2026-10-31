@@ -65,13 +65,39 @@ struct UnfilteredSound {
     std::string level;
 };
 UnfilteredSound unfiltered_sound(const HostSettings&, bool identity);
+// A setting's value as people read it, without its unit: one decimal at
+// most ("-76", "56.1", not a host slider's "-75.967" and "56.1413"), two
+// significant digits for a value too small for that ("-0.01"), and as many
+// decimals as it takes (up to six) not to read as `low` or `high` when it is
+// neither ("99.96", not "100"). The window's sliders show the same text.
+std::string setting_text(double value, double low, double high);
 // PLUG-10: the settings in words, such as "gain 0 dB, mix 100% wet".
 // `equal_counts` false says the mix does not apply.
 std::string settings_words(const HostSettings&, bool equal_counts);
+// What plays under `host` and why, in full: the silent failure (with what
+// Mix's dry share still lets through), the filter with any speaker notice,
+// or what passes with no filter. The part of started_line() after the
+// host's rate, channels and block size; the editor report (PLUG-9) uses it
+// too, so the window and the log say the same.
+std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&);
+// " Hosts run an effect with one channel on a mono track ...": for a stereo
+// filter (2 in, 2 out) refused by a host running the plug-in with 1 in and
+// 1 out, the usual way to meet it; empty otherwise. playing_words() ends a
+// silent failure with it.
+std::string mono_track_hint(const HostFailure&, const HostLayout& host);
 // After the host starts (activates or initializes) the instance: the rate,
 // channels and block size, then what plays and why (the failure or speaker
 // notice in full), and the settings in use when the adapter has them
 // (settings_words(); PLUG-10).
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
                          const HostSettings* settings = nullptr);
+// PLUG-9: the host's program name where the platform gives it (empty
+// otherwise), as the log's lines name it.
+std::string host_program_name();
+// PLUG-9, for Copy diagnostics: the last lines (at most `max_lines`) that
+// this process wrote to the Convolver log for `format` (an adapter's tag,
+// such as "Audio Unit #2"), with this process's session line, read from at
+// most the last 64 KiB of the file. Empty when the file cannot be read.
+// Control or UI thread; never from audio processing.
+std::string host_log_recent(const std::string& format, std::size_t max_lines = 40);
 } // namespace convolver

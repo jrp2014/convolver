@@ -1191,8 +1191,10 @@ void status_lines() {
         {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
         {HostFailureKind::state_newer, "saved by a newer Convolver"},
         {HostFailureKind::preparation, "could not be prepared"},
-        {HostFailureKind::sample_rate, "the filter is for 0 Hz"},
-        {HostFailureKind::channels, "the filter has 0 in, 0 out"},
+        // Rejected with no filter carried: no "0 Hz" or "0 in, 0 out" (jrp's
+        // GarageBand run); the host is unknown here.
+        {HostFailureKind::sample_rate, "the filter is for another rate."},
+        {HostFailureKind::channels, "the filter has other channel counts."},
     }};
     for (const auto& [kind, part] : kinds) {
         f.reject(kind, "why");

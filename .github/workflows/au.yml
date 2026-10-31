@@ -76,7 +76,8 @@ jobs:
           max-size: 1G
           save: ${{ github.event_name != 'pull_request' }}
       # AUTO selects Accelerate for plug-in builds on macOS; libsndfile is only
-      # for the CLI and the tests' fixtures, never linked into the component.
+      # for the CLI and the tests, never linked into the component, which reads
+      # filter files with AudioToolbox (au.bundle checks its libraries).
       - name: Configure
         run: >-
           cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Release -DCONVOLVER_BUILD_AU=ON
@@ -97,8 +98,12 @@ jobs:
           # Make the component registrar rescan, as after an installer.
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           auval -a | grep -i conv || true
+      # AU-6: auval also lists and loads Convolver's window.
       - name: auval (strict)
-        run: auval -strict -v aufx Conv CONV
+        shell: bash  # With pipefail, so auval's own failure still fails the step.
+        run: |
+          auval -strict -v aufx Conv CONV | tee auval.txt
+          grep -q "Cocoa Views Available: 1" auval.txt
       # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
       - name: Explain a failure that may come from a new upstream release
         if: failure()
@@ -121,6 +126,9 @@ jobs:
   # tests with ASan and UBSan (jrp's review of 0.5.5: they were only linked
   # with the runtimes). Only the AU tests run here: the core's sanitizer runs
   # are in the native workflow, and auval cannot load an instrumented bundle.
+  # This job also builds the fallbacks, libsndfile for the window's filter
+  # files and FFTW for the FFT, so they keep working; the Release job above
+  # builds the defaults (AudioToolbox and Accelerate) that packages use.
   au-sanitizers:
     needs: scope
     if: needs.scope.outputs.build == 'true'
@@ -140,7 +148,7 @@ jobs:
           python scripts/release/sources.py --latest --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources" audiounitsdk
       - name: Tools and libraries
-        run: brew install libsndfile
+        run: brew install libsndfile fftw
       - name: Compiler cache
         uses: hendrikmuhs/ccache-action@v1.2.24
         with:
@@ -151,7 +159,8 @@ jobs:
         run: >-
           cmake -S . -B build-au -DCMAKE_BUILD_TYPE=Debug -DCONVOLVER_SANITIZERS=ON
           -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"
-          -DCONVOLVER_LEGACY_TESTS=OFF
+          -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_AU_FILE_READER=LIBSNDFILE
+          -DCONVOLVER_FFT_BACKEND=FFTW
       # Only what the au.* tests run (CI-9).
       - name: Build
         run: cmake --build build-au --target convolver_au_suite

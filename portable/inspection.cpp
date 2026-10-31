@@ -209,8 +209,9 @@ class Inspector {
                 verify(result, std::move(cfg));
             } else {
                 auto cfg = detail::configuration_graph(l.document->configuration);
-                const auto decoded = detail::decode_impulses(*l.document, cfg, budget_,
-                                                             options_.raw_filter_encoding);
+                const auto decoded =
+                    detail::decode_impulses(*l.document, cfg, budget_, detail::libsndfile_files(),
+                                            options_.raw_filter_encoding);
                 for (std::size_t i = 0; i < decoded.size(); ++i) {
                     auto& f = result.paths[i];
                     f.resolved = decoded[i].resolved;
@@ -246,7 +247,8 @@ class Inspector {
                 report_.traversal.push_back(
                     {doc.source, chain(c), "list", std::nullopt, std::nullopt, std::nullopt});
                 portability(doc, c);
-            });
+            },
+            detail::Resolver::from(detail::libsndfile_files()));
         bool stopped = false;
         try {
             stopped = resolver.run(report_.path);
@@ -383,7 +385,8 @@ class Inspector {
     static bool raw_filter_reference(const std::filesystem::path& owner,
                                      const detail::ParsedReference& ref) {
         try {
-            return detail::raw_filter(detail::resolve_reference(owner, ref));
+            return detail::raw_filter(detail::resolve_reference(owner, ref),
+                                      detail::libsndfile_files());
         } catch (const ConfigurationError&) {
             return false; // A nonportable path is reported on its own.
         }

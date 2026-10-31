@@ -35,6 +35,7 @@ PATHSPECS = (
     'tests/*.hpp',
     'tests/*.cpp',
     'tests/*.h',
+    'tests/*.mm',
     ':!:portable/third_party/',
     ':!:tests/regression/',
 )

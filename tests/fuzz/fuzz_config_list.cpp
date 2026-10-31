@@ -22,9 +22,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         return std::string(s.begin(), s.end());
     };
     Resolver::Sources sources;
-    sources.open_audio = [](const std::filesystem::path&) {
-        return std::unique_ptr<convolver::AudioReader>();
-    };
+    sources.open_audio = [](const std::filesystem::path&) { return std::unique_ptr<SoundFile>(); };
     sources.read_text = [&](const std::filesystem::path& p) {
         const auto it = files.find(name(p));
         if (it == files.end())

@@ -137,6 +137,17 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   selection, routes, delays and tail, and the `portable-paths` warnings, against
   the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
+- `native.filter_file`: a filter file chosen in a plug-in and refused, through
+  `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
+  use them. The short status text gives the refused file's own channels
+  ("the filter has 1 in, 1 out, the plug-in 2 in, 2 out") or rate, never
+  "0 in, 0 out" or "0 Hz", also when no filter was carried. A list's status
+  names the host's channels or rate rather than one entry's, and is refused
+  for the rate only when no entry has the host's rate. The full explanation
+  advises on the host's settings and loading the file in Convolver, with no
+  command-line options and no window (the LV2 plug-in has none), for a mono
+  WAV, a 48 kHz WAV, a 2-in 6-out `.cfg` and a list; the command line keeps
+  `--output-channels` advice.
 - `native.limits`: every resource limit accepted at its value and rejected just
   beyond it, using the production constants: 1 MiB per text file, 16 nesting
   levels, 4096 list visits, 16 MiB of configuration text per resolution (shared
@@ -145,6 +156,19 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   without decoding; a file named by two paths counts twice, although it is
   decoded once), 256 diagnostics plus a truncation marker, and 64 MiB of host
   state.
+- `native.audio_toolbox` (macOS only, as the reader is): the Audio Unit's
+  filter-file reader, macOS's AudioToolbox, against libsndfile's. WAV (16, 24 and 32-bit
+  integer, float and double), AIFF, CAF, W64, RF64 and (when libsndfile has it) FLAC filters of three
+  channels, a `.cfg` naming a WAV, a headerless `.pcm` and a WAV named
+  `.pcm`, and a configuration list must load to the same configuration from
+  both, sample for sample (the test prints the largest difference, in units
+  of the last place; 32-bit integers may differ by one); a missing,
+  truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
+  a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
+  `.pcm` chosen directly (starting like an MPEG frame) must be refused with
+  the same diagnostic code by both. A WAV whose header claims 800 kHz,
+  which the reader opens and then refuses, is refused 20 times without
+  leaving a file descriptor open (counted in `/dev/fd`).
 - `fuzz.replay.config_text`, `fuzz.replay.config_list`, `fuzz.replay.host_state`,
   `fuzz.replay.ir_file`: every committed [fuzz seed and regression input](../../tests/fuzz/README.md)
   run once through its harness on every compiler, without libFuzzer.
@@ -175,6 +199,14 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   ramps sample by sample; clamping; the mix with unequal counts; and the
   log's settings words.
   The audio thread is checked for allocation throughout.
+- `native.host_report`: the editor report (PLUG-9), one case per state a
+  window shows (no filter, before and after the host starts; Gain −20 dB
+  with no filter; a stereo filter on a mono track; a wrong rate; a failed
+  first load at Mix 50%; a refused replacement; playing; not checked yet; a
+  fault), checking the status, the explanation's wording and what it must
+  not say, the details, the fields and the plain text; and the Copy
+  diagnostics text, which keeps only this process's lines for the instance
+  from a log written by several.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state is still written as version 1), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
@@ -517,7 +549,7 @@ compatibility with every DAW; see [host testing](host-testing.md).
 
 ### Audio Unit tests
 
-Three CTest tests run when the adapter is built (label `au`):
+Four CTest tests run when the adapter is built (label `au`):
 
 - `au.harness`: the PLUG-2 comparisons through the Audio Unit API, with
   filters loaded as `.aupreset` dictionaries and latency and tail converted
@@ -533,15 +565,54 @@ Three CTest tests run when the adapter is built (label `au`):
   them with `ClassInfo`, including a preset without settings, malformed
   parameter data and a rejected preset, and the Status text and start line
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
+- `au.editor`: the window (AU-6). The report and diagnostics properties
+  (types, read-only, change notifications) for a stereo preset on a mono
+  track (and a preset restored again and again, whose identical failure is
+  logged once), then the view the factory makes, attached to an off-screen
+  window: its size fitted to the text whatever size the host offers, the
+  buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
+  setting its parameter, a host change moving the slider), its status and
+  text before and after the fix, Copy diagnostics (onto a
+  private pasteboard), the accessibility names (AppKit sets the buttons'
+  roles itself and need not report them on a runner), and that a closed
+  window stops reading the unit. Then filter files: the Choose Filter
+  button is shown and the window accepts dropped file URLs (neither the
+  file dialog nor a drag is driven: a headless runner has no user to answer
+  them), then the view's load step, which both use: a stereo WAV plays, the
+  details and the load property name it, and the saved state equals
+  `filter_file_state()`'s with the same reader; the accepted file sends
+  `ClassInfo` and `PresentPreset` notifications and becomes the present
+  preset, whose name the saved state carries and a restore in another unit
+  brings back; a mono WAV and a missing file are refused with the file
+  named, the stereo filter still playing and saved and the preset name
+  kept; on an empty unit a refused first file leaves it silent. The
+  dialog's answer is driven in two steps (`startChoosing`,
+  `finishChoosing:URL:`), without a dialog or the mouse: only the pending
+  request loads, once, while the view is in an open window; a request
+  replaced by a newer one, a cancelled dialog, and an answer arriving after
+  the host closed the window (keeping the view in it) load nothing. Then
+  responsiveness, without timing: a restore on another thread is held open
+  while it holds the control lock (the adapter's `load_started_for_tests`
+  hook, null in the component), and a report read must return within 10 s
+  with the last report ("No filter"); once the load is released the report
+  says Playing. A file chosen in the window is read on the main thread, so
+  this does not cover it. Then faults: invalid input rendered, the
+  report says Fault and keeps Render's Fault value, and repeated reads, as an
+  open window makes, log the faults once. The AU workflow's `auval -strict`
+  step also requires `Cocoa Views Available: 1`.
 - `au.bundle`: the bundle's codes and version against the
   [identity registry](plugin-identities.md), a single exported symbol
-  (`ConvolverAUFactory`), the licence files and the signature.
+  (`ConvolverAUFactory`), only macOS's own libraries linked (`otool -L`; a
+  sanitizer build's runtime aside; a build with a fallback library only
+  lists them), the licence files and the signature.
 
 The tests register the unit inside the test process with
 `AudioComponentRegister`, so they need no installation. The
 [Audio Unit workflow](../../.github/workflows/au.yml) runs them on macOS, then
 installs the component for the runner's user and runs `auval -strict`; its
-`au-sanitizers` job runs them again with ASan and UBSan. Named
+`au-sanitizers` job runs them again with ASan and UBSan, built with the
+fallbacks (`CONVOLVER_AU_FILE_READER=LIBSNDFILE`, `CONVOLVER_FFT_BACKEND=FFTW`)
+so that they keep working. Named
 host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 

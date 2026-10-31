@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "effect.hpp"
 #include "convolver_sdk.hpp"
+#include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
 #include <AudioToolbox/AudioUnitUtilities.h>
@@ -9,17 +10,18 @@
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <dlfcn.h>
 #include <exception>
+#include <filesystem>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace convolver::au {
 namespace {
 // The Status parameter's values, in HostStatus order.
-constexpr std::array<const char*, 5> status_names{"Playing", "No filter", "Load failed",
-                                                  "Not checked yet", "Fault"};
-static_assert(static_cast<std::size_t>(HostStatus::fault) == status_names.size() - 1);
+constexpr auto& status_names = host_status_names;
 constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
                                                               status_parameter};
 
@@ -91,6 +93,60 @@ std::string hz(double rate) {
     return std::to_string(static_cast<long long>(rate));
 }
 
+// UTF-8 text as a CFString the caller releases; null if out of memory.
+CFStringRef cf_string(const std::string& text) {
+    return CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(text.data()),
+                                   static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
+}
+
+// A path from the window as the file system spells it; empty if it has none.
+std::string file_path(CFStringRef text) {
+    const auto most = CFStringGetMaximumSizeOfFileSystemRepresentation(text);
+    if (most <= 0)
+        return {};
+    std::string out(static_cast<std::size_t>(most), '\0');
+    if (!CFStringGetFileSystemRepresentation(text, out.data(), most))
+        return {};
+    out.resize(std::strlen(out.c_str()));
+    return out;
+}
+
+// AU-6: the component bundle that holds the window's classes: the bundle of
+// this very image, because with two Convolver builds loaded in one host the
+// shared identifier may name the other one, whose classes have other names.
+// Not found when the unit was registered in-process without its bundle (the
+// AU tests). Worked out once and kept for the life of the process.
+CFBundleRef own_bundle() {
+    static const int anchor = 0;
+    Dl_info info{};
+    if (!dladdr(&anchor, &info) || !info.dli_fname)
+        return nullptr;
+    // The executable is BUNDLE/Contents/MacOS/NAME.
+    auto url = CFURLCreateFromFileSystemRepresentation(
+        nullptr, reinterpret_cast<const UInt8*>(info.dli_fname),
+        static_cast<CFIndex>(std::strlen(info.dli_fname)), false);
+    for (int level = 0; level < 3 && url; ++level) {
+        const auto up = CFURLCreateCopyDeletingLastPathComponent(nullptr, url);
+        CFRelease(url);
+        url = up;
+    }
+    if (!url)
+        return nullptr;
+    auto bundle = CFBundleCreate(nullptr, url);
+    CFRelease(url);
+    const auto id = bundle ? CFBundleGetIdentifier(bundle) : nullptr;
+    if (bundle &&
+        (!id || CFStringCompare(id, CFSTR(CONVOLVER_AU_BUNDLE_ID), 0) != kCFCompareEqualTo)) {
+        CFRelease(bundle);
+        bundle = nullptr;
+    }
+    return bundle;
+}
+CFBundleRef view_bundle() {
+    static const CFBundleRef bundle = own_bundle();
+    return bundle;
+}
+
 bool same(const HostLayout& a, const HostLayout& b) {
     return a.sample_rate == b.sample_rate && a.inputs == b.inputs && a.outputs == b.outputs;
 }
@@ -119,6 +175,15 @@ std::string foreign(CFDictionaryRef dict, const AudioComponentDescription& desc)
                "convolver-preset.";
     return {};
 }
+// A numbered line without its "Request 3: " prefix; any other line whole.
+std::string_view unnumbered(std::string_view line) {
+    constexpr std::string_view prefix = "Request ";
+    if (line.substr(0, prefix.size()) != prefix)
+        return line;
+    const auto end = line.find(": ", prefix.size());
+    return end == std::string_view::npos ? line : line.substr(end + 2);
+}
+
 } // namespace
 
 Effect::Effect(AudioComponentInstance instance)
@@ -157,7 +222,13 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
 void Effect::log(const std::string& message, bool problem) noexcept {
     try {
         std::lock_guard lock(logging_);
-        if (message.empty() || message == logged_)
+        // The same line again is left out. A problem is left out even under
+        // a new request number: GarageBand restored one preset five times in
+        // a second on a mono track, and five identical failures pushed the
+        // useful lines out of Copy diagnostics (jrp's run of AU-6). An
+        // accepted load is always logged, so each reload has its line.
+        if (message.empty() || message == logged_ ||
+            (problem && unnumbered(message) == unnumbered(logged_)))
             return;
         host_log(tag_.c_str(), message, problem);
         logged_ = message;
@@ -225,6 +296,76 @@ void Effect::notify_status() noexcept {
     event.mArgument.mParameter = {GetComponentInstance(), status_parameter, kAudioUnitScope_Global,
                                   0};
     AUEventListenerNotify(nullptr, nullptr, &event);
+    // AU-6: Convolver's window rereads the report.
+    PropertyChanged(report_property, kAudioUnitScope_Global, 0);
+}
+
+HostReport Effect::report_locked(std::string& faults) {
+    // As for the Status text: faults Render signalled are explained here,
+    // and Gain or Mix may have changed on another thread. Only an update
+    // that has observed new faults rewrites the Status value, which Render
+    // may have just set to Fault (refresh_status_text). A Fault Render wrote
+    // that is not explained yet is taken in at once; faults that go on after
+    // it at most every report_fault_interval, so an open window does not log
+    // a line twice a second (the independent review).
+    const auto now = std::chrono::steady_clock::now();
+    const bool unexplained = status_.status != HostStatus::fault &&
+                             Globals()->GetParameter(status_parameter) ==
+                                 static_cast<AudioUnitParameterValue>(HostStatus::fault);
+    if (unexplained || now - report_faults_at_ >= report_fault_interval) {
+        faults = observe_faults();
+        report_faults_at_ = now;
+    }
+    if (faults.empty())
+        refresh_status_text();
+    else
+        update_status();
+    HostReportFacts facts;
+    facts.format = tag_;
+    facts.host = known_layout();
+    facts.max_frames = host_ ? GetMaxFramesPerSlice() : 0;
+    facts.settings = settings();
+    facts.latency_frames = latency_frames;
+    facts.tail_frames = tail_.load();
+    facts.log_written = status_log_written_;
+    facts.chooses_files = true; // Choose Filter in the window (load_property).
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    facts.file_reader = sndfile_version();
+#else
+    facts.file_reader = "macOS AudioToolbox";
+#endif
+    return host_report(filter_, facts);
+}
+
+HostReport Effect::report() {
+    std::string faults;
+    HostReport r;
+    {
+        // A load holds the lock while it prepares a filter, which can take a
+        // while: the window then gets the last report at once rather than
+        // waiting, and rereads when the load notifies (TODO AU-6).
+        std::unique_lock lock(control_, std::try_to_lock);
+        if (!lock.owns_lock()) {
+            {
+                std::lock_guard cached(report_cache_lock_);
+                if (report_cache_)
+                    return *report_cache_;
+            }
+            lock.lock(); // Nothing read yet: wait this once.
+        }
+        r = report_locked(faults);
+        // Stored under control_, so a slower reader cannot replace a newer copy.
+        try {
+            std::lock_guard cached(report_cache_lock_);
+            report_cache_ = r;
+        } catch (...) { // Out of memory: the older copy stays.
+        }
+    }
+    if (!faults.empty()) { // As when a host reads the Status text.
+        log_faults(faults);
+        notify_status();
+    }
+    return r;
 }
 
 HostStatusLine Effect::status() {
@@ -439,6 +580,23 @@ OSStatus Effect::GetPropertyInfo(AudioUnitPropertyID id, AudioUnitScope scope,
         writable = false;
         return noErr;
     }
+    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+        size = sizeof(CFTypeRef);
+        writable = false;
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == load_property) {
+        size = sizeof(CFStringRef);
+        writable = true;
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+        if (!view_bundle())
+            return kAudioUnitErr_InvalidProperty; // Registered without the bundle (the tests).
+        size = sizeof(AudioUnitCocoaViewInfo);
+        writable = false;
+        return noErr;
+    }
     return AUBase::GetPropertyInfo(id, scope, element, size, writable);
 }
 
@@ -464,6 +622,69 @@ OSStatus Effect::GetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
             f->message.copy(t.message, sizeof t.message - 1);
         }
         std::memcpy(data, &t, sizeof t);
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && (id == report_property || id == diagnostics_property)) {
+        CFTypeRef value = nullptr;
+        try {
+            const auto r = report();
+            if (id == report_property) {
+                const auto fields = report_fields(r);
+                const auto dict = CFDictionaryCreateMutable(
+                    nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                for (const auto& [key, text] : fields) {
+                    const auto k = cf_string(key), v = cf_string(text);
+                    if (dict && k && v)
+                        CFDictionarySetValue(dict, k, v);
+                    if (k)
+                        CFRelease(k);
+                    if (v)
+                        CFRelease(v);
+                }
+                value = dict;
+            } else {
+                value = cf_string(diagnostics_text(r, tag_));
+            }
+        } catch (...) { // Out of memory.
+        }
+        if (!value)
+            return kAudioUnitErr_InvalidPropertyValue;
+        std::memcpy(data, &value, sizeof value); // The caller releases it.
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == load_property) {
+        std::string path;
+        try {
+            std::lock_guard lock(control_);
+            if (const auto& r = filter_.accepted(); r.source == HostFilterSource::file)
+                path = r.path;
+        } catch (...) {
+            return kAudioUnitErr_InvalidPropertyValue;
+        }
+        const CFStringRef value = cf_string(path);
+        if (!value)
+            return kAudioUnitErr_InvalidPropertyValue;
+        std::memcpy(data, &value, sizeof value); // The caller releases it.
+        return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_CocoaUI) {
+        const auto bundle = view_bundle();
+        if (!bundle)
+            return kAudioUnitErr_InvalidProperty;
+        // The class names carry the version, so two Convolver builds in one
+        // host keep their own windows (Objective-C has one class namespace).
+        AudioUnitCocoaViewInfo info{
+            CFBundleCopyBundleURL(bundle),
+            {CFStringCreateWithCString(nullptr, CONVOLVER_AU_VIEW_FACTORY_NAME,
+                                       kCFStringEncodingUTF8)}};
+        if (!info.mCocoaAUViewBundleLocation || !info.mCocoaAUViewClass[0]) {
+            if (info.mCocoaAUViewBundleLocation)
+                CFRelease(info.mCocoaAUViewBundleLocation);
+            if (info.mCocoaAUViewClass[0])
+                CFRelease(info.mCocoaAUViewClass[0]);
+            return kAudioUnitErr_InvalidProperty;
+        }
+        std::memcpy(data, &info, sizeof info); // The caller releases the URL and the name.
         return noErr;
     }
     if (scope == kAudioUnitScope_Global && id == kAudioUnitProperty_ParameterStringFromValue) {
@@ -517,6 +738,19 @@ OSStatus Effect::SetProperty(AudioUnitPropertyID id, AudioUnitScope scope, Audio
         std::memcpy(&value, data, sizeof value);
         bypass_.store(value != 0);
         return noErr;
+    }
+    if (scope == kAudioUnitScope_Global && id == load_property) {
+        CFStringRef path = nullptr;
+        if (!data || size < sizeof path)
+            return kAudioUnitErr_InvalidPropertyValue;
+        std::memcpy(&path, data, sizeof path);
+        if (!path || CFGetTypeID(path) != CFStringGetTypeID())
+            return kAudioUnitErr_InvalidPropertyValue;
+        try {
+            return load_file(file_path(path));
+        } catch (...) { // Out of memory before anything changed.
+            return kAudioUnitErr_InvalidPropertyValue;
+        }
     }
     return AUBase::SetProperty(id, scope, element, data, size);
 }
@@ -632,11 +866,12 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     return noErr;
 }
 
-std::string Effect::reject(HostFailureKind kind, const std::string& why) {
+std::string Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
+                           const Configuration* carried) {
     std::lock_guard lock(control_);
     auto faults = observe_faults(); // Explained under the filter that played.
     const bool was_failed = filter_.failed();
-    filter_.reject(kind, why);
+    filter_.reject(kind, why, request, carried);
     // An empty instance that fails its first load plays silence, not identity.
     if (host_ && filter_.failed() && !was_failed) {
         try {
@@ -652,62 +887,17 @@ std::string Effect::reject(HostFailureKind kind, const std::string& why) {
     return faults;
 }
 
-OSStatus Effect::RestoreState(CFPropertyListRef plist) {
-    if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
-        log_faults(reject(HostFailureKind::state_unreadable,
-                          "The saved state is not an Audio Unit preset dictionary."));
-        log(rejection_line());
-        notify_status();
-        return kAudioUnitErr_InvalidPropertyValue;
-    }
-    const auto dict = static_cast<CFDictionaryRef>(plist);
-    HostState next;
-    try {
-        if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
-            throw std::invalid_argument(why);
-        const auto value = CFDictionaryGetValue(dict, state_key());
-        if (!value || CFGetTypeID(value) != CFDataGetTypeID())
-            throw std::invalid_argument(
-                "The preset holds no Convolver filter (it has no convolver-state entry). Make "
-                "the preset with convolver-preset, or save it from Convolver in the host.");
-        const auto data = static_cast<CFDataRef>(value);
-        const auto size = static_cast<std::size_t>(CFDataGetLength(data));
-        if (size > max_host_state_bytes)
-            throw std::invalid_argument("The saved filter is larger than the 64 MB limit.");
-        next = decode_host_state(
-            std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
-    } catch (const NewerHostState& e) {
-        log_faults(reject(HostFailureKind::state_newer,
-                          std::string("The saved state could not be read: ") + e.what()));
-        log(rejection_line());
-        notify_status();
-        return kAudioUnitErr_InvalidPropertyValue;
-    } catch (const std::exception& e) {
-        log_faults(reject(HostFailureKind::state_unreadable,
-                          std::string("The saved state could not be read: ") + e.what()));
-        log(rejection_line());
-        notify_status();
-        return kAudioUnitErr_InvalidPropertyValue;
-    }
-
-    // AU-7: Gain and Mix as saved with the state, applied if the state is
-    // accepted. A preset from convolver-preset has none, and settings it does
-    // not hold keep their values.
-    std::optional<std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>> saved;
-    bool settings_unreadable = false;
-    if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
-        data && CFGetTypeID(data) == CFDataGetTypeID()) {
-        try {
-            saved = saved_parameters(static_cast<CFDataRef>(data));
-        } catch (...) { // Out of memory: the settings are left as they are.
-        }
-        settings_unreadable = !saved;
-    }
-
+// RestoreState's and a chosen file's common step: `next` through
+// HostFilter::load as `request`, then the log lines and notifications.
+// `saved`: Gain and Mix from a restored state, applied if it is accepted.
+bool Effect::install(HostState next, const HostRequest& request, const SavedSettings* saved,
+                     bool settings_unreadable) {
     bool accepted = false, problem = true;
     std::string message, faults;
     {
         std::lock_guard lock(control_);
+        if (const auto hook = load_started_for_tests)
+            hook();
         faults = observe_faults(); // Explained under the filter that played; a load clears them.
         const bool was_failed = filter_.failed();
         // Initialized, a prepared replacement is published to the audio thread;
@@ -724,7 +914,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
                     uninitialized_tail = configuration_tail_frames(*next.configuration);
                 } catch (...) {
                     filter_.reject(HostFailureKind::preparation,
-                                   "The filter could not be prepared.");
+                                   "The filter could not be prepared.", request);
                     throw;
                 }
             }
@@ -734,7 +924,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
                     if (host_)
                         host_->replace(c);
                 },
-                {}, host_.get());
+                request, host_.get());
             // Nothing from here on can throw: the request is accepted.
             tail_.store(host_ ? host_->tail_frames() : uninitialized_tail);
             accepted = true;
@@ -784,6 +974,115 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         log("The preset's parameter values (its \"data\" entry) could not be read, so Gain and "
             "Mix keep their values.");
     notify_status();
+    return accepted;
+}
+
+// AU-6: a filter file chosen in Convolver's window, read with the step
+// convolver-preset uses (PLUG-9) for the unit's rate and channels, so a list
+// chooses its entry as in the CLI. The state then saved holds the filter
+// itself, not the path, as a preset does. The file is read before the
+// control lock is taken; preparing the filter runs under it, on the host's
+// thread that set the property, as a state restore does.
+OSStatus Effect::load_file(const std::string& path) {
+    const HostRequest request{HostFilterSource::file, path, 0};
+    HostLayout host;
+    {
+        std::lock_guard lock(control_);
+        host = known_layout().value_or(layout());
+    }
+    FilterFileFailure why;
+    // macOS's reader, not libsndfile, so the component needs nothing beyond
+    // macOS (jrp's decision, 30 October 2026); CONVOLVER_AU_FILE_READER=LIBSNDFILE
+    // builds the fallback.
+#if defined(CONVOLVER_AU_READER_LIBSNDFILE)
+    const auto& reader = detail::libsndfile_files();
+#else
+    const auto& reader = detail::audio_toolbox_files();
+#endif
+    auto next = read_filter_file(path, host, reader, why);
+    bool accepted = false;
+    if (!next) {
+        log_faults(reject(why.kind, why.message, request, why.filter()));
+        log(rejection_line());
+        notify_status();
+    } else {
+        accepted = install(std::move(*next), request, nullptr, false);
+    }
+    // The state the host saves has changed either way (a refusal is recorded
+    // in it, and an empty instance then plays silence): hosts that listen for
+    // ClassInfo changes, as for a preset chosen in the plug-in, can mark the
+    // project as changed.
+    PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
+    // GarageBand 10.4.14 ignored that (jrp's run of d1dc0a2: no save prompt,
+    // and the chosen filter was lost on reopening). An accepted file also
+    // becomes the present preset, a user preset (number -1) named after the
+    // file, as choosing a preset would; GarageBand then asks to save (jrp's
+    // run of bf7adb6).
+    if (accepted) {
+        const auto name = std::filesystem::path(path).stem().string();
+        if (const auto preset_name = cf_string(name.empty() ? path : name)) {
+            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name}));
+            CFRelease(preset_name);
+            PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
+        }
+    }
+    return accepted ? noErr : kAudioUnitErr_InvalidPropertyValue;
+}
+
+OSStatus Effect::RestoreState(CFPropertyListRef plist) {
+    if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
+        log_faults(reject(HostFailureKind::state_unreadable,
+                          "The saved state is not an Audio Unit preset dictionary."));
+        log(rejection_line());
+        notify_status();
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+    const auto dict = static_cast<CFDictionaryRef>(plist);
+    HostState next;
+    try {
+        if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
+            throw std::invalid_argument(why);
+        const auto value = CFDictionaryGetValue(dict, state_key());
+        if (!value || CFGetTypeID(value) != CFDataGetTypeID())
+            throw std::invalid_argument(
+                "The preset holds no Convolver filter (it has no convolver-state entry). Make "
+                "the preset with convolver-preset, or save it from Convolver in the host.");
+        const auto data = static_cast<CFDataRef>(value);
+        const auto size = static_cast<std::size_t>(CFDataGetLength(data));
+        if (size > max_host_state_bytes)
+            throw std::invalid_argument("The saved filter is larger than the 64 MB limit.");
+        next = decode_host_state(
+            std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
+    } catch (const NewerHostState& e) {
+        log_faults(reject(HostFailureKind::state_newer,
+                          std::string("The saved state could not be read: ") + e.what()));
+        log(rejection_line());
+        notify_status();
+        return kAudioUnitErr_InvalidPropertyValue;
+    } catch (const std::exception& e) {
+        log_faults(reject(HostFailureKind::state_unreadable,
+                          std::string("The saved state could not be read: ") + e.what()));
+        log(rejection_line());
+        notify_status();
+        return kAudioUnitErr_InvalidPropertyValue;
+    }
+
+    // AU-7: Gain and Mix as saved with the state, applied if the state is
+    // accepted. A preset from convolver-preset has none, and settings it does
+    // not hold keep their values.
+    std::optional<SavedSettings> saved;
+    bool settings_unreadable = false;
+    if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
+        data && CFGetTypeID(data) == CFDataGetTypeID()) {
+        try {
+            saved = saved_parameters(static_cast<CFDataRef>(data));
+        } catch (...) { // Out of memory: the settings are left as they are.
+        }
+        settings_unreadable = !saved;
+    }
+
+    const bool accepted =
+        install(std::move(next), {}, saved ? &*saved : nullptr, settings_unreadable);
     if (!accepted)
         return kAudioUnitErr_InvalidPropertyValue;
     if (saved) {

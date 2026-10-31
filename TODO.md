@@ -275,6 +275,16 @@ Shared work, done once for all three formats:
   state byte-identical to `convolver-preset`'s. Table-driven tests per
   failure kind in `native.host`; the contract change in its own pull request.
   Needed for the first preview.
+  Progress (25 October 2026, PR #84): the report, `report_fields()`,
+  `report_text()` and Copy diagnostics' `diagnostics_text()` in
+  `portable/host_report.hpp`, checked per state in `native.host_report`, for
+  the Audio Unit's first window; the log's start line now gives the same
+  mono-track advice. The file-to-state step is shared as
+  `portable/filter_file.hpp` (`filter_file_state()`, `read_filter_file()`),
+  used by `convolver-preset`, the LV2 plug-in and the Audio Unit's Choose
+  Filter; `au.editor` checks that a file loaded in the window saves the
+  state the tool writes. Remaining: the settings' computed gains and meters
+  as PLUG-10 adds them, and VST3's load message (VST3-3).
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -377,6 +387,105 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   shows the Status row with no value, so a stereo preset on a mono track
   played silence with no visible reason. The window must show why the
   plug-in is silent.
+  Progress (25 October 2026, PR #84): the smallest useful window, at jrp's
+  request in his review of 0.5.5: report and Copy diagnostics properties
+  (64000, 64001) with change notifications, and an AppKit view named by
+  `kAudioUnitProperty_CocoaUI`, with versioned class names: the status, Gain
+  and Mix sliders (GarageBand shows the window instead of its generic
+  controls), the full reason and what to change, the details, Copy
+  diagnostics and Show log, sized to its text. `au.editor` and `auval`
+  check it. jrp's GarageBand run on 25 October (build `a05818c`, before the
+  compact layout and the sliders): the window opens from the Plug-ins slot,
+  shows Playing on a saved project and Load failed with the stereo-track
+  advice on a mono track; Copy diagnostics and Show log work.
+  Then, at jrp's request before more testing (the old Convolver chose a
+  `.cfg` or sound file directly): **Choose Filter…** and dropping a file on
+  the window, through a load property (64002) that reads the file with
+  PLUG-9's shared step and installs it as a state restore does, with a
+  `ClassInfo` change notification after it, accepted or refused. Sound
+  files are read with macOS's AudioToolbox, not libsndfile (jrp, 30 October
+  2026), so the component links only macOS (`au.bundle` checks it);
+  `native.audio_toolbox` compares the two readers.
+  The window still reads the report itself rather than copying reports
+  pushed to it (the editor plan's
+  [rule 2](docs/project/plans/2026-10-24-plugin-editor.md#threads)), but a
+  read no longer waits for a load: while a load holds the control lock it
+  returns the last report (the window's next timed read shows the
+  result), and `au.editor` checks that with a restore held open on another
+  thread. Limitation: a chosen file is
+  read and its filter prepared on the host's main thread, so the window
+  (and the host) waits for a long filter; the cached report does not help
+  there; a worker thread, as LV2 has, is for later.
+  Remaining: recent files and reload (the editor plan's conveniences), the
+  view shared with VST3-11, a behaviour-preserving split of
+  `plugins/au/effect.cpp` (about 1,150 lines: state and loading, and
+  properties and the report, apart from lifecycle and rendering; jrp's
+  review of 30 October), and these acceptance gates (jrp, 30 October 2026),
+  each to pass and be recorded, with the GarageBand and macOS versions,
+  before AU-6 is done:
+  jrp's GarageBand run of `54eac9f` (30 October 2026; GarageBand 10.4.14,
+  macOS 27.2, Apple Silicon, Accelerate and AudioToolbox) passed the
+  checked items; it also found a refused file's summary reading "0 in,
+  0 out" and command-line advice in the window, both fixed in `8177017`.
+  GarageBand gave Convolver stereo even on a mono track, so the mono-track
+  refusal could not be reproduced there.
+  jrp's follow-up run of `d1dc0a2` (31 October 2026; same versions, macOS
+  27.2 26B123, 51/51 local tests, auval) passed the refusal summaries and
+  advice, repeated refusals, the held Gain slider (checked before and
+  after), Mix automation followed in the open window (also while the mouse
+  was held elsewhere) and the Filter detail after an explicit save. It
+  found that choosing a file alone did not mark the project changed (no
+  save prompt; the file was lost on reopening) and that the file dialog
+  opened behind GarageBand's windows. jrp's run of `bf7adb6` (31 October
+  2026) passed the save prompt after only choosing a file (the host's
+  preset name became the file's; *Don't Save* then restored the saved
+  filter) and the echo after a refused file (exports before and after
+  identical in all 705,600 samples). The file dialog was still behind
+  Convolver's window and took no typing. On `eda43e4` it opens above
+  Convolver's window, but still took typing only after a click, as
+  GarageBand kept the keyboard. jrp's run of `abb2edf` logged the focus
+  state (Convolver's window, an `NSServiceViewControllerWindow` in the
+  plug-in's process, was key; the separate dialog could not become key)
+  and showed that the dialog as a sheet on Convolver's window took typing
+  at once and loaded a file. The sheet is the only dialog since; the
+  investigation's logging, Option-click switch, activation and window-level
+  changes are gone.
+  Not checked: VoiceOver; the sheet in a host that runs the plug-in in its
+  own process (REAPER, for example), where it attaches to the host's window.
+  - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
+    sandbox whose WAV files it read (allowed in that session); a dropped
+    `.cfg`.
+  - [ ] If the sandbox refuses a `.cfg`'s WAV files, the window says
+    permission was denied (not provoked: GarageBand allowed the access).
+  - [x] Save, quit and reopen a project after choosing a file, with the
+    original files moved away: the filter and the settings came back.
+  - [x] After a save and reopen, the Filter detail says the filter came
+    from the saved project (`d1dc0a2`).
+  - [x] A refused replacement keeps the previous filter.
+  - [x] GarageBand marks the project changed after only choosing a file
+    (`bf7adb6`: the file becomes the present preset).
+  - [x] The file dialog, a sheet as the only dialog (`b0f2552`), opens
+    in front of the host's windows and Convolver's: a plain click takes
+    typing and loads a file, Cancel keeps the filter, closing Convolver's
+    window from GarageBand's plug-in button while the sheet is open loads
+    nothing, and two Convolver instances each keep their own file (exports
+    of the two tracks: echoes on the `repeat` one only). Not checked: two
+    windows open at once, as GarageBand closed one when the other opened.
+  - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
+    identical before and after).
+  - [x] Mix automation with the window open: the slider followed, also
+    while the mouse was held elsewhere; a held Gain slider kept its value
+    (`d1dc0a2`; the sliders send no begin and end gestures yet, so
+    recording automation by dragging them is untested).
+  - [x] Repeated refusals of the same file change nothing else (`d1dc0a2`).
+  - [x] The refused-file summary and advice (a mono WAV on a stereo track:
+    "the filter has 1 in, 1 out, the plug-in 2 in, 2 out"; a 48 kHz WAV:
+    set the host's project or audio device), on `d1dc0a2`.
+  - [ ] VoiceOver reads the status, the sliders and the buttons.
+  - [ ] A long explanation (a list `.cfg`) scrolls; the compact layout fits.
+  - [ ] The main-thread pause for a long chosen filter: measured and judged
+    acceptable, or moved to a worker thread. (The file dialog also closes
+    with a perceptible delay when the window closes; not measured.)
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
