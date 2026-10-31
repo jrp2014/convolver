@@ -455,8 +455,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
-  - [ ] If the sandbox refuses a `.cfg`'s WAV files, the window says
-    permission was denied (not provoked: GarageBand allowed the access).
+  - [x] If the sandbox refuses a `.cfg`'s WAV files, the window says
+    permission was denied: a `.cfg` in Music naming a WAV in Downloads was
+    refused with Core Audio error -54, the explanation said permission was
+    denied in a sandboxed host, and the previous filter stayed (`b0f2552`).
   - [x] Save, quit and reopen a project after choosing a file, with the
     original files moved away: the filter and the settings came back.
   - [x] After a save and reopen, the Filter detail says the filter came
@@ -481,11 +483,23 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] The refused-file summary and advice (a mono WAV on a stereo track:
     "the filter has 1 in, 1 out, the plug-in 2 in, 2 out"; a 48 kHz WAV:
     set the host's project or audio device), on `d1dc0a2`.
-  - [ ] VoiceOver reads the status, the sliders and the buttons.
-  - [ ] A long explanation (a list `.cfg`) scrolls; the compact layout fits.
-  - [ ] The main-thread pause for a long chosen filter: measured and judged
-    acceptable, or moved to a worker thread. (The file dialog also closes
-    with a perceptible delay when the window closes; not measured.)
+  - [ ] VoiceOver reads the status, the sliders and the buttons. Tried on
+    `b0f2552` but not heard reliably; an accessibility inspection found the
+    text, the Gain and Mix values and the three buttons, which is not a
+    VoiceOver check.
+  - [x] A long explanation (a list of twelve configurations, of which it
+    names ten and "… and 2 more") scrolls to its end with the sliders and
+    buttons usable; the compact layout comes back after a short one
+    (`b0f2552`).
+  - [x] The main-thread pause for a long chosen filter, measured on
+    `b0f2552` during playback: the report showed after about 1.4 s for a
+    30-second stereo filter (1,323,000 taps) and about 1.7 s for a
+    120-second one (5,292,000 taps), observation included. Load
+    performance work is deferred
+    ([decisions](docs/project/decisions.md#plug-in-behaviour)).
+  - [ ] The host stays responsive and the audio uninterrupted while a long
+    filter loads: not verified. (The file dialog also closes with a
+    perceptible delay when the window closes; not measured.)
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
