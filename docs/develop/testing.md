@@ -162,9 +162,15 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
   activations until a later request succeeds; `mute()` (its 64-frame ramp,
-  bypass, reset, a crossfade, and a replacement fading in from silence); and
-  allocation failure at every step of `HostFilter::load`, checking that what
-  plays is what is saved. A live replacement and a reset, at B = 257, 255 and
+  bypass, reset, a crossfade, and a replacement fading in from silence);
+  `silence()` (ROBUST-3: no allocation, exact silence from the first frame
+  before any audio, the ramp while audio plays, and which publications it
+  covers); allocation failure at every step of `HostFilter::load`, checking
+  that what plays is what is saved; and the saved-state limit (PLUG-12): the
+  size counted without encoding matches the encoding, a filter exactly at
+  64 MiB loads, saves and reads back, and one sample more is refused,
+  keeping the previous filter's saved bytes, or failing an empty instance's
+  first load. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
