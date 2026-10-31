@@ -142,9 +142,12 @@ struct SelectionCandidate {
 // A self-contained explanation of why no candidate matches `wanted`, naming each
 // difference and what to change. `subject` says where the wanted properties came
 // from, for example "the input audio". `list` is true when `filter` is a list.
+// `plugin`: `wanted` is a plug-in host's rate and channels, so the advice
+// names the host's settings and Convolver's window, not command-line options.
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& wanted, std::string_view subject);
+                             const ConfigurationSelection& wanted, std::string_view subject,
+                             bool plugin = false);
 
 struct DecodedIr {
     std::filesystem::path resolved;

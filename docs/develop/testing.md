@@ -137,6 +137,14 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   selection, routes, delays and tail, and the `portable-paths` warnings, against
   the same expectations: routes, signed zero, delays, BOM/CRLF,
   relative/Windows/mixed/UTF-8 paths, list selection and diagnostics.
+- `native.filter_file`: a filter file chosen in a plug-in and refused, through
+  `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
+  use them. The short status text gives the refused file's own channels
+  ("the filter has 1 in, 1 out, the plug-in 2 in, 2 out") or rate, never
+  "0 in, 0 out" or "0 Hz", also when no filter was carried; the full
+  explanation advises on the host's settings and Convolver's window, with no
+  command-line options, for a mono WAV, a 48 kHz WAV, a 2-in 6-out `.cfg` and
+  a list; the command line keeps `--output-channels` advice.
 - `native.limits`: every resource limit accepted at its value and rejected just
   beyond it, using the production constants: 1 MiB per text file, 16 nesting
   levels, 4096 list visits, 16 MiB of configuration text per resolution (shared

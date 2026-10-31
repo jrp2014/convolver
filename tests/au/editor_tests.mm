@@ -474,6 +474,15 @@ void files() {
     require(contains(r[@"explanation"], mono.c_str()) &&
                 contains(r[@"explanation"], "could not be used"),
             "mono file refusal: " + text(r[@"explanation"]));
+    // The short summary (Status, Copy diagnostics) gives the refused file's
+    // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
+    // explanation speaks of the window and the host, not command-line options.
+    require(contains(r[@"summary"], "the filter has 1 in, 1 out, the plug-in 2 in, 2 out") &&
+                !contains(r[@"summary"], "0 in, 0 out"),
+            "mono file summary: " + text(r[@"summary"]));
+    require(!contains(r[@"explanation"], "--") &&
+                contains(r[@"explanation"], "choose it in Convolver's window"),
+            "mono file advice: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
     const auto kept = unit.failure();
     require(kept.present && !kept.silent && unit.saved().configuration,

@@ -17,16 +17,24 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
                                           const detail::SoundFiles& reader,
                                           FilterFileFailure& failure) {
     try {
-        return filter_file_state(path, {host.sample_rate, host.inputs, host.outputs}, reader);
+        // Explained in the host's terms, not the command line's (jrp's
+        // GarageBand run: the window advised omitting --output-channels).
+        HostState state;
+        state.configuration = detail::load_configuration(
+            path, {host.sample_rate, host.inputs, host.outputs}, reader, nullptr, nullptr, true);
+        return state;
     } catch (const std::exception& e) {
         // Readable, but made for another rate or other channels? Then the
         // record's kind says so; the message already explains. (A file that
         // fails for another reason as well is classified by rate or channels.)
         failure.kind = HostFailureKind::filter_file;
+        failure.carried.reset();
         try {
-            const auto any = detail::load_configuration(path, {}, reader);
+            auto any = detail::load_configuration(path, {}, reader);
             failure.kind = any.sample_rate != host.sample_rate ? HostFailureKind::sample_rate
                                                                : HostFailureKind::channels;
+            any.paths.clear(); // Only the rate and counts are kept.
+            failure.carried = std::move(any);
         } catch (...) {
         }
         failure.message = "The filter file \"" + path + "\" could not be used: " + e.what();

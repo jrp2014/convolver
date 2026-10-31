@@ -45,11 +45,14 @@ const SoundFiles& libsndfile_files();
 const SoundFiles& audio_toolbox_files();
 #endif
 
-// load_configuration(), reading filter files with `files`.
+// load_configuration(), reading filter files with `files`. `plugin`: the
+// selection is a plug-in host's, so a mismatch is explained in its terms
+// (explain_no_match()).
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
                                  const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths = nullptr,
-                                 std::vector<std::filesystem::path>* raw_filters = nullptr);
+                                 std::vector<std::filesystem::path>* raw_filters = nullptr,
+                                 bool plugin = false);
 
 // Shared by the readers.
 // What the first bytes of a file say about it: a container marker no sample

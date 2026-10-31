@@ -426,7 +426,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     if (r.generation < newest())
         return Outcome::superseded;
     if (!next) {
-        p.filter.reject(why.kind, std::move(why.message), request);
+        p.filter.reject(why.kind, std::move(why.message), request, why.filter());
         return failed();
     }
     try {

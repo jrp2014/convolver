@@ -865,12 +865,12 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     return noErr;
 }
 
-std::string Effect::reject(HostFailureKind kind, const std::string& why,
-                           const HostRequest& request) {
+std::string Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
+                           const Configuration* carried) {
     std::lock_guard lock(control_);
     auto faults = observe_faults(); // Explained under the filter that played.
     const bool was_failed = filter_.failed();
-    filter_.reject(kind, why, request);
+    filter_.reject(kind, why, request, carried);
     // An empty instance that fails its first load plays silence, not identity.
     if (host_ && filter_.failed() && !was_failed) {
         try {
@@ -1001,7 +1001,7 @@ OSStatus Effect::load_file(const std::string& path) {
     auto next = read_filter_file(path, host, reader, why);
     bool accepted = false;
     if (!next) {
-        log_faults(reject(why.kind, why.message, request));
+        log_faults(reject(why.kind, why.message, request, why.filter()));
         log(rejection_line());
         notify_status();
     } else {

@@ -192,11 +192,13 @@ std::string joined(const std::vector<std::string>& parts, const char* separator)
         text += (text.empty() ? "" : separator) + p;
     return text;
 }
-std::string resample_hint(int wanted, const std::string& available, bool list) {
+std::string resample_hint(int wanted, const std::string& available, bool list, bool plugin) {
     return "Convolver never resamples. " +
            std::string(list ? "Add an entry for " : "Use a filter made for ") + hertz(wanted) +
-           " (with IRs recorded or designed at that rate), or convert the audio to " + available +
-           " first." +
+           " (with IRs recorded or designed at that rate), or " +
+           (plugin ? "set the host's project or audio device to " + available
+                   : "convert the audio to " + available + " first") +
+           "." +
            (list ? ""
                  : " A configuration list can hold one configuration per sample rate and "
                    "pick the matching one automatically.");
@@ -227,8 +229,10 @@ std::string indented(const std::string& text) {
     }
     return result;
 }
+// `plugin`: the wanted properties are a plug-in host's, so the advice names
+// the host's settings and Convolver's window rather than command-line options.
 std::string explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
-                        const ConfigurationSelection& w, std::string_view subject) {
+                        const ConfigurationSelection& w, std::string_view subject, bool plugin) {
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
     std::string text;
@@ -247,15 +251,14 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     text += " It cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
             "): " + joined(diffs, "; ") + ".";
     if (w.sample_rate && w.sample_rate != c.sample_rate)
-        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false);
+        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false, plugin);
     if (w.input_channels && w.input_channels != c.input_channels) {
         if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8)
             text += "\nTo apply this mono IR to all " + std::to_string(w.input_channels) +
                     " channels, save a configuration such as the following beside " +
-                    utf8_string(c.path.filename()) +
-                    " (for example as filter.cfg) and pass it "
-                    "as the filter instead:\n" +
-                    indented(mono_example(c, w.input_channels)) +
+                    utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
+                    (plugin ? "choose it in Convolver's window" : "pass it as the filter") +
+                    " instead:\n" + indented(mono_example(c, w.input_channels)) +
                     "Lines starting with // are comments and can be kept or removed.";
         else if (c.sound_file)
             text += "\nUse an IR file with one channel per input channel (" +
@@ -268,7 +271,21 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
                     channels(w.input_channels, "input ") +
                     ", or a configuration list containing one for each channel layout you use.";
     }
-    if (w.output_channels && w.output_channels != c.output_channels)
+    // A host always sets both counts: for a sound file whose input advice
+    // already covers equal counts, the output paragraph would only repeat it.
+    const bool covered = c.sound_file && w.input_channels != c.input_channels &&
+                         w.input_channels == w.output_channels;
+    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered)
+        text += "\nThe host gives the plug-in " + channels(w.output_channels, "output ") + ". " +
+                (c.sound_file ? "A sound-file filter always has as many outputs as inputs: use "
+                                "a configuration (.cfg) file to produce a different number, or "
+                                "give the plug-in as many outputs as inputs in the host's track "
+                                "or routing settings."
+                              : "Use a configuration with that output count (its third header "
+                                "number), or give the plug-in " +
+                                    channels(c.output_channels, "output ") +
+                                    " in the host's track or routing settings.");
+    else if (w.output_channels && w.output_channels != c.output_channels && !plugin)
         text += c.sound_file
                     ? "\n--output-channels asked for " + channels(w.output_channels, "output ") +
                           ", but a sound-file filter always has as many outputs as inputs. "
@@ -283,9 +300,10 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
 
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
-                             const ConfigurationSelection& w, std::string_view subject) {
+                             const ConfigurationSelection& w, std::string_view subject,
+                             bool plugin) {
     if (!list && candidates.size() == 1)
-        return explain_one(filter, candidates.front(), w, subject);
+        return explain_one(filter, candidates.front(), w, subject, plugin);
     const auto name = utf8_string(filter);
     if (candidates.empty())
         return "the configuration list " + name + " names no sound file or configuration.";
@@ -320,19 +338,24 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         for (std::size_t i = 0; i < rates.size(); ++i)
             available += (i == 0 ? "" : i + 1 == rates.size() ? " or " : ", ") + hertz(rates[i]);
         text += "\nNo entry is for " + hertz(w.sample_rate) + ". " +
-                resample_hint(w.sample_rate, available, true);
+                resample_hint(w.sample_rate, available, true, plugin);
     } else if (w.input_channels && !any([&](const SelectionCandidate& c) {
                    return matches(c.sample_rate, c.input_channels, c.output_channels,
                                   {w.sample_rate, w.input_channels, 0});
                })) {
         text += "\nNo entry takes " + channels(w.input_channels, "input ") +
                 (w.sample_rate ? " at " + hertz(w.sample_rate) : std::string()) +
-                ". Add one to the list, or use audio with a channel count an entry accepts.";
+                ". Add one to the list, or " +
+                (plugin ? "give the plug-in as many inputs as an entry takes in the host's "
+                          "track or routing settings."
+                        : "use audio with a channel count an entry accepts.");
     } else if (w.output_channels) {
         text += "\nEntries exist for the sample rate and input channels, but none produces " +
-                channels(w.output_channels, "output ") +
-                ". Add one to the list, or omit --output-channels to take the first entry "
-                "that matches the input.";
+                channels(w.output_channels, "output ") + ". Add one to the list, or " +
+                (plugin ? "give the plug-in an entry's output count in the host's track or "
+                          "routing settings."
+                        : "omit --output-channels to take the first entry that matches the "
+                          "input.");
     }
     return text;
 }
@@ -650,7 +673,7 @@ namespace convolver::detail {
 Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
-                                 std::vector<std::filesystem::path>* raw_filters) {
+                                 std::vector<std::filesystem::path>* raw_filters, bool plugin) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
@@ -702,7 +725,8 @@ Configuration load_configuration(const std::filesystem::path& path,
             *source_paths = resolver.sources();
         return std::move(*selected);
     }
-    throw std::runtime_error(
-        detail::explain_no_match(path, list, candidates, selection, "the audio to be filtered"));
+    throw std::runtime_error(detail::explain_no_match(
+        path, list, candidates, selection,
+        plugin ? "the plug-in in its host" : "the audio to be filtered", plugin));
 }
 } // namespace convolver::detail

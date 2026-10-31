@@ -136,7 +136,8 @@ class Effect final : public ausdk::AUBase {
     // foreign state), as HostFilter::load records its own rejections.
     // Returns the explanation of faults counted before it (observe_faults()),
     // to log before the rejection.
-    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {});
+    std::string reject(HostFailureKind, const std::string& why, const HostRequest& = {},
+                       const Configuration* carried = nullptr);
     // Gain and Mix as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
     // The common step of RestoreState and a chosen file: loads `next`, then

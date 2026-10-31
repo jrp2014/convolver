@@ -29,7 +29,11 @@ Until 1.0 the C++ API may change between minor versions.
   `native.audio_toolbox` checks that it reads every format the tests write
   to the same samples as libsndfile. A build with
   `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE` reads them with libsndfile instead,
-  as a fallback; the window's Software detail names the reader. While the host restores a filter on
+  as a fallback; the window's Software detail names the reader. A refused
+  file's short status names its own channels or rate (jrp's GarageBand run
+  showed "the filter has 0 in, 0 out"), and plug-ins explain a file that
+  does not fit in terms of the host's settings and Convolver's window, not
+  command-line options (Audio Unit and LV2). While the host restores a filter on
   another thread the window shows the last report rather than waiting. No
   sound changes.
 - Library (internal to the adapters): the editor report (PLUG-9) in

@@ -29,6 +29,12 @@ HostState filter_file_state(const std::filesystem::path& path,
 struct FilterFileFailure {
     HostFailureKind kind = HostFailureKind::filter_file;
     std::string message;
+    // For a readable file made for another rate or other channels: its rate
+    // and counts, without its paths, to pass to HostFilter::reject().
+    std::optional<Configuration> carried;
+    const Configuration* filter() const noexcept {
+        return carried ? &*carried : nullptr;
+    }
 };
 // For a plug-in: the filter in `path` for `host`'s rate and channels, or none
 // with `failure` filled in. A readable file made for another rate or other

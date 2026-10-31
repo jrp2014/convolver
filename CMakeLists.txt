@@ -354,6 +354,10 @@ if(CONVOLVER_BUILD_NATIVE)
                 SOURCES tests/native/inspection_tests.cpp LIBRARIES convolver_io)
             convolver_native_test(native.limits convolver_limits_tests
                 SOURCES tests/native/limits_tests.cpp LIBRARIES convolver_io Convolver::host)
+            # PLUG-9: a refused filter file's short status text.
+            convolver_native_test(native.filter_file convolver_filter_file_tests
+                SOURCES tests/native/filter_file_tests.cpp
+                LIBRARIES convolver_io convolver_filter_file)
             if(APPLE)
                 # AU-6: macOS's reader, for the Audio Unit, against libsndfile's.
                 # The reader exists only on macOS, so the test runs only there.

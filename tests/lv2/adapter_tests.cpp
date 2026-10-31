@@ -895,6 +895,13 @@ void worker_loads(host::World& world, const fs::path& work) {
                       r->message.find("previous filter is kept") != std::string::npos &&
                       p->log.contains(LV2_LOG__Error, what),
                   "failed replacement with " + path + ": recorded, explained, original kept");
+            // The refused file's own rate or counts are recorded for the short
+            // status text, and the advice is not the command line's (jrp's
+            // GarageBand run of the Audio Unit, which shares this step).
+            check((kind != HostFailureKind::sample_rate || r->sample_rate == 44100) &&
+                      (kind != HostFailureKind::channels || (r->inputs == 1 && r->outputs == 1)) &&
+                      r->message.find("--") == std::string::npos,
+                  "failed replacement with " + path + ": its rate and counts, host advice");
             check(near(play_constant(*p, 1024).back(), .5f) && reported(*p) == original &&
                       saved_path(*p) == original,
                   "failed replacement with " + path + ": the original plays and is reported");
