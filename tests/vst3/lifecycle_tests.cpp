@@ -44,6 +44,7 @@ class Vst3 final : public lc::Driver {
                         Op::state_failed,
                         Op::state_b_starved,
                         Op::state_b_shortage,
+                        Op::state_malformed_starved,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -216,6 +217,10 @@ int main(int argc, char** argv) {
                  "state-A setup rate start listen stop rate start listen reopen listen",
                  // Out of memory at each allocation of setState: a first
                  // load, a replacement, inactive and before setupProcessing.
+                 // ROBUST-3: memory runs out just after a failed first load
+                 // is recorded, before audio and while it plays.
+                 "start state-malformed-starved listen",
+                 "start play state-malformed-starved listen",
                  "start state-B-starved listen",
                  "start state-A play state-B-starved listen",
                  "state-A state-B-starved start listen",

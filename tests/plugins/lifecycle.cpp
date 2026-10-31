@@ -20,7 +20,7 @@ constexpr std::size_t transition = 512; // Warm-up and crossfade, 256 frames eac
 constexpr std::size_t ramp = 64;        // Bypass and mute ramps.
 constexpr double tolerance = 1e-5;      // PLUG-2's tolerance against the oracle.
 
-constexpr std::array<std::pair<Op, const char*>, 24> names{{
+constexpr std::array<std::pair<Op, const char*>, 25> names{{
     {Op::state_a, "state-A"},
     {Op::state_b, "state-B"},
     {Op::state_other_rate, "state-other-rate"},
@@ -29,6 +29,7 @@ constexpr std::array<std::pair<Op, const char*>, 24> names{{
     {Op::state_failed, "state-failed"},
     {Op::state_b_starved, "state-B-starved"},
     {Op::state_b_shortage, "state-B-shortage"},
+    {Op::state_malformed_starved, "state-malformed-starved"},
     {Op::play, "play"},
     {Op::bypass, "bypass"},
     {Op::reset, "reset"},
@@ -224,6 +225,10 @@ void apply(const Context& x, Model& m, Op op) {
         return restore(x, m, Which::other_rate, false, false);
     case Op::state_malformed:
         return restore(x, m, std::nullopt, false, true);
+    case Op::state_malformed_starved:
+        restore(x, m, std::nullopt, false, true);
+        m.numbers_unknown = true;
+        return;
     case Op::state_empty:
         return restore(x, m, std::nullopt, false, false);
     case Op::state_failed:
@@ -312,7 +317,8 @@ void apply(const Context& x, Model& m, Op op) {
 
 // Loads under an allocation limit, kept out of the enumeration for time.
 bool starving(Op op) {
-    return op == Op::state_b_starved || op == Op::state_b_shortage;
+    return op == Op::state_b_starved || op == Op::state_b_shortage ||
+           op == Op::state_malformed_starved;
 }
 bool supports(const Format& format, Op op) {
     return op == Op::listen || std::find(format.operations.begin(), format.operations.end(), op) !=
@@ -531,6 +537,8 @@ class Runner {
         case Op::state_b_starved:
         case Op::state_b_shortage:
             return starved(x, m, op);
+        case Op::state_malformed_starved:
+            return starved_failure(x, m, op);
         case Op::play:
             // Long enough to finish a ramp, short enough to stop inside a
             // replacement's crossfade (256 frames of warm-up, then 256).
@@ -636,6 +644,38 @@ class Runner {
             m.numbers_unknown = true;
             if (m.active)
                 listen(x, m);
+        }
+        apply(x, m, op);
+    }
+
+    // ROBUST-3. Contract, loading and failure: a failed first load never
+    // plays the unfiltered input, even when memory runs out just after the
+    // failure is recorded. Malformed state is restored with memory running
+    // out at each allocation in turn, until an attempt records its failure;
+    // from the attempt that records it, an active instance with no filter
+    // must play silence.
+    void starved_failure(const Context& x, Model& m, Op op) {
+        std::vector<std::byte> bytes;
+        for (const char c : std::string("this is not Convolver state"))
+            bytes.push_back(static_cast<std::byte>(c));
+        for (std::size_t allowed = 0;; ++allowed) {
+            if (allowed == 100000)
+                throw std::logic_error("the malformed state's failure was never recorded");
+            const auto before = driver_.failure();
+            const auto accepted = driver_.restore_starved(bytes, allowed, false);
+            if (!accepted)
+                throw std::logic_error("this driver cannot fail allocations");
+            expect(!*accepted, "malformed state was accepted");
+            const auto after = driver_.failure();
+            const auto saved = driver_.saved();
+            if (saved.failed && !m.failed)
+                reject(m, HostFailureKind::state_unreadable, ++m.requests);
+            m.numbers_unknown = true;
+            if (m.active)
+                listen(x, m);
+            if (after && after->kind == HostFailureKind::state_unreadable &&
+                (!before || after->request.number > before->request.number))
+                break; // Recorded: later attempts repeat this one.
         }
         apply(x, m, op);
     }

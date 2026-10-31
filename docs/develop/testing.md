@@ -422,7 +422,11 @@ allocations failing from the first onwards, then from the second, and so on
 until it loads (`state-B-starved`), and again with only one allocation failing
 each time (`state-B-shortage`). After each failed attempt the saved filter
 must be unchanged and, while active, what plays must still be what the model
-expects. Only allocations made during the plug-in's own call fail: for Audio
+expects. `state-malformed-starved` (ROBUST-3) restores malformed state with
+the allocations failing from each one in turn until the failure is recorded:
+an empty active instance must play silence from the attempt that records it,
+which caught LV2 playing the input and VST3 letting an exception escape when
+memory ran out just after the record. Only allocations made during the plug-in's own call fail: for Audio
 Units that call goes through the Audio Unit SDK's dispatch, whose C++
 allocations fail too, while Core Foundation's never do (they do not go
 through `operator new`).

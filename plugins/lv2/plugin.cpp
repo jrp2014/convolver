@@ -187,14 +187,11 @@ struct Instance {
         lv2_log_error(&logger, "Convolver: %s\n", message.c_str());
     }
     // After a rejection: a failed first load plays silence rather than the
-    // unfiltered input.
-    void silence_failed_first_load(bool was_failed) {
-        if (host && filter.failed() && !was_failed) {
-            try {
-                host->replace(unfiltered_configuration(layout, true));
-            } catch (...) {
-            }
-        }
+    // unfiltered input, without allocating, as memory may have run out
+    // (ROBUST-3).
+    void silence_failed_first_load(bool was_failed) noexcept {
+        if (host && filter.failed() && !was_failed)
+            host->silence();
     }
     // Records a request run() could not hand to the worker, unless a newer
     // one has been recorded since. Control side, under the lock.

@@ -829,6 +829,69 @@ void muting() {
             "mute(through) silenced a playing filter published after the count");
     counted.collect();
 }
+// ROBUST-3: silence(), the control side's mute for a failed first load,
+// allocates nothing, so it works when memory has run out. The audio thread
+// applies it at its next call: silent from the first frame before any audio
+// (no ramp lets the input through), a 64-frame ramp while audio plays. A
+// filter published before it stays silent; one published after it plays.
+// mute() before any audio is silent at once too.
+void control_silence() {
+    std::array<float, 512> input{}, output{};
+    input.fill(1);
+    const float* in[] = {input.data()};
+    float* out[] = {output.data()};
+    const auto run = [&](HostProcessor& host, std::size_t frames) {
+        audio_thread = true;
+        const bool ok = host.process(in, out, frames);
+        audio_thread = false;
+        require(ok, "process rejected");
+    };
+    const auto silent_from = [&](std::size_t from, std::size_t frames) {
+        for (std::size_t i = from; i < frames; ++i)
+            if (output[i] != 0)
+                return false;
+        return true;
+    };
+    // Any allocation throws, which ends the test from a noexcept function.
+    const auto starved_silence = [](HostProcessor& host) {
+        allocations_left = 0;
+        host.silence();
+        allocations_left = -1;
+    };
+    HostProcessor fresh(mono(1), 512, 8);
+    starved_silence(fresh);
+    run(fresh, 128);
+    require(silent_from(0, 128), "silence() before any audio let the input through");
+    HostProcessor muted(mono(1), 512, 8);
+    audio_thread = true;
+    muted.mute();
+    audio_thread = false;
+    run(muted, 128);
+    require(silent_from(0, 128), "mute() before any audio let the input through");
+    HostProcessor playing(mono(1), 512, 8);
+    run(playing, 64);
+    starved_silence(playing);
+    run(playing, 128);
+    for (std::size_t i = 0; i < 64; ++i)
+        require(std::abs(output[i] - 1.25f * (1 - static_cast<float>(i + 1) / 64)) < 1e-5,
+                "silence() does not ramp over 64 frames while audio plays");
+    require(silent_from(63, 128), "silence() not exactly silent");
+    for (const bool started : {false, true}) {
+        HostProcessor host(mono(1), 512, 8);
+        if (started)
+            run(host, 64);
+        host.replace(mono(2));
+        starved_silence(host);
+        run(host, 512);
+        require(silent_from(started ? 300 : 0, 512),
+                "a filter published before silence() was heard when picked up");
+        host.replace(mono(3));
+        run(host, 512);
+        require(std::abs(output[511] - 3.25f) < 1e-5,
+                "a filter published after silence() is silent");
+        host.collect();
+    }
+}
 // A load is a transaction: whichever allocation runs out of memory, what
 // plays (the last configuration `install` published) is what the filter
 // saves, and a rejected load leaves the previous state whole. Found in jrp's
@@ -1412,6 +1475,7 @@ int main() {
         speaker_notices();
         unequal_bypass();
         muting();
+        control_silence();
         allocation_failures();
         status_lines();
         processing_faults();

@@ -325,10 +325,11 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 
 // Prepared planar host boundary. Float DSP with float/double host buffers.
 // Input and output channel counts follow the configuration and may differ.
-// Control: construction, replace, prepare, publish, collect, destruction;
-// serialize these calls. Audio: process, set_bypass, reset, mute, publications; one audio
-// thread per instance. Control and audio may overlap only for replace, prepare,
-// publish and collect. Teardown requires stopped audio.
+// Control: construction, replace, prepare, publish, silence, collect,
+// destruction; serialize these calls. Audio: process, set_bypass, reset, mute,
+// publications; one audio thread per instance. Control and audio may overlap
+// only for replace, prepare, publish, silence and collect. Teardown requires
+// stopped audio.
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
@@ -374,14 +375,14 @@ class HostProcessor {
     // counts). Each change ramps over 64 frames.
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
-    // Audio thread: the current filter ramps to silence over 64 frames and
+    // Audio thread: the current filter ramps to silence over 64 frames (or is
+    // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
     // before it (still waiting for the audio thread) is silenced too. Bypass
     // still passes the dry signal. For a failure the audio thread finds
-    // itself, before the control side can publish silence: LV2's run()
-    // refusing an empty instance's first load (no worker, or a full worker
-    // queue).
+    // itself: LV2's run() refusing an empty instance's first load (no
+    // worker, or a full worker queue). The control side uses silence().
     void mute() noexcept;
     // The same for publications up to `through`, a count publications()
     // returned. An adapter that decides to mute from a flag its control side
@@ -389,6 +390,15 @@ class HostProcessor {
     // filter published after the flag was cleared is never silenced. A count
     // older than the filter already playing does nothing.
     void mute(std::uint64_t through) noexcept;
+    // Control side (ROBUST-3): mute() for a failure the control side finds,
+    // a failed first load, without allocating, locking or throwing, so the
+    // silence cannot fail when memory has run out. The audio thread mutes at
+    // the start of its next process() call, before it adopts a pending
+    // filter: one published before this call stays silent, one published
+    // after it takes over. With no audio since construction or reset, the
+    // first frame is already silent; otherwise the filter ramps to silence
+    // over 64 frames.
+    void silence() noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.
     std::uint64_t publications() const noexcept;

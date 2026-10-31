@@ -607,6 +607,9 @@ struct HostProcessor::Impl {
     // Publications up to this number were made before mute(): adopting one
     // keeps the silence. Only a filter published after it ends the silence.
     std::uint64_t muted_through = 0;
+    // silence() (ROBUST-3): the publications to mute, plus one, for the
+    // audio thread to apply at its next call; 0 when none is waiting.
+    std::atomic<std::uint64_t> silence_through{0};
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
     Impl(const Configuration& c, std::size_t maximum_, std::size_t block_,
@@ -710,6 +713,19 @@ struct HostProcessor::Impl {
         mix = mix_target = target_mix();
         gain_ramp = mix_ramp = 0;
     }
+    // Audio thread. Before any audio since construction or reset there is
+    // nothing to ramp from, so the silence starts at once: the first frame
+    // heard is already silent, as a filter published then is installed
+    // directly.
+    void mute(std::uint64_t through) noexcept {
+        // A filter published after `through` is already playing: nothing to mute.
+        if (current && current->number > through)
+            return;
+        muted = true;
+        muted_through = std::max(muted_through, through);
+        if (!started)
+            level = 0;
+    }
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
                  std::size_t frames) noexcept {
@@ -717,6 +733,10 @@ struct HostProcessor::Impl {
             count(invalid_call);
             return false;
         }
+        // Before adopting a pending filter, so that one published after
+        // silence() ends it and one published before stays silent.
+        if (const auto through = silence_through.exchange(0, std::memory_order_acquire))
+            mute(through - 1);
         if (!frames)
             return true;
         if (!previous) {
@@ -892,11 +912,12 @@ void HostProcessor::mute() noexcept {
     mute(publications());
 }
 void HostProcessor::mute(std::uint64_t through) noexcept {
-    // A filter published after `through` is already playing: nothing to mute.
-    if (impl_->current && impl_->current->number > through)
-        return;
-    impl_->muted = true;
-    impl_->muted_through = std::max(impl_->muted_through, through);
+    impl_->mute(through);
+}
+void HostProcessor::silence() noexcept {
+    // The control side is the only publisher, so this count is exact.
+    impl_->silence_through.store(impl_->published.load(std::memory_order_relaxed) + 1,
+                                 std::memory_order_release);
 }
 std::size_t HostProcessor::latency_frames() const noexcept {
     return impl_->block;

@@ -36,6 +36,7 @@ class AudioUnitDriver final : public lc::Driver {
                         Op::state_failed,
                         Op::state_b_starved,
                         Op::state_b_shortage,
+                        Op::state_malformed_starved,
                         Op::play,
                         Op::bypass,
                         Op::reset,
@@ -172,6 +173,10 @@ int main(int argc, char** argv) {
                  "setup start stop state-other-rate start listen",
                  // Out of memory at each allocation of a restore: a first
                  // load, a replacement, uninitialized, before the formats.
+                 // ROBUST-3: memory runs out just after a failed first load
+                 // is recorded, before audio and while it plays.
+                 "start state-malformed-starved listen",
+                 "start play state-malformed-starved listen",
                  "start state-B-starved listen",
                  "start state-A play state-B-starved listen",
                  "state-A state-B-starved start listen",
