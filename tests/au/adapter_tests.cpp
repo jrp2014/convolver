@@ -897,6 +897,10 @@ void status_parameter() {
     require(contains(shown(), "Load failed, previous filter kept: the filter is for 44100 Hz") &&
                 contains(log_text(), "Filter not loaded; the previous filter is kept."),
             "refused replacement not shown or logged: " + shown());
+    // A state refused before it reaches the filter is logged too, with why.
+    require(unit.restore(CFSTR("not a preset")) != noErr, "a string accepted as ClassInfo");
+    require(contains(log_text(), "The saved state is not an Audio Unit preset dictionary."),
+            "refused state not logged");
     // Another value reads as its name.
     AudioUnitParameterValue playing = 0;
     AudioUnitParameterStringFromValue request{au::status_parameter, &playing, nullptr};

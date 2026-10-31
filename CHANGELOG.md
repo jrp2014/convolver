@@ -164,6 +164,19 @@ Until 1.0 the C++ API may change between minor versions.
   proposed minimum system is unchanged, but no CI job now runs a candidate on
   macOS 14 itself. See
   [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- Audio Unit source (AU-8): `plugins/au/effect.cpp` is split by
+  responsibility into `effect.cpp` (initialization, cleanup, stream formats,
+  rendering, latency and tail), `effect_state.cpp` (preset checks, saved
+  parameters, save and restore, a chosen file, installing or refusing a
+  filter) and `effect_properties.cpp` (parameters, properties, the window's
+  report, notifications and logging), still one `Effect` class (jrp's review,
+  30 October 2026). The repeated "a failed first load plays silence" step
+  and the refusals' logging are now one function each, and Core Foundation
+  values are released by `cf_owned` (`plugins/au/core_foundation.hpp`)
+  rather than by hand. No behaviour changes, except that the preset checks
+  no longer create a string per key, which could crash if memory ran out.
+  `au.adapter` now also checks that a state refused before it reaches the
+  filter is logged.
 
 ### Fixed
 
