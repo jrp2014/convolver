@@ -83,7 +83,7 @@ they offer.
 | --- | --- | --- | --- |
 | The command-line tools (`convolver`, `convolver-preset`, `convolver-equalizer-apo`) and the C++ libraries | Accelerate | FFTW | libsndfile, on every platform (the core library alone needs none) |
 | VST3 plug-in | Accelerate | Ooura (built in) | None: the filter arrives in a preset or the saved project |
-| Audio Unit (macOS only) | Accelerate | Not built | None: as VST3 |
+| Audio Unit (macOS only) | Accelerate | Not built | AudioToolbox (macOS's own), for the filter file chosen in its window; a preset needs none |
 | LV2 plug-in | Accelerate | Ooura (built in) | libsndfile, for the filter file chosen in the host |
 
 What to change, and why you might:
@@ -94,6 +94,11 @@ What to change, and why you might:
   which only FFTW has; an FFTW built for your CPU can also be faster for long
   filters ([measurements](fft-backends.md#accelerate-by-default-on-macos)).
 - **No FFT library at all,** anywhere: `-DCONVOLVER_FFT_BACKEND=OOURA`.
+- **libsndfile in the Audio Unit:** `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE`
+  reads the files chosen in its window as `convolver-preset` reads them, to
+  compare with the other platforms or to work around a macOS reader problem
+  ([Audio Unit](#audio-unit)). The component then needs libsndfile wherever
+  it runs, so CMake warns.
 - **Accelerate** is chosen by default on macOS; `-DCONVOLVER_FFT_BACKEND=ACCELERATE`
   (or the `accelerate` presets) names it explicitly.
 - **FFTW in a plug-in** works but makes CMake warn: a plug-in shares its process
@@ -368,26 +373,19 @@ a CMake installed outside Homebrew, such as conda's, may also need
 `-DCMAKE_PREFIX_PATH="$(brew --prefix)"` to find it.
 
 The component is `build-au/plugins/au/Convolver.component`. By default it
-links only macOS's own libraries, so it needs nothing installed beside it,
-and each has a fallback to the library the other platforms use (jrp,
-30 October 2026):
+links only macOS's own libraries (Accelerate, and AudioToolbox for the files
+chosen in its window), so it needs nothing installed beside it.
+[Which libraries each build uses](#which-libraries-each-build-uses)
+lists the defaults and the fallbacks, FFTW and libsndfile, as build options.
+The defaults are what to ship. Specific to the Audio Unit:
 
-| Job | Default | Fallback, as a build option |
-| --- | --- | --- |
-| FFT | Accelerate | FFTW: `-DCONVOLVER_FFT_BACKEND=FFTW` ([plug-in builds](fft-backends.md#plug-in-builds)) |
-| Reading the filter files chosen in its window | AudioToolbox | libsndfile, as `convolver-preset` reads them: `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE` |
-
-Use a fallback to compare with the other platforms or to work around a
-macOS reader or FFT problem; the defaults are what to ship. A fallback build
-passes the same tests (`native.audio_toolbox` checks that both readers give
-the same samples). CMake warns for each fallback, because every Mac that
-loads the component must then have that library; `au.bundle`, which
-otherwise fails on any library outside macOS (`otool -L`), lists them
-instead. The window's Software detail names the FFT library and the file
-reader, so a report shows which build it came from. The Audio Unit
-workflow's `au-sanitizers` job builds both fallbacks. The VST3 has the same
-FFT default and fallback and reads no files; the tools and tests read files
-with libsndfile on every platform.
+- A fallback build passes the same tests (`native.audio_toolbox` checks that
+  both readers give the same samples).
+- `au.bundle` fails on any library outside macOS (`otool -L`); for a
+  fallback build it lists them instead.
+- The window's Software detail names the FFT library and the file reader,
+  so a report shows which build it came from.
+- The Audio Unit workflow's `au-sanitizers` job builds both fallbacks.
 
 The AU target builds as C++23 because AudioUnitSDK needs it; the core
 and other formats stay C++20.
