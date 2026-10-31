@@ -763,6 +763,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   PR #88: the latest stable ruff in pre-commit and lint CI, with every stable
   rule but a few listed in `ruff.toml`;
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- [x] **CI-19 — Build the Apple silicon candidate on `macos-15`.** 31 October
+  2026: GitHub retires the `macos-14` image on 2 November 2026, and its
+  brownouts on 30 October cancelled the candidate job before it ran (PRs #84
+  and #89, [runner-images#13518](https://github.com/actions/runner-images/issues/13518));
+  the package still targets macOS 14; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;
