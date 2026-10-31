@@ -820,9 +820,9 @@ candidate during its scheduled brownouts on 30 October
 CI-19). So no CI job runs a candidate on macOS 14: `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. Until 27 October 2026 a second,
-offline build of the same archive with `tests/release/source_build.py` did this on Linux; the
-script remains for [local checks](build.md#preview-recipe). See the
-[qualification record](releasing.md) for external gates.
+offline build of the same archive with `tests/release/source_build.py` did
+this on Linux; the script remains for [local checks](build.md#preview-recipe).
+See the [qualification record](releasing.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
