@@ -520,6 +520,22 @@ How each adapter meets the contract where its format differs:
   marked silent only once the tail has decayed. Rejections are returned to the
   host as errors, shown by the Status parameter and written to the Convolver
   log and the unified log.
+- **Audio Unit window in a host** (learned in GarageBand 10.4.14, whose
+  runs are recorded in TODO AU-6); the VST3 window (VST3-11) starts from
+  these:
+  - The host may run the plug-in in a process of its own (GarageBand:
+    `AUHostingServiceXPC_arrow`). The window is then an
+    `NSServiceViewControllerWindow` of that process, shown at a floating
+    level, while the host keeps the keyboard.
+  - A file dialog is a sheet on the plug-in's own window
+    (`beginSheetModalForWindow:`), which takes the keys with that window.
+    A separate dialog window stayed behind the plug-in's window, and above
+    it still could not become key. Never `runModal`.
+  - Choosing a file changes the saved state without a parameter change.
+    Apple documents no way to tell the host; a `ClassInfo` change
+    notification alone did not mark the project changed. Making the file
+    the present preset (a user preset named after it) with a
+    `PresentPreset` notification did.
 - **LV2:** ports are fixed, so each channel layout is its own plug-in
   ([identities](plugin-identities.md#channel-layouts)). Bypass is the `enabled`
   port, which the host saves, so the adapter's state does not record bypass and
