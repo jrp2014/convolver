@@ -433,10 +433,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   (and the host) waits for a long filter; the cached report does not help
   there; a worker thread, as LV2 has, is for later.
   Remaining: recent files and reload (the editor plan's conveniences), the
-  view shared with VST3-11, a behaviour-preserving split of
-  `plugins/au/effect.cpp` (about 1,150 lines: state and loading, and
-  properties and the report, apart from lifecycle and rendering; jrp's
-  review of 30 October), and these acceptance gates (jrp, 30 October 2026),
+  view shared with VST3-11, and these acceptance gates (jrp, 30 October 2026),
   each to pass and be recorded, with the GarageBand and macOS versions,
   before AU-6 is done:
   jrp's GarageBand run of `54eac9f` (30 October 2026; GarageBand 10.4.14,
@@ -851,6 +848,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `ClassInfo` under `convolver-state`, and `.aupreset` files from the preset
   tool; loading one from a named host's preset menu is checked under AU-4;
   [presets](docs/use/presets.md).
+- [x] **AU-8 — Split the adapter's source by responsibility.** 31 October
+  2026, PR #92, from jrp's review of 30 October: `plugins/au/effect.cpp`
+  (1,166 lines) moved unchanged into `effect.cpp`, `effect_state.cpp` and
+  `effect_properties.cpp`, then the repeated silence and refusal steps were
+  made one function each and Core Foundation values owned by `cf_owned`; no
+  behaviour changes; [implementation map](docs/develop/architecture.md).
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:
