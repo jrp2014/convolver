@@ -405,9 +405,10 @@ class HostProcessor {
     // silence cannot fail when memory has run out. The audio thread mutes at
     // the start of its next process() call, before it adopts a pending
     // filter: one published before this call stays silent, one published
-    // after it takes over. With no audio since construction or reset, the
-    // first frame is already silent; otherwise the filter ramps to silence
-    // over 64 frames.
+    // after it takes over. With no audio since construction or reset, that
+    // next call is silent from its first frame; otherwise the filter ramps to
+    // silence over 64 frames. A call already running when this one is made
+    // may still play a filter it adopted.
     void silence() noexcept;
     // Audio thread: how many filters replace() and publish() have handed
     // over so far.

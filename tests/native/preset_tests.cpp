@@ -177,6 +177,19 @@ int main() {
             require(rejects([&] { presets::check_writable(format, failed, "x"); }, "failed load")
                             .find("failed to load") != std::string::npos,
                     "a saved failed load is converted");
+        // PLUG-12: one sample more than 64 MiB of saved state holds. With its
+        // two delays, this mono filter takes 19 words besides its samples.
+        HostState oversized = routed(1, 1);
+        oversized.configuration->paths.front().impulse.assign(max_host_state_bytes / 4 - 18, 0.0F);
+        require(encoded_host_state_size(oversized) == max_host_state_bytes + 4,
+                "oversized state is one word over");
+        for (auto format : {Format::vst3, Format::au, Format::lv2})
+            require(rejects([&] { presets::check_writable(format, oversized, "x"); }, "oversized")
+                            .find("too large to save") != std::string::npos,
+                    "an oversized filter is refused and explained");
+        oversized.configuration->paths.front().impulse.pop_back();
+        for (auto format : {Format::vst3, Format::au, Format::lv2})
+            presets::check_writable(format, oversized, "x");
         for (auto format : {Format::vst3, Format::au, Format::lv2}) {
             require(rejects([&] { presets::check_writable(format, routed(9, 9), "x"); }, "9x9")
                             .find("1 to 8") != std::string::npos,

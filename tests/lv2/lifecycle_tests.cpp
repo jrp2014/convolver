@@ -282,11 +282,11 @@ int main(int argc, char** argv) {
               // Out of memory at each allocation of a state
               // restore: first load, replacement, inactive,
               // and over a filter file.
+              "start state-B-starved listen", "start state-A play state-B-starved listen",
+              "state-A state-B-starved start listen", "start file-A state-B-starved listen",
               // ROBUST-3: memory runs out just after a failed first load is
               // recorded, before audio and while it plays.
-              "start state-malformed-starved listen", "start play state-malformed-starved listen",
-              "start state-B-starved listen", "start state-A play state-B-starved listen",
-              "state-A state-B-starved start listen", "start file-A state-B-starved listen"})
+              "start state-malformed-starved listen", "start play state-malformed-starved listen"})
             options.fixed.push_back(lc::parse(s));
         std::size_t failures = 0;
         for (const lc::Host h : {lc::Host{48000, 2, 2}, lc::Host{48000, 1, 2}}) {

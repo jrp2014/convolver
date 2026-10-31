@@ -108,7 +108,8 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
 
 - **What failed:** a missing or unreadable filter file, unreadable or
   malformed state, a newer state version, the sample rate, the channel counts
-  or layout, preparation, or activation (the same list as DIAG-1's table).
+  or layout, a filter too large to save (PLUG-12), preparation, or activation
+  (DIAG-1's table, which predates the size check).
 - **The request it belongs to:** where the filter came from (preset, saved
   state, file path), its rate and channel counts, and a request number, so a
   later request's success or failure is never confused with it.

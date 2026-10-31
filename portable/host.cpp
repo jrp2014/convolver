@@ -497,7 +497,7 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
     case HostFailureKind::saved_failure:
         return "a load had failed when this was saved.";
     case HostFailureKind::too_large:
-        return "the filter is too long to save with the project.";
+        return "the filter is too large to save with the project.";
     }
     return "the filter could not be loaded.";
 }

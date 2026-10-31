@@ -1331,7 +1331,7 @@ void status_lines() {
           "unwritable log, refused rate");
     const std::array<std::pair<HostFailureKind, const char*>, 7> kinds{{
         {HostFailureKind::filter_file, "filter file could not be read"},
-        {HostFailureKind::too_large, "too long to save with the project"},
+        {HostFailureKind::too_large, "too large to save with the project"},
         {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
         {HostFailureKind::state_newer, "saved by a newer Convolver"},
         {HostFailureKind::preparation, "could not be prepared"},
