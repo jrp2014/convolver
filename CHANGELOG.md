@@ -17,8 +17,10 @@ Until 1.0 the C++ API may change between minor versions.
   are in (jrp, 31 October 2026). The first preview is cut from the 0.7
   series. CMake consumers now request `find_package(Convolver 0.7)`; the
   package keeps its same-minor compatibility policy, so a consumer asking for
-  0.6 no longer finds it. Nothing else changes: the library, plug-ins and
-  their saved state are as in 0.6.10.
+  0.6 no longer finds it. The LV2 plug-in now reports minor version 7,
+  which LV2 treats as a development version until jrp decides the mapping
+  (LV2-5). Nothing else changes: the library, plug-ins and their saved state
+  are as in 0.6.10.
 
 ## [0.6.10] - 2026-10-31
 
