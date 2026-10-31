@@ -76,6 +76,8 @@ const char* kind_name(HostFailureKind k) {
         return "activation";
     case HostFailureKind::saved_failure:
         return "saved_failure";
+    case HostFailureKind::too_large:
+        return "too_large";
     }
     return "?";
 }

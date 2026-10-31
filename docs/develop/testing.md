@@ -563,7 +563,9 @@ AU-4.
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers
   delivered inside `run()`, without a worker, and with scheduling that fails;
-  failed files of every kind; rapid choices; the two preparation-window cases,
+  failed files of every kind; a filter file too large to save (PLUG-12: two
+  paths of 8,388,608 samples, refused with the original kept, playing and
+  saved, or as a silent failed first load); rapid choices; the two preparation-window cases,
   with `work()` paused (through a second test-only extension) after
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;

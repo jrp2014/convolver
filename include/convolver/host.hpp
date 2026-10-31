@@ -22,7 +22,18 @@ struct HostState {
     bool failed = false;
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
+// Throws std::length_error when the encoding would exceed max_host_state_bytes
+// (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
+// PLUG-12: the size in bytes encode_host_state() writes for this state,
+// counted without encoding or allocating. It may exceed max_host_state_bytes;
+// such state cannot be saved (saturates at SIZE_MAX).
+std::size_t encoded_host_state_size(const HostState&) noexcept;
+// PLUG-12: why this state is too large to save, in full sentences saying what
+// to change, or empty when it fits. HostFilter::load refuses such a filter
+// before accepting it, so a plug-in never plays a filter it cannot save, and
+// convolver-preset refuses to write it.
+std::string host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
@@ -74,6 +85,7 @@ enum class HostFailureKind {
     preparation,      // The filter could not be prepared for playing.
     activation,       // The processor could not be built when the host activated.
     saved_failure,    // The restored state records an earlier failed load.
+    too_large,        // The filter is too large to save in the plug-in's state (PLUG-12).
 };
 // Where a filter came from. Plug-ins cannot tell a preset from a saved
 // session: both arrive as state.
@@ -214,18 +226,16 @@ class HostFilter {
     }
     // Load decoded state: a filter, none to return to an empty instance, or a
     // saved failed load (plays silence). Bypass is the adapter's to apply.
-    // Checks on the state itself always run. Checks against the host run when
-    // `host` is given (its configuration is known); `install` then receives
-    // what to play and may throw to reject, or throw SupersededRequest to
-    // abandon the request with nothing recorded or changed (a newer request
-    // has arrived). Without `host`, well-formed state
-    // is accepted and checked at activation. On rejection this records the
-    // error, keeps the accepted filter (a failed initial load if there was
-    // none) and throws std::invalid_argument with an explanation.
-    // A transaction: everything kept is built before `install` is called and
-    // nothing after it throws, so `install` must publish as its last step
-    // (prepare, which may throw, then publish, which cannot). What plays is
-    // then always what is saved, even when memory runs out.
+    // Checks on the state itself always run, including that it fits the
+    // saved-state limit (PLUG-12), so whatever is accepted can be saved. Checks against the host
+    // run when `host` is given (its configuration is known); `install` then receives what to play
+    // and may throw to reject, or throw SupersededRequest to abandon the request with nothing
+    // recorded or changed (a newer request has arrived). Without `host`, well-formed state is
+    // accepted and checked at activation. On rejection this records the error, keeps the accepted
+    // filter (a failed initial load if there was none) and throws std::invalid_argument with an
+    // explanation. A transaction: everything kept is built before `install` is called and nothing
+    // after it throws, so `install` must publish as its last step (prepare, which may throw, then
+    // publish, which cannot). What plays is then always what is saved, even when memory runs out.
     // `request` says where the state came from (numbered if 0).
     // `counting`: the processor that plays (if any). An accepted load clears
     // its fault baseline (HostProcessor::clear_faults()) and observes from the

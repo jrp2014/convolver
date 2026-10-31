@@ -391,7 +391,13 @@ not throw; invalid dimensions return failure without advancing audio.
 
 Host state uses a bounded, versioned little-endian format (64 MiB encoded
 limit), validated transactionally: state that fails decoding or its own checks
-leaves the previous state untouched. Checks against the host's configuration
+leaves the previous state untouched. What is accepted can always be saved
+(PLUG-12): `HostFilter::load` refuses a filter whose encoding would exceed the
+limit (`encoded_host_state_size()`, counted without encoding) before
+installing it, with `HostFailureKind::too_large` and the explanation from
+`host_state_size_error()`, as a check on the state itself. A `.cfg` may hold
+64 Mi samples, four times what the state holds, so a filter file can be too
+large; `convolver-preset` makes the same check. Checks against the host's configuration
 follow [loading and failure](#loading-and-failure), including state restored
 before the host is configured. Version 1 records the filter (or an empty
 instance) and the bypass setting (used by VST3 only; see [bypass](#bypass)); version 2 is written only for a saved failed

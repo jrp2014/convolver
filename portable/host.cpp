@@ -241,6 +241,11 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                        "; this plug-in supports 1 to " + std::to_string(max_channels_) +
                        " channels on each side.",
                    request, carried);
+        // PLUG-12: what is accepted is saved, so a filter the saved state
+        // cannot hold is refused here, before it plays.
+        if (next)
+            if (auto why = host_state_size_error(state); !why.empty())
+                refuse(HostFailureKind::too_large, std::move(why), request, carried);
         if (host && next) {
             if (auto m = mismatch(*next, *host))
                 refuse(m->kind, std::move(m->why), request, carried);
@@ -491,6 +496,8 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
         return "the plug-in could not start the filter.";
     case HostFailureKind::saved_failure:
         return "a load had failed when this was saved.";
+    case HostFailureKind::too_large:
+        return "the filter is too long to save with the project.";
     }
     return "the filter could not be loaded.";
 }

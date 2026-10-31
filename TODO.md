@@ -821,6 +821,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
   [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
+- [x] **PLUG-12 — Accept only filters that can be saved.** 31 October 2026,
+  from jrp's review of `6920a45`: a `.cfg` may hold 64 Mi samples but saved
+  state only 64 MiB, so a 16,777,216-sample filter loaded and then could not
+  be saved. `HostFilter::load` refuses a filter whose state would exceed the
+  limit before installing it (`too_large`), and `convolver-preset` refuses
+  to write one; [host state](docs/develop/plugin-contract.md#host-state).
 - [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
   24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
   in its constructor, so out of memory reaches the caller, and

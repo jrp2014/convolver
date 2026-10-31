@@ -953,6 +953,86 @@ void allocation_failures() {
     f.load(HostState{filter(2)}, host, [](const Configuration&) {});
     require(!f.notice().empty(), "speaker notice not kept");
 }
+// PLUG-12: a filter is accepted only if its saved state fits. Loading a
+// filter one sample over the limit is refused before anything is installed,
+// keeping the previous filter and what it saves byte for byte (or, for an
+// empty instance, a failed first load that saves); one exactly at the limit
+// loads and saves. jrp's review of 6920a45: a 16,777,216-sample WAV loaded
+// and then could not be saved.
+void saved_state_limit() {
+    using Kind = HostFailureKind;
+    // encoded_host_state_size() counts what encode_host_state() writes.
+    Configuration routed{48000, 2, 3, 0x7, {1, 2}, {0, 4, 9}, {}};
+    routed.paths.push_back({{1, .5f, .25f}, {{0, 1}, {1, .5f}}, {{2, 1}}});
+    routed.paths.push_back({{-1}, {{1, 1}}, {{0, .5f}, {1, .25f}, {2, 1}}});
+    HostState failed;
+    failed.failed = true;
+    HostState bypassed{mono()};
+    bypassed.bypass = true;
+    for (const auto& state : {HostState{}, failed, bypassed, HostState{routed}})
+        require(encoded_host_state_size(state) == encode_host_state(state).size(),
+                "encoded_host_state_size differs from the encoding");
+    // One mono path: 17 words besides its samples, so this many fill the limit.
+    constexpr std::size_t at_limit = max_host_state_bytes / 4 - 17;
+    const auto filter = [](std::size_t samples) {
+        Configuration c{48000, 1, 1, 0, {}, {}, {}};
+        c.paths.push_back({std::vector<float>(samples, 0.f), {{0, 1}}, {{0, 1}}});
+        c.paths[0].impulse[0] = 1;
+        return c;
+    };
+    require(encoded_host_state_size(HostState{filter(at_limit)}) == max_host_state_bytes,
+            "the boundary filter does not fill the limit exactly");
+    const HostLayout host{48000, 1, 1};
+    std::size_t installed = 0;
+    const std::function<void(const Configuration&)> install = [&](const Configuration& c) {
+        installed = c.paths.at(0).impulse.size();
+    };
+    const auto refused_over = [&](HostFilter& f) {
+        installed = 0;
+        try {
+            f.load(HostState{filter(at_limit + 1)}, host, install);
+        } catch (const std::invalid_argument& e) {
+            require(std::string(e.what()).find("too large to save") != std::string::npos,
+                    "the refusal does not explain the size limit");
+            require(!installed, "a filter too large to save was installed");
+            return;
+        }
+        throw std::runtime_error("a filter too large to save was accepted");
+    };
+    // Over a working filter: refused, the filter and its saved bytes kept.
+    HostFilter kept(8);
+    kept.load(HostState{mono(.5f)}, host, install);
+    const auto before = encode_host_state(HostState{kept.filter()});
+    refused_over(kept);
+    require(kept.failure() && kept.failure()->kind == Kind::too_large && !kept.failure()->silent &&
+                kept.failure()->inputs == 1 && kept.failure()->outputs == 1,
+            "the refusal's failure record is wrong");
+    require(!kept.failed() && encode_host_state(HostState{kept.filter()}) == before,
+            "a refused oversized filter changed the saved state");
+    // Without the host's configuration, the check still runs at once.
+    try {
+        kept.load(HostState{filter(at_limit + 1)}, std::nullopt);
+        throw std::runtime_error("an oversized filter was accepted before activation");
+    } catch (const std::invalid_argument&) {
+    }
+    require(encode_host_state(HostState{kept.filter()}) == before,
+            "an oversized filter changed the saved state before activation");
+    // An empty instance: a failed first load, which saves.
+    HostFilter empty(8);
+    refused_over(empty);
+    require(empty.failed() && !empty.filter() && empty.failure()->silent,
+            "an oversized first filter is not a failed first load");
+    HostState saved_failure;
+    saved_failure.failed = true;
+    require(encode_host_state(saved_failure).size() == 12, "the failed first load does not save");
+    // Exactly at the limit: accepted, installed and saved, and it reads back.
+    empty.load(HostState{filter(at_limit)}, host, install);
+    require(installed == at_limit && !empty.failure(), "the filter at the limit was refused");
+    const auto bytes = encode_host_state(HostState{empty.filter()});
+    require(bytes.size() == max_host_state_bytes, "the filter at the limit did not save in full");
+    require(decode_host_state(bytes).configuration->paths.at(0).impulse.size() == at_limit,
+            "the filter at the limit does not read back");
+}
 // CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
 // since temporary folders may hold characters outside the ANSI code page.
 std::optional<std::filesystem::path> log_variable() {
@@ -1249,8 +1329,9 @@ void status_lines() {
           "Load failed, previous filter kept: the filter is for 44100 Hz, the host runs at 48000 "
           "Hz. The log could not be written.",
           "unwritable log, refused rate");
-    const std::array<std::pair<HostFailureKind, const char*>, 6> kinds{{
+    const std::array<std::pair<HostFailureKind, const char*>, 7> kinds{{
         {HostFailureKind::filter_file, "filter file could not be read"},
+        {HostFailureKind::too_large, "too long to save with the project"},
         {HostFailureKind::state_unreadable, "preset or saved state could not be read"},
         {HostFailureKind::state_newer, "saved by a newer Convolver"},
         {HostFailureKind::preparation, "could not be prepared"},
@@ -1477,6 +1558,7 @@ int main() {
         muting();
         control_silence();
         allocation_failures();
+        saved_state_limit();
         status_lines();
         processing_faults();
         costly_moments_against_oracle();
