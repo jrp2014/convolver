@@ -520,26 +520,26 @@ How each adapter meets the contract where its format differs:
   marked silent only once the tail has decayed. Rejections are returned to the
   host as errors, shown by the Status parameter and written to the Convolver
   log and the unified log.
-- **Audio Unit window in a host** (learned in GarageBand 10.4.14, whose
-  runs are recorded in TODO AU-6); the VST3 window (VST3-11) starts from
-  these:
+- **Audio Unit window in a host** (the evidence is in TODO AU-6); the VST3
+  window (VST3-11) starts from these:
   - The host may run the plug-in in a process of its own (GarageBand:
-    `AUHostingServiceXPC_arrow`). The window is then an
+    `AUHostingServiceXPC_arrow`). The view's window is then an
     `NSServiceViewControllerWindow` of that process, shown at a floating
-    level, while the host keeps the keyboard.
-  - A file dialog is a sheet on the plug-in's own window, begun
+    level, while the host keeps the keyboard. A host that runs the
+    plug-in in its own process puts the view in one of its own windows
+    instead, and the sheet then attaches there.
+  - A file dialog is a sheet on the window that holds the view, begun
     asynchronously with `beginSheetModalForWindow:completionHandler:` as
     Apple's
     [file panel guide](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/UsingtheOpenandSavePanels/UsingtheOpenandSavePanels.html)
-    describes and as JUCE's macOS file chooser does for a plug-in. The
-    sheet takes the keys with that window. A separate dialog window stayed
-    behind the plug-in's window, and raised above it still could not
-    become key, so there is no separate-window fallback. Never `runModal`.
-  - Choosing a file changes the saved state without a parameter change.
-    Apple documents no way to tell the host; a `ClassInfo` change
-    notification alone did not mark the project changed. Making the file
-    the present preset (a user preset named after it) with a
-    `PresentPreset` notification did.
+    describes. There is no separate dialog window: in an out-of-process
+    host it cannot become key. Never `runModal`.
+  - An accepted file changes the saved state without a parameter change,
+    and a `ClassInfo` notification alone does not make GarageBand mark
+    the project changed. The file therefore also becomes the present
+    preset (a user preset, number -1, named after the file), with a
+    `PresentPreset` notification. A refused file keeps the filter, so it
+    sends only `ClassInfo`.
 - **LV2:** ports are fixed, so each channel layout is its own plug-in
   ([identities](plugin-identities.md#channel-layouts)). Bypass is the `enabled`
   port, which the host saves, so the adapter's state does not record bypass and

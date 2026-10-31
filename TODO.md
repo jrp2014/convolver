@@ -450,7 +450,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   at once and loaded a file. The sheet is the only dialog since; the
   investigation's logging, Option-click switch, activation and window-level
   changes are gone.
-  Not checked: VoiceOver.
+  Not checked: VoiceOver; the sheet in a host that runs the plug-in in its
+  own process (REAPER, for example), where it attaches to the host's window.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
@@ -463,11 +464,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] A refused replacement keeps the previous filter.
   - [x] GarageBand marks the project changed after only choosing a file
     (`bf7adb6`: the file becomes the present preset).
-  - [x] The file dialog opens in front of the host's windows and
-    Convolver's (`eda43e4`).
-  - [x] The file dialog takes typing without a click first: as a sheet
-    on Convolver's window (`abb2edf`, Option-click).
-  - [x] The sheet as the only dialog (`b0f2552`): a plain click takes
+  - [x] The file dialog, a sheet as the only dialog (`b0f2552`), opens
+    in front of the host's windows and Convolver's: a plain click takes
     typing and loads a file, Cancel keeps the filter, closing Convolver's
     window from GarageBand's plug-in button while the sheet is open loads
     nothing, and two Convolver instances each keep their own file (exports

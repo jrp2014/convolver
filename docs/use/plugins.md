@@ -283,13 +283,13 @@ the plug-in's button in the track's Plug-ins area. The window has:
   The project saves the filter itself, not the file's path: after
   reopening, the Filter detail says it came from the saved project. An
   accepted file also becomes the plug-in's current preset, named after the
-  file, so the host can tell the project has changed and asks to save it
-  (checked in GarageBand 10.4.14). The
+  file, so the host can tell the project has changed and asks to save it.
+  The
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
-  moment. The file dialog opens as a sheet on Convolver's window and takes
-  typing at once, also in GarageBand, which runs Convolver in a separate
-  process. Closing
+  moment. The file dialog opens as a sheet on the window that holds
+  Convolver (the host's own window, in a host that runs Convolver in its
+  own process) and takes typing at once. Closing
   Convolver's window while the file dialog is open closes
   the dialog too, and nothing is loaded. GarageBand runs plug-ins in a
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files

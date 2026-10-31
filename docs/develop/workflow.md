@@ -76,9 +76,8 @@ Contents: [before you start](#before-you-start) ·
   frameworks do it, not from a design of your own. Have the smallest working
   interaction tried in the real host early. Log the state at the first
   unexplained failure before trying another fix, and put any comparison into
-  one clearly described run whose logs jrp collects. The AU file dialog
-  ([format notes](plugin-contract.md#format-notes)) took four of jrp's runs
-  because a separate dialog window was tried before the standard sheet.
+  one clearly described run whose logs jrp collects. Check the
+  [format notes](plugin-contract.md#format-notes) first.
 - **New dependencies:** if your work needs a new build or test dependency, add
   it in the same pull request to the CI workflow and to
   `.claude/hooks/session-start.sh`, so the next cloud session has it.

@@ -580,9 +580,12 @@ Four CTest tests run when the adapter is built (label `au`):
   file dialog nor a drag is driven: a headless runner has no user to answer
   them), then the view's load step, which both use: a stereo WAV plays, the
   details and the load property name it, and the saved state equals
-  `filter_file_state()`'s with the same reader; a mono WAV and a missing
-  file are refused with the file named, the stereo filter still playing
-  and saved; on an empty unit a refused first file leaves it silent. The
+  `filter_file_state()`'s with the same reader; the accepted file sends
+  `ClassInfo` and `PresentPreset` notifications and becomes the present
+  preset, whose name the saved state carries and a restore in another unit
+  brings back; a mono WAV and a missing file are refused with the file
+  named, the stereo filter still playing and saved and the preset name
+  kept; on an empty unit a refused first file leaves it silent. The
   dialog's answer is driven in two steps (`startChoosing`,
   `finishChoosing:URL:`), without a dialog or the mouse: only the pending
   request loads, once, while the view is in an open window; a request

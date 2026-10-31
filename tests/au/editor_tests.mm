@@ -512,6 +512,25 @@ void files() {
             "mono file advice: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
     require(present_preset(unit) == "stereo", "a refused file renamed the present preset");
+    {
+        // The saved state carries the preset name, and restoring it in
+        // another unit (a reopened project) brings the name back.
+        const auto plist = unit.class_info_now();
+        const auto saved_name = static_cast<CFStringRef>(
+            CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), CFSTR(kAUPresetNameKey)));
+        const bool named = saved_name && CFGetTypeID(saved_name) == CFStringGetTypeID() &&
+                           text((__bridge NSString*)saved_name) == "stereo";
+        Unit reopened;
+        check(reopened.configure(44100, 2, 2, 512), "reopened formats");
+        check(reopened.initialize(), "reopened initialization");
+        const auto restored = reopened.restore(plist);
+        CFRelease(plist);
+        require(named, "the saved state does not name the preset \"stereo\"");
+        check(restored, "restoring the saved state");
+        require(present_preset(reopened) == "stereo",
+                "restored present preset: " + present_preset(reopened));
+        reopened.uninitialize();
+    }
     const auto kept = unit.failure();
     require(kept.present && !kept.silent && unit.saved().configuration,
             "after a refused file the stereo filter must still play and be saved");
