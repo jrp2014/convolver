@@ -853,7 +853,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   (1,166 lines) moved unchanged into `effect.cpp`, `effect_state.cpp` and
   `effect_properties.cpp`, then the repeated silence and refusal steps were
   made one function each and Core Foundation values owned by `cf_owned`; no
-  behaviour changes; [implementation map](docs/develop/architecture.md).
+  behaviour changes (CHANGELOG has the one out-of-memory exception);
+  [implementation map](docs/develop/architecture.md).
 - [x] **CI-1 — Skip builds and tests for documentation-only pull requests.**
   24 October 2026, PR #63; [documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests).
 - [x] **CI-2 — Shorten CI without losing coverage.** 24 October 2026, PR #65:

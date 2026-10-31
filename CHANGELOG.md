@@ -173,7 +173,10 @@ Until 1.0 the C++ API may change between minor versions.
   30 October 2026). The repeated "a failed first load plays silence" step
   and the refusals' logging are now one function each, and Core Foundation
   values are released by `cf_owned` (`plugins/au/core_foundation.hpp`)
-  rather than by hand. No behaviour changes.
+  rather than by hand. No behaviour changes, except that the preset checks
+  no longer create a string per key, which could crash if memory ran out.
+  `au.adapter` now also checks that a state refused before it reaches the
+  filter is logged.
 
 ### Fixed
 

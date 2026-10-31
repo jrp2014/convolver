@@ -146,7 +146,8 @@ class Effect final : public ausdk::AUBase {
                 const Configuration* carried = nullptr);
     // Under `control_`, after a request failed: if it was the first load to
     // fail (`was_failed` is filter_.failed() from before it), the unit plays
-    // silence rather than the unfiltered input.
+    // silence rather than the unfiltered input; uninitialized, a failed
+    // filter's tail is 0.
     void silence_failed_first_load(bool was_failed) noexcept;
     // Gain and Mix as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
