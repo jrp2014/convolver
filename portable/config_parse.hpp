@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace convolver::detail {
@@ -143,11 +144,22 @@ struct SelectionCandidate {
 // difference and what to change. `subject` says where the wanted properties came
 // from, for example "the input audio". `list` is true when `filter` is a list.
 // `plugin`: `wanted` is a plug-in host's rate and channels, so the advice
-// names the host's settings and Convolver's window, not command-line options.
+// names the host's settings and loading the file in Convolver, not
+// command-line options.
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
                              const ConfigurationSelection& wanted, std::string_view subject,
                              bool plugin = false);
+// What load_configuration() throws when no filter in the file matches the
+// selection: the explanation, and what it was worked out from, so a plug-in
+// can say which rate or channels the file was made for.
+struct NoMatch : std::runtime_error {
+    NoMatch(const std::string& explanation, bool in_list, std::vector<SelectionCandidate> checked)
+        : std::runtime_error(explanation), list(in_list),
+          candidates(std::make_shared<const std::vector<SelectionCandidate>>(std::move(checked))) {}
+    bool list = false; // The file is a configuration list.
+    std::shared_ptr<const std::vector<SelectionCandidate>> candidates; // In entry order.
+};
 
 struct DecodedIr {
     std::filesystem::path resolved;

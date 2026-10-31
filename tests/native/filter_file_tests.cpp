@@ -74,8 +74,10 @@ void run(const fs::path& dir) {
         require(!has(why.message, "--"), "command-line advice: " + why.message);
         return why.message;
     };
-    require(has(explanation(dir / "mono.wav", stereo), "choose it in Convolver's window instead"),
-            "the mono example names the window");
+    // It names no window: the LV2 plug-in has none (review of 8177017).
+    const auto mono = explanation(dir / "mono.wav", stereo);
+    require(has(mono, "load it in Convolver instead") && !has(mono, "window"),
+            "the mono example: " + mono);
     require(has(explanation(dir / "fast.wav", stereo), "set the host's project or audio device"),
             "the rate advice names the host");
     {
@@ -91,6 +93,27 @@ void run(const fs::path& dir) {
     }
     require(has(explanation(dir / "list.txt", stereo), "in the host's track or routing settings"),
             "the list advice names the host");
+    // A list's summary does not report one entry as "the filter": its
+    // entries differ (review of 8177017). With an entry at the host's rate it
+    // is refused for channels, otherwise for the rate.
+    const HostLayout fast_stereo{48000, 2, 2};
+    impulse(dir / "fast-mono.wav", 48000, 1);
+    {
+        std::ofstream list(dir / "mixed.txt");
+        list << "mono.wav\nfast-mono.wav\n";
+    }
+    const auto mixed = refused(dir / "mixed.txt", fast_stereo, HostFailureKind::channels);
+    require(has(mixed, "the filter does not suit the plug-in's 2 in, 2 out.") &&
+                !has(mixed, "44100"),
+            "list with an entry at the host's rate: " + mixed);
+    {
+        std::ofstream list(dir / "slow.txt");
+        list << "mono.wav\n";
+    }
+    const auto slow = refused(dir / "slow.txt", fast_stereo, HostFailureKind::sample_rate);
+    require(has(slow, "the filter is not for the host's 48000 Hz.") && !has(slow, "1 in"),
+            "list with no entry at the host's rate: " + slow);
+
     // The command line keeps its own advice.
     try {
         load_configuration(dir / "crossover.cfg", ConfigurationSelection{44100, 2, 2});

@@ -943,7 +943,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
             } catch (...) {
             }
         } else {
-            p.filter.reject(why.kind, std::move(why.message), from_file);
+            p.filter.reject(why.kind, std::move(why.message), from_file, why.filter());
         }
     }
     if (loaded) {

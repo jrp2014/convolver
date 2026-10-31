@@ -141,10 +141,13 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   `read_filter_file()` and `HostFilter::reject()` as the Audio Unit and LV2
   use them. The short status text gives the refused file's own channels
   ("the filter has 1 in, 1 out, the plug-in 2 in, 2 out") or rate, never
-  "0 in, 0 out" or "0 Hz", also when no filter was carried; the full
-  explanation advises on the host's settings and Convolver's window, with no
-  command-line options, for a mono WAV, a 48 kHz WAV, a 2-in 6-out `.cfg` and
-  a list; the command line keeps `--output-channels` advice.
+  "0 in, 0 out" or "0 Hz", also when no filter was carried. A list's status
+  names the host's channels or rate rather than one entry's, and is refused
+  for the rate only when no entry has the host's rate. The full explanation
+  advises on the host's settings and loading the file in Convolver, with no
+  command-line options and no window (the LV2 plug-in has none), for a mono
+  WAV, a 48 kHz WAV, a 2-in 6-out `.cfg` and a list; the command line keeps
+  `--output-channels` advice.
 - `native.limits`: every resource limit accepted at its value and rejected just
   beyond it, using the production constants: 1 MiB per text file, 16 nesting
   levels, 4096 list visits, 16 MiB of configuration text per resolution (shared

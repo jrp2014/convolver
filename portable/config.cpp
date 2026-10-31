@@ -230,7 +230,8 @@ std::string indented(const std::string& text) {
     return result;
 }
 // `plugin`: the wanted properties are a plug-in host's, so the advice names
-// the host's settings and Convolver's window rather than command-line options.
+// the host's settings, not command-line options. It names no window: the LV2
+// plug-in has none, and its host's file chooser loads the file.
 std::string explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
                         const ConfigurationSelection& w, std::string_view subject, bool plugin) {
     const auto name = utf8_string(filter);
@@ -257,8 +258,8 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
             text += "\nTo apply this mono IR to all " + std::to_string(w.input_channels) +
                     " channels, save a configuration such as the following beside " +
                     utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
-                    (plugin ? "choose it in Convolver's window" : "pass it as the filter") +
-                    " instead:\n" + indented(mono_example(c, w.input_channels)) +
+                    (plugin ? "load it in Convolver" : "pass it as the filter") + " instead:\n" +
+                    indented(mono_example(c, w.input_channels)) +
                     "Lines starting with // are comments and can be kept or removed.";
         else if (c.sound_file)
             text += "\nUse an IR file with one channel per input channel (" +
@@ -725,8 +726,9 @@ Configuration load_configuration(const std::filesystem::path& path,
             *source_paths = resolver.sources();
         return std::move(*selected);
     }
-    throw std::runtime_error(detail::explain_no_match(
+    auto explanation = detail::explain_no_match(
         path, list, candidates, selection,
-        plugin ? "the plug-in in its host" : "the audio to be filtered", plugin));
+        plugin ? "the plug-in in its host" : "the audio to be filtered", plugin);
+    throw detail::NoMatch(explanation, list, std::move(candidates));
 }
 } // namespace convolver::detail

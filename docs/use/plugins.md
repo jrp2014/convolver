@@ -285,9 +285,10 @@ the plug-in's button in the track's Plug-ins area. The window has:
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
   moment. Closing Convolver's window while the file dialog is open closes
-  the dialog too, and nothing is loaded. Not yet tried in GarageBand, which runs plug-ins in a sandbox: a
-  `.cfg` there may not be allowed to read the WAV files beside it, and the
-  explanation then says permission was denied. A preset always works.
+  the dialog too, and nothing is loaded. GarageBand runs plug-ins in a
+  sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
+  beside it. Where a sandbox refuses, the explanation says permission was
+  denied. A preset always works.
 - **Copy diagnostics** puts all of this, with this instance's recent lines
   from the Convolver log, on the clipboard as plain text, ready to paste into
   a report.

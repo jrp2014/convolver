@@ -432,8 +432,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
+  - [ ] If the sandbox refuses a `.cfg`'s WAV files, the window says
+    permission was denied (not provoked: GarageBand allowed the access).
   - [x] Save, quit and reopen a project after choosing a file, with the
     original files moved away: the filter and the settings came back.
+  - [ ] After that reopen, the Filter detail says the filter came from the
+    project (not recorded in the run of `54eac9f`).
   - [x] A refused replacement keeps the previous filter.
   - [ ] Whether GarageBand marks the project changed after only choosing a
     file.
