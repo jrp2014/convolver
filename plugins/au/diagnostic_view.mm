@@ -446,14 +446,17 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return NO;
 }
 
-// The system's file dialog, as a sheet on Convolver's window. In GarageBand,
-// which runs the plug-in in a process of its own, a separate dialog window
-// stayed behind Convolver's window and then took no typing, as GarageBand
-// kept the keyboard; the sheet takes the keys with Convolver's window (jrp's
-// runs of bf7adb6, eda43e4 and abb2edf, GarageBand 10.4.14). A separate
-// dialog, above Convolver's window, is left for when no sheet can attach.
+// The system's file dialog, as a sheet on Convolver's window, presented
+// asynchronously as Apple's file-panel guide describes
+// (beginSheetModalForWindow:completionHandler:). In GarageBand, which runs
+// the plug-in in a process of its own, a separate dialog window stayed
+// behind Convolver's window and took no typing; the sheet takes the keys
+// with Convolver's window (jrp's runs of bf7adb6 to abb2edf).
 - (void)chooseFilter:(id)sender {
-    const NSUInteger request = [self startChoosing];
+    NSWindow* own = self.window;
+    if (!own)
+        return; // The button is in the window; nothing to attach to otherwise.
+    const NSUInteger request = [self startChoosing]; // Ends an earlier sheet.
     NSOpenPanel* panel = [NSOpenPanel openPanel];
     panel_ = panel;
     panel.canChooseFiles = YES;
@@ -468,29 +471,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // first, which forgets the request and ends the sheet (stopChoosing).
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
     __weak NSOpenPanel* weakPanel = panel;
-    void (^finished)(NSModalResponse) = ^(NSModalResponse response) {
-      CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
-      NSURL* url = response == NSModalResponseOK ? weakPanel.URL : nil;
-      if (view)
-          [view finishChoosing:request URL:url];
-    };
-    NSWindow* own = self.window;
-    if (own && own.visible && !own.attachedSheet) {
-        [panel beginSheetModalForWindow:own completionHandler:finished];
-        return;
-    }
-    // A separate dialog: above Convolver's window, which GarageBand shows at
-    // a floating level, and made key once on screen.
-    NSWindowLevel above = NSModalPanelWindowLevel;
-    if (own && own.level >= above)
-        above = own.level + 1;
-    panel.level = above;
-    [panel beginWithCompletionHandler:finished];
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NSOpenPanel* shown = weakPanel;
-      if (shown && shown.visible)
-          [shown makeKeyAndOrderFront:nil];
-    });
+    [panel beginSheetModalForWindow:own
+                  completionHandler:^(NSModalResponse response) {
+                    CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
+                    NSURL* url = response == NSModalResponseOK ? weakPanel.URL : nil;
+                    if (view)
+                        [view finishChoosing:request URL:url];
+                  }];
 }
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {

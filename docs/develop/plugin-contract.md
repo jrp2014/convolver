@@ -527,10 +527,14 @@ How each adapter meets the contract where its format differs:
     `AUHostingServiceXPC_arrow`). The window is then an
     `NSServiceViewControllerWindow` of that process, shown at a floating
     level, while the host keeps the keyboard.
-  - A file dialog is a sheet on the plug-in's own window
-    (`beginSheetModalForWindow:`), which takes the keys with that window.
-    A separate dialog window stayed behind the plug-in's window, and above
-    it still could not become key. Never `runModal`.
+  - A file dialog is a sheet on the plug-in's own window, begun
+    asynchronously with `beginSheetModalForWindow:completionHandler:` as
+    Apple's
+    [file panel guide](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/UsingtheOpenandSavePanels/UsingtheOpenandSavePanels.html)
+    describes and as JUCE's macOS file chooser does for a plug-in. The
+    sheet takes the keys with that window. A separate dialog window stayed
+    behind the plug-in's window, and raised above it still could not
+    become key, so there is no separate-window fallback. Never `runModal`.
   - Choosing a file changes the saved state without a parameter change.
     Apple documents no way to tell the host; a `ClassInfo` change
     notification alone did not mark the project changed. Making the file

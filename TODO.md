@@ -447,8 +447,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   state (Convolver's window, an `NSServiceViewControllerWindow` in the
   plug-in's process, was key; the separate dialog could not become key)
   and showed that the dialog as a sheet on Convolver's window took typing
-  at once and loaded a file. The sheet is the dialog since; the
-  investigation's logging and Option-click switch are gone.
+  at once and loaded a file. The sheet is the only dialog since; the
+  investigation's logging, Option-click switch, activation and window-level
+  changes are gone.
   Not checked: VoiceOver.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
@@ -465,8 +466,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] The file dialog opens in front of the host's windows and
     Convolver's (`eda43e4`).
   - [x] The file dialog takes typing without a click first: as a sheet
-    on Convolver's window (`abb2edf`, Option-click). To recheck as the
-    default: closing Convolver's window while the sheet is open.
+    on Convolver's window (`abb2edf`, Option-click).
+  - [ ] The sheet as the only dialog: a plain click loads a file, Cancel
+    keeps the filter, closing Convolver's window while the sheet is open
+    loads nothing, and two Convolver instances each take their own file.
   - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
     identical before and after).
   - [x] Mix automation with the window open: the slider followed, also
