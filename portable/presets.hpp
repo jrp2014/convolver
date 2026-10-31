@@ -55,7 +55,8 @@ Lv2Preset lv2_preset(const HostState&, std::string_view name);
 std::string base64(std::span<const std::byte>);
 
 // Checks that the state can be written in this format, with an explanatory
-// message otherwise (channel limits, LV2 layouts, preset names).
+// message otherwise (channel limits, LV2 layouts, preset names, the saved
+// state's size).
 void check_writable(Format, const HostState&, std::string_view name);
 // Creates the file (or LV2 folder); never replaces an existing entry. A
 // partly written LV2 folder is removed again.

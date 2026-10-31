@@ -1205,6 +1205,63 @@ void worker_loads(host::World& world, const fs::path& work) {
     }
 }
 
+// PLUG-12 (jrp's review of 6920a45): a filter file whose filter the saved
+// state cannot hold is refused when it is chosen, not accepted and then
+// lost when the host saves. Two paths of 8,388,608 samples are 16,777,216 in
+// all, just over the limit; the refusal keeps the working filter, its path
+// and its saved bytes, and an empty instance's first load fails into silence.
+void oversized_files(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    const auto folder = work / "oversized";
+    fs::create_directories(folder);
+    {
+        fs::remove(folder / "long.wav");
+        AudioWriter writer(folder / "long.wav", {48000, 1}, OutputFormat::wav_float);
+        std::vector<float> chunk(1 << 16, 0.f);
+        chunk[0] = 1;
+        for (int i = 0; i < 128; ++i) {
+            writer.write(chunk);
+            chunk[0] = 0;
+        }
+        writer.close();
+    }
+    const auto oversized = (folder / "long.cfg").string();
+    write_text(oversized, scaling_cfg(48000, "long.wav", ".5"));
+    using lv2::Status;
+    const auto refused = [&](host::Plugin& p, bool silent, const std::string& label) {
+        p.log.messages.clear();
+        p.set_filter(oversized);
+        settle(p);
+        const auto r = p.failure();
+        check(p.status == as_float(Status::load_failed) && r &&
+                  r->kind == HostFailureKind::too_large && r->silent == silent &&
+                  r->message.find("too large to save") != std::string::npos &&
+                  p.log.contains(LV2_LOG__Error, "too large to save"),
+              label + "refused as too large to save, and explained");
+    };
+    {
+        auto p = worker_instance(world, host::Worker::threaded);
+        p->activate();
+        p->set_filter(files.original.string());
+        settle(*p);
+        const auto before = p->save().bytes;
+        refused(*p, false, "oversized replacement: ");
+        check(near(play_constant(*p, 1024).back(), .5f) &&
+                  reported(*p) == files.original.string() &&
+                  saved_path(*p) == files.original.string() && p->save().bytes == before,
+              "oversized replacement: the original plays and saves as before");
+    }
+    {
+        auto p = worker_instance(world, host::Worker::threaded);
+        p->activate();
+        refused(*p, true, "oversized first load: ");
+        check(silent(play_constant(*p, 1024)) && decode_host_state(p->save().bytes).failed &&
+                  saved_path(*p).empty(),
+              "oversized first load: plays silence and saves as a failed load");
+    }
+    fs::remove(folder / "long.wav");
+}
+
 // --- Expectations from the shared contract and the LV2 specification -------------
 // Found in jrp's review of 0.4.30, where tests had followed the implementation.
 
@@ -1580,6 +1637,7 @@ int main(int argc, char** argv) {
         bundle(world);
         instantiation(world);
         worker_loads(world, work);
+        oversized_files(world, work);
         path_state(world, work);
         refused_first_loads(world, work);
         empty_state_resets(world, work);

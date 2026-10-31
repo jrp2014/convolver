@@ -53,15 +53,16 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)) | Done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). |
+| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 are pre-preview fixes, each with a test of the sequence that failed. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| Early walkthrough (macOS) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only, as soon as step 3 has its stereo preset and journey | Recorded like REL-3, with its limits stated. It finds installation, documentation, loading and reopening problems while the other windows are still being built; it does not change the first preview's contents (jrp's 25 October decision) and does not replace REL-3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.6.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in the [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md) plan, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
-| Before any optimisation | **PERF-3:** resource budgets | Callback-time distributions, memory and preparation time for long and 6/8-channel filters, including replacement and reset, define the supported workloads. PERF-2, FFT-2 and VST3-5 start only if PERF-3 shows a need. |
-| Supporting, cheap | **ROBUST-3**, **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | ROBUST-3 (a failed first load can play unfiltered input if memory then runs out) breaks the contract but needs memory exhaustion at one exact moment; VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. Neither blocks the first preview; either moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
+| Supporting, cheap | **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -131,6 +132,21 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
+- [ ] **REL-5 — Early limited walkthrough on macOS.** Proposed in jrp's
+  review of `6920a45` (31 October 2026): before the other platforms' windows
+  are finished, someone who did not write the code or the guides follows the
+  stereo room-correction journey (REL-2) on macOS from an exact candidate
+  package (identified by its SHA-256 sums), in one named host, using only the
+  documentation, and the record says plainly what it does not cover (the
+  other journeys, platforms and formats). It looks for installation,
+  documentation, loading and reopening problems early. Where the journey
+  checks output, it does so by command (the host's render compared with
+  `expected.wav`), not by ear or screen, as jrp prefers testing through the
+  CLI where that makes sense. Record it as REL-3 says, and fix what it finds. It needs the stereo preset in the package
+  (PLUG-5) and the stereo journey written (REL-2). It does not change what
+  the first preview holds (jrp's
+  [25 October decision](docs/project/decisions.md), confirmed on 31 October)
+  and does not replace REL-3.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -480,15 +496,6 @@ means a patched FFmpeg build with `--enable-gpl`.
 - [ ] **ROBUST-2 — Bound report output.** Review traversal/report growth after the
   configuration-visit limit and diagnostic truncation, including huge invalid
   lists. Bound reporting work as well as file reads.
-- [ ] **ROBUST-3 — Silence when memory runs out after a recorded failure.**
-  When an active VST3 or AU instance's first load fails, the adapter records
-  the failure and then prepares silence to replace the unfiltered input. If
-  memory runs out while preparing that silence, the error is swallowed and
-  the input keeps playing unfiltered, though the state says "load failed"
-  (the contract says a failed first load never plays the unfiltered input).
-  The PLUG-7 sequences cannot reach it: they fail either every allocation
-  from one onwards or a single one. A fix could mute from the audio thread,
-  as LV2 does with `HostProcessor::mute`.
 
 ## VST3 SDK features not yet used
 
@@ -625,6 +632,40 @@ so the preset file path is not needed).
   callback size chosen apart from B, for warmed processing, startup, reset,
   live replacement and configuration loading; its first results are in
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
+  jrp's review of `6920a45` (31 October 2026) asks for callback tail latency,
+  peak memory and preparation time during loading, replacement and reset,
+  across realistic routing and callback sizes, before further substantial
+  DSP changes; those results decide whether more complex partitioning is
+  justified.
+
+### Loading responsiveness
+
+An acceptance gate for the first preview (jrp's review of `6920a45`, 31
+October 2026), not an optimisation item. Every adapter except LV2 reads and
+prepares a filter on the thread that asks for it: VST3's `setState`, the
+Audio Unit's `RestoreState` and, in PR #84, the Audio Unit window's
+Choose Filter property call. Cached reports keep other readers from waiting,
+but not the calling thread, which may be the host's interface thread.
+Measure, on the PERF-3 supported workloads, how long that thread is held
+and whether audio drops out while a long filter loads, replaces another and
+is reset; if loads cause noticeable pauses, move preparation to the
+background before the preview (VST3-5 is the VST3 part). Measure with
+automated tests and command-line benchmarks rather than by hand in a host's
+window (jrp, 31 October 2026: test through the CLI where that makes sense):
+time each adapter's own load call (`setState`, `RestoreState`, the window's
+load property) from the test hosts, with `convolver_callback_benchmark`
+timing callbacks while it runs; a named host only confirms the result. LV2's request
+numbers and prepare-then-publish (`HostFilter::load` with
+`SupersededRequest`) are the pattern; the adapter, not its window, owns the
+request, overtaken requests and shutdown, whether or not a window is open.
+First evidence (jrp's GarageBand run of PR #84's `b0f2552`, 31 October
+2026, [recorded on the pull request](https://github.com/jrp2014/convolver/pull/84#issuecomment-6548846745)):
+stereo 44.1 kHz filters of 30 s (1,323,000 taps a path) and 120 s
+(5,292,000 taps) loaded during playback, the new report appearing after
+about 1.4 s and 1.7 s including the observation's own overhead. Those are
+not isolated preparation timings, and whether the interface stayed
+responsive and the audio free of dropouts was not verified. jrp deferred
+load-performance work for now; that is not a qualification of either.
 
 ## Developer tooling
 
@@ -821,6 +862,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [lifecycle sequences](docs/develop/testing.md#lifecycle-sequences-plug-7).
 - [x] **PLUG-8 — Keep a structured failure reason.** 23 October 2026, PR #46;
   [failure reasons](docs/develop/plugin-contract.md#failure-reasons).
+- [x] **PLUG-12 — Accept only filters that can be saved.** 31 October 2026,
+  from jrp's review of `6920a45`: a `.cfg` may hold 64 Mi samples but saved
+  state only 64 MiB, so a 16,777,216-sample filter loaded and then could not
+  be saved. `HostFilter::load` refuses a filter whose state would exceed the
+  limit before installing it (`too_large`), and `convolver-preset` refuses
+  to write one; [host state](docs/develop/plugin-contract.md#host-state).
+- [x] **ROBUST-3 — Silence when memory runs out after a recorded failure.**
+  31 October 2026, from jrp's review of `6920a45`: a failed first load
+  silences the processor with `HostProcessor::silence()`, which cannot
+  allocate or fail, in VST3, the Audio Unit and LV2; lifecycle sequence
+  `state-malformed-starved`;
+  [replacement and threads](docs/develop/plugin-contract.md#replacement-and-threads).
 - [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
   24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
   in its constructor, so out of memory reaches the caller, and

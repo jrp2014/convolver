@@ -162,9 +162,15 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
   activations until a later request succeeds; `mute()` (its 64-frame ramp,
-  bypass, reset, a crossfade, and a replacement fading in from silence); and
-  allocation failure at every step of `HostFilter::load`, checking that what
-  plays is what is saved. A live replacement and a reset, at B = 257, 255 and
+  bypass, reset, a crossfade, and a replacement fading in from silence);
+  `silence()` (ROBUST-3: no allocation, exact silence from the first frame
+  before any audio, the ramp while audio plays, and which publications it
+  covers); allocation failure at every step of `HostFilter::load`, checking
+  that what plays is what is saved; and the saved-state limit (PLUG-12): the
+  size counted without encoding matches the encoding, a filter exactly at
+  64 MiB loads, saves and reads back, and one sample more is refused,
+  keeping the previous filter's saved bytes, or failing an empty instance's
+  first load. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
@@ -422,7 +428,11 @@ allocations failing from the first onwards, then from the second, and so on
 until it loads (`state-B-starved`), and again with only one allocation failing
 each time (`state-B-shortage`). After each failed attempt the saved filter
 must be unchanged and, while active, what plays must still be what the model
-expects. Only allocations made during the plug-in's own call fail: for Audio
+expects. `state-malformed-starved` (ROBUST-3) restores malformed state with
+the allocations failing from each one in turn until the failure is recorded:
+an empty active instance must play silence from the attempt that records it,
+which caught LV2 playing the input and VST3 letting an exception escape when
+memory ran out just after the record. Only allocations made during the plug-in's own call fail: for Audio
 Units that call goes through the Audio Unit SDK's dispatch, whose C++
 allocations fail too, while Core Foundation's never do (they do not go
 through `operator new`).
@@ -559,7 +569,9 @@ AU-4.
   state round trip; long `run()` calls; filter files through the worker, run
   on a thread, synchronously (as when a host free-wheels) and with answers
   delivered inside `run()`, without a worker, and with scheduling that fails;
-  failed files of every kind; rapid choices; the two preparation-window cases,
+  failed files of every kind; a filter file too large to save (PLUG-12: two
+  paths of 8,388,608 samples, refused with the original kept, playing and
+  saved, or as a silent failed first load); rapid choices; the two preparation-window cases,
   with `work()` paused (through a second test-only extension) after
   preparation and after its last check while a newer request arrives, and a
   failed read overtaken the same way; restore with an answer outstanding;

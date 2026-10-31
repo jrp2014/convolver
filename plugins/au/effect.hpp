@@ -108,8 +108,9 @@ class Effect final : public ausdk::AUBase {
     // Why the unit plays silence or rejected its last filter; empty if neither.
     // The same text goes to the system log when it happens.
     std::string error();
-    // Why the newest request failed, numbered for the log (rejected_line).
-    std::string rejection_line();
+    // Why the newest request failed, numbered for the log (rejected_line);
+    // empty if memory runs out.
+    std::string rejection_line() noexcept;
     // What the Status parameter shows (DIAG-1).
     HostStatusLine status();
     // AU-7: the settings the parameters hold, within their ranges.

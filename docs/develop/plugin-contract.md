@@ -108,7 +108,8 @@ is shown is in [status and log](#status-and-log) (DIAG-1):
 
 - **What failed:** a missing or unreadable filter file, unreadable or
   malformed state, a newer state version, the sample rate, the channel counts
-  or layout, preparation, or activation (the same list as DIAG-1's table).
+  or layout, a filter too large to save (PLUG-12), preparation, or activation
+  (DIAG-1's table, which predates the size check).
 - **The request it belongs to:** where the filter came from (preset, saved
   state, file path), its rate and channel counts, and a request number, so a
   later request's success or failure is never confused with it.
@@ -227,9 +228,10 @@ format.
   accepted load sets `hold_fault_signal(failure_shown())` before the
   snapshot, and VST3 and the Audio Unit set it again after every rejection
   and activation; LV2's status port puts Load failed first itself. When an
-  empty instance's first load fails, VST3 and the Audio Unit switch the
-  processor that plays to silence (`unfiltered_configuration`) without
-  `activate()`, which would restart the fault count. The audio
+  empty instance's first load fails, every adapter silences the processor
+  that plays with `HostProcessor::silence()` (ROBUST-3) rather than
+  `activate()`, which would restart the fault count; it neither allocates
+  nor fails, so the silence holds even when memory has run out. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends
@@ -368,9 +370,14 @@ of memory never leaves one filter playing while another is saved. One audio
 thread calls process, reset, set_bypass and mute, and reads publications.
 `mute()` is for a failure
 found on the audio thread itself: the current filter ramps to silence over 64
-samples and stays silent until a filter published after the mute takes over
-and fades in from silence; one published before it but not yet picked up by
-the audio thread is silenced too. Bypass still passes the dry signal. Destruction and
+samples (or is silent from the first sample, when nothing has been processed
+since construction or reset) and stays silent until a filter published after
+the mute takes over and fades in from silence; one published before it but
+not yet picked up by the audio thread is silenced too. Bypass still passes the
+dry signal. `silence()` is the same mute requested from the control side, for
+a failed first load (ROBUST-3): it only stores the number of publications so
+far, so it cannot allocate or fail, and the audio thread mutes at the start of
+its next `process()`, before adopting a pending filter. Destruction and
 reconfiguration require audio to have stopped. Reset invalidates history
 without allocation; its work scales with the block buffers and delay lines,
 not the filter length, and until the history refills the callbacks after it
@@ -385,7 +392,13 @@ not throw; invalid dimensions return failure without advancing audio.
 
 Host state uses a bounded, versioned little-endian format (64 MiB encoded
 limit), validated transactionally: state that fails decoding or its own checks
-leaves the previous state untouched. Checks against the host's configuration
+leaves the previous state untouched. What is accepted can always be saved
+(PLUG-12): `HostFilter::load` refuses a filter whose encoding would exceed the
+limit (`encoded_host_state_size()`, counted without encoding) before
+installing it, with `HostFailureKind::too_large` and the explanation from
+`host_state_size_error()`, as a check on the state itself. A `.cfg` may hold
+64 Mi samples, four times what the state holds, so a filter file can be too
+large; `convolver-preset` makes the same check. Checks against the host's configuration
 follow [loading and failure](#loading-and-failure), including state restored
 before the host is configured. Version 1 records the filter (or an empty
 instance) and the bypass setting (used by VST3 only; see [bypass](#bypass)); version 2 is written only for a saved failed

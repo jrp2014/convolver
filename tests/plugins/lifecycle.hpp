@@ -41,16 +41,19 @@
 namespace convolver::plugin_test::lifecycle {
 enum class Op {
     // Filters arriving as host state (a preset, or a session), in every format.
-    state_a,          // A valid filter, A.
-    state_b,          // Another valid filter, B.
-    state_other_rate, // A filter made for the other sample rate.
-    state_malformed,  // Bytes that are not host state.
-    state_empty,      // Host state with no filter: an empty instance.
-    state_failed,     // A saved failed first load (state version 2).
-    state_b_starved,  // B, first with memory running out at each allocation
-                      // in turn; fixed sequences only (request numbers are
-                      // not followed afterwards).
-    state_b_shortage, // B, first with one allocation failing, each in turn.
+    state_a,                 // A valid filter, A.
+    state_b,                 // Another valid filter, B.
+    state_other_rate,        // A filter made for the other sample rate.
+    state_malformed,         // Bytes that are not host state.
+    state_empty,             // Host state with no filter: an empty instance.
+    state_failed,            // A saved failed first load (state version 2).
+    state_b_starved,         // B, first with memory running out at each allocation
+                             // in turn; fixed sequences only (request numbers are
+                             // not followed afterwards).
+    state_b_shortage,        // B, first with one allocation failing, each in turn.
+    state_malformed_starved, // Malformed state, first with memory running out at
+                             // each allocation in turn (ROBUST-3); fixed
+                             // sequences only.
     // What a host does.
     play,   // Some audio, in uneven callbacks; may leave a transition running.
     bypass, // Toggle bypass.

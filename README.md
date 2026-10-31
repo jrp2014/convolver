@@ -18,8 +18,10 @@ A filter is a multichannel impulse-response (IR) sound file, or a Convolver
 variants of the `.cfg` format ([other programs](docs/use/other-programs.md)).
 Coming from the old Windows Convolver? Your `.cfg` files may need a few
 edits ([how](docs/use/other-programs.md#configurations-from-the-old-windows-convolver)).
-Convolver is a developer preview: packages are unsigned and no named DAW has
-been tested yet ([status](docs/project/status.md)).
+Convolver is a developer preview: packages are unsigned and nothing has been
+published yet. The Audio Unit has been tried in GarageBand; the full host
+tests and an independent user's walkthrough are still to come
+([status](docs/project/status.md)).
 
 ## Start here
 
