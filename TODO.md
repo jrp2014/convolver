@@ -423,19 +423,31 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   review of 30 October), and these acceptance gates (jrp, 30 October 2026),
   each to pass and be recorded, with the GarageBand and macOS versions,
   before AU-6 is done:
-  - [ ] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
-    sandbox whose WAV files it must be allowed to read (if refused, the
-    window must say permission was denied).
-  - [ ] Save, quit and reopen a project after choosing a file: the same
-    filter plays, and the Filter detail says it came from the project.
-  - [ ] Whether GarageBand marks the project changed after a chosen file.
-  - [ ] Gain and Mix automation with the window open (the sliders send no
-    begin and end gestures yet, so recording automation by dragging them is
-    untested).
+  jrp's GarageBand run of `54eac9f` (30 October 2026; GarageBand 10.4.14,
+  macOS 27.2, Apple Silicon, Accelerate and AudioToolbox) passed the
+  checked items; it also found a refused file's summary reading "0 in,
+  0 out" and command-line advice in the window, both fixed in `8177017`.
+  GarageBand gave Convolver stereo even on a mono track, so the mono-track
+  refusal could not be reproduced there.
+  - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
+    sandbox whose WAV files it read (allowed in that session); a dropped
+    `.cfg`.
+  - [x] Save, quit and reopen a project after choosing a file, with the
+    original files moved away: the filter and the settings came back.
+  - [x] A refused replacement keeps the previous filter.
+  - [ ] Whether GarageBand marks the project changed after only choosing a
+    file.
+  - [ ] Gain and Mix automation with the window open, and a held slider
+    while the host changes the setting (the sliders send no begin and end
+    gestures yet, so recording automation by dragging them is untested).
+  - [ ] Repeated refusals of the same file change nothing else.
+  - [ ] The refused-file summary and advice after `8177017` (a mono WAV on
+    a stereo track: "the filter has 1 in, 1 out, the plug-in 2 in, 2 out").
   - [ ] VoiceOver reads the status, the sliders and the buttons.
   - [ ] A long explanation (a list `.cfg`) scrolls; the compact layout fits.
   - [ ] The main-thread pause for a long chosen filter: measured and judged
-    acceptable, or moved to a worker thread.
+    acceptable, or moved to a worker thread. (The file dialog also closes
+    with a perceptible delay when the window closes; not measured.)
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
