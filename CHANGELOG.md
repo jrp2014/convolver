@@ -181,11 +181,12 @@ Until 1.0 the C++ API may change between minor versions.
   behaviour. The AudioToolbox reader checks for a regular file in one place,
   the window builds its detail styles once, and the Audio Unit's property
   calls hand other scopes to `AUBase` first instead of testing the scope on
-  every branch. One fix: the Status parameter's value names are refused,
-  rather than crashing the host, if memory runs out while they are made.
+  every branch.
 
 ### Fixed
 
+- Audio Unit (AU-9): the Status parameter's value names are refused,
+  rather than crashing the host, if memory runs out while they are made.
 - Plug-ins (PLUG-12): a filter too large for the saved state is refused when
   it is loaded, instead of loading and then failing every save. A `.cfg` may
   hold 64 Mi samples, but plug-in state holds at most 64 MiB (just under
