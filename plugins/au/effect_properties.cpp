@@ -304,6 +304,8 @@ OSStatus Effect::GetParameterValueStrings(AudioUnitScope scope, AudioUnitParamet
     std::array<CFTypeRef, status_names.size()> values{};
     for (std::size_t i = 0; i < names.size(); ++i) {
         names[i].reset(CFStringCreateWithCString(nullptr, status_names[i], kCFStringEncodingUTF8));
+        if (!names[i]) // Out of memory: CFArrayCreate must not be handed a null.
+            return kAudioUnitErr_InvalidProperty;
         values[i] = names[i].get();
     }
     *out = CFArrayCreate(nullptr, values.data(), static_cast<CFIndex>(values.size()),
