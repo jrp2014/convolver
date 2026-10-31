@@ -461,7 +461,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] The file dialog opens in front of the host's windows and
     Convolver's (`eda43e4`).
   - [ ] The file dialog takes typing without a click first (not on
-    `eda43e4`; documented in the plug-in guide).
+    `eda43e4`; documented in the plug-in guide). Under investigation: the
+    dialog logs the activation and key-window state, and Option-click
+    opens it as a sheet on Convolver's window for comparison; keep one
+    way and remove the other and the logging once decided.
   - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
     identical before and after).
   - [x] Mix automation with the window open: the slider followed, also
