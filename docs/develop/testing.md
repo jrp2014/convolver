@@ -811,7 +811,11 @@ copy, never replacing existing outputs) and real SDK validation. Windows also co
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles); the macOS candidates use Ninja and
-Windows Visual Studio (CI-10). Until 27 October 2026 a second, offline build of
+Windows Visual Studio (CI-10). Both macOS candidates build on macOS 15
+runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
+deployment target, so the archives are still built for the
+[proposed minimum system](releasing.md#candidates); on 30 October 2026 GitHub
+cancelled the `macos-14` jobs before a runner took them (CI-19). Until 27 October 2026 a second, offline build of
 the same archive with `tests/release/source_build.py` did this on Linux; the
 script remains for [local checks](build.md#preview-recipe). See the
 [qualification record](releasing.md) for external gates.

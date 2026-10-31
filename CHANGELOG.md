@@ -87,6 +87,14 @@ Until 1.0 the C++ API may change between minor versions.
   line. Like the Clang tools, ruff is not pinned, so a new release can turn
   Lint red. No behaviour changes. See
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- Continuous integration (CI-19): the Apple silicon (`macos-arm64`) release
+  candidate is built on GitHub's `macos-15` runner instead of `macos-14`. On
+  30 October 2026 GitHub cancelled the `macos-14` candidate jobs within
+  seconds, before a runner took them, so pull requests showed the candidate
+  workflow as cancelled. The package is still built for macOS 14
+  (`CMAKE_OSX_DEPLOYMENT_TARGET=14.0`) and the proposed minimum system is
+  unchanged. See
+  [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
 
 ### Fixed
 
