@@ -8,6 +8,7 @@
 #include "host_report.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -35,6 +36,10 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 // plugins/identities.json; never change them.
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
+// The global parameters in the order GetParameterList gives them, which
+// RestoreState also notifies.
+inline constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
+                                                                     status_parameter};
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
