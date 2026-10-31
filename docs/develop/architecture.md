@@ -124,22 +124,25 @@ callbacks meet deadlines. Report the actual checks and their limits.
 
 ## Dependency choices
 
-FFTW remains the default FFT backend unless the build includes a plug-in
-(`CONVOLVER_BUILD_VST3=ON`). Then `AUTO` picks the built-in Ooura FFT on Linux
-and Windows and Accelerate on macOS for the whole build, CLI included, because
-other code in the host process may call the same FFTW, whose planner Convolver
-cannot lock ([plug-in builds](fft-backends.md#plug-in-builds)). Build the CLI
-separately to keep FFTW for offline rendering. Accelerate uses an Apple system
-framework; Ooura is built in and avoids a separate FFT dependency. The
-[FFT guide](fft-backends.md) has the numerical contract and dated measurements;
-none is asserted to be fastest for every workload.
+[Which libraries each build uses](build.md#which-libraries-each-build-uses)
+lists the FFT and sound-file library of every build and how to change them.
+The reasons: on macOS every build prefers what macOS includes (Accelerate), so
+nothing extra is installed or shipped, and the other platforms' libraries stay
+build options. Plug-in builds never default to FFTW, because other code in the
+host process may call the same FFTW, whose planner Convolver cannot lock
+([plug-in builds](fft-backends.md#plug-in-builds)); on Linux and Windows they
+use the built-in Ooura. The [FFT guide](fft-backends.md) has the numerical
+contract and dated measurements; none is asserted to be fastest for every
+workload.
 
 [libsndfile](https://libsndfile.github.io/libsndfile/) remains the file
 decoding and encoding boundary. The core and host libraries can omit it, and
 the Audio Unit reads filter files with macOS's AudioToolbox instead, so that
 the component needs nothing beyond macOS. It is
 neither an audio-device layer nor a resampler. Replacing it would need a
-concrete format, packaging or correctness benefit and matching real-file tests.
+concrete format, packaging or correctness benefit and matching real-file tests;
+macOS's AudioToolbox, considered for the tools, did not offer one
+([sound files](build.md#which-libraries-each-build-uses)).
 
 Plug-in adapters use each format's own headers (VST3 SDK, AudioUnitSDK, `lv2`)
 rather than a framework; builds take each one's newest release

@@ -10,18 +10,24 @@ them.
 
 **In short:**
 
-- Install CMake 3.20 or later, a C++20 compiler, FFTW (single precision),
-  libsndfile and Python 3.8 or later, then run the three commands under
-  [everyday build](#everyday-build).
+- Install CMake 3.20 or later, a C++20 compiler, libsndfile, Python 3.8 or
+  later and, except on macOS, FFTW (single precision), then run the three
+  commands under [everyday build](#everyday-build).
+- On macOS, every build uses Apple's own Accelerate for the FFT; FFTW is an
+  option there. Elsewhere the tools use FFTW and the plug-ins a built-in FFT.
+  [Which libraries each build uses](#which-libraries-each-build-uses) explains
+  the choices and how to change them.
 - Contributors and agents use the [sanitizer build](#sanitizer-build-for-changes)
   for changes, and a Release build for measurements.
 - A plug-in build adds one option and that format's SDK: see
-  [plug-ins](#plug-ins). Plug-ins use a built-in FFT, so they need no FFTW.
+  [plug-ins](#plug-ins). Plug-ins need no FFTW.
 - Configuration never downloads anything. Missing dependencies stop CMake with a
   message naming what to install.
 
 Contents: [choose a build](#choose-a-build) ·
-[dependencies](#dependencies) · [everyday build](#everyday-build) ·
+[dependencies](#dependencies) ·
+[which libraries each build uses](#which-libraries-each-build-uses) ·
+[everyday build](#everyday-build) ·
 [sanitizer build](#sanitizer-build-for-changes) · [presets](#cmake-presets) ·
 [FFT backend](#fft-backend) · [Windows](#windows) · [options](#build-options) ·
 [targets and installing](#targets-and-installing) · [plug-ins](#plug-ins) ·
@@ -37,6 +43,7 @@ Contents: [choose a build](#choose-a-build) ·
 | To change the code (people and agents) | [Sanitizer build](#sanitizer-build-for-changes), then [testing](testing.md) |
 | Only the C++ libraries, for your own program | [Library guide](library.md#core-only-build) |
 | No FFT library at all | Add `-DCONVOLVER_FFT_BACKEND=OOURA` ([FFT backend](#fft-backend)) |
+| FFTW's tuned plans on macOS | Add `-DCONVOLVER_FFT_BACKEND=FFTW` ([which libraries](#which-libraries-each-build-uses)) |
 | A VST3, Audio Unit or LV2 plug-in | [Plug-ins](#plug-ins) |
 | The exact recipe used for preview packages | [Preview recipe](#preview-recipe) |
 
@@ -44,7 +51,7 @@ Contents: [choose a build](#choose-a-build) ·
 
 | Platform | Command |
 | --- | --- |
-| macOS (Homebrew) | `brew install cmake fftw libsndfile` |
+| macOS (Homebrew) | `brew install cmake libsndfile` (add `fftw` only to [build with FFTW](#which-libraries-each-build-uses)) |
 | Debian or Ubuntu | `sudo apt-get install cmake g++ python3 libfftw3-dev libsndfile1-dev` |
 | Windows | vcpkg; see [Windows](#windows) |
 
@@ -60,8 +67,63 @@ and to the CI workflow in the same pull request.
 Use `-DCMAKE_PREFIX_PATH=/path/to/dependencies` for libraries installed
 somewhere CMake does not look. CMake finds FFTW3f and SndFile package configs,
 then falls back to searching for the libraries and headers (and pkg-config for
-libsndfile). The default FFTW backend needs FFTW's **single-precision** library
-even if the double-precision one is installed.
+libsndfile). FFTW builds need FFTW's **single-precision** library even if the
+double-precision one is installed.
+
+## Which libraries each build uses
+
+Convolver needs two kinds of library: an FFT library for the convolution, and a
+sound-file library to read filter files and to read and write audio. On macOS
+it prefers what macOS already includes, so a Mac build needs no FFT library
+installed and a Mac package ships none. The libraries the other platforms use
+stay available as build options: the fallback when you need something only
+they offer.
+
+| What you build | FFT on macOS | FFT on Linux and Windows | Sound files |
+| --- | --- | --- | --- |
+| The command-line tools (`convolver`, `convolver-preset`, `convolver-equalizer-apo`) and the C++ libraries | Accelerate | FFTW | libsndfile, on every platform (the core library alone needs none) |
+| VST3 plug-in | Accelerate | Ooura (built in) | None: the filter arrives in a preset or the saved project |
+| Audio Unit (macOS only) | Accelerate | Not built | None: as VST3 |
+| LV2 plug-in | Accelerate | Ooura (built in) | libsndfile, for the filter file chosen in the host |
+
+What to change, and why you might:
+
+- **FFTW on macOS:** `brew install fftw`, then configure with
+  `-DCONVOLVER_FFT_BACKEND=FFTW`. The command-line tool then offers tuned FFT
+  plans and saved wisdom ([FFTW plan tuning](../use/command-line.md#fftw-plan-tuning)),
+  which only FFTW has; an FFTW built for your CPU can also be faster for long
+  filters ([measurements](fft-backends.md#accelerate-by-default-on-macos)).
+- **No FFT library at all,** anywhere: `-DCONVOLVER_FFT_BACKEND=OOURA`.
+- **Accelerate** is chosen by default on macOS; `-DCONVOLVER_FFT_BACKEND=ACCELERATE`
+  (or the `accelerate` presets) names it explicitly.
+- **FFTW in a plug-in** works but makes CMake warn: a plug-in shares its process
+  with the host and other plug-ins, which may use the same FFTW, and FFTW's
+  planner is not thread-safe ([plug-in builds](fft-backends.md#plug-in-builds)).
+- **Sound files:** the tools use libsndfile on macOS too, so they read and
+  write the same formats on every platform. There is no option to replace it.
+  macOS's own AudioToolbox (its ExtAudioFile API) can read and write sound
+  files too, but it is not used for the tools, by choice:
+  - Reading with it alone gains nothing: the tools write every output file
+    with libsndfile, so a Mac build would still need libsndfile, and would
+    have two readers to keep in agreement.
+  - Writing with it as well would remove libsndfile from Mac builds of the
+    tools, but at the cost of a second writer used only on macOS, whose
+    formats, headers and options differ in small ways from libsndfile's,
+    with its own tests. Linux and Windows would still need libsndfile, and
+    the preview packages already ship it beside the tools, so users install
+    nothing either way.
+
+  AudioToolbox pays off only where a build reads files but writes none and
+  must load with nothing installed beside it, such as a plug-in that opens
+  filter files itself.
+
+One FFT library serves the whole build: a build that includes a plug-in uses
+the plug-in's choice for the tools as well, so build the tools separately for
+FFTW (on macOS with `-DCONVOLVER_FFT_BACKEND=FFTW`). The preview packages are
+such builds: everything in them uses Accelerate on macOS and Ooura on Linux
+and Windows ([preview recipe](#preview-recipe)). `convolver --version` names the FFT library and libsndfile version a
+binary uses. All the FFT libraries give the same results within a small tested
+tolerance ([FFT guide](fft-backends.md#correctness-evidence)).
 
 ## Everyday build
 
@@ -117,7 +179,7 @@ presets and builds into `build/presets/NAME`:
 | `release` | Everything in the default configuration, Release |
 | `debug-sanitizers` | The same, Debug with ASan and UBSan (GCC or Clang) |
 | `core-only` | Core library and its C++ and package-consumer tests; no libsndfile or Python |
-| `accelerate`, `accelerate-debug` | Apple's Accelerate FFT instead of FFTW (macOS) |
+| `accelerate`, `accelerate-debug` | Apple's Accelerate FFT, named explicitly (macOS, where it is already the default) |
 | `ooura` | The built-in Ooura FFT, so no FFT library is needed |
 | `release-vst3` | The VST3 distribution; needs the SDK path ([VST3](#vst3)) |
 
@@ -140,12 +202,14 @@ One FFT library serves every target in a build, chosen with
 
 | Value | Meaning |
 | --- | --- |
-| `AUTO` (default) | FFTW, except in a plug-in build: Ooura, or Accelerate on macOS |
+| `AUTO` (default) | Accelerate on macOS; elsewhere FFTW, except in a plug-in build: Ooura |
 | `FFTW` | FFTW's single-precision library |
 | `ACCELERATE` | Apple's Accelerate framework (macOS only); searches for and links no FFTW |
 | `OOURA` | Ooura's FFT, built into the library; the only remaining dependency is libsndfile for the CLI |
 
-The choice is fixed when building, not at run time. Plug-in builds avoid FFTW
+The choice is fixed when building, not at run time. On macOS `AUTO` prefers
+Accelerate, part of macOS; pass `FFTW` for FFTW's tuned plans
+([which libraries each build uses](#which-libraries-each-build-uses)). Plug-in builds avoid FFTW
 because a plug-in shares its process with the host and other plug-ins, which
 may use the same FFTW, and FFTW's planner is not thread-safe; selecting FFTW for
 a plug-in build makes CMake warn. The [FFT guide](fft-backends.md) has the
@@ -225,7 +289,7 @@ Each format is optional and needs its own SDK, fetched separately. The core
 alone never needs one. In every plug-in build:
 
 - the default FFT backend is Ooura, or Accelerate on macOS, so the plug-in links
-  no FFTW ([FFT backend](#fft-backend));
+  no FFTW ([which libraries each build uses](#which-libraries-each-build-uses));
 - `convolver-preset`, which makes presets for every format, is built with the
   CLI as usual; a VST3 build with I/O also builds the older
   `convolver-vst3-preset`. Both need libsndfile;

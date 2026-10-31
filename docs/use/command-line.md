@@ -23,7 +23,8 @@ To build it, see [build from source](../develop/build.md).
 - `--inspect` and `--validate` explain what a configuration resolves to without
   rendering; `--json` gives a machine-readable report.
 - FFTW builds can save tuned FFT plans ("wisdom") with `--tune-fft` and reuse
-  them with `--fft-wisdom`.
+  them with `--fft-wisdom`. On macOS the tool uses Apple's Accelerate unless it
+  was built with FFTW.
 
 Contents:
 
@@ -423,6 +424,10 @@ report is available to C++ programs ([library guide](../develop/library.md#inspe
 ## FFTW plan tuning
 
 This applies only to builds that use FFTW (`convolver --version` says which).
+Builds for Linux and Windows use FFTW by default. On macOS the default is
+Apple's Accelerate, which has no tuned plans; to use them there, build with
+`-DCONVOLVER_FFT_BACKEND=FFTW`
+([which libraries each build uses](../develop/build.md#which-libraries-each-build-uses)).
 An optimized FFTW build supplies SIMD routines; measured planning selects among
 them for the transform size actually used. Run this once on the target machine
 with a Release binary and little competing CPU activity:

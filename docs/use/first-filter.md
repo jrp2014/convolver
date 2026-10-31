@@ -16,7 +16,7 @@ itself, so build it from the source. On macOS with Homebrew, or Debian and
 Ubuntu:
 
 ```sh
-brew install cmake fftw libsndfile
+brew install cmake libsndfile
 sudo apt-get install cmake g++ python3 libfftw3-dev libsndfile1-dev
 ```
 
