@@ -467,9 +467,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
     Convolver's (`eda43e4`).
   - [x] The file dialog takes typing without a click first: as a sheet
     on Convolver's window (`abb2edf`, Option-click).
-  - [ ] The sheet as the only dialog: a plain click loads a file, Cancel
-    keeps the filter, closing Convolver's window while the sheet is open
-    loads nothing, and two Convolver instances each take their own file.
+  - [x] The sheet as the only dialog (`b0f2552`): a plain click takes
+    typing and loads a file, Cancel keeps the filter, closing Convolver's
+    window from GarageBand's plug-in button while the sheet is open loads
+    nothing, and two Convolver instances each keep their own file (exports
+    of the two tracks: echoes on the `repeat` one only). Not checked: two
+    windows open at once, as GarageBand closed one when the other opened.
   - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
     identical before and after).
   - [x] Mix automation with the window open: the slider followed, also
