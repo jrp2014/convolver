@@ -81,9 +81,10 @@ jobs:
             platform: linux-x86_64
           - os: windows-2022
             platform: windows-x86_64
-          # Built on macos-15: on 30 October 2026 GitHub cancelled the
-          # macos-14 jobs before a runner took them (CI-19). The package
-          # still targets macOS 14 (CMAKE_OSX_DEPLOYMENT_TARGET in candidate.py).
+          # Built on macos-15: GitHub retires the macos-14 image on
+          # 2 November 2026 and cancels its jobs during scheduled brownouts
+          # (actions/runner-images#13518, CI-19). The package still targets
+          # macOS 14 (CMAKE_OSX_DEPLOYMENT_TARGET in candidate.py).
           - os: macos-15
             platform: macos-arm64
           - os: macos-15-intel

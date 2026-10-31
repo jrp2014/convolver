@@ -813,10 +813,14 @@ candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles); the macOS candidates use Ninja and
 Windows Visual Studio (CI-10). Both macOS candidates build on macOS 15
 runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
-deployment target, so the archives are still built for the
-[proposed minimum system](releasing.md#candidates); on 30 October 2026 GitHub
-cancelled the `macos-14` jobs before a runner took them (CI-19). Until 27 October 2026 a second, offline build of
-the same archive with `tests/release/source_build.py` did this on Linux; the
+deployment target, the [proposed minimum system](releasing.md#candidates).
+GitHub retires its macOS 14 image on 2 November 2026 and cancelled the arm64
+candidate during its scheduled brownouts on 30 October
+([runner-images#13518](https://github.com/actions/runner-images/issues/13518),
+CI-19). So no CI job runs a candidate on macOS 14: `verify_artifact.py` fails
+any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
+API used without an availability check. Until 27 October 2026 a second,
+offline build of the same archive with `tests/release/source_build.py` did this on Linux; the
 script remains for [local checks](build.md#preview-recipe). See the
 [qualification record](releasing.md) for external gates.
 
