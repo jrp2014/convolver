@@ -23,7 +23,9 @@ Until 1.0 the C++ API may change between minor versions.
   GarageBand show it instead of their generic controls. **Choose Filter…**
   (or dropping a file on the window) loads a `.cfg`, configuration list or
   sound file directly, as the old Convolver did, read as `convolver-preset`
-  reads it, so the project then holds the same state a preset would. The
+  reads it, so the project then holds the same state a preset would, and
+  the chosen file becomes the current preset, named after it, so hosts can
+  mark the project changed. The
   Audio Unit reads sound files with macOS's own AudioToolbox, so the
   component still links nothing beyond macOS (jrp, 30 October 2026);
   `native.audio_toolbox` checks that it reads every format the tests write

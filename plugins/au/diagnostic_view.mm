@@ -470,6 +470,19 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
       if (view)
           [view finishChoosing:request URL:url];
     }];
+    // A host that runs plug-ins in a process of their own, as GarageBand
+    // does, is the active application, so the dialog opened behind its
+    // windows (jrp's run of d1dc0a2). Bring it forward and give it the keys.
+    [panel orderFrontRegardless];
+    [panel makeKeyWindow];
+    if (@available(macOS 14.0, *)) {
+        [NSApp activate];
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations" // Replaced in macOS 14.
+        [NSApp activateIgnoringOtherApps:YES];
+#pragma clang diagnostic pop
+    }
 }
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {

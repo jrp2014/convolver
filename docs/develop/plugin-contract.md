@@ -221,7 +221,11 @@ format.
   (the host's main thread for the window); preparing the filter runs under
   the lock there, as a restore does. A file load, accepted or refused,
   also sends a `ClassInfo` change notification, since the saved state
-  changes either way, for hosts that mark the project changed from it. While faults
+  changes either way, for hosts that mark the project changed from it. An
+  accepted file also becomes the present preset, a user preset (number -1)
+  named after the file, with a `PresentPreset` change notification:
+  GarageBand 10.4.14 did not mark the project changed from `ClassInfo`
+  alone. While faults
   go on, a read takes them in (and logs them) at most every 10 seconds, once
   Render's Fault is explained.
 - **The Convolver log** (`host_log()` in

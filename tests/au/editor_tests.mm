@@ -200,6 +200,24 @@ void report_changed(void*, AudioUnit, AudioUnitPropertyID id, AudioUnitScope, Au
         ++report_changes;
 }
 
+// The state notifications hosts may use to mark the project changed.
+std::atomic<int> class_info_changes{0}, preset_changes{0};
+void state_changed(void*, AudioUnit, AudioUnitPropertyID id, AudioUnitScope, AudioUnitElement) {
+    if (id == kAudioUnitProperty_ClassInfo)
+        ++class_info_changes;
+    if (id == kAudioUnitProperty_PresentPreset)
+        ++preset_changes;
+}
+std::string present_preset(Unit& unit) {
+    AUPreset preset{};
+    UInt32 size = sizeof preset;
+    check(AudioUnitGetProperty(unit.get(), kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global,
+                               0, &preset, &size),
+          "present preset");
+    NSString* name = CFBridgingRelease(preset.presetName);
+    return preset.presetNumber == -1 ? text(name) : "factory preset " + text(name);
+}
+
 // The properties: types, read-only, notifications, and what they say for a
 // stereo preset on a mono track.
 void properties(const PrivateLog& log) {
@@ -456,7 +474,16 @@ void files() {
     require([view.registeredDraggedTypes containsObject:NSPasteboardTypeFileURL],
             "the window takes no dropped files");
 
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        check(AudioUnitAddPropertyListener(unit.get(), id, state_changed, nullptr),
+              "state listener");
     require([view loadFile:@(stereo.c_str())], "the stereo file was refused");
+    // The project must be marked changed: GarageBand 10.4.14 ignored the
+    // ClassInfo notification alone (jrp's run of d1dc0a2), so an accepted
+    // file is also the present preset, a user preset named after it.
+    require(class_info_changes > 0 && preset_changes > 0,
+            "a chosen file sent no ClassInfo or PresentPreset notification");
+    require(present_preset(unit) == "stereo", "present preset: " + present_preset(unit));
     auto r = report(unit);
     require([r[@"status name"] isEqualToString:@"Playing"] &&
                 [view.statusField.stringValue isEqualToString:@"Playing"],
@@ -484,6 +511,7 @@ void files() {
                 contains(r[@"explanation"], "load it in Convolver instead"),
             "mono file advice: " + text(r[@"explanation"]));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
+    require(present_preset(unit) == "stereo", "a refused file renamed the present preset");
     const auto kept = unit.failure();
     require(kept.present && !kept.silent && unit.saved().configuration,
             "after a refused file the stereo filter must still play and be saved");

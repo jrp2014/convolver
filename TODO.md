@@ -429,6 +429,15 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   0 out" and command-line advice in the window, both fixed in `8177017`.
   GarageBand gave Convolver stereo even on a mono track, so the mono-track
   refusal could not be reproduced there.
+  jrp's follow-up run of `d1dc0a2` (31 October 2026; same versions, macOS
+  27.2 26B123, 51/51 local tests, auval) passed the refusal summaries and
+  advice, repeated refusals, the held Gain slider (checked before and
+  after), Mix automation followed in the open window (also while the mouse
+  was held elsewhere) and the Filter detail after an explicit save. It
+  found that choosing a file alone did not mark the project changed (no
+  save prompt; the file was lost on reopening) and that the file dialog
+  opened behind GarageBand's windows; both are changed since, untested in
+  GarageBand. Not checked: the echo still heard after refusals, VoiceOver.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
@@ -436,17 +445,24 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
     permission was denied (not provoked: GarageBand allowed the access).
   - [x] Save, quit and reopen a project after choosing a file, with the
     original files moved away: the filter and the settings came back.
-  - [ ] After that reopen, the Filter detail says the filter came from the
-    project (not recorded in the run of `54eac9f`).
+  - [x] After a save and reopen, the Filter detail says the filter came
+    from the saved project (`d1dc0a2`).
   - [x] A refused replacement keeps the previous filter.
-  - [ ] Whether GarageBand marks the project changed after only choosing a
-    file.
-  - [ ] Gain and Mix automation with the window open, and a held slider
-    while the host changes the setting (the sliders send no begin and end
-    gestures yet, so recording automation by dragging them is untested).
-  - [ ] Repeated refusals of the same file change nothing else.
-  - [ ] The refused-file summary and advice after `8177017` (a mono WAV on
-    a stereo track: "the filter has 1 in, 1 out, the plug-in 2 in, 2 out").
+  - [ ] GarageBand marks the project changed after only choosing a file
+    (failed on `d1dc0a2`; the present-preset notification added since is
+    untested).
+  - [ ] The file dialog opens in front of the host's windows (behind them
+    on `d1dc0a2`; brought forward since, untested).
+  - [ ] The echo is still heard after refused files (the window and report
+    showed the filter kept on `d1dc0a2`; not heard or rendered).
+  - [x] Mix automation with the window open: the slider followed, also
+    while the mouse was held elsewhere; a held Gain slider kept its value
+    (`d1dc0a2`; the sliders send no begin and end gestures yet, so
+    recording automation by dragging them is untested).
+  - [x] Repeated refusals of the same file change nothing else (`d1dc0a2`).
+  - [x] The refused-file summary and advice (a mono WAV on a stereo track:
+    "the filter has 1 in, 1 out, the plug-in 2 in, 2 out"; a 48 kHz WAV:
+    set the host's project or audio device), on `d1dc0a2`.
   - [ ] VoiceOver reads the status, the sliders and the buttons.
   - [ ] A long explanation (a list `.cfg`) scrolls; the compact layout fits.
   - [ ] The main-thread pause for a long chosen filter: measured and judged

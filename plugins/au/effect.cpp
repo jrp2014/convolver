@@ -12,6 +12,7 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <exception>
+#include <filesystem>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -1012,6 +1013,18 @@ OSStatus Effect::load_file(const std::string& path) {
     // ClassInfo changes, as for a preset chosen in the plug-in, can mark the
     // project as changed.
     PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
+    // GarageBand 10.4.14 ignored that (jrp's run of d1dc0a2: no save prompt,
+    // and the chosen filter was lost on reopening). An accepted file also
+    // becomes the present preset, a user preset (number -1) named after the
+    // file, as choosing a preset would; hosts watch that property too.
+    if (accepted) {
+        const auto name = std::filesystem::path(path).stem().string();
+        if (const auto preset_name = cf_string(name.empty() ? path : name)) {
+            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name}));
+            CFRelease(preset_name);
+            PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
+        }
+    }
     return accepted ? noErr : kAudioUnitErr_InvalidPropertyValue;
 }
 
