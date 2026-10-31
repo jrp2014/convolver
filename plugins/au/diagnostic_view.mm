@@ -446,39 +446,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return NO;
 }
 
-// AU-6 focus investigation (jrp's runs of bf7adb6 and eda43e4: the dialog
-// takes no typing in GarageBand): one line to the Convolver log with the
-// activation and key-window state. State only, never keystrokes.
-static NSString* window_text(NSWindow* window) {
-    if (!window)
-        return @"none";
-    return [NSString stringWithFormat:@"%@ level %ld%@%@%@", NSStringFromClass([window class]),
-                                      static_cast<long>(window.level),
-                                      window.visible ? @" visible" : @"",
-                                      window.keyWindow ? @" key" : @"",
-                                      window.canBecomeKeyWindow ? @"" : @" cannot-be-key"];
-}
-static void log_focus(NSString* when, NSWindow* own, NSWindow* panel) {
-    NSRunningApplication* front = NSWorkspace.sharedWorkspace.frontmostApplication;
-    NSString* line = [NSString
-        stringWithFormat:@"Choose Filter focus, %@: this process %@ (pid %d, policy %ld); front "
-                         @"app %@ (pid %d); key window %@; Convolver's window %@; dialog %@; "
-                         @"first responder %@",
-                         when, NSApp.active ? @"active" : @"not active",
-                         NSProcessInfo.processInfo.processIdentifier,
-                         static_cast<long>(NSApp.activationPolicy),
-                         front.bundleIdentifier ?: @"unknown", front.processIdentifier,
-                         window_text(NSApp.keyWindow), window_text(own), window_text(panel),
-                         panel.firstResponder ? NSStringFromClass([panel.firstResponder class])
-                                              : @"none"];
-    convolver::host_log("Audio Unit", line.UTF8String, false);
-}
-
-// The system's file dialog, as its own window above Convolver's. Option-click
-// opens it as a sheet on Convolver's window instead, to compare which takes
-// typing in a host that runs the plug-in in its own process (temporary, for
-// the focus investigation; the window's own sheet needs that window to be
-// this process's, which GarageBand's hosted view may not be).
+// The system's file dialog, as a sheet on Convolver's window. In GarageBand,
+// which runs the plug-in in a process of its own, a separate dialog window
+// stayed behind Convolver's window and then took no typing, as GarageBand
+// kept the keyboard; the sheet takes the keys with Convolver's window (jrp's
+// runs of bf7adb6, eda43e4 and abb2edf, GarageBand 10.4.14). A separate
+// dialog, above Convolver's window, is left for when no sheet can attach.
 - (void)chooseFilter:(id)sender {
     const NSUInteger request = [self startChoosing];
     NSOpenPanel* panel = [NSOpenPanel openPanel];
@@ -492,66 +465,31 @@ static void log_focus(NSString* when, NSWindow* own, NSWindow* panel) {
     // Not runModal: a modal loop inside the plug-in would stall the host's
     // own window events (plan, threads rule 4). The view may go before the
     // panel does, so the handler holds it weakly; and the window may close
-    // first, which forgets the request (finishChoosing:URL:).
+    // first, which forgets the request and ends the sheet (stopChoosing).
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
     __weak NSOpenPanel* weakPanel = panel;
-    NSWindow* own = self.window;
-    __weak NSWindow* weakOwn = own;
-    log_focus(@"before", own, nil);
-    __block id becameKey = [NSNotificationCenter.defaultCenter
-        addObserverForName:NSWindowDidBecomeKeyNotification
-                    object:panel
-                     queue:nil
-                usingBlock:^(NSNotification* note) {
-                  static_cast<void>(note);
-                  log_focus(@"the dialog became key", weakOwn, weakPanel);
-                }];
     void (^finished)(NSModalResponse) = ^(NSModalResponse response) {
-      if (becameKey) {
-          [NSNotificationCenter.defaultCenter removeObserver:becameKey];
-          becameKey = nil;
-      }
       CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
       NSURL* url = response == NSModalResponseOK ? weakPanel.URL : nil;
       if (view)
           [view finishChoosing:request URL:url];
     };
-    const BOOL sheet = own && own.visible && !own.attachedSheet &&
-                       (NSEvent.modifierFlags & NSEventModifierFlagOption) != 0;
-    if (sheet) {
+    NSWindow* own = self.window;
+    if (own && own.visible && !own.attachedSheet) {
         [panel beginSheetModalForWindow:own completionHandler:finished];
-        dispatch_async(dispatch_get_main_queue(), ^{
-          log_focus(@"as a sheet", weakOwn, weakPanel);
-        });
         return;
     }
-    // Above Convolver's window, not only the host's: GarageBand shows plug-in
-    // windows at a floating level, and a dialog at the normal level stayed
-    // behind it (jrp's run of bf7adb6; above it on eda43e4).
+    // A separate dialog: above Convolver's window, which GarageBand shows at
+    // a floating level, and made key once on screen.
     NSWindowLevel above = NSModalPanelWindowLevel;
     if (own && own.level >= above)
         above = own.level + 1;
     panel.level = above;
     [panel beginWithCompletionHandler:finished];
-    // A host that runs plug-ins in a process of their own, as GarageBand
-    // does, is the active application: ask to activate this process and give
-    // the dialog the keys once it is on screen. (On eda43e4 GarageBand kept
-    // the keyboard; the log lines say why.)
-    if (@available(macOS 14.0, *)) {
-        [NSApp activate];
-    } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations" // Replaced in macOS 14.
-        [NSApp activateIgnoringOtherApps:YES];
-#pragma clang diagnostic pop
-    }
     dispatch_async(dispatch_get_main_queue(), ^{
       NSOpenPanel* shown = weakPanel;
-      if (shown && shown.visible) {
-          shown.level = above;
+      if (shown && shown.visible)
           [shown makeKeyAndOrderFront:nil];
-      }
-      log_focus(@"as a window", weakOwn, shown);
     });
 }
 

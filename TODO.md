@@ -442,9 +442,13 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   filter) and the echo after a refused file (exports before and after
   identical in all 705,600 samples). The file dialog was still behind
   Convolver's window and took no typing. On `eda43e4` it opens above
-  Convolver's window, but still takes typing only after a click: macOS
-  (14 and later) lets only the active application hand over the keyboard,
-  and GarageBand runs the plug-in in a separate process.
+  Convolver's window, but still took typing only after a click, as
+  GarageBand kept the keyboard. jrp's run of `abb2edf` logged the focus
+  state (Convolver's window, an `NSServiceViewControllerWindow` in the
+  plug-in's process, was key; the separate dialog could not become key)
+  and showed that the dialog as a sheet on Convolver's window took typing
+  at once and loaded a file. The sheet is the dialog since; the
+  investigation's logging and Option-click switch are gone.
   Not checked: VoiceOver.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
@@ -460,11 +464,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
     (`bf7adb6`: the file becomes the present preset).
   - [x] The file dialog opens in front of the host's windows and
     Convolver's (`eda43e4`).
-  - [ ] The file dialog takes typing without a click first (not on
-    `eda43e4`; documented in the plug-in guide). Under investigation: the
-    dialog logs the activation and key-window state, and Option-click
-    opens it as a sheet on Convolver's window for comparison; keep one
-    way and remove the other and the logging once decided.
+  - [x] The file dialog takes typing without a click first: as a sheet
+    on Convolver's window (`abb2edf`, Option-click). To recheck as the
+    default: closing Convolver's window while the sheet is open.
   - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
     identical before and after).
   - [x] Mix automation with the window open: the slider followed, also
