@@ -441,7 +441,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   preset name became the file's; *Don't Save* then restored the saved
   filter) and the echo after a refused file (exports before and after
   identical in all 705,600 samples). The file dialog was still behind
-  Convolver's window and took no typing; raised above it since, untested.
+  Convolver's window and took no typing. On `eda43e4` it opens above
+  Convolver's window, but still takes typing only after a click: macOS
+  (14 and later) lets only the active application hand over the keyboard,
+  and GarageBand runs the plug-in in a separate process.
   Not checked: VoiceOver.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
@@ -455,9 +458,10 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] A refused replacement keeps the previous filter.
   - [x] GarageBand marks the project changed after only choosing a file
     (`bf7adb6`: the file becomes the present preset).
-  - [ ] The file dialog opens in front of the host's windows and
-    Convolver's, and takes typing (behind Convolver's window on `bf7adb6`;
-    raised above it since, untested).
+  - [x] The file dialog opens in front of the host's windows and
+    Convolver's (`eda43e4`).
+  - [ ] The file dialog takes typing without a click first (not on
+    `eda43e4`; documented in the plug-in guide).
   - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
     identical before and after).
   - [x] Mix automation with the window open: the slider followed, also

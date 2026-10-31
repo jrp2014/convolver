@@ -288,7 +288,9 @@ the plug-in's button in the track's Plug-ins area. The window has:
   file is read and the filter prepared before the window responds again,
   so a very long filter can make the window (and the host) pause for a
   moment. The file dialog opens in front of the host's windows and
-  Convolver's. Closing
+  Convolver's. In GarageBand, click the dialog once before typing in it:
+  GarageBand runs Convolver in a separate process, and macOS gives the
+  keyboard only to the application in front. Closing
   Convolver's window while the file dialog is open closes
   the dialog too, and nothing is loaded. GarageBand runs plug-ins in a
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
