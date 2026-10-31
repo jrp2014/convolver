@@ -1016,7 +1016,8 @@ OSStatus Effect::load_file(const std::string& path) {
     // GarageBand 10.4.14 ignored that (jrp's run of d1dc0a2: no save prompt,
     // and the chosen filter was lost on reopening). An accepted file also
     // becomes the present preset, a user preset (number -1) named after the
-    // file, as choosing a preset would; hosts watch that property too.
+    // file, as choosing a preset would; GarageBand then asks to save (jrp's
+    // run of bf7adb6).
     if (accepted) {
         const auto name = std::filesystem::path(path).stem().string();
         if (const auto preset_name = cf_string(name.empty() ? path : name)) {

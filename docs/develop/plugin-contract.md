@@ -224,8 +224,8 @@ format.
   changes either way, for hosts that mark the project changed from it. An
   accepted file also becomes the present preset, a user preset (number -1)
   named after the file, with a `PresentPreset` change notification:
-  GarageBand 10.4.14 did not mark the project changed from `ClassInfo`
-  alone. While faults
+  GarageBand 10.4.14 marks the project changed from that, not from
+  `ClassInfo` alone. While faults
   go on, a read takes them in (and logs them) at most every 10 seconds, once
   Render's Fault is explained.
 - **The Convolver log** (`host_log()` in

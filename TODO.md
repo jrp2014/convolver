@@ -436,8 +436,13 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   was held elsewhere) and the Filter detail after an explicit save. It
   found that choosing a file alone did not mark the project changed (no
   save prompt; the file was lost on reopening) and that the file dialog
-  opened behind GarageBand's windows; both are changed since, untested in
-  GarageBand. Not checked: the echo still heard after refusals, VoiceOver.
+  opened behind GarageBand's windows. jrp's run of `bf7adb6` (31 October
+  2026) passed the save prompt after only choosing a file (the host's
+  preset name became the file's; *Don't Save* then restored the saved
+  filter) and the echo after a refused file (exports before and after
+  identical in all 705,600 samples). The file dialog was still behind
+  Convolver's window and took no typing; raised above it since, untested.
+  Not checked: VoiceOver.
   - [x] Choose Filter in GarageBand: a sound file, and a `.cfg` inside its
     sandbox whose WAV files it read (allowed in that session); a dropped
     `.cfg`.
@@ -448,13 +453,13 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [x] After a save and reopen, the Filter detail says the filter came
     from the saved project (`d1dc0a2`).
   - [x] A refused replacement keeps the previous filter.
-  - [ ] GarageBand marks the project changed after only choosing a file
-    (failed on `d1dc0a2`; the present-preset notification added since is
-    untested).
-  - [ ] The file dialog opens in front of the host's windows (behind them
-    on `d1dc0a2`; brought forward since, untested).
-  - [ ] The echo is still heard after refused files (the window and report
-    showed the filter kept on `d1dc0a2`; not heard or rendered).
+  - [x] GarageBand marks the project changed after only choosing a file
+    (`bf7adb6`: the file becomes the present preset).
+  - [ ] The file dialog opens in front of the host's windows and
+    Convolver's, and takes typing (behind Convolver's window on `bf7adb6`;
+    raised above it since, untested).
+  - [x] The echo is kept after a refused file (`bf7adb6`: exported audio
+    identical before and after).
   - [x] Mix automation with the window open: the slider followed, also
     while the mouse was held elsewhere; a held Gain slider kept its value
     (`d1dc0a2`; the sliders send no begin and end gestures yet, so

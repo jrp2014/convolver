@@ -464,6 +464,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // first, which forgets the request (finishChoosing:URL:).
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
     __weak NSOpenPanel* weakPanel = panel;
+    // Above Convolver's window, not only the host's: GarageBand shows plug-in
+    // windows at a floating level, and a dialog at the normal level stayed
+    // behind it and took no typing (jrp's runs of d1dc0a2 and bf7adb6).
+    NSWindowLevel above = NSModalPanelWindowLevel;
+    if (self.window && self.window.level >= above)
+        above = self.window.level + 1;
+    panel.level = above;
     [panel beginWithCompletionHandler:^(NSModalResponse response) {
       CONVOLVER_DIAGNOSTIC_VIEW* view = weakSelf;
       NSURL* url = response == NSModalResponseOK ? weakPanel.URL : nil;
@@ -471,10 +478,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
           [view finishChoosing:request URL:url];
     }];
     // A host that runs plug-ins in a process of their own, as GarageBand
-    // does, is the active application, so the dialog opened behind its
-    // windows (jrp's run of d1dc0a2). Bring it forward and give it the keys.
-    [panel orderFrontRegardless];
-    [panel makeKeyWindow];
+    // does, is the active application: activate this process and give the
+    // dialog the keys once it is on screen.
     if (@available(macOS 14.0, *)) {
         [NSApp activate];
     } else {
@@ -483,6 +488,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         [NSApp activateIgnoringOtherApps:YES];
 #pragma clang diagnostic pop
     }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NSOpenPanel* shown = weakPanel;
+      if (shown && shown.visible) {
+          shown.level = above;
+          [shown makeKeyAndOrderFront:nil];
+      }
+    });
 }
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
