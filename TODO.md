@@ -921,6 +921,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   brownouts on 30 October cancelled the candidate job before it ran (PRs #84
   and #89, [runner-images#13518](https://github.com/actions/runner-images/issues/13518));
   the package still targets macOS 14; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [x] **CI-20 — Keep unpacked ZIP files inside their destination.** 1
+  November 2026, from a Skylos scan: `candidate.extract_zip` reads member
+  names as POSIX paths (so `/name` is refused on Windows too) and checks each
+  resolved path stays under the destination, as `sources.extract` does for
+  source archives; tested in `release.source`.
 - [x] **DIAG-1 — Review how diagnostics reach the user.** Status parameter
   and Convolver log (23 October 2026, PR #57), processing faults and run
   identity (PR #68), symbol checks (PR #72), fault state after reloads (PR

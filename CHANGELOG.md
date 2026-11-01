@@ -77,6 +77,15 @@ Until 1.0 the C++ API may change between minor versions.
   redesign and editor tests, jrp's GarageBand run of the redesign and the
   typed-box defects it led to, and what remains of the settings and windows.
 
+### Fixed
+
+- Release scripts (CI-20): unpacking a ZIP (the downloaded NSIS release on
+  Windows, and each candidate's own ZIP) now checks that every file lands
+  inside the destination. Before, on Windows a member name starting with `/`
+  passed the name check and could be written at the root of the drive, and a
+  link already in the destination could lead a file outside it. Found in a
+  Skylos scan (1 November 2026). Packages are unchanged.
+
 ## [0.7.1] - 2026-11-01
 
 ### Changed

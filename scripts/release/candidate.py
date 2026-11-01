@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import resolve
 from build_dependencies import add_jobs_option, parallel
@@ -24,12 +24,20 @@ def run(command, **kwargs):
 
 
 def extract_zip(archive, destination):
+    """Unpacks a ZIP's regular files and directories under destination. Member
+    names are POSIX paths, so a name starting with / counts as absolute on
+    Windows too; links are written as plain files."""
+    root = destination.resolve()
     with zipfile.ZipFile(archive) as package:
         for info in package.infolist():
-            path = Path(info.filename)
+            path = PurePosixPath(info.filename)
             if path.is_absolute() or '..' in path.parts or '\\' in info.filename or ':' in info.filename:
-                raise ValueError('unsafe ZIP member')
-            target = destination / path
+                raise ValueError(f'unsafe ZIP member: {info.filename}')
+            target = destination / Path(*path.parts)
+            try:
+                target.resolve().relative_to(root)
+            except ValueError as error:
+                raise ValueError(f'unsafe ZIP member outside {destination}: {info.filename}') from error
             if info.is_dir():
                 target.mkdir(parents=True, exist_ok=True)
             else:
