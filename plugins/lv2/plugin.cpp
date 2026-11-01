@@ -34,6 +34,7 @@
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
 #include "filter_file.hpp"
+#include "host_log.hpp"
 #include "presets.hpp"
 #include <algorithm>
 #include <array>
@@ -253,9 +254,23 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
                        const LV2_Feature* const* features) {
     const auto index = layout_index(descriptor);
     auto* map = static_cast<LV2_URID_Map*>(const_cast<void*>(feature(features, LV2_URID__map)));
-    if (index == layout_count || !map || !std::isfinite(rate) || rate < 1 || rate > 768000 ||
-        std::floor(rate) != rate)
+    // DIAG-1: a refused instance says why in the host's log (or on standard
+    // error without one); the host itself only learns that it failed.
+    const auto refuse = [&](const char* why) -> LV2_Handle {
+        LV2_Log_Logger logger{};
+        lv2_log_logger_init(
+            &logger, map,
+            static_cast<LV2_Log_Log*>(const_cast<void*>(feature(features, LV2_LOG__log))));
+        lv2_log_error(&logger, "Convolver: Refused to start an instance at %.6g Hz: %s\n", rate,
+                      why);
         return nullptr;
+    };
+    if (index == layout_count)
+        return refuse("the host asked for a plug-in this library does not hold.");
+    if (!map)
+        return refuse("the host does not provide the urid:map feature, which Convolver needs.");
+    if (!std::isfinite(rate) || rate < 1 || rate > 768000 || std::floor(rate) != rate)
+        return refuse("the sample rate must be a whole number of hertz from 1 to 768000 Hz.");
     try {
         auto p = std::make_unique<Instance>();
         const auto& layout = identity::fixed_layouts[index];
@@ -298,7 +313,7 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         }
         return p.release();
     } catch (...) {
-        return nullptr;
+        return refuse("there was not enough memory.");
     }
 }
 
@@ -792,6 +807,7 @@ class Paths {
 LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_State_Handle state,
                       std::uint32_t, const LV2_Feature* const* features) {
     auto& p = *static_cast<Instance*>(handle);
+    bool embedded = false; // The filter itself is stored.
     try {
         std::lock_guard lock(p.control);
         p.record_dropped();
@@ -805,14 +821,25 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
             p.host->collect();
         const auto status = store(state, p.uris.state_key, bytes.data(), bytes.size(), p.uris.chunk,
                                   LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
-        if (status != LV2_STATE_SUCCESS || p.installed_path.empty())
+        if (status != LV2_STATE_SUCCESS) {
+            p.log_error(save_failure_message); // DIAG-1: the host may not say so.
+            return status;
+        }
+        embedded = true;
+        if (p.installed_path.empty())
             return status;
         // The file the filter came from, mapped so the session can move.
-        // Restore prefers the embedded copy above.
+        // Restore prefers the embedded copy above, so the filter is saved
+        // even if this fails.
         const auto path = Paths(features).abstract(p.installed_path);
         return store(state, p.uris.filter_key, path.c_str(), path.size() + 1, p.uris.path,
                      LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
     } catch (...) {
+        try {
+            if (!embedded)
+                p.log_error(save_failure_message); // DIAG-1: the host may not say so.
+        } catch (...) {                            // Out of memory for the message.
+        }
         return LV2_STATE_ERR_UNKNOWN;
     }
 }

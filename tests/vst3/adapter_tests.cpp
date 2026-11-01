@@ -745,6 +745,31 @@ void status_and_log() {
                 name[1] == 'l',
             "status value names");
     SpeakerArrangement stereo = SpeakerArr::kStereo;
+    // DIAG-1: refused host settings are logged with the reason; a refused
+    // layout only once per instance, as hosts try one after another.
+    SpeakerArrangement nine = (SpeakerArrangement(1) << 9) - 1;
+    require(p.setBusArrangements(&nine, 1, &stereo, 1) == kResultFalse &&
+                p.setBusArrangements(&stereo, 1, &nine, 1) == kResultFalse,
+            "status nine channels accepted");
+    const auto count = [](const std::string& text, const char* part) {
+        std::size_t n = 0;
+        for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
+            ++n;
+        return n;
+    };
+    require(contains(log_text(), "Refused the host's channel layout: it has 9 input and 2 "
+                                 "output channels; Convolver takes 1 to 8 of each.") &&
+                count(log_text(), "Refused the host's channel layout") == 1,
+            "refused layout not logged once");
+    ProcessSetup odd{kRealtime, kSample32, 64, 44100.5};
+    require(p.setupProcessing(odd) == kInvalidArgument &&
+                contains(log_text(), "Refused the host's processing settings (44100.5 Hz, "
+                                     "blocks of up to 64 samples): the sample rate must be a "
+                                     "whole number"),
+            "refused rate not logged");
+    require(p.getState(nullptr) == kResultFalse &&
+                contains(log_text(), convolver::save_failure_message),
+            "failed save not logged");
     require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "status buses");
     p.activateBus(kAudio, kInput, 0, true);
     p.activateBus(kAudio, kOutput, 0, true);
@@ -853,12 +878,6 @@ void status_and_log() {
             "fault not logged");
     // Stopping playback explains nothing: setProcessing may run on the audio
     // thread. Nothing new is logged twice.
-    const auto count = [](const std::string& text, const char* part) {
-        std::size_t n = 0;
-        for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
-            ++n;
-        return n;
-    };
     {
         const auto logged = log_text();
         p.setProcessing(false);

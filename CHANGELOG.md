@@ -66,6 +66,27 @@ Until 1.0 the C++ API may change between minor versions.
   (`HostFact`), `settings`, `reference`, `sample_rate` and
   `latency_waits` (pre-1.0 internal API).
 
+## [0.7.1] - 2026-11-01
+
+### Changed
+
+- Clearer failure messages everywhere (DIAG-1, from jrp's choices on
+  31 October 2026). The CLI names the file, time, frame and channel of an
+  invalid input sample (not a number, or infinite) and says to export the file
+  again; an overflow names its time, frame and channel and says to lower
+  `--gain-db` or use `no-clip`; and after any failure once the output is open
+  it says the output is incomplete. Damaged, truncated or unrecognised sound
+  files, incomplete RAW frames and binary files given as a filter now say what
+  to do, in all three tools and in the Audio Unit. `convolver-preset` starts
+  its messages with its name, names a file that is not a VST3 preset, points
+  to the CLI for filters over 8 channels, describes a list that matches
+  nothing in terms of the options given, and accepts options after the file
+  names, `--help` included (an option written there without a value used to
+  be taken as an output name). The VST3 plug-in logs a sample rate, block size, sample type
+  or (once per instance) channel layout it refuses, LV2 logs why it refused
+  to start, and all three formats log a failed save. Each message has a test.
+  The CLI still replaces an existing output, now documented as deliberate.
+
 ## [0.7.0] - 2026-11-01
 
 ### Changed
@@ -958,7 +979,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
 [0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
 [0.5.6]: https://github.com/jrp2014/convolver/compare/v0.5.5...v0.5.6

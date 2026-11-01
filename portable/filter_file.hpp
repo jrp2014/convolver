@@ -19,13 +19,14 @@ namespace convolver {
 // chooses, with its coefficients embedded, its sound files read by `reader`
 // (detail::libsndfile_files() or, in the Audio Unit, audio_toolbox_files()).
 // `raw_filters` receives the raw filters (.pcm, .raw) it read. `plugin`: a
-// refusal is explained in a plug-in host's terms. Throws as
+// refusal is explained in a plug-in host's terms; `options`: in terms of
+// command-line options alone (convolver-preset). Throws as
 // load_configuration() does.
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters = nullptr,
-                            bool plugin = false);
+                            bool plugin = false, bool options = false);
 
 // Why a chosen filter file could not be used, for HostFilter::reject().
 struct FilterFileFailure {

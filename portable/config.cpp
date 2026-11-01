@@ -192,12 +192,13 @@ std::string joined(const std::vector<std::string>& parts, const char* separator)
         text += (text.empty() ? "" : separator) + p;
     return text;
 }
-std::string resample_hint(int wanted, const std::string& available, bool list, bool plugin) {
+std::string resample_hint(int wanted, const std::string& available, bool list, Chooser who) {
     return "Convolver never resamples. " +
            std::string(list ? "Add an entry for " : "Use a filter made for ") + hertz(wanted) +
            " (with IRs recorded or designed at that rate), or " +
-           (plugin ? "set the host's project or audio device to " + available
-                   : "convert the audio to " + available + " first") +
+           (who == Chooser::host      ? "set the host's project or audio device to " + available
+            : who == Chooser::options ? "choose " + available + " with --sample-rate"
+                                      : "convert the audio to " + available + " first") +
            "." +
            (list ? ""
                  : " A configuration list can hold one configuration per sample rate and "
@@ -229,11 +230,12 @@ std::string indented(const std::string& text) {
     }
     return result;
 }
-// `plugin`: the wanted properties are a plug-in host's, so the advice names
-// the host's settings, not command-line options. It names no window: the LV2
-// plug-in has none, and its host's file chooser loads the file.
+// `who` chose the wanted properties (explain_no_match()). For a plug-in host
+// the advice names the host's settings, not command-line options. It names no
+// window: the LV2 plug-in has none, and its host's file chooser loads the file.
 std::string explain_one(const std::filesystem::path& filter, const SelectionCandidate& c,
-                        const ConfigurationSelection& w, std::string_view subject, bool plugin) {
+                        const ConfigurationSelection& w, std::string_view subject, Chooser who) {
+    const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
     std::string text;
@@ -252,20 +254,26 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     text += " It cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
             "): " + joined(diffs, "; ") + ".";
     if (w.sample_rate && w.sample_rate != c.sample_rate)
-        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false, plugin);
+        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false, who);
     if (w.input_channels && w.input_channels != c.input_channels) {
         if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8)
             text += "\nTo apply this mono IR to all " + std::to_string(w.input_channels) +
                     " channels, save a configuration such as the following beside " +
                     utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
-                    (plugin ? "load it in Convolver" : "pass it as the filter") + " instead:\n" +
-                    indented(mono_example(c, w.input_channels)) +
+                    (plugin                    ? "load it in Convolver"
+                     : who == Chooser::options ? "make the preset from it"
+                                               : "pass it as the filter") +
+                    " instead:\n" + indented(mono_example(c, w.input_channels)) +
                     "Lines starting with // are comments and can be kept or removed.";
         else if (c.sound_file)
             text += "\nUse an IR file with one channel per input channel (" +
                     std::to_string(w.input_channels) +
                     "), or a configuration (.cfg) file that says which IR channel filters which "
                     "input and where the result goes.";
+        else if (who == Chooser::options)
+            text += "\n--input-channels asked for " + channels(w.input_channels, "input ") +
+                    ". Use a configuration with that input count (its second header number), "
+                    "or omit --input-channels.";
         else
             text += "\nThe audio must have exactly as many channels as the configuration's "
                     "input count. Use a configuration written for " +
@@ -302,9 +310,10 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
                              const ConfigurationSelection& w, std::string_view subject,
-                             bool plugin) {
+                             Chooser who) {
     if (!list && candidates.size() == 1)
-        return explain_one(filter, candidates.front(), w, subject, plugin);
+        return explain_one(filter, candidates.front(), w, subject, who);
+    const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     if (candidates.empty())
         return "the configuration list " + name + " names no sound file or configuration.";
@@ -339,7 +348,7 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         for (std::size_t i = 0; i < rates.size(); ++i)
             available += (i == 0 ? "" : i + 1 == rates.size() ? " or " : ", ") + hertz(rates[i]);
         text += "\nNo entry is for " + hertz(w.sample_rate) + ". " +
-                resample_hint(w.sample_rate, available, true, plugin);
+                resample_hint(w.sample_rate, available, true, who);
     } else if (w.input_channels && !any([&](const SelectionCandidate& c) {
                    return matches(c.sample_rate, c.input_channels, c.output_channels,
                                   {w.sample_rate, w.input_channels, 0});
@@ -349,7 +358,8 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
                 ". Add one to the list, or " +
                 (plugin ? "give the plug-in as many inputs as an entry takes in the host's "
                           "track or routing settings."
-                        : "use audio with a channel count an entry accepts.");
+                 : who == Chooser::options ? "choose an entry's input count with --input-channels."
+                                           : "use audio with a channel count an entry accepts.");
     } else if (w.output_channels) {
         text += "\nEntries exist for the sample rate and input channels, but none produces " +
                 channels(w.output_channels, "output ") + ". Add one to the list, or " +
@@ -674,7 +684,8 @@ namespace convolver::detail {
 Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
-                                 std::vector<std::filesystem::path>* raw_filters, bool plugin) {
+                                 std::vector<std::filesystem::path>* raw_filters, bool plugin,
+                                 bool options) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
@@ -726,9 +737,13 @@ Configuration load_configuration(const std::filesystem::path& path,
             *source_paths = resolver.sources();
         return std::move(*selected);
     }
-    auto explanation = detail::explain_no_match(
-        path, list, candidates, selection,
-        plugin ? "the plug-in in its host" : "the audio to be filtered", plugin);
+    const auto who = plugin ? Chooser::host : options ? Chooser::options : Chooser::audio;
+    auto explanation =
+        detail::explain_no_match(path, list, candidates, selection,
+                                 who == Chooser::host      ? "the plug-in in its host"
+                                 : who == Chooser::options ? "the requested selection"
+                                                           : "the audio to be filtered",
+                                 who);
     throw detail::NoMatch(explanation, list, std::move(candidates));
 }
 } // namespace convolver::detail

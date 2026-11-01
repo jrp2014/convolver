@@ -60,7 +60,6 @@ boundary and C++20 in the core.
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.8.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
-| Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in the [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md) plan, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
 | Supporting, cheap | **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
@@ -192,60 +191,6 @@ is superseded.
   Windows device in the [guide](docs/develop/testing.md#equalizer-apo-export-tests)
   (device rate and channel count reach the configuration; exclusive mode
   bypasses it), done by anyone with a Windows computer, with the result recorded there.
-- [ ] **DIAG-1 — Review how diagnostics reach the user.** Do this once the
-  current plug-in plans are implemented (see the
-  [execution priorities](#execution-priorities)). For every failure a user can
-  meet, check where the explanation is produced and where it actually appears,
-  in the CLI, the preset tool and each plug-in format. The CLI prints
-  explanatory messages on standard error (for example, a configuration that
-  matches nothing lists each candidate and what to change), and
-  `--inspect`/`--validate --json` report diagnostics as JSON. The plug-ins
-  have no editor: the VST3 adapter keeps a structured reason for every
-  failure (PLUG-8, done) but, before the progress below, showed it nowhere. It reports a preset with the
-  wrong rate or channel counts, or with corrupt state, to the host only as
-  `kResultFalse`, and a mismatch found at activation activates and plays
-  silence with nothing reported. Because PLUG-8 keeps the reasons, this review
-  decides presentation rather than recovering lost information. The
-  [shared adapter contract](docs/develop/plugin-contract.md#loading-and-failure)
-  asks for the message in the host's log and a "load failed" status, but only
-  LV2 had a defined route (`log:log` and the status port); VST3 and AU have no
-  host log interface, so they now use a Status parameter and the Convolver log
-  (progress below); an editor is VST3-3/HOST-2. Make
-  a table of failures (missing or unreadable filter, rate mismatch, channel
-  count or layout mismatch, corrupt or newer state, failed preparation, failed
-  activation) against surfaces (CLI standard error, exit status and JSON
-  reports; preset tool; VST3 return codes and what named hosts show; LV2 log
-  and status port; AU `OSStatus` and the macOS log). Then propose where each
-  message should appear without an editor (for example a read-only status
-  parameter, the host's log or the system log) for jrp to decide, using the
-  same explanatory text everywhere. jrp prefers diagnostics that explain
-  generously: what failed, why, and what to change, without needing the
-  documentation. Add tests that each failure produces
-  its message on each surface.
-  Progress (23 October 2026, PR #57): the host-facing part was brought forward
-  before the HOST-1 smoke tests. VST3 and
-  AU have a read-only Status parameter and write every load, start and failure
-  to the Convolver log ([status and log](docs/develop/plugin-contract.md#status-and-log)),
-  tested per failure through each adapter. Progress (24 October 2026, PR #68, from
-  jrp's review of 0.4.37): processing faults (rejected input, output
-  overflow, processing failure, and invalid calls from Audio Unit hosts) are counted on the audio
-  thread and shown as Status Fault, explained in the log on the control side;
-  the log names the process, numbers requests and starts with what ran (FFT
-  backend, CPU kernels); an unwritable log is said in the Status text;
-  failed CI test jobs keep their evidence, and preview candidates keep
-  matching debugging symbols. Progress (24 October 2026, PR #72, from jrp's
-  review of 0.4.43): the candidate checks each kept symbol file's debugging
-  information and its identity against the packaged binary (GNU build ID,
-  Mach-O UUID, PDB GUID and age), tested by `release.symbols`.
-  Progress (24 October 2026, PR #73, from jrp's review of 0.4.43): one fault
-  snapshot when a load is accepted, so faults from before it are logged but no
-  longer shown; Load failed stays ahead of Fault on every adapter's audio
-  thread; the user guides point to the Status parameter and the log. The
-  failure-by-surface table, CLI and preset tool included, is in the
-  [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md)
-  plan, with eight proposals for jrp.
-  Remaining: jrp's choice among those proposals, their implementation and
-  tests, and what named hosts actually show (HOST-1).
 
 ## Plug-ins: VST3, LV2 and AU
 
@@ -849,7 +794,7 @@ with compatibility tests; linked IDs point to open work above.
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
 | Path portability checks are partial | No drive/share remapping; a clean profile is not certification for Windows or another reader. Extend checks only with fixtures. | [Profiles](docs/use/other-programs.md#check-that-a-configuration-will-travel) |
 | Output is WAV, RF64, W64, AIFF, CAF, FLAC or headerless raw; speaker labels and reduced valid bits are WAV-only | Input codecs and FLAC output depend on the libsndfile build; the preview packages have no FLAC or Ogg, by decision ([workarounds](docs/use/command-line.md#flac-and-ogg)). Boundary-size tests remain IO-1; labels in other containers are IO-5. RAW has no embedded rate/channel metadata. | [Output formats](docs/use/command-line.md#output-formats) |
-| Output writes are not transactional | I/O/numeric failure may leave a partial file; consider temporary-file/atomic publication for regular-file renders if required. Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
+| Output writes are not transactional | An I/O or numerical failure leaves a partial file, which the CLI says is incomplete; deleting it or publishing through a temporary file was not chosen ([decisions](docs/project/decisions.md#diagnostics)). Never promise rollback for pipes. | [Output safety](docs/use/command-line.md#output-safety) |
 | Gain estimation is not a limiter; float samples can exceed full scale | Integer samples clip; strict quantizer headroom is GAIN-1. | [Gain](docs/use/command-line.md#gain-and-attenuation) |
 | Dither/shaping/valid bits apply to integer file output only | Float/RAW output rejects those options; the plug-ins exchange floats, so the host does any final conversion. | [Integer output](docs/use/command-line.md#integer-formats-dither-and-noise-shaping) |
 | C++ packages are static development libraries, not self-contained installers or a stable binary ABI | Rebuild with compatible toolchains; shared dependencies must be deployed. REL-1 covers end-user bundles. | [Package guide](docs/develop/library.md) |
@@ -963,6 +908,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   brownouts on 30 October cancelled the candidate job before it ran (PRs #84
   and #89, [runner-images#13518](https://github.com/actions/runner-images/issues/13518));
   the package still targets macOS 14; [candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- [x] **DIAG-1 — Review how diagnostics reach the user.** Status parameter
+  and Convolver log (23 October 2026, PR #57), processing faults and run
+  identity (PR #68), symbol checks (PR #72), fault state after reloads (PR
+  #73); the [diagnostics by surface](docs/archive/plans/2026-10-24-diagnostics-by-surface.md)
+  table, and jrp's choices among its proposals implemented (31 October 2026,
+  PR #96): CLI sample faults and incomplete outputs, next steps for damaged
+  files, `convolver-preset` wording and option order, logged plug-in refusals
+  and failed saves, with a test per message. What named hosts show is
+  HOST-1 and AU-4; [output safety](docs/use/command-line.md#output-safety),
+  [status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **DOC-0 — Refresh the entry points for 0.4.0.** 20 October 2026;
   [documentation review](docs/archive/reviews/2026-10-20-documentation-review.md).
 - [x] **DOC-1 — Runnable first-use examples.** 22 October 2026, PR #28;

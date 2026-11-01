@@ -54,6 +54,11 @@ std::string loaded_line(const HostFilter&, bool host_known);
 // After a rejected load: HostFilter::rejection()'s message, numbered as
 // loaded_line() numbers accepted ones ("Request 3: "); empty if there is none.
 std::string rejected_line(const HostFilter&);
+// DIAG-1: logged when the host's save call fails, which hosts may not report.
+inline constexpr const char* save_failure_message =
+    "Saving failed: the plug-in's state could not be written for the host (out of memory, or "
+    "the host did not take the data), so the project or preset being saved does not hold "
+    "the filter. Save again, and report it if it keeps failing.";
 // PLUG-10: what Gain and Mix let through while no filter is heard, with
 // equal input and output counts (otherwise Mix does not apply and there is
 // silence). `identity` true: no filter is loaded, so the filtered path is the

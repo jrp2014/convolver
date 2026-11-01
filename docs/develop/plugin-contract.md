@@ -263,7 +263,13 @@ format.
   the file gets the execution line with its first written line. An empty
   `CONVOLVER_LOG` turns the file off on purpose and is not a failure. Locations are in the
   [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
-  `CONVOLVER_LOG` into the build folder.
+  `CONVOLVER_LOG` into the build folder. Host requests the plug-in refuses
+  are logged with the reason, as the host only gets an error code: VST3's
+  `setupProcessing` (rate, block size, sample size) and `setBusArrangements`
+  (only an instance's first refused layout, as hosts probe one after another),
+  and LV2's `instantiate` (through the host's `log:log`, on standard error
+  without it). A failed save (`getState`, `SaveState`, LV2 `save` when the
+  filter itself was not stored) logs `save_failure_message`.
 - **Processing faults** (jrp's review of 24 October 2026). `HostProcessor`
   counts, per `process()` call and without locking or allocating, rejected
   input (nonfinite or out-of-range samples, played as silence), output

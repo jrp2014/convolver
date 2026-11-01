@@ -149,7 +149,11 @@ std::vector<Line> logical_lines(std::string_view text, const Parser& p) {
         p.fail(0, 0, "text exceeds 1 MiB");
     for (unsigned char c : text)
         if (c == 0 || (c < 32 && c != '\n' && c != '\r' && c != '\t'))
-            p.fail(0, 0, "binary or damaged audio file");
+            p.fail(0, 0,
+                   "binary or damaged audio file: it is neither a configuration (text) nor a "
+                   "sound file this Convolver can read. If it is a configuration, save it as "
+                   "plain text (UTF-8, not UTF-16 \"Unicode\"); if it is a sound file, it is "
+                   "damaged or incomplete: export it again from the program that made it");
     if (text.starts_with("\xef\xbb\xbf"))
         text.remove_prefix(3);
     std::vector<Line> result;

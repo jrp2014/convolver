@@ -83,6 +83,115 @@ def wave_fields(path):
     return (*fields, payload)
 
 
+def float_wave(path, frames, channels=1, rate=48000):
+    """A 32-bit float WAV of `frames` (tuples of `channels` samples), NaN and infinity kept."""
+    data = b''.join(struct.pack(f'<{channels}f', *frame) for frame in frames)
+    fmt = struct.pack('<HHIIHH', 3, channels, rate, rate * 4 * channels, 4 * channels, 32)
+    body = b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(data)) + data
+    Path(path).write_bytes(b'RIFF' + struct.pack('<I', len(body)) + body)
+
+
+def failure_message_tests(d):
+    """DIAG-1: each failure names the file or value and says what to change."""
+    ir = d / 'msg-ir.wav'
+    pcm(ir, [16384])
+    stereo_ir = d / 'msg-ir2.wav'
+    pcm(stereo_ir, [16384, 16384], channels=2)
+    good = d / 'msg-in.wav'
+    pcm(good, [1000, -1000, 500])
+    out = d / 'msg-out.wav'
+    nan_input = d / 'msg-nan.wav'
+    float_wave(nan_input, [(0.5, 0.5), (0.25, float('nan')), (0.0, 0.0)], channels=2)
+    loud = d / 'msg-loud.wav'
+    float_wave(loud, [(3e38,), (3e38,)])
+    garbage = d / 'msg-garbage.wav'
+    garbage.write_bytes(b'RIFF\0\1\2\3' + b'\xff' * 64)
+    truncated = d / 'msg-truncated.wav'
+    pcm(truncated, list(range(100)))
+    truncated.write_bytes(truncated.read_bytes()[:-20])
+    damaged_cfg = d / 'msg-damaged.cfg'
+    damaged_cfg.write_text('48000 1 1 0\n0\n0\nmsg-truncated.wav\n0\n0\n0\n')
+    binary = d / 'msg-binary.bin'
+    binary.write_bytes(bytes(range(256)))
+    # A whole WAV whose format chunk names an unknown encoding: libsndfile's own refusal.
+    bad_fmt = d / 'msg-fmt.wav'
+    float_wave(bad_fmt, [(0.5,), (0.25,)])
+    data = bytearray(bad_fmt.read_bytes())
+    data[20] = 0x99
+    bad_fmt.write_bytes(bytes(data))
+    nan_ir = d / 'msg-nan-ir.wav'
+    float_wave(nan_ir, [(0.5,), (float('inf'),)])
+    # 16-bit samples read as the default float32 include a NaN pattern (0x7fc0).
+    s16 = d / 'msg-s16.raw'
+    s16.write_bytes(struct.pack('<4h', 0, 0x7FC0, 0, 0x7FC0))
+    raw_args = ['--input', '-', '--raw-input', '48000', '1', '--output', '-', '--output-format', 'raw-float']
+    cases = (
+        # (arguments, standard input, texts the message must hold, output incomplete)
+        (
+            ['--filter', stereo_ir, '--input', nan_input, '--output', out],
+            None,
+            [str(nan_input), 'at 0.000 s (frame 1), channel 2', 'export it again'],
+            True,
+        ),
+        (
+            ['--filter', ir, '--input', loud, '--output', out, '--gain-db', '12'],
+            None,
+            ['output overflowed at 0.000 s (frame 0), channel 1', 'lower --gain-db', 'no-clip'],
+            True,
+        ),
+        (
+            ['--filter', ir, *raw_args],
+            struct.pack('<2f', 0.5, float('inf')),
+            ['from standard input', 'frame 1', 'read as f32le'],
+            True,
+        ),
+        (['--filter', ir, '--input', garbage, '--output', out], None, [str(garbage), 'export it again'], False),
+        (['--filter', ir, '--input', bad_fmt, '--output', out], None, [str(bad_fmt), 'export it again'], False),
+        (
+            ['--filter', nan_ir, '--input', good, '--output', out],
+            None,
+            ['cannot read audio file', 'frame 1), channel 1', 'export it again'],
+            False,
+        ),
+        (
+            ['--filter', ir, '--input', s16, '--raw-input', '48000', '1', '--output', out],
+            None,
+            ['read as f32le', '--raw-format'],
+            True,
+        ),
+        (
+            ['--filter', ir, '--input', truncated, '--output', out],
+            None,
+            [str(truncated), 'RIFF/WAVE', 'export it again'],
+            False,
+        ),
+        (
+            ['--filter', damaged_cfg, '--input', good, '--output', out],
+            None,
+            ['msg-truncated.wav', 'export it again'],
+            False,
+        ),
+        (
+            ['--filter', binary, '--input', good, '--output', out],
+            None,
+            ['neither a configuration', 'export it again'],
+            False,
+        ),
+        (['--filter', ir, *raw_args], b'\0\0\0', ['incomplete frame', 'channel count and sample type'], True),
+    )
+    for args, data, texts, incomplete in cases:
+        p = call(args, ok=False, data=data)
+        message = p.stderr.decode()
+        for text in texts:
+            assert text in message, (args, text, message)
+        shown = 'standard output' if args[args.index('--output') + 1] == '-' else str(out)
+        assert ('is incomplete' in message and shown in message) == incomplete, (args, message)
+    # The CLI replaces an existing output, as command-line tools usually do.
+    out.write_bytes(b'not audio')
+    call(['--filter', ir, '--input', good, '--output', out])
+    assert floats(out)[0] == 1
+
+
 def integer_format_tests(d):
     """Dither, noise shaping, PCM8 and valid bits through the CLI."""
     ir = d / 'if-ir.wav'
@@ -710,6 +819,7 @@ def main():
         repeatability_tests(d)
         speaker_map_tests(d)
         container_tests(d)
+        failure_message_tests(d)
         # An option value spelled like an inspection flag is still a value.
         pcm(d / 'v-ir.wav', [16384])
         pcm(d / 'v-in.wav', [1000, -1000])

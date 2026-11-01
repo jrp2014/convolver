@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -48,7 +49,7 @@ std::string explain(OSStatus status) {
     case kAudioFileInvalidChunkError:
     case kAudioFileInvalidPacketOffsetError:
     case kAudioFileEndOfFileError:
-        meaning = "the sound file is damaged or incomplete";
+        meaning = std::string(damaged_file_advice);
         break;
     case kAudioFilePermissionsError:
     case permission_error:
@@ -97,7 +98,7 @@ void require_file(const std::filesystem::path& path, const std::string& opening)
 // A file read through its header by ExtAudioFile, decoded to 32-bit floats.
 class ToolboxFile final : public SoundFile {
   public:
-    explicit ToolboxFile(const std::filesystem::path& path) {
+    explicit ToolboxFile(const std::filesystem::path& path) : path_(path) {
         const auto opening = "cannot open audio input " + path.string() + ": ";
         require_file(path, opening);
         validate_wave(path);
@@ -177,7 +178,9 @@ class ToolboxFile final : public SoundFile {
             throw std::runtime_error("audio read failed: " + explain(status));
         for (std::size_t i = 0; i < std::size_t{frames} * channels; ++i)
             if (!std::isfinite(data[i]))
-                throw std::runtime_error("nonfinite audio sample");
+                throw std::runtime_error(invalid_sample_message(
+                    path_, position_ + i / channels, i % channels + 1, info_.sample_rate));
+        position_ += frames;
         return frames;
     }
     void close() override {
@@ -202,13 +205,15 @@ class ToolboxFile final : public SoundFile {
     Handle file_;
     AudioInfo info_{};
     std::optional<std::size_t> frames_;
+    std::filesystem::path path_;
+    std::uint64_t position_ = 0; // Frames read so far, for messages.
 };
 
 // A headerless file, decoded as io.cpp decodes one.
 class RawFile final : public SoundFile {
   public:
     RawFile(const std::filesystem::path& path, RawSpec spec, RawEncoding encoding)
-        : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)) {
+        : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)), path_(path) {
         validate(spec);
         const auto opening = "cannot open audio input " + path.string() + ": ";
         require_file(path, opening);
@@ -221,7 +226,7 @@ class RawFile final : public SoundFile {
             throw std::runtime_error(opening + ec.message());
         frame_bytes_ = width_ * spec.channels;
         if (bytes % frame_bytes_)
-            throw std::runtime_error("RAW input ends with an incomplete frame");
+            throw std::runtime_error(detail::raw_incomplete_frame);
         frames_ = static_cast<std::size_t>(bytes / frame_bytes_);
     }
     AudioInfo info() const noexcept override {
@@ -242,12 +247,15 @@ class RawFile final : public SoundFile {
         if (file_.bad())
             throw std::runtime_error("RAW audio read failed");
         if (got % frame_bytes_)
-            throw std::runtime_error("RAW input ends with an incomplete frame");
+            throw std::runtime_error(detail::raw_incomplete_frame);
         for (std::size_t i = 0; i < got / width_; ++i) {
             data[i] = decode_raw(bytes_.data() + i * width_, encoding_);
             if (!std::isfinite(data[i]))
-                throw std::runtime_error("nonfinite audio sample");
+                throw std::runtime_error(
+                    invalid_sample_message(path_, position_ + i / info_.channels,
+                                           i % info_.channels + 1, info_.sample_rate, encoding_));
         }
+        position_ += got / frame_bytes_;
         return got / frame_bytes_;
     }
     void close() override {
@@ -261,6 +269,8 @@ class RawFile final : public SoundFile {
     std::size_t frames_ = 0;
     std::ifstream file_;
     std::vector<std::byte> bytes_;
+    std::filesystem::path path_;
+    std::uint64_t position_ = 0; // Frames read so far, for messages.
 };
 
 // A .pcm or .raw filter is read through a header only when it starts with a

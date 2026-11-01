@@ -141,7 +141,7 @@ At publication, and before the next preview: COMPAT-1 keeps presets, a host
 project and expected audio from the published release, so later previews are
 tested against them. Not part of this milestone, but tracked: signing and
 notarization (the production gate, REL-1 and PLUG-5), resource budgets
-(PERF-3), the rest of the diagnostics review (DIAG-1), other `.cfg` readers
+(PERF-3), other `.cfg` readers
 (CFG-1) and Equalizer APO on a real device (HOST-4).
 
 ## What still blocks the first preview

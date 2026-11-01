@@ -8,9 +8,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace convolver::vst3 {
 using namespace Steinberg;
@@ -79,17 +82,52 @@ tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 n
     const auto result = arrange(in, ni, out, no);
     if (result == kResultOk)
         send_status(); // Whether the filter has been checked may have changed.
+    else
+        write_log();
     return result;
 }
 tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement* out, int32 no) {
     std::lock_guard lock(control_);
-    if (active_ || ni != 1 || no != 1 || !in || !out)
+    // DIAG-1: say why. A layout Convolver cannot take is logged once per
+    // instance: hosts offer layouts one after another until one is accepted,
+    // and only the first refusal is news. log() skips a repeated line.
+    const auto refuse = [&](auto&& why, bool once) noexcept {
+        try {
+            if (once && std::exchange(layout_refusal_logged_, true))
+                return kResultFalse;
+            log("Refused the host's channel layout: " + why() +
+                (once ? " The host may go on to offer another layout; only the first refusal "
+                        "is logged."
+                      : ""));
+        } catch (...) { // Out of memory for the message: refused all the same.
+        }
         return kResultFalse;
+    };
+    if (active_)
+        return refuse(
+            [] { return std::string("the host changed it while the plug-in was active."); }, false);
+    if (ni != 1 || no != 1 || !in || !out)
+        return refuse(
+            [&] {
+                return "it has " + std::to_string(ni) + " input and " + std::to_string(no) +
+                       " output buses; Convolver takes one of each.";
+            },
+            true);
     const auto inputs = SpeakerArr::getChannelCount(in[0]);
     const auto outputs = SpeakerArr::getChannelCount(out[0]);
     if (inputs < min_bus_channels || inputs > max_bus_channels || outputs < min_bus_channels ||
         outputs > max_bus_channels || (!identity::unequal_counts && inputs != outputs))
-        return kResultFalse;
+        return refuse(
+            [&] {
+                return "it has " + std::to_string(inputs) + " input and " +
+                       std::to_string(outputs) + " output channels; Convolver takes " +
+                       std::to_string(min_bus_channels) + " to " +
+                       std::to_string(max_bus_channels) + " of each." +
+                       (inputs > max_bus_channels || outputs > max_bus_channels
+                            ? " Use the command-line tool for filters with more channels."
+                            : "");
+            },
+            true);
     auto result = AudioEffect::setBusArrangements(in, ni, out, no);
     if (result == kResultOk) {
         inputs_ = inputs;
@@ -110,15 +148,35 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
     tresult result = kInvalidArgument;
     {
         std::lock_guard lock(control_);
-        if (active_ || !std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
-            setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate ||
-            setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20) ||
-            canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
-            return kInvalidArgument;
-        result = AudioEffect::setupProcessing(setup);
+        // DIAG-1: say why the host's settings were refused (log() skips a
+        // repeat of the same line, as hosts retry).
+        std::string why;
+        if (active_)
+            why = "the host changed them while the plug-in was active.";
+        else if (!std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
+                 setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate)
+            why = "the sample rate must be a whole number of hertz from 1 to 768000 Hz.";
+        else if (setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20))
+            why = "the largest block must be 1 to 1048576 samples.";
+        else if (canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
+            why = "samples must be 32-bit or 64-bit floating point.";
+        if (!why.empty()) {
+            try {
+                char rate[32];
+                std::snprintf(rate, sizeof rate, "%.6g", setup.sampleRate);
+                log(std::string("Refused the host's processing settings (") + rate +
+                    " Hz, blocks of up to " + std::to_string(setup.maxSamplesPerBlock) +
+                    " samples): " + why +
+                    " The host may report the plug-in as unusable, or offer other settings.");
+            } catch (...) { // Out of memory for the message: refused all the same.
+            }
+        } else
+            result = AudioEffect::setupProcessing(setup);
     }
     if (result == kResultOk)
         send_status(); // Whether the filter has been checked may have changed.
+    else
+        write_log();
     return result;
 }
 HostLayout Processor::layout() const {
@@ -374,11 +432,16 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
             result = write_state(stream, state) ? kResultOk : kResultFalse;
         } catch (...) {
         }
+        if (result != kResultOk) // DIAG-1: the host may not say that saving failed.
+            try {
+                log(save_failure_message);
+            } catch (...) { // Out of memory for the message.
+            }
     }
-    if (faulted) {
+    if (faulted || result != kResultOk)
         write_log();
+    if (faulted)
         send_status();
-    }
     return result;
 }
 namespace {
