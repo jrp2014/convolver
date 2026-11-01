@@ -26,7 +26,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 | I want to… | Start with | Then |
 | --- | --- | --- |
 | Filter WAV files, or a stream through a pipe | [Your first filter](first-filter.md) | [Command-line reference](command-line.md) |
-| Filter audio in a DAW or other plug-in host | [Install](install.md), then [your first sound in a host](first-sound-in-a-host.md) | [Plug-in presets](presets.md), [how the plug-ins behave](plugins.md) |
+| Filter audio in a DAW or other plug-in host | [Install](install.md), then [your first sound in a host](first-sound-in-a-host.md) | [Check a stereo filter in a host](check-a-stereo-filter.md), [plug-in presets](presets.md), [how the plug-ins behave](plugins.md) |
 | Filter everything Windows plays | [Equalizer APO export](equalizer-apo.md) | |
 | Use a filter made for Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](other-programs.md) | [Configuration files](configuration.md) |
 
@@ -37,6 +37,7 @@ and the plug-ins have not yet been tested in named DAWs. The
 | [Concepts](concepts.md) | Background | Audio terms, latency, tails, files versus streams |
 | [Your first filter](first-filter.md) | Tutorial | The bundled example filters with the command-line tool |
 | [Your first sound in a host](first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
+| [Check a stereo filter in a host](check-a-stereo-filter.md) | Tutorial | From download to a host render checked against the expected output |
 | [Install](install.md) | How-to | A preview package or your own build, for every plug-in format and system |
 | [Plug-in presets](presets.md) | How-to | Turning a filter into a preset for a plug-in |
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
@@ -51,14 +52,27 @@ To build Convolver yourself, see [build from source](../develop/build.md).
 
 ## Tools in a preview package
 
-A preview package holds the VST3 plug-in, two tools in `bin/`, example presets
-in `presets/`, these pages in `docs/use/` and licence notices in `licenses/`.
+A preview package holds the VST3 plug-in, three tools in `bin/`, example presets
+in `presets/`, the [first-use examples](first-filter.md#2-filter-the-examples)
+with presets made from them in `examples/first-use/`, these pages in
+`docs/use/` and licence notices in `licenses/`.
 Check the package's SHA-256 checksum against the one published with it before
 installing ([install](install.md)).
 
 Run the tools from the extracted package folder. On Windows add `.exe`
 (`./bin/convolver-preset.exe` in PowerShell). Outputs must be new paths: the
-tools never replace an existing file or folder. Both print `--help`.
+tools never replace an existing file or folder. All three print `--help`.
+
+### convolver
+
+Filters files and streams, and compares a render with the output it should
+give ([command-line reference](command-line.md)):
+
+<!-- executable-example -->
+
+```sh
+./bin/convolver --filter examples/first-use/mono/impulse.wav --input examples/first-use/mono/input.wav --output mono.wav
+```
 
 ### convolver-preset
 

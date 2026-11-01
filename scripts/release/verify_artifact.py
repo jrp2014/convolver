@@ -147,7 +147,7 @@ def inspect(root, candidate, policy):
             records[path.relative_to(root).as_posix()] = inspect_binary(path, candidate, policy)
     if not any(name.startswith('VST3/Convolver.vst3/') for name in records):
         raise ValueError('missing native plug-in binary')
-    for tool in ('bin/convolver-preset', 'bin/convolver-equalizer-apo'):
+    for tool in ('bin/convolver', 'bin/convolver-preset', 'bin/convolver-equalizer-apo'):
         if tool not in records and tool + '.exe' not in records:
             raise ValueError('missing tool binary: ' + tool)
     return records
@@ -218,6 +218,9 @@ def main():
             'docs/use/presets.md',
             'docs/use/equalizer-apo.md',
             'presets/examples.json',
+            'examples/first-use/stereo/filter.vstpreset',
+            'examples/first-use/stereo/input.wav',
+            'examples/first-use/stereo/expected.wav',
             'VST3/Convolver.vst3/Contents/Resources/moduleinfo.json',
             'VERSION.txt',
         ):

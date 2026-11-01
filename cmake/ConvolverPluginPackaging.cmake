@@ -1,14 +1,18 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Optional distribution, separate from the C++ library package and exports.
-# The package ships the shared tools (PLUG-3 presets, HOST-4 Equalizer APO export),
-# which are built with the CLI. convolver-vst3-preset stays a source-build alias.
-if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_preset_tool OR NOT TARGET convolver_equalizer_apo)
+# The package ships the CLI (PLUG-5) and the shared tools (PLUG-3 presets, HOST-4
+# Equalizer APO export). convolver-vst3-preset stays a source-build alias.
+if(NOT TARGET convolver_vst3 OR NOT TARGET convolver_cli OR NOT TARGET convolver_preset_tool
+   OR NOT TARGET convolver_equalizer_apo)
     message(FATAL_ERROR "CONVOLVER_PACKAGE_PLUGINS requires VST3, I/O and the CLI tools "
         "(CONVOLVER_BUILD_VST3, CONVOLVER_BUILD_IO and CONVOLVER_BUILD_CLI)")
 endif()
-set(convolver_packaged_tools convolver_preset_tool convolver_equalizer_apo)
-foreach(tool IN LISTS convolver_packaged_tools)
-    convolver_keep_symbols(${tool}) # CONVOLVER_DEBUG_SYMBOLS (the VST3 bundle's own CMakeLists keeps its).
+set(convolver_packaged_tools convolver_cli convolver_preset_tool convolver_equalizer_apo)
+# CONVOLVER_DEBUG_SYMBOLS (the VST3 bundle's own CMakeLists keeps its). The
+# CLI's symbols are convolver-cli.*, apart from the plug-in's Convolver.*.
+convolver_keep_symbols(convolver_cli NAME convolver-cli)
+foreach(tool IN ITEMS convolver_preset_tool convolver_equalizer_apo)
+    convolver_keep_symbols(${tool})
 endforeach()
 find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
 get_target_property(convolver_bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
@@ -54,6 +58,29 @@ add_custom_command(OUTPUT "${examples_dir}/examples.json"
 add_custom_target(convolver_plugin_examples ALL DEPENDS "${examples_dir}/examples.json")
 install(DIRECTORY "${examples_dir}/" DESTINATION presets COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/examples/plugin-presets/README.md" DESTINATION presets COMPONENT PluginDistribution)
+# The first-use examples (DOC-1) for the user journeys (REL-2): each folder's
+# filter, input.wav and expected.wav, plus a preset made from its filter. Their
+# README describes a source build, so the guides in docs/use/ take its place.
+set(first_use_source "${PROJECT_SOURCE_DIR}/examples/first-use")
+set(first_use_presets "${CMAKE_CURRENT_BINARY_DIR}/first-use-presets/$<CONFIG>")
+add_custom_command(OUTPUT "${first_use_presets}/stamp"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${first_use_presets}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${first_use_presets}/mono" "${first_use_presets}/stereo"
+        "${first_use_presets}/crossover"
+    COMMAND convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_presets}/mono/filter.vstpreset"
+    COMMAND convolver_preset_tool "${first_use_source}/stereo/filter.cfg" "${first_use_presets}/stereo/filter.vstpreset"
+    COMMAND convolver_preset_tool "${first_use_source}/crossover/filter.cfg"
+        "${first_use_presets}/crossover/filter.vstpreset"
+    COMMAND "${CMAKE_COMMAND}" -E touch "${first_use_presets}/stamp"
+    DEPENDS convolver_preset_tool "${first_use_source}/mono/impulse.wav" "${first_use_source}/stereo/filter.cfg"
+        "${first_use_source}/stereo/room.wav" "${first_use_source}/crossover/filter.cfg"
+        "${first_use_source}/crossover/crossover.wav"
+    VERBATIM)
+add_custom_target(convolver_first_use_presets ALL DEPENDS "${first_use_presets}/stamp")
+install(DIRECTORY "${first_use_source}/" DESTINATION examples/first-use COMPONENT PluginDistribution
+    PATTERN README.md EXCLUDE)
+install(DIRECTORY "${first_use_presets}/" DESTINATION examples/first-use COMPONENT PluginDistribution
+    PATTERN stamp EXCLUDE)
 # Every user page (docs/use/), with links to other pages pointing at the source
 # repository's copy at the packaged commit.
 file(GLOB guide_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/docs/use/*.md")
@@ -98,10 +125,10 @@ if(CONVOLVER_BUILD_TESTS)
         --cmake "${CMAKE_COMMAND}" --config "$<CONFIG>"
         ${validator_argument} --probe "$<TARGET_FILE:convolver_vst3_package_probe>")
     set_tests_properties(release.stage PROPERTIES LABELS "packaging;vst3;real-libraries" TIMEOUT 180)
-    add_dependencies(check convolver_plugin_examples convolver_vst3_package_probe)
+    add_dependencies(check convolver_plugin_examples convolver_first_use_presets convolver_vst3_package_probe)
     # release.stage carries the vst3 label and installs the whole distribution.
     add_dependencies(convolver_vst3_suite convolver_vst3_package_probe convolver_plugin_examples
-        convolver_packaged_guides ${convolver_packaged_tools})
+        convolver_first_use_presets convolver_packaged_guides ${convolver_packaged_tools})
 endif()
 set(CPACK_PACKAGE_NAME Convolver)
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")

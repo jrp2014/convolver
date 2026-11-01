@@ -284,6 +284,12 @@ except the Audio Unit build, which runs in a source checkout.
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
    48000 Hz: the echo returns. Copy the log into the report.
+10. Follow sections 4 to 6 of
+    [check a stereo filter in a host](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
+    in a new project: render the stereo example through its preset, save and
+    reopen, and load the presets that do not fit. Record the output of each
+    `convolver --compare` and every place the guide's menu names or results
+    differ from REAPER's.
 
 ### Audacity (VST3)
 

@@ -46,6 +46,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Concepts](use/concepts.md) | Background | Audio terms, latency, tails, files versus streams |
 | [Your first filter](use/first-filter.md) | Tutorial | The bundled examples with the command-line tool |
 | [Your first sound in a host](use/first-sound-in-a-host.md) | Tutorial | The example presets in a plug-in host |
+| [Check a stereo filter in a host](use/check-a-stereo-filter.md) | Tutorial | Download to checked host render: checksum, install, render, `--compare`, save and reopen, a preset that does not fit |
 | [Install](use/install.md) | How-to | Preview packages and source builds, for every plug-in format and system; unsigned previews |
 | [Plug-in presets](use/presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, messages |
 | [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
