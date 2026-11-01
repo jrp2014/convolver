@@ -845,7 +845,17 @@ void responsive() {
     check(loaded, "held load");
     require(prompt, "a report read waited for a load that holds the control lock");
     require(during == before, "a read during the load gave '" + during + "', not the last report");
-    const auto after = text(report(unit)[@"status name"]);
+    // The restore also wakes the Latency worker, which takes the lock for a
+    // moment; a read then still gets the last report, as the window's next
+    // timed read would put right. So the result is read until it shows, for
+    // up to 10 s (CI-22: one read failed on a busy runner).
+    std::string after;
+    for (int i = 0; i < 1000; ++i) {
+        after = text(report(unit)[@"status name"]);
+        if (after == "Playing")
+            break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     require(after == "Playing", "after the load: " + after);
     std::cout << "report read during a held load: '" << during << "', then '" << after << "'\n";
     unit.uninitialize();

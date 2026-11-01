@@ -28,7 +28,8 @@ Contents: [native tests](#native-production-tests),
 [historical tests](#historical-tests-run-with-cmakectest) and
 [their coverage](#historical-coverage), [limits](#validation-limits-and-release-work),
 [documentation checks](#documentation-checks), [fuzzing](#fuzz-smoke-tests-and-longer-campaigns),
-[evidence from failed CI runs](#evidence-from-failed-ci-runs) and
+[evidence from failed CI runs](#evidence-from-failed-ci-runs),
+[intermittent failures](#intermittent-failures) and
 [when CI runs](#ci-triggers).
 
 ## Native production tests
@@ -221,10 +222,43 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   while the task runs (which it waits for) and at each point the worker
   passes between waking and running the task, held there until the stop
   has been asked for, as a destructor asks; and 2000 workers requested and
-  stopped at once. Each case has a 10-second watchdog, so a lost stop
-  fails the test instead of hanging it. With the order jrp found (the stop
+  stopped at once. Each case has a watchdog: when a case makes no progress
+  for 10 seconds (each of the 2000 workers counts as progress), the test
+  fails instead of hanging and reports a timeout with the workers done, what
+  the test's thread was doing (starting, requesting or stopping a worker),
+  the last point the current worker reported from its own thread (half the
+  workers have a probe for this; the other half run without one, as the
+  Audio Unit's does), and every thread's stack from the platform's debugger
+  (cdb, gdb or lldb). The debugger suspends the test while attached, so a
+  separate process ends it after 30 seconds; the report says how long the
+  debugger took. cdb reads symbols only from the test's own folder, so
+  Windows frames show by their exports: with the runners' default path
+  (`srv*`, Microsoft's symbol server over the network) it took 2 to over 30
+  seconds, ran past 30 in the Ooura builds on 35221f0 and 6f20a44, and on
+  fa5ce6a printed no listing in time, most likely while it looked symbols
+  up. It reports a timeout, not a
+  lost stop: the stacks tell a stall on a busy runner from a lost wake.
+  Conditions are waited for by the clock, up to 5 seconds, so they fail as
+  themselves before the watchdog fires. With the order jrp found (the stop
   checked before the request is taken), the case held as the worker wakes
-  hangs and fails.
+  hangs and fails. `native.request_worker.watchdog` runs a case that never
+  finishes, with a 1-second limit, and passes only when the report comes
+  with a thread listing from the debugger. It is skipped where none is
+  installed and, outside CI (no `CI` variable), where the debugger cannot
+  attach; the native Linux CI jobs install gdb. A debugger that overruns
+  is killed with its process group and, on macOS, with the children lldb
+  started: lldb starts `debugserver` in a process group of its own, and
+  `debugserver` holds the test suspended until it exits. However the
+  debugger ends, the supervisor then sends the test SIGCONT: lldb's attach
+  stops the test, and a stop can outlast the debugger. On macOS
+  `debugserver` may finish detaching after lldb exits, so the supervisor
+  resends SIGCONT until nothing traces the test, for up to 2 seconds. A tracer that dies
+  while attached takes the test with it on macOS, so there the test may
+  end with SIGKILL after the line "The debugger ran past its time limit
+  and is ended". The time limit is 30 seconds, or
+  `CONVOLVER_DEBUGGER_LIMIT_MS` (the
+  [Watchdog stacks check](#watchdog-stacks-check) sets it short). The check has the CTest label `debugger`, which the
+  package candidates leave out ([below](#which-configurations-run-which-tests)).
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
@@ -699,8 +733,9 @@ Four CTest tests run when the adapter is built (label `au`):
   while it holds the control lock (the adapter's `load_started_for_tests`
   hook, null in the component), and a report read must return within 10 s
   with the last report ("No filter"); once the load is released the report
-  says Playing. A file chosen in the window is read on the main thread, so
-  this does not cover it. Then faults: invalid input rendered, the
+  says Playing within 10 s (the restore also wakes the Latency worker, which
+  may hold the lock a moment longer). A file chosen in the window is read on
+  the main thread, so this does not cover it. Then faults: invalid input rendered, the
   report says Fault and keeps Render's Fault value, and repeated reads, as an
   open window makes, log the faults once. The AU workflow's `auval -strict`
   step also requires `Cocoa Views Available: 1`.
@@ -1016,7 +1051,7 @@ qualification. Never bypass system security to turn those checks green.
 ## Evidence from failed CI runs
 
 When a test job fails, the native, VST3, LV2 and Audio Unit workflows keep an
-artifact named `test-evidence-<job>-<index>` for 14 days (DIAG-1, jrp's review
+artifact named `test-evidence-<job>-<index>-attempt-<n>` for 14 days (DIAG-1, jrp's review
 of 24 October 2026), collected by
 [`ci_evidence.py`](../../scripts/ci_evidence.py) from each build folder the job
 made: CTest's full output (`Testing/Temporary/LastTest.log`, which holds every
@@ -1028,6 +1063,152 @@ image, compiler and build type). The candidate workflow keeps its own
 `diagnostics-<platform>` artifact and the
 [debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
 its findings.
+
+## Intermittent failures
+
+A test that fails on one run and passes on the next has a cause, usually a
+race or a time limit that a busy runner exceeds; find and fix it rather than
+re-running until green. CI does not repeat failed tests automatically, as
+that would hide real races like the Audio Unit's lost stop. Causes found so
+far (CI-22, 1 November 2026, from the 1,000 most recent workflow runs, 25
+October to 1 November, with their re-run attempts):
+
+- Windows builds, "The process cannot access the file because it is being
+  used by another process", exit 32, in the app-local DLL step
+  (`vcpkg.exe z-applocal`) after a link, both in the main build (PR #88) and
+  in `packaging.consumer.source-no-ctest` (PR #102). The message is the
+  system's, not one of vcpkg's own errors, and 32 is Windows'
+  sharing-violation code: the command could not start `vcpkg.exe`. In #88
+  it came 8 ms after another target's `z-applocal` had copied its DLL and
+  was exiting. An exiting vcpkg sends its metrics by first copying
+  `vcpkg.exe` to a temporary folder, and vcpkg opened the source of that
+  copy without sharing
+  ([microsoft/vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163),
+  reported with vcpkg-tool 2026-09-26; fixed by #2165, merged 28 October
+  2026). The Windows jobs set
+  `VCPKG_DISABLE_METRICS=1`, which removes that copy; do the same for local
+  parallel builds with an older vcpkg. No handle trace was taken, so this
+  is the cause the evidence points to; if the error comes back with metrics
+  off, it is another one.
+- `native.request_worker`, Windows (PR #102): "many workers did not finish
+  within 10 s" in the Ooura build, its only run of that binary, while two
+  package consumer builds ran beside it; the main and core-only builds' tests
+  had passed in about 0.5 s earlier in that job. The cause is not
+  established: a stall on an oversubscribed runner and a lost
+  wake look alike from the old report. It happened again on PR #105 (1
+  November, main's test without this report): again the Ooura build, the
+  job's third run of the binary after passes in about 0.5 seconds, this
+  time beside `native.kernel_divergence` and `native.host_lifecycle`
+  rather than the consumer builds. The watchdog now records the evidence
+  that tells them apart ([above](#native-production-tests)).
+- `au.editor` (PR #103): the read after a held load could get the last
+  report while the Latency worker held the lock a moment; the test now reads
+  until the result shows, as the window's next timed read would.
+- `au.adapter` under ASan (`au-sanitizers`, PR #104, d7a9795):
+  heap-use-after-free in `host_log_path()`, which read `CONVOLVER_LOG`
+  with `getenv` on a unit's Latency worker while the test's private-log
+  helper changed the variable with `setenv` for the next case. The test
+  now sets the variable once, before any unit exists, and each case reads
+  what the log gained while it ran; at exit the log is appended to the one
+  CTest names.
+- `native.request_worker.watchdog`, the macOS arm64 candidate on
+  `macos-15` (PR #104, 1 November 2026): it started and never finished,
+  though its CTest timeout is 120 seconds, and the job's build-and-test step
+  ran for over 18 minutes until it was cancelled. The same check passed on
+  that image in the Audio Unit job (7 seconds), on `macos-15-intel` and on
+  `macos-26`. The [Watchdog stacks check](#watchdog-stacks-check) then
+  caught a stall on `macos-26` (35221f0, 1 run in 20): lldb was gone and
+  its supervisor had exited by the normal path (no overrun note), but the
+  test was left stopped (state `T`) in its wait for the supervisor. That is
+  consistent with lldb's attach stopping the test (SIGSTOP) and nothing
+  resuming it; only an overrun sent SIGCONT. The supervisor then sent
+  SIGCONT however the debugger ended, and on macOS it now resends SIGCONT
+  until nothing traces the test, in case `debugserver` detaches after
+  lldb exits (a SIGCONT sent while it still traces can be lost). Why CTest's 120-second timeout did not end the stopped test on the
+  candidate is not established (CI-25). The candidates still leave the
+  check out, but `native.request_worker` runs there, and a real stall
+  would take the same lldb path, bounded by the step's time limit. While
+  `debugserver` traces the test, macOS makes it the test's parent, so the
+  test's own parent (CTest, or the probe) cannot wait for it until the
+  debugger lets go; and a tracer that dies while attached takes the test
+  with it (SIGKILL).
+
+The package consumer tests each build with `--parallel 2`, so CTest counts
+two CPUs for each (`PROCESSORS 2`) and runs fewer other tests beside them.
+
+Every build and test job but the fuzz campaigns (whose manual runs last as
+long as asked) has a time limit (`timeout-minutes`): 15 to 30 minutes, 60
+for the native Windows job, the VST3 matrix (which has a Windows leg) and
+the release candidates, whose build-and-verify steps have 40. That is a few
+times the longest successful job of the 60 most recent runs (13 minutes, a
+candidate). A process that CTest
+cannot end then fails the job instead of holding a runner for GitHub's
+default of six hours.
+
+When a test job fails, its summary lists the failed tests (or that another
+step failed) with the run attempt, and its evidence artifact's name ends in
+`-attempt-<n>` ([evidence](#evidence-from-failed-ci-runs)). When a job
+passes on a re-run, it says so in its summary and with a "Passed on retry"
+warning linking the earlier attempt (`.github/actions/note-retry`). A pass on
+re-run means the cause is unresolved, not that there was none.
+
+CTest lists a skipped test under "The following tests did not run"; that
+is not a failure. `vst3.pluginval.acceptance` skips itself with pluginval 1
+([pluginval](#pluginval)).
+
+### Watchdog stacks check
+
+`.github/workflows/watchdog.yml` builds only the request_worker test, with
+the candidates' flags (`-O3 -DNDEBUG -g`), and runs `--check-watchdog` 50
+times on `macos-15`, `macos-15-intel`, `macos-latest` and Linux with gdb,
+each run in a session of its own under `scripts/ci_watchdog_probe.py` with
+a 90-second deadline. For a run that overruns it shows the test's output,
+every process of the run with its process group and state, and a `sample`
+of the test on macOS; it then kills them and says whether the test went
+away. Fifty more runs end the debugger while it attaches
+(`CONVOLVER_DEBUGGER_LIMIT_MS` of 50 ms to 1 second): each must end, with
+or without stacks or by the SIGKILL macOS sends when the tracer dies (then
+sometimes with no exit status for the probe), and leave no debugger
+running. A debugger
+left behind fails the run. Only on CI does the script also kill debuggers
+outside the run's own processes.
+
+Each run is alone on an idle runner, with its output to a file. The
+candidate ran it from a CMake build under `ctest --parallel`, beside other
+tests, with CTest reading its output through pipes; passes here do not rule
+out a cause that needs those. The workflow runs for pull requests that
+change the worker, its test, the script or the workflow, and by hand ("Run
+workflow", with the number of runs).
+
+On 1 November 2026 (90b9a40) the 20 runs on Linux printed stacks within
+1.5 seconds. The macOS runs of that commit and the next two (5e96a3f,
+d7a9795) are not evidence: they took the probe's word for when the test
+ended, and on macOS that was wrong: with the test reparented to `debugserver`, Python's `Popen.poll()`
+gets ECHILD and reports exit 0. So they showed "debugger left running"
+for runs that had not finished. The probe now waits with `waitpid` itself
+and treats ECHILD as still running while the process exists. On 1b9350f
+all 80 plain runs printed stacks (at most 5.2 seconds on `macos-15`, 4.3
+on `macos-26`, 12.5 on `macos-15-intel` and 1.4 on Linux), and all 80
+early kills ended: on macOS with exit 0, 1 or SIGKILL (three times with no
+exit status), on Linux with exit 0 or 1. None hung and none left a
+debugger running. On 35221f0 run 15 of 20 on `macos-26` overran: the
+probe's listing showed the test stopped (`T`) with its supervisor a
+zombie, and `sample` showed the test's main thread in `wait4` in
+`print_stacks()`. That is the stall described
+[above](#intermittent-failures). On 6f20a44, with SIGCONT after every
+debugger, all 200 plain runs printed stacks and all 200 early kills ended
+(the slowest plain run 10.8 seconds, on `macos-15-intel`). On bcf9c65 (the
+same code) plain run 29 of 50 on `macos-26`, and on df822c1 (which waits
+for the detach) plain run 48 of 50 on `macos-15`, ended in normal time
+with the stacks printed but no exit status for the probe: the test was
+gone from `ps` and `waitpid` gave ECHILD. Whether it exited while still
+traced, or the probe looked in the moment the test was handed back, is
+not known. A test that exits while traced is reaped by its tracer, and
+macOS then hands it back to its parent, so the probe now waits up to 5
+seconds for a late status and says how late it came. On fa5ce6a all 400
+runs passed and every status came: at most 0.5 seconds late, each from an
+early kill that ended with SIGKILL. So those two runs were the probe's
+misreading, not a test left behind.
 
 ## CI triggers
 
@@ -1123,6 +1304,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
+| `debugger` label: `native.request_worker.watchdog` (CI's debugger, not the build) | As the core and CLI suite below | The release candidates and `tests/release/source_build.py` |
 | Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 

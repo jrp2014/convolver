@@ -619,36 +619,75 @@ void render_requires_initialization() {
             "rendered without initialization");
 }
 
-// While it exists, the Convolver log goes to a file of this process's own
-// (CTest's is shared with the other AU tests).
+// The Convolver log, a file of this process's own (CTest's is shared with
+// the other AU tests). main() sets CONVOLVER_LOG once, before any unit
+// exists: a setenv while a unit's Latency worker reads the variable is a
+// data race, which ASan caught when a test changed it per case (CI-22).
+// At exit the file is appended to the log CTest names, kept as evidence.
+std::filesystem::path process_log;
+std::optional<std::string> ctest_log;
+
+// What the Convolver log gained while this object exists.
 class PrivateLog {
   public:
-    explicit PrivateLog(const std::string& name)
-        : path_(std::filesystem::temp_directory_path() /
-                ("convolver-au-" + name + "-" + std::to_string(std::random_device{}()) + ".log")) {
-        if (const char* configured = std::getenv("CONVOLVER_LOG"))
-            earlier_ = configured;
-        setenv("CONVOLVER_LOG", path_.c_str(), 1);
-    }
-    PrivateLog(const PrivateLog&) = delete;
-    PrivateLog& operator=(const PrivateLog&) = delete;
-    ~PrivateLog() {
-        if (earlier_)
-            setenv("CONVOLVER_LOG", earlier_->c_str(), 1);
-        else
-            unsetenv("CONVOLVER_LOG");
-        std::error_code ignored;
-        std::filesystem::remove(path_, ignored);
-    }
+    PrivateLog() : start_(size_now()) {}
+    // If the log passed 1 MiB meanwhile, host_log moved it to ".old" and
+    // began a new one: then the rest of the old one and all of the new.
     std::string text() const {
-        std::ifstream in(path_, std::ios::binary);
-        return std::string(std::istreambuf_iterator<char>(in), {});
+        auto all = read(process_log);
+        if (all.size() < start_ || rotated()) {
+            auto old = process_log;
+            old += ".old";
+            const auto before = read(old);
+            all = (start_ < before.size() ? before.substr(start_) : std::string()) + all;
+            return all;
+        }
+        return all.substr(start_);
     }
 
   private:
-    std::filesystem::path path_;
-    std::optional<std::string> earlier_;
+    static std::string read(const std::filesystem::path& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    }
+    static std::filesystem::file_time_type old_time() {
+        auto old = process_log;
+        old += ".old";
+        std::error_code missing;
+        return std::filesystem::last_write_time(old, missing);
+    }
+    bool rotated() const {
+        return old_time() != old_time_;
+    }
+    static std::size_t size_now() {
+        std::error_code missing;
+        const auto size = std::filesystem::file_size(process_log, missing);
+        return missing ? 0 : static_cast<std::size_t>(size);
+    }
+    std::size_t start_;
+    std::filesystem::file_time_type old_time_ = old_time();
 };
+
+void use_process_log() {
+    process_log = std::filesystem::temp_directory_path() /
+                  ("convolver-au-adapter-" + std::to_string(std::random_device{}()) + ".log");
+    if (const char* configured = std::getenv("CONVOLVER_LOG"))
+        ctest_log = configured;
+    setenv("CONVOLVER_LOG", process_log.c_str(), 1);
+}
+
+void keep_process_log() {
+    if (ctest_log) {
+        std::ifstream in(process_log, std::ios::binary);
+        std::ofstream out(*ctest_log, std::ios::binary | std::ios::app);
+        out << in.rdbuf();
+    }
+    std::error_code ignored;
+    std::filesystem::remove(process_log, ignored);
+    auto old = process_log;
+    old += ".old";
+    std::filesystem::remove(old, ignored);
+}
 } // namespace
 
 // AU-7: PLUG-10's settings as global parameters. Ranges and defaults, what
@@ -724,7 +763,7 @@ void settings_parameters() {
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
     {
-        PrivateLog log("settings");
+        PrivateLog log;
         check(copy.restore(saved), "restore with settings");
         require(log.text().find("Restored settings: gain -6 dB, mix 50% wet, latency 256 "
                                 "frames.") != std::string::npos,
@@ -869,7 +908,7 @@ void latency_parameter() {
     // log says so.
     seen.clear();
     {
-        PrivateLog log("latency-change");
+        PrivateLog log;
         set_parameter(unit, au::latency_parameter, 0);
         require(eventually([&] {
                     return log.text().find("Latency changed from 512 to 64 frames") !=
@@ -996,7 +1035,7 @@ void latency_parameter() {
         const auto before = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
         const AudioUnitParameterValue target = before == 256 ? 0 : 2;
         const long frames = target == 0 ? 64 : 256;
-        PrivateLog log("latency-oom");
+        PrivateLog log;
         fail_countdown = k;
         set_parameter(unit, au::latency_parameter, target);
         // Done when the change is logged, or when an allocation failed. The
@@ -1081,7 +1120,7 @@ void settings_in_diagnostics() {
         return text.find(part) != std::string::npos;
     };
     {
-        PrivateLog log("gain-status");
+        PrivateLog log;
         Unit unit;
         check(unit.configure(48000, 2, 2, 512), "gain status formats");
         set_parameter(unit, au::gain_parameter, -20);
@@ -1101,7 +1140,7 @@ void settings_in_diagnostics() {
                 "Status after Gain returned to 0 dB: " + status_text(unit));
         unit.uninitialize();
     }
-    PrivateLog log("mix-status");
+    PrivateLog log;
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "mix status formats");
     set_parameter(unit, au::mix_parameter, 50);
@@ -1132,18 +1171,8 @@ void status_parameter() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
     };
-    // A log of this process's own: CTest's is shared with the other AU tests.
-    const auto log_path =
-        std::filesystem::temp_directory_path() /
-        ("convolver-au-status-" + std::to_string(std::random_device{}()) + ".log");
-    const char* configured = std::getenv("CONVOLVER_LOG");
-    const std::optional<std::string> earlier =
-        configured ? std::optional<std::string>(configured) : std::nullopt;
-    setenv("CONVOLVER_LOG", log_path.c_str(), 1);
-    const auto log_text = [&] {
-        std::ifstream in(log_path, std::ios::binary);
-        return std::string(std::istreambuf_iterator<char>(in), {});
-    };
+    const PrivateLog log;
+    const auto log_text = [&] { return log.text(); };
     Unit unit;
     const auto au = unit.get();
     AudioUnitParameterID ids[8]{};
@@ -1288,14 +1317,10 @@ void status_parameter() {
     render_invalid();
     require(value() == HostStatus::fault, "Render did not write Fault after an accepted load");
     unit.uninitialize();
-    if (earlier)
-        setenv("CONVOLVER_LOG", earlier->c_str(), 1);
-    else
-        unsetenv("CONVOLVER_LOG");
-    std::filesystem::remove(log_path);
 }
 
 int main() {
+    use_process_log();
     try {
         channel_capabilities();
         timing_in_seconds();
@@ -1312,10 +1337,12 @@ int main() {
         latency_parameter();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
+        keep_process_log();
         return 0;
     } catch (const std::exception& e) {
         counting = false;
         std::cerr << e.what() << '\n';
+        keep_process_log();
         return 1;
     }
 }
