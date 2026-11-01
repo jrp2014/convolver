@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -16,6 +17,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <new>
 #include <optional>
 #include <random>
@@ -24,12 +26,21 @@
 #include <vector>
 
 namespace {
-std::atomic<bool> counting{false};
+// Allocations are counted only on a thread that sets `counting`, so the
+// unit's own worker thread (a Latency change) is not counted with a render.
+thread_local bool counting = false;
 std::atomic<std::size_t> allocations{0};
+// When positive, the allocation that brings it to 0 fails, on any thread
+// that has not set `never_fail` (the test's own).
+std::atomic<int> fail_countdown{0};
+thread_local bool never_fail = false;
 } // namespace
 void* operator new(std::size_t n) {
-    if (counting.load(std::memory_order_relaxed))
+    if (counting)
         allocations.fetch_add(1, std::memory_order_relaxed);
+    if (!never_fail && fail_countdown.load(std::memory_order_relaxed) > 0 &&
+        fail_countdown.fetch_sub(1) == 1)
+        throw std::bad_alloc();
     if (auto p = std::malloc(n ? n : 1))
         return p;
     throw std::bad_alloc();
@@ -184,13 +195,36 @@ void channel_capabilities() {
     require(b.output_silent(), "an empty 2 to 6 instance is not silent");
 }
 
+// Counts property notifications, which may arrive on the unit's worker
+// thread (a Latency change).
 struct Notifications {
-    std::map<AudioUnitPropertyID, int> count;
+    std::mutex lock;
+    std::map<AudioUnitPropertyID, int> counts;
     static void listener(void* self, AudioUnit, AudioUnitPropertyID id, AudioUnitScope,
                          AudioUnitElement) {
-        ++static_cast<Notifications*>(self)->count[id];
+        auto& n = *static_cast<Notifications*>(self);
+        std::lock_guard guard(n.lock);
+        ++n.counts[id];
+    }
+    int of(AudioUnitPropertyID id) {
+        std::lock_guard guard(lock);
+        return counts[id];
+    }
+    void clear() {
+        std::lock_guard guard(lock);
+        counts.clear();
     }
 };
+
+// Waits up to five seconds for `done`, as a host waits for a notification.
+template <class Done> bool eventually(Done done) {
+    for (int i = 0; i < 5000; ++i) {
+        if (done())
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return done();
+}
 
 void timing_in_seconds() {
     Unit unit;
@@ -204,18 +238,17 @@ void timing_in_seconds() {
     require(unit.seconds(kAudioUnitProperty_Latency) == 256.0 / 48000,
             "latency at 48 kHz is not 256 frames in seconds");
     check(unit.load(state_of(filter)), "load before initialization");
-    require(seen.count[kAudioUnitProperty_TailTime] > 0, "no tail notification after a load");
+    require(seen.of(kAudioUnitProperty_TailTime) > 0, "no tail notification after a load");
     require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
             "tail before initialization is not the filter's tail in seconds");
     check(unit.initialize(), "initialization");
     require(unit.seconds(kAudioUnitProperty_TailTime) == static_cast<double>(tail) / 48000,
             "tail after initialization is not the filter's tail in seconds");
     unit.uninitialize();
-    seen.count.clear();
+    seen.clear();
     // A new rate changes both values in seconds, and the host is told.
     check(unit.configure(96000, 2, 6, 512), "formats at 96 kHz");
-    require(seen.count[kAudioUnitProperty_Latency] > 0 &&
-                seen.count[kAudioUnitProperty_TailTime] > 0,
+    require(seen.of(kAudioUnitProperty_Latency) > 0 && seen.of(kAudioUnitProperty_TailTime) > 0,
             "no timing notifications after a sample-rate change");
     require(unit.seconds(kAudioUnitProperty_Latency) == 256.0 / 96000,
             "latency at 96 kHz is not 256 frames in seconds");
@@ -763,26 +796,13 @@ std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterVa
     return text;
 }
 
-// Reads the window's report, as the window does twice a second; this
-// applies a Latency set on the render thread (Effect::apply_latency).
-void read_report(Unit& unit) {
-    CFTypeRef value = nullptr;
-    UInt32 size = sizeof value;
-    check(AudioUnitGetProperty(unit.get(), au::report_property, kAudioUnitScope_Global, 0, &value,
-                               &size),
-          "report property");
-    if (value)
-        CFRelease(value);
-}
-
 // PLUG-10, AU-7: Latency, a menu of block sizes from 64 to 4096 frames, which
 // takes effect at once (jrp, 1 November 2026). Uninitialized, the reported
 // latency follows the choice. Initialized, a new processor with the chosen
 // block size replaces the running one at the next render, and the host is
-// told; set on the thread that renders, the change waits for a control-thread
-// call such as saving the state or the window's report. A restored Latency
-// applies even when the host started the unit first, as GarageBand does.
-// Saved with the settings.
+// told. Whatever thread sets it, the unit's own worker thread applies it. A
+// restored Latency applies even when the host started the unit first, as
+// GarageBand does. Saved with the settings.
 void latency_parameter() {
     Unit unit;
     AudioUnitParameterInfo info{};
@@ -829,76 +849,117 @@ void latency_parameter() {
         one.paths.push_back({{1.f}, {{ch, 1}}, {{ch, 1}}});
     check(unit.configure(48000, 2, 2, 512), "latency formats");
     check(unit.load(state_of(one)), "latency filter");
-    seen.count.clear();
+    const auto reports = [](Unit& u, double frames) {
+        return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
+    };
+    // The unit's worker applies a choice: uninitialized, the reported latency
+    // follows it, and the host is told once.
+    seen.clear();
     set_parameter(unit, au::latency_parameter, 3);
-    require(seen.count[kAudioUnitProperty_Latency] == 1, "no notification for a new Latency");
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "uninitialized latency is not the chosen 512 frames");
+    require(eventually([&] { return seen.of(kAudioUnitProperty_Latency) == 1; }),
+            "no notification for a new Latency");
+    require(reports(unit, 512), "uninitialized latency is not the chosen 512 frames");
     set_parameter(unit, au::latency_parameter, 3);
-    require(seen.count[kAudioUnitProperty_Latency] == 1, "a notification without a change");
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    require(seen.of(kAudioUnitProperty_Latency) == 1, "a notification without a change");
     check(unit.initialize(), "initialization at 512 frames");
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
 
-    // Chosen while initialized, on this (the main) thread: applied at once,
-    // and the host is told.
-    seen.count.clear();
+    // Chosen while initialized: applied at once, the host is told, and the
+    // log says so.
+    seen.clear();
     {
         PrivateLog log("latency-change");
         set_parameter(unit, au::latency_parameter, 0);
-        require(log.text().find("Latency changed from 512 to 64 frames") != std::string::npos,
+        require(eventually([&] {
+                    return log.text().find("Latency changed from 512 to 64 frames") !=
+                           std::string::npos;
+                }),
                 "no log line for the Latency change: " + log.text());
     }
-    require(seen.count[kAudioUnitProperty_Latency] == 1 &&
-                unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+    require(reports(unit, 64) &&
+                eventually([&] { return seen.of(kAudioUnitProperty_Latency) == 1; }),
             "a Latency chosen while running was not applied and reported");
     require(impulse_delay(unit) == 64, "the audio is not delayed by the new 64 frames");
 
-    // Set on another thread that does not render (a host's IPC thread, say):
-    // applied there at once.
-    std::thread([&] { set_parameter(unit, au::latency_parameter, 3); }).join();
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "a Latency set on another thread was not applied");
+    // Set from a pre-render callback on a new audio thread (john's review of
+    // 1e0b045 found 63 allocations there): the render allocates nothing on
+    // that thread, and the worker applies the change.
+    struct PreRender {
+        AudioUnit unit;
+        AudioUnitParameterValue index;
+        OSStatus set = noErr;
+        static OSStatus callback(void* self, AudioUnitRenderActionFlags* flags,
+                                 const AudioTimeStamp*, UInt32, UInt32, AudioBufferList*) {
+            auto& p = *static_cast<PreRender*>(self);
+            if (*flags & kAudioUnitRenderAction_PreRender)
+                p.set = AudioUnitSetParameter(p.unit, au::latency_parameter, kAudioUnitScope_Global,
+                                              0, p.index, 0);
+            return noErr;
+        }
+    } pre{unit.get(), 3};
+    check(AudioUnitAddRenderNotify(unit.get(), &PreRender::callback, &pre), "render notify");
+    OSStatus rendered = noErr;
+    std::size_t counted = 0;
+    std::thread([&] {
+        Buffers r(2, 2, 512);
+        bool silent = false;
+        const auto before = allocations.load();
+        counting = true;
+        rendered = render(unit, r, 512, false, silent);
+        counting = false;
+        counted = allocations.load() - before;
+    }).join();
+    check(AudioUnitRemoveRenderNotify(unit.get(), &PreRender::callback, &pre),
+          "remove render notify");
+    check(rendered, "render with a pre-render Latency change");
+    check(pre.set, "Latency set before a render");
+    require(counted == 0,
+            std::to_string(counted) + " C++ allocations on an audio thread that set the Latency");
+    require(reports(unit, 512), "a Latency set before a render was not applied");
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames again");
 
-    // Set on the thread that renders, between renders: it waits, and the
-    // next control-thread call that applies it does (saving the state, then
-    // the window's report).
-    const auto set_where_rendering = [&](AudioUnitParameterValue index) {
-        OSStatus rendered = noErr, set = noErr;
-        std::thread([&] {
-            Buffers r(2, 2, 512);
-            bool silent = false;
-            rendered = render(unit, r, 512, false, silent);
-            set = AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global,
-                                        0, index, 0);
-        }).join();
-        check(rendered, "render on another thread");
-        check(set, "Latency set on the render thread");
+    // Set from the input callback while this (the main) thread renders
+    // (john's review found a deadlock there): the render finishes, and the
+    // worker applies the change.
+    OSStatus set_inside = noErr;
+    unit.while_pulling = [&] {
+        set_inside = AudioUnitSetParameter(unit.get(), au::latency_parameter,
+                                           kAudioUnitScope_Global, 0, 0, 0);
     };
-    set_where_rendering(0);
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "a Latency set on the render thread was applied there");
-    CFRelease(unit.class_info_now());
-    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
-            "saving the state did not apply the waiting Latency");
-    set_where_rendering(3);
-    read_report(unit);
-    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "the report did not apply the waiting Latency");
-    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames after the report");
+    {
+        Buffers r(2, 2, 512);
+        bool silent = false;
+        const auto status = render(unit, r, 512, false, silent);
+        unit.while_pulling = nullptr;
+        check(status, "render with a Latency change inside it");
+    }
+    check(set_inside, "Latency set inside a render");
+    require(reports(unit, 64), "a Latency set inside a render was not applied");
+    require(impulse_delay(unit) == 64, "the audio is not delayed by 64 frames after a render");
 
-    // Switched again and again from another thread while this one renders:
-    // a replaced processor is freed only once Render has let it go.
+    // Choices from two threads at once while this one renders (john's review
+    // reproduced 1024 frames of delay reported as 64): once they stop, the
+    // reported latency is the last choice, and the audio has it. Render
+    // never uses a processor after it is freed (the sanitizer job runs this
+    // under ASan, which catches it when the timing hits it).
     std::atomic<bool> done{false};
-    std::thread switcher([&] {
-        for (int i = 0; !done.load(); ++i) {
-            set_parameter(unit, au::latency_parameter, i % 2 ? 1 : 3);
-            read_report(unit);
-            std::this_thread::yield();
-        }
-    });
+    const auto chooser = [&](int seed) {
+        return std::thread([&, seed] {
+            for (int i = seed; !done.load(); ++i) {
+                set_parameter(unit, au::latency_parameter, static_cast<float>(i % 5));
+                std::this_thread::yield();
+            }
+        });
+    };
+    std::thread first = chooser(0), second = chooser(3);
     Buffers b(2, 2, 512);
     std::uint32_t seed = 5;
+    const auto stop = [&] {
+        done = true;
+        first.join();
+        second.join();
+    };
     try {
         for (int block = 0; block < 300; ++block) {
             b.noise(seed);
@@ -910,22 +971,73 @@ void latency_parameter() {
                             "Latency switching broke the output");
         }
     } catch (...) {
-        done = true;
-        switcher.join();
+        stop();
         throw;
     }
-    done = true;
-    switcher.join();
+    stop();
+    const auto last =
+        host_latencies[static_cast<std::size_t>(parameter(unit, au::latency_parameter))];
+    require(reports(unit, static_cast<double>(last)),
+            "after concurrent choices the reported latency is not the last choice, " +
+                std::to_string(last) + " frames");
+    require(impulse_delay(unit) == static_cast<long>(last),
+            "after concurrent choices the audio is not delayed by the reported " +
+                std::to_string(last) + " frames");
+
+    // Out of memory at each allocation the worker makes for a change: the
+    // reported latency is always the one the audio has, and a change is
+    // never logged as failed once it plays (john's review: a failure while
+    // formatting the log line reported a successful change as failed).
+    never_fail = true;
+    set_parameter(unit, au::latency_parameter, 2);
+    require(reports(unit, 256), "Latency 256 before the allocation failures");
+    bool completed = false;
+    for (int k = 1; k <= 400 && !completed; ++k) {
+        const auto before = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
+        const AudioUnitParameterValue target = before == 256 ? 0 : 2;
+        const long frames = target == 0 ? 64 : 256;
+        PrivateLog log("latency-oom");
+        fail_countdown = k;
+        set_parameter(unit, au::latency_parameter, target);
+        // Done when the change is logged, or when an allocation failed. The
+        // worker changes what plays only while it holds the unit's lock,
+        // which saving the state waits for.
+        eventually([&] {
+            return fail_countdown.load() == 0 ||
+                   log.text().find("Latency changed") != std::string::npos;
+        });
+        completed = fail_countdown.exchange(0) > 0; // No allocation failed.
+        CFRelease(unit.class_info_now());
+        std::this_thread::sleep_for(std::chrono::milliseconds(20)); // For its log line.
+        const auto reported = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
+        require(reported == before || reported == frames, "allocation failure " +
+                                                              std::to_string(k) + ": reported " +
+                                                              std::to_string(reported) + " frames");
+        require(impulse_delay(unit) == reported, "allocation failure " + std::to_string(k) +
+                                                     ": reported " + std::to_string(reported) +
+                                                     " frames, but the audio has another latency");
+        require(reported == before || log.text().find("could not be applied") == std::string::npos,
+                "allocation failure " + std::to_string(k) +
+                    ": a change that plays was logged as failed: " + log.text());
+        if (reported == before) {
+            // A refused choice stays until chosen again; choosing it again
+            // without failures applies it.
+            set_parameter(unit, au::latency_parameter, target);
+            require(reports(unit, static_cast<double>(frames)),
+                    "allocation failure " + std::to_string(k) + ": choosing again did not apply");
+        }
+    }
+    never_fail = false;
+    require(completed, "every one of 400 allocations failed");
     set_parameter(unit, au::latency_parameter, 0);
-    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000, "Latency 64 again");
+    require(reports(unit, 64), "Latency 64 again");
 
     // Saved with the state and restored, before initialization, as reported.
     const auto saved = unit.class_info_now();
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
     check(copy.restore(saved), "restore with Latency");
-    require(parameter(copy, au::latency_parameter) == 0 &&
-                copy.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+    require(parameter(copy, au::latency_parameter) == 0 && reports(copy, 64),
             "Latency not restored");
     check(copy.initialize(), "copy initialization");
     require(impulse_delay(copy) == 64, "restored Latency not applied");
@@ -939,8 +1051,7 @@ void latency_parameter() {
     require(late.seconds(kAudioUnitProperty_Latency) == 256.0 / 48000, "late default latency");
     check(late.restore(saved), "restore after initialization");
     CFRelease(saved);
-    require(late.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
-            "a Latency restored after initialization is not reported");
+    require(reports(late, 64), "a Latency restored after initialization is not reported");
     require(impulse_delay(late) == 64, "a Latency restored after initialization does not play");
     late.uninitialize();
     unit.uninitialize();

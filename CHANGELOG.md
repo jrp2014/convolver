@@ -18,8 +18,8 @@ Until 1.0 the C++ API may change between minor versions.
   command line's `--block-size`). Smaller is less delay and more processor
   load. It is not automatable and is saved with Gain and Mix. A new choice
   plays at once, also when GarageBand restores a project after starting the
-  plug-in: a new processor is built off the audio thread and handed over
-  without locking, with a gap in the sound (the new latency plus the
+  plug-in: the unit's own worker thread builds a new processor and hands it
+  over without locking, with a gap in the sound (the new latency plus the
   filter's own delay), and the host is told the new latency. The log
   records each change and its settings name the latency. The default
   leaves the sound unchanged; the oracle tests cover gain and mix at each of
@@ -29,8 +29,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
-  CMake consumers now request `find_package(Convolver 0.8)`, the LV2 plug-in
-  reports minor version 8, and the first preview is cut from the 0.8 series.
+  CMake consumers now request `find_package(Convolver 0.8)`, and the first
+  preview is cut from the 0.8 series. The LV2 plug-in reports minor version
+  8, an even (release) minor again, though odd patch numbers still give a
+  micro version LV2 treats as a development one (LV2-5).
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new
   `host_latencies`, default `default_host_latency`, 256), and
   `HostProcessor`'s settings constructor takes the block size from it,

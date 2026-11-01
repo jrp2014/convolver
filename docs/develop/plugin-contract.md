@@ -399,23 +399,26 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   Latency and posts the latency and tail notifications. A new choice plays
   at once ([decisions](../project/decisions.md#plug-in-behaviour): GarageBand
   starts the unit before it restores a project, so waiting for the next
-  `Initialize` would leave a saved Latency unused). `apply_latency()` builds
-  a processor with the new block size on a control thread and hands it to
-  Render through an atomic pointer. Render marks the processor it uses for
-  the length of each call, and the control side frees the replaced one as
-  soon as Render no longer marks it, waiting at most for the rest of one
-  render call; the audio thread never locks, allocates or waits.
+  `Initialize` would leave a saved Latency unused). Only the unit's own
+  worker thread applies a choice: `SetParameter` may arrive on any thread,
+  including an audio thread, a pre-render notification or the input
+  callback inside Render, so it stores the value and wakes the worker with
+  an atomic store and notify (no allocation, lock or wait); `RestoreState`
+  wakes it too. The worker reads the settings once, builds a processor with
+  the new block size and hands it to Render through an atomic pointer, and
+  the reported latency is the installed processor's. Render marks the
+  processor it uses for the length of each call, and the worker frees the
+  replaced one, without holding the control lock, as soon as Render no
+  longer marks it, waiting at most for the rest of one render call.
   Uninitialized, `kAudioUnitProperty_Latency` simply follows the choice. The
-  host is told of the new latency and tail, and the log says what changed.
-  `SetParameter` applies the change itself unless it runs on the thread that
-  last rendered (a host may send it there between renders); then the next
-  control-thread call does (`RestoreState`, `SaveState`, the window's
-  report, which it reads twice a second, or `Initialize`). The new processor
-  starts the fault count again, so the window's fault totals restart, and
-  faults the old one counts in its last moments are not reported. If the new
-  processor cannot be built, the old one keeps playing, the log says why,
-  the window says the chosen Latency is not in use, and it is not tried
-  again until chosen again.
+  host is told of the new latency and tail from the worker thread, and the
+  log says what changed; the log line is best effort, so running out of
+  memory while writing it does not undo or misreport a change. The new
+  processor starts the fault count again, so the window's fault totals
+  restart, and faults the old one counts in its last moments are not
+  reported. If the new processor cannot be built, the old one keeps
+  playing, the log says why, the window says the chosen Latency is not in
+  use, and it is not tried again until chosen again.
   `RestoreState` reads the parameter values from "data" itself, with bounds
   checks (AUBase's reader has none), and applies them only when the filter is
   accepted; it ignores Status and unknown IDs, keeps settings the state does
