@@ -79,6 +79,11 @@ is superseded.
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
   [check scope](docs/develop/documentation.md#automated-checks).
+- [ ] **DOC-5 — Refresh the status page's evidence.** The
+  [status page](docs/project/status.md) says it was checked against `main`
+  at `a2593e1` (0.6.10), while it describes the 0.8 series. Check it again
+  against the current `main` and update the snapshot and the evidence it
+  cites. Recommended in jrp's review of PR #98 (1 November 2026).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -482,6 +487,13 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   host with a light window), a manual Mix drag, listening to the Latency
   gap and the kept echo, and VoiceOver reading the Audio facts and typed
   fields.
+- [ ] **AU-10 — Separate the window's setting editing from its layout.**
+  `plugins/au/diagnostic_view.mm` is 959 lines after the redesign and the
+  typed-box fixes (PR #97, PR #98). Before the window gains more controls,
+  move the setting rows' editing (sliders, typed boxes, reset, the record
+  of a changed box) out of the code that builds the layout, keeping
+  `au.editor` unchanged. Recommended in jrp's review of PR #98
+  (1 November 2026); not blocking.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
