@@ -9,6 +9,7 @@
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
 #include "sound_files.hpp"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -113,6 +114,48 @@ void run(const fs::path& dir) {
     const auto slow = refused(dir / "slow.txt", fast_stereo, HostFailureKind::sample_rate);
     require(has(slow, "the filter is not for the host's 48000 Hz.") && !has(slow, "1 in"),
             "list with no entry at the host's rate: " + slow);
+
+    // VST3-11: an accepted file gives every file it was read from, for the
+    // window's watch; a refused one gives none.
+    {
+        std::ofstream cfg(dir / "stereo.cfg");
+        cfg << "44100 2 2 0\n0 0\n0 0\nmono.wav\n0\n0\n0\nmono.wav\n0\n1\n1\n";
+    }
+    std::vector<std::string> files{"stale"};
+    FilterFileFailure why;
+    require(read_filter_file((dir / "stereo.cfg").string(), stereo, detail::libsndfile_files(), why,
+                             &files)
+                .has_value(),
+            "stereo.cfg refused: " + why.message);
+    const auto named = [&](const std::string& name) {
+        return std::any_of(files.begin(), files.end(),
+                           [&](const std::string& f) { return fs::path(f).filename() == name; });
+    };
+    require(!files.empty() && fs::path(files.front()).filename() == "stereo.cfg" &&
+                named("mono.wav") && !named("stale"),
+            "files read: " + std::to_string(files.size()));
+    require(!read_filter_file((dir / "fast.wav").string(), stereo, detail::libsndfile_files(), why,
+                              &files) &&
+                files.empty(),
+            "a refused file's files");
+    // A list gives the lists and configurations it visited and the chosen
+    // entry's IRs, not the IRs of an entry passed over, which need not be
+    // installed: a missing one there must not stop the window reloading.
+    {
+        std::ofstream fast(dir / "fast-missing.cfg");
+        fast << "48000 2 2 0\n0 0\n0 0\nnot-installed.wav\n0\n0\n0\n";
+        std::ofstream list(dir / "watched.txt");
+        list << "fast-missing.cfg\nstereo.cfg\n";
+    }
+    require(read_filter_file((dir / "watched.txt").string(), stereo, detail::libsndfile_files(),
+                             why, &files)
+                .has_value(),
+            "watched.txt refused: " + why.message);
+    require(files.size() >= 4 && fs::path(files[0]).filename() == "watched.txt" &&
+                fs::path(files[1]).filename() == "fast-missing.cfg" &&
+                fs::path(files[2]).filename() == "stereo.cfg" && named("mono.wav") &&
+                !named("not-installed.wav"),
+            "a list's files: " + std::to_string(files.size()));
 
     // The command line keeps its own advice.
     try {

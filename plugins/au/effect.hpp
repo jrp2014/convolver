@@ -243,7 +243,11 @@ class Effect final : public ausdk::AUBase {
     bool status_log_written_ = true; // host_log_written() when status_ was set; under control_.
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
-    // AU-6: the last report read, for a read while a load holds `control_`.
+    // AU-6: the last report read, for a read while another call holds
+    // `control_` (a load or the Latency worker preparing a filter, which can
+    // take a while). update_status() forgets it whenever what the unit plays
+    // changes, so a read after a load never gets the report from before it;
+    // a read with no copy waits for the lock.
     std::mutex report_cache_lock_;
     std::optional<HostReport> report_cache_; // Under report_cache_lock_.
     std::mutex logging_;

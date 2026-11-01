@@ -10,23 +10,37 @@ HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters, bool plugin,
-                            bool options) {
+                            bool options, std::vector<std::filesystem::path>* sources) {
     HostState state;
-    state.configuration =
-        detail::load_configuration(path, selection, reader, nullptr, raw_filters, plugin, options);
+    state.configuration = detail::load_configuration(path, selection, reader, nullptr, raw_filters,
+                                                     plugin, options, sources);
     return state;
 }
 
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
                                           const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure) {
+                                          FilterFileFailure& failure,
+                                          std::vector<std::string>* files) {
     failure.kind = HostFailureKind::filter_file;
     failure.carried.reset();
+    if (files)
+        files->clear();
     try {
         // Explained in the host's terms, not the command line's (jrp's
         // GarageBand run: the window advised omitting --output-channels).
-        return filter_file_state(path, {host.sample_rate, host.inputs, host.outputs}, reader,
-                                 nullptr, true);
+        std::vector<std::filesystem::path> sources;
+        auto state = filter_file_state(path, {host.sample_rate, host.inputs, host.outputs}, reader,
+                                       nullptr, true, false, &sources);
+        if (files) {
+            // As UTF-8, which every window's file APIs take.
+            std::vector<std::string> named;
+            for (const auto& source : sources) {
+                const auto text = source.u8string();
+                named.emplace_back(text.begin(), text.end());
+            }
+            *files = std::move(named);
+        }
+        return state;
     } catch (const detail::NoMatch& e) {
         // Readable, but made for another rate or other channels. A list is
         // a rate refusal only when no entry has the host's rate.

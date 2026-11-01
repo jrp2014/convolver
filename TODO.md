@@ -240,7 +240,7 @@ Shared work, done once for all three formats:
   used by `convolver-preset`, the LV2 plug-in and the Audio Unit's Choose
   Filter; `au.editor` checks that a file loaded in the window saves the
   state the tool writes. Remaining: the settings' computed gains and meters
-  as PLUG-10 adds them, and VST3's load message (VST3-3).
+  as PLUG-10 adds them.
 - [ ] **PLUG-10 — Gain, mix and latency settings.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings): in `HostProcessor`, an output gain
   with three modes (a set value, the noise estimate and the no-clip bound of
@@ -377,8 +377,11 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   read and its filter prepared on the host's main thread, so the window
   (and the host) waits for a long filter; the cached report does not help
   there; a worker thread, as LV2 has, is for later.
-  Remaining: recent files and reload (the editor plan's conveniences), the
-  view shared with VST3-11, and these acceptance gates (jrp, 30 October 2026),
+  The view is now shared with VST3-11 and has the editor plan's
+  conveniences, Recent, Reload and reloading when the file changes
+  ([PR #103](https://github.com/jrp2014/convolver/pull/103); checked by
+  `vst3.editor`, not yet tried in GarageBand). Remaining: these acceptance
+  gates (jrp, 30 October 2026),
   each to pass and be recorded, with the GarageBand and macOS versions,
   before AU-6 is done:
   jrp's GarageBand run of `54eac9f` (30 October 2026; GarageBand 10.4.14,
@@ -600,28 +603,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   parameter), for example the entries of a configuration list, possibly chosen
   automatically by host rate and layout. Hosts can then switch filters in generic
   UIs and automation. Changes reuse the existing crossfading replacement.
-- [ ] **VST3-3 — Editor messaging between controller and processor.** Phase 1
-  of the [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), with no
-  window yet: the processor sends the PLUG-9 report with the Status line, the
-  controller keeps a copy for a view; a `ConvolverLoad` message carries a
-  chosen path to the processor, which loads it as `setState` does
-  (`HostFilterSource::file`) and the controller calls `setDirty`; Bypass edits
-  go through the controller. Headless tests in `vst3.adapter` and
-  `vst3.lifecycle`. `IDataExchangeHandler` could feed meters later. Plug-in
-  snapshots for host browsers (`smtg_target_add_plugin_snapshots`) need the
-  window first.
-  Needed for the first preview.
-- [ ] **VST3-4 — Gain, mix and latency parameters.** PLUG-10's settings as
-  VST3 parameters ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings)): Gain (ID 0,
-  VST2's attenuation ID, with a new range for jrp to approve), Gain mode, Mix
-  tagged `kDryWetMix` through `IParameterFunctionName`, and Latency (not
-  automatable), saved in the component state, with
-  `restartComponent(kLatencyChanged)` when latency changes and tests in hosts
-  that compensate it. The IDs (Gain on 0, the others from 1002) go in
-  `plugins/identities.json`, `tests/identities_tests.py` and
-  `docs/develop/plugin-identities.md`, which today keeps 0 to 2 free. A
-  `kLowLatencyMode` switch only makes sense if PERF-2 provides a lower-latency
-  mode. Needed for the first preview.
 - [ ] **VST3-5 — Progress for slow filter preparation.** `setState` prepares the
   filter synchronously on the host's thread. Measure the worst case (PERF-3) for long,
   multichannel filters (including FFTW planning) and, if hosts stall noticeably,
@@ -644,6 +625,19 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   diagnostics, show the log, bypass. Needed for the first preview. Opened in CI by `editorhost` and pluginval's GUI tests, with an
   accessibility test of names, roles and text; smoke steps in REAPER and
   Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)).
+  Progress (1 November 2026, PR #103): the Audio Unit's window, moved to
+  `plugins/editor/mac/`, shown through the SDK's `EditorView` for
+  `kPlatformTypeNSView`, with settings edited as `beginEdit`, `performEdit`
+  and `endEdit` (a drag is one edit), a Bypass checkbox editing the bypass
+  parameter, files loaded through VST3-3's message (with the Recent menu,
+  Reload and reloading when the file changes, shared with the Audio Unit)
+  and the window resizing through `IPlugFrame::resizeView`; checked off
+  screen by `vst3.editor` on macOS, and opened by pluginval's editor tests
+  on macOS CI ([format notes](docs/develop/plugin-contract.md#format-notes)).
+  `editorhost` is not used: it is an interactive program that runs until its
+  window is closed, so pluginval's editor tests stand in for it. Remaining:
+  the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3)),
+  VoiceOver, and the meters (with PLUG-10).
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.
@@ -780,16 +774,16 @@ with compatibility tests; linked IDs point to open work above.
 
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
-| Plug-in settings (gain, mix, latency) only in the Audio Unit so far; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; VST3-4 and LV2-7 add the settings there. | [Settings](docs/use/plugins.md#settings) |
+| Plug-in settings (gain, mix, latency) in VST3 and the Audio Unit, not yet LV2; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; LV2-7 adds the settings to LV2. | [Settings](docs/use/plugins.md#settings) |
 | Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
+| One VST3 input bus and one output bus, each 1–8 channels; a window on macOS only | Presets and generic host controls elsewhere; layouts are checked with a notice only; the Windows and Linux windows are VST3-12 and VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU/build/size-sensitive and process-global | Retune when relevant inputs change; external planner users must coordinate. A successful import does not prove optimality. | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing uses interleaved float buffers that must not overlap | Use `HostProcessor` for planar/in-place float/double host buffers; internal DSP remains float. | [Engine API](docs/develop/library.md#engine-api) |
-| Latency and filter replacement are not instantaneous | Core latency is B; VST3 is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
+| Latency and filter replacement are not instantaneous | Core latency is B; the plug-ins' default is 256 frames. Replacement starts with fresh history and warms/crossfades; reset work scales with the block buffers and delay lines, not the filter length (PERF-5). | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |
 | Callback safety has a defined thread contract | One audio thread per instance; serialized control calls; teardown requires stopped audio. Stress/deadline evidence remains ROBUST-1. | [Implementation invariants](docs/develop/architecture.md#invariants-to-preserve) |
 | Resource limits cap channels, paths, delays, text, IRs and state | Intentional bounds; assess any increase with memory/overflow tests. Report-size follow-up is ROBUST-2. | [Core limits](docs/develop/library.md#resource-limits), [tests](docs/develop/testing.md) |
 | The configuration format is not identical across consumers | No external consumer has verified this corpus yet; CFG-1. Older bundled configs may need delay lines and portable paths. | [Compatibility matrix](docs/use/other-programs.md#what-convolver-accepts) |
@@ -1026,6 +1020,26 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
+- [x] **VST3-3 — Editor messaging between controller and processor.**
+  1 November 2026, PR #103: the processor sends the PLUG-9 report with each
+  Status update and when the controller asks (`ConvolverReport`); a
+  `ConvolverLoad` message carries a chosen path, which the processor reads
+  as `convolver-preset` does (AudioToolbox on macOS) and installs as
+  `setState` does, and the controller then calls `setDirty`; headless tests
+  in `vst3.adapter` (the lifecycle sequences have no messages to add).
+  Bypass stays the host's parameter, edited through the controller as
+  before; a Bypass control in the window moved to VST3-11. Not done:
+  `IDataExchangeHandler` for meters (with PLUG-10's meters) and plug-in
+  snapshots for host browsers (`smtg_target_add_plugin_snapshots`), which
+  need the window;
+  [messages](docs/develop/plugin-contract.md#status-and-log).
+- [x] **VST3-4 — Gain, mix and latency parameters.** 1 November 2026, PR
+  #103: Gain (0), Mix (1003, `kDryWetMix`) and Latency (1004, not
+  automatable, `restartComponent(kLatencyChanged)`), saved in host state
+  version 3 only when they differ from the defaults; tests in
+  `vst3.adapter` and `native.state`. Gain mode (1002) waits with PLUG-10's
+  deferred parts; whether REAPER and Audacity compensate a new Latency
+  moved to their host steps under HOST-1; [settings](docs/develop/plugin-contract.md#settings).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,
   with the reset follow-up in PR #40; [adapter contract](docs/develop/plugin-contract.md).
 - [x] **VST3-8 — Follow the SDK documentation where the audit found gaps.**

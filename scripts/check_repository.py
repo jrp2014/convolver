@@ -20,6 +20,10 @@ READER_FOLDERS = ('docs/use/', 'docs/develop/', 'docs/project/')
 # Pages whose backticked repository paths must exist.
 PATH_SOURCES = ('AGENTS.md', 'CONTRIBUTING.md', 'docs/develop/architecture.md', 'docs/develop/workflow.md')
 
+# Folders under plugins/ that hold code the adapters share, not an adapter:
+# the windows (plugins/editor/, VST3-11), tested through each format's tests.
+SHARED_PLUGIN_FOLDERS = {'editor'}
+
 # What may sit at the top of the repository. Add to this list deliberately,
 # and describe the new entry in the README's repository table.
 TOP_LEVEL = {
@@ -250,7 +254,10 @@ def check_layout(root, files, errors):
             f'{top}: not an expected top-level entry; put it in an existing folder, '
             'or add it to TOP_LEVEL in scripts/check_repository.py and the README'
         )
-    adapters = sorted({name.split('/')[1] for name in files if name.startswith('plugins/') and name.count('/') >= 2})
+    adapters = sorted(
+        {name.split('/')[1] for name in files if name.startswith('plugins/') and name.count('/') >= 2}
+        - SHARED_PLUGIN_FOLDERS
+    )
     for adapter in adapters:
         if not any(name.startswith(f'tests/{adapter}/') for name in files):
             errors.append(f'plugins/{adapter}/: adapter has no tests in tests/{adapter}/')

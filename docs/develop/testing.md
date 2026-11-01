@@ -154,7 +154,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   advises on the host's settings and loading the file in Convolver, with no
   command-line options and no window (the LV2 plug-in has none), for a mono
   WAV, a 48 kHz WAV, a 2-in 6-out `.cfg` and a list; the command line keeps
-  `--output-channels` advice.
+  `--output-channels` advice. An accepted `.cfg` gives the files it was read
+  from (itself first, then its WAV) for the window's watch; a refused file
+  gives none.
 - `native.limits`: every resource limit accepted at its value and rejected just
   beyond it, using the production constants: 1 MiB per text file, 16 nesting
   levels, 4096 list visits, 16 MiB of configuration text per resolution (shared
@@ -233,12 +235,21 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   marked as problems, the Routing of a filter that is not playing, what is
   known before the host starts), the Loudest peak and the Gain that rules
   out clipping (the same at any Mix above 0; nothing clips at Mix 0), the headline, the Filter row and
-  reference lines for a saved and a refused file, and the Latency that
-  waits; and the Copy
+  reference lines for a saved and a refused file, the filter path and
+  files the window reloads and watches (an accepted file's, never a refused
+  one's or saved state's), and the Latency that waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
   from a log written by several.
+- `native.recent_files`: the windows' recent filter files (VST3-11) beside
+  the log: newest first, no repeats, ten kept, paths with spaces and
+  accents, no path with a line break, nothing left beside the list after
+  it is replaced, a list with Windows line ends, Clear Menu, and no list
+  with the log turned off.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
-  marker (and that every other state is still written as version 1), state
+  marker (and that every other state is still written as version 1), a
+  version-3 fixture with settings, its round trips with a filter and a
+  failed load, default settings still written as version 1 or 2, and
+  out-of-range settings refused, state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
@@ -532,6 +543,34 @@ deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
 comparisons; since VST3-7 the adapter lists no known deviations.
 
+`vst3.adapter` also checks the settings (VST3-4): the parameters' order,
+flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
+saving them as host state version 3 and restoring them in a second
+instance, an older state resetting them to their defaults, 0 dB from a host that
+keeps normalized values as float, and a Latency choice that asks the host
+to restart, is reported once the host has, and delays an impulse by exactly
+the chosen frames, also when restored. And the window's messages
+(VST3-3): the report's fields, a fresh report on request after a Gain
+change, no request for the host to reread the parameters while the
+Status line stays the same, a chosen WAV accepted (the project marked changed, the status
+Playing, the filter named and saved) or refused for its rate, an empty path,
+and a build with no file reader. Where the build has no reader of its own
+(Linux and Windows), the test lends the processor libsndfile.
+
+On macOS `vst3.editor` opens the window (VST3-11) as a host does:
+`createView("editor")` (and nothing for another name), NSView only, not
+resizable, its size, attached to an off-screen window's content view, the
+shared view with VST3's own class name, the status and title, the two
+sliders and the Latency menu, a Gain the host set shown in the window, a
+reset that is one `beginEdit`, `performEdit`, `endEdit`, a Latency choice
+that is one edit, reaches the processor and asks the host to restart (and
+the window saying it is not in use until then), the Bypass checkbox (one
+edit per click, and following the host), a chosen WAV loaded and the
+project marked changed, the file in the Recent menu, Reload, a change to
+the file reloaded on the second check (not with the box unticked, and not
+when the file is gone), Copy Diagnostics, a resize request when the folded
+lines open, and `removed()`.
+
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
 and adds automation patterns. The validator does not create three tests that
@@ -552,11 +591,13 @@ JUCE-based host that runs headless. It is downloaded separately, never linked
 into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to
 add:
 
-- `vst3.pluginval`: pluginval's validation at `--strictness-level 10
-  --skip-gui-tests` (`pluginval validate` in pluginval 2, `--validate` in
-  pluginval 1). Open and close, state save and restore, bus layouts, parameter
-  fuzzing and thread safety, allocations during processing and oversized
-  blocks, at several sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS`
+- `vst3.pluginval`: pluginval's validation at `--strictness-level 10`
+  (`pluginval validate` in pluginval 2, `--validate` in pluginval 1). Open
+  and close, state save and restore, bus layouts, parameter fuzzing and
+  thread safety, allocations during processing and oversized blocks, at
+  several sample rates and block sizes. On macOS its editor tests also open
+  Convolver's window (VST3-11) and change parameters while it is open;
+  elsewhere, with no window yet, the test passes `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
   adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
   can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block

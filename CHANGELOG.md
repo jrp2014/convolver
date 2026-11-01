@@ -28,6 +28,46 @@ Until 1.0 the C++ API may change between minor versions.
 - User guide: [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
   the stereo journey from download and checksum to a host render checked
   with `--compare`, saving and reopening, and presets that do not fit (REL-2).
+- VST3: **Gain**, **Mix** and **Latency** settings (VST3-4), with the
+  Audio Unit's ranges, defaults and parameter IDs: Gain 0 (−100 to +24 dB),
+  Mix 1003 (0 to 100 %, which hosts can show as the plug-in's dry/wet
+  control through `kDryWetMix`) and Latency 1004 (64 to 4096 frames, not
+  automatable). A new Latency asks the host to restart the plug-in
+  (`restartComponent(kLatencyChanged)`) and plays from then on. The
+  settings are saved in host state version 3, written only when one
+  differs from its default, so projects at the defaults save the same
+  bytes as before and older builds still open them; older builds refuse a
+  version 3 state. The Audio Unit and LV2 read a version 3 state's filter
+  and ignore its settings. The defaults leave the sound unchanged; Gain
+  mode waits with PLUG-10's other deferred parts.
+- VST3: the controller and processor exchange what a window needs
+  (VST3-3). The processor sends the PLUG-9 report with each Status update
+  and a fresh one when the controller asks; the controller builds Copy
+  Diagnostics from it. A `ConvolverLoad` message carries a chosen file's
+  path to the processor, which reads it as `convolver-preset` does (on
+  macOS with AudioToolbox, so the bundle still needs nothing beyond macOS)
+  and installs or refuses it as for a preset; an accepted file marks the
+  project changed (`setDirty`). Other systems refuse the file with a
+  reason until their windows exist.
+- VST3 on macOS: Convolver's window (VST3-11, in progress), the same view as
+  the Audio Unit's: the status and what to change, the filter with Choose…
+  and drag and drop, Gain, Mix and Latency, the Audio facts, Copy
+  Diagnostics and Show Log, and a Bypass checkbox (VST3 only; Audio Unit
+  hosts show their own). It is the SDK's `EditorView` for an NSView, as
+  the VST3 documentation describes an editor without VSTGUI; settings change
+  through `beginEdit`, `performEdit` and `endEdit` (a slider drag is one
+  edit), and the window asks the host to resize it when its folded lines
+  open. Checked off screen by `vst3.editor`, and opened by pluginval's
+  editor tests on macOS CI; not yet tried in REAPER or Audacity. Windows
+  and Linux have no window yet (VST3-12, VST3-13).
+- Convolver's window on macOS (VST3-11, and the Audio Unit's, AU-6):
+  **Recent** lists the last ten filter files loaded in any Convolver window
+  (kept in `recent-filters.txt` beside the Convolver log, never in the
+  project), **Reload** reads the file again, and **Reload when the file
+  changes** (ticked when the window opens) does so by itself while the
+  window is open, a second after the file, or a file a `.cfg` or the list
+  entry that plays names, has changed. Not yet tried in GarageBand, REAPER
+  or Audacity.
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
@@ -43,6 +83,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`
+  (VST3-11), shared by the Audio Unit and VST3, which each build them with
+  class names of their own. The setting rows can now mark the start and end
+  of a slider drag for a format that asks (VST3 does); the Audio Unit's
+  window behaves as before.
+- Library (VST3-11): `HostRequest` gains `files`, the files an accepted
+  file's filter was read from; the report gains the fields `filter path`
+  and `filter files` for the window's Reload. Code that builds a
+  `HostRequest` compiles unchanged.
+- Library (VST3-4): `HostState` gains `settings`, an optional
+  `HostSettings` that host state version 3 records (VST3 only), and
+  `HostSettings` is declared before it in `convolver/host.hpp`. Existing
+  code that builds a `HostState` compiles unchanged.
 - Audio Unit window (AU-10): the Gain, Mix and Latency rows and their
   handling moved out of the window's layout code into their own file
   (`plugins/au/setting_rows.mm`), so the window can gain controls without
@@ -105,6 +158,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Audio Unit window: a report read just after a load could show the state
+  from before it, when the Latency worker happened to hold the unit's lock
+  at that moment. The window's last report is now forgotten whenever what
+  the unit plays changes, so it is shown only while it is still current
+  (during a load or a Latency change, as before). Seen as an intermittent
+  `au.editor` failure in the sanitizer job.
 - Release scripts (CI-20): unpacking a ZIP (the downloaded NSIS release on
   Windows, and each candidate's own ZIP) now checks that every file lands
   inside the destination. Before, on Windows a member name starting with `/`

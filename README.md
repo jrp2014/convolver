@@ -63,7 +63,7 @@ the usual causes; Windows builds use vcpkg ([Windows](docs/develop/build.md#wind
 | --- | --- |
 | [`include/convolver/`](include/convolver/) | Public C++ APIs |
 | [`portable/`](portable/) | Engine, FFT backends, file I/O, configuration loader and the tools |
-| [`plugins/`](plugins/) | One folder per plug-in format ([`vst3/`](plugins/vst3/), [`au/`](plugins/au/), [`lv2/`](plugins/lv2/)) |
+| [`plugins/`](plugins/) | One folder per plug-in format ([`vst3/`](plugins/vst3/), [`au/`](plugins/au/), [`lv2/`](plugins/lv2/)), and the macOS window they share ([`editor/`](plugins/editor/)) |
 | [`tests/`](tests/) | Native, plug-in, package, compatibility and historical tests |
 | [`docs/`](docs/README.md) | Guides by reader ([`use/`](docs/use/README.md), [`develop/`](docs/develop/), [`project/`](docs/project/)) and dated records ([`archive/`](docs/archive/)) |
 | [`examples/`](examples/) | First-use filters with expected output |

@@ -151,7 +151,7 @@ std::string file_name(const std::string& path) {
 }
 
 // The Audio section: what plays, in plain words
-// (docs/use/plugins.md#the-audio-units-window).
+// (docs/use/plugins.md#convolvers-window).
 std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFacts& facts) {
     std::vector<HostFact> audio;
     const auto& host = facts.host;
@@ -313,6 +313,10 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
                             : "From the saved project or preset";
     else
         r.filter_name = "None";
+    if (c && accepted.source == HostFilterSource::file) {
+        r.filter_path = accepted.path;
+        r.filter_files = accepted.files;
+    }
     // A refused request (not a failure found when the host started the
     // accepted filter, which names no new file).
     const bool refused_request = failure && failure->request.number != accepted.number;
@@ -370,7 +374,9 @@ std::string fact_text(const HostFact& f) {
 } // namespace
 
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport& r) {
-    std::string audio, reference;
+    std::string audio, reference, files;
+    for (const auto& file : r.filter_files)
+        files += file + "\n";
     for (const auto& f : r.audio)
         audio += f.label + "\t" + f.value + "\t" + f.note + "\t" + (f.problem ? "problem" : "") +
                  "\t" + f.help + "\n";
@@ -384,6 +390,8 @@ std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&
             {"headline", r.headline},
             {"filter name", r.filter_name},
             {"filter note", r.filter_note},
+            {"filter path", r.filter_path},
+            {"filter files", files},
             {"sample rate", r.sample_rate ? std::to_string(r.sample_rate) : std::string()},
             {"latency waits", r.latency_waits ? "yes" : "no"},
             {"audio", audio},
@@ -405,7 +413,10 @@ std::string report_text(const HostReport& r) {
 }
 
 std::string diagnostics_text(const HostReport& r, const std::string& format) {
-    auto text = report_text(r) + "\nRecent Convolver log lines for " + format + ":\n";
+    return diagnostics_text(report_text(r), format);
+}
+std::string diagnostics_text(const std::string& report_text, const std::string& format) {
+    auto text = report_text + "\nRecent Convolver log lines for " + format + ":\n";
     const auto recent = host_log_recent(format);
     return text + (recent.empty() ? "(none found)\n" : recent);
 }

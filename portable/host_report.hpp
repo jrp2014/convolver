@@ -65,6 +65,12 @@ struct HostReport {
     // saved project or preset" when it came from saved state, "None"), and
     // a note about the newest request when it was refused.
     std::string filter_name, filter_note;
+    // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came
+    // from saved state), which the window's Reload reads again, and every
+    // file it was read from (HostRequest::files), which the window watches
+    // to reload when one changes.
+    std::string filter_path;
+    std::vector<std::string> filter_files;
     // The real data, in the order the window lists it: sample rate,
     // channels, routing, filter length, added delay, ring-out, loudest peak,
     // host blocks (each only when known).
@@ -88,10 +94,10 @@ HostReport host_report(const HostFilter&, const HostReportFacts&);
 // The report as named text values, for a format's transport (an Audio Unit
 // property dictionary): status (the HostStatus number), status name,
 // summary (the status line), title, explanation, headline, filter name,
-// filter note, sample rate (digits, or empty), latency waits ("yes" or
-// "no"), audio (one line per fact: label, value, note, "problem" or
-// empty, and help, separated by tabs), reference (one "Label: value" line
-// each), log path and log written ("yes" or "no").
+// filter note, filter path, filter files (one per line), sample rate (digits, or empty), latency
+// waits ("yes" or "no"), audio (one line per fact: label, value, note, "problem" or empty, and
+// help, separated by tabs), reference (one "Label: value" line each), log path and log written
+// ("yes" or "no").
 std::vector<std::pair<std::string, std::string>> report_fields(const HostReport&);
 
 // The report as plain text: title, status, explanation, the Audio facts
@@ -102,4 +108,7 @@ std::string report_text(const HostReport&);
 // the Convolver log (host_log_recent), ready to paste into a report. Reads
 // the log file, so it is built only when asked for, never on the audio thread.
 std::string diagnostics_text(const HostReport&, const std::string& format);
+// The same from report_text() already made, for a format whose window has
+// only the text (the VST3 controller, which the processor sends it).
+std::string diagnostics_text(const std::string& report_text, const std::string& format);
 } // namespace convolver

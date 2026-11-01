@@ -317,7 +317,29 @@ format.
 
 LV2 keeps its own routes (the `status` port, whose values are Running, No
 filter, Load failed, Loading and Fault, and `log:log`) and does not write
-the file. An editor (VST3-3, HOST-2) would show the same text.
+the file. An editor (HOST-2) would show the same text.
+
+VST3 carries the window's traffic in `IMessage`s between the processor and
+the controller (VST3-3), which hosts may deliver on any thread and may run in
+separate processes, so each carries values, never pointers:
+
+- The processor's `ConvolverStatus` message also carries the editor report:
+  `report_fields()` encoded as one binary attribute, `report_text()` and the
+  log tag ("VST3 #2"). The controller keeps a copy under its own lock for a
+  view, and asks the host to reread the parameters only when the Status line
+  changed; Copy diagnostics joins its text with the recent log lines
+  (`diagnostics_text()`).
+- A window reading the report sends `ConvolverReport`, and the processor
+  answers with a fresh `ConvolverStatus`, so faults the audio thread counted
+  appear as they do in the Audio Unit's twice-a-second read. It looks for new
+  faults at most every 10 seconds, as the Audio Unit does.
+- `ConvolverLoad` carries a chosen file's UTF-8 path. The processor reads it
+  with `read_filter_file()` for the current rate and channels (macOS
+  AudioToolbox, as the Audio Unit reads; builds with no reader refuse it with
+  a reason) and installs it as `setState` does, or records the refusal; the
+  controller then calls `setDirty(true)` for an accepted file, so the host
+  marks the project changed. Reading happens on the thread that delivered the
+  message, never in `process()`.
 
 ## Initial restoration and live replacement
 
@@ -392,9 +414,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   Not automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
   keeps the load measurement beside it for later.
 - **Saved form:** each format's own way. The Audio Unit's parameters are
-  saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
-  in host state version 3, written only when a setting differs from its
-  default (VST3-4); LV2 will add control ports (LV2-7). A preset from
+  saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 saves them in
+  host state version 3, written only when a setting differs from its
+  default (VST3-4, [host state](#host-state)); LV2 will add control ports (LV2-7). A preset from
   `convolver-preset` carries the filter only, and a state moved between
   formats carries the filter but not the settings, as
   [how the plug-ins behave](../use/plugins.md#settings) tells users.
@@ -433,6 +455,27 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   not hold (a `convolver-preset` preset has an empty "data"), and keeps both
   when "data" is malformed (and logs it). The start line in the log lists the
   settings (`started_line()` with `settings_words()`), Latency included.
+- **VST3 (VST3-4).** Parameters Gain (0, a `RangeParameter` in dB, normalized
+  linearly over −100 to +24), Mix (1003, 0 to 100 %, tagged `kDryWetMix`
+  through `IParameterFunctionName`) and Latency (1004, a `StringListParameter`
+  "64 frames" to "4096 frames", not automatable), listed before Bypass and
+  Status, with the same IDs as the Audio Unit. The processor reads the last
+  point of each parameter queue in `process()`, as the SDK examples do, and
+  hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
+  of 0 counts as 0 dB, because hosts that keep normalized values as float
+  cannot send 0 dB exactly, and a project reset to the default must still
+  save as version 1 or 2. A new Latency follows
+  the SDK's documented route: the controller tells the processor
+  (`ConvolverLatency` message) and asks the host to restart the component
+  (`restartComponent(kLatencyChanged)`); the next `setActive(true)` builds
+  the processor with it, and `getLatencySamples()` reports the latency the
+  running processor has (the choice while inactive), as the SDK says a host
+  reads it after `setActive(true)`.
+  Until the host restarts the plug-in the old Latency keeps playing and the
+  window says the choice is not in use yet. A restored state sets all three
+  (a version 1 or 2 state resets them to their defaults), and the
+  controller's `setComponentState` mirrors them, asking for a restart when the
+  Latency differs.
 
 ## Channel layouts
 
@@ -509,8 +552,14 @@ large; `convolver-preset` makes the same check. Checks against the host's config
 follow [loading and failure](#loading-and-failure), including state restored
 before the host is configured. Version 1 records the filter (or an empty
 instance) and the bypass setting (used by VST3 only; see [bypass](#bypass)); version 2 is written only for a saved failed
-initial load, with no filter.
-Decoders read both; encoders write version 1 whenever nothing new is recorded,
+initial load, with no filter. Version 3 (VST3-4, VST3 only) adds the
+[settings](#settings) after the flags (Gain in dB and Mix from 0 to 1, each
+an IEEE double as two little-endian words, then Latency in frames) and is
+written only when a setting differs from its default, with a filter or a
+failed-load marker as before; decoding checks each setting's range and
+refuses the state otherwise. The Audio Unit and LV2 read a version 3 state's
+filter and ignore its settings, which they save their own way.
+Decoders read all three; encoders write version 1 whenever nothing new is recorded,
 so older builds still read those presets. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
@@ -577,7 +626,7 @@ How each adapter meets the contract where its format differs:
   flags an output channel silent exactly when a call left it all zero (VST3-10):
   a tail that is still sounding is never flagged, while the latency, an output
   no path feeds and drained output are. `getTailSamples()` is the filter's
-  tail plus the 256-sample latency, measured at the output as Steinberg's tail
+  tail plus the latency (`getLatencySamples()`), measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
   change notification when either changes; the tail stays at the longest
@@ -587,8 +636,26 @@ How each adapter meets the contract where its format differs:
   marked silent only once the tail has decayed. Rejections are returned to the
   host as errors, shown by the Status parameter and written to the Convolver
   log and the unified log.
+- **VST3 window on macOS (VST3-11).** Reached as the SDK documents an
+  editor without VSTGUI: `Controller::createView(ViewType::kEditor)` returns
+  the SDK's `EditorView` for `kPlatformTypeNSView` only, sized to the shared
+  view's fitted content (`getSize`), which `attached()` adds to the host's
+  view and `removed()` takes away. It is not resizable by the user
+  (`canResize` stays false); when its content changes height (the folded
+  lines) it asks the host with `IPlugFrame::resizeView`, and the host's
+  `onSize` keeps it in place. Everything goes through the edit controller on
+  the host's main thread: settings as `beginEdit`, `performEdit` and
+  `endEdit` (a drag is one edit; a click, a typed value, a menu choice or a
+  reset is one each), with `setParamNormalized` for the controller's own
+  copy; the Bypass checkbox edits the bypass parameter (1000) the same way,
+  one edit per click; the report as `ConvolverReport` and the copy the processor sent;
+  a chosen or dropped file as `ConvolverLoad`. The view's blocks hold a
+  shared link that the editor clears in its destructor, so nothing the view
+  does afterwards (a timer, a closing file dialog) reaches a controller the
+  host has released. The view does not touch the processor or the audio
+  thread.
 - **Audio Unit window in a host** (the evidence is in TODO AU-6); the VST3
-  window (VST3-11) starts from these:
+  window (VST3-11) follows these too:
   - The host may run the plug-in in a process of its own (GarageBand:
     `AUHostingServiceXPC_arrow`). The view's window is then an
     `NSServiceViewControllerWindow` of that process, shown at a floating

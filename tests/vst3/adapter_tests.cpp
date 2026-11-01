@@ -5,6 +5,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "public.sdk/source/vst/vstpresetfile.h"
+#include "sound_files.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -28,6 +29,69 @@ void require(bool v, const char* m) {
     if (!v)
         throw std::runtime_error(m);
 }
+// The default Latency, the delay these tests expect unless they choose another.
+constexpr uint32 latency_samples = convolver::default_host_latency;
+// What a host's component handler receives from the controller: restart
+// requests (kLatencyChanged), edits and dirty marks.
+class Handler final : public IComponentHandler, public IComponentHandler2 {
+  public:
+    tresult PLUGIN_API beginEdit(ParamID id) override {
+        edits.push_back({'b', id, 0});
+        return kResultOk;
+    }
+    tresult PLUGIN_API performEdit(ParamID id, ParamValue value) override {
+        edits.push_back({'p', id, value});
+        return kResultOk;
+    }
+    tresult PLUGIN_API endEdit(ParamID id) override {
+        edits.push_back({'e', id, 0});
+        return kResultOk;
+    }
+    tresult PLUGIN_API restartComponent(int32 flags) override {
+        restarts.push_back(flags);
+        return kResultOk;
+    }
+    tresult PLUGIN_API setDirty(TBool state) override {
+        dirty += state ? 1 : 0;
+        return kResultOk;
+    }
+    tresult PLUGIN_API requestOpenEditor(FIDString) override {
+        return kNotImplemented;
+    }
+    tresult PLUGIN_API startGroupEdit() override {
+        return kNotImplemented;
+    }
+    tresult PLUGIN_API finishGroupEdit() override {
+        return kNotImplemented;
+    }
+    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
+        QUERY_INTERFACE(iid, obj, FUnknown::iid, IComponentHandler)
+        QUERY_INTERFACE(iid, obj, IComponentHandler::iid, IComponentHandler)
+        QUERY_INTERFACE(iid, obj, IComponentHandler2::iid, IComponentHandler2)
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    uint32 PLUGIN_API addRef() override {
+        return 1;
+    }
+    uint32 PLUGIN_API release() override {
+        return 1;
+    }
+    struct Edit {
+        char kind;
+        ParamID id;
+        ParamValue value;
+    };
+    std::vector<Edit> edits;
+    // How many restart requests asked the host to read the latency again;
+    // the Status text asks for kParamValuesChanged on every change.
+    std::size_t latency_restarts() const {
+        return static_cast<std::size_t>(std::count_if(
+            restarts.begin(), restarts.end(), [](int32 f) { return (f & kLatencyChanged) != 0; }));
+    }
+    std::vector<int32> restarts;
+    int dirty = 0;
+};
 void edge_cases() {
     HostApplication context;
     Processor p;
@@ -629,9 +693,9 @@ void failure_records() {
     require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 2,
             "damaged state not recorded");
     MemoryStream newer;
-    const std::array<unsigned char, 16> v3{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
-                                           3,  0, 0, 0, 0,    0,    0,    0};
-    newer.write(const_cast<unsigned char*>(v3.data()), 16, nullptr);
+    const std::array<unsigned char, 16> v4{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
+                                           4,  0, 0, 0, 0,    0,    0,    0};
+    newer.write(const_cast<unsigned char*>(v4.data()), 16, nullptr);
     newer.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&newer) == kResultFalse, "newer state accepted");
     f = p.failure();
@@ -715,7 +779,7 @@ void status_and_log() {
     require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk,
             "status initialize");
     ParameterInfo info{};
-    require(c.getParameterCount() == 2 && c.getParameterInfo(1, info) == kResultOk &&
+    require(c.getParameterCount() == 5 && c.getParameterInfo(4, info) == kResultOk &&
                 info.id == status_id && (info.flags & ParameterInfo::kIsReadOnly) &&
                 (info.flags & ParameterInfo::kIsList) &&
                 !(info.flags & ParameterInfo::kCanAutomate) && info.stepCount == 4,
@@ -1233,6 +1297,343 @@ void output_silence_flags_64() {
 }
 // VST3-8: the Bypass text converts both ways, and the controller's own
 // state calls succeed (it keeps no state, so they store and read nothing).
+// VST3-4: Gain, Mix and Latency as parameters, applied by the processor,
+// saved in the component state (version 3 only when not at the defaults), and
+// a new Latency reported to the host with kLatencyChanged.
+void settings_parameters() {
+    HostApplication context;
+    Handler handler; // Outlives the controller, which holds it.
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk,
+            "settings initialize");
+    require(c.setComponentHandler(&handler) == kResultOk, "settings handler");
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "settings connect");
+    // The settings first, then Bypass and Status, with their IDs and flags.
+    const std::array<ParamID, 5> order{gain_id, mix_id, latency_id, bypass_id, status_id};
+    require(c.getParameterCount() == 5, "settings parameter count");
+    for (int32 i = 0; i < 5; ++i) {
+        ParameterInfo info{};
+        require(c.getParameterInfo(i, info) == kResultOk && info.id == order[i],
+                "settings parameter order");
+        const bool automatable = (info.flags & ParameterInfo::kCanAutomate) != 0;
+        if (info.id == gain_id)
+            require(automatable && info.stepCount == 0 &&
+                        std::abs(info.defaultNormalizedValue - normalized_gain(0)) < 1e-12,
+                    "Gain parameter");
+        // A host that keeps normalized values as float still sets 0 dB exactly,
+        // so a project reset to the default saves as before the settings.
+        require(gain_db(static_cast<float>(normalized_gain(0))) == 0 &&
+                    gain_db(std::nextafter(static_cast<float>(normalized_gain(0)), 1.f)) == 0 &&
+                    gain_db(normalized_gain(-.01)) < 0,
+                "Gain near 0 dB from a float host");
+        if (info.id == mix_id)
+            require(automatable && info.defaultNormalizedValue == 1, "Mix parameter");
+        if (info.id == latency_id)
+            require(!automatable && (info.flags & ParameterInfo::kIsList) && info.stepCount == 6 &&
+                        latency_frames(info.defaultNormalizedValue) == 256,
+                    "Latency parameter");
+    }
+    const auto text = [&](ParamID id, ParamValue v) {
+        String128 t{};
+        require(c.getParamStringByValue(id, v, t) == kResultOk, "settings text");
+        std::string ascii;
+        for (int i = 0; t[i]; ++i)
+            ascii += static_cast<char>(t[i]);
+        return ascii;
+    };
+    require(text(gain_id, normalized_gain(-6.5)) == "-6.5" && text(mix_id, .25) == "25" &&
+                text(latency_id, normalized_latency(1024)) == "1024 frames",
+            "settings value text");
+    // Hosts find the wet/dry mix by its function name.
+    IParameterFunctionName* function = nullptr;
+    require(c.queryInterface(IParameterFunctionName::iid, reinterpret_cast<void**>(&function)) ==
+                    kResultOk &&
+                function,
+            "IParameterFunctionName not offered");
+    ParamID found = kNoParamId;
+    require(function->getParameterIDFromFunctionName(kRootUnitId, FunctionNameType::kDryWetMix,
+                                                     found) == kResultTrue &&
+                found == mix_id,
+            "Mix not found as kDryWetMix");
+    function->release();
+
+    // A one-tap filter of gain 0.5: wet is half the input, dry the input.
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "settings buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    convolver::HostState half;
+    half.configuration =
+        convolver::Configuration{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+    MemoryStream state;
+    require(write_state(&state, half), "encode settings state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore settings state");
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.setProcessing(true) == kResultOk,
+            "settings activate");
+    std::array<float, 512> in{}, out{};
+    float* ins[] = {in.data()};
+    float* outs[] = {out.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    in.fill(1);
+    const auto run = [&](ParameterChanges* changes) {
+        d.inputParameterChanges = changes;
+        require(p.process(d) == kResultOk, "settings process");
+        d.inputParameterChanges = nullptr;
+        require(p.process(d) == kResultOk, "settings process"); // Past the 64-frame ramp.
+        return out[511];
+    };
+    require(std::abs(run(nullptr) - .5f) < 1e-6, "default settings changed the output");
+    // Gain -6.0206 dB halves the wet signal; the host sends the last point
+    // of a block, which the processor takes.
+    const double halve = 20 * std::log10(.5);
+    ParameterChanges gain;
+    int32 index = 0;
+    auto* queue = gain.addParameterData(gain_id, index);
+    queue->addPoint(0, normalized_gain(0), index);
+    queue->addPoint(100, normalized_gain(halve), index);
+    require(std::abs(run(&gain) - .25f) < 1e-5, "Gain not applied");
+    // Mix 25%: a quarter of the wet (0.25) and three quarters of the dry (1).
+    ParameterChanges mix;
+    index = 0;
+    mix.addParameterData(mix_id, index)->addPoint(0, .25, index);
+    require(std::abs(run(&mix) - (.25f * .25f + .75f)) < 1e-5, "Mix not applied");
+    // The settings travel in the state as version 3, to a new processor and
+    // to the controller.
+    c.setParamNormalized(gain_id, normalized_gain(halve));
+    c.setParamNormalized(mix_id, .25);
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "save settings");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    {
+        std::array<unsigned char, 12> head{};
+        int32 got = 0;
+        saved.read(head.data(), 12, &got);
+        require(got == 12 && head[8] == 3, "settings not saved as state version 3");
+        saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    }
+    const auto restored = read_state(&saved);
+    require(restored.settings && std::abs(restored.settings->gain_db - halve) < 1e-9 &&
+                restored.settings->mix == .25 && restored.settings->latency == 256,
+            "saved settings");
+    Handler other_handler;
+    Controller other;
+    require(other.initialize(&context) == kResultOk &&
+                other.setComponentHandler(&other_handler) == kResultOk,
+            "second controller");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(other.setComponentState(&saved) == kResultOk &&
+                std::abs(other.getParamNormalized(gain_id) - normalized_gain(halve)) < 1e-12 &&
+                other.getParamNormalized(mix_id) == .25 && other_handler.latency_restarts() == 0,
+            "controller did not read the settings");
+    other.terminate();
+    // An older state (a preset from convolver-preset) brings the defaults back.
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "restore an older state");
+    require(std::abs(run(nullptr) - .5f) < 1e-5, "an older state kept the settings");
+    MemoryStream plain;
+    require(p.getState(&plain) == kResultOk, "save default settings");
+    plain.seek(0, IBStream::kIBSeekSet, nullptr);
+    {
+        std::array<unsigned char, 12> head{};
+        int32 got = 0;
+        plain.read(head.data(), 12, &got);
+        require(got == 12 && head[8] == 1, "default settings not saved as state version 1");
+    }
+    // Latency: the controller tells the processor and asks the host to
+    // restart; the next activation plays at the new delay.
+    handler.restarts.clear();
+    // Until the host restarts it, the processor reports the latency it runs at.
+    require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
+                p.settings().latency == 1024 && p.getLatencySamples() == 256 &&
+                handler.latency_restarts() == 1,
+            "Latency not passed on with kLatencyChanged");
+    require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
+                handler.latency_restarts() == 1,
+            "an unchanged Latency restarted the component");
+    require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
+                p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk,
+            "restart after Latency");
+    require(p.getLatencySamples() == 1024 && p.getTailSamples() == 1024,
+            "latency and tail after the restart");
+    in.fill(0);
+    in[0] = 1;
+    int at = -1;
+    for (int b = 0; b < 4 && at < 0; ++b) {
+        require(p.process(d) == kResultOk, "latency process");
+        in[0] = 0;
+        for (int i = 0; i < 512; ++i)
+            if (at < 0 && std::abs(out[i]) > 1e-6)
+                at = b * 512 + i;
+    }
+    require(at == 1024, "output not delayed by the new Latency");
+    // A state with another Latency changes the processor's and asks the
+    // controller's host to restart.
+    MemoryStream with_latency;
+    require(p.getState(&with_latency) == kResultOk, "save latency");
+    with_latency.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&with_latency).settings->latency == 1024, "latency not saved");
+    handler.restarts.clear();
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk && p.settings().latency == 256 &&
+                p.getLatencySamples() == 1024,
+            "an older state kept the Latency, or it played before a restart");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(c.setComponentState(&state) == kResultOk &&
+                latency_frames(c.getParamNormalized(latency_id)) == 256 &&
+                handler.latency_restarts() == 1,
+            "controller did not ask to restart for the restored Latency");
+    p.setProcessing(false);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
+// A 16-bit WAV with an impulse of one half on every channel.
+void write_wav(const std::filesystem::path& path, int rate, int channels, int frames) {
+    std::ofstream out(path, std::ios::binary);
+    const auto put = [&](std::uint32_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out.put(static_cast<char>((value >> (8 * i)) & 0xff));
+    };
+    const auto data = static_cast<std::uint32_t>(frames * channels * 2);
+    out.write("RIFF", 4);
+    put(36 + data, 4);
+    out.write("WAVEfmt ", 8);
+    put(16, 4);
+    put(1, 2); // PCM
+    put(static_cast<std::uint32_t>(channels), 2);
+    put(static_cast<std::uint32_t>(rate), 4);
+    put(static_cast<std::uint32_t>(rate * channels * 2), 4);
+    put(static_cast<std::uint32_t>(channels * 2), 2);
+    put(16, 2);
+    out.write("data", 4);
+    put(data, 4);
+    for (int f = 0; f < frames; ++f)
+        for (int c = 0; c < channels; ++c)
+            put(f == 0 ? 16384 : 0, 2);
+    if (!out)
+        throw std::runtime_error("could not write " + path.string());
+}
+// VST3-3: the processor sends the window's report with the status, the
+// controller keeps it, and a filter file chosen in the window loads through
+// a message as a state restore would, marking the project changed.
+void report_and_files() {
+    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
+                          const char* name) {
+        for (const auto& [key, value] : report)
+            if (key == name)
+                return value;
+        return std::string("(missing)");
+    };
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "report initialize");
+    require(c.report().empty() && c.diagnostics().empty(), "a report before connecting");
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "report connect");
+    auto report = c.report();
+    require(field(report, "status name") == "No filter" &&
+                field(report, "title").find("VST3 #") != std::string::npos &&
+                field(report, "filter name") == "None",
+            "report of an empty instance");
+    require(c.diagnostics().find("Recent Convolver log lines for VST3 #") != std::string::npos,
+            "diagnostics text");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "report buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "report activate");
+    report = c.report();
+    require(field(report, "sample rate") == "48000", "report rate after activation");
+    // A window reads twice a second; the host is asked to reread the
+    // parameters only when the Status line changes.
+    handler.restarts.clear();
+    c.report();
+    c.report();
+    require(std::none_of(handler.restarts.begin(), handler.restarts.end(),
+                         [](int32 f) { return (f & kParamValuesChanged) != 0; }),
+            "an unchanged report asked the host to reread the parameters");
+    // A Gain the host changed reaches the report when the window asks again.
+    ParameterChanges gain;
+    int32 index = 0;
+    gain.addParameterData(gain_id, index)->addPoint(0, normalized_gain(-12), index);
+    ProcessData flush{};
+    flush.inputParameterChanges = &gain;
+    require(p.process(flush) == kResultOk, "report gain");
+    require(c.report() != report, "report not refreshed on request");
+
+    const auto folder = private_temp("convolver-vst3-files");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
+    write_wav(good, 48000, 1, 8);
+    write_wav(wrong, 44100, 1, 8);
+    const auto* reader = convolver::vst3::test_file_reader;
+#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
+    convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
+#endif
+#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
+    // Accepted: the filter plays, the report names the file, the host is told
+    // the project changed, and the saved state holds the filter.
+    require(c.load_file(good.string()) && handler.dirty == 1, "file not loaded");
+    report = c.report();
+    require(field(report, "status name") == "Playing" && field(report, "filter name") == "room.wav",
+            "report after loading a file");
+    auto f = p.failure();
+    require(!f, "a loaded file left a failure");
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "save after loading a file");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto state = read_state(&saved);
+    require(state.configuration && state.configuration->sample_rate == 48000 &&
+                std::abs(state.configuration->paths.at(0).impulse.at(0) - .5f) < 1e-4,
+            "saved state does not hold the file's filter");
+    // Refused: the filter stays, the report says why, the project is not
+    // marked changed.
+    require(!c.load_file(wrong.string()) && handler.dirty == 1, "a wrong-rate file accepted");
+    f = p.failure();
+    require(f && f->request.source == convolver::HostFilterSource::file &&
+                f->request.path == wrong.string(),
+            "the refused file is not the failure's request");
+    report = c.report();
+    require(field(report, "filter name") == "room.wav" &&
+                field(report, "filter note") != "(missing)" &&
+                !field(report, "filter note").empty(),
+            "report after a refused file");
+#else
+    // A build with no reader refuses, and says why.
+    require(!c.load_file(good.string()) && handler.dirty == 0, "a file loaded without a reader");
+    const auto f = p.failure();
+    require(f && f->message.find("cannot read filter files") != std::string::npos,
+            "no reader not explained");
+#endif
+    convolver::vst3::test_file_reader = reader;
+    require(!c.load_file(""), "an empty path accepted");
+    std::filesystem::remove_all(folder);
+    p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
+    c.terminate();
+    p.terminate();
+}
 void controller_conversions() {
     HostApplication context;
     Controller c;
@@ -1273,6 +1674,8 @@ int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
         controller_conversions();
+        settings_parameters();
+        report_and_files();
         tail_measured_at_output();
         output_silence_flags();
         output_silence_flags_64();

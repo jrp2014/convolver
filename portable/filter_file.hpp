@@ -20,13 +20,17 @@ namespace convolver {
 // (detail::libsndfile_files() or, in the Audio Unit, audio_toolbox_files()).
 // `raw_filters` receives the raw filters (.pcm, .raw) it read. `plugin`: a
 // refusal is explained in a plug-in host's terms; `options`: in terms of
-// command-line options alone (convolver-preset). Throws as
+// command-line options alone (convolver-preset). `sources` receives what
+// the chosen filter was read from: the file, each list and configuration
+// visited, and the chosen configuration's IRs, not those of list entries
+// passed over (detail::Resolver::chosen_sources()). Throws as
 // load_configuration() does.
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
                             std::vector<std::filesystem::path>* raw_filters = nullptr,
-                            bool plugin = false, bool options = false);
+                            bool plugin = false, bool options = false,
+                            std::vector<std::filesystem::path>* sources = nullptr);
 
 // Why a chosen filter file could not be used, for HostFilter::reject().
 struct FilterFileFailure {
@@ -43,8 +47,12 @@ struct FilterFileFailure {
 // For a plug-in: the filter in `path` for `host`'s rate and channels, or none
 // with `failure` filled in. A readable file made for another rate or other
 // channels is classified as such (a list by rate only when no entry has the
-// host's rate); the message names the file and explains.
+// host's rate); the message names the file and explains. `files`, when
+// given, receives every file the accepted filter was read from (the file,
+// then for a .cfg or list as filter_file_state()'s `sources`), for
+// HostRequest::files; it is emptied when the file is refused.
 std::optional<HostState> read_filter_file(const std::string& path, const HostLayout& host,
                                           const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure);
+                                          FilterFileFailure& failure,
+                                          std::vector<std::string>* files = nullptr);
 } // namespace convolver

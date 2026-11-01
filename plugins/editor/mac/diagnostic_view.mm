@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
+#include "recent_files.hpp"
 #import "view_layout.h"
+#include <cmath>
 
 using namespace convolver::view;
 
@@ -18,6 +20,7 @@ constexpr CGFloat fact_label = 104; // "Filter length" and the other Audio label
 constexpr CGFloat most_text =
     200; // A longer explanation scrolls (a list .cfg explains each entry).
 constexpr NSTimeInterval refresh_interval = 0.5;
+constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
 
 NSString* field(NSDictionary<NSString*, NSString*>* report, NSString* key) {
     NSString* value = report[key];
@@ -136,11 +139,16 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 } // namespace
 
+// The Recent menu asks the view to fill it as it opens.
+@interface CONVOLVER_DIAGNOSTIC_VIEW () <NSMenuDelegate>
+@end
+
 @implementation CONVOLVER_DIAGNOSTIC_VIEW {
     ConvolverReportSource report_;
     ConvolverDiagnosticsSource diagnostics_;
     ConvolverFileLoader loader_;
-    NSStackView* stack_; // Everything, top to bottom.
+    NSDictionary<NSString*, id>* bypass_; // The format's bypass (diagnostic_view.h), or nil.
+    NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
     NSStackView* audio_; // The Audio facts' rows, rebuilt when they change.
@@ -151,12 +159,22 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSUInteger choosing_,
         requests_;       // The pending Choose… request (0: none), the last number.
     NSOpenPanel* panel_; // Its dialog, while one is open.
+    // Reload: the playing filter's file, the files it was read from (the
+    // report's text and as a list) and their times and sizes when it was
+    // loaded; a change waiting to settle; timer ticks, for the checks.
+    NSString* filterPath_;
+    NSString* watchedText_;
+    NSArray<NSString*>* watched_;
+    NSDictionary<NSString*, id>* stamps_;
+    NSDictionary<NSString*, id>* changed_;
+    unsigned ticks_;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
                      settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
+                       bypass:(NSDictionary<NSString*, id>*)bypass
                        loader:(ConvolverFileLoader)loader {
     // The view's own size: the frame gives only its position.
     self = [super initWithFrame:NSMakeRect(NSMinX(frame), NSMinY(frame), width, 400)];
@@ -166,6 +184,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
     loader_ = [loader copy];
+    bypass_ = [bypass copy];
 
     // The stack is pinned at the top left and has the window's width; its
     // own height is the content's, and fit gives the view that height. No
@@ -261,8 +280,36 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         stack(@[ document, names, _chooseButton ], NSUserInterfaceLayoutOrientationHorizontal, 8);
     filter_row.distribution = NSStackViewDistributionFill;
     [self add:[self formRow:@"Filter" content:filter_row] after:12];
-    if (loader_)
+
+    // Under it: the recent files, Reload, and reloading when the file
+    // changes, for someone refining a filter in another program.
+    _recentButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
+    _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [_recentButton addItemWithTitle:@"Recent"];
+    _recentButton.menu.delegate = self;
+    _recentButton.menu.autoenablesItems = NO; // updateRecentMenu enables each item itself.
+    _recentButton.accessibilityLabel = @"Recent Filters";
+    _recentButton.toolTip = @"Filter files loaded recently in a Convolver window, in any host.";
+    _reloadButton = [NSButton buttonWithTitle:@"Reload"
+                                       target:self
+                                       action:@selector(reloadFilter:)];
+    _reloadButton.accessibilityLabel = @"Reload Filter";
+    _reloadButton.toolTip = @"Reads the filter file again, for example after changing it in "
+                            @"another program. Available for a file loaded in this window, "
+                            @"not for a filter from the saved project or a preset.";
+    _watchButton = [NSButton checkboxWithTitle:@"Reload when the file changes"
+                                        target:self
+                                        action:@selector(watchToggled:)];
+    _watchButton.state = NSControlStateValueOn;
+    _watchButton.toolTip = @"While this window is open, reads the filter again when its file, "
+                           @"or a file a .cfg names, changes.";
+    if (loader_) {
+        NSStackView* reload_row = stack(@[ _recentButton, _reloadButton, _watchButton ],
+                                        NSUserInterfaceLayoutOrientationHorizontal, 8);
+        [self add:[self formRow:@"" content:reload_row] after:12];
         [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
+    }
+    [self updateRecentMenu];
 
     // The settings (setting_rows.h), each a row of the form.
     __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
@@ -310,7 +357,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     fixed_width(_referenceField, inner);
     [self add:_referenceField after:8];
 
-    // The buttons at the bottom right, Show Log rightmost.
+    // Bypass at the bottom left, as a checkbox; the buttons at the bottom
+    // right, Show Log rightmost.
+    _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
+                                         target:self
+                                         action:@selector(bypassClicked:)];
+    _bypassButton.toolTip = @"Lets the audio through without the filter, as the host's own "
+                            @"bypass does; the host records the change like any other.";
+    _bypassButton.hidden = bypass_ == nil;
     _diagnosticsButton = [NSButton buttonWithTitle:@"Copy Diagnostics"
                                             target:self
                                             action:@selector(putDiagnosticsOnPasteboard:)];
@@ -320,6 +374,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _logButton = [NSButton buttonWithTitle:@"Show Log" target:self action:@selector(showLog:)];
     _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
     NSStackView* buttons = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 12);
+    [buttons addView:_bypassButton inGravity:NSStackViewGravityLeading];
     [buttons addView:_diagnosticsButton inGravity:NSStackViewGravityTrailing];
     [buttons addView:_logButton inGravity:NSStackViewGravityTrailing];
     fixed_width(buttons, inner);
@@ -338,7 +393,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // A row of the form: "Name:" right-aligned, then `content` across the rest.
 - (NSStackView*)formRow:(NSString*)name content:(NSView*)content {
     NSTextField* title = label(body_font(), [NSColor labelColor]);
-    title.stringValue = [name stringByAppendingString:@":"];
+    title.stringValue = name.length ? [name stringByAppendingString:@":"] : @"";
     title.alignment = NSTextAlignmentRight;
     title.selectable = NO;
     fixed_width(title, form_label);
@@ -394,8 +449,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [super viewDidMoveToWindow];
     [timer_ invalidate];
     timer_ = nil;
-    // A file chosen for another window, or none, is not loaded.
+    // A file chosen for another window, or none, is not loaded, and a drag
+    // the window no longer sees ends its edit.
     [self stopChoosing];
+    [settings_ endGesture];
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSWindowWillCloseNotification
                                                   object:nil];
@@ -410,7 +467,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                     repeats:YES
                                       block:^(NSTimer* timer) {
                                         static_cast<void>(timer);
-                                        [weakSelf refreshIfShown];
+                                        [weakSelf tick];
                                       }];
     [[NSRunLoop mainRunLoop] addTimer:timer_ forMode:NSRunLoopCommonModes];
     [self refresh];
@@ -419,6 +476,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (BOOL)shown {
     NSWindow* window = self.window;
     return window.visible && (window.occlusionState & NSWindowOcclusionStateVisible);
+}
+
+// The report while the window is on screen; the files once a second while
+// it is open, even behind another window, since the program that changes
+// them is then in front.
+- (void)tick {
+    [self refreshIfShown];
+    if (++ticks_ % ticks_per_check == 0 && self.window.visible)
+        [self checkForChanges];
 }
 
 - (BOOL)refreshIfShown {
@@ -503,6 +569,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [settings_ readWithSampleRate:field(report, @"sample rate").intValue
                      latencyWaits:[field(report, @"latency waits") isEqualToString:@"yes"]];
     _logButton.enabled = logPath_.length > 0;
+    [self readBypass];
+    [self watchFiles:report ? field(report, @"filter files") : @""];
+    filterPath_ = report ? field(report, @"filter path") : @"";
+    _reloadButton.enabled = filterPath_.length > 0;
+    _watchButton.enabled = filterPath_.length > 0;
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
                            : @"Or drop a .cfg or sound file on this window.";
@@ -520,6 +591,152 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self fit];
 }
 
+// Starts watching the files a newly loaded filter was read from (one per
+// line), with their times and sizes as they are now.
+- (void)watchFiles:(NSString*)lines {
+    if ([lines isEqualToString:watchedText_])
+        return;
+    watchedText_ = lines;
+    NSMutableArray<NSString*>* files = [NSMutableArray array];
+    for (NSString* line in [lines componentsSeparatedByString:@"\n"])
+        if (line.length)
+            [files addObject:line];
+    watched_ = files;
+    stamps_ = [self stamps];
+    changed_ = nil;
+}
+
+// Each watched file's modification time and size, or NSNull when it is not
+// there.
+- (NSDictionary<NSString*, id>*)stamps {
+    NSMutableDictionary<NSString*, id>* now = [NSMutableDictionary dictionary];
+    NSFileManager* files = [NSFileManager defaultManager];
+    for (NSString* path in watched_) {
+        NSDictionary<NSFileAttributeKey, id>* attributes = [files attributesOfItemAtPath:path
+                                                                                   error:nil];
+        NSDate* modified = attributes.fileModificationDate;
+        now[path] = modified ? @[ modified, @(attributes.fileSize) ] : [NSNull null];
+    }
+    return now;
+}
+
+- (BOOL)checkForChanges {
+    if (!loader_ || _watchButton.state != NSControlStateValueOn || filterPath_.length == 0 ||
+        watched_.count == 0)
+        return NO;
+    NSDictionary<NSString*, id>* now = [self stamps];
+    if ([now isEqualToDictionary:stamps_]) {
+        changed_ = nil;
+        return NO;
+    }
+    if (![now isEqualToDictionary:changed_]) {
+        changed_ = now; // Changed: reload once it has stayed so for one check.
+        return NO;
+    }
+    stamps_ = now;
+    changed_ = nil;
+    if ([now.allValues containsObject:[NSNull null]])
+        return NO; // Moved or deleted: the filter that plays stays.
+    // The host may have replaced the filter (a preset, an undo) while the
+    // window was covered and not reading the report: reload only the file
+    // that still plays.
+    NSString* path = filterPath_;
+    NSString* files = watchedText_;
+    [self refresh];
+    if (![filterPath_ isEqualToString:path] || ![watchedText_ isEqualToString:files])
+        return NO;
+    [self loadFile:filterPath_];
+    return YES;
+}
+
+- (void)watchToggled:(NSButton*)button {
+    static_cast<void>(button);
+    stamps_ = [self stamps]; // Changes made while it was off are not reloaded.
+    changed_ = nil;
+}
+
+- (void)reloadFilter:(id)sender {
+    static_cast<void>(sender);
+    if (filterPath_.length == 0 || ![self loadFile:filterPath_])
+        NSBeep();
+}
+
+- (void)menuNeedsUpdate:(NSMenu*)menu {
+    if (menu == _recentButton.menu)
+        [self updateRecentMenu];
+}
+
+// "room.cfg — Filters": the file's name and its folder's, since several
+// folders often hold a filter.cfg; the full path is the item's tooltip.
+- (void)updateRecentMenu {
+    NSMenu* menu = _recentButton.menu;
+    while (menu.numberOfItems > 1) // The first item is the button's title.
+        [menu removeItemAtIndex:1];
+    NSFileManager* files = [NSFileManager defaultManager];
+    BOOL any = NO;
+    for (const auto& file : convolver::recent_files()) {
+        NSString* path = [NSString stringWithUTF8String:file.c_str()];
+        if (!path || ![files fileExistsAtPath:path])
+            continue;
+        NSString* folder = path.stringByDeletingLastPathComponent.lastPathComponent;
+        NSString* title =
+            folder.length && ![folder isEqualToString:@"/"]
+                ? [NSString stringWithFormat:@"%@ — %@", path.lastPathComponent, folder]
+                : path.lastPathComponent;
+        NSMenuItem* item = [menu addItemWithTitle:title
+                                           action:@selector(recentChosen:)
+                                    keyEquivalent:@""];
+        item.target = self;
+        item.representedObject = path;
+        item.toolTip = path;
+        any = YES;
+    }
+    if (!any) {
+        [menu addItemWithTitle:@"No Recent Filters" action:nil keyEquivalent:@""].enabled = NO;
+        return;
+    }
+    [menu addItem:[NSMenuItem separatorItem]];
+    [menu addItemWithTitle:@"Clear Menu" action:@selector(clearRecent:) keyEquivalent:@""].target =
+        self;
+}
+
+- (void)recentChosen:(NSMenuItem*)item {
+    NSString* path = item.representedObject;
+    if (![path isKindOfClass:[NSString class]] || ![self loadFile:path])
+        NSBeep();
+}
+
+- (void)clearRecent:(id)sender {
+    static_cast<void>(sender);
+    convolver::forget_recent_files();
+    [self updateRecentMenu];
+}
+
+// Shows the format's bypass as the host has it now (its own button,
+// automation); disabled when the plug-in cannot say.
+- (void)readBypass {
+    if (!bypass_)
+        return;
+    ConvolverSettingGetter get = bypass_[@"get"];
+    const double value = get ? get() : NAN;
+    _bypassButton.enabled = !std::isnan(value);
+    _bypassButton.state = value >= 0.5 ? NSControlStateValueOn : NSControlStateValueOff;
+}
+
+// One click is one edit: begin, set, end, as the VST3 SDK asks of an editor.
+- (void)bypassClicked:(NSButton*)button {
+    ConvolverSettingGesture begin = bypass_[@"begin"];
+    ConvolverSettingSetter set = bypass_[@"set"];
+    ConvolverSettingGesture end = bypass_[@"end"];
+    if (begin)
+        begin();
+    if (set)
+        set(button.state == NSControlStateValueOn ? 1.0 : 0.0);
+    if (end)
+        end();
+    [self refresh];
+}
+
 - (void)referenceToggled:(NSButton*)button {
     [self showReference:button.state == NSControlStateValueOn];
 }
@@ -532,7 +749,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 - (BOOL)loadFile:(NSString*)path {
     const BOOL accepted = loader_ && path.length > 0 && loader_(path);
+    if (accepted && path.UTF8String)
+        convolver::remember_recent_file(path.UTF8String);
     [self refresh]; // The report says what plays now, and why a refused file was refused.
+    if (accepted) {
+        stamps_ = [self stamps]; // What was read is what plays: nothing to reload.
+        changed_ = nil;
+    }
     return accepted;
 }
 

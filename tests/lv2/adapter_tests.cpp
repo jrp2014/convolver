@@ -396,7 +396,7 @@ void status_and_log(host::World& world, const Fixture& f) {
               p->failure()->request.number == 5,
           label + "corrupt state: recorded as unreadable state");
     const auto newer =
-        std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0});
+        std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 4, 0, 0, 0, 0, 0, 0, 0});
     p->log.messages.clear();
     check(p->restore(std::as_bytes(std::span(newer)), chunk(world)) != LV2_STATE_SUCCESS &&
               p->failure() && p->failure()->kind == HostFailureKind::state_newer &&

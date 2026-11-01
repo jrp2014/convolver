@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "bytes.hpp"
 #include "convolver/host.hpp"
+#include <algorithm>
 #include <bit>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -9,9 +11,21 @@
 namespace convolver {
 namespace {
 // Version 2 adds flag 4, a failed initial load (owner's decision, 22 October
-// 2026). Encoders write version 1 whenever that flag is clear, so builds that
-// read only version 1 keep reading every other state.
-constexpr std::uint32_t magic = 0x53564e43, version = 2;
+// 2026). Version 3 (VST3-4; owner's decision, 25 October 2026) is a superset
+// of version 2 that also holds the settings, in five words after the flags:
+// the gain in decibels and the mix as 64-bit doubles (low word first), then
+// the latency in frames. Encoders write the lowest version that holds the
+// state: 3 only for settings that differ from the defaults, 2 for a failed
+// load without them, 1 otherwise, so builds that read only version 1 keep
+// reading every other state.
+constexpr std::uint32_t magic = 0x53564e43, version = 3;
+constexpr std::size_t settings_words = 5;
+// The version encode_host_state() writes for this state.
+std::uint32_t state_version(const HostState& state) noexcept {
+    if (state.settings && *state.settings != HostSettings{})
+        return 3;
+    return state.failed ? 2 : 1;
+}
 struct Writer {
     std::vector<std::byte> data;
     void word(std::size_t n) {
@@ -23,6 +37,11 @@ struct Writer {
     }
     void sample(float v) {
         word(std::bit_cast<std::uint32_t>(v));
+    }
+    void number(double v) {
+        const auto bits = std::bit_cast<std::uint64_t>(v);
+        word(static_cast<std::uint32_t>(bits));
+        word(static_cast<std::uint32_t>(bits >> 32));
     }
 };
 struct Reader {
@@ -43,6 +62,10 @@ struct Reader {
     float sample() {
         return std::bit_cast<float>(word());
     }
+    double number() {
+        const std::uint64_t low = word();
+        return std::bit_cast<double>(low | (std::uint64_t{word()} << 32));
+    }
 };
 std::size_t add(std::size_t a, std::size_t b) noexcept {
     return b > std::numeric_limits<std::size_t>::max() - a ? std::numeric_limits<std::size_t>::max()
@@ -51,6 +74,8 @@ std::size_t add(std::size_t a, std::size_t b) noexcept {
 // The words encode_host_state() writes, saturating.
 std::size_t encoded_words(const HostState& state) noexcept {
     std::size_t words = 3; // Magic, version, flags.
+    if (state_version(state) == 3)
+        words += settings_words;
     if (!state.configuration)
         return words;
     const auto& c = *state.configuration;
@@ -108,9 +133,15 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
         throw std::length_error("host state exceeds limit");
     Writer w;
     w.data.reserve(size);
+    const auto format = state_version(state);
     w.word(magic);
-    w.word(state.failed ? version : 1);
+    w.word(format);
     w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0));
+    if (format == 3) {
+        w.number(state.settings->gain_db);
+        w.number(state.settings->mix);
+        w.word(state.settings->latency);
+    }
     if (state.configuration) {
         const auto& c = *state.configuration;
         w.word(c.sample_rate);
@@ -151,15 +182,29 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
                              std::to_string(version) +
                              "). Update Convolver to load it, or make the preset again "
                              "from its .cfg with this version's convolver-preset.");
-    if (format != 1 && format != version)
+    if (format < 1)
         throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();
-    // Version 2 only ever marks a failed load (flag 4), never with a filter.
-    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == version && !(flags & 4)))
+    // Version 2 only ever marks a failed load (flag 4); a failed load never
+    // holds a filter. Version 3 may mark one or not.
+    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == 2 && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
     HostState state;
     state.bypass = (flags & 2) != 0;
     state.failed = (flags & 4) != 0;
+    if (format == 3) {
+        HostSettings settings;
+        settings.gain_db = r.number();
+        settings.mix = r.number();
+        settings.latency = r.word();
+        if (!std::isfinite(settings.gain_db) || settings.gain_db < min_gain_db ||
+            settings.gain_db > max_gain_db || !std::isfinite(settings.mix) || settings.mix < 0 ||
+            settings.mix > 1 ||
+            std::find(host_latencies.begin(), host_latencies.end(), settings.latency) ==
+                host_latencies.end())
+            throw std::invalid_argument("invalid host state settings");
+        state.settings = settings;
+    }
     if (flags & 1) {
         Configuration c;
         auto rate = r.word();

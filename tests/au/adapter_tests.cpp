@@ -397,7 +397,7 @@ void rejected_presets() {
     recorded(HostFailureKind::state_unreadable, 0, false, "a truncated convolver-state");
     require(modified([&](CFMutableDictionaryRef d) {
                 const auto key = au_test::state_key();
-                const UInt8 newer[] = {'C', 'N', 'V', 'S', 3, 0, 0, 0, 0, 0, 0, 0};
+                const UInt8 newer[] = {'C', 'N', 'V', 'S', 4, 0, 0, 0, 0, 0, 0, 0};
                 const auto data = CFDataCreate(nullptr, newer, sizeof newer);
                 CFDictionarySetValue(d, key, data);
                 CFRelease(data);

@@ -52,12 +52,15 @@ const SoundFiles& audio_toolbox_files();
 // selection is a plug-in host's, so a mismatch is explained in its terms
 // (explain_no_match()). `options`: the selection comes from command-line
 // options alone, with no audio (convolver-preset), so the advice is to
-// choose other values.
+// choose other values. `chosen_paths` receives what the selected filter was
+// read from (Resolver::chosen_sources()): unlike `source_paths`, not the IRs
+// of list entries passed over.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
                                  const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths = nullptr,
                                  std::vector<std::filesystem::path>* raw_filters = nullptr,
-                                 bool plugin = false, bool options = false);
+                                 bool plugin = false, bool options = false,
+                                 std::vector<std::filesystem::path>* chosen_paths = nullptr);
 
 // Shared by the readers.
 // What the first bytes of a file say about it: a container marker no sample

@@ -32,6 +32,10 @@ FROZEN = {
     ('vst3', 'macos_bundle_id'): 'io.github.jrp2014.convolver.vst3',
     ('vst3', 'bypass_parameter_id'): 1000,
     ('vst3', 'status_parameter_id'): 1001,
+    # PLUG-10's settings in VST3 (VST3-4), the Audio Unit's IDs (jrp, 25 October 2026).
+    ('vst3', 'gain_parameter_id'): 0,
+    ('vst3', 'mix_parameter_id'): 1003,
+    ('vst3', 'latency_parameter_id'): 1004,
     ('au', 'type'): 'aufx',
     ('au', 'subtype'): 'Conv',
     ('au', 'manufacturer'): 'CONV',
@@ -177,11 +181,12 @@ def check_rules(registry, errors):
             errors.append(f'VST3 class ID {cid}: 32 uppercase hex digits, not all zero')
     if len(set(ids)) != len(ids):
         errors.append('VST3 processor and controller class IDs must differ')
-    vst3_parameters = [registry['vst3'][k] for k in ('bypass_parameter_id', 'status_parameter_id')]
+    vst3_names = ('bypass', 'status', 'mix', 'latency')
+    vst3_parameters = [registry['vst3'][f'{k}_parameter_id'] for k in vst3_names]
     au_names = ('status', 'mix', 'latency')
     au_parameters = [au[f'{k}_parameter_id'] for k in au_names]
     for name, pid in [
-        *zip(('vst3 bypass', 'vst3 status'), vst3_parameters),
+        *((f'vst3 {k}', p) for k, p in zip(vst3_names, vst3_parameters)),
         *((f'au {k}', p) for k, p in zip(au_names, au_parameters)),
     ]:
         # VST3 reserves IDs from 0x80000000 for hosts (vsttypes.h).
@@ -192,8 +197,9 @@ def check_rules(registry, errors):
             )
     # Gain takes the VST2 Attenuation's index on purpose (jrp, 25 October 2026),
     # with a new range; VST3-6 must convert old values if it maps VST2 projects.
-    if au['gain_parameter_id'] != VST2_PARAMETERS.index('Attenuation dB'):
-        errors.append('au gain parameter ID: the VST2 Attenuation index, 0')
+    for fmt in ('vst3', 'au'):
+        if registry[fmt]['gain_parameter_id'] != VST2_PARAMETERS.index('Attenuation dB'):
+            errors.append(f'{fmt} gain parameter ID: the VST2 Attenuation index, 0')
     if len(set(vst3_parameters)) != len(vst3_parameters):
         errors.append('VST3 parameter IDs must differ')
     if len({au['gain_parameter_id'], *au_parameters}) != len(au_parameters) + 1:

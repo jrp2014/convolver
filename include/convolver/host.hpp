@@ -8,8 +8,34 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace convolver {
+// PLUG-10: the settings every adapter offers as host parameters
+// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
+// it was before the settings existed.
+inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
+// The latencies adapters offer, in frames: HostProcessor's block size, the
+// engine's uniform partition (the CLI's --block-size). Smaller is less delay
+// and more processor load. jrp, 25 October 2026: powers of two from 64 to
+// 4096, default 256.
+inline constexpr std::array<std::size_t, 7> host_latencies{64, 128, 256, 512, 1024, 2048, 4096};
+inline constexpr std::size_t default_host_latency = 256;
+struct HostSettings {
+    // The filtered signal's gain in decibels, within min_gain_db and
+    // max_gain_db (clamped there by HostProcessor).
+    double gain_db = 0;
+    // The share of the filtered signal, 0 to 1; the rest is the input delayed
+    // by the latency. Ignored (always 1) when input and output counts differ,
+    // as there is no dry signal (the bypass rule). Clamped to 0..1.
+    double mix = 1;
+    // The latency in frames, one of host_latencies. Unlike gain and mix it
+    // cannot change while a processor runs: it is the block size the
+    // processor is built with.
+    std::size_t latency = default_host_latency;
+    bool operator==(const HostSettings&) const = default;
+};
+
 // Versioned self-contained host state. All codec calls are control-thread only.
 struct HostState {
     // Absent means an empty instance: identity at the host's rate and layout for
@@ -22,6 +48,13 @@ struct HostState {
     // saved so that reopening a project stays silent. Never with a configuration.
     // Encoded as version 2; all other states stay version 1.
     bool failed = false;
+    // Saved and applied by the VST3 adapter only (VST3-4): the settings its
+    // parameters held. Encoded as version 3, only when they differ from the
+    // defaults, so every other state keeps its older version. Absent in
+    // older states, presets from convolver-preset and the other formats'
+    // states; the Audio Unit and LV2 save their settings as parameters and
+    // ports, and ignore these.
+    std::optional<HostSettings> settings = std::nullopt;
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 // Throws std::length_error when the encoding would exceed max_host_state_bytes
@@ -104,6 +137,12 @@ struct HostRequest {
     // A failure at activation carries the accepted filter's request, which is
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
+    // VST3-11: every file an accepted file's filter was read from (the file
+    // itself, then for a .cfg or list the lists and configurations visited
+    // and the chosen configuration's IRs, but not the IRs of list entries
+    // passed over), as read_filter_file() gives them, so a window can reload
+    // the filter when one changes. Empty for state and for a refused file.
+    std::vector<std::string> files{};
 };
 struct HostFailure {
     HostFailureKind kind = HostFailureKind::state_unreadable;
@@ -298,31 +337,6 @@ class HostFilter {
     std::string notice_;
     HostFaults faults_, observed_; // Shown since the last clear; processor totals seen.
     HostFaults unshown_; // Counted before an accepted load and not yet returned by observe().
-};
-
-// PLUG-10: the settings every adapter offers as host parameters
-// (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
-// it was before the settings existed.
-inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
-// The latencies adapters offer, in frames: HostProcessor's block size, the
-// engine's uniform partition (the CLI's --block-size). Smaller is less delay
-// and more processor load. jrp, 25 October 2026: powers of two from 64 to
-// 4096, default 256.
-inline constexpr std::array<std::size_t, 7> host_latencies{64, 128, 256, 512, 1024, 2048, 4096};
-inline constexpr std::size_t default_host_latency = 256;
-struct HostSettings {
-    // The filtered signal's gain in decibels, within min_gain_db and
-    // max_gain_db (clamped there by HostProcessor).
-    double gain_db = 0;
-    // The share of the filtered signal, 0 to 1; the rest is the input delayed
-    // by the latency. Ignored (always 1) when input and output counts differ,
-    // as there is no dry signal (the bypass rule). Clamped to 0..1.
-    double mix = 1;
-    // The latency in frames, one of host_latencies. Unlike gain and mix it
-    // cannot change while a processor runs: it is the block size the
-    // processor is built with.
-    std::size_t latency = default_host_latency;
-    bool operator==(const HostSettings&) const = default;
 };
 
 // DIAG-1: what a host's status display shows for an instance, for formats

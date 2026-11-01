@@ -372,6 +372,11 @@ component`). The tools and tests need libsndfile (`brew install libsndfile`);
 a CMake installed outside Homebrew, such as conda's, may also need
 `-DCMAKE_PREFIX_PATH="$(brew --prefix)"` to find it.
 
+Build the Audio Unit and the VST3 plug-in in separate build directories:
+one tree configured with both fails at CMake's generate step, because the
+Audio Unit turns on Objective-C++ after the VST3 SDK's folder has been set
+up without it.
+
 The component is `build-au/plugins/au/Convolver.component`. By default it
 links only macOS's own libraries (Accelerate, and AudioToolbox for the files
 chosen in its window), so it needs nothing installed beside it.

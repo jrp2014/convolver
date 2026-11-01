@@ -69,12 +69,49 @@ if(CONVOLVER_SDK_STRIP)
     set(convolver_strip "${CMAKE_STRIP}")
     set(CMAKE_STRIP "${CONVOLVER_SDK_STRIP}")
 endif()
-smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST processor.cpp factory.cpp)
+# VST3-11: the window. On macOS the Audio Unit's AppKit view
+# (plugins/editor/mac/) behind the SDK's EditorView, in Objective-C++ with
+# ARC; its classes carry the format and version in their names, so two
+# Convolver builds or formats in one host keep their own windows. No window
+# elsewhere yet (VST3-12, VST3-13). Every target that compiles processor.cpp
+# takes these sources (convolver_vst3_editor below). The .mm files compile as
+# CXX, as the SDK's own .mm files do: enabling OBJCXX here would turn the
+# SDK's .mm files, in a directory added before, into a language that
+# directory has no rules for.
+if(APPLE)
+    string(REPLACE "." "_" vst3_class_version "${Convolver_VERSION}")
+    set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
+    set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor.mm"
+        "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
+    set(vst3_view_classes "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverVST3View_${vst3_class_version};CONVOLVER_SETTING_ROWS=ConvolverVST3SettingRows_${vst3_class_version}")
+    set_source_files_properties(${vst3_editor_sources} PROPERTIES
+        COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
+        COMPILE_DEFINITIONS "${vst3_view_classes}"
+        INCLUDE_DIRECTORIES "${mac_editor}")
+else()
+    set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor_none.cpp")
+endif()
+function(convolver_vst3_editor target)
+    target_sources(${target} PRIVATE ${vst3_editor_sources})
+    if(APPLE)
+        target_link_libraries(${target} PRIVATE "-framework AppKit")
+    endif()
+endfunction()
+smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST processor.cpp factory.cpp
+    ${vst3_editor_sources})
 if(CONVOLVER_SDK_STRIP)
     set(CMAKE_STRIP "${convolver_strip}")
 endif()
 target_include_directories(convolver_vst3 PRIVATE "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable")
-target_link_libraries(convolver_vst3 PRIVATE Convolver::host sdk)
+# VST3-3: a filter file chosen in the window is read as convolver-preset reads
+# it (convolver_filter_file); on macOS its sound files with AudioToolbox, as
+# the Audio Unit reads them, so the bundle needs nothing beyond macOS. Other
+# systems have no reader until their windows (VST3-12, VST3-13).
+set(vst3_file_libraries convolver_filter_file)
+if(APPLE)
+    list(APPEND vst3_file_libraries convolver_audio_toolbox)
+endif()
+target_link_libraries(convolver_vst3 PRIVATE Convolver::host sdk ${vst3_file_libraries})
 add_dependencies(convolver_vst3 convolver_build_version)
 target_include_directories(convolver_vst3 PRIVATE "${Convolver_BINARY_DIR}/generated")
 smtg_target_configure_version_file(convolver_vst3)
@@ -88,7 +125,15 @@ if(CONVOLVER_BUILD_TESTS)
         processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
     target_include_directories(convolver_vst3_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
         "${Convolver_BINARY_DIR}/generated")
-    target_link_libraries(convolver_vst3_tests PRIVATE Convolver::host sdk sdk_hosting)
+    target_link_libraries(convolver_vst3_tests PRIVATE Convolver::host sdk sdk_hosting
+        ${vst3_file_libraries})
+    convolver_vst3_editor(convolver_vst3_tests)
+    # Loading a file in the tests on systems without a reader: libsndfile, as
+    # the tools read files (test_file_reader in processor.hpp).
+    if(TARGET convolver_io)
+        target_link_libraries(convolver_vst3_tests PRIVATE convolver_io)
+        target_compile_definitions(convolver_vst3_tests PRIVATE CONVOLVER_VST3_TESTS_IO=1)
+    endif()
     if(APPLE)
         target_link_libraries(convolver_vst3_tests PRIVATE "-framework Cocoa")
     endif()
@@ -99,6 +144,21 @@ if(CONVOLVER_BUILD_TESTS)
         set(bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
         add_test(NAME vst3.signature COMMAND codesign --verify --deep --strict "${bundle}")
         set_tests_properties(vst3.signature PROPERTIES LABELS "vst3;real-libraries")
+        # VST3-11: the window, created, attached to an off-screen window and
+        # removed as a host does.
+        add_executable(convolver_vst3_editor_tests "${PROJECT_SOURCE_DIR}/tests/vst3/editor_tests.mm"
+            processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        set_source_files_properties("${PROJECT_SOURCE_DIR}/tests/vst3/editor_tests.mm" PROPERTIES
+            COMPILE_OPTIONS "-fobjc-arc"
+            COMPILE_DEFINITIONS "${vst3_view_classes}"
+            INCLUDE_DIRECTORIES "${mac_editor}")
+        target_include_directories(convolver_vst3_editor_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
+        target_link_libraries(convolver_vst3_editor_tests PRIVATE Convolver::host sdk sdk_hosting
+            ${vst3_file_libraries} "-framework Cocoa")
+        convolver_vst3_editor(convolver_vst3_editor_tests)
+        add_test(NAME vst3.editor COMMAND convolver_vst3_editor_tests)
+        set_tests_properties(vst3.editor PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 180)
     endif()
     if(CONVOLVER_VST3_RUNTIME_VALIDATION)
         find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
@@ -147,7 +207,9 @@ if(CONVOLVER_BUILD_IO)
         add_executable(convolver_vst3_preset_format "${PROJECT_SOURCE_DIR}/tests/vst3/preset_format_tests.cpp"
             processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
         target_include_directories(convolver_vst3_preset_format PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}")
-        target_link_libraries(convolver_vst3_preset_format PRIVATE convolver_presets sdk)
+        target_link_libraries(convolver_vst3_preset_format PRIVATE convolver_presets sdk
+            ${vst3_file_libraries})
+        convolver_vst3_editor(convolver_vst3_preset_format)
         if(APPLE)
             target_link_libraries(convolver_vst3_preset_format PRIVATE "-framework Cocoa")
         endif()
@@ -170,7 +232,9 @@ if(CONVOLVER_BUILD_IO)
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_harness PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
                 "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
-            target_link_libraries(convolver_vst3_harness PRIVATE Convolver::host Convolver::io sdk sdk_hosting)
+            target_link_libraries(convolver_vst3_harness PRIVATE Convolver::host Convolver::io sdk sdk_hosting
+                ${vst3_file_libraries})
+            convolver_vst3_editor(convolver_vst3_harness)
             if(APPLE)
                 target_link_libraries(convolver_vst3_harness PRIVATE "-framework Cocoa")
             endif()
@@ -187,7 +251,8 @@ if(CONVOLVER_BUILD_IO)
             target_include_directories(convolver_vst3_lifecycle PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
                 "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
             target_link_libraries(convolver_vst3_lifecycle PRIVATE Convolver::host sdk sdk_hosting
-                ${CMAKE_DL_LIBS})
+                ${vst3_file_libraries} ${CMAKE_DL_LIBS})
+            convolver_vst3_editor(convolver_vst3_lifecycle)
             if(APPLE)
                 target_link_libraries(convolver_vst3_lifecycle PRIVATE "-framework Cocoa")
             endif()
@@ -234,7 +299,9 @@ if(CONVOLVER_BUILD_TESTS AND CONVOLVER_PACKAGE_PLUGINS)
         processor.cpp "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
     target_include_directories(convolver_vst3_package_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${SDK_ROOT}" "${PROJECT_SOURCE_DIR}/portable"
         "${Convolver_BINARY_DIR}/generated")
-    target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting)
+    target_link_libraries(convolver_vst3_package_probe PRIVATE Convolver::host sdk sdk_hosting
+        ${vst3_file_libraries})
+    convolver_vst3_editor(convolver_vst3_package_probe)
     if(APPLE)
         target_link_libraries(convolver_vst3_package_probe PRIVATE "-framework Cocoa")
     endif()
@@ -265,4 +332,4 @@ endif()
 # runtimes. The bundle still links the instrumented core.
 convolver_sanitize(convolver_vst3_tests convolver_vst3_preset
     convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
-    convolver_vst3_package_probe)
+    convolver_vst3_package_probe convolver_vst3_editor_tests)

@@ -223,6 +223,13 @@ class Resolver {
     const std::vector<std::filesystem::path>& sources() const noexcept {
         return sources_;
     }
+    // What the leaf the visitor chose was read from, canonical, in order:
+    // each list and configuration visited up to it, then its own IRs, but not
+    // the IRs of entries it passed over, which need not be installed
+    // (VST3-11: the files a window watches). Empty until a visitor chooses.
+    const std::vector<std::filesystem::path>& chosen_sources() const noexcept {
+        return chosen_sources_;
+    }
 
   private:
     bool visit(const std::filesystem::path&);
@@ -234,6 +241,7 @@ class Resolver {
     std::size_t text_bytes_ = 0;
     std::set<std::filesystem::path> active_;
     std::vector<std::filesystem::path> sources_;
+    std::vector<std::filesystem::path> chosen_sources_;
     IncludeChain chain_;
     std::size_t visits_ = 0;
 };

@@ -149,6 +149,12 @@ std::string Effect::observe_faults() noexcept {
 
 void Effect::update_status() noexcept {
     try {
+        {
+            // What plays may have changed: the window's next read builds a
+            // new report rather than taking the copy (report()).
+            std::lock_guard cached(report_cache_lock_);
+            report_cache_.reset();
+        }
         status_log_written_ = host_log_written();
         // Gain and Mix change what plays without a filter (PLUG-10).
         status_ = host_status(filter_, known_layout(), status_log_written_, settings());
@@ -231,9 +237,11 @@ HostReport Effect::report() {
     std::string faults;
     HostReport r;
     {
-        // A load holds the lock while it prepares a filter, which can take a
-        // while: the window then gets the last report at once rather than
-        // waiting, and rereads when the load notifies (TODO AU-6).
+        // A load or the Latency worker holds the lock while it prepares a
+        // filter, which can take a while: the window then gets the last
+        // report at once rather than waiting, and rereads when the load
+        // notifies (TODO AU-6). The copy is forgotten whenever what plays
+        // changes (update_status), so it never predates a finished load.
         std::unique_lock lock(control_, std::try_to_lock);
         if (!lock.owns_lock()) {
             {
@@ -241,7 +249,7 @@ HostReport Effect::report() {
                 if (report_cache_)
                     return *report_cache_;
             }
-            lock.lock(); // Nothing read yet: wait this once.
+            lock.lock(); // No current copy: wait.
         }
         r = report_locked(faults);
         // Stored under control_, so a slower reader cannot replace a newer copy.

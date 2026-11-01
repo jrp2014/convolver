@@ -137,6 +137,9 @@ class RepositoryChecks(unittest.TestCase):
 
     def test_top_level_layout_and_adapter_completeness(self):
         self.assertBroken(self.run_check({'notes.txt': 'scratch\n'}), 'notes.txt: not an expected top-level entry')
+        # The adapters' shared window code is not an adapter.
+        result = self.run_check({'plugins/editor/mac/view.mm': SPDX_CPP})
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertBroken(
             self.run_check({'plugins/lv2/plugin.cpp': SPDX_CPP}),
             'plugins/lv2/: adapter has no tests in tests/lv2/',
