@@ -308,8 +308,8 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   host recording automation from it may record each step separately; not
   yet tried in GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
-  rate beside it, and "from the host's next start" when a new choice waits
-  ([settings](#settings)).
+  rate beside it; a new choice plays at once, and "not in use yet" shows
+  only until it does ([settings](#settings)).
 - **Audio**: what plays, in plain words, with the technical term in
   brackets. Hold the pointer over a line for what it means.
 
@@ -319,7 +319,7 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   | Channels | The host's inputs and outputs, the speakers the filter's outputs are labelled for, and the filter's counts when they do not suit |
   | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
   | Filter length | The longest filter, in time and in taps |
-  | Added delay | The latency, in time and frames, and the one that waits for the next start |
+  | Added delay | The latency, in time and frames, and a chosen one not in use yet |
   | Ring-out | How long the output goes on after the input stops (the tail) |
   | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping at the current Mix (or that it cannot clip) |
   | Host blocks | The largest block the host sends at a time |
@@ -355,7 +355,7 @@ Convolver did before the settings existed.
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. With different input and output counts there is no dry signal, so the mix stays at 100%. Like bypass, the input share still plays when a filter fails to load and the filtered sound is silent. |
-| **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. See [latency and tail](#latency-and-tail) for when a change takes effect. |
+| **Latency** | 64, 128, 256, 512, 1024, 2048 or 4096 frames | 256 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. Smaller values mean less delay and more processor load; larger values the opposite. It is the old Convolver's partitions setting in modern form, and the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
 - Gain and Mix changes fade over 64 samples, so automating them does not
   click. Latency cannot be automated.
@@ -373,17 +373,19 @@ Convolver did before the settings existed.
 
 ## Latency and tail
 
-Latency is 256 samples, whatever the host's buffer size, and the plug-in
-reports it so the host can line the audio up. At 48 kHz that is about 5.3 ms.
+Latency is 256 samples by default, whatever the host's buffer size, and the
+plug-in reports it so the host can line the audio up. At 48 kHz that is about 5.3 ms.
 In the Audio Unit the [Latency setting](#settings) chooses it, from 64 to
 4096 samples; VST3 and LV2 always use 256.
 
-A new Latency takes effect when the host next starts the plug-in, for example
-when the project is reopened or the sample rate changes; until then the
-plug-in keeps the latency it started with, and Convolver's window says which
-one plays and which one waits. Hosts also differ in when they line the audio
-up again after a latency change: some do it at once, others at the next
-playback.
+A new Latency plays at once. Changing it during playback leaves a gap in the
+sound, because Convolver starts again with the new size: the gap lasts the
+new latency plus the filter's own delay, which is short for most room
+correction filters but can be most of a second for a long linear-phase
+one, and a filter's tail that was still sounding is cut. The
+[Convolver log](#status-and-the-convolver-log) records each change. Hosts
+differ in when they line the audio up again after a latency change: some do
+it at once, others at the next playback.
 
 The tail is the time the filter keeps sounding after the input stops: its
 longest response plus any delays. VST3 and the Audio Unit report it (the Audio

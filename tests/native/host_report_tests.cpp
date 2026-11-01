@@ -301,18 +301,17 @@ void cases() {
             fact(ri, "Routing").note == "(this filter is not playing)" && ri.filter_note.empty(),
         "mono track facts: " + report_text(ri));
 
-    // PLUG-10: a Latency chosen while the processor runs at another block
-    // size waits for the next start, and the window says so.
+    // PLUG-10: a Latency chosen but not yet in use (not applied yet, or it
+    // could not be), and the window says so.
     require(!contains(r.explanation, "is chosen"), "a latency in use reads as waiting");
     const auto waiting = host_report(f, facts(stereo, {0, 1, 1024}));
-    require(contains(waiting.explanation, "Latency 1024 frames is chosen; it takes effect when "
-                                          "the host next starts the plug-in") &&
-                contains(waiting.explanation, "the plug-in keeps 256 frames."),
+    require(contains(waiting.explanation, "Latency 1024 frames is chosen but not in use yet, so "
+                                          "the plug-in keeps 256 frames for now."),
             "waiting latency explanation: " + waiting.explanation);
     require(waiting.latency_waits && !r.latency_waits && waiting.sample_rate == 44100,
             "latency waits field");
     require(fact(waiting, "Added delay").note ==
-                "(256 frames, reported to the host); 23.2 ms from the host's next start",
+                "(256 frames, reported to the host); 23.2 ms chosen, not in use yet",
             "waiting latency fact: " + fact(waiting, "Added delay").note);
 }
 

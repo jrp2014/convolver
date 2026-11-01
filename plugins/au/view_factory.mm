@@ -125,8 +125,7 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     if (NSDictionary<NSString*, id>* latency =
             choice(unit, convolver::identity::au_latency_parameter_id, @"Latency",
                    @"The delay Convolver adds, in frames. Smaller is less delay and more processor "
-                   @"load. A new choice takes effect when the host next starts the plug-in, for "
-                   @"example when the project is reopened."))
+                   @"load. A new choice plays at once, after a gap in the sound."))
         [settings addObject:latency];
     // A chosen or dropped file goes to the unit by path, as a property: the
     // unit reads it, so this also works when the host runs it in another process.

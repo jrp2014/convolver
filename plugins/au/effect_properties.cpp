@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <string_view>
 
 namespace convolver::au {
@@ -109,12 +110,9 @@ void Effect::store(AudioUnitParameterID id, AudioUnitParameterValue value) noexc
     static_cast<void>(Globals()->SetParameterOrError(id, value));
 }
 
-void Effect::follow_chosen_latency() {
-    if (IsInitialized())
-        return;
-    const auto chosen = settings().latency;
-    if (latency_.exchange(chosen) != chosen)
-        PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
+bool Effect::latency_pending() noexcept {
+    const auto chosen = host_latencies[latency_index(Globals()->GetParameterRT(latency_parameter))];
+    return chosen != latency_.load() && chosen != refused_latency_.load();
 }
 
 void Effect::log(const std::string& message, bool problem) noexcept {
@@ -236,6 +234,10 @@ HostReport Effect::report_locked(std::string& faults) {
 }
 
 HostReport Effect::report() {
+    // The window reads this twice a second, on a control thread: a Latency a
+    // host set on another thread is applied here (apply_latency).
+    if (latency_pending())
+        apply_latency(false);
     std::string faults;
     HostReport r;
     {
@@ -316,8 +318,8 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.flags = settable;
         return noErr;
     case latency_parameter:
-        // A menu of block sizes. A change needs a new processor, built at the
-        // next Initialize, so hosts are asked not to automate it.
+        // A menu of block sizes. A change needs a new processor and leaves a
+        // short gap in the sound, so hosts are asked not to automate it.
         FillInParameterName(info, CFSTR("Latency"), false);
         info.unit = kAudioUnitParameterUnit_Indexed;
         info.minValue = 0;
@@ -369,10 +371,18 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
     if (id != gain_parameter && id != mix_parameter && id != latency_parameter)
         return kAudioUnitErr_InvalidParameter;
     AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map; a Latency "
-                          "change is reported only while uninitialized, when nothing renders")
+                          "change is applied only on a thread other than the render thread")
     store(id, value);
     if (id == latency_parameter)
-        follow_chosen_latency();
+        refused_latency_.store(0); // Chosen again: worth another try.
+    // Applied here unless this is the render thread (the parameter is not
+    // real-time, but a host may still send it there between renders). A host
+    // that renders on the main thread does so between its own calls
+    // (offline), so a change made there is applied too.
+    if (id == latency_parameter &&
+        (!IsInitialized() || pthread_main_np() != 0 ||
+         !pthread_equal(pthread_self(), render_thread_.load(std::memory_order_relaxed))))
+        apply_latency();
     AUSDK_RT_UNSAFE_END
     return noErr;
 }

@@ -28,8 +28,8 @@ std::string seconds(std::size_t frames, int rate) {
     return text;
 }
 
-// PLUG-10: a Latency chosen while the processor runs at another block size
-// waits for the next start (docs/develop/plugin-contract.md#settings).
+// PLUG-10: a Latency chosen but not yet in use: the adapter has not applied
+// it yet, or could not (docs/develop/plugin-contract.md#settings).
 bool latency_waits(const HostReportFacts& facts) {
     return facts.latency_frames && facts.settings.latency != facts.latency_frames;
 }
@@ -67,10 +67,9 @@ std::string explanation(const HostFilter& filter, const HostReportFacts& facts) 
         text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
     if (latency_waits(facts))
         text += " Latency " + std::to_string(facts.settings.latency) +
-                " frames is chosen; it takes effect when the host next starts the plug-in (for "
-                "example when the project is reopened or the sample rate changes). Until then "
-                "the plug-in keeps " +
-                std::to_string(facts.latency_frames) + " frames.";
+                " frames is chosen but not in use yet, so the plug-in keeps " +
+                std::to_string(facts.latency_frames) +
+                " frames for now. If it could not be applied, the Convolver log says why.";
     if (!filter.filter() && !failure && !filter.failed())
         text += facts.chooses_files
                     ? " To filter the audio, choose a filter file (Choose… beside Filter, or drop "
@@ -223,7 +222,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         delay.note +=
             "; " +
             (rate ? duration(facts.settings.latency, rate) : frames(facts.settings.latency)) +
-            " from the host's next start";
+            " chosen, not in use yet";
     audio.push_back(std::move(delay));
 
     audio.push_back({"Ring-out",

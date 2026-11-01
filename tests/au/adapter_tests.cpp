@@ -763,10 +763,26 @@ std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterVa
     return text;
 }
 
-// PLUG-10, AU-7: Latency, a menu of block sizes from 64 to 4096 frames. A
-// choice made while uninitialized is reported at once, with a notification;
-// one made while the unit runs waits for the next Initialize, so the host
-// never reads a latency the audio does not have. Saved with the settings.
+// Reads the window's report, as the window does twice a second; this
+// applies a Latency set on the render thread (Effect::apply_latency).
+void read_report(Unit& unit) {
+    CFTypeRef value = nullptr;
+    UInt32 size = sizeof value;
+    check(AudioUnitGetProperty(unit.get(), au::report_property, kAudioUnitScope_Global, 0, &value,
+                               &size),
+          "report property");
+    if (value)
+        CFRelease(value);
+}
+
+// PLUG-10, AU-7: Latency, a menu of block sizes from 64 to 4096 frames, which
+// takes effect at once (jrp, 1 November 2026). Uninitialized, the reported
+// latency follows the choice. Initialized, a new processor with the chosen
+// block size replaces the running one at the next render, and the host is
+// told; set on the thread that renders, the change waits for a control-thread
+// call such as saving the state or the window's report. A restored Latency
+// applies even when the host started the unit first, as GarageBand does.
+// Saved with the settings.
 void latency_parameter() {
     Unit unit;
     AudioUnitParameterInfo info{};
@@ -823,33 +839,110 @@ void latency_parameter() {
     check(unit.initialize(), "initialization at 512 frames");
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
 
-    // Chosen while initialized: the running latency stays, and the host is
-    // not told of a change that has not happened.
+    // Chosen while initialized, on this (the main) thread: applied at once,
+    // and the host is told.
     seen.count.clear();
-    set_parameter(unit, au::latency_parameter, 0);
-    require(seen.count[kAudioUnitProperty_Latency] == 0 &&
-                unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
-            "a Latency chosen while running changed the reported latency");
-    require(impulse_delay(unit) == 512, "a Latency chosen while running changed the audio");
-    unit.uninitialize();
+    {
+        PrivateLog log("latency-change");
+        set_parameter(unit, au::latency_parameter, 0);
+        require(log.text().find("Latency changed from 512 to 64 frames") != std::string::npos,
+                "no log line for the Latency change: " + log.text());
+    }
+    require(seen.count[kAudioUnitProperty_Latency] == 1 &&
+                unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+            "a Latency chosen while running was not applied and reported");
+    require(impulse_delay(unit) == 64, "the audio is not delayed by the new 64 frames");
+
+    // Set on another thread that does not render (a host's IPC thread, say):
+    // applied there at once.
+    std::thread([&] { set_parameter(unit, au::latency_parameter, 3); }).join();
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "a Latency set on another thread was not applied");
+    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames again");
+
+    // Set on the thread that renders, between renders: it waits, and the
+    // next control-thread call that applies it does (saving the state, then
+    // the window's report).
+    const auto set_where_rendering = [&](AudioUnitParameterValue index) {
+        OSStatus rendered = noErr, set = noErr;
+        std::thread([&] {
+            Buffers r(2, 2, 512);
+            bool silent = false;
+            rendered = render(unit, r, 512, false, silent);
+            set = AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global,
+                                        0, index, 0);
+        }).join();
+        check(rendered, "render on another thread");
+        check(set, "Latency set on the render thread");
+    };
+    set_where_rendering(0);
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "a Latency set on the render thread was applied there");
+    CFRelease(unit.class_info_now());
     require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
-            "uninitialized, the latency is not the chosen 64 frames");
-    check(unit.initialize(), "initialization at 64 frames");
-    require(seen.count[kAudioUnitProperty_Latency] > 0, "no notification at initialization");
-    require(impulse_delay(unit) == 64, "the audio is not delayed by 64 frames");
+            "saving the state did not apply the waiting Latency");
+    set_where_rendering(3);
+    read_report(unit);
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "the report did not apply the waiting Latency");
+    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames after the report");
+
+    // Switched again and again from another thread while this one renders:
+    // a replaced processor is freed only once Render has let it go.
+    std::atomic<bool> done{false};
+    std::thread switcher([&] {
+        for (int i = 0; !done.load(); ++i) {
+            set_parameter(unit, au::latency_parameter, i % 2 ? 1 : 3);
+            read_report(unit);
+            std::this_thread::yield();
+        }
+    });
+    Buffers b(2, 2, 512);
+    std::uint32_t seed = 5;
+    try {
+        for (int block = 0; block < 300; ++block) {
+            b.noise(seed);
+            bool silent = false;
+            check(render(unit, b, 512, false, silent), "render while Latency changes");
+            for (auto& channel : b.out)
+                for (auto v : channel)
+                    require(std::isfinite(v) && std::abs(v) <= .5f,
+                            "Latency switching broke the output");
+        }
+    } catch (...) {
+        done = true;
+        switcher.join();
+        throw;
+    }
+    done = true;
+    switcher.join();
+    set_parameter(unit, au::latency_parameter, 0);
+    require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000, "Latency 64 again");
 
     // Saved with the state and restored, before initialization, as reported.
     const auto saved = unit.class_info_now();
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
     check(copy.restore(saved), "restore with Latency");
-    CFRelease(saved);
     require(parameter(copy, au::latency_parameter) == 0 &&
                 copy.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
             "Latency not restored");
     check(copy.initialize(), "copy initialization");
     require(impulse_delay(copy) == 64, "restored Latency not applied");
     copy.uninitialize();
+
+    // GarageBand's order: the unit starts with the defaults, then the
+    // project is restored. The saved Latency plays at once.
+    Unit late;
+    check(late.configure(48000, 2, 2, 512), "late formats");
+    check(late.initialize(), "late initialization at the default 256 frames");
+    require(late.seconds(kAudioUnitProperty_Latency) == 256.0 / 48000, "late default latency");
+    check(late.restore(saved), "restore after initialization");
+    CFRelease(saved);
+    require(late.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
+            "a Latency restored after initialization is not reported");
+    require(impulse_delay(late) == 64, "a Latency restored after initialization does not play");
+    late.uninitialize();
     unit.uninitialize();
 }
 

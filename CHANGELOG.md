@@ -16,12 +16,75 @@ Until 1.0 the C++ API may change between minor versions.
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
   command line's `--block-size`). Smaller is less delay and more processor
-  load. It is not automatable, is saved with Gain and Mix, and takes effect
-  when the host next starts the plug-in; until then the plug-in keeps, and
-  reports, the latency it started with, and the window says which latency
-  plays and which waits. The log's settings now name the latency. The
-  default leaves the sound unchanged; the oracle tests cover gain and mix at
-  each of the seven block sizes.
+  load. It is not automatable and is saved with Gain and Mix. A new choice
+  plays at once, also when GarageBand restores a project after starting the
+  plug-in: a new processor is built off the audio thread and handed over
+  without locking, with a gap in the sound (the new latency plus the
+  filter's own delay), and the host is told the new latency. The log
+  records each change and its settings name the latency. The default
+  leaves the sound unchanged; the oracle tests cover gain and mix at each of
+  the seven block sizes.
+
+### Changed
+
+- The version is now 0.8.0, the minor step for the library change below
+  (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
+  CMake consumers now request `find_package(Convolver 0.8)`, the LV2 plug-in
+  reports minor version 8, and the first preview is cut from the 0.8 series.
+- Library (PLUG-10): `HostSettings` gains `latency` (one of the new
+  `host_latencies`, default `default_host_latency`, 256), and
+  `HostProcessor`'s settings constructor takes the block size from it,
+  refusing any other value with `std::invalid_argument`; its separate block
+  argument is gone. `settings_words()` adds the latency, and
+  `HostReportFacts::latency_frames` is the running latency, so a report
+  explains a chosen one that could not be applied.
+- Audio Unit: Convolver's window is redesigned (AU-6, as jrp approved on 1
+  November 2026 from a mockup). The status has a symbol, and what plays, why
+  and what to change sits under it. A form follows: **Filter** with the
+  file's name and **Choose…** beside it; **Gain** and **Mix** with a box
+  for typing the value exactly (a value beyond the range stops at its end)
+  and Option-click on a slider to reset it, Mix labelled Dry and Wet; and
+  **Latency** with the delay it adds. An always-shown **Audio** section
+  gives what plays in plain words, with the technical term in brackets and
+  a tooltip for each line: sample rate, channels and speakers, routing,
+  filter length, added delay, ring-out (the tail), the loudest possible
+  peak and the Gain that rules out clipping (new), and the host's block
+  size; a line that does not match (a filter for another rate) is marked
+  with a warning sign and says what differs. The file path, software and log
+  lines are folded away; Copy Diagnostics and Show Log use title case. The
+  layout uses stack views (auto layout) and still fits its height to the
+  content. Copy Diagnostics uses the same plain labels and adds the
+  settings. Sound unchanged.
+- Library: `worst_case_peak()` (engine.hpp) gives the guaranteed peak
+  bound behind `--gain-db no-clip` without running the convolution, and
+  now clears only the part of its work buffer each output and input use;
+  `HostFilter::filter_peak()` holds it for the accepted filter, found when
+  the filter is accepted. The editor report (`host_report.hpp`) replaces its
+  `details` with `headline`, `filter_name`, `filter_note`, `audio`
+  (`HostFact`), `settings`, `reference`, `sample_rate` and
+  `latency_waits` (pre-1.0 internal API).
+
+## [0.7.0] - 2026-11-01
+
+### Changed
+
+- The version is now 0.7.0, a deliberate minor step at a milestone: the
+  Audio Unit's window (AU-6) and the pre-preview fixes (PLUG-12, ROBUST-3)
+  are in (jrp, 31 October 2026). The first preview is cut from the 0.7
+  series. CMake consumers now request `find_package(Convolver 0.7)`; the
+  package keeps its same-minor compatibility policy, so a consumer asking for
+  0.6 no longer finds it. The LV2 plug-in now reports minor version 7,
+  which LV2 treats as a development version until jrp decides the mapping
+  (LV2-5). Nothing else changes: the library, plug-ins and their saved state
+  are as in 0.6.10.
+
+## [0.6.10] - 2026-10-31
+
+The 0.6 series, from 0.6.0 (25 October 2026) to 0.6.10; its patch versions
+have no entries of their own.
+
+### Added
+
 - Audio Unit: a small window of its own (AU-6, first version), so a user can
   see why the plug-in is silent or refused a preset without finding the log.
   It shows the status, what plays, why and what to change in full (a stereo
@@ -63,38 +126,6 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
-- Audio Unit: Convolver's window is redesigned (AU-6, as jrp approved on 1
-  November 2026 from a mockup). The status has a symbol, and what plays, why
-  and what to change sits under it. A form follows: **Filter** with the
-  file's name and **Choose…** beside it; **Gain** and **Mix** with a box
-  for typing the value exactly (a value beyond the range stops at its end)
-  and Option-click on a slider to reset it, Mix labelled Dry and Wet; and
-  **Latency** with the delay it adds. An always-shown **Audio** section
-  gives what plays in plain words, with the technical term in brackets and
-  a tooltip for each line: sample rate, channels and speakers, routing,
-  filter length, added delay, ring-out (the tail), the loudest possible
-  peak and the Gain that rules out clipping (new), and the host's block
-  size; a line that does not match (a filter for another rate) is marked
-  with a warning sign and says what differs. The file path, software and log
-  lines are folded away; Copy Diagnostics and Show Log use title case. The
-  layout uses stack views (auto layout) and still fits its height to the
-  content. Copy Diagnostics uses the same plain labels and adds the
-  settings. Sound unchanged.
-- Library: `worst_case_peak()` (engine.hpp) gives the guaranteed peak
-  bound behind `--gain-db no-clip` without running the convolution, and
-  now clears only the part of its work buffer each output and input use;
-  `HostFilter::filter_peak()` holds it for the accepted filter, found when
-  the filter is accepted. The editor report (`host_report.hpp`) replaces its
-  `details` with `headline`, `filter_name`, `filter_note`, `audio`
-  (`HostFact`), `settings`, `reference`, `sample_rate` and
-  `latency_waits` (pre-1.0 internal API).
-- Library (PLUG-10): `HostSettings` gains `latency` (one of the new
-  `host_latencies`, default `default_host_latency`, 256), and
-  `HostProcessor`'s settings constructor takes the block size from it,
-  refusing any other value with `std::invalid_argument`; its separate block
-  argument is gone. `settings_words()` adds the latency, and
-  `HostReportFacts::latency_frames` is the running latency, so a report
-  explains a chosen one that waits for the next start.
 - The version is now 0.6.0, a deliberate minor step for the library changes
   below (jrp, 25 October 2026: old interfaces are not kept while the API
   settles). CMake consumers now request `find_package(Convolver 0.6)`; the
@@ -925,7 +956,9 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
+[0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
 [0.5.6]: https://github.com/jrp2014/convolver/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/jrp2014/convolver/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/jrp2014/convolver/compare/v0.5.3...v0.5.4

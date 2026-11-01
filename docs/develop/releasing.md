@@ -92,7 +92,7 @@ Signing is not needed for a preview. Publication is a manual step owned by
 jrp, and has not been done yet:
 
 1. Run the "Plug-in distribution candidates" workflow by hand on the chosen tag
-   (`vX.Y.Z`; the first preview comes from a 0.6.x tag): Actions, then
+   (`vX.Y.Z`; the first preview comes from a 0.8.x tag): Actions, then
    "Run workflow", choosing the tag, or
    `gh workflow run release.yml --ref vX.Y.Z`. The version bot's tag push does
    not start it, because pushes made with the workflow token do not trigger

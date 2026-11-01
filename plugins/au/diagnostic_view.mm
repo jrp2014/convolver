@@ -204,7 +204,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSArray<NSControl*>* controls_; // Each setting's slider or menu, in settings_ order.
     NSInteger dragging_;            // The slider the user is dragging, or -1.
     int sampleRate_;                // The host's, for the Latency row; 0 before it starts.
-    BOOL latencyWaits_;             // The chosen Latency waits for the host's next start.
+    BOOL latencyWaits_;             // The chosen Latency is not in use yet.
     NSUInteger choosing_,
         requests_;       // The pending Choose… request (0: none), the last number.
     NSOpenPanel* panel_; // Its dialog, while one is open.
@@ -581,8 +581,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return @(text.c_str());
 }
 
-// The time a Latency choice adds at the host's rate ("5.3 ms"), and when it
-// applies; the item titles begin with the frames ("256 frames").
+// The time a Latency choice adds at the host's rate ("5.3 ms"), and whether
+// it is not in use yet; the item titles begin with the frames ("256 frames").
 - (NSString*)latencyNote:(NSPopUpButton*)menu {
     const double frames = menu.titleOfSelectedItem.doubleValue;
     NSString* time = sampleRate_ > 0 && frames > 0
@@ -590,8 +590,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                          : @"";
     if (!latencyWaits_)
         return time;
-    return time.length ? [time stringByAppendingString:@", from the host's next start"]
-                       : @"From the host's next start";
+    return time.length ? [time stringByAppendingString:@", not in use yet"] : @"Not in use yet";
 }
 
 // Shows `value` for setting `i`: in its typed field (unless the user is

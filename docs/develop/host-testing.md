@@ -368,13 +368,14 @@ except the Audio Unit build, which runs in a source checkout.
    (GarageBand starts the plug-in with the defaults before restoring the
    project, so the `Started at ...` line just before it shows 0 dB and 100%).
 10. Latency (PLUG-10). In the window, choose 1024 frames while the project
-    plays: the sound carries on unchanged, and the window says 1024 frames is
-    chosen and waits for the next start. Record what makes GarageBand start
-    the plug-in again (stopping playback, switching the plug-in off and on,
-    changing the project's sample rate, reopening the project), and whether
-    the track stays in time with the others afterwards (GarageBand
-    compensating for the new latency). After reopening, the log's
-    `Started at ...` or `Restored settings` line names 1024 frames.
+    plays: a gap, then the sound carries on, the window's Latency
+    detail reads 1024 frames, and the log has `Latency changed from 256 to
+    1024 frames`. Record whether the track stays in time with the other
+    tracks (GarageBand compensating for the new latency) at once or only
+    after stopping and starting playback. Save, quit and reopen: the window's
+    Latency detail reads 1024 frames again (the log's `Latency changed`
+    line after `Restored settings` shows it was applied after GarageBand
+    started the plug-in).
 
 ## Production qualification
 

@@ -28,7 +28,7 @@ struct HostReportFacts {
     std::size_t max_frames = 0;     // The host's largest block; 0 if not known.
     HostSettings settings;
     // The latency the processor runs at (settings.latency is the one chosen,
-    // which waits for the next start when they differ), and the tail.
+    // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
     bool log_written = true; // host_log_written()
     // The format's window can load a filter file (the Audio Unit's Choose
@@ -73,7 +73,7 @@ struct HostReport {
     // window shows them as its controls.
     std::string settings;
     // For the window's Latency row: the host's rate (0 before it starts),
-    // and whether the chosen Latency waits for the host's next start.
+    // and whether the chosen Latency is not in use yet (latency_waits()).
     int sample_rate = 0;
     bool latency_waits = false;
     // Reference material for problem reports, smaller and folded away in

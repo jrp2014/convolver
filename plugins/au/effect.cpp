@@ -11,6 +11,7 @@
 #include <cmath>
 #include <exception>
 #include <span>
+#include <thread>
 #include <vector>
 
 namespace convolver::au {
@@ -107,7 +108,8 @@ OSStatus Effect::Initialize() {
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
-            host_ = std::move(next);
+            refused_latency_.store(0);
+            install_processor(std::move(next));
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
@@ -159,8 +161,11 @@ void Effect::Cleanup() {
         faults = observe_faults(); // Before the processor that counted them goes.
         if (rendered_.load())
             committed_ = initialized_;
-        host_.reset();
+        // The host does not render while it uninitializes the unit; if it
+        // did, this waits for the render call to finish.
+        install_processor(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
+        refused_latency_.store(0);
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
     log_faults(faults);
@@ -222,6 +227,75 @@ Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
 
+void Effect::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
+    playing_.store(next.get());
+    // Render marks its processor in `rendering_` and then checks that it is
+    // still `playing_` (sequentially consistent), so once the previous one is
+    // no longer marked, Render is not using it and never will again.
+    while (host_ && rendering_.load() == host_.get())
+        std::this_thread::yield();
+    host_ = std::move(next);
+}
+
+void Effect::apply_latency(bool wait) {
+    std::string message, faults;
+    bool changed = false, problem = false;
+    {
+        std::unique_lock lock(control_, std::defer_lock);
+        if (wait)
+            lock.lock();
+        else if (!lock.try_lock())
+            return; // A load is running; the window's next report tries again.
+        const auto chosen = settings().latency;
+        if (!host_) {
+            changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
+            refused_latency_.store(0);
+        } else if (host_->latency_frames() != chosen && initialized_) {
+            const auto before = host_->latency_frames();
+            faults = observe_faults(); // Before the processor that counted them goes.
+            try {
+                // As Initialize builds it; Render switches at its next call.
+                auto next = std::make_unique<HostProcessor>(filter_.activate(*initialized_),
+                                                            GetMaxFramesPerSlice(), settings());
+                next->set_bypass(bypass_.load());
+                next->reset();
+                const auto tail = next->tail_frames();
+                install_processor(std::move(next));
+                tail_.store(tail);
+                latency_.store(chosen);
+                refused_latency_.store(0);
+                changed = true;
+                message = "Latency changed from " + std::to_string(before) + " to " +
+                          std::to_string(chosen) +
+                          " frames; the sound paused briefly while the new processor started.";
+            } catch (const std::exception& e) {
+                // The previous processor keeps playing at its latency; the
+                // window's report says the chosen one waits.
+                problem = true;
+                refused_latency_.store(chosen);
+                message = "Latency " + std::to_string(chosen) +
+                          " frames could not be applied, so the plug-in keeps " +
+                          std::to_string(before) + " frames: " + e.what();
+            } catch (...) {
+                problem = true;
+                refused_latency_.store(chosen);
+            }
+            // activate() started the fault count again for a new processor;
+            // the old one keeps playing, so count from its totals (already
+            // logged above) rather than logging them all again.
+            if (problem)
+                (void)filter_.observe(host_->faults());
+            update_status();
+        }
+    }
+    log_faults(faults);
+    log(message, problem);
+    if (changed)
+        timing_changed();
+    if (!message.empty())
+        notify_status();
+}
+
 void Effect::timing_changed() {
     PropertyChanged(kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0);
     PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
@@ -229,7 +303,21 @@ void Effect::timing_changed() {
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
                         UInt32 frames) noexcept AUSDK_RTSAFE {
-    auto* host = host_.get();
+    // The processor to use, marked for the length of this call so that the
+    // control side does not free it (install_processor()): marked, then checked to be
+    // still the one playing. Atomic loads and stores only.
+    render_thread_.store(pthread_self(), std::memory_order_relaxed);
+    HostProcessor* host = nullptr;
+    do {
+        host = playing_.load();
+        rendering_.store(host);
+    } while (host != playing_.load());
+    struct Unmark {
+        std::atomic<HostProcessor*>& marked;
+        ~Unmark() {
+            marked.store(nullptr, std::memory_order_release);
+        }
+    } unmark{rendering_};
     if (!host)
         return kAudioUnitErr_Uninitialized;
     auto& input = GetInput0();

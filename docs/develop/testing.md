@@ -585,8 +585,14 @@ Four CTest tests run when the adapter is built (label `au`):
   Latency (PLUG-10): its parameter info and value names, rounding and
   clamping, the reported latency and its notification when chosen
   uninitialized, an impulse delayed by exactly the chosen frames, a choice
-  made while initialized leaving the reported latency and the audio alone
-  until the next initialization, and saving and restoring it.
+  made while initialized applied at once with its notification and log line,
+  also from another thread, one set on the rendering thread waiting until
+  saving the state or the report applies it, repeated switches from another
+  thread while rendering (outputs stay finite and bounded; the sanitizer job
+  runs it under ASan and UBSan, which catch a freed processor only if the
+  timing hits it), and saving and restoring it, also after the unit has
+  started (GarageBand's order). Not covered: a Latency that cannot be built
+  (it needs memory to run out).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
@@ -601,8 +607,8 @@ Four CTest tests run when the adapter is built (label `au`):
   range's end, text that is not a number changing nothing, the reset that
   Option-click does, a host change moving the slider), the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
-  window saying it waits for the next start, a host change moving the
-  menu), its status and
+  Added delay fact showing the new latency in use, a host change moving
+  the menu), its status and
   text before and after the fix, Copy Diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
@@ -917,19 +923,20 @@ examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
 copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
-CMake's default generator (Unix Makefiles); the macOS candidates use Ninja and
-Windows Visual Studio (CI-10). Both macOS candidates build on macOS 15
-runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
+CMake's default generator (Unix Makefiles). Until 27 October 2026 the
+candidate was built with networking, and a second, offline build of the same
+archive with `tests/release/source_build.py` checked that it builds offline;
+the script remains for [local checks](build.md#preview-recipe). The macOS
+candidates use Ninja and Windows Visual Studio (CI-10). Both macOS candidates
+build on macOS 15 runners (`macos-15` for arm64, `macos-15-intel` for x86-64) with a macOS 14
 deployment target, the [proposed minimum system](releasing.md#candidates).
 GitHub retires its macOS 14 image on 2 November 2026 and cancelled the arm64
 candidate during its scheduled brownouts on 30 October
 ([runner-images#13518](https://github.com/actions/runner-images/issues/13518),
 CI-19). So no CI job runs a candidate on macOS 14: `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
-API used without an availability check. Until 27 October 2026 a second,
-offline build of the same archive with `tests/release/source_build.py` did
-this on Linux; the script remains for [local checks](build.md#preview-recipe).
-See the [qualification record](releasing.md) for external gates.
+API used without an availability check. See the
+[qualification record](releasing.md) for external gates.
 
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone

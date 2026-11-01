@@ -7,9 +7,9 @@ implemented. Finished items are listed briefly under [done](#done); what they
 delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 
 **In short:** the next milestone is end-to-end testing: an independent user
-running an exact preview package from the 0.6 series. The
+running an exact preview package from the 0.8 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
-open fixes, run jrp's host smoke tests (HOST-1), put the CLI
+open fixes (done on 31 October 2026), run jrp's host smoke tests (HOST-1), put the CLI
 and the journey presets in the package while writing the user journeys
 (PLUG-5, REL-2), then the independent walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
@@ -40,7 +40,7 @@ request before starting so independent tasks do not duplicate changes.
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation. This is the end-to-end test. "Ready" means the
 REL-2 journeys work, not that a set of items is ticked. The first preview is
-cut from the 0.6 series and holds the VST3 plug-in, the Audio Unit (macOS),
+cut from the 0.8 series and holds the VST3 plug-in, the Audio Unit (macOS),
 the `convolver` CLI and the preset tool, with the editor's settings and window
 in both plug-in formats; LV2 joins a later preview once
 its own journeys are demonstrated. What still blocks it, with the evidence, is in
@@ -53,12 +53,12 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 are pre-preview fixes, each with a test of the sequence that failed. |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start as soon as step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only, as soon as step 3 has its stereo preset and journey | Recorded like REL-3, with its limits stated. It finds installation, documentation, loading and reopening problems while the other windows are still being built; it does not change the first preview's contents (jrp's 25 October decision) and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
-| 5. The milestone | A candidate from a 0.6.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
+| 5. The milestone | A candidate from a 0.8.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Diagnostics | The rest of **DIAG-1**: jrp's choice among the proposals in the [diagnostics by surface](docs/project/plans/2026-10-24-diagnostics-by-surface.md) plan, then the CLI and preset tool | Same explanatory text on every surface, with a test per failure. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
@@ -326,10 +326,9 @@ Shared work, done once for all three formats:
   VST3-4.
   Progress (31 October 2026, PR #95): the Latency choice in `HostSettings`
   and `HostProcessor`, with oracle tests at each of the seven block sizes,
-  and in the Audio Unit (AU-7). A new Latency takes effect at the host's next
-  start of the plug-in ([settings](docs/develop/plugin-contract.md#settings));
-  HOST-1 records what makes each host restart it. Remaining: the Estimate and
-  No clipping gain modes and the meters.
+  and in the Audio Unit (AU-7). A new Latency plays at once, after a gap
+  in the sound ([settings](docs/develop/plugin-contract.md#settings)). Remaining: the
+  Estimate and No clipping gain modes and the meters.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
@@ -358,8 +357,7 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  a 0.6.x build is minor 6, but every odd patch number is a micro version
-  LV2 reads as a development version.
+  every 0.8.x build is minor 8, which LV2 reads as a development version.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
@@ -540,7 +538,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `ClassInfo` ([settings](docs/use/plugins.md#settings)). Progress
   (31 October 2026, PR #95): Latency (1004), with the latency change
   notification and a menu in the window; a choice made while the unit runs
-  waits for the next `Initialize`. Remaining, with PLUG-10's deferred parts:
+  plays at once (a new processor handed to Render). Not yet checked in
+  GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
 
 ## FFmpeg integration
@@ -783,8 +782,8 @@ so the preset file path is not needed).
 An acceptance gate for the first preview (jrp's review of `6920a45`, 31
 October 2026), not an optimisation item. Every adapter except LV2 reads and
 prepares a filter on the thread that asks for it: VST3's `setState`, the
-Audio Unit's `RestoreState` and, in PR #84, the Audio Unit window's
-Choose Filter property call. Cached reports keep other readers from waiting,
+Audio Unit's `RestoreState` and, since PR #84 (merged 31 October 2026), the
+Audio Unit window's Choose Filter property call. Cached reports keep other readers from waiting,
 but not the calling thread, which may be the host's interface thread.
 Measure, on the PERF-3 supported workloads, how long that thread is held
 and whether audio drops out while a long filter loads, replaces another and
@@ -834,7 +833,7 @@ with compatibility tests; linked IDs point to open work above.
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
 | Plug-in settings (gain, mix, latency) only in the Audio Unit so far; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; VST3-4 and LV2-7 add the settings there. | [Settings](docs/use/plugins.md#settings) |
-| A new Audio Unit Latency takes effect only when the host next starts (initializes) the plug-in | The plug-in keeps and reports the latency it started with, and the window says which plays and which waits; switching while running would need a lock-free swap of the whole processor (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
+| Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
