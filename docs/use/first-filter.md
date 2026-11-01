@@ -5,15 +5,16 @@ For anyone trying the command-line tool for the first time. You will filter
 three example recordings that come with Convolver and check the results, then
 filter your own file.
 
-**In short:** build `convolver`, run it on `examples/first-use/stereo`, and
+**In short:** get `convolver` from a preview package or build it, run it on `examples/first-use/stereo`, and
 compare the output with the expected file. Then give it your own IR or `.cfg`
 and your own WAV file.
 
 ## 1. Get the command-line tool
 
-Preview packages contain the plug-in and the preset tools, not `convolver`
-itself, so build it from the source. On macOS with Homebrew, or Debian and
-Ubuntu:
+A preview package has `convolver` in its `bin/` folder and the examples in
+`examples/first-use/`: run the commands below from the extracted package
+folder with `./bin/convolver` in place of `./build/convolver`. To build it
+from the source instead, on macOS with Homebrew, or Debian and Ubuntu:
 
 ```sh
 brew install cmake libsndfile
@@ -54,7 +55,15 @@ Run all three from the source folder:
 Each command writes a 32-bit float WAV. Convolver removes its own processing
 delay and keeps the whole filter tail, so `stereo.wav` lines up with the input
 and matches `examples/first-use/stereo/expected.wav` sample for sample, apart
-from rounding differences smaller than 0.00001.
+from rounding differences smaller than 0.00001. Check it:
+
+<!-- first-use-example -->
+```sh
+./build/convolver --compare stereo.wav examples/first-use/stereo/expected.wav
+```
+
+The last line printed is `Match: no sample differs by more than the limit
+(0.0001 of the expected peak, -80 dB, or two 16-bit steps).`
 The inputs are white noise at half full scale: turn the volume down before you
 listen.
 

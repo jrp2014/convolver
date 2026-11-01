@@ -29,11 +29,12 @@ instructions. The next milestone is end-to-end testing: an independent user
 installing and using an exact preview package, cut from the 0.8 series that
 `main` is now in.
 [Still blocking it](#what-still-blocks-the-first-preview): jrp's host
-smoke tests, the CLI and journey presets in the package with the journeys
-written, the plug-in settings and windows with the Audio Unit in the
-package, and a tester for the walkthrough. An earlier, limited macOS
-walkthrough (REL-5) is planned once the stereo journey and its preset
-exist.
+smoke tests, the crossover and CLI journeys written (the CLI, the
+journey presets and the stereo journey are in the package from PR #101),
+the plug-in settings and windows with the Audio Unit in the package, and a
+tester for the walkthrough. An earlier, limited macOS check of the stereo
+journey (REL-5) ran the package and command-line steps on a candidate of
+PR #101 and found no defect; its host steps moved to the REAPER smoke test.
 
 The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
@@ -111,9 +112,9 @@ not fit its input instead of saving and presets.
 
 | Journey | Filter | Surfaces | Status |
 | --- | --- | --- | --- |
-| Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI (`examples.first_use`). The preview package has no preset made from this filter yet. Not demonstrated. |
-| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI. No 2→6 preset in the package yet. GarageBand offers only mono and stereo effects, so the Audio Unit's 2→6 journey needs a second host, still to be chosen in AU-4. Not demonstrated. |
-| Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI. The package has no CLI yet; the first preview will ship it (PLUG-5). Not demonstrated. |
+| Stereo room correction | [`examples/first-use/stereo`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI (`examples.first_use`). The package holds the example and a preset made from it, and the journey is written ([check a stereo filter in a host](../use/check-a-stereo-filter.md)), checked with `convolver --compare`; the release tests render it with the packaged CLI. On 1 November its package and command-line steps passed on a macOS arm64 candidate (REL-5). Not demonstrated in a host: that is part of the REAPER smoke test (HOST-1). |
+| 2→6 crossover | [`examples/first-use/crossover`](../../examples/first-use/README.md) | VST3 and the Audio Unit in named hosts; CLI | CLI commands run in CI. The package holds the example and a 2→6 preset; the journey is not written. GarageBand offers only mono and stereo effects, so the Audio Unit's 2→6 journey needs a second host, still to be chosen in AU-4. Not demonstrated. |
+| Offline file rendering | All three first-use filters | CLI from the preview package | Run from the source tree in CI; the release tests also run the packaged `bin/convolver` on all three examples. The journey is not written. Not demonstrated. |
 
 Recovering from a wrong preset is the step to watch. VST3 keeps the working
 filter but can report the rejection to the host only as `kResultFalse`, which
@@ -173,9 +174,10 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
    Audacity. They need only the latest candidate artifact, not the CLI, so
    they can start now. GarageBand's Audio Unit test (AU-4), at the same
    sitting, now gates this preview too, including its Latency step.
-3. **Unclaimed work:** PLUG-5's first-preview contents (the `convolver` CLI and
-   presets made from the stereo and 2→6 first-use filters, in the package) and
-   the REL-2 journeys. No pull request is open for either.
+3. **The remaining journeys:** PR #101 puts the `convolver` CLI and presets
+   made from the stereo and 2→6 first-use filters in the package, and writes
+   the stereo journey; the 2→6 crossover and CLI journeys (REL-2) and the VST
+   trademark notice (PLUG-5) remain.
 4. **The editor's settings and windows, and the Audio Unit:** the gain
    modes, computed gains and meters (PLUG-9's and PLUG-10's remainder, with
    AU-7's Gain mode), VST3's editor messaging
@@ -194,9 +196,6 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
 5. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
    trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
    before LV2 joins a preview.
-6. **An early, limited walkthrough on macOS (REL-5):** the stereo journey
-   from an exact candidate, once PLUG-5 and REL-2 provide its preset and
-   steps. It does not change what the first preview holds.
 
 ## Compatibility guarantees
 

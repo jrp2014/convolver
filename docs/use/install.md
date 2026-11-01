@@ -16,8 +16,10 @@ package or from your own build. Afterwards, follow
 
 ## What a preview package contains
 
-`VST3/Convolver.vst3`, the tools in `bin/`, example presets in `presets/`,
-these pages in `docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
+`VST3/Convolver.vst3`, the tools in `bin/` (`convolver`, `convolver-preset`
+and `convolver-equalizer-apo`), example presets in `presets/`, the first-use
+examples with presets made from them in `examples/first-use/`, these pages in
+`docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
 SHA-256 checksum against the one published with it before going further.
 
 Windows needs the Microsoft Visual C++ 2015–2022 x64 runtime. The plug-in has
@@ -91,7 +93,8 @@ script with administrator rights only to remove Convolver.
 ## Replace or remove
 
 Close the host before replacing or removing a bundle, and keep backups of your
-projects. To remove a copied installation, delete only the bundle you copied
+projects. To replace a copied bundle, delete the old one first and then copy
+the new one, so no files from the old version stay inside it. To remove a copied installation, delete only the bundle you copied
 and the extracted package folder. Uninstallers leave other plug-ins, projects
 and your own presets alone; on Windows, a file in use stops the uninstaller,
 which you can then run again.

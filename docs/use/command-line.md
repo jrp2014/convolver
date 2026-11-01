@@ -22,6 +22,8 @@ To build it, see [build from source](../develop/build.md).
   `no-clip` (worst-case filter bound). Neither estimate is a limiter.
 - `--inspect` and `--validate` explain what a configuration resolves to without
   rendering; `--json` gives a machine-readable report.
+- `--compare OUTPUT EXPECTED` checks a render, such as a plug-in host's,
+  against the file it should match, and says why when it does not.
 - FFTW builds can save tuned FFT plans ("wisdom") with `--tune-fft` and reuse
   them with `--fft-wisdom`. On macOS the tool uses Apple's Accelerate unless it
   was built with FFTW.
@@ -35,6 +37,7 @@ Contents:
   [output safety](#output-safety)
 - [RAW streams](#raw-streams) and [FFmpeg](#with-ffmpeg)
 - [Inspection and validation](#inspecting-and-validating-configurations)
+- [Comparing two files](#comparing-two-files)
 - [FFTW plan tuning](#fftw-plan-tuning)
 
 The examples assume `convolver` is on your `PATH`; from a source build, use
@@ -120,9 +123,8 @@ FLAC output needs a libsndfile built with FLAC; see [FLAC and Ogg](#flac-and-ogg
 The [preview packages](install.md#what-a-preview-package-contains) contain a libsndfile built
 without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
 and will stay that way, to keep the packages free of extra dependencies. So
-the plug-ins and the tools in a package cannot read FLAC or Ogg files (as
-input or as IRs), and the command line will be the same when packages include
-it. `convolver --version` says whether the libsndfile in use has FLAC
+the plug-ins and the tools in a package, `convolver` included, cannot read
+FLAC or Ogg files (as input or as IRs). `convolver --version` says whether the libsndfile in use has FLAC
 (it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
 refused with a message before any file is created.
 
@@ -429,6 +431,36 @@ Resolved paths are machine-specific; source spellings are kept as written.
 [Other programs](other-programs.md) lists the `portable-paths` profile's
 warnings and what is known about other programs that read the format. The same
 report is available to C++ programs ([library guide](../develop/library.md#inspecting-configurations)).
+
+## Comparing two files
+
+`--compare` checks a rendered file against the file it should match, sample
+for sample. It is how the user guides check a plug-in host's render of an
+example's `input.wav` against its `expected.wav`
+([check a stereo filter in a host](check-a-stereo-filter.md)).
+
+```sh
+convolver --compare host-render.wav examples/first-use/stereo/expected.wav
+```
+
+- Both files must have the same sample rate and channel count; otherwise
+  Convolver says which differs and stops. Any format Convolver reads works,
+  so a 16-bit render can be compared with a float expected file.
+- It prints both files' rate, channels and length, then the largest sample
+  difference: its size, in decibels relative to the expected file's peak, and
+  the channel and frame where it is. Frames one file lacks count as silence,
+  so a render with a longer silent tail still matches.
+- The files match when no sample differs by more than 0.0001 times the
+  expected peak (-80 dB), or by two 16-bit steps (0.000061) when that is
+  larger. That allows for single-precision rounding and 16-bit dither; a
+  wrong filter, route or level differs by far more.
+- When they differ, a further line names the likely cause: silent or empty
+  output (often a filter that did not load), output that would match if it
+  started earlier (a host that did not make up for a plug-in's latency),
+  output that ends before the filter's tail does, output at another level
+  (with the difference in decibels), or output with its polarity reversed.
+- Exit status: 0 the files match, 1 they differ or a file cannot be read,
+  2 invalid usage. `convolver --compare --help` summarises it.
 
 ## FFTW plan tuning
 

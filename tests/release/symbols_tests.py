@@ -163,9 +163,16 @@ class SymbolTests(unittest.TestCase):
             self.assertIn(fragment, str(caught.exception))
         return str(caught.exception)
 
+    def test_kept_names_differ_ignoring_case(self):
+        # macOS and Windows folders ignore case: Convolver.dSYM and
+        # convolver.dSYM would be one file there.
+        for system, targets in symbols.TARGETS.items():
+            names = [name.lower() for name, _ in targets]
+            self.assertEqual(len(names), len(set(names)), system)
+
     # Linux
 
-    def linux(self, ids=(b'\x11' * 20, b'\x22' * 20, b'\x33' * 20)):
+    def linux(self, ids=(b'\x11' * 20, b'\x44' * 20, b'\x22' * 20, b'\x33' * 20)):
         for (name, pattern), build_id in zip(symbols.TARGETS['Linux'], ids):
             binary_path = pattern.replace('*', 'x86_64-linux')
             debug = elf(build_id, debug_info=b'\1' * 32)
@@ -254,7 +261,7 @@ class SymbolTests(unittest.TestCase):
         dwarf = self.kept / 'convolver-preset.dSYM/Contents/Resources/DWARF/convolver-preset'
         dwarf.write_bytes(macho(b'\x77' * 16, 64))
         self.fails('Darwin', 'another build')
-        dwarf.write_bytes(macho(b'\x02' * 16))
+        dwarf.write_bytes(macho(b'\x03' * 16))  # convolver-preset's UUID, third in TARGETS
         self.fails('Darwin', 'no debugging information')
 
     def test_darwin_universal(self):
@@ -330,7 +337,7 @@ class SymbolTests(unittest.TestCase):
     @unittest.skipUnless(platform.system() == 'Linux' and shutil.which('objcopy'), 'needs Linux binutils')
     def test_real_elf(self):
         built = {}
-        for (name, pattern), value in zip(symbols.TARGETS['Linux'], (1, 2, 3)):
+        for (name, pattern), value in zip(symbols.TARGETS['Linux'], (1, 2, 3, 4)):
             binary = self.stage / pattern.replace('*', 'x86_64-linux')
             binary.parent.mkdir(parents=True, exist_ok=True)
             self.kept.mkdir(exist_ok=True)
@@ -348,7 +355,7 @@ class SymbolTests(unittest.TestCase):
 
     @unittest.skipUnless(platform.system() == 'Darwin' and shutil.which('dsymutil'), 'needs dsymutil')
     def test_real_macho(self):
-        for (name, pattern), value in zip(symbols.TARGETS['Darwin'], (1, 2, 3)):
+        for (name, pattern), value in zip(symbols.TARGETS['Darwin'], (1, 2, 3, 4)):
             binary = self.stage / pattern
             binary.parent.mkdir(parents=True, exist_ok=True)
             self.kept.mkdir(exist_ok=True)

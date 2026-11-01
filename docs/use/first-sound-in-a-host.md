@@ -74,4 +74,6 @@ choosing an entry from a list, and the Audio Unit and LV2 preset formats.
 - Loading another preset while audio plays fades over to it. The new filter
   starts fresh: it cannot filter audio that played before it was loaded.
 
-[How the plug-ins behave](plugins.md) has the details.
+[How the plug-ins behave](plugins.md) has the details. To check a real
+filter's output exactly, render it in the host and compare the result by
+command: [check a stereo filter in a host](check-a-stereo-filter.md).
