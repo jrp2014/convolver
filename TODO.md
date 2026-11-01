@@ -944,6 +944,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-23 — Run `vst3.fft_symbols` on Windows.** 1 November 2026: CTest
+  runs outside a developer prompt, so `dumpbin` was not on PATH and the test
+  always skipped there; it now finds `dumpbin` through `vswhere`;
+  [VST3 tests](docs/develop/testing.md#plug-in-format-tests).
 - [x] **CI-19 — Build the Apple silicon candidate on `macos-15`.** 31 October
   2026: GitHub retires the `macos-14` image on 2 November 2026, and its
   brownouts on 30 October cancelled the candidate job before it ran (PRs #84

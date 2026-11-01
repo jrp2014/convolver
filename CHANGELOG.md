@@ -200,6 +200,9 @@ Until 1.0 the C++ API may change between minor versions.
   timeout is still open (CI-24). See
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
   Tests and CI only: no change to the plug-ins, the CLI or the sound.
+- Continuous integration (CI-23): `vst3.fft_symbols` now runs on Windows
+  instead of always skipping, finding `dumpbin` through `vswhere` when it
+  is not on PATH.
 
 ## [0.7.1] - 2026-11-01
 

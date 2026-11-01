@@ -339,8 +339,10 @@ the SDK reads our presets, and we read the SDK's, including controller and
 metadata chunks),
 plus the SDK validator loading the built plug-in in its default and extensive
 modes (the preset test requires I/O). `vst3.fft_symbols` inspects the plug-in
-binary with `nm`/`readelf`, `otool` or `dumpbin`: it must export no FFTW symbols
-and, unless FFTW was chosen, import none (skipped where no tool is found).
+binary with `nm`/`readelf`, `otool` or `dumpbin` (on Windows found on PATH or,
+failing that, in the newest Visual Studio through `vswhere`, CI-23): it must
+export no FFTW symbols and, unless FFTW was chosen, import none (skipped where
+no tool is found).
 `identities` (in every build with the CLI, and in pre-commit) checks the
 [identity registry](plugin-identities.md#changing-the-registry): each format's
 rules, its frozen values, the installer files, and that no file keeps its own
