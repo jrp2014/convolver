@@ -546,11 +546,17 @@ Plugin::Saved Plugin::save() {
     struct Store {
         LV2_URID key, filter;
         Saved saved;
-    } s{world_.urids().map(state_uri().c_str()), world_.urids().map(filter_uri().c_str()), {}};
+        bool fails;
+    } s{world_.urids().map(state_uri().c_str()),
+        world_.urids().map(filter_uri().c_str()),
+        {},
+        store_fails};
     const auto store = [](LV2_State_Handle h, std::uint32_t key, const void* value,
                           std::size_t size, std::uint32_t type,
                           std::uint32_t flags) -> LV2_State_Status {
         auto& s = *static_cast<Store*>(h);
+        if (s.fails)
+            return LV2_STATE_ERR_NO_SPACE;
         ++s.saved.properties;
         const auto* p = static_cast<const std::byte*>(value);
         Property property{key, type, std::vector<std::byte>(p, p + size), flags};

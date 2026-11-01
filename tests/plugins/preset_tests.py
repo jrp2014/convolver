@@ -265,6 +265,7 @@ def main():
         assert 'Created' not in result.stdout, result.stdout
         assert 'f.aupreset' in result.stderr and 'No presets were kept' in result.stderr, result.stderr
         assert sorted(p.name for p in root.iterdir()) == before, 'refusals wrote nothing'
+        message_tests(root)
         # A .vstpreset stores no name, so its file name may be anything the
         # file system allows; an AU or LV2 name comes from the first of those.
         if sys.platform.startswith('linux'):
@@ -280,6 +281,48 @@ def main():
             (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
         print('Refusals: LV2 layouts, existing paths, unknown formats, names, other plug-ins')
+
+
+def message_tests(root):
+    """DIAG-1: refusals name the program, the file or value, and what to do instead."""
+    cfg = CROSSOVER / 'filter.cfg'
+    junk = root / 'junk.vstpreset'
+    junk.write_bytes(b'not a preset at all')
+    nine = root / 'nine.wav'
+    write_pcm16(nine, 48000, [[16384, 0]] * 9)
+    cases = (
+        ((junk, root / 'g.aupreset'), [str(junk), "no 'VST3' header", 'make the preset from the filter']),
+        ((nine, root / 'g.aupreset'), ['9 inputs and 9 outputs', 'command-line tool, convolver']),
+        (
+            ('--sample-rate', 44100, cfg, root / 'g.vstpreset'),
+            ['the requested selection (44100 Hz)', 'choose 48000 Hz with --sample-rate'],
+        ),
+        ((cfg, root / 'g.vstpreset', '--sample-rate', 44100), ['the requested selection (44100 Hz)']),
+        (
+            ('--input-channels', 3, cfg, root / 'g.vstpreset'),
+            ['--input-channels asked for 3 input channels', 'omit --input-channels'],
+        ),
+        ((cfg, root / 'g.vstpreset', '--sample-rate'), ['--sample-rate needs a value']),
+        ((cfg, root / 'g.vstpreset', '--bogus'), ['Invalid option: --bogus']),
+        (('--bogus', 1, cfg, root / 'g.vstpreset'), ['Invalid option or value: --bogus']),
+    )
+    for args, texts in cases:
+        message = run(*args, ok=False).stderr
+        assert message.startswith('convolver-preset: '), (args, message)
+        for text in texts:
+            assert text in message, (args, text, message)
+    # The CLI hint belongs to the channel limit only.
+    message = run('--name', 'a\tb', nine, root / 'g.aupreset', ok=False).stderr
+    assert 'control characters' in message and 'command-line tool' not in message, message
+    # Help is shown wherever --help is written.
+    assert run(cfg, root / 'g.vstpreset', '--help').stdout.startswith('Usage: convolver-preset')
+    assert not (root / 'g.vstpreset').exists()
+    # Options may follow the file names.
+    run(cfg, root / 'g.vstpreset', '--sample-rate', 48000, '--input-channels', 2)
+    assert read_vstpreset(root / 'g.vstpreset') == read_vstpreset(root / 'Crossover.vstpreset')
+    for path in (junk, nine, root / 'g.vstpreset'):
+        path.unlink()
+    print('Messages: program name, file, value and next step; options after the file names')
 
 
 if __name__ == '__main__':

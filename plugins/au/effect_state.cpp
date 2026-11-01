@@ -100,6 +100,14 @@ std::string Effect::rejection_line() noexcept {
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
+    // DIAG-1: hosts may not say that saving failed, so the log does.
+    const auto failed = [this](OSStatus status) noexcept {
+        try {
+            this->log(save_failure_message);
+        } catch (...) { // Out of memory for the message.
+        }
+        return status;
+    };
     std::vector<std::byte> bytes;
     std::string faults;
     try {
@@ -120,7 +128,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         // decision, 23 October 2026: follow each format's convention).
         bytes = encode_host_state(state);
     } catch (...) {
-        return kAudioUnitErr_InvalidPropertyValue;
+        return failed(kAudioUnitErr_InvalidPropertyValue);
     }
     if (!faults.empty()) {
         log_faults(faults);
@@ -129,7 +137,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     // AU-7: AUBase writes the parameter values (Gain, Mix and Latency, and
     // Status, which RestoreState ignores) under "data".
     if (const auto result = AUBase::SaveState(out); result != noErr)
-        return result;
+        return failed(result);
     // AUBase::SaveState creates a mutable dictionary.
     auto* dict = static_cast<CFMutableDictionaryRef>(const_cast<void*>(*out));
     const cf_owned<CFDataRef> data(CFDataCreate(
@@ -137,7 +145,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!data) {
         CFRelease(*out);
         *out = nullptr;
-        return kAudioUnitErr_InvalidPropertyValue;
+        return failed(kAudioUnitErr_InvalidPropertyValue);
     }
     CFDictionarySetValue(dict, state_key(), data.get());
     return noErr;

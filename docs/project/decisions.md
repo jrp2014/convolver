@@ -116,6 +116,7 @@ were recorded in the repository; this log is their first written record.
 | Date | Decision | Explained in |
 | --- | --- | --- |
 | 21 October 2026 | Messages explain generously: what failed, why and what to change, so users need not read the documentation | [TODO](../../TODO.md) DIAG-1 |
+| 31 October 2026 | DIAG-1's proposals: invalid CLI samples and overflows name the file, time and channel and say what to change; damaged sound files and `convolver-preset` messages get a next step and the program's name, and that tool takes options after the file names; plug-ins log host settings they refuse and failed saves. After a failure the CLI only says that its output is incomplete (no deleting it, no temporary file). The CLI keeps replacing an existing output ("normal macOS / Linux behaviour") | [Output safety](../use/command-line.md#output-safety), [Convolver log](../use/plugins.md#status-and-the-convolver-log), [archived plan](../archive/plans/2026-10-24-diagnostics-by-surface.md#gaps-and-proposals) |
 
 ## Licences and dependencies
 

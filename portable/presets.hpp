@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -54,9 +55,14 @@ Lv2Preset lv2_preset(const HostState&, std::string_view name);
 
 std::string base64(std::span<const std::byte>);
 
+// The refusal of a filter with more channels than the plug-ins take, so a
+// tool can add what to use instead.
+struct ChannelLimit : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
 // Checks that the state can be written in this format, with an explanatory
-// message otherwise (channel limits, LV2 layouts, preset names, the saved
-// state's size).
+// message otherwise (channel limits, as ChannelLimit; LV2 layouts, preset
+// names, the saved state's size).
 void check_writable(Format, const HostState&, std::string_view name);
 // Creates the file (or LV2 folder); never replaces an existing entry. A
 // partly written LV2 folder is removed again.
