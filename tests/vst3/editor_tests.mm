@@ -312,7 +312,8 @@ void window() {
     require(![shown checkForChanges] && ![shown checkForChanges] && handler.dirty == 3,
             "a missing file was reloaded");
     [shown updateRecentMenu];
-    require([shown.recentButton.itemArray[1].title isEqualToString:@"No Recent Filters"],
+    require([shown.recentButton.itemArray[1].title isEqualToString:@"No Recent Filters"] &&
+                !shown.recentButton.itemArray[1].enabled,
             "a missing file in the Recent menu");
     std::filesystem::remove_all(folder);
 

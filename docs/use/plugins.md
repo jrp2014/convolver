@@ -331,7 +331,10 @@ From the top, the window has:
     once a second it checks the file and, for a `.cfg` or list, the files it
     names, and reloads a second after one has changed, so a file still being
     written is not read half way. A file that has gone (moved or deleted)
-    is not reloaded; the filter that plays stays. Each reload marks the
+    is not reloaded; the filter that plays stays, as it does when a reload
+    is refused (say, a `.cfg` that names a file not written yet): press
+    Reload once the file is ready. A filter the host has restored since
+    (a preset, an undo) is not replaced by a reload. Each reload marks the
     project changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to

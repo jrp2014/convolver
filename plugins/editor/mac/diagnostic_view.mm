@@ -287,6 +287,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _recentButton.translatesAutoresizingMaskIntoConstraints = NO;
     [_recentButton addItemWithTitle:@"Recent"];
     _recentButton.menu.delegate = self;
+    _recentButton.menu.autoenablesItems = NO; // updateRecentMenu enables each item itself.
     _recentButton.accessibilityLabel = @"Recent Filters";
     _recentButton.toolTip = @"Filter files loaded recently in a Convolver window, in any host.";
     _reloadButton = [NSButton buttonWithTitle:@"Reload"
@@ -636,6 +637,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     changed_ = nil;
     if ([now.allValues containsObject:[NSNull null]])
         return NO; // Moved or deleted: the filter that plays stays.
+    // The host may have replaced the filter (a preset, an undo) while the
+    // window was covered and not reading the report: reload only the file
+    // that still plays.
+    NSString* path = filterPath_;
+    NSString* files = watchedText_;
+    [self refresh];
+    if (![filterPath_ isEqualToString:path] || ![watchedText_ isEqualToString:files])
+        return NO;
     [self loadFile:filterPath_];
     return YES;
 }
@@ -683,7 +692,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         any = YES;
     }
     if (!any) {
-        [menu addItemWithTitle:@"No Recent Filters" action:nil keyEquivalent:@""];
+        [menu addItemWithTitle:@"No Recent Filters" action:nil keyEquivalent:@""].enabled = NO;
         return;
     }
     [menu addItem:[NSMenuItem separatorItem]];
