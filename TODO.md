@@ -487,13 +487,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   host with a light window), a manual Mix drag, listening to the Latency
   gap and the kept echo, and VoiceOver reading the Audio facts and typed
   fields.
-- [ ] **AU-10 — Separate the window's setting editing from its layout.**
-  `plugins/au/diagnostic_view.mm` is 959 lines after the redesign and the
-  typed-box fixes (PR #97, PR #98). Before the window gains more controls,
-  move the setting rows' editing (sliders, typed boxes, reset, the record
-  of a changed box) out of the code that builds the layout, keeping
-  `au.editor` unchanged. Recommended in jrp's review of PR #98
-  (1 November 2026); not blocking.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with
@@ -840,6 +833,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-10 — Separate the window's setting editing from its layout.**
+  1 November 2026, PR #PRNUM, from jrp's review of PR #98: the Gain, Mix and
+  Latency rows and everything the user does with them (dragging, reset,
+  typing, choosing) moved from `plugins/au/diagnostic_view.mm` (959 lines,
+  now about 630) to `plugins/au/setting_rows.mm`, with the shared layout
+  helpers in `plugins/au/view_layout.h`. Behaviour unchanged; `au.editor`
+  unchanged.
 - [x] **AU-9 — Simplify the macOS plug-in code.** 31 October 2026, PR #93,
   jrp's request: behaviour-preserving simplifications of the AudioToolbox
   reader, the window and the adapter's property calls, one commit each,

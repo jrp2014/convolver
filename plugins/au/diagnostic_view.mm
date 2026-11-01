@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
-#include "host_log.hpp"
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <locale.h>
-#include <xlocale.h>
+#import "view_layout.h"
+
+using namespace convolver::view;
 
 namespace {
 // The usual macOS panel layout (jrp's GarageBand run: the first version
@@ -18,7 +15,6 @@ constexpr CGFloat margin = 20;
 constexpr CGFloat inner = width - 2 * margin;
 constexpr CGFloat form_label = 64;  // "Latency:" and the other form labels.
 constexpr CGFloat fact_label = 104; // "Filter length" and the other Audio labels.
-constexpr CGFloat value_field = 56; // A setting's typed value.
 constexpr CGFloat most_text =
     200; // A longer explanation scrolls (a list .cfg explains each entry).
 constexpr NSTimeInterval refresh_interval = 0.5;
@@ -57,57 +53,6 @@ NSString* status_symbol(NSInteger status) {
     }
 }
 
-NSFont* body_font() {
-    return [NSFont systemFontOfSize:[NSFont systemFontSize]];
-}
-NSFont* small_font() {
-    return [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
-}
-
-// A one-line label the user can select (to copy a value).
-NSTextField* label(NSFont* font, NSColor* colour) {
-    NSTextField* text = [NSTextField labelWithString:@""];
-    text.font = font;
-    text.textColor = colour;
-    text.selectable = YES;
-    text.lineBreakMode = NSLineBreakByTruncatingTail;
-    text.translatesAutoresizingMaskIntoConstraints = NO;
-    return text;
-}
-// A label that wraps within `wide` points.
-NSTextField* wrapping(NSFont* font, NSColor* colour, CGFloat wide) {
-    NSTextField* text = [NSTextField wrappingLabelWithString:@""];
-    text.font = font;
-    text.textColor = colour;
-    text.selectable = YES;
-    text.preferredMaxLayoutWidth = wide;
-    text.translatesAutoresizingMaskIntoConstraints = NO;
-    [text setContentCompressionResistancePriority:NSLayoutPriorityRequired
-                                   forOrientation:NSLayoutConstraintOrientationVertical];
-    return text;
-}
-
-NSStackView* stack(NSArray<NSView*>* views, NSUserInterfaceLayoutOrientation orientation,
-                   CGFloat spacing) {
-    NSStackView* s = [NSStackView stackViewWithViews:views];
-    s.orientation = orientation;
-    s.spacing = spacing;
-    s.alignment = orientation == NSUserInterfaceLayoutOrientationVertical
-                      ? NSLayoutAttributeLeading
-                      : NSLayoutAttributeCenterY;
-    s.translatesAutoresizingMaskIntoConstraints = NO;
-    return s;
-}
-void fixed_width(NSView* view, CGFloat wide) {
-    view.translatesAutoresizingMaskIntoConstraints = NO;
-    [view.widthAnchor constraintEqualToConstant:wide].active = YES;
-}
-// A view that takes the room its row leaves.
-void stretches(NSView* view) {
-    [view setContentHuggingPriority:1 forOrientation:NSLayoutConstraintOrientationHorizontal];
-    [view setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
-                                   forOrientation:NSLayoutConstraintOrientationHorizontal];
-}
 NSBox* separator() {
     NSBox* line = [[NSBox alloc] init];
     line.boxType = NSBoxSeparator;
@@ -191,10 +136,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 } // namespace
 
-// The typed boxes tell the view when the user first changes their text.
-@interface CONVOLVER_DIAGNOSTIC_VIEW () <NSTextFieldDelegate>
-@end
-
 @implementation CONVOLVER_DIAGNOSTIC_VIEW {
     ConvolverReportSource report_;
     ConvolverDiagnosticsSource diagnostics_;
@@ -206,12 +147,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSTimer* timer_;
     NSString* shown_; // The text last shown, so a refresh keeps a selection.
     NSString* logPath_;
-    NSArray<NSDictionary<NSString*, id>*>* settings_;
-    NSArray<NSControl*>* controls_; // Each setting's slider or menu, in settings_ order.
-    NSInteger dragging_;            // The slider the user is dragging, or -1.
-    NSInteger typed_;               // The box whose text the user has changed, or -1.
-    int sampleRate_;                // The host's, for the Latency row; 0 before it starts.
-    BOOL latencyWaits_;             // The chosen Latency is not in use yet.
+    CONVOLVER_SETTING_ROWS* settings_; // Gain, Mix and Latency, and what the user does to them.
     NSUInteger choosing_,
         requests_;       // The pending Choose… request (0: none), the last number.
     NSOpenPanel* panel_; // Its dialog, while one is open.
@@ -230,8 +166,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
     loader_ = [loader copy];
-    dragging_ = -1;
-    typed_ = -1;
 
     // The stack is pinned at the top left and has the window's width; its
     // own height is the content's, and fit gives the view that height. No
@@ -330,108 +264,17 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     if (loader_)
         [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
 
-    // The settings. A host that shows this window shows it instead of its
-    // generic controls (jrp's GarageBand run), so each is a full control:
-    // a slider with its value typed beside it and its unit (Apple's generic
-    // view, Logic), or a menu with the time it adds (Logic's buffer size).
-    settings_ = [settings copy];
-    NSMutableArray<NSControl*>* controls = [NSMutableArray array];
-    NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
-    NSMutableArray<NSPopUpButton*>* menus = [NSMutableArray array];
-    NSMutableArray<NSTextField*>* values = [NSMutableArray array];
-    for (NSUInteger i = 0; i < settings_.count; ++i) {
-        NSDictionary<NSString*, id>* setting = settings_[i];
-        NSView* content = nil;
-        NSControl* control = nil;
-        NSTextField* value = nil;
-        NSArray<NSString*>* choices = setting[@"choices"];
-        if ([choices isKindOfClass:[NSArray class]]) {
-            // A choice from a list (Latency): the item's index is the value.
-            NSPopUpButton* menu = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
-            [menu addItemsWithTitles:choices];
-            menu.target = self;
-            menu.action = @selector(choiceMade:);
-            menu.translatesAutoresizingMaskIntoConstraints = NO;
-            control = menu;
-            [menus addObject:menu];
-            value = label(body_font(), [NSColor secondaryLabelColor]);
-            stretches(value);
-            NSStackView* row =
-                stack(@[ menu, value ], NSUserInterfaceLayoutOrientationHorizontal, 12);
-            row.distribution = NSStackViewDistributionFill;
-            content = row;
-        } else {
-            NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
-                                                minValue:[setting[@"minimum"] doubleValue]
-                                                maxValue:[setting[@"maximum"] doubleValue]
-                                                  target:self
-                                                  action:@selector(settingChanged:)];
-            slider.continuous = YES;
-            slider.translatesAutoresizingMaskIntoConstraints = NO;
-            stretches(slider);
-            control = slider;
-            [sliders addObject:slider];
-            NSView* track = slider;
-            NSString* low = setting[@"low"];
-            NSString* high = setting[@"high"];
-            if ([low isKindOfClass:[NSString class]] && [high isKindOfClass:[NSString class]]) {
-                // Words under the ends (Mix: Dry and Wet, as reverbs label it).
-                NSTextField* left =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
-                NSTextField* right =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
-                left.stringValue = low;
-                right.stringValue = high;
-                right.alignment = NSTextAlignmentRight;
-                left.selectable = right.selectable = NO;
-                NSStackView* ends =
-                    stack(@[ left, right ], NSUserInterfaceLayoutOrientationHorizontal, 0);
-                ends.distribution = NSStackViewDistributionEqualSpacing;
-                NSStackView* column =
-                    stack(@[ slider, ends ], NSUserInterfaceLayoutOrientationVertical, 0);
-                [NSLayoutConstraint activateConstraints:@[
-                    [slider.widthAnchor constraintEqualToAnchor:column.widthAnchor],
-                    [ends.widthAnchor constraintEqualToAnchor:column.widthAnchor]
-                ]];
-                stretches(column);
-                track = column;
-            }
-            // The value, typed: Return or leaving the field sets it.
-            value = [NSTextField textFieldWithString:@""];
-            value.font = [NSFont monospacedDigitSystemFontOfSize:[NSFont systemFontSize]
-                                                          weight:NSFontWeightRegular];
-            value.alignment = NSTextAlignmentRight;
-            value.target = self;
-            value.action = @selector(valueTyped:);
-            value.cell.sendsActionOnEndEditing = YES;
-            value.delegate = self; // For controlTextDidBeginEditing:.
-            value.tag = static_cast<NSInteger>(i);
-            value.accessibilityLabel = setting[@"name"];
-            fixed_width(value, value_field);
-            NSTextField* unit = label(body_font(), [NSColor secondaryLabelColor]);
-            unit.stringValue = [setting[@"unit"]
-                stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-            unit.selectable = NO;
-            fixed_width(unit, 40);
-            NSStackView* row =
-                stack(@[ track, value, unit ], NSUserInterfaceLayoutOrientationHorizontal, 8);
-            row.distribution = NSStackViewDistributionFill;
-            content = row;
-        }
-        control.tag = static_cast<NSInteger>(i);
-        control.accessibilityLabel = setting[@"name"];
-        if (NSString* tip = setting[@"tip"])
-            control.toolTip = tip;
-        else if (setting[@"default"])
-            control.toolTip = @"Option-click to reset.";
-        [self add:[self formRow:setting[@"name"] content:content] after:12];
-        [controls addObject:control];
-        [values addObject:value];
-    }
-    controls_ = controls;
-    _settingSliders = sliders;
-    _settingMenus = menus;
-    _settingValues = values;
+    // The settings (setting_rows.h), each a row of the form.
+    __weak CONVOLVER_DIAGNOSTIC_VIEW* weakSelf = self;
+    settings_ = [[CONVOLVER_SETTING_ROWS alloc] initWithSettings:settings
+                                                          chosen:^{
+                                                            [weakSelf refresh];
+                                                          }];
+    for (NSUInteger i = 0; i < settings_.rows.count; ++i)
+        [self add:[self formRow:settings[i][@"name"] content:settings_.rows[i]] after:12];
+    _settingSliders = settings_.sliders;
+    _settingMenus = settings_.menus;
+    _settingValues = settings_.values;
     [stack_ setCustomSpacing:14 afterView:stack_.arrangedSubviews.lastObject];
     [self add:separator() after:12];
 
@@ -582,175 +425,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return YES;
 }
 
-// A setting's value as the window writes it ("-12", "50"): the same text as
-// the report's settings and the log (convolver::setting_text).
-- (NSString*)number:(double)value of:(NSDictionary<NSString*, id>*)setting {
-    const auto text = convolver::setting_text(value, [setting[@"minimum"] doubleValue],
-                                              [setting[@"maximum"] doubleValue]);
-    return @(text.c_str());
-}
-
-// The time a Latency choice adds at the host's rate ("5.3 ms"), and whether
-// it is not in use yet; the item titles begin with the frames ("256 frames").
-- (NSString*)latencyNote:(NSPopUpButton*)menu {
-    const double frames = menu.titleOfSelectedItem.doubleValue;
-    NSString* time = sampleRate_ > 0 && frames > 0
-                         ? [NSString stringWithFormat:@"%.1f ms", 1000 * frames / sampleRate_]
-                         : @"";
-    if (!latencyWaits_)
-        return time;
-    return time.length ? [time stringByAppendingString:@", not in use yet"] : @"Not in use yet";
-}
-
-// Shows `value` for setting `i`: in its typed field (unless the user is
-// typing there) and as VoiceOver's value for the slider ("50% wet"). A menu
-// shows its choice itself, with the time it adds beside it.
-- (void)show:(double)value at:(NSUInteger)i {
-    if ([controls_[i] isKindOfClass:[NSPopUpButton class]]) {
-        auto* menu = static_cast<NSPopUpButton*>(controls_[i]);
-        const auto index = static_cast<NSInteger>(std::lround(value));
-        if (index >= 0 && index < menu.numberOfItems && menu.indexOfSelectedItem != index)
-            [menu selectItemAtIndex:index];
-        _settingValues[i].stringValue = [self latencyNote:menu];
-        return;
-    }
-    NSString* number = [self number:value of:settings_[i]];
-    if (!_settingValues[i].currentEditor)
-        _settingValues[i].stringValue = number;
-    controls_[i].accessibilityValueDescription =
-        [number stringByAppendingString:settings_[i][@"unit"]];
-}
-
-// Passes `value` for setting `i` to the host and shows it.
-- (void)set:(double)value at:(NSUInteger)i {
-    ConvolverSettingSetter set = settings_[i][@"set"];
-    if (set)
-        set(value);
-    [self show:value at:i];
-}
-
-// The user moved or reset slider `i`: a value half typed in its own field
-// is dropped, so that leaving the field later cannot put it back (jrp's
-// GarageBand run of 1 November 2026: Option-click reset Gain, then leaving
-// the field restored the typed -3.5). Typing in the other box stays.
-- (void)dropTyping:(NSUInteger)i {
-    if (typed_ == static_cast<NSInteger>(i))
-        typed_ = -1;
-    NSTextField* field = _settingValues[i];
-    if (field.currentEditor)
-        [field abortEditing];
-}
-
 - (void)resetSetting:(NSUInteger)i {
-    if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
-        return;
-    NSNumber* initial = settings_[i][@"default"];
-    if (![initial isKindOfClass:[NSNumber class]])
-        return;
-    [self dropTyping:i];
-    controls_[i].doubleValue = initial.doubleValue;
-    [self set:initial.doubleValue at:i];
-}
-
-// The user chose from a menu: the format passes the item's index to the host.
-- (void)choiceMade:(NSPopUpButton*)menu {
-    const auto i = static_cast<NSUInteger>(menu.tag);
-    if (i >= settings_.count)
-        return;
-    [self set:static_cast<double>(menu.indexOfSelectedItem) at:i];
-    [self refresh]; // The report says when the new choice takes effect.
-}
-
-// The user moved a slider: the format passes the value to the host. While
-// the mouse drags this slider, readSettings leaves it where the user puts
-// it. Option-click resets it to its default, as in Logic and Apple's
-// generic view (the whole click: the release would move it again).
-- (void)settingChanged:(NSSlider*)slider {
-    const auto i = static_cast<NSUInteger>(slider.tag);
-    if (i >= settings_.count)
-        return;
-    NSEvent* event = NSApp.currentEvent;
-    const NSEventType type = event.type;
-    const BOOL mouse = type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ||
-                       type == NSEventTypeLeftMouseUp;
-    dragging_ =
-        type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ? slider.tag : -1;
-    if (mouse && (event.modifierFlags & NSEventModifierFlagOption)) {
-        [self resetSetting:i];
-        return;
-    }
-    [self dropTyping:i];
-    [self set:slider.doubleValue at:i];
-}
-
-// AppKit sends this at the user's first change to a box's text, not when
-// the box gets focus.
-- (void)controlTextDidBeginEditing:(NSNotification*)note {
-    typed_ = static_cast<NSControl*>(note.object).tag;
-}
-
-// Return or leaving a box: text the user changed sets the setting, within
-// the slider's range, and text that is not a number beeps. A box left
-// unchanged sets nothing, since its text may be rounded ("-6.5" for
-// -6.46 dB) or older than a change the host made meanwhile (automation).
-// Either way the box then shows the value as the window writes it.
-- (void)valueTyped:(NSTextField*)value {
-    const auto i = static_cast<NSUInteger>(value.tag);
-    if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
-        return;
-    auto* slider = static_cast<NSSlider*>(controls_[i]);
-    if (typed_ == value.tag) {
-        typed_ = -1;
-        // A decimal comma reads as a point ("-6,5"), whatever the host's locale.
-        NSString* typed = [[[value.stringValue stringByReplacingOccurrencesOfString:@"−"
-                                                                         withString:@"-"]
-            stringByReplacingOccurrencesOfString:@","
-                                      withString:@"."]
-            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-        // The number at the start, read in the C locale, so a host's LC_NUMERIC
-        // cannot change it; a unit typed after it ("-6 dB") is ignored.
-        static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
-        const char* chars = typed.UTF8String;
-        char* end = nullptr;
-        const double number = chars && c_locale ? strtod_l(chars, &end, c_locale) : 0;
-        if (!chars || !c_locale || end == chars || !std::isfinite(number)) {
-            NSBeep();
-        } else {
-            slider.doubleValue = std::clamp(number, slider.minValue, slider.maxValue);
-            [self set:slider.doubleValue at:i];
-        }
-    }
-    value.stringValue = [self number:slider.doubleValue of:settings_[i]];
-}
-
-// The settings as the host has them now (automation, its own controls),
-// except the slider the user is dragging (jrp's review: a button held
-// anywhere else must not freeze them).
-- (void)readSettings {
-    if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0)
-        dragging_ = -1; // The drag ended without a final action.
-    for (NSUInteger i = 0; i < settings_.count; ++i) {
-        const BOOL dragging = dragging_ == static_cast<NSInteger>(i);
-        ConvolverSettingGetter get = settings_[i][@"get"];
-        const double value = get ? get() : NAN;
-        if (std::isnan(value)) {
-            if (typed_ == static_cast<NSInteger>(i))
-                typed_ = -1; // Disabling the box ends its editing unread.
-            controls_[i].enabled = NO;
-            _settingValues[i].enabled = NO;
-            _settingValues[i].stringValue = @"";
-            continue;
-        }
-        controls_[i].enabled = YES;
-        _settingValues[i].enabled = YES;
-        if ([controls_[i] isKindOfClass:[NSPopUpButton class]]) {
-            [self show:value at:i];
-            continue;
-        }
-        if (!dragging && controls_[i].doubleValue != value)
-            controls_[i].doubleValue = value;
-        [self show:(dragging ? controls_[i].doubleValue : value) at:i];
-    }
+    [settings_ resetSetting:i];
 }
 
 // Rebuilds the Audio rows from the report's "audio" field: one line per
@@ -802,8 +478,6 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                    @"has the details.";
         audio = reference = name = note = @"";
         logPath_ = nil;
-        sampleRate_ = 0;
-        latencyWaits_ = NO;
     } else {
         const NSInteger status = field(report, @"status").integerValue;
         _titleField.stringValue = field(report, @"title");
@@ -820,10 +494,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         name = field(report, @"filter name");
         note = field(report, @"filter note");
         logPath_ = field(report, @"log path");
-        sampleRate_ = field(report, @"sample rate").intValue;
-        latencyWaits_ = [field(report, @"latency waits") isEqualToString:@"yes"];
     }
-    [self readSettings]; // After the rate and Latency's wait, which its row shows.
+    // The Latency row shows the time a choice adds at the host's rate, and
+    // whether the chosen Latency is in use yet.
+    [settings_ readWithSampleRate:field(report, @"sample rate").intValue
+                     latencyWaits:[field(report, @"latency waits") isEqualToString:@"yes"]];
     _logButton.enabled = logPath_.length > 0;
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
