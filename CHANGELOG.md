@@ -27,6 +27,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Audio Unit window (AU-10): the Gain, Mix and Latency rows and their
+  handling moved out of the window's layout code into their own file
+  (`plugins/au/setting_rows.mm`), so the window can gain controls without
+  growing one file further. No change in behaviour or sound.
 - The version is now 0.8.0, the minor step for the library change below
   (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
   CMake consumers now request `find_package(Convolver 0.8)`, and the first

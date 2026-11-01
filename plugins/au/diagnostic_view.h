@@ -16,6 +16,7 @@
 // can show the same; its control labels, hints and tooltips are its own. VST3-11 is to
 // reuse this view, moving it to a folder both formats share.
 #pragma once
+#import "setting_rows.h"
 #import <AppKit/AppKit.h>
 
 // Objective-C classes share one namespace per process, so the build names
@@ -32,27 +33,15 @@ NS_ASSUME_NONNULL_BEGIN
 typedef NSDictionary<NSString*, NSString*>* _Nullable (^ConvolverReportSource)(void);
 // diagnostics_text(), or nil.
 typedef NSString* _Nullable (^ConvolverDiagnosticsSource)(void);
-// A setting's current value (NAN when the plug-in cannot give it), and a
-// change the user made, which the format passes to the host.
-typedef double (^ConvolverSettingGetter)(void);
-typedef void (^ConvolverSettingSetter)(double value);
 // Loads the filter file at `path` (a .cfg, a configuration list or a sound
 // file); returns whether the plug-in accepted it. Either way the report then
 // says what plays and why.
 typedef BOOL (^ConvolverFileLoader)(NSString* path);
-// One setting the window shows as a slider is a dictionary with the keys
-// @"name" (NSString), @"minimum", @"maximum" and @"default" (NSNumber),
-// @"unit" (NSString, as @" dB") for writing its value, @"get"
-// (ConvolverSettingGetter) and @"set" (ConvolverSettingSetter); optionally
-// @"low" and @"high" (NSString), words under the slider's ends (Mix: Dry and
-// Wet). With @"choices" (NSArray<NSString*>) it is a menu instead, whose value
-// is the chosen item's index (Latency); @"tip" (NSString), if present, is the
-// control's tooltip.
 
 @interface CONVOLVER_DIAGNOSTIC_VIEW : NSView
-// `settings` (Gain, Mix and Latency) appear as rows of the form under the
-// Filter row: a host that shows this window shows it instead of its generic
-// controls.
+// `settings` (Gain, Mix and Latency, described in setting_rows.h) appear
+// as rows of the form under the Filter row: a host that shows this window
+// shows it instead of its generic controls.
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics

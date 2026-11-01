@@ -78,10 +78,10 @@ enable_language(OBJCXX)
 string(REPLACE "." "_" au_class_version "${Convolver_VERSION}")
 set(au_view_factory "ConvolverAUViewFactory_${au_class_version}")
 set(au_view_sources "${CMAKE_CURRENT_SOURCE_DIR}/view_factory.mm"
-    "${CMAKE_CURRENT_SOURCE_DIR}/diagnostic_view.mm")
+    "${CMAKE_CURRENT_SOURCE_DIR}/diagnostic_view.mm" "${CMAKE_CURRENT_SOURCE_DIR}/setting_rows.mm")
 set_source_files_properties(${au_view_sources} PROPERTIES
     COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
-    COMPILE_DEFINITIONS "CONVOLVER_AU_VIEW_FACTORY=${au_view_factory};CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version}"
+    COMPILE_DEFINITIONS "CONVOLVER_AU_VIEW_FACTORY=${au_view_factory};CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version}"
     INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}")
 # The unit names the factory class and finds its own bundle for hosts.
 target_compile_definitions(convolver_au_adapter PRIVATE
@@ -155,7 +155,7 @@ if(CONVOLVER_BUILD_TESTS)
         ${au_view_sources})
     set_source_files_properties("${PROJECT_SOURCE_DIR}/tests/au/editor_tests.mm" PROPERTIES
         COMPILE_OPTIONS "-fobjc-arc"
-        COMPILE_DEFINITIONS "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_AU_VIEW_FACTORY=${au_view_factory}"
+        COMPILE_DEFINITIONS "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version};CONVOLVER_AU_VIEW_FACTORY=${au_view_factory}"
         INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}")
     set_target_properties(convolver_au_editor_tests PROPERTIES OBJCXX_STANDARD 23 OBJCXX_EXTENSIONS OFF)
     target_link_libraries(convolver_au_editor_tests PRIVATE convolver_au_adapter convolver_presets
