@@ -352,23 +352,28 @@ void window() {
                 contains(view.explanationView.string, text(r[@"explanation"]).c_str()) &&
                 contains(view.explanationView.string, "put Convolver on a stereo track"),
             "window text:\n" + text(view.explanationView.string));
-    // The Audio facts in plain words, the mismatch marked in words too.
+    // The Audio facts in plain words, the mismatch marked in words too. The
+    // sign is U+26A0 with its text-style selector U+FE0E: NSString matches
+    // whole composed characters, so the sign alone would not be found.
     const auto fact = [&](const char* name) -> NSTextField* {
         for (NSUInteger i = 0; i < view.audioLabels.count; ++i)
             if ([view.audioLabels[i].stringValue isEqualToString:@(name)])
                 return view.audioValues[i];
         return nil;
     };
-    require(view.audioLabels.count >= 6 &&
-                [view.audioLabels[0].stringValue isEqualToString:@"Sample rate"] &&
-                [fact("Sample rate").stringValue hasPrefix:@"44100 Hz"] &&
-                contains(fact("Channels").stringValue, "1 in, 1 out") &&
-                contains(fact("Channels").stringValue, "\u26A0") &&
-                contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
-                fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
-                fact("Added delay") != nil,
-            "Audio facts: " + text([[view.audioLabels valueForKey:@"stringValue"]
-                                  componentsJoinedByString:@", "]));
+    require(
+        view.audioLabels.count >= 6 &&
+            [view.audioLabels[0].stringValue isEqualToString:@"Sample rate"] &&
+            [fact("Sample rate").stringValue hasPrefix:@"44100 Hz"] &&
+            contains(fact("Channels").stringValue, "1 in, 1 out") &&
+            contains(fact("Channels").stringValue, "\u26A0\uFE0E") &&
+            contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
+            fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
+            fact("Added delay") != nil,
+        "Audio facts: " +
+            text([[view.audioLabels valueForKey:@"stringValue"] componentsJoinedByString:@", "]) +
+            "\n" +
+            text([[view.audioValues valueForKey:@"stringValue"] componentsJoinedByString:@"\n"]));
     require([view.filterNameField.stringValue isEqualToString:r[@"filter name"]] &&
                 [view.filterNameField.stringValue
                     isEqualToString:@"From the saved project or preset"] &&
