@@ -952,13 +952,13 @@ void latency_parameter() {
             }
         });
     };
-    std::thread first = chooser(0), second = chooser(3);
+    std::thread left = chooser(0), right = chooser(3);
     Buffers b(2, 2, 512);
     std::uint32_t seed = 5;
     const auto stop = [&] {
         done = true;
-        first.join();
-        second.join();
+        left.join();
+        right.join();
     };
     try {
         for (int block = 0; block < 300; ++block) {
