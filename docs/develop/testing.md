@@ -221,7 +221,13 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
   first load at Mix 50%; a refused replacement; playing; not checked yet; a
   fault), checking the status, the explanation's wording and what it must
-  not say, the details, the fields and the plain text; and the Copy
+  not say, the fields and the plain text; the Audio facts in order with
+  their values, notes and help (a refused rate and a mono track's channels
+  marked as problems, the Routing of a filter that is not playing, what is
+  known before the host starts), the Loudest peak and the Gain that rules
+  out clipping (the same at any Mix above 0; nothing clips at Mix 0), the headline, the Filter row and
+  reference lines for a saved and a refused file, and the Latency that
+  waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
   from a log written by several.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
@@ -604,24 +610,34 @@ Four CTest tests run when the adapter is built (label `au`):
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
   logged once), then the view the factory makes, attached to an off-screen
-  window: its size fitted to the text whatever size the host offers, the
-  buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
-  setting its parameter, a host change moving the slider), the Latency menu
-  (its choices, a choice setting the parameter and the details showing the
-  new latency in use, a host change moving the menu), its status and
-  text before and after the fix, Copy diagnostics (onto a
+  window: its size fitted to the content whatever size the host offers
+  (between 300 and 680 points high), the explanation, the Audio facts and
+  the buttons at the bottom right in that order, the view ending just under
+  the buttons, the folded file, software and log lines making it taller
+  when opened and closing back to the same height, the Audio facts (the mono track's Channels line marked
+  as a problem in words), the Filter row, the Gain and Mix sliders (ranges,
+  a slider setting its parameter, a typed value setting it, clamped at the
+  range's end, text that is not a number changing nothing, the reset that
+  Option-click does, a reset or a slider move dropping a value half typed
+  in the field so that leaving it changes nothing, a host change moving
+  the slider), the window following the host window's light and dark
+  appearance, the Latency menu
+  (its choices, the time it adds, a choice setting the parameter and the
+  Added delay fact showing the new latency in use, a host change moving
+  the menu), its status and
+  text before and after the fix, Copy Diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed
-  window stops reading the unit. Then filter files: the Choose Filter
-  button is shown and the window accepts dropped file URLs (neither the
+  window stops reading the unit. Then filter files: the Choose… button is
+  shown and the window accepts dropped file URLs (neither the
   file dialog nor a drag is driven: a headless runner has no user to answer
   them), then the view's load step, which both use: a stereo WAV plays, the
-  details and the load property name it, and the saved state equals
+  Filter row, the reference lines and the load property name it, and the saved state equals
   `filter_file_state()`'s with the same reader; the accepted file sends
   `ClassInfo` and `PresentPreset` notifications and becomes the present
   preset, whose name the saved state carries and a restore in another unit
   brings back; a mono WAV and a missing file are refused with the file
-  named, the stereo filter still playing and saved and the preset name
+  named (the Filter row notes the refused file), the stereo filter still playing and saved and the preset name
   kept; on an empty unit a refused first file leaves it silent. The
   dialog's answer is driven in two steps (`startChoosing`,
   `finishChoosing:URL:`), without a dialog or the mouse: only the pending

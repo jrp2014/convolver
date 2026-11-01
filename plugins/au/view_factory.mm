@@ -31,7 +31,8 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
 }
 
 // One of the unit's settings as the window's slider: its range from the
-// unit, its value read and changed through the Audio Unit API. AUParameterSet
+// unit, with its default (Option-click), its value read and changed through
+// the Audio Unit API. AUParameterSet
 // tells the host and its other views of each change; the slider sends no
 // begin and end of a gesture, so a host records automation from it as
 // separate changes.
@@ -58,6 +59,7 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
         @"name" : name,
         @"minimum" : @(info.minValue),
         @"maximum" : @(info.maxValue),
+        @"default" : @(info.defaultValue),
         @"unit" : unit_text,
         @"get" : [get copy],
         @"set" : [set copy]
@@ -114,8 +116,12 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
             setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB"))
         [settings addObject:gain];
     if (NSDictionary<NSString*, id>* mix =
-            setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet"))
-        [settings addObject:mix];
+            setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet")) {
+        NSMutableDictionary<NSString*, id>* ends = [mix mutableCopy];
+        ends[@"low"] = @"Dry"; // As reverbs label a wet/dry slider.
+        ends[@"high"] = @"Wet";
+        [settings addObject:ends];
+    }
     if (NSDictionary<NSString*, id>* latency =
             choice(unit, convolver::identity::au_latency_parameter_id, @"Latency",
                    @"The delay Convolver adds, in frames. Smaller is less delay and more processor "

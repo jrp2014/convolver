@@ -183,9 +183,19 @@ format.
   for a window and its Copy diagnostics, `host_report()` gathers the status
   and its line (`host_status()`), the full explanation of what plays, why
   and what to change (the failure's message, or `playing_words()`, the same
-  words the log's start line uses, with any fault explanation), and labelled
-  details: host, filter, settings, latency and tail, `execution_line()` and
-  the log. `report_fields()` gives it as named text values for a format's
+  words the log's start line uses, with any fault explanation), a headline
+  for under the status word (the explanation without a leading "Playing"),
+  the Filter row (the file's name and a note when the newest request was
+  refused), the Audio facts in plain words (`HostFact`: sample rate,
+  channels and speakers, routing, filter length, added delay, ring-out,
+  loudest peak from `HostFilter::filter_peak()`, host blocks; each with a
+  note, a problem flag for what does not match, and help text), the
+  settings in words, and reference lines: the filter file and request,
+  `execution_line()` and the log. Everything a window says about the
+  filter and the audio comes from here, so the VST3 windows (VST3-11 to
+  VST3-13) show the same; the control labels, hints and tooltips are the
+  view's own.
+  `report_fields()` gives it as named text values for a format's
   transport, `report_text()` as plain text, and `diagnostics_text()` adds
   this instance's recent log lines (`host_log_recent()`, at most the last
   64 KiB of the file). Built on the control side; reading the log happens

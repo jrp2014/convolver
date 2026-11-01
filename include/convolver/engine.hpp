@@ -45,6 +45,12 @@ void validate_configuration(const Configuration&, std::size_t block_frames = 256
 // Validate and return FIR/routing support, excluding latency, without FFT planning.
 std::size_t configuration_tail_frames(const Configuration&, std::size_t block_frames = 256);
 
+// The largest |output| any input within full scale can produce through `c`
+// (AttenuationEstimate::worst_case_peak), without running the convolution:
+// its cost follows the number of taps. 0 for silent routing. Allocates the
+// longest impulse's length in doubles: not for the audio thread.
+double worst_case_peak(const Configuration&);
+
 // The historical engine's "optimum attenuation": the gain that keeps output
 // within full scale (|sample| <= 1) for input within full scale.
 struct AttenuationEstimate {

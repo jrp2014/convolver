@@ -18,6 +18,7 @@ std::uint64_t splitmix64(std::uint64_t& state) noexcept {
     z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
     return z ^ (z >> 31);
 }
+} // namespace
 // Exact peak bound: output o is sum_i (k_oi * x_i) with k_oi the sum over paths of
 // out_gain * in_gain * h. Its largest magnitude for |x| <= 1 is sum_i sum_n |k_oi[n]|.
 double worst_case_peak(const Configuration& c) {
@@ -29,7 +30,7 @@ double worst_case_peak(const Configuration& c) {
     for (std::size_t o = 0; o < c.output_channels; ++o) {
         double total = 0;
         for (std::size_t i = 0; i < c.input_channels; ++i) {
-            std::size_t used = 0;
+            std::size_t used = 0; // kernel[0, used) holds this input's sum.
             for (const auto& p : c.paths) {
                 double gain_in = 0, gain_out = 0;
                 for (const auto& r : p.inputs)
@@ -41,9 +42,13 @@ double worst_case_peak(const Configuration& c) {
                 const double gain = gain_in * gain_out;
                 if (gain == 0)
                     continue;
-                if (!used)
-                    std::fill(kernel.begin(), kernel.end(), 0.0);
-                used = std::max(used, p.impulse.size());
+                // Only the part this output and input use is cleared, so the
+                // cost follows the taps, not outputs x inputs x the longest.
+                if (p.impulse.size() > used) {
+                    std::fill(kernel.begin() + static_cast<std::ptrdiff_t>(used),
+                              kernel.begin() + static_cast<std::ptrdiff_t>(p.impulse.size()), 0.0);
+                    used = p.impulse.size();
+                }
                 for (std::size_t n = 0; n < p.impulse.size(); ++n)
                     kernel[n] += gain * p.impulse[n];
             }
@@ -54,7 +59,6 @@ double worst_case_peak(const Configuration& c) {
     }
     return peak;
 }
-} // namespace
 AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t seed,
                                          std::size_t lengths) {
     if (lengths == 0 || lengths > 1000)

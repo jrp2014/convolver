@@ -188,6 +188,8 @@ writes [speaker labels](../use/command-line.md#speaker-labels); the default
 `OutputMetadata{}` keeps the plain header. `estimate_attenuation` in
 [engine.hpp](../../include/convolver/engine.hpp) is the calculation behind
 `--gain-db auto` and `no-clip` ([attenuation.cpp](../../portable/attenuation.cpp)).
+`worst_case_peak` gives `no-clip`'s bound alone, without running the
+convolution; the plug-ins' windows show it as the Loudest peak.
 
 ## Presets
 
