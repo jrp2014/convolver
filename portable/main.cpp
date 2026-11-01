@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "compare_cli.hpp"
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
@@ -35,6 +36,7 @@ constexpr auto help = R"(Convolver portable CLI
 Usage: convolver --filter IR_OR_CFG --input FILE --output FILE [options]
        convolver --tune-fft NEW_WISDOM_FILE --block-size N [--fft-plan MODE]
        convolver --inspect CONFIG | --validate CONFIG [options]  (see --inspect --help)
+       convolver --compare OUTPUT EXPECTED  (see --compare --help)
   --block-size N       Partition payload in frames (default 256)
   --fft-plan MODE      estimate (render default), measure, patient (tune default)
                       or exhaustive
@@ -176,6 +178,8 @@ std::string read_wisdom(const std::filesystem::path& path) {
 }
 } // namespace
 int run(int argc, char** argv) {
+    if (convolver::cli::is_comparison(argc, argv))
+        return convolver::cli::run_comparison(argc, argv);
     if (convolver::cli::is_inspection(argc, argv))
         return convolver::cli::run_inspection(argc, argv);
     try {

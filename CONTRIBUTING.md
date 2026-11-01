@@ -66,7 +66,7 @@ Presets export `compile_commands.json`. Run the correctness-oriented checks in
 `.clang-tidy` against the translation units present in that build:
 
 ```sh
-clang-tidy -p build/presets/release portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/sound_files.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/dither_advice.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/host_report.cpp portable/filter_file.cpp portable/state.cpp portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp
+clang-tidy -p build/presets/release portable/engine.cpp portable/kernels.cpp portable/kernels_avx2.cpp portable/attenuation.cpp portable/config.cpp portable/config_parse.cpp portable/sound_files.cpp portable/inspection.cpp portable/inspection_cli.cpp portable/compare_cli.cpp portable/dither_advice.cpp portable/io.cpp portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/host_report.cpp portable/filter_file.cpp portable/state.cpp portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp portable/equalizer_apo_main.cpp
 ```
 
 Replace `fft_fftw.cpp` with `fft_accelerate.cpp` or `fft_ooura.cpp` for the

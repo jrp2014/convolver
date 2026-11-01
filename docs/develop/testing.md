@@ -131,6 +131,13 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   tabs and Unicode in names, invalid UTF-8 filenames on Linux, the
   `portable-paths` profile with `--warnings-as-errors`, and diagnosis of every
   bundled historical sample in `historical/configs/`.
+- `native.compare_cli`: `--compare` matches the CLI's float and dithered
+  16-bit renders of the stereo example, a dithered 16-bit render of the
+  quieter crossover and a longer silent tail; explains a render 256 frames
+  late, one 10 frames early, one both late and short, a missing tail, empty
+  and silent output, a -6 dB level and reversed polarity; finds swapped
+  channels different with no simpler cause; refuses another rate or channel
+  count; exit codes 0/1/2.
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
