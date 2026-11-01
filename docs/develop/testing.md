@@ -531,11 +531,13 @@ comparisons; since VST3-7 the adapter lists no known deviations.
 `vst3.adapter` also checks the settings (VST3-4): the parameters' order,
 flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
 saving them as host state version 3 and restoring them in a second
-instance, an older state resetting them to their defaults, and a Latency
-choice that is reported, asks the host to restart and delays an impulse by
-exactly the chosen frames, also when restored. And the window's messages
+instance, an older state resetting them to their defaults, 0 dB from a host that
+keeps normalized values as float, and a Latency choice that asks the host
+to restart, is reported once the host has, and delays an impulse by exactly
+the chosen frames, also when restored. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
-change, a chosen WAV accepted (the project marked changed, the status
+change, no request for the host to reread the parameters while the
+Status line stays the same, a chosen WAV accepted (the project marked changed, the status
 Playing, the filter named and saved) or refused for its rate, an empty path,
 and a build with no file reader. Where the build has no reader of its own
 (Linux and Windows), the test lends the processor libsndfile.

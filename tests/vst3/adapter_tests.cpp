@@ -1321,6 +1321,12 @@ void settings_parameters() {
             require(automatable && info.stepCount == 0 &&
                         std::abs(info.defaultNormalizedValue - normalized_gain(0)) < 1e-12,
                     "Gain parameter");
+        // A host that keeps normalized values as float still sets 0 dB exactly,
+        // so a project reset to the default saves as before the settings.
+        require(gain_db(static_cast<float>(normalized_gain(0))) == 0 &&
+                    gain_db(std::nextafter(static_cast<float>(normalized_gain(0)), 1.f)) == 0 &&
+                    gain_db(normalized_gain(-.01)) < 0,
+                "Gain near 0 dB from a float host");
         if (info.id == mix_id)
             require(automatable && info.defaultNormalizedValue == 1, "Mix parameter");
         if (info.id == latency_id)
@@ -1449,8 +1455,10 @@ void settings_parameters() {
     // Latency: the controller tells the processor and asks the host to
     // restart; the next activation plays at the new delay.
     handler.restarts.clear();
+    // Until the host restarts it, the processor reports the latency it runs at.
     require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
-                p.getLatencySamples() == 1024 && handler.latency_restarts() == 1,
+                p.settings().latency == 1024 && p.getLatencySamples() == 256 &&
+                handler.latency_restarts() == 1,
             "Latency not passed on with kLatencyChanged");
     require(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk &&
                 handler.latency_restarts() == 1,
@@ -1458,7 +1466,8 @@ void settings_parameters() {
     require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
                 p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk,
             "restart after Latency");
-    require(p.getTailSamples() == 1024, "tail does not include the new latency");
+    require(p.getLatencySamples() == 1024 && p.getTailSamples() == 1024,
+            "latency and tail after the restart");
     in.fill(0);
     in[0] = 1;
     int at = -1;
@@ -1478,8 +1487,9 @@ void settings_parameters() {
     require(read_state(&with_latency).settings->latency == 1024, "latency not saved");
     handler.restarts.clear();
     state.seek(0, IBStream::kIBSeekSet, nullptr);
-    require(p.setState(&state) == kResultOk && p.getLatencySamples() == 256,
-            "an older state kept the Latency");
+    require(p.setState(&state) == kResultOk && p.settings().latency == 256 &&
+                p.getLatencySamples() == 1024,
+            "an older state kept the Latency, or it played before a restart");
     state.seek(0, IBStream::kIBSeekSet, nullptr);
     require(c.setComponentState(&state) == kResultOk &&
                 latency_frames(c.getParamNormalized(latency_id)) == 256 &&
@@ -1554,6 +1564,14 @@ void report_and_files() {
             "report activate");
     report = c.report();
     require(field(report, "sample rate") == "48000", "report rate after activation");
+    // A window reads twice a second; the host is asked to reread the
+    // parameters only when the Status line changes.
+    handler.restarts.clear();
+    c.report();
+    c.report();
+    require(std::none_of(handler.restarts.begin(), handler.restarts.end(),
+                         [](int32 f) { return (f & kParamValuesChanged) != 0; }),
+            "an unchanged report asked the host to reread the parameters");
     // A Gain the host changed reaches the report when the window asks again.
     ParameterChanges gain;
     int32 index = 0;

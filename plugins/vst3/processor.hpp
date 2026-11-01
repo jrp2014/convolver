@@ -108,10 +108,12 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API process(Steinberg::Vst::ProcessData&) override;
-    // The chosen Latency (VST3-4). After a new choice the host restarts the
-    // component (kLatencyChanged), and the next activation runs at it.
+    // The latency the processor runs at while active, otherwise the chosen
+    // Latency (VST3-4). After a new choice the host restarts the component
+    // (kLatencyChanged) and reads it after setActive(true), as the SDK says.
     Steinberg::uint32 PLUGIN_API getLatencySamples() override {
-        return static_cast<Steinberg::uint32>(latency_.load());
+        const auto running = active_latency_.load();
+        return static_cast<Steinberg::uint32>(running ? running : latency_.load());
     }
     // How long the output keeps sounding after the input stops, measured at the
     // plug-in's output as Steinberg's tail test does: the filter's tail plus
@@ -194,6 +196,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restored), and the chosen Latency in frames.
     std::atomic<double> gain_db_{0}, mix_{1};
     std::atomic<std::size_t> latency_{default_host_latency};
+    std::atomic<std::size_t> active_latency_{0}; // The running processor's; 0 while inactive.
     std::atomic<Steinberg::uint32> tail_{0};
     int inputs_ = 2, outputs_ = 2;
     Steinberg::Vst::SpeakerArrangement input_arrangement_ = Steinberg::Vst::SpeakerArr::kStereo,

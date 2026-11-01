@@ -326,7 +326,8 @@ separate processes, so each carries values, never pointers:
 - The processor's `ConvolverStatus` message also carries the editor report:
   `report_fields()` encoded as one binary attribute, `report_text()` and the
   log tag ("VST3 #2"). The controller keeps a copy under its own lock for a
-  view; Copy diagnostics joins its text with the recent log lines
+  view, and asks the host to reread the parameters only when the Status line
+  changed; Copy diagnostics joins its text with the recent log lines
   (`diagnostics_text()`).
 - A window reading the report sends `ConvolverReport`, and the processor
   answers with a fresh `ConvolverStatus`, so faults the audio thread counted
@@ -460,11 +461,16 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   "64 frames" to "4096 frames", not automatable), listed before Bypass and
   Status, with the same IDs as the Audio Unit. The processor reads the last
   point of each parameter queue in `process()`, as the SDK examples do, and
-  hands Gain and Mix to the processor on every call. A new Latency follows
+  hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
+  of 0 counts as 0 dB, because hosts that keep normalized values as float
+  cannot send 0 dB exactly, and a project reset to the default must still
+  save as version 1 or 2. A new Latency follows
   the SDK's documented route: the controller tells the processor
   (`ConvolverLatency` message) and asks the host to restart the component
-  (`restartComponent(kLatencyChanged)`); `getLatencySamples()` then reports
-  the choice, and the next `setActive(true)` builds the processor with it.
+  (`restartComponent(kLatencyChanged)`); the next `setActive(true)` builds
+  the processor with it, and `getLatencySamples()` reports the latency the
+  running processor has (the choice while inactive), as the SDK says a host
+  reads it after `setActive(true)`.
   Until the host restarts the plug-in the old Latency keeps playing and the
   window says the choice is not in use yet. A restored state sets all three
   (a version 1 or 2 state resets them to their defaults), and the
@@ -620,7 +626,7 @@ How each adapter meets the contract where its format differs:
   flags an output channel silent exactly when a call left it all zero (VST3-10):
   a tail that is still sounding is never flagged, while the latency, an output
   no path feeds and drained output are. `getTailSamples()` is the filter's
-  tail plus the latency (`getLatencySamples()`, the chosen Latency), measured at the output as Steinberg's tail
+  tail plus the latency (`getLatencySamples()`), measured at the output as Steinberg's tail
   test does. 32- and 64-bit host buffers both use the float engine.
 - **Audio Unit:** latency and tail are reported in seconds, with a property
   change notification when either changes; the tail stays at the longest

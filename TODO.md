@@ -776,7 +776,7 @@ with compatibility tests; linked IDs point to open work above.
 | Plug-in settings (gain, mix, latency) in VST3 and the Audio Unit, not yet LV2; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; LV2-7 adds the settings to LV2. | [Settings](docs/use/plugins.md#settings) |
 | Changing the Audio Unit's Latency during playback leaves a gap (the new latency plus the filter's own delay) and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
-| One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; the windows are VST3-11 to VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
+| One VST3 input bus and one output bus, each 1–8 channels; a window on macOS only | Presets and generic host controls elsewhere; layouts are checked with a notice only; the Windows and Linux windows are VST3-12 and VST3-13, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |
 | No built-in device application or clock management | CLI pipes need a producer/consumer; VST3 relies on its host. Standalone device support requires a separate design. | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
 | One FFT backend per binary; Ooura/Accelerate have no FFTW-style measured plans or wisdom | Intentional deployment choice. Assess alternatives under FFT-2; do not imply runtime fallback. | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
@@ -999,17 +999,20 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `ConvolverLoad` message carries a chosen path, which the processor reads
   as `convolver-preset` does (AudioToolbox on macOS) and installs as
   `setState` does, and the controller then calls `setDirty`; headless tests
-  in `vst3.adapter`. Not done: `IDataExchangeHandler` for meters (with
-  PLUG-10's meters) and plug-in snapshots for host browsers
-  (`smtg_target_add_plugin_snapshots`), which need the window;
+  in `vst3.adapter` (the lifecycle sequences have no messages to add).
+  Bypass stays the host's parameter, edited through the controller as
+  before; a Bypass control in the window moved to VST3-11. Not done:
+  `IDataExchangeHandler` for meters (with PLUG-10's meters) and plug-in
+  snapshots for host browsers (`smtg_target_add_plugin_snapshots`), which
+  need the window;
   [messages](docs/develop/plugin-contract.md#status-and-log).
 - [x] **VST3-4 — Gain, mix and latency parameters.** 1 November 2026, PR
   #103: Gain (0), Mix (1003, `kDryWetMix`) and Latency (1004, not
   automatable, `restartComponent(kLatencyChanged)`), saved in host state
   version 3 only when they differ from the defaults; tests in
   `vst3.adapter` and `native.state`. Gain mode (1002) waits with PLUG-10's
-  deferred parts; latency compensation is still to be checked in REAPER
-  and Audacity (HOST-1); [settings](docs/develop/plugin-contract.md#settings).
+  deferred parts; whether REAPER and Audacity compensate a new Latency
+  moved to their host steps under HOST-1; [settings](docs/develop/plugin-contract.md#settings).
 - [x] **VST3-7 — Follow the shared adapter contract.** 22 October 2026, PR #35,
   with the reset follow-up in PR #40; [adapter contract](docs/develop/plugin-contract.md).
 - [x] **VST3-8 — Follow the SDK documentation where the audit found gaps.**

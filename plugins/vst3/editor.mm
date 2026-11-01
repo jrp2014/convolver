@@ -204,6 +204,7 @@ Editor::~Editor() {
 tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     if (!parent || !view_ || isPlatformTypeSupported(type) != kResultTrue)
         return kResultFalse;
+    stop_following(); // A host that attaches again without removing first.
     const tresult result = EditorView::attached(parent, type);
     NSView* host = (__bridge NSView*)parent;
     [view_ setFrameOrigin:NSZeroPoint];

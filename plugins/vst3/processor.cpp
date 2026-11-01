@@ -62,7 +62,11 @@ bool write_state(IBStream* stream, const HostState& state) {
            transfer(stream, bytes.data(), bytes.size(), true);
 }
 double gain_db(ParamValue v) noexcept {
-    return min_gain_db + std::clamp(v, 0.0, 1.0) * (max_gain_db - min_gain_db);
+    const double gain = min_gain_db + std::clamp(v, 0.0, 1.0) * (max_gain_db - min_gain_db);
+    // Hosts that keep normalized values as float send 0.80645162f for 0 dB,
+    // which is 7e-7 dB: that is the default, so a project reset to it still
+    // saves as state version 1 or 2.
+    return std::abs(gain) < 1e-5 ? 0.0 : gain;
 }
 ParamValue normalized_gain(double gain) noexcept {
     return (std::clamp(gain, min_gain_db, max_gain_db) - min_gain_db) / (max_gain_db - min_gain_db);
@@ -271,6 +275,7 @@ tresult Processor::activate(TBool state) {
             next->set_bypass(bypass_.load());
             next->reset();
             host_ = std::move(next);
+            active_latency_.store(host_->latency_frames());
             hold_fault_signal();
             activated_ = layout();
             // What plays and why: a filter restored before the host's rate
@@ -283,8 +288,10 @@ tresult Processor::activate(TBool state) {
                     (f && f->silent) || !filter_.notice().empty());
             } catch (...) { // Out of memory for the line: it is dropped.
             }
-        } else
+        } else {
             host_.reset();
+            active_latency_.store(0);
+        }
         active_ = state != 0;
         return AudioEffect::setActive(state);
     } catch (const std::exception& e) {
@@ -858,8 +865,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     auto* parameter = getParameterObject(status_id);
     if (!parameter) // Not initialized, or terminated: nothing to show it on.
         return kResultFalse;
+    bool changed = false;
     {
         std::lock_guard lock(status_lock_);
+        changed = status_text_ != text || status_value_ != static_cast<int>(status);
         status_text_.swap(text);
         status_value_ = static_cast<int>(status);
         if (!report.empty()) {
@@ -868,6 +877,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             format_.swap(format);
         }
     }
+    // A window asks for the report twice a second; only a new status line
+    // is news for the host.
+    if (!changed)
+        return kResultOk;
     EditController::setParamNormalized(status_id,
                                        parameter->toNormalized(static_cast<ParamValue>(status)));
     // Ask the host to read the parameters again (the status is not edited

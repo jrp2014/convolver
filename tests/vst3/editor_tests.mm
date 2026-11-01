@@ -229,14 +229,16 @@ void window() {
     NSPopUpButton* latency = shown.settingMenus[0];
     [latency selectItemAtIndex:4];
     [latency sendAction:latency.action to:latency.target];
-    require(handler.kinds(latency_id) == "bpe" && p.getLatencySamples() == 1024 &&
-                handler.latency_restarts == 1,
+    require(handler.kinds(latency_id) == "bpe" && p.settings().latency == 1024 &&
+                p.getLatencySamples() == 256 && handler.latency_restarts == 1,
             "Latency choice: " + handler.kinds(latency_id));
     [shown refresh];
     require([shown.settingValues[2].stringValue rangeOfString:@"not in use yet"].location !=
                 NSNotFound,
             "Latency note " + text(shown.settingValues[2].stringValue));
-    require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk, "restart");
+    require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
+                p.getLatencySamples() == 1024,
+            "restart");
     [shown refresh];
     require([shown.settingValues[2].stringValue isEqualToString:@"21.3 ms"],
             "Latency note after the restart " + text(shown.settingValues[2].stringValue));
