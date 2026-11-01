@@ -109,12 +109,16 @@ std::size_t encoded_host_state_size(const HostState& state) noexcept {
     return word_bytes(encoded_words(state));
 }
 std::string host_state_size_error(const HostState& state) {
-    // PLUG-13: room for the settings is kept whether or not the state holds
-    // them yet, so a filter accepted at default settings still saves once a
-    // VST3 setting changes (jrp's review of 276c7dc).
+    // PLUG-13: a fixed room for the settings is kept whether or not the
+    // state holds them yet, so a filter accepted at default settings still
+    // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
+    // after later settings are added.
+    static_assert(settings_words * 4 <= host_settings_room_bytes);
     auto words = encoded_words(state);
-    if (state.configuration && state_version(state) != 3)
-        words = add(words, settings_words);
+    if (state_version(state) == 3)
+        words -= settings_words;
+    if (state.configuration)
+        words = add(words, host_settings_room_bytes / 4);
     const auto size = word_bytes(words);
     if (size <= max_host_state_bytes)
         return {};
@@ -127,7 +131,8 @@ std::string host_state_size_error(const HostState& state) {
            "hold at most " +
            std::to_string(max_host_state_bytes) + " bytes (64 MiB), just under " +
            std::to_string(limit_samples) +
-           " samples. A plug-in that played it could not save it with the project. Shorten "
+           " samples, with room kept for the plug-in's settings. Plug-ins refuse it so that a "
+           "project never holds a filter it cannot save. Shorten "
            "the impulse responses (most of a long one's end is usually silence) or use fewer "
            "of them; the convolver command-line tool can still render with it.";
 }

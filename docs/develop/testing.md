@@ -200,9 +200,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   before any audio, the ramp while audio plays, and which publications it
   covers); allocation failure at every step of `HostFilter::load`, checking
   that what plays is what is saved; and the saved-state limit (PLUG-12): the
-  size counted without encoding matches the encoding, a filter that fills
-  64 MiB once settings are added (PLUG-13) loads, saves with and without
-  them and reads back, and one sample more is refused,
+  size counted without encoding matches the encoding, a filter that leaves
+  exactly the settings' room (PLUG-13) loads, saves with and without
+  settings and reads back, a state that already holds settings is accepted
+  at that limit and refused one sample over, and one sample more is refused,
   keeping the previous filter's saved bytes, or failing an empty instance's
   first load. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the

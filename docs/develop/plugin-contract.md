@@ -547,9 +547,11 @@ leaves the previous state untouched. What is accepted can always be saved
 limit (`encoded_host_state_size()`, counted without encoding) before
 installing it, with `HostFailureKind::too_large` and the explanation from
 `host_state_size_error()`, as a check on the state itself. The check keeps
-room for version 3's settings (20 bytes) even when the state has none, so a
-filter accepted at default settings still saves after a VST3 setting changes
-(PLUG-13); every format and `convolver-preset` use the same limit. A `.cfg` may hold
+`host_settings_room_bytes` (256 bytes) free for the settings, counted in
+place of any settings the state holds, so a filter accepted at default
+settings still saves after a VST3 setting changes, including settings added
+later (PLUG-13); every format and `convolver-preset` use the same limit, and
+restored state is checked the same way. A `.cfg` may hold
 64 Mi samples, four times what the state holds, so a filter file can be too
 large; `convolver-preset` makes the same check. Checks against the host's configuration
 follow [loading and failure](#loading-and-failure), including state restored

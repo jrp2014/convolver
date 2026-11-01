@@ -975,9 +975,9 @@ void saved_state_limit() {
     for (const auto& state : {HostState{}, failed, bypassed, HostState{routed}})
         require(encoded_host_state_size(state) == encode_host_state(state).size(),
                 "encoded_host_state_size differs from the encoding");
-    // One mono path: 17 words besides its samples, and 5 for the settings,
-    // so this many fill the limit once a setting differs from its default.
-    constexpr std::size_t at_limit = max_host_state_bytes / 4 - 22;
+    // One mono path: 17 words besides its samples, and the room kept for
+    // the settings (PLUG-13), so this many fill the limit.
+    constexpr std::size_t at_limit = (max_host_state_bytes - host_settings_room_bytes) / 4 - 17;
     const auto filter = [](std::size_t samples) {
         Configuration c{48000, 1, 1, 0, {}, {}, {}};
         c.paths.push_back({std::vector<float>(samples, 0.f), {{0, 1}}, {{0, 1}}});
@@ -990,9 +990,11 @@ void saved_state_limit() {
         s.settings = quieter;
         return s;
     };
-    require(encoded_host_state_size(with_settings(at_limit)) == max_host_state_bytes &&
-                encoded_host_state_size(HostState{filter(at_limit)}) == max_host_state_bytes - 20,
-            "the boundary filter does not fill the limit exactly with settings");
+    require(encoded_host_state_size(HostState{filter(at_limit)}) ==
+                    max_host_state_bytes - host_settings_room_bytes &&
+                encoded_host_state_size(with_settings(at_limit)) ==
+                    max_host_state_bytes - host_settings_room_bytes + 20,
+            "the boundary filter does not leave exactly the settings' room");
     const HostLayout host{48000, 1, 1};
     std::size_t installed = 0;
     const std::function<void(const Configuration&)> install = [&](const Configuration& c) {
@@ -1037,16 +1039,17 @@ void saved_state_limit() {
     saved_failure.failed = true;
     require(encode_host_state(saved_failure).size() == 12, "the failed first load does not save");
     // Exactly at the limit: accepted and installed at default settings; it
-    // saves without them and, after a setting changes, with them, filling the
-    // limit, and both read back.
+    // saves without them and, after a setting changes, with them, and both
+    // read back.
     empty.load(HostState{filter(at_limit)}, host, install);
     require(installed == at_limit && !empty.failure(), "the filter at the limit was refused");
-    require(encode_host_state(HostState{empty.filter()}).size() == max_host_state_bytes - 20,
+    require(encode_host_state(HostState{empty.filter()}).size() ==
+                max_host_state_bytes - host_settings_room_bytes,
             "the filter at the limit did not save at default settings");
     HostState changed{empty.filter()};
     changed.settings = quieter;
     const auto bytes = encode_host_state(changed);
-    require(bytes.size() == max_host_state_bytes,
+    require(bytes.size() == max_host_state_bytes - host_settings_room_bytes + 20,
             "the filter at the limit did not save after a setting changed");
     const auto restored = decode_host_state(bytes);
     require(restored.configuration->paths.at(0).impulse.size() == at_limit &&

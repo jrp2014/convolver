@@ -1638,9 +1638,10 @@ void report_and_files() {
 // default settings loaded and saved, and after Gain changed to -6 dB
 // getState() failed. Load, change a setting, save and restore, at the limit.
 void settings_at_state_limit() {
-    // One mono path takes 17 words besides its samples; 5 more are kept free
-    // for the settings.
-    constexpr std::size_t at_limit = convolver::max_host_state_bytes / 4 - 22;
+    // One mono path takes 17 words besides its samples, and room is kept
+    // free for the settings.
+    constexpr std::size_t at_limit =
+        (convolver::max_host_state_bytes - convolver::host_settings_room_bytes) / 4 - 17;
     const auto state = [](std::size_t samples) {
         convolver::Configuration c{48000, 1, 1, 0, {}, {}, {}};
         c.paths.push_back({std::vector<float>(samples, 0.f), {{0, 1}}, {{0, 1}}});

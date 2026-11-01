@@ -168,12 +168,14 @@ Until 1.0 the C++ API may change between minor versions.
 - Plug-ins (PLUG-13): a filter that filled the saved state at default
   settings could no longer be saved once a VST3 setting changed (jrp's review
   of `276c7dc`: Gain to −6 dB, then `getState()` failed), because settings
-  add 20 bytes. The size check now keeps room for the settings whether or
-  not they are in use, so what loads still saves after any setting changes.
-  The largest accepted filter is 5 samples shorter in every format, still
-  just under 16,777,216 samples; `convolver-preset` refuses the same filters,
-  and a saved state within those 20 bytes of the limit without settings is
-  refused when restored, with the size explanation.
+  add 20 bytes. The size check now keeps 256 bytes free for the settings
+  whether or not they are in use (`host_settings_room_bytes`, room for
+  settings added later too), so what loads still saves after any setting
+  changes. The largest accepted filter is 64 samples shorter in every
+  format, still just under 16,777,216 samples; `convolver-preset` refuses
+  the same filters, and a state saved by an earlier build within 256 bytes
+  of the limit is refused when restored, with the size explanation (no
+  release has published such a state).
 - Audio Unit window: a report read just after a load could show the state
   from before it, when the Latency worker happened to hold the unit's lock
   at that moment. The window's last report is now forgotten whenever what
