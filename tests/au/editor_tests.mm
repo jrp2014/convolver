@@ -468,30 +468,41 @@ void window() {
     require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12"] &&
                 [gain.accessibilityValueDescription isEqualToString:@"-12 dB"],
             "the Gain slider did not set Gain: " + std::to_string(now));
-    // Typed, with a minus sign as the window writes it; beyond the range it
-    // stops at the end; text that is not a number changes nothing.
-    view.settingValues[0].stringValue = @"\u22126.5";
-    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
-    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
-          "typed Gain");
+    // Typed through the box's field editor, as a user types: AppKit marks
+    // the first change, and only changed text sets the setting. Return keeps
+    // the box's focus, as in any Mac text field.
+    NSTextField* typing = view.settingValues[0];
+    const auto start_typing = [&](NSString* typed) {
+        require([host makeFirstResponder:typing] && typing.currentEditor != nil,
+                "the Gain field did not start editing");
+        auto* editor = static_cast<NSTextView*>(typing.currentEditor);
+        [editor selectAll:nil];
+        [editor insertText:typed replacementRange:editor.selectedRange];
+    };
+    const auto type = [&](NSString* typed, const char* what) {
+        start_typing(typed);
+        [static_cast<NSTextView*>(typing.currentEditor) insertNewline:nil];
+        check(
+            AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+            what);
+        require(typing.currentEditor != nil, std::string(what) + ": Return left the box");
+    };
+    // With a minus sign as the window writes it; beyond the range it stops
+    // at the end; text that is not a number changes nothing.
+    type(@"\u22126.5", "typed Gain");
     require(now == -6.5f && gain.doubleValue == -6.5, "typed Gain: " + std::to_string(now));
-    // A decimal comma, as in a German or French locale, and a unit after it.
-    view.settingValues[0].stringValue = @"-3,5 dB";
-    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
-    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
-          "typed Gain with a comma");
-    require(now == -3.5f, "typed Gain with a comma: " + std::to_string(now));
-    view.settingValues[0].stringValue = @"40";
-    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
-    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
-          "typed Gain beyond the range");
+    // A decimal comma, as in a German or French locale, and a unit after it,
+    // shown afterwards as the window writes it.
+    type(@"-3,5 dB", "typed Gain with a comma");
+    require(now == -3.5f && [typing.stringValue isEqualToString:@"-3.5"],
+            "typed Gain with a comma: " + std::to_string(now) + ", shown " +
+                text(typing.stringValue));
+    type(@"40", "typed Gain beyond the range");
     require(now == 24, "typed Gain beyond the range: " + std::to_string(now));
-    view.settingValues[0].stringValue = @"loud";
-    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
-    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
-          "typed text");
-    require(now == 24 && [view.settingValues[0].stringValue isEqualToString:@"24"],
+    type(@"loud", "typed text");
+    require(now == 24 && [typing.stringValue isEqualToString:@"24"],
             "typed text changed Gain: " + std::to_string(now));
+    [host makeFirstResponder:nil];
     [view resetSetting:0];
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "reset Gain");
@@ -499,12 +510,6 @@ void window() {
     // jrp's GarageBand run (1 November 2026): with a value half typed in the
     // field, Option-click reset the slider, and leaving the field then put
     // the typed value back. A reset or a slider move drops the typing.
-    NSTextField* typing = view.settingValues[0];
-    const auto start_typing = [&](NSString* typed) {
-        require([host makeFirstResponder:typing] && typing.currentEditor != nil,
-                "the Gain field did not start editing");
-        typing.currentEditor.string = typed;
-    };
     start_typing(@"-3.5");
     [view resetSetting:0];
     require(typing.currentEditor == nil && [typing.stringValue isEqualToString:@"0"],
@@ -522,6 +527,52 @@ void window() {
           "Gain after a slider move while typing");
     require(now == -20 && [typing.stringValue isEqualToString:@"-20"],
             "leaving the field undid the slider move: " + std::to_string(now));
+    // Moving the other slider keeps what is typed in this box; and after
+    // Return, typing again in the same box (no new click) still counts.
+    start_typing(@"-9");
+    mix.doubleValue = 60;
+    [mix sendAction:mix.action to:mix.target];
+    auto* editor = static_cast<NSTextView*>(typing.currentEditor);
+    require(editor != nil, "moving Mix ended typing in the Gain box");
+    [editor insertNewline:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain typed while Mix moved");
+    require(now == -9, "moving Mix dropped the Gain typed beside it: " + std::to_string(now));
+    editor = static_cast<NSTextView*>(typing.currentEditor);
+    require(editor != nil, "Return left the Gain box");
+    [editor selectAll:nil];
+    [editor insertText:@"-8" replacementRange:editor.selectedRange];
+    [editor insertNewline:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain typed again after Return");
+    require(now == -8, "typing again after Return set nothing: " + std::to_string(now));
+    [host makeFirstResponder:nil];
+    // Clicking in the box and leaving it unchanged sets nothing: not the
+    // rounded text ("-6.5" for -6.46 dB), and not the value from before a
+    // host change made while the box was being edited (automation).
+    const auto leave_unchanged = [&](float host_value, const char* what) {
+        require([host makeFirstResponder:typing], "the Gain field did not start editing");
+        check(AudioUnitSetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0,
+                                    host_value, 0),
+              what);
+        [view refresh];
+        [host makeFirstResponder:nil];
+        check(
+            AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+            what);
+        require(now == host_value && gain.doubleValue == host_value,
+                std::string(what) + ": leaving the box set " + std::to_string(now));
+    };
+    check(
+        AudioUnitSetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, -6.46f, 0),
+        "Gain from the host");
+    [view refresh];
+    require([typing.stringValue isEqualToString:@"-6.5"],
+            "rounded Gain " + text(typing.stringValue));
+    leave_unchanged(-6.46f, "a rounded value");
+    leave_unchanged(-7.77f, "a host change while the box is being edited");
+    require([typing.stringValue isEqualToString:@"-7.8"],
+            "the box does not show the host's value: " + text(typing.stringValue));
     gain.doubleValue = -12;
     [gain sendAction:gain.action to:gain.target];
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
