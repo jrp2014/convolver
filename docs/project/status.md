@@ -8,19 +8,18 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** status checked on 31 October 2026 against `main` at `6920a45`
-(0.6.6). Nothing has been published yet: there are no GitHub releases, and
+**In short:** status checked on 31 October 2026 against `main` at `a2593e1`
+(0.6.10). Nothing has been published yet: there are no GitHub releases, and
 preview packages exist only as temporary CI artifacts. The command-line
 renderer, the preset tool, the Equalizer APO export and the VST3, Audio Unit
 and LV2 plug-ins are implemented and tested automatically. In a named host,
 jrp has run the Audio Unit in GarageBand several times, including builds of
-its window from [PR #84](https://github.com/jrp2014/convolver/pull/84) (not
-yet merged); the full smoke test is not yet recorded, the VST3 hosts (REAPER,
-Audacity) have not been run, and no independent user has followed the
-instructions. The next milestone is end-to-end testing: an independent user
-installing and using an exact preview package, cut from the 0.6 series.
-[Still blocking it](#what-still-blocks-the-first-preview): two pre-preview
-fixes from jrp's review of `6920a45` (PLUG-12 and ROBUST-3), jrp's host
+its window from [PR #84](https://github.com/jrp2014/convolver/pull/84)
+(merged 31 October 2026); the full smoke test is not yet recorded, the VST3
+hosts (REAPER, Audacity) have not been run, and no independent user has
+followed the instructions. The next milestone is end-to-end testing: an independent user
+installing and using an exact preview package, cut from the 0.7 series.
+[Still blocking it](#what-still-blocks-the-first-preview): jrp's host
 smoke tests, the CLI and journey presets in the package with the journeys
 written, the plug-in settings and windows with the Audio Unit in the
 package, and a tester for the walkthrough. An earlier, limited macOS
@@ -89,7 +88,7 @@ format's specification rather than from the implementation.
 | jrp, 0.4.37 | A sound file with an unlisted header (Sun/NeXT AU) named `.pcm` or `.raw` was read as raw samples; syntax-only inspection opened filters, so a named pipe blocked it; a native test was missing from the `check` target and the sanitizer flags. Processing faults were not shown, and the log did not say what ran | [PR #66](https://github.com/jrp2014/convolver/pull/66), [PR #68](https://github.com/jrp2014/convolver/pull/68) |
 | jrp, 0.4.43 | Kept debugging symbols were checked by name only; `Quantizer` could run out of memory where the caller could not see it; a non-finite attenuation estimate was accepted | [PR #72](https://github.com/jrp2014/convolver/pull/72) |
 | jrp, 0.4.43 | Faults counted while a replacement was prepared were shown as Fault against the new filter; Fault could overwrite Load failed; the user guides did not yet explain Status and the log | [PR #73](https://github.com/jrp2014/convolver/pull/73), 25 October 2026 |
-| jrp, `6920a45` (0.6.6) | A filter of 16,777,216 samples loaded (a `.cfg` allows 64 Mi samples) and then could not be saved (saved state holds 64 MiB), reproduced through PR #84's Audio Unit file loading and present in LV2's filter files (PLUG-12); after a failed first load, VST3, the Audio Unit and LV2 allocated a silent filter, so running out of memory there let the unfiltered input play while the status said the load failed (ROBUST-3) | PLUG-12 and ROBUST-3, in review |
+| jrp, `6920a45` (0.6.6) | A filter of 16,777,216 samples loaded (a `.cfg` allows 64 Mi samples) and then could not be saved (saved state holds 64 MiB), reproduced through PR #84's Audio Unit file loading and present in LV2's filter files (PLUG-12); after a failed first load, VST3, the Audio Unit and LV2 allocated a silent filter, so running out of memory there let the unfiltered input play while the status said the load failed (ROBUST-3) | [PR #91](https://github.com/jrp2014/convolver/pull/91), 31 October 2026 |
 
 ## User journeys for the first preview
 
@@ -124,7 +123,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.6.x tag.
+The first preview is cut from a 0.7.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
@@ -134,7 +133,7 @@ The first preview is cut from a 0.6.x tag.
 | Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
 | The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` runs in CI; pluginval for the component, GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) and the component in the package remain |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
-| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Started: Gain and Mix in the Audio Unit ([PR #80](https://github.com/jrp2014/convolver/pull/80)), checked by jrp in GarageBand; Status and the log describe them ([PR #83](https://github.com/jrp2014/convolver/pull/83)). The Audio Unit's first window (status, Gain and Mix, the full reason, Choose Filter and dropping a file, Copy diagnostics, Show log; [PR #84](https://github.com/jrp2014/convolver/pull/84)). jrp checked it in GarageBand up to `b0f2552` (TODO AU-6 lists what passed and what remains). The Audio Unit's Latency menu ([PR #95](https://github.com/jrp2014/convolver/pull/95)). Remaining: the gain modes and meters (PLUG-10), the settings in VST3 (VST3-4), recent files and reload in the window (AU-6), and the VST3 windows (VST3-11 to VST3-13) |
+| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Started: Gain and Mix in the Audio Unit ([PR #80](https://github.com/jrp2014/convolver/pull/80)), checked by jrp in GarageBand; Status and the log describe them ([PR #83](https://github.com/jrp2014/convolver/pull/83)). The Audio Unit's first window (status, Gain and Mix, the full reason, Choose Filter and dropping a file, Copy diagnostics, Show log; [PR #84](https://github.com/jrp2014/convolver/pull/84), merged 31 October 2026). jrp checked it in GarageBand up to `b0f2552` (TODO AU-6 lists what passed and what remains). The Audio Unit's Latency menu ([PR #95](https://github.com/jrp2014/convolver/pull/95)). Remaining: the gain modes and meters (PLUG-10), the settings in VST3 (VST3-4), recent files and reload in the window (AU-6), and the VST3 windows (VST3-11 to VST3-13) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 
@@ -150,17 +149,18 @@ notarization (the production gate, REL-1 and PLUG-5), resource budgets
 In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
 31 October 2026:
 
-1. **Open fixes.** DIAG-1 is done ([PR #73](https://github.com/jrp2014/convolver/pull/73),
-   merged 25 October 2026). From jrp's review of `6920a45` (31 October 2026):
+1. **Open fixes: none left.** DIAG-1 is done
+   ([PR #73](https://github.com/jrp2014/convolver/pull/73), merged 25 October 2026). From jrp's review of `6920a45` (31 October 2026),
    PLUG-12 (refuse a filter that could not be saved) and ROBUST-3
-   (allocation-free silence after a failed first load), in review. The same
-   review made loading responsiveness a gate for the windows
+   (allocation-free silence after a failed first load) are done
+   ([PR #91](https://github.com/jrp2014/convolver/pull/91), merged 31 October
+   2026). The same review made loading responsiveness a gate for the windows
    ([TODO](../../TODO.md#loading-responsiveness)) and put PERF-3 before further
    substantial DSP changes.
 2. **jrp's time on his Mac** for the HOST-1 smoke tests in REAPER and
-   Audacity. They need only the latest candidate artifact, not the CLI, so they
-   can start once the fix is merged. GarageBand's Audio Unit test (AU-4), at
-   the same sitting, now gates this preview too.
+   Audacity. They need only the latest candidate artifact, not the CLI, so
+   they can start now. GarageBand's Audio Unit test (AU-4), at the same
+   sitting, now gates this preview too.
 3. **Unclaimed work:** PLUG-5's first-preview contents (the `convolver` CLI and
    presets made from the stereo and 2→6 first-use filters, in the package) and
    the REL-2 journeys. No pull request is open for either.
@@ -169,8 +169,9 @@ In the order of [TODO's priorities](../../TODO.md#execution-priorities), on
    the Windows and Linux windows (VST3-11 to VST3-13, AU-6), as planned in
    the [editor plan](plans/2026-10-24-plugin-editor.md#phases-and-todo-items);
    and the Audio Unit's validation, guide and package (AU-3 to AU-5).
-   Gain and Mix are in the Audio Unit (PR #80); its window (AU-6, with the
-   PLUG-9 report) is in [PR #84](https://github.com/jrp2014/convolver/pull/84);
+   Gain and Mix are in the Audio Unit (PR #80); its first window (AU-6, with
+   the PLUG-9 report) is merged
+   ([PR #84](https://github.com/jrp2014/convolver/pull/84), 31 October 2026);
    the rest is unclaimed and is the largest remaining part of the preview.
    Loading a long filter must not pause the host noticeably
    ([loading responsiveness](../../TODO.md#loading-responsiveness)).
