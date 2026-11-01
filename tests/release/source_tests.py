@@ -158,7 +158,12 @@ class ZipTests(unittest.TestCase):
     def test_unsafe_names(self):
         # A name starting with / is rooted on Windows too, where Path() alone
         # would not call it absolute and the join would leave the destination.
-        for name in ('/escape', '../escape', 'a/../../escape', 'C:escape', 'a\\escape'):
+        names = ['/escape', '../escape', 'a/../../escape', 'C:escape']
+        if sys.platform != 'win32':
+            # zipfile on Windows turns a backslash into / when it writes or
+            # reads a name, so there the name is a/escape, which is safe.
+            names.append('a\\escape')
+        for name in names:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 with self.assertRaisesRegex(ValueError, 'unsafe ZIP member'):
