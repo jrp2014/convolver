@@ -647,7 +647,8 @@ How each adapter meets the contract where its format differs:
   the host's main thread: settings as `beginEdit`, `performEdit` and
   `endEdit` (a drag is one edit; a click, a typed value, a menu choice or a
   reset is one each), with `setParamNormalized` for the controller's own
-  copy; the report as `ConvolverReport` and the copy the processor sent;
+  copy; the Bypass checkbox edits the bypass parameter (1000) the same way,
+  one edit per click; the report as `ConvolverReport` and the copy the processor sent;
   a chosen or dropped file as `ConvolverLoad`. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the

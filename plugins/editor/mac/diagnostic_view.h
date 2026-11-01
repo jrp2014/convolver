@@ -43,11 +43,17 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @interface CONVOLVER_DIAGNOSTIC_VIEW : NSView
 // `settings` (Gain, Mix and Latency, described in setting_rows.h) appear
 // as rows of the form under the Filter row: a host that shows this window
-// shows it instead of its generic controls.
+// shows it instead of its generic controls. `bypass`, when a format gives
+// it, is a Bypass checkbox at the bottom left, for the format's own bypass:
+// a dictionary with @"get" (ConvolverSettingGetter: 1 bypassed, 0 not, NAN
+// when unknown) and @"set" (ConvolverSettingSetter), and optionally
+// @"begin" and @"end" (ConvolverSettingGesture) around each click, so the
+// host records it as one change.
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
                      settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
+                       bypass:(nullable NSDictionary<NSString*, id>*)bypass
                        loader:(nullable ConvolverFileLoader)loader;
 // What Choose… and a drop do with the file: loads it and rereads the
 // report. Returns whether the plug-in accepted it.
@@ -96,6 +102,8 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSTextField* referenceField;
 @property(readonly, nonatomic) NSButton* diagnosticsButton;
 @property(readonly, nonatomic) NSButton* logButton;
+// The Bypass checkbox, hidden when the format gave no `bypass`.
+@property(readonly, nonatomic) NSButton* bypassButton;
 // Where Copy Diagnostics puts its text: the general pasteboard, unless a test
 // gives another.
 @property(strong, nonatomic) NSPasteboard* pasteboard;

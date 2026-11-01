@@ -134,10 +134,13 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
       return AudioUnitSetProperty(unit, convolver::au::load_property, kAudioUnitScope_Global, 0,
                                   &value, sizeof value) == noErr;
     };
+    // No Bypass checkbox: Audio Unit hosts show their own bypass button
+    // (kAudioUnitProperty_BypassEffect).
     return [[CONVOLVER_DIAGNOSTIC_VIEW alloc] initWithFrame:frame
                                                      report:report
                                                 diagnostics:diagnostics
                                                    settings:settings
+                                                     bypass:nil
                                                      loader:loader];
 }
 @end

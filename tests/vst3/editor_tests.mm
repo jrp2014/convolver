@@ -4,7 +4,7 @@
 // sized (getSize), attached to an off-screen window's content view and
 // removed again. Checks that it is the shared Convolver view, that it shows
 // the processor's report, that its settings edit the parameters as the SDK
-// asks (beginEdit, performEdit, endEdit), that a Latency choice reaches the
+// asks (beginEdit, performEdit, endEdit), Bypass too, that a Latency choice reaches the
 // processor and asks the host to restart, that a chosen file loads and
 // marks the project changed, and that a taller view asks the host to resize.
 #import "diagnostic_view.h"
@@ -242,6 +242,22 @@ void window() {
     [shown refresh];
     require([shown.settingValues[2].stringValue isEqualToString:@"21.3 ms"],
             "Latency note after the restart " + text(shown.settingValues[2].stringValue));
+
+    // Bypass: a click is one edit of the bypass parameter, and the host's
+    // own bypass shows in the checkbox.
+    require(!shown.bypassButton.hidden && shown.bypassButton.enabled &&
+                shown.bypassButton.state == NSControlStateValueOff &&
+                [shown.bypassButton.title isEqualToString:@"Bypass"],
+            "Bypass checkbox");
+    handler.edits.clear();
+    [shown.bypassButton performClick:nil];
+    require(handler.kinds(bypass_id) == "bpe" && handler.edits[1].value == 1.0 &&
+                c.getParamNormalized(bypass_id) == 1.0 &&
+                shown.bypassButton.state == NSControlStateValueOn,
+            "Bypass click edits: " + handler.kinds(bypass_id));
+    c.setParamNormalized(bypass_id, 0.0);
+    [shown refresh];
+    require(shown.bypassButton.state == NSControlStateValueOff, "Bypass from the host");
 
     // A file chosen in the window loads in the processor and marks the
     // project changed.

@@ -10,8 +10,8 @@
 // resizable by the user (canResize is false). The view talks only to the
 // edit controller, on the host's main thread: settings as parameter edits
 // (beginEdit, performEdit, endEdit, with setParamNormalized for the
-// controller's own copy), the report the processor sent, and a chosen file
-// as a message the processor handles (Controller::load_file).
+// controller's own copy; Bypass too), the report the processor sent, and a
+// chosen file as a message the processor handles (Controller::load_file).
 #include "editor.hpp"
 #import "diagnostic_view.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
@@ -175,6 +175,9 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
                    @"load. A new choice plays once the host restarts the plug-in, which it is "
                    @"asked to do at once, after a gap in the sound."))
         [settings addObject:latency];
+    // Bypass: the plug-in's bypass parameter, edited as the settings are, so
+    // the host's own bypass button, automation and undo follow it.
+    NSDictionary<NSString*, id>* bypass = setting(link_, bypass_id, @"Bypass", @"");
     // A chosen or dropped file goes to the processor by path, in a message:
     // the processor reads it, as for a state the host restores.
     ConvolverFileLoader loader = ^BOOL(NSString* path) {
@@ -186,6 +189,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
                                                       report:report
                                                  diagnostics:diagnostics
                                                     settings:settings
+                                                      bypass:bypass
                                                       loader:loader];
     // The view has fitted itself to its content: the size the host asks for
     // before attaching it.

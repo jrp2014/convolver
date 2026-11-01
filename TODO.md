@@ -625,13 +625,15 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   Progress (1 November 2026, PR #103): the Audio Unit's window, moved to
   `plugins/editor/mac/`, shown through the SDK's `EditorView` for
   `kPlatformTypeNSView`, with settings edited as `beginEdit`, `performEdit`
-  and `endEdit` (a drag is one edit), files loaded through VST3-3's message
+  and `endEdit` (a drag is one edit), a Bypass checkbox editing the bypass
+  parameter, files loaded through VST3-3's message
   and the window resizing through `IPlugFrame::resizeView`; checked off
-  screen by `vst3.editor` on macOS
-  ([format notes](docs/develop/plugin-contract.md#format-notes)). Remaining:
+  screen by `vst3.editor` on macOS, and opened by pluginval's editor tests
+  on macOS CI ([format notes](docs/develop/plugin-contract.md#format-notes)).
+  `editorhost` is not used: it is an interactive program that runs until its
+  window is closed, so pluginval's editor tests stand in for it. Remaining:
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3)),
-  VoiceOver, pluginval's GUI tests and `editorhost` in CI, bypass in the
-  window, recent files and reload, and the meters (with PLUG-10).
+  VoiceOver, recent files and reload, and the meters (with PLUG-10).
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

@@ -52,12 +52,13 @@ Until 1.0 the C++ API may change between minor versions.
 - VST3 on macOS: Convolver's window (VST3-11, in progress), the same view as
   the Audio Unit's: the status and what to change, the filter with Choose…
   and drag and drop, Gain, Mix and Latency, the Audio facts, Copy
-  Diagnostics and Show Log. It is the SDK's `EditorView` for an NSView, as
+  Diagnostics and Show Log, and a Bypass checkbox (VST3 only; Audio Unit
+  hosts show their own). It is the SDK's `EditorView` for an NSView, as
   the VST3 documentation describes an editor without VSTGUI; settings change
   through `beginEdit`, `performEdit` and `endEdit` (a slider drag is one
   edit), and the window asks the host to resize it when its folded lines
-  open. Checked off screen by `vst3.editor`; not yet tried in REAPER or
-  Audacity. Windows and Linux have no window yet (VST3-12, VST3-13).
+  open. Checked off screen by `vst3.editor`, and opened by pluginval's
+  editor tests on macOS CI; not yet tried in REAPER or Audacity. Windows and Linux have no window yet (VST3-12, VST3-13).
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the

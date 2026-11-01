@@ -7,7 +7,9 @@ share.
 
   validate   <pluginval> <bundle> [extra pluginval options...]
              Host conformance: lifecycle, state, buses, parameter fuzzing and
-             allocations during processing, at strictness level 10.
+             allocations during processing, at strictness level 10. On
+             macOS, where the plug-in has a window (VST3-11), pluginval's
+             editor tests open and close it too; elsewhere they are skipped.
   acceptance <pluginval> <bundle> <preset-tool>
              Loads real filters through the host's state call, renders audio
              at awkward block sizes, and compares the result with a direct
@@ -68,9 +70,14 @@ def major_version(pluginval):
     return int(match[1])
 
 
-def validate_command(major, bundle, extra):
-    """pluginval 2 has a `validate` command; pluginval 1 takes options and --validate."""
-    options = ['--strictness-level', '10', '--skip-gui-tests', *extra]
+def validate_command(major, bundle, extra, platform=sys.platform):
+    """pluginval 2 has a `validate` command; pluginval 1 takes options and --validate.
+
+    The editor tests run only on macOS, the one system with a window so far
+    (VST3-11; Windows and Linux follow in VST3-12 and VST3-13).
+    """
+    gui = [] if platform == 'darwin' else ['--skip-gui-tests']
+    options = ['--strictness-level', '10', *gui, *extra]
     if major >= 2:
         return ['validate', *options, bundle]
     return [*options, '--validate', bundle]

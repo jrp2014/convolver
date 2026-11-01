@@ -373,6 +373,10 @@ except:
 - Dragging a Gain or Mix slider is one change for the host's undo and
   automation, from mouse down to mouse up, as the VST3 SDK asks.
 - An accepted file marks the project changed, so the host asks to save it.
+- A **Bypass** checkbox at the bottom left is the plug-in's bypass: ticking
+  it is the same as the host's own bypass button, which it follows, and the
+  host's undo and automation record it. The Audio Unit's window has none,
+  since Audio Unit hosts show their own bypass button.
 - The window grows when the file, software and log lines are shown, and
   asks the host to make its window fit; the user cannot resize it.
 - The software line names macOS AudioToolbox as the reader of filter files,

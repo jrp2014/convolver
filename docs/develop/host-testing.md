@@ -126,11 +126,13 @@ These are tools for developers, not evidence that a DAW works.
   22 October 2026 and are **not** added to CI, because they would catch nothing
   that the validator and pluginval do not already catch. (The SDK's third
   sample, the VST3 Inspector, only lists a plug-in's class information.)
-  - `editorhost` only opens a plug-in's own editor window. Convolver has no
-    editor yet (planned in VST3-3 and VST3-11), so it stops at once with "EditController does
-    not provide its own editor". It becomes worth a smoke test only if an editor
-    is added, and pluginval's GUI tests (skipped in CI today with
-    `--skip-gui-tests`) could cover the same ground instead.
+  - `editorhost` only opens a plug-in's own editor window. Before VST3-11 it
+    stopped at once with "EditController does not provide its own editor".
+    With the macOS window it opens it, but then runs until someone closes the
+    window (SDK 3.8.1's `editorhost.cpp` quits only then), so it cannot run
+    unattended. pluginval's editor tests, which open the window and change
+    parameters while it is open, run on macOS CI instead (`vst3.pluginval`;
+    other systems keep `--skip-gui-tests` until their windows exist).
   - `audiohost` (cross-platform, but tested by Steinberg only on Linux; needs a
     running JACK server) loads the plug-in and activates it with its default
     stereo layout, but never activates its buses, so Convolver receives and

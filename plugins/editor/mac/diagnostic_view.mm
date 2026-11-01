@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
 #import "view_layout.h"
+#include <cmath>
 
 using namespace convolver::view;
 
@@ -140,7 +141,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     ConvolverReportSource report_;
     ConvolverDiagnosticsSource diagnostics_;
     ConvolverFileLoader loader_;
-    NSStackView* stack_; // Everything, top to bottom.
+    NSDictionary<NSString*, id>* bypass_; // The format's bypass (diagnostic_view.h), or nil.
+    NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
     NSStackView* audio_; // The Audio facts' rows, rebuilt when they change.
@@ -157,6 +159,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
                      settings:(NSArray<NSDictionary<NSString*, id>*>*)settings
+                       bypass:(NSDictionary<NSString*, id>*)bypass
                        loader:(ConvolverFileLoader)loader {
     // The view's own size: the frame gives only its position.
     self = [super initWithFrame:NSMakeRect(NSMinX(frame), NSMinY(frame), width, 400)];
@@ -166,6 +169,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     report_ = [report copy];
     diagnostics_ = [diagnostics copy];
     loader_ = [loader copy];
+    bypass_ = [bypass copy];
 
     // The stack is pinned at the top left and has the window's width; its
     // own height is the content's, and fit gives the view that height. No
@@ -310,7 +314,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     fixed_width(_referenceField, inner);
     [self add:_referenceField after:8];
 
-    // The buttons at the bottom right, Show Log rightmost.
+    // Bypass at the bottom left, as a checkbox; the buttons at the bottom
+    // right, Show Log rightmost.
+    _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
+                                         target:self
+                                         action:@selector(bypassClicked:)];
+    _bypassButton.toolTip = @"Lets the audio through without the filter, as the host's own "
+                            @"bypass does; the host records the change like any other.";
+    _bypassButton.hidden = bypass_ == nil;
     _diagnosticsButton = [NSButton buttonWithTitle:@"Copy Diagnostics"
                                             target:self
                                             action:@selector(putDiagnosticsOnPasteboard:)];
@@ -320,6 +331,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _logButton = [NSButton buttonWithTitle:@"Show Log" target:self action:@selector(showLog:)];
     _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
     NSStackView* buttons = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 12);
+    [buttons addView:_bypassButton inGravity:NSStackViewGravityLeading];
     [buttons addView:_diagnosticsButton inGravity:NSStackViewGravityTrailing];
     [buttons addView:_logButton inGravity:NSStackViewGravityTrailing];
     fixed_width(buttons, inner);
@@ -505,6 +517,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [settings_ readWithSampleRate:field(report, @"sample rate").intValue
                      latencyWaits:[field(report, @"latency waits") isEqualToString:@"yes"]];
     _logButton.enabled = logPath_.length > 0;
+    [self readBypass];
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
                            : @"Or drop a .cfg or sound file on this window.";
@@ -520,6 +533,31 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self showAudio:audio];
     _referenceField.attributedStringValue = reference_text(reference);
     [self fit];
+}
+
+// Shows the format's bypass as the host has it now (its own button,
+// automation); disabled when the plug-in cannot say.
+- (void)readBypass {
+    if (!bypass_)
+        return;
+    ConvolverSettingGetter get = bypass_[@"get"];
+    const double value = get ? get() : NAN;
+    _bypassButton.enabled = !std::isnan(value);
+    _bypassButton.state = value >= 0.5 ? NSControlStateValueOn : NSControlStateValueOff;
+}
+
+// One click is one edit: begin, set, end, as the VST3 SDK asks of an editor.
+- (void)bypassClicked:(NSButton*)button {
+    ConvolverSettingGesture begin = bypass_[@"begin"];
+    ConvolverSettingSetter set = bypass_[@"set"];
+    ConvolverSettingGesture end = bypass_[@"end"];
+    if (begin)
+        begin();
+    if (set)
+        set(button.state == NSControlStateValueOn ? 1.0 : 0.0);
+    if (end)
+        end();
+    [self refresh];
 }
 
 - (void)referenceToggled:(NSButton*)button {

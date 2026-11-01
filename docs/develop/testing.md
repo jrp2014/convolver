@@ -580,11 +580,13 @@ JUCE-based host that runs headless. It is downloaded separately, never linked
 into Convolver. Configure with `-DCONVOLVER_PLUGINVAL=/path/to/pluginval` to
 add:
 
-- `vst3.pluginval`: pluginval's validation at `--strictness-level 10
-  --skip-gui-tests` (`pluginval validate` in pluginval 2, `--validate` in
-  pluginval 1). Open and close, state save and restore, bus layouts, parameter
-  fuzzing and thread safety, allocations during processing and oversized
-  blocks, at several sample rates and block sizes. `CONVOLVER_PLUGINVAL_ARGS`
+- `vst3.pluginval`: pluginval's validation at `--strictness-level 10`
+  (`pluginval validate` in pluginval 2, `--validate` in pluginval 1). Open
+  and close, state save and restore, bus layouts, parameter fuzzing and
+  thread safety, allocations during processing and oversized blocks, at
+  several sample rates and block sizes. On macOS its editor tests also open
+  Convolver's window (VST3-11) and change parameters while it is open;
+  elsewhere, with no window yet, the test passes `--skip-gui-tests`. `CONVOLVER_PLUGINVAL_ARGS`
   adds options; CI adds `--rtcheck;relaxed` on macOS with pluginval 2, which
   can flag real-time-unsafe calls in process callbacks.
 - `vst3.pluginval.acceptance`: makes presets from a stereo impulse WAV (block
