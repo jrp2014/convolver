@@ -35,6 +35,12 @@ std::string request_words(const HostRequest& r) {
                 : ", from a saved project or preset");
 }
 
+// PLUG-10: a Latency chosen but not yet in use: the adapter has not applied
+// it yet, or could not (docs/develop/plugin-contract.md#settings).
+bool latency_waits(const HostReportFacts& facts) {
+    return facts.latency_frames && facts.settings.latency != facts.latency_frames;
+}
+
 // What plays, why, and what to change, in full.
 std::string explanation(const HostFilter& filter, const HostReportFacts& facts) {
     const auto& host = facts.host;
@@ -66,6 +72,11 @@ std::string explanation(const HostFilter& filter, const HostReportFacts& facts) 
         text += mono_track_hint(*failure, *host);
     if (filter.faults().any())
         text += " " + fault_message(HostFaultReport{filter.faults(), {}, filter.failure_shown()});
+    if (latency_waits(facts))
+        text += " Latency " + std::to_string(facts.settings.latency) +
+                " frames is chosen but not in use yet, so the plug-in keeps " +
+                std::to_string(facts.latency_frames) +
+                " frames for now. If it could not be applied, the Convolver log says why.";
     if (!filter.filter() && !failure && !filter.failed())
         text += facts.chooses_files
                     ? " To filter the audio, choose a filter file (Choose Filter, or drop a .cfg "
@@ -120,10 +131,14 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& facts) {
                                                       filter.filter()->output_channels;
     r.details.emplace_back("Settings", settings_words(facts.settings, equal));
     const int rate = host ? host->sample_rate : 0;
-    r.details.emplace_back("Latency", std::to_string(facts.latency_frames) + " frames" +
-                                          seconds(facts.latency_frames, rate) + ", tail " +
-                                          std::to_string(facts.tail_frames) + " frames" +
-                                          seconds(facts.tail_frames, rate));
+    r.details.emplace_back(
+        "Latency",
+        std::to_string(facts.latency_frames) + " frames" + seconds(facts.latency_frames, rate) +
+            ", tail " + std::to_string(facts.tail_frames) + " frames" +
+            seconds(facts.tail_frames, rate) +
+            (latency_waits(facts)
+                 ? "; " + std::to_string(facts.settings.latency) + " frames chosen, not in use yet"
+                 : std::string()));
     auto software = execution_line();
     if (software.starts_with("Session: "))
         software.erase(0, 9);

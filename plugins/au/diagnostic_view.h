@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // AU-6: Convolver's first window, the smallest useful one: the status, the
-// Gain and Mix sliders, the full explanation of what plays and what to
+// Gain and Mix sliders and the Latency menu, the full explanation of what plays and what to
 // change, the details, and the Choose Filter, Copy diagnostics and Show log
 // buttons; a filter file can also be dropped on it. Native
 // AppKit controls only, so screen readers, keyboard use, dark mode and text
@@ -37,11 +37,15 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 // One setting the window shows as a slider is a dictionary with the keys
 // @"name" (NSString), @"minimum" and @"maximum" (NSNumber), @"unit"
 // (NSString, as @" dB") for writing its value, @"get"
-// (ConvolverSettingGetter) and @"set" (ConvolverSettingSetter).
+// (ConvolverSettingGetter) and @"set" (ConvolverSettingSetter). With
+// @"choices" (NSArray<NSString*>) it is a menu instead, whose value is the
+// chosen item's index (Latency); @"tip" (NSString), if present, is the
+// control's tooltip.
 
 @interface CONVOLVER_DIAGNOSTIC_VIEW : NSView
-// `settings` (Gain and Mix) appear as sliders above the text: a host that
-// shows this window shows it instead of its generic controls.
+// `settings` (Gain, Mix and Latency) appear as sliders and menus above the
+// text: a host that shows this window shows it instead of its generic
+// controls.
 - (instancetype)initWithFrame:(NSRect)frame
                        report:(ConvolverReportSource)report
                   diagnostics:(ConvolverDiagnosticsSource)diagnostics
@@ -75,6 +79,7 @@ typedef BOOL (^ConvolverFileLoader)(NSString* path);
 @property(readonly, nonatomic) NSButton* diagnosticsButton;
 @property(readonly, nonatomic) NSButton* logButton;
 @property(readonly, nonatomic) NSArray<NSSlider*>* settingSliders;
+@property(readonly, nonatomic) NSArray<NSPopUpButton*>* settingMenus;
 @property(readonly, nonatomic) NSArray<NSTextField*>* settingValues;
 // Where Copy diagnostics puts its text: the general pasteboard, unless a test
 // gives another.

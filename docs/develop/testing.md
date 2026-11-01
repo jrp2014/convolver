@@ -200,11 +200,22 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
   (PLUG-10). Default settings give output bit-identical to a processor built
   without them, through bypass and a replacement; gain and mix from the first
-  frame against the oracle at blocks of 64 to 4096 frames and callbacks of 1
-  to 4096, printing the worst error relative to the output peak; the 64-frame
-  ramps sample by sample; clamping; the mix with unequal counts; and the
-  log's settings words.
+  frame against the oracle at each latency the plug-ins offer (blocks of 64
+  to 4096 frames) and callbacks of 1 to 4096, printing the worst error
+  relative to the output peak; each offered latency used and any other
+  refused; the 64-frame ramps sample by sample; clamping; the mix with
+  unequal counts; and the log's settings words.
   The audio thread is checked for allocation throughout.
+- `native.request_worker`: the thread that applies the Audio Unit's
+  Latency (`portable/request_worker.hpp`, PLUG-10). A request runs the
+  task; requests while it runs make it run once more; a stop while idle,
+  while the task runs (which it waits for) and at each point the worker
+  passes between waking and running the task, held there until the stop
+  has been asked for, as a destructor asks; and 2000 workers requested and
+  stopped at once. Each case has a 10-second watchdog, so a lost stop
+  fails the test instead of hanging it. With the order jrp found (the stop
+  checked before the request is taken), the case held as the worker wakes
+  hangs and fails.
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
@@ -575,13 +586,29 @@ Four CTest tests run when the adapter is built (label `au`):
   them with `ClassInfo`, including a preset without settings, malformed
   parameter data and a rejected preset, and the Status text and start line
   with them (no filter at Gain −20 dB, a refused first load at Mix 50%).
+  Latency (PLUG-10): its parameter info and value names, rounding and
+  clamping, the reported latency and its notification when chosen
+  uninitialized, an impulse delayed by exactly the chosen frames, a choice
+  made while initialized applied with its notification and log line, one
+  set from a pre-render notification on a new audio thread (no allocation
+  on that thread) and one set from the input callback during a render on
+  the main thread (no deadlock), choices from two threads at once while
+  rendering (afterwards the reported latency is the last choice and the
+  audio has it; the sanitizer job runs it under ASan and UBSan, which catch
+  a freed processor only if the timing hits it), out of memory at each
+  allocation the worker makes for a change (the reported latency always
+  matches the audio, and a change that plays is never logged as failed),
+  and saving and restoring it, also after the unit has started
+  (GarageBand's order).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
   logged once), then the view the factory makes, attached to an off-screen
   window: its size fitted to the text whatever size the host offers, the
   buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
-  setting its parameter, a host change moving the slider), its status and
+  setting its parameter, a host change moving the slider), the Latency menu
+  (its choices, a choice setting the parameter and the details showing the
+  new latency in use, a host change moving the menu), its status and
   text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed

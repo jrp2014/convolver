@@ -27,6 +27,8 @@ struct HostReportFacts {
     std::optional<HostLayout> host; // As for host_status(): nullopt while not known.
     std::size_t max_frames = 0;     // The host's largest block; 0 if not known.
     HostSettings settings;
+    // The latency the processor runs at (settings.latency is the one chosen,
+    // not yet in use when they differ), and the tail.
     std::size_t latency_frames = 0, tail_frames = 0;
     bool log_written = true; // host_log_written()
     // The format's window can load a filter file (the Audio Unit's Choose

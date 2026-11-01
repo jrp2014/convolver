@@ -228,6 +228,18 @@ void cases() {
     require(!contains(detail(r, "Software"), "Session:"), "software detail");
     require(detail(host_report(HostFilter(8), facts(std::nullopt)), "Host") == "not started yet",
             "host detail before start");
+    require(!contains(r.explanation, "is chosen") && !contains(detail(r, "Latency"), "chosen"),
+            "a running latency is reported as waiting");
+
+    // PLUG-10: a Latency chosen but not yet in use (not applied yet, or it
+    // could not be), and the window says so.
+    const auto waiting = host_report(f, facts(stereo, {0, 1, 1024}));
+    require(contains(waiting.explanation, "Latency 1024 frames is chosen but not in use yet, so "
+                                          "the plug-in keeps 256 frames for now."),
+            "waiting latency explanation: " + waiting.explanation);
+    require(detail(waiting, "Latency") ==
+                "256 frames (5.8 ms), tail 2 frames (0.0 ms); 1024 frames chosen, not in use yet",
+            "waiting latency detail: " + detail(waiting, "Latency"));
 }
 
 std::optional<std::string> log_variable() {

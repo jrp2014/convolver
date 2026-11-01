@@ -18,7 +18,7 @@ its window from [PR #84](https://github.com/jrp2014/convolver/pull/84)
 (merged 31 October 2026); the full smoke test is not yet recorded, the VST3
 hosts (REAPER, Audacity) have not been run, and no independent user has
 followed the instructions. The next milestone is end-to-end testing: an independent user
-installing and using an exact preview package, cut from the 0.7 series.
+installing and using an exact preview package, cut from the 0.8 series.
 [Still blocking it](#what-still-blocks-the-first-preview): jrp's host
 smoke tests, the CLI and journey presets in the package with the journeys
 written, the plug-in settings and windows with the Audio Unit in the
@@ -123,7 +123,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.7.x tag.
+The first preview is cut from a 0.8.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |
@@ -133,7 +133,7 @@ The first preview is cut from a 0.7.x tag.
 | Smoke test of VST3 in at least one named host | Proposed with the milestone; the preview gate in [releasing](../develop/releasing.md#publishing-an-unsigned-preview) | HOST-1 | Not run. Steps written for REAPER and Audacity on jrp's Mac ([smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host)) |
 | The Audio Unit validated, smoke-tested in a named host and in the package | jrp | AU-3, AU-4, AU-5 | `auval -strict` runs in CI; pluginval for the component, GarageBand's [smoke test](../develop/host-testing.md#garageband-audio-unit) and the component in the package remain |
 | An exact preview package: VST3, the CLI, the preset tool, examples and guides | jrp's milestone | PLUG-5 | Preset tool and Equalizer APO export in the package ([PR #38](https://github.com/jrp2014/convolver/pull/38)); the CLI, the journey presets and the VST trademark notice remain |
-| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Started: Gain and Mix in the Audio Unit ([PR #80](https://github.com/jrp2014/convolver/pull/80)), checked by jrp in GarageBand; Status and the log describe them ([PR #83](https://github.com/jrp2014/convolver/pull/83)). The Audio Unit's first window (status, Gain and Mix, the full reason, Choose Filter and dropping a file, Copy diagnostics, Show log; [PR #84](https://github.com/jrp2014/convolver/pull/84), merged 31 October 2026). jrp checked it in GarageBand up to `b0f2552` (TODO AU-6 lists what passed and what remains). Remaining: the gain modes, the latency choice and meters (PLUG-10), the settings in VST3 (VST3-4), recent files and reload in the window (AU-6), and the VST3 windows (VST3-11 to VST3-13) |
+| Settings (gain, mix, latency) and a window in each VST3 build and the Audio Unit | jrp | PLUG-9, PLUG-10, VST3-3, VST3-4, VST3-11 to VST3-13, AU-6, AU-7 | Started: Gain and Mix in the Audio Unit ([PR #80](https://github.com/jrp2014/convolver/pull/80)), checked by jrp in GarageBand; Status and the log describe them ([PR #83](https://github.com/jrp2014/convolver/pull/83)). The Audio Unit's first window (status, Gain and Mix, the full reason, Choose Filter and dropping a file, Copy diagnostics, Show log; [PR #84](https://github.com/jrp2014/convolver/pull/84), merged 31 October 2026). jrp checked it in GarageBand up to `b0f2552` (TODO AU-6 lists what passed and what remains). The Audio Unit's Latency menu ([PR #95](https://github.com/jrp2014/convolver/pull/95)). Remaining: the gain modes and meters (PLUG-10), the settings in VST3 (VST3-4), recent files and reload in the window (AU-6), and the VST3 windows (VST3-11 to VST3-13) |
 | Journeys written as steps, with the presets they need in the package | jrp's milestone | REL-2 | Not started |
 | An independent user completes the journeys from those exact files | jrp's milestone | REL-3 | Not started; uses the candidate's files before upload |
 

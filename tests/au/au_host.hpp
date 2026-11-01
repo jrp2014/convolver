@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -201,6 +202,9 @@ class Unit {
     // One render: planar host buffers (inputs and outputs may be the same
     // memory). `silent_input` marks the pulled input with OutputIsSilence.
     // Returns the status; `silent_output` tells whether the unit flagged its output.
+    // Called inside the input callback, during the unit's Render, as a
+    // host's own code there might call back into the unit.
+    std::function<void()> while_pulling;
     OSStatus render(std::span<const float* const> in, std::span<float* const> out, UInt32 frames,
                     bool silent_input, bool& silent_output) {
         inputs_ = in;
@@ -238,6 +242,8 @@ class Unit {
         }
         if (unit.silent_input_)
             *flags |= kAudioUnitRenderAction_OutputIsSilence;
+        if (unit.while_pulling)
+            unit.while_pulling();
         return noErr;
     }
     AudioUnit unit_ = nullptr;

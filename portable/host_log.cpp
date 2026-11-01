@@ -184,9 +184,11 @@ std::string setting_text(double value, double low, double high) {
 
 std::string settings_words(const HostSettings& s, bool equal_counts) {
     const auto gain = "gain " + setting_text(s.gain_db, min_gain_db, max_gain_db) + " dB";
+    const auto latency = ", latency " + std::to_string(s.latency) + " frames";
     if (!equal_counts)
-        return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)";
-    return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet";
+        return gain + ", mix 100% wet (inputs and outputs differ, so there is no dry signal)" +
+               latency;
+    return gain + ", mix " + setting_text(100 * s.mix, 0, 100) + "% wet" + latency;
 }
 
 std::string mono_track_hint(const HostFailure& failure, const HostLayout& host) {

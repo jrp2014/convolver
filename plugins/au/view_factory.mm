@@ -2,7 +2,7 @@
 // AU-6: the Cocoa view factory that kAudioUnitProperty_CocoaUI names. Hosts
 // load it from the component bundle and ask it for Convolver's window, which
 // uses the unit only through the Audio Unit API (properties by value, as
-// Apple asks, and the Gain and Mix parameters), so it also works when the
+// Apple asks, and the Gain, Mix and Latency parameters), so it also works when the
 // host runs the unit in another process (GarageBand does).
 #include "convolver_identities.hpp"
 #import "diagnostic_view.h"
@@ -63,6 +63,27 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
         @"set" : [set copy]
     };
 }
+
+// A setting chosen from a list, as the window's menu: the item names from
+// the unit (kAudioUnitProperty_ParameterValueStrings), the value an item's
+// index.
+NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID parameter_id,
+                                    NSString* name, NSString* tip) {
+    NSMutableDictionary<NSString*, id>* entry =
+        [setting(unit, parameter_id, name, @"") mutableCopy];
+    CFArrayRef names = nullptr;
+    UInt32 size = sizeof names;
+    if (!entry ||
+        AudioUnitGetProperty(unit, kAudioUnitProperty_ParameterValueStrings, kAudioUnitScope_Global,
+                             parameter_id, &names, &size) != noErr)
+        return nil;
+    NSArray* titles = CFBridgingRelease(names);
+    if (![titles isKindOfClass:[NSArray class]] || titles.count == 0)
+        return nil;
+    entry[@"choices"] = titles;
+    entry[@"tip"] = tip;
+    return entry;
+}
 } // namespace
 
 @interface CONVOLVER_AU_VIEW_FACTORY : NSObject <AUCocoaUIBase>
@@ -95,6 +116,11 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
     if (NSDictionary<NSString*, id>* mix =
             setting(unit, convolver::identity::au_mix_parameter_id, @"Mix", @"% wet"))
         [settings addObject:mix];
+    if (NSDictionary<NSString*, id>* latency =
+            choice(unit, convolver::identity::au_latency_parameter_id, @"Latency",
+                   @"The delay Convolver adds, in frames. Smaller is less delay and more processor "
+                   @"load. A new choice plays at once, after a gap in the sound."))
+        [settings addObject:latency];
     // A chosen or dropped file goes to the unit by path, as a property: the
     // unit reads it, so this also works when the host runs it in another process.
     ConvolverFileLoader loader = ^BOOL(NSString* path) {

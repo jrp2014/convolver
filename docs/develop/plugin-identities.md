@@ -34,7 +34,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | |
 | AU | macOS bundle identifier | `io.github.jrp2014.convolver.au` | For `Convolver.component` (AU-1) |
 | AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. |
-| AU | Parameter IDs | Gain `0`, Mix `1003` (global scope) | The [settings](plugin-contract.md#settings) (AU-7). Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB); VST3-4 gives the VST3 parameters the same IDs. Gain mode `1002` and Latency `1004` are approved for when those settings arrive. |
+| AU | Parameter IDs | Gain `0`, Mix `1003`, Latency `1004` (global scope) | The [settings](plugin-contract.md#settings) (AU-7). Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB); VST3-4 gives the VST3 parameters the same IDs. Gain mode `1002` is approved for when that setting arrives. |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |

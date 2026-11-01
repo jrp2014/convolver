@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "convolver/engine.hpp"
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -297,6 +299,12 @@ class HostFilter {
 // (docs/develop/plugin-contract.md#settings). The defaults leave the sound as
 // it was before the settings existed.
 inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October 2026.
+// The latencies adapters offer, in frames: HostProcessor's block size, the
+// engine's uniform partition (the CLI's --block-size). Smaller is less delay
+// and more processor load. jrp, 25 October 2026: powers of two from 64 to
+// 4096, default 256.
+inline constexpr std::array<std::size_t, 7> host_latencies{64, 128, 256, 512, 1024, 2048, 4096};
+inline constexpr std::size_t default_host_latency = 256;
 struct HostSettings {
     // The filtered signal's gain in decibels, within min_gain_db and
     // max_gain_db (clamped there by HostProcessor).
@@ -305,6 +313,10 @@ struct HostSettings {
     // by the latency. Ignored (always 1) when input and output counts differ,
     // as there is no dry signal (the bypass rule). Clamped to 0..1.
     double mix = 1;
+    // The latency in frames, one of host_latencies. Unlike gain and mix it
+    // cannot change while a processor runs: it is the block size the
+    // processor is built with.
+    std::size_t latency = default_host_latency;
     bool operator==(const HostSettings&) const = default;
 };
 
@@ -347,9 +359,10 @@ HostStatusLine host_status(const HostFilter&, const std::optional<HostLayout>& h
 class HostProcessor {
   public:
     HostProcessor(const Configuration&, std::size_t max_frames, std::size_t block = 256);
-    // PLUG-10: with the settings (gain and mix) applied from the first frame.
-    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
-                  std::size_t block = 256);
+    // PLUG-10: with the settings applied from the first frame: gain and mix,
+    // and the latency as the block size. Throws std::invalid_argument if the
+    // latency is not one of host_latencies.
+    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;

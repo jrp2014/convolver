@@ -318,8 +318,9 @@ void window() {
     CONVOLVER_DIAGNOSTIC_VIEW* view = (CONVOLVER_DIAGNOSTIC_VIEW*)made;
     // Fitted to its text, whatever size the host offers (jrp's GarageBand
     // run: the first version filled a large window and left it mostly blank).
+    // The bound allows the three setting rows (Gain, Mix, Latency).
     require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 150 &&
-                NSHeight(view.frame) <= 460,
+                NSHeight(view.frame) <= 500,
             "empty window size " + std::to_string(NSWidth(view.frame)) + " x " +
                 std::to_string(NSHeight(view.frame)));
     NSView* offered = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(1270, 1120)];
@@ -378,7 +379,9 @@ void window() {
     // Gain and Mix as sliders (jrp's GarageBand run: a host that shows this
     // window no longer shows its generic sliders). Moving one sets the
     // parameter; a change from the host moves the slider.
-    require(view.settingSliders.count == 2 && view.settingValues.count == 2, "no setting sliders");
+    require(view.settingSliders.count == 2 && view.settingMenus.count == 1 &&
+                view.settingValues.count == 3,
+            "no setting sliders and menu");
     NSSlider* gain = view.settingSliders[0];
     NSSlider* mix = view.settingSliders[1];
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
@@ -417,6 +420,37 @@ void window() {
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 100, 0),
           "Mix back");
     [view refresh];
+
+    // Latency as a menu of block sizes (PLUG-10). A choice sets the
+    // parameter, the unit's worker thread applies it at once, and the
+    // details show it.
+    const auto shows = [&](const char* line) {
+        for (int i = 0; i < 500; ++i) {
+            [view refresh];
+            if (contains(view.explanationView.string, line))
+                return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return false;
+    };
+    NSPopUpButton* latency = view.settingMenus[0];
+    require(latency.numberOfItems == 7 && [latency.itemTitles[0] isEqualToString:@"64 frames"] &&
+                [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
+                latency.indexOfSelectedItem == 2 &&
+                [latency.accessibilityLabel isEqualToString:@"Latency"],
+            "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
+    [latency selectItemAtIndex:3];
+    [latency sendAction:latency.action to:latency.target];
+    check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
+          "Latency value");
+    require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
+    require(shows("Latency\t512 frames") && !contains(view.explanationView.string, "is chosen"),
+            "the window does not show the new Latency in use:\n" +
+                text(view.explanationView.string));
+    check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
+          "Latency from the host");
+    require(shows("Latency\t256 frames") && latency.indexOfSelectedItem == 2,
+            "the Latency menu did not follow the host");
 
     // Copy diagnostics, to a pasteboard of the test's own.
     NSPasteboard* board = [NSPasteboard pasteboardWithUniqueName];

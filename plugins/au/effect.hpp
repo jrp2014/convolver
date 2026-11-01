@@ -6,6 +6,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "request_worker.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <array>
@@ -21,8 +22,6 @@
 #include <vector>
 
 namespace convolver::au {
-// HostProcessor's fixed latency; AU reports it in seconds.
-inline constexpr std::size_t latency_frames = 256;
 inline constexpr UInt32 max_channels = identity::max_channels;
 // DIAG-1: the read-only Status parameter, an indexed HostStatus whose current
 // value reads (kAudioUnitProperty_ParameterStringFromValue) as the unit's
@@ -32,14 +31,18 @@ inline constexpr UInt32 max_channels = identity::max_channels;
 inline constexpr AudioUnitParameterID status_parameter = identity::au_status_parameter_id;
 // AU-7: PLUG-10's settings as global parameters, saved by AUBase::SaveState
 // with ClassInfo and restored by RestoreState (docs/develop/plugin-contract.md#settings):
-// Gain in dB (min_gain_db to max_gain_db) and Mix in percent. IDs from
+// Gain in dB (min_gain_db to max_gain_db), Mix in percent, and Latency, an
+// index into host_latencies (see request_latency). IDs from
 // plugins/identities.json; never change them.
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
+inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
+inline constexpr AudioUnitParameterValue default_latency_index = 2;
+static_assert(host_latencies[2] == default_host_latency);
 // The global parameters in the order GetParameterList gives them, which
 // RestoreState also notifies.
-inline constexpr std::array<AudioUnitParameterID, 3> parameter_order{gain_parameter, mix_parameter,
-                                                                     status_parameter};
+inline constexpr std::array<AudioUnitParameterID, 4> parameter_order{
+    gain_parameter, mix_parameter, latency_parameter, status_parameter};
 
 // For the tests only, never offered to hosts as a feature: a custom global
 // property (custom IDs start at 64000) giving the PLUG-8 failure record, which
@@ -77,6 +80,9 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 class Effect final : public ausdk::AUBase {
   public:
     explicit Effect(AudioComponentInstance);
+    ~Effect() override;
+    Effect(const Effect&) = delete;
+    Effect& operator=(const Effect&) = delete;
 
     OSStatus Initialize() override;
     void Cleanup() override;
@@ -92,8 +98,9 @@ class Effect final : public ausdk::AUBase {
     OSStatus GetParameterInfo(AudioUnitScope, AudioUnitParameterID,
                               AudioUnitParameterInfo&) override;
     OSStatus GetParameterValueStrings(AudioUnitScope, AudioUnitParameterID, CFArrayRef*) override;
-    // The Status parameter is read-only: a host's write is ignored. Gain and
-    // Mix are stored within their ranges; Render hands them to the processor.
+    // The Status parameter is read-only: a host's write is ignored. Gain, Mix
+    // and Latency are stored within their ranges; Render hands Gain and Mix to
+    // the processor, and a new Latency is applied as request_latency says.
     OSStatus SetParameter(AudioUnitParameterID, AudioUnitScope, AudioUnitElement,
                           AudioUnitParameterValue, UInt32) AUSDK_RTSAFE override;
 
@@ -107,7 +114,8 @@ class Effect final : public ausdk::AUBase {
         return false;
     }
 
-    // In seconds, as Audio Units report them: frames / sample rate.
+    // In seconds, as Audio Units report them: frames / sample rate. The
+    // latency is the newest processor's, or uninitialized the chosen one.
     Float64 GetLatency() noexcept AUSDK_RTSAFE override;
     Float64 GetTailTime() noexcept AUSDK_RTSAFE override;
     bool SupportsTail() noexcept AUSDK_RTSAFE override {
@@ -149,7 +157,7 @@ class Effect final : public ausdk::AUBase {
     // silence rather than the unfiltered input; uninitialized, a failed
     // filter's tail is 0.
     void silence_failed_first_load(bool was_failed) noexcept;
-    // Gain and Mix as a saved state holds them.
+    // The settings as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
     // The common step of RestoreState and a chosen file: loads `next`, then
     // logs and notifies outside the lock. `saved` settings are applied if
@@ -186,15 +194,43 @@ class Effect final : public ausdk::AUBase {
     // every report_fault_interval, once Render's Fault is explained.
     HostReport report_locked(std::string& faults);
     static constexpr std::chrono::seconds report_fault_interval{10};
-    // AU-7: stores a Gain or Mix value clamped to its range.
+    // AU-7: stores a Gain, Mix or Latency value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
+    // PLUG-10: a new Latency is applied only by the unit's own worker thread
+    // (latency_worker_), never by the thread that chose it: SetParameter can
+    // arrive on any thread, including an audio thread or inside a render
+    // callback, so it only stores the value and wakes the worker (an atomic
+    // store and notify, which neither allocates nor waits). RestoreState
+    // wakes it too. Uninitialized, the worker makes the reported latency
+    // follow the choice. Initialized, it builds a processor with the chosen
+    // block size and hands it to Render, which switches at its next call: the
+    // new one starts with no history, so the sound has a gap (the new latency
+    // plus the filter's own delay). The host is told of the new latency and
+    // tail, from the worker thread, and the log says what happened. A Latency
+    // that cannot be built is tried again only when chosen again.
+    void request_latency() noexcept;
+    void apply_latency() noexcept;
+    // Under `control_`: makes `next` (null when uninitializing) the processor
+    // Render uses and returns the previous one, for release_processor().
+    std::unique_ptr<HostProcessor> install_processor(std::unique_ptr<HostProcessor> next) noexcept;
+    // Without `control_` (a render callback may call into the unit): frees a
+    // replaced processor once Render no longer uses it, a wait of at most the
+    // rest of one render call. Never on a thread that is rendering.
+    void release_processor(std::unique_ptr<HostProcessor> previous) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
+    // The newest processor, which the control side uses. Render uses
+    // `playing_`, which install_processor() sets to it, and marks the one it
+    // is using in `rendering_` for the length of each call, so a replaced
+    // processor is freed only once Render has let it go.
     std::unique_ptr<HostProcessor> host_;
+    std::atomic<HostProcessor*> playing_{nullptr};
+    std::atomic<HostProcessor*> rendering_{nullptr};
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
+    std::atomic<std::size_t> latency_{default_host_latency}; // In frames; see GetLatency.
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches
@@ -213,5 +249,8 @@ class Effect final : public ausdk::AUBase {
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.
+    // The Latency worker (request_latency()), stopped in the destructor.
+    // Started at the end of the constructor, after every member it uses.
+    RequestWorker latency_worker_;
 };
 } // namespace convolver::au

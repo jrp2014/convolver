@@ -364,9 +364,18 @@ except the Audio Unit build, which runs in a source checkout.
    track, without the repeat; 50% mixes the two. Save, quit and reopen the
    project: both values come back, and the log's `Loaded a filter ...` line
    after the reopening ends with
-   `Restored settings: gain -12 dB, mix 50% wet.` (GarageBand starts the
-   plug-in with the defaults before restoring the project, so the
-   `Started at ...` line just before it shows 0 dB and 100%).
+   `Restored settings: gain -12 dB, mix 50% wet, latency 256 frames.`
+   (GarageBand starts the plug-in with the defaults before restoring the
+   project, so the `Started at ...` line just before it shows 0 dB and 100%).
+10. Latency (PLUG-10). In the window, choose 1024 frames while the project
+    plays: a gap, then the sound carries on, the window's Latency
+    detail reads 1024 frames, and the log has `Latency changed from 256 to
+    1024 frames`. Record whether the track stays in time with the other
+    tracks (GarageBand compensating for the new latency) at once or only
+    after stopping and starting playback. Save, quit and reopen: the window's
+    Latency detail reads 1024 frames again (the log's `Latency changed`
+    line after `Restored settings` shows it was applied after GarageBand
+    started the plug-in).
 
 ## Production qualification
 

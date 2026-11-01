@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // The Audio Unit's saved state and filter loading: preset checks, the saved
-// Gain and Mix, SaveState and RestoreState, a file chosen in the window, and
+// settings, SaveState and RestoreState, a file chosen in the window, and
 // installing a new filter or recording its refusal (see effect.cpp).
 #include "core_foundation.hpp"
 #include "effect.hpp"
@@ -134,8 +134,8 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         log_faults(faults);
         notify_status();
     }
-    // AU-7: AUBase writes the parameter values (Gain and Mix, and Status,
-    // which RestoreState ignores) under "data".
+    // AU-7: AUBase writes the parameter values (Gain, Mix and Latency, and
+    // Status, which RestoreState ignores) under "data".
     if (const auto result = AUBase::SaveState(out); result != noErr)
         return failed(result);
     // AUBase::SaveState creates a mutable dictionary.
@@ -178,7 +178,7 @@ void Effect::reject(HostFailureKind kind, const std::string& why, const HostRequ
 
 // RestoreState's and a chosen file's common step: `next` through
 // HostFilter::load as `request`, then the log lines and notifications.
-// `saved`: Gain and Mix from a restored state, applied if it is accepted.
+// `saved`: the settings from a restored state, applied if it is accepted.
 bool Effect::install(HostState next, const HostRequest& request, const SavedSettings* saved,
                      bool settings_unreadable) {
     bool accepted = false, problem = true;
@@ -234,7 +234,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 // Hosts such as GarageBand restore a project after starting the
                 // unit, so its "Started at" line shows the settings before this.
                 if (saved && std::ranges::any_of(*saved, [](const auto& p) {
-                        return p.first == gain_parameter || p.first == mix_parameter;
+                        return p.first == gain_parameter || p.first == mix_parameter ||
+                               p.first == latency_parameter;
                     })) {
                     const auto counts = host ? *host : layout();
                     message += " Restored settings: " +
@@ -250,8 +251,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
     if (accepted && settings_unreadable)
-        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain and "
-            "Mix keep their values.");
+        log("The preset's parameter values (its \"data\" entry) could not be read, so Gain, Mix "
+            "and Latency keep their values.");
     notify_status();
     return accepted;
 }
@@ -337,7 +338,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         return kAudioUnitErr_InvalidPropertyValue;
     }
 
-    // AU-7: Gain and Mix as saved with the state, applied if the state is
+    // AU-7: the settings as saved with the state, applied if the state is
     // accepted. A preset from convolver-preset has none, and settings it does
     // not hold keep their values.
     std::optional<SavedSettings> saved;
@@ -355,6 +356,10 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         install(std::move(next), {}, saved ? &*saved : nullptr, settings_unreadable);
     if (!accepted)
         return kAudioUnitErr_InvalidPropertyValue;
+    // A restored Latency plays at once. GarageBand starts the unit before it
+    // restores a project, so waiting for the next start would leave it unused
+    // (the independent review).
+    request_latency();
     if (saved) {
         // Hosts and generic views reread the settings.
         AudioUnitEvent event{};
@@ -365,7 +370,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
         }
     }
     // The preset name and element names, as AUBase restores them. Its "data"
-    // (parameter values) is left out: Gain and Mix were read above with bounds
+    // (parameter values) is left out: the settings were read above with bounds
     // checks, and AUBase reads that blob without them.
     const cf_owned<CFMutableDictionaryRef> copy(CFDictionaryCreateMutableCopy(nullptr, 0, dict));
     if (!copy)

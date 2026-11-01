@@ -10,17 +10,41 @@ Until 1.0 the C++ API may change between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
+  menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
+  default 256 (the old Convolver's partitions setting in modern form, and the
+  command line's `--block-size`). Smaller is less delay and more processor
+  load. It is not automatable and is saved with Gain and Mix. A new choice
+  plays at once, also when GarageBand restores a project after starting the
+  plug-in: the unit's own worker thread builds a new processor and hands it
+  over without locking, with a gap in the sound (the new latency plus the
+  filter's own delay), and the host is told the new latency. The log
+  records each change and its settings name the latency. The default
+  leaves the sound unchanged; the oracle tests cover gain and mix at each of
+  the seven block sizes.
+
 ### Changed
 
-- The version is now 0.7.0, a deliberate minor step at a milestone: the
-  Audio Unit's window (AU-6) and the pre-preview fixes (PLUG-12, ROBUST-3)
-  are in (jrp, 31 October 2026). The first preview is cut from the 0.7
-  series. CMake consumers now request `find_package(Convolver 0.7)`; the
-  package keeps its same-minor compatibility policy, so a consumer asking for
-  0.6 no longer finds it. The LV2 plug-in now reports minor version 7,
-  which LV2 treats as a development version until jrp decides the mapping
-  (LV2-5). Nothing else changes: the library, plug-ins and their saved state
-  are as in 0.6.10.
+- The version is now 0.8.0, the minor step for the library change below
+  (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
+  CMake consumers now request `find_package(Convolver 0.8)`, and the first
+  preview is cut from the 0.8 series. The LV2 plug-in reports minor version
+  8, an even (release) minor again, though odd patch numbers still give a
+  micro version LV2 treats as a development one (LV2-5).
+- Library (PLUG-10): `HostSettings` gains `latency` (one of the new
+  `host_latencies`, default `default_host_latency`, 256), and
+  `HostProcessor`'s settings constructor takes the block size from it,
+  refusing any other value with `std::invalid_argument`; its separate block
+  argument is gone. `settings_words()` adds the latency, and
+  `HostReportFacts::latency_frames` is the running latency, so a report
+  explains a chosen one that could not be applied.
+
+## [0.7.1] - 2026-11-01
+
+### Changed
+
 - Clearer failure messages everywhere (DIAG-1, from jrp's choices on
   31 October 2026). The CLI names the file, time, frame and channel of an
   invalid input sample (not a number, or infinite) and says to export the file
@@ -37,6 +61,20 @@ Until 1.0 the C++ API may change between minor versions.
   or (once per instance) channel layout it refuses, LV2 logs why it refused
   to start, and all three formats log a failed save. Each message has a test.
   The CLI still replaces an existing output, now documented as deliberate.
+
+## [0.7.0] - 2026-11-01
+
+### Changed
+
+- The version is now 0.7.0, a deliberate minor step at a milestone: the
+  Audio Unit's window (AU-6) and the pre-preview fixes (PLUG-12, ROBUST-3)
+  are in (jrp, 31 October 2026). The first preview is cut from the 0.7
+  series. CMake consumers now request `find_package(Convolver 0.7)`; the
+  package keeps its same-minor compatibility policy, so a consumer asking for
+  0.6 no longer finds it. The LV2 plug-in now reports minor version 7,
+  which LV2 treats as a development version until jrp decides the mapping
+  (LV2-5). Nothing else changes: the library, plug-ins and their saved state
+  are as in 0.6.10.
 
 ## [0.6.10] - 2026-10-31
 
@@ -916,7 +954,9 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.6.10...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/jrp2014/convolver/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
 [0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
 [0.5.6]: https://github.com/jrp2014/convolver/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/jrp2014/convolver/compare/v0.5.4...v0.5.5
