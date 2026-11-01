@@ -834,7 +834,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
 - [x] **AU-10 — Separate the window's setting editing from its layout.**
-  1 November 2026, PR #PRNUM, from jrp's review of PR #98: the Gain, Mix and
+  1 November 2026, PR #100, from jrp's review of PR #98: the Gain, Mix and
   Latency rows and everything the user does with them (dragging, reset,
   typing, choosing) moved from `plugins/au/diagnostic_view.mm` (959 lines,
   now about 630) to `plugins/au/setting_rows.mm`, with the shared layout
