@@ -191,6 +191,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
 } // namespace
 
+// The typed boxes tell the view when the user first changes their text.
+@interface CONVOLVER_DIAGNOSTIC_VIEW () <NSTextFieldDelegate>
+@end
+
 @implementation CONVOLVER_DIAGNOSTIC_VIEW {
     ConvolverReportSource report_;
     ConvolverDiagnosticsSource diagnostics_;
@@ -205,6 +209,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSArray<NSDictionary<NSString*, id>*>* settings_;
     NSArray<NSControl*>* controls_; // Each setting's slider or menu, in settings_ order.
     NSInteger dragging_;            // The slider the user is dragging, or -1.
+    NSInteger typed_;               // The box whose text the user has changed, or -1.
     int sampleRate_;                // The host's, for the Latency row; 0 before it starts.
     BOOL latencyWaits_;             // The chosen Latency is not in use yet.
     NSUInteger choosing_,
@@ -226,6 +231,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     diagnostics_ = [diagnostics copy];
     loader_ = [loader copy];
     dragging_ = -1;
+    typed_ = -1;
 
     // The stack is pinned at the top left and has the window's width; its
     // own height is the content's, and fit gives the view that height. No
@@ -398,6 +404,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
             value.target = self;
             value.action = @selector(valueTyped:);
             value.cell.sendsActionOnEndEditing = YES;
+            value.delegate = self; // For controlTextDidBeginEditing:.
             value.tag = static_cast<NSInteger>(i);
             value.accessibilityLabel = setting[@"name"];
             fixed_width(value, value_field);
@@ -627,6 +634,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // GarageBand run of 1 November 2026: Option-click reset Gain, then leaving
 // the field restored the typed -3.5).
 - (void)dropTyping:(NSUInteger)i {
+    typed_ = -1;
     NSTextField* field = _settingValues[i];
     if (field.currentEditor)
         [field abortEditing];
@@ -674,33 +682,44 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self set:slider.doubleValue at:i];
 }
 
-// The user typed a value: Return or leaving the field sets it, within the
-// slider's range. Text that is not a number beeps and is put back.
+// AppKit sends this at the user's first change to a box's text, not when
+// the box gets focus.
+- (void)controlTextDidBeginEditing:(NSNotification*)note {
+    typed_ = static_cast<NSControl*>(note.object).tag;
+}
+
+// Return or leaving a box: text the user changed sets the setting, within
+// the slider's range, and text that is not a number beeps. A box left
+// unchanged sets nothing, since its text may be rounded ("-6.5" for
+// -6.46 dB) or older than a change the host made meanwhile (automation).
+// Either way the box then shows the value as the window writes it.
 - (void)valueTyped:(NSTextField*)value {
     const auto i = static_cast<NSUInteger>(value.tag);
     if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
         return;
-    // A decimal comma reads as a point ("-6,5"), whatever the host's locale.
-    NSString* typed = [[[value.stringValue stringByReplacingOccurrencesOfString:@"−"
-                                                                     withString:@"-"]
-        stringByReplacingOccurrencesOfString:@","
-                                  withString:@"."]
-        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    // The number at the start, read in the C locale, so a host's LC_NUMERIC
-    // cannot change it; a unit typed after it ("-6 dB") is ignored.
-    static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
-    const char* chars = typed.UTF8String;
-    char* end = nullptr;
-    double number = chars && c_locale ? strtod_l(chars, &end, c_locale) : 0;
     auto* slider = static_cast<NSSlider*>(controls_[i]);
-    if (!chars || !c_locale || end == chars || !std::isfinite(number)) {
-        NSBeep();
-        value.stringValue = [self number:slider.doubleValue of:settings_[i]];
-        return;
+    if (typed_ == value.tag) {
+        typed_ = -1;
+        // A decimal comma reads as a point ("-6,5"), whatever the host's locale.
+        NSString* typed = [[[value.stringValue stringByReplacingOccurrencesOfString:@"−"
+                                                                         withString:@"-"]
+            stringByReplacingOccurrencesOfString:@","
+                                      withString:@"."]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        // The number at the start, read in the C locale, so a host's LC_NUMERIC
+        // cannot change it; a unit typed after it ("-6 dB") is ignored.
+        static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
+        const char* chars = typed.UTF8String;
+        char* end = nullptr;
+        const double number = chars && c_locale ? strtod_l(chars, &end, c_locale) : 0;
+        if (!chars || !c_locale || end == chars || !std::isfinite(number)) {
+            NSBeep();
+        } else {
+            slider.doubleValue = std::clamp(number, slider.minValue, slider.maxValue);
+            [self set:slider.doubleValue at:i];
+        }
     }
-    number = std::clamp(number, slider.minValue, slider.maxValue);
-    slider.doubleValue = number;
-    [self set:number at:i];
+    value.stringValue = [self number:slider.doubleValue of:settings_[i]];
 }
 
 // The settings as the host has them now (automation, its own controls),

@@ -56,7 +56,9 @@ Until 1.0 the C++ API may change between minor versions.
   lines are folded away; Copy Diagnostics and Show Log use title case. The
   layout uses stack views (auto layout) and still fits its height to the
   content. Copy Diagnostics uses the same plain labels. A typed value
-  accepts a decimal comma. Sound unchanged.
+  accepts a decimal comma. A box sets a value only when you changed its
+  text: leaving it untouched no longer sets the rounded value it shows, or
+  one older than a change the host made meanwhile. Sound unchanged.
 - Library: `worst_case_peak()` (engine.hpp) gives the guaranteed peak
   bound behind `--gain-db no-clip` without running the convolution, and
   now clears only the part of its work buffer each output and input use;
