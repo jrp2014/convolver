@@ -337,6 +337,18 @@ void window() {
                                                      defer:NO];
     host.releasedWhenClosed = NO;
     [host.contentView addSubview:view];
+    // Light and dark come from the host's window: the view sets no
+    // appearance of its own (jrp's GarageBand run showed it dark with macOS
+    // set to Light, as GarageBand's own window is).
+    NSArray<NSAppearanceName>* both = @[ NSAppearanceNameAqua, NSAppearanceNameDarkAqua ];
+    for (NSAppearanceName name in both) {
+        host.appearance = [NSAppearance appearanceNamed:name];
+        require([[view.effectiveAppearance bestMatchFromAppearancesWithNames:both]
+                    isEqualToString:name] &&
+                    view.appearance == nil,
+                "the window does not follow the host's appearance " + text(name));
+    }
+    host.appearance = nil;
 
     // Empty, then the mono-track failure, then a mono filter that plays.
     require([view.statusField.stringValue isEqualToString:@"No filter"],
@@ -484,6 +496,32 @@ void window() {
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "reset Gain");
     require(now == 0 && gain.doubleValue == 0, "reset Gain: " + std::to_string(now));
+    // jrp's GarageBand run (1 November 2026): with a value half typed in the
+    // field, Option-click reset the slider, and leaving the field then put
+    // the typed value back. A reset or a slider move drops the typing.
+    NSTextField* typing = view.settingValues[0];
+    const auto start_typing = [&](NSString* typed) {
+        require([host makeFirstResponder:typing] && typing.currentEditor != nil,
+                "the Gain field did not start editing");
+        typing.currentEditor.string = typed;
+    };
+    start_typing(@"-3.5");
+    [view resetSetting:0];
+    require(typing.currentEditor == nil && [typing.stringValue isEqualToString:@"0"],
+            "a reset left the typed value: " + text(typing.stringValue));
+    [host makeFirstResponder:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain after a reset while typing");
+    require(now == 0 && gain.doubleValue == 0,
+            "leaving the field undid the reset: " + std::to_string(now));
+    start_typing(@"-3.5");
+    gain.doubleValue = -20;
+    [gain sendAction:gain.action to:gain.target];
+    [host makeFirstResponder:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain after a slider move while typing");
+    require(now == -20 && [typing.stringValue isEqualToString:@"-20"],
+            "leaving the field undid the slider move: " + std::to_string(now));
     gain.doubleValue = -12;
     [gain sendAction:gain.action to:gain.target];
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),

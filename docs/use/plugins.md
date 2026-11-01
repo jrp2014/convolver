@@ -307,8 +307,9 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
-  slider to put it back to its default (0 dB, 100% wet), as in Logic. Mix
-  is labelled Dry and Wet at its ends. A host that shows
+  slider to put it back to its default (0 dB, 100% wet), as in Logic.
+  Moving or resetting a slider drops a value you had not finished typing.
+  Mix is labelled Dry and Wet at its ends. A host that shows
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own

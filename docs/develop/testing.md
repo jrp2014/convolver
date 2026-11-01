@@ -618,7 +618,10 @@ Four CTest tests run when the adapter is built (label `au`):
   as a problem in words), the Filter row, the Gain and Mix sliders (ranges,
   a slider setting its parameter, a typed value setting it, clamped at the
   range's end, text that is not a number changing nothing, the reset that
-  Option-click does, a host change moving the slider), the Latency menu
+  Option-click does, a reset or a slider move dropping a value half typed
+  in the field so that leaving it changes nothing, a host change moving
+  the slider), the window following the host window's light and dark
+  appearance, the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
   Added delay fact showing the new latency in use, a host change moving
   the menu), its status and

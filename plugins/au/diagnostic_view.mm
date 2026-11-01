@@ -622,12 +622,23 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self show:value at:i];
 }
 
+// The user moved or reset slider `i`: a value half typed in its field is
+// dropped, so that leaving the field later cannot put it back (jrp's
+// GarageBand run of 1 November 2026: Option-click reset Gain, then leaving
+// the field restored the typed -3.5).
+- (void)dropTyping:(NSUInteger)i {
+    NSTextField* field = _settingValues[i];
+    if (field.currentEditor)
+        [field abortEditing];
+}
+
 - (void)resetSetting:(NSUInteger)i {
     if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
         return;
     NSNumber* initial = settings_[i][@"default"];
     if (![initial isKindOfClass:[NSNumber class]])
         return;
+    [self dropTyping:i];
     controls_[i].doubleValue = initial.doubleValue;
     [self set:initial.doubleValue at:i];
 }
@@ -659,6 +670,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         [self resetSetting:i];
         return;
     }
+    [self dropTyping:i];
     [self set:slider.doubleValue at:i];
 }
 
