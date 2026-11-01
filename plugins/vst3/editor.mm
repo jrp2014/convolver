@@ -47,34 +47,34 @@ NSString* ns(const std::string& text) {
 // default from the controller's parameter, the value read from the
 // controller and changed as the SDK asks of an editor, with a drag as one
 // edit (begin and end).
-NSDictionary<NSString*, id>* setting(const SharedLink& link, ParamID id, NSString* name,
+NSDictionary<NSString*, id>* setting(const SharedLink& link, ParamID tag, NSString* name,
                                      NSString* unit) {
     Controller* controller = link->controller;
-    Parameter* parameter = controller ? controller->getParameterObject(id) : nullptr;
+    Parameter* parameter = controller ? controller->getParameterObject(tag) : nullptr;
     if (!parameter)
         return nil;
     SharedLink held = link;
     ConvolverSettingGetter get = ^double(void) {
       Controller* c = held->controller;
-      Parameter* p = c ? c->getParameterObject(id) : nullptr;
-      return p ? p->toPlain(c->getParamNormalized(id)) : NAN;
+      Parameter* p = c ? c->getParameterObject(tag) : nullptr;
+      return p ? p->toPlain(c->getParamNormalized(tag)) : NAN;
     };
     ConvolverSettingSetter set = ^(double plain) {
       Controller* c = held->controller;
-      Parameter* p = c ? c->getParameterObject(id) : nullptr;
+      Parameter* p = c ? c->getParameterObject(tag) : nullptr;
       if (!p)
           return;
       const ParamValue normalized = p->toNormalized(plain);
-      c->setParamNormalized(id, normalized);
-      c->performEdit(id, normalized);
+      c->setParamNormalized(tag, normalized);
+      c->performEdit(tag, normalized);
     };
     ConvolverSettingGesture begin = ^(void) {
       if (Controller* c = held->controller)
-          c->beginEdit(id);
+          c->beginEdit(tag);
     };
     ConvolverSettingGesture end = ^(void) {
       if (Controller* c = held->controller)
-          c->endEdit(id);
+          c->endEdit(tag);
     };
     return @{
         @"name" : name,
@@ -91,10 +91,10 @@ NSDictionary<NSString*, id>* setting(const SharedLink& link, ParamID id, NSStrin
 
 // A setting chosen from a list (Latency) as the window's menu: the item
 // names the controller gives, the value an item's index.
-NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID id, NSString* name,
+NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID tag, NSString* name,
                                     NSString* tip) {
-    NSMutableDictionary<NSString*, id>* entry = [setting(link, id, name, @"") mutableCopy];
-    Parameter* parameter = link->controller ? link->controller->getParameterObject(id) : nullptr;
+    NSMutableDictionary<NSString*, id>* entry = [setting(link, tag, name, @"") mutableCopy];
+    Parameter* parameter = link->controller ? link->controller->getParameterObject(tag) : nullptr;
     if (!entry || !parameter)
         return nil;
     NSMutableArray<NSString*>* titles = [NSMutableArray array];
