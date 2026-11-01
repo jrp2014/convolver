@@ -476,8 +476,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `au.editor` checks it on macOS CI. jrp's GarageBand run (1 November,
   `bbf94c5`, Release): typing a value (also with a decimal comma), the
   Latency row, the fold-out and a refused file passed; Option-click during
-  an unfinished edit was undone on leaving the field (fixed after it, with
-  an `au.editor` case); the window stayed dark with macOS set to Light, as
+  an unfinished edit was undone on leaving the field (fixed in `ddfc64c`,
+  with an `au.editor` case; jrp's re-check in GarageBand passed); the window stayed dark with macOS set to Light, as
   GarageBand's own window does. Still to check: a light rendering (in a
   host with a light window), a manual Mix drag, listening to the Latency
   gap and the kept echo, and VoiceOver reading the Audio facts and typed
