@@ -67,7 +67,9 @@ std::size_t encoded_host_state_size(const HostState&) noexcept;
 // PLUG-12: why this state is too large to save, in full sentences saying what
 // to change, or empty when it fits. HostFilter::load refuses such a filter
 // before accepting it, so a plug-in never plays a filter it cannot save, and
-// convolver-preset refuses to write it.
+// convolver-preset refuses to write it. PLUG-13: a filter fits only with room
+// for the settings (version 3's five words), even when the state holds none,
+// so changing a VST3 setting never makes an accepted filter unsaveable.
 std::string host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.

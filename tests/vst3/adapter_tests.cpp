@@ -1634,6 +1634,51 @@ void report_and_files() {
     c.terminate();
     p.terminate();
 }
+// PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
+// default settings loaded and saved, and after Gain changed to -6 dB
+// getState() failed. Load, change a setting, save and restore, at the limit.
+void settings_at_state_limit() {
+    // One mono path takes 17 words besides its samples; 5 more are kept free
+    // for the settings.
+    constexpr std::size_t at_limit = convolver::max_host_state_bytes / 4 - 22;
+    const auto state = [](std::size_t samples) {
+        convolver::Configuration c{48000, 1, 1, 0, {}, {}, {}};
+        c.paths.push_back({std::vector<float>(samples, 0.f), {{0, 1}}, {{0, 1}}});
+        c.paths[0].impulse[0] = 1;
+        auto stream = std::make_unique<MemoryStream>();
+        require(write_state(stream.get(), convolver::HostState{std::move(c)}),
+                "encode a filter near the limit");
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        return stream;
+    };
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "limit initialize");
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "limit buses");
+    require(p.setState(state(at_limit + 1).get()) == kResultFalse,
+            "a filter with no room for the settings was accepted");
+    require(p.setState(state(at_limit).get()) == kResultOk, "the filter at the limit was refused");
+    // The host changes Gain to -6 dB, as in the review.
+    ParameterChanges gain;
+    int32 index = 0;
+    gain.addParameterData(gain_id, index)->addPoint(0, normalized_gain(-6), index);
+    ProcessData flush{};
+    flush.inputParameterChanges = &gain;
+    require(p.process(flush) == kResultOk && p.settings().gain_db != 0, "limit gain");
+    MemoryStream saved;
+    require(p.getState(&saved) == kResultOk, "the filter at the limit did not save with Gain");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    Processor reopened;
+    require(reopened.initialize(&context) == kResultOk &&
+                reopened.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+            "limit reopen");
+    require(reopened.setState(&saved) == kResultOk &&
+                std::abs(reopened.settings().gain_db - p.settings().gain_db) < 1e-9,
+            "the saved filter and Gain were not restored");
+    reopened.terminate();
+    p.terminate();
+}
 void controller_conversions() {
     HostApplication context;
     Controller c;
@@ -1676,6 +1721,7 @@ int run(const std::filesystem::path& preset_path) {
         controller_conversions();
         settings_parameters();
         report_and_files();
+        settings_at_state_limit();
         tail_measured_at_output();
         output_silence_flags();
         output_silence_flags_64();

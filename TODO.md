@@ -992,6 +992,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   be saved. `HostFilter::load` refuses a filter whose state would exceed the
   limit before installing it (`too_large`), and `convolver-preset` refuses
   to write one; [host state](docs/develop/plugin-contract.md#host-state).
+- [x] **PLUG-13 — Keep room for the settings in saved state.** 1 November
+  2026, from jrp's review of `276c7dc`: a VST3 filter that filled the limit
+  at default settings could not be saved once Gain changed. The size check
+  counts the settings whether or not they are in use;
+  [host state](docs/develop/plugin-contract.md#host-state).
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's
