@@ -254,7 +254,10 @@ void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept
 
 void Effect::request_latency() noexcept {
     latency_requested_.store(true);
-    latency_requested_.notify_one();
+    // notify_all: libc++ parks waiters on a table shared by many atomics, so
+    // notify_one can wake another unit's worker and leave this one asleep
+    // (au.lifecycle, with many units, hung in the destructor's join).
+    latency_requested_.notify_all();
 }
 
 void Effect::latency_worker() noexcept {
