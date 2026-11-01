@@ -67,6 +67,11 @@ Until 1.0 the C++ API may change between minor versions.
   `details` with `headline`, `filter_name`, `filter_note`, `audio`
   (`HostFact`), `settings`, `reference`, `sample_rate` and
   `latency_waits` (pre-1.0 internal API).
+- The [status page](docs/project/status.md) is checked again against `main`,
+  now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
+  and the CI runs it relies on, the Audio Unit's Latency setting, window
+  redesign and editor tests, jrp's GarageBand run of the redesign and the
+  typed-box defects it led to, and what remains of the settings and windows.
 
 ## [0.7.1] - 2026-11-01
 
