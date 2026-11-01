@@ -70,7 +70,7 @@ jobs:
       # Compiler cache: pull requests restore it; main and manual runs also
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
-        uses: hendrikmuhs/ccache-action@v1.2.24
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d  # v1.2.24
         with:
           key: au-macos-15
           max-size: 1G
@@ -150,7 +150,7 @@ jobs:
       - name: Tools and libraries
         run: brew install libsndfile fftw
       - name: Compiler cache
-        uses: hendrikmuhs/ccache-action@v1.2.24
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d  # v1.2.24
         with:
           key: au-sanitizers-macos-15
           max-size: 1G
