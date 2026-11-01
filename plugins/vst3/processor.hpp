@@ -224,6 +224,9 @@ class Controller final : public Steinberg::Vst::EditController,
     Steinberg::tresult PLUGIN_API getParamValueByString(Steinberg::Vst::ParamID,
                                                         Steinberg::Vst::TChar*,
                                                         Steinberg::Vst::ParamValue&) override;
+    // VST3-11: the window (editor.hpp) for ViewType::kEditor; none on
+    // systems without one yet.
+    Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
     // The controller keeps no state of its own; hosts call these on every save
     // and load, so they succeed rather than report kNotImplemented (VST3-8).
     // Hosts therefore save an empty controller state: any controller state

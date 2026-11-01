@@ -151,7 +151,7 @@ std::string file_name(const std::string& path) {
 }
 
 // The Audio section: what plays, in plain words
-// (docs/use/plugins.md#the-audio-units-window).
+// (docs/use/plugins.md#convolvers-window).
 std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFacts& facts) {
     std::vector<HostFact> audio;
     const auto& host = facts.host;

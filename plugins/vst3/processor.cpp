@@ -2,6 +2,7 @@
 #include "processor.hpp"
 #include "bytes.hpp"
 #include "convolver_sdk.hpp"
+#include "editor.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/base/ibstream.h"
@@ -972,6 +973,11 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     if (latency_frames(getParamNormalized(latency_id)) != before && componentHandler)
         componentHandler->restartComponent(kLatencyChanged);
     return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
+}
+IPlugView* PLUGIN_API Controller::createView(FIDString name) {
+    if (!name || std::string_view(name) != ViewType::kEditor)
+        return nullptr;
+    return create_editor(*this);
 }
 std::vector<std::pair<std::string, std::string>> Controller::report() {
     // Outside the lock: the processor answers with its status_message.

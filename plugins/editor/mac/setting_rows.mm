@@ -24,6 +24,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     void (^chosen_)(void);
     NSInteger dragging_; // The slider the user is dragging, or -1.
     NSInteger typed_;    // The box whose text the user has changed, or -1.
+    NSInteger gesture_;  // The setting whose edit is open (its begin called), or -1.
     int sampleRate_;     // The host's, for the Latency row; 0 before it starts.
     BOOL latencyWaits_;  // The chosen Latency is not in use yet.
 }
@@ -37,6 +38,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     chosen_ = [chosen copy];
     dragging_ = -1;
     typed_ = -1;
+    gesture_ = -1;
     NSMutableArray<NSView*>* rows = [NSMutableArray array];
     NSMutableArray<NSControl*>* controls = [NSMutableArray array];
     NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
@@ -178,11 +180,42 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         [number stringByAppendingString:settings_[i][@"unit"]];
 }
 
-// Passes `value` for setting `i` to the host and shows it.
+// Opens an edit of setting `i` (ending any other), and ends the open one.
+- (void)beginGesture:(NSUInteger)i {
+    if (gesture_ == static_cast<NSInteger>(i))
+        return;
+    [self endGesture];
+    gesture_ = static_cast<NSInteger>(i);
+    ConvolverSettingGesture begin = settings_[i][@"begin"];
+    if (begin)
+        begin();
+}
+
+- (void)endGesture {
+    if (gesture_ < 0)
+        return;
+    const auto i = static_cast<NSUInteger>(gesture_);
+    gesture_ = -1;
+    ConvolverSettingGesture end = settings_[i][@"end"];
+    if (end)
+        end();
+}
+
+- (void)dealloc {
+    [self endGesture];
+}
+
+// Passes `value` for setting `i` to the host and shows it: inside the open
+// edit of a drag, or as an edit of its own.
 - (void)set:(double)value at:(NSUInteger)i {
+    const BOOL own = gesture_ != static_cast<NSInteger>(i);
+    if (own)
+        [self beginGesture:i];
     ConvolverSettingSetter set = settings_[i][@"set"];
     if (set)
         set(value);
+    if (own)
+        [self endGesture];
     [self show:value at:i];
 }
 
@@ -233,12 +266,17 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                        type == NSEventTypeLeftMouseUp;
     dragging_ =
         type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ? slider.tag : -1;
-    if (mouse && (event.modifierFlags & NSEventModifierFlagOption)) {
+    // A drag is one edit, from the mouse going down to it coming up.
+    if (mouse && type != NSEventTypeLeftMouseUp)
+        [self beginGesture:i];
+    if (mouse && (event.modifierFlags & NSEventModifierFlagOption))
         [self resetSetting:i];
-        return;
+    else {
+        [self dropTyping:i];
+        [self set:slider.doubleValue at:i];
     }
-    [self dropTyping:i];
-    [self set:slider.doubleValue at:i];
+    if (type == NSEventTypeLeftMouseUp && gesture_ == slider.tag)
+        [self endGesture];
 }
 
 // AppKit sends this at the user's first change to a box's text, not when
@@ -286,8 +324,10 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 - (void)readWithSampleRate:(int)sampleRate latencyWaits:(BOOL)latencyWaits {
     sampleRate_ = sampleRate;
     latencyWaits_ = latencyWaits;
-    if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0)
+    if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.
+        [self endGesture];
+    }
     for (NSUInteger i = 0; i < settings_.count; ++i) {
         const BOOL dragging = dragging_ == static_cast<NSInteger>(i);
         ConvolverSettingGetter get = settings_[i][@"get"];

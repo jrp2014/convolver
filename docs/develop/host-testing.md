@@ -252,11 +252,12 @@ except the Audio Unit build, which runs in a source checkout.
 2. Set *File › Project settings* to 48000 Hz and the audio device to 48 kHz.
    Import the 48 kHz test file onto a track.
 3. Open the track's FX window and add Convolver. With no preset loaded it
-   passes stereo audio unchanged. Convolver has no window of its own, so
-   REAPER should show its generic controls: Bypass and a read-only **Status**.
-   Status should read `No filter: audio passes unchanged. Load a Convolver
-   preset.` Record whether REAPER shows Status, and where (the generic
-   controls, or the **Param** button's list).
+   passes stereo audio unchanged. On macOS REAPER shows
+   [Convolver's window](../use/plugins.md#convolvers-window) (VST3-11), with
+   the status **No filter**; elsewhere, or with the FX window's **UI** button
+   off, it shows its generic controls: Gain, Mix, Latency, Bypass and a
+   read-only **Status**, which should read `No filter: audio passes
+   unchanged. Load a Convolver preset.` Record what REAPER shows.
 4. From the **+** button beside the FX window's preset menu, import
    `presets/identity-48000-stereo/filter.vstpreset` (the import item for VST
    preset files). Play: the sound is unchanged. Import
@@ -284,6 +285,20 @@ except the Audio Unit build, which runs in a source checkout.
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
    48000 Hz: the echo returns. Copy the log into the report.
+10. The window and settings (macOS, VST3-11). Use a source checkout's
+    `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
+    click **Choose…**, pick that file: the status reads Playing, the Filter
+    row reads `filter.cfg`, and REAPER marks the project changed (an
+    asterisk in the title bar). Drag Gain to about −12 dB while playing:
+    the level drops without a click, and *Edit › Undo* undoes the whole drag
+    in one step. Set Mix to 0%: you hear the dry track. Option-click both
+    sliders to reset them. Choose 1024 frames in the Latency menu: after a
+    short gap the sound carries on, the window's Latency row reads
+    `21.3 ms`, the log has `Latency set to 1024 frames`, and the track stays
+    in time with the source. Record where REAPER shows the plug-in's latency
+    (its delay compensation) and whether it reads 1024 samples. Open the disclosure triangle: REAPER's FX window grows to fit.
+    Click **Copy Diagnostics** and paste into the report. Save, quit and
+    reopen: Gain, Mix and Latency come back.
 
 ### Audacity (VST3)
 
@@ -323,6 +338,15 @@ except the Audio Unit build, which runs in a source checkout.
    disagree.
 8. Record what a mono track does with a stereo preset; Audacity asks the
    plug-in for two channels even there, so no particular result is expected.
+9. The window (macOS, VST3-11). Open the real-time effect's window: it is
+   [Convolver's window](../use/plugins.md#convolvers-window). Choose
+   `examples/first-use/stereo/filter.cfg` with **Choose…** and play. Record
+   whether the playing copy plays it (Audacity copies the window's copy's
+   state to it; the log's `VST3 #n` lines show which copy loaded what), and
+   what the window's own copy reads. Move Gain and Mix and listen.
+   Choose 1024 frames for Latency and record whether Audacity restarts the
+   effect at once or at the next playback, and whether the track stays in
+   time. Record anything the window does differently from REAPER.
 
 ### GarageBand (Audio Unit)
 

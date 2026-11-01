@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// AU-6: the settings in Convolver's window (Gain, Mix and Latency), apart
+// AU-6, VST3-11: the settings in Convolver's window (Gain, Mix and Latency), apart
 // from the window's layout (AU-10, jrp's review of 1 November 2026). Each
 // setting is a full control, because a host that shows the window shows it
 // instead of its generic controls: a slider with its value typed beside it
@@ -14,7 +14,8 @@
 // Objective-C classes share one namespace per process, so the build names
 // this class with Convolver's version, as it does the view.
 #ifndef CONVOLVER_SETTING_ROWS
-#error "CONVOLVER_SETTING_ROWS names the setting rows' class; plugins/au/CMakeLists.txt defines it."
+#error                                                                                             \
+    "CONVOLVER_SETTING_ROWS names the setting rows' class; each format's CMakeLists.txt defines it."
 #endif
 
 NS_ASSUME_NONNULL_BEGIN
@@ -23,6 +24,9 @@ NS_ASSUME_NONNULL_BEGIN
 // change the user made, which the format passes to the host.
 typedef double (^ConvolverSettingGetter)(void);
 typedef void (^ConvolverSettingSetter)(double value);
+// The start or end of one edit (VST3's beginEdit and endEdit), so a host
+// records a drag as one gesture.
+typedef void (^ConvolverSettingGesture)(void);
 // One setting the window shows as a slider is a dictionary with the keys
 // @"name" (NSString), @"minimum", @"maximum" and @"default" (NSNumber),
 // @"unit" (NSString, as @" dB") for writing its value, @"get"
@@ -30,7 +34,11 @@ typedef void (^ConvolverSettingSetter)(double value);
 // @"low" and @"high" (NSString), words under the slider's ends (Mix: Dry and
 // Wet). With @"choices" (NSArray<NSString*>) it is a menu instead, whose value
 // is the chosen item's index (Latency); @"tip" (NSString), if present, is the
-// control's tooltip.
+// control's tooltip. Optionally @"begin" and @"end" (ConvolverSettingGesture)
+// bracket each edit: a slider calls begin when the mouse goes down and end
+// when it comes up, and every other change (typing, a menu choice,
+// Option-click, a key) calls begin, set and end, as the VST3 SDK asks of an
+// editor. Without them, changes are only set.
 
 @interface CONVOLVER_SETTING_ROWS : NSObject
 // `chosen` runs after the user chooses from a menu, so the window can read
@@ -45,6 +53,9 @@ typedef void (^ConvolverSettingSetter)(double value);
 - (void)readWithSampleRate:(int)sampleRate latencyWaits:(BOOL)latencyWaits;
 // Setting `i` back to its default, as Option-click on its slider does.
 - (void)resetSetting:(NSUInteger)i;
+// Ends an edit still open (a drag the window stopped seeing), as when the
+// window closes.
+- (void)endGesture;
 // Each setting's row, without its "Name:" label, in the settings' order.
 @property(readonly, nonatomic) NSArray<NSView*>* rows;
 // Each setting's slider or menu, and its value: an editable number field for

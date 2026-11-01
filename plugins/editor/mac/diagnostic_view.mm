@@ -394,8 +394,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [super viewDidMoveToWindow];
     [timer_ invalidate];
     timer_ = nil;
-    // A file chosen for another window, or none, is not loaded.
+    // A file chosen for another window, or none, is not loaded, and a drag
+    // the window no longer sees ends its edit.
     [self stopChoosing];
+    [settings_ endGesture];
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSWindowWillCloseNotification
                                                   object:nil];

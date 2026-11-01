@@ -630,8 +630,25 @@ How each adapter meets the contract where its format differs:
   marked silent only once the tail has decayed. Rejections are returned to the
   host as errors, shown by the Status parameter and written to the Convolver
   log and the unified log.
+- **VST3 window on macOS (VST3-11).** Reached as the SDK documents an
+  editor without VSTGUI: `Controller::createView(ViewType::kEditor)` returns
+  the SDK's `EditorView` for `kPlatformTypeNSView` only, sized to the shared
+  view's fitted content (`getSize`), which `attached()` adds to the host's
+  view and `removed()` takes away. It is not resizable by the user
+  (`canResize` stays false); when its content changes height (the folded
+  lines) it asks the host with `IPlugFrame::resizeView`, and the host's
+  `onSize` keeps it in place. Everything goes through the edit controller on
+  the host's main thread: settings as `beginEdit`, `performEdit` and
+  `endEdit` (a drag is one edit; a click, a typed value, a menu choice or a
+  reset is one each), with `setParamNormalized` for the controller's own
+  copy; the report as `ConvolverReport` and the copy the processor sent;
+  a chosen or dropped file as `ConvolverLoad`. The view's blocks hold a
+  shared link that the editor clears in its destructor, so nothing the view
+  does afterwards (a timer, a closing file dialog) reaches a controller the
+  host has released. The view does not touch the processor or the audio
+  thread.
 - **Audio Unit window in a host** (the evidence is in TODO AU-6); the VST3
-  window (VST3-11) starts from these:
+  window (VST3-11) follows these too:
   - The host may run the plug-in in a process of its own (GarageBand:
     `AUHostingServiceXPC_arrow`). The view's window is then an
     `NSServiceViewControllerWindow` of that process, shown at a floating

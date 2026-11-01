@@ -33,6 +33,15 @@ Until 1.0 the C++ API may change between minor versions.
   and installs or refuses it as for a preset; an accepted file marks the
   project changed (`setDirty`). Other systems refuse the file with a
   reason until their windows exist.
+- VST3 on macOS: Convolver's window (VST3-11, in progress), the same view as
+  the Audio Unit's: the status and what to change, the filter with Choose…
+  and drag and drop, Gain, Mix and Latency, the Audio facts, Copy
+  Diagnostics and Show Log. It is the SDK's `EditorView` for an NSView, as
+  the VST3 documentation describes an editor without VSTGUI; settings change
+  through `beginEdit`, `performEdit` and `endEdit` (a slider drag is one
+  edit), and the window asks the host to resize it when its folded lines
+  open. Checked off screen by `vst3.editor`; not yet tried in REAPER or
+  Audacity. Windows and Linux have no window yet (VST3-12, VST3-13).
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
@@ -48,6 +57,11 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`
+  (VST3-11), shared by the Audio Unit and VST3, which each build them with
+  class names of their own. The setting rows can now mark the start and end
+  of a slider drag for a format that asks (VST3 does); the Audio Unit's
+  window behaves as before.
 - Library (VST3-4): `HostState` gains `settings`, an optional
   `HostSettings` that host state version 3 records (VST3 only), and
   `HostSettings` is declared before it in `convolver/host.hpp`. Existing

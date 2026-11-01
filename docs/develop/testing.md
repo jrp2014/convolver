@@ -540,6 +540,17 @@ Playing, the filter named and saved) or refused for its rate, an empty path,
 and a build with no file reader. Where the build has no reader of its own
 (Linux and Windows), the test lends the processor libsndfile.
 
+On macOS `vst3.editor` opens the window (VST3-11) as a host does:
+`createView("editor")` (and nothing for another name), NSView only, not
+resizable, its size, attached to an off-screen window's content view, the
+shared view with VST3's own class name, the status and title, the two
+sliders and the Latency menu, a Gain the host set shown in the window, a
+reset that is one `beginEdit`, `performEdit`, `endEdit`, a Latency choice
+that is one edit, reaches the processor and asks the host to restart (and
+the window saying it is not in use until then), a chosen WAV loaded and the
+project marked changed, Copy Diagnostics, a resize request when the folded
+lines open, and `removed()`.
+
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)
 and adds automation patterns. The validator does not create three tests that

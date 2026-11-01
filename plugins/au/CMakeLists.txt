@@ -70,19 +70,21 @@ target_compile_options(convolver_au_adapter PRIVATE -Wall -Wextra -Wpedantic)
 set_target_properties(convolver_au_adapter PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
-# AU-6: Convolver's window, in AppKit (Objective-C++ with ARC), compiled
-# into the component and the window test. Objective-C classes share one
-# namespace per process, so their names carry the version: two Convolver
-# builds loaded in one host keep their own windows.
+# AU-6: Convolver's window, in AppKit (Objective-C++ with ARC): the view the
+# VST3 plug-in shows too (plugins/editor/mac/), with the Audio Unit's view
+# factory, compiled into the component and the window test. Objective-C
+# classes share one namespace per process, so their names carry the version:
+# two Convolver builds loaded in one host keep their own windows.
 enable_language(OBJCXX)
 string(REPLACE "." "_" au_class_version "${Convolver_VERSION}")
 set(au_view_factory "ConvolverAUViewFactory_${au_class_version}")
+set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
 set(au_view_sources "${CMAKE_CURRENT_SOURCE_DIR}/view_factory.mm"
-    "${CMAKE_CURRENT_SOURCE_DIR}/diagnostic_view.mm" "${CMAKE_CURRENT_SOURCE_DIR}/setting_rows.mm")
+    "${mac_editor}/diagnostic_view.mm" "${mac_editor}/setting_rows.mm")
 set_source_files_properties(${au_view_sources} PROPERTIES
     COMPILE_OPTIONS "-fobjc-arc;-Wall;-Wextra"
     COMPILE_DEFINITIONS "CONVOLVER_AU_VIEW_FACTORY=${au_view_factory};CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version}"
-    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}")
+    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR};${mac_editor}")
 # The unit names the factory class and finds its own bundle for hosts.
 target_compile_definitions(convolver_au_adapter PRIVATE
     "CONVOLVER_AU_VIEW_FACTORY_NAME=\"${au_view_factory}\""
@@ -156,7 +158,7 @@ if(CONVOLVER_BUILD_TESTS)
     set_source_files_properties("${PROJECT_SOURCE_DIR}/tests/au/editor_tests.mm" PROPERTIES
         COMPILE_OPTIONS "-fobjc-arc"
         COMPILE_DEFINITIONS "CONVOLVER_DIAGNOSTIC_VIEW=ConvolverDiagnosticView_${au_class_version};CONVOLVER_SETTING_ROWS=ConvolverSettingRows_${au_class_version};CONVOLVER_AU_VIEW_FACTORY=${au_view_factory}"
-        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}")
+        INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR};${mac_editor}")
     set_target_properties(convolver_au_editor_tests PROPERTIES OBJCXX_STANDARD 23 OBJCXX_EXTENSIONS OFF)
     target_link_libraries(convolver_au_editor_tests PRIVATE convolver_au_adapter convolver_presets
         "-framework AppKit")

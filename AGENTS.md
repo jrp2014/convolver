@@ -7,7 +7,8 @@ holds two implementations:
 - **Portable core (active):** C++20 library, CLI and plug-in adapters built
   with CMake. `include/convolver/` (public API), `portable/` (engine, host
   lifecycle, FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/`
-  (one folder per format: `plugins/vst3/`, `plugins/lv2/` and `plugins/au/`),
+  (one folder per format: `plugins/vst3/`, `plugins/lv2/` and `plugins/au/`,
+  and `plugins/editor/` for the macOS window VST3 and the AU share),
   `tests/` (one folder per area), `scripts/release/` and `packaging/`
   (preview release builds).
 - **Historical Windows code (preserved):** `historical/` — the 2005–2006 engine

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// AU-6: Convolver's window, laid out as jrp approved on 1 November 2026
-// (docs/use/plugins.md#the-audio-units-window): the status as a symbol, a word and what
+// AU-6, VST3-11: Convolver's window on macOS, laid out as jrp approved on 1 November 2026
+// (docs/use/plugins.md#convolvers-window): the status as a symbol, a word and what
 // plays, why and what to change; a form with the Filter (its file name and
 // Choose…), Gain and Mix (slider, typed value, unit; Option-click resets) and
 // Latency (menu and the time it adds); the Audio facts in plain words; the
@@ -9,21 +9,23 @@
 // stack views (auto layout), so screen readers, keyboard use, dark mode and
 // text scaling come from the system. It reads and sets everything through
 // blocks a format supplies (the Audio Unit's custom properties and
-// parameters), on the main thread, and never touches the processor or the
+// parameters; VST3's edit controller), on the main thread, and never touches the processor or the
 // audio thread (docs/project/plans/2026-10-24-plugin-editor.md#threads).
 // Everything it says about the filter and the audio comes from the shared
-// report (portable/host_report), so the VST3 windows (VST3-11 to VST3-13)
-// can show the same; its control labels, hints and tooltips are its own. VST3-11 is to
-// reuse this view, moving it to a folder both formats share.
+// report (portable/host_report), so every format's window shows the same;
+// its control labels, hints and tooltips are its own. The Audio Unit (AU-6,
+// its view factory) and VST3 on macOS (VST3-11, its editor) both show this
+// view, each supplying the blocks.
 #pragma once
 #import "setting_rows.h"
 #import <AppKit/AppKit.h>
 
 // Objective-C classes share one namespace per process, so the build names
-// this class with Convolver's version (ConvolverDiagnosticView_0_6_0): two
-// Convolver builds in one host each keep their own window.
+// this class with Convolver's version (ConvolverDiagnosticView_0_6_0 in the
+// Audio Unit, ConvolverVST3View_0_6_0 in VST3): two Convolver builds or
+// formats in one host each keep their own window.
 #ifndef CONVOLVER_DIAGNOSTIC_VIEW
-#error "CONVOLVER_DIAGNOSTIC_VIEW names the view class; plugins/au/CMakeLists.txt defines it."
+#error "CONVOLVER_DIAGNOSTIC_VIEW names the view class; each format's CMakeLists.txt defines it."
 #endif
 
 NS_ASSUME_NONNULL_BEGIN

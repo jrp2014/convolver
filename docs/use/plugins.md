@@ -17,10 +17,11 @@ does not fit. Installing is in [install](install.md); making presets is in
   and the host saves the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
-  The Audio Unit also has a [window](#the-audio-units-window) that
-  shows the status, why it is silent and what to change, the filter and
-  settings, what plays in plain words, with Copy Diagnostics and Show Log;
-  the VST3 and LV2 plug-ins have no window yet.
+  The Audio Unit and the VST3 plug-in on macOS also have a
+  [window](#convolvers-window) that shows the status, why it is silent and
+  what to change, the filter and settings, what plays in plain words, with
+  Copy Diagnostics and Show Log; the VST3 plug-in on Windows and Linux and
+  the LV2 plug-in have no window yet.
 - Latency is 256 samples by default, and the host makes up for it. The
   VST3 plug-in and the Audio Unit have [settings](#settings) for the gain,
   the wet/dry mix and the latency; the LV2 plug-in does not have them yet
@@ -49,8 +50,8 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | How to get it | Preview package, or build | Build from source | Build from source |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
-| Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
-| Choose a `.cfg` or IR file directly | No | [Yes](#the-audio-units-window), in its window | [Yes](#lv2-filter-files) |
+| Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
+| Choose a `.cfg` or IR file directly | [On macOS](#convolvers-window), in its window | [Yes](#convolvers-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
 | [Settings](#settings): gain, mix, latency | Yes | Yes | Not yet |
@@ -92,9 +93,10 @@ The filter is prepared away from the audio, then installed. A preset loaded
 before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
-In the Audio Unit you can also choose the `.cfg` file, list or impulse
-response itself, in Convolver's window: **Choose…** beside Filter, or drop
-the file on the window ([the Audio Unit's window](#the-audio-units-window)). In LV2
+In the Audio Unit, and in the VST3 plug-in on macOS, you can also choose the
+`.cfg` file, list or impulse response itself, in Convolver's window:
+**Choose…** beside Filter, or drop the file on the window
+([Convolver's window](#convolvers-window)). In LV2
 you choose it with the host's file chooser
 ([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
 file as `convolver-preset` does, for the rate and channels the host has
@@ -156,8 +158,8 @@ How each format reports a refusal:
 ## Status and the Convolver log
 
 The VST3 and the Audio Unit say what they are doing in two places, the Status
-parameter and the Convolver log; the Audio Unit also shows both in
-[its window](#the-audio-units-window).
+parameter and the Convolver log; on macOS both also show them in
+[Convolver's window](#convolvers-window).
 
 **The Status parameter** is a read-only parameter that hosts can list with the
 plug-in's controls, for example in their generic plug-in window or parameter
@@ -249,13 +251,17 @@ still points to the log; on macOS the lines are in the system log). LV2 has
 no file of its own: it writes to the host's log, including why it refused to
 start at the host's sample rate and when a save failed.
 
-### The Audio Unit's window
+### Convolver's window
 
-The Audio Unit offers hosts a window of its own (`auval` lists it as a Cocoa
-view). Hosts that show plug-in views open it from the plug-in's slot; if a
-host shows its generic sliders instead, choose the plug-in's own view in the
-plug-in window, where the host offers the choice. GarageBand opens it from
-the plug-in's button in the track's Plug-ins area. From the top, the window has:
+The Audio Unit, and the VST3 plug-in on macOS, offer hosts a window of their
+own (`auval` lists the Audio Unit's as a Cocoa view). Hosts that show plug-in
+views open it from the plug-in's slot; if a host shows its generic sliders
+instead, choose the plug-in's own view in the plug-in window, where the host
+offers the choice. GarageBand opens it from the plug-in's button in the
+track's Plug-ins area; REAPER and Audacity open the VST3 plug-in's window
+when you add the effect or click its name in the effects list. Both formats
+show the same window, with the differences listed after the description.
+From the top, the window has:
 
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
   as in the log) and the program that runs the plug-in, or "the host's
@@ -316,9 +322,10 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own
-  controls), except the one you are dragging. The window does not yet mark the start and end of a drag, so a
-  host recording automation from it may record each step separately; not
-  yet tried in GarageBand.
+  controls), except the one you are dragging. In the Audio Unit the window
+  does not yet mark the start and end of a drag, so a host recording
+  automation from it may record each step separately; not yet tried in
+  GarageBand.
 - **Latency**: a menu of block sizes, with the delay it adds at the host's
   rate beside it; a new choice plays at once, and "not in use yet" shows
   only until it does ([settings](#settings)).
@@ -340,7 +347,7 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   a warning sign and says what differs, in red.
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's), the software
-  (version, FFT library, CPU kernels, the Audio Unit SDK, and what reads the
+  (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
   filter files), and where the log is.
 - **Copy Diagnostics** puts all of this, with the settings and this
   instance's recent lines from the Convolver log, on the clipboard as plain
@@ -355,6 +362,21 @@ window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows the last report until the
 filter is ready. The window has no list of recent files and does not
 reload a file yet.
+
+**In VST3** (VST3-11, macOS only so far) the window behaves as above,
+except:
+
+- The title line names the instance as the log does (`VST3 #2`).
+- A Latency choice plays once the host restarts the plug-in, which
+  Convolver asks it to do at once; until then the Latency row says the
+  choice is not in use yet ([settings](#settings)).
+- Dragging a Gain or Mix slider is one change for the host's undo and
+  automation, from mouse down to mouse up, as the VST3 SDK asks.
+- An accepted file marks the project changed, so the host asks to save it.
+- The window grows when the file, software and log lines are shown, and
+  asks the host to make its window fit; the user cannot resize it.
+- The software line names macOS AudioToolbox as the reader of filter files,
+  as in the Audio Unit. Not yet tried in REAPER or Audacity (HOST-1).
 
 ## Settings
 
