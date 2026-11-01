@@ -308,7 +308,8 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
   slider to put it back to its default (0 dB, 100% wet), as in Logic.
-  Moving or resetting a slider drops a value you had not finished typing.
+  Moving or resetting a slider drops a value you had not finished typing
+  in its own box.
   Leaving a box without changing it sets nothing, so the rounded value it
   shows does not replace a more exact one, or one the host has set since.
   Mix is labelled Dry and Wet at its ends. A host that shows

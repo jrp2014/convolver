@@ -620,10 +620,11 @@ Four CTest tests run when the adapter is built (label `au`):
   setting it and keeping the box's focus after Return, clamped at the
   range's end, text that is not a number changing nothing, the reset that
   Option-click does, a reset or a slider move dropping a value half typed
-  in the field so that leaving it changes nothing, a box left unchanged
+  in its own field so that leaving it changes nothing, while the other
+  slider leaves it alone, typing again after Return, a box left unchanged
   setting nothing (neither its rounded text nor a value older than a host
-  change), a host change moving the slider), the window following the host window's light and dark
-  appearance, the Latency menu
+  change), a host change moving the slider), the window following the
+  host window's light and dark appearance, the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
   Added delay fact showing the new latency in use, a host change moving
   the menu), its status and

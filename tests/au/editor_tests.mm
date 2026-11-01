@@ -527,6 +527,26 @@ void window() {
           "Gain after a slider move while typing");
     require(now == -20 && [typing.stringValue isEqualToString:@"-20"],
             "leaving the field undid the slider move: " + std::to_string(now));
+    // Moving the other slider keeps what is typed in this box; and after
+    // Return, typing again in the same box (no new click) still counts.
+    start_typing(@"-9");
+    mix.doubleValue = 60;
+    [mix sendAction:mix.action to:mix.target];
+    auto* editor = static_cast<NSTextView*>(typing.currentEditor);
+    require(editor != nil, "moving Mix ended typing in the Gain box");
+    [editor insertNewline:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain typed while Mix moved");
+    require(now == -9, "moving Mix dropped the Gain typed beside it: " + std::to_string(now));
+    editor = static_cast<NSTextView*>(typing.currentEditor);
+    require(editor != nil, "Return left the Gain box");
+    [editor selectAll:nil];
+    [editor insertText:@"-8" replacementRange:editor.selectedRange];
+    [editor insertNewline:nil];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "Gain typed again after Return");
+    require(now == -8, "typing again after Return set nothing: " + std::to_string(now));
+    [host makeFirstResponder:nil];
     // Clicking in the box and leaving it unchanged sets nothing: not the
     // rounded text ("-6.5" for -6.46 dB), and not the value from before a
     // host change made while the box was being edited (automation).

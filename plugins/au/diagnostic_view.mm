@@ -629,12 +629,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self show:value at:i];
 }
 
-// The user moved or reset slider `i`: a value half typed in its field is
-// dropped, so that leaving the field later cannot put it back (jrp's
+// The user moved or reset slider `i`: a value half typed in its own field
+// is dropped, so that leaving the field later cannot put it back (jrp's
 // GarageBand run of 1 November 2026: Option-click reset Gain, then leaving
-// the field restored the typed -3.5).
+// the field restored the typed -3.5). Typing in the other box stays.
 - (void)dropTyping:(NSUInteger)i {
-    typed_ = -1;
+    if (typed_ == static_cast<NSInteger>(i))
+        typed_ = -1;
     NSTextField* field = _settingValues[i];
     if (field.currentEditor)
         [field abortEditing];
@@ -733,6 +734,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         ConvolverSettingGetter get = settings_[i][@"get"];
         const double value = get ? get() : NAN;
         if (std::isnan(value)) {
+            if (typed_ == static_cast<NSInteger>(i))
+                typed_ = -1; // Disabling the box ends its editing unread.
             controls_[i].enabled = NO;
             _settingValues[i].enabled = NO;
             _settingValues[i].stringValue = @"";
