@@ -12,8 +12,8 @@ HostState filter_file_state(const std::filesystem::path& path,
                             std::vector<std::filesystem::path>* raw_filters, bool plugin,
                             bool options, std::vector<std::filesystem::path>* sources) {
     HostState state;
-    state.configuration =
-        detail::load_configuration(path, selection, reader, sources, raw_filters, plugin, options);
+    state.configuration = detail::load_configuration(path, selection, reader, nullptr, raw_filters,
+                                                     plugin, options, sources);
     return state;
 }
 

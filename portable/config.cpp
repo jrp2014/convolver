@@ -613,6 +613,7 @@ bool Resolver::visit(const std::filesystem::path& path) {
                                  "configuration list nesting/entry limit exceeded");
     const auto resolved = canonical(path, {path, 0, 0});
     sources_.push_back(resolved);
+    chosen_sources_.push_back(resolved);
     if (!active_.insert(resolved).second)
         throw ConfigurationError("cycle", {path, 0, 0},
                                  "configuration list cycle: " + utf8_string(path));
@@ -632,10 +633,14 @@ bool Resolver::visit(const std::filesystem::path& path) {
     text_bytes_ += text.size();
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {
+        const auto irs = sources_.size();
         for (const auto& p : doc.configuration.paths)
             sources_.push_back(
                 canonical(resolve_reference(path, p.ir, files_.exists), p.ir.location));
-        return visitor_({path, chain_, &doc, nullptr});
+        if (!visitor_({path, chain_, &doc, nullptr}))
+            return false;
+        chosen_sources_.insert(chosen_sources_.end(), sources_.begin() + irs, sources_.end());
+        return true;
     }
     if (on_list_)
         on_list_(doc, chain_);
@@ -685,7 +690,7 @@ Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
                                  std::vector<std::filesystem::path>* raw_filters, bool plugin,
-                                 bool options) {
+                                 bool options, std::vector<std::filesystem::path>* chosen_paths) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
@@ -735,6 +740,8 @@ Configuration load_configuration(const std::filesystem::path& path,
     if (resolver.run(path) && selected) {
         if (source_paths)
             *source_paths = resolver.sources();
+        if (chosen_paths)
+            *chosen_paths = resolver.chosen_sources();
         return std::move(*selected);
     }
     const auto who = plugin ? Chooser::host : options ? Chooser::options : Chooser::audio;

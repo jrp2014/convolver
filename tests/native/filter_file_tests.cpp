@@ -138,6 +138,24 @@ void run(const fs::path& dir) {
                               &files) &&
                 files.empty(),
             "a refused file's files");
+    // A list gives the lists and configurations it visited and the chosen
+    // entry's IRs, not the IRs of an entry passed over, which need not be
+    // installed: a missing one there must not stop the window reloading.
+    {
+        std::ofstream fast(dir / "fast-missing.cfg");
+        fast << "48000 2 2 0\n0 0\n0 0\nnot-installed.wav\n0\n0\n0\n";
+        std::ofstream list(dir / "watched.txt");
+        list << "fast-missing.cfg\nstereo.cfg\n";
+    }
+    require(read_filter_file((dir / "watched.txt").string(), stereo, detail::libsndfile_files(),
+                             why, &files)
+                .has_value(),
+            "watched.txt refused: " + why.message);
+    require(files.size() >= 4 && fs::path(files[0]).filename() == "watched.txt" &&
+                fs::path(files[1]).filename() == "fast-missing.cfg" &&
+                fs::path(files[2]).filename() == "stereo.cfg" && named("mono.wav") &&
+                !named("not-installed.wav"),
+            "a list's files: " + std::to_string(files.size()));
 
     // The command line keeps its own advice.
     try {

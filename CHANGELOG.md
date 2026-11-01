@@ -65,8 +65,9 @@ Until 1.0 the C++ API may change between minor versions.
   (kept in `recent-filters.txt` beside the Convolver log, never in the
   project), **Reload** reads the file again, and **Reload when the file
   changes** (ticked when the window opens) does so by itself while the
-  window is open, a second after the file, or a file a `.cfg` names, has
-  changed. Not yet tried in GarageBand, REAPER or Audacity.
+  window is open, a second after the file, or a file a `.cfg` or the list
+  entry that plays names, has changed. Not yet tried in GarageBand, REAPER
+  or Audacity.
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the

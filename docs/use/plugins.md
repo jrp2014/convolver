@@ -329,8 +329,11 @@ From the top, the window has:
   - **Reload when the file changes** (ticked when the window opens) does
     the same by itself while the window is open, even behind other windows:
     once a second it checks the file and, for a `.cfg` or list, the files it
-    names, and reloads a second after one has changed, so a file still being
-    written is not read half way. A file that has gone (moved or deleted)
+    names that make up the filter that plays (for a list, the lists and
+    `.cfg` files it reads and the sound files of the entry chosen, not those
+    of other entries, which need not be installed), and reloads a second
+    after one has changed, so a file still being written is not read half
+    way. A file that has gone (moved or deleted)
     is not reloaded; the filter that plays stays, as it does when a reload
     is refused (say, a `.cfg` that names a file not written yet): press
     Reload once the file is ready. A filter the host has restored since

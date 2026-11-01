@@ -7,7 +7,8 @@
 // asks (beginEdit, performEdit, endEdit), Bypass too, that a Latency choice reaches the
 // processor and asks the host to restart, that a chosen file loads, marks
 // the project changed, joins the Recent menu and is reloaded by hand and
-// when it changes, and that a taller view asks the host to resize.
+// when it or the chosen list entry's filter changes (not when the filter was
+// replaced meanwhile), and that a taller view asks the host to resize.
 #import "diagnostic_view.h"
 #include "processor.hpp"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
@@ -311,6 +312,47 @@ void window() {
     std::filesystem::remove(file);
     require(![shown checkForChanges] && ![shown checkForChanges] && handler.dirty == 3,
             "a missing file was reloaded");
+
+    // A list whose unused entry names a filter that is not installed (jrp's
+    // review of fb0f549): a change to the entry that plays still reloads it.
+    write_wav(file);
+    {
+        std::ofstream slow(folder / "slow.cfg");
+        slow << "44100 1 1 0\n0\n0\nmissing.wav\n0\n0\n0\n";
+        std::ofstream room_cfg(folder / "room.cfg");
+        room_cfg << "48000 1 1 0\n0\n0\nroom.wav\n0\n0\n0\n";
+        std::ofstream list(folder / "list.txt");
+        list << "slow.cfg\nroom.cfg\n";
+    }
+    const int listed = handler.dirty;
+    require([shown loadFile:@((folder / "list.txt").c_str())] && handler.dirty == listed + 1,
+            "list not loaded: " + text(shown.explanationView.string));
+    require([files
+                setAttributes:@{NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:180]}
+                 ofItemAtPath:room
+                        error:nil] &&
+                ![shown checkForChanges] && [shown checkForChanges] && handler.dirty == listed + 2,
+            "a list with a missing unused filter was not reloaded");
+
+    // The filter replaced without the window reading the report (a preset
+    // restored while the window was covered): a change to the file the
+    // window loaded does not bring that file back.
+    const auto other = folder / "other.wav";
+    write_wav(other);
+    require(c.load_file(other.string()), "other.wav not loaded");
+    const int replaced = handler.dirty;
+    require([files
+                setAttributes:@{NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:240]}
+                 ofItemAtPath:room
+                        error:nil] &&
+                ![shown checkForChanges] && ![shown checkForChanges] && handler.dirty == replaced &&
+                [shown.filterNameField.stringValue isEqualToString:@"other.wav"],
+            "a change to the old file replaced the newer filter: " +
+                text(shown.filterNameField.stringValue));
+    std::filesystem::remove(other);
+    std::filesystem::remove(file);
+    std::filesystem::remove(folder / "list.txt");
+
     [shown updateRecentMenu];
     require([shown.recentButton.itemArray[1].title isEqualToString:@"No Recent Filters"] &&
                 !shown.recentButton.itemArray[1].enabled,

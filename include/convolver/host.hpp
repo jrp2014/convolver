@@ -138,9 +138,10 @@ struct HostRequest {
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
     // VST3-11: every file an accepted file's filter was read from (the file
-    // itself, then for a .cfg or list the files it names), as
-    // read_filter_file() gives them, so a window can reload the filter when
-    // one changes. Empty for state and for a refused file.
+    // itself, then for a .cfg or list the lists and configurations visited
+    // and the chosen configuration's IRs, but not the IRs of list entries
+    // passed over), as read_filter_file() gives them, so a window can reload
+    // the filter when one changes. Empty for state and for a refused file.
     std::vector<std::string> files{};
 };
 struct HostFailure {
