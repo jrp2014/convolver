@@ -11,6 +11,11 @@ lifecycle tests' failing operation sequences included), the JUnit report
 tests write (convolver-tests.log) and CMakeCache.txt (compiler, flags and
 options). identity.txt records the commit, runner image and compiler.
 
+The failed tests of each folder (LastTestsFailed.log), or that another step
+failed, also go to the job's summary with the run attempt, so they stay
+listed when a re-run passes (CI-22): a pass on re-run does not explain a
+failure.
+
 Usage: ci_evidence.py OUTPUT BUILD [BUILD ...]. Missing folders and files are
 skipped, so the step can run whichever stage failed.
 """
@@ -52,6 +57,36 @@ def collect(build, out):
     return copied
 
 
+def failed_tests(build):
+    """The tests CTest recorded as failed in this folder (lines "N:name")."""
+    log = build / 'Testing/Temporary/LastTestsFailed.log'
+    if not log.is_file():
+        return []
+    return [line.split(':', 1)[-1].strip() for line in log.read_text(errors='replace').splitlines() if line.strip()]
+
+
+def summarize(failures):
+    """Appends this attempt's failure to the GitHub job summary, if there is one."""
+    summary = os.environ.get('GITHUB_STEP_SUMMARY')
+    if not summary:
+        return
+    attempt = os.environ.get('GITHUB_RUN_ATTEMPT', '?')
+    lines = [f'### Failed on attempt {attempt}', '']
+    lines += [f'- `{name}` in `{build}`' for build, names in failures for name in names]
+    if not failures:
+        lines.append('No CTest failures recorded: another step failed (see the job log).')
+    lines += [
+        '',
+        (
+            'A later attempt that passes does not explain this failure: see [intermittent failures]'
+            '(https://github.com/jrp2014/convolver/blob/main/docs/develop/testing.md#intermittent-failures).'
+        ),
+        '',
+    ]
+    with Path(summary).open('a', encoding='utf-8') as out:
+        out.write('\n'.join(lines))
+
+
 def main(argv):
     if len(argv) < 3:
         print('usage: ci_evidence.py OUTPUT BUILD [BUILD ...]', file=sys.stderr)
@@ -71,8 +106,12 @@ def main(argv):
         ),
         f'platform: {platform.platform()} ({platform.machine()})',
     ]
+    failures = []
     for name in argv[2:]:
         build = Path(name)
+        if failed := failed_tests(build):
+            failures.append((name, failed))
+            identity.append(f'{name}: failed tests: {", ".join(failed)}')
         if not build.is_dir():
             identity.append(f'{name}: not built')
             continue
@@ -87,6 +126,7 @@ def main(argv):
         identity.append(f'  kept: {", ".join(copied) if copied else "nothing"}')
     (output / 'identity.txt').write_text('\n'.join(identity) + '\n')
     print('\n'.join(identity))
+    summarize(failures)
     return 0
 
 
