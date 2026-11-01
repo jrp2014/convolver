@@ -157,6 +157,19 @@ Until 1.0 the C++ API may change between minor versions.
   and the CI runs it relies on, the Audio Unit's Latency setting, window
   redesign and editor tests, jrp's GarageBand run of the redesign and the
   typed-box defects it led to, and what remains of the settings and windows.
+- Continuous integration (CI-21): the one third-party action,
+  `hendrikmuhs/ccache-action`, is pinned to the commit of its v1.2.24 release
+  instead of the tag, so a moved tag cannot run other code in CI. Dependabot
+  still proposes each new release. GitHub's own actions keep their major tags.
+
+### Fixed
+
+- Release scripts (CI-20): unpacking a ZIP (the downloaded NSIS release on
+  Windows, and each candidate's own ZIP) now checks that every file lands
+  inside the destination. Before, on Windows a member name starting with `/`
+  passed the name check and could be written at the root of the drive, and a
+  link already in the destination could lead a file outside it. Found in a
+  Skylos scan (1 November 2026). Packages are unchanged.
 
 ## [0.7.1] - 2026-11-01
 

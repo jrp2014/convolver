@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -130,6 +131,55 @@ class SourceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'unsafe'):
                     self.sources.extract(self._archive_with_link(root, name, link), root / 'out')
                 self.assertFalse((root / 'out').exists() and any((root / 'out').iterdir()))
+
+
+class ZipTests(unittest.TestCase):
+    """candidate.extract_zip unpacks downloaded tools (NSIS) and candidate ZIPs."""
+
+    @classmethod
+    def setUpClass(cls):
+        from candidate import extract_zip
+
+        cls.extract_zip = staticmethod(extract_zip)
+
+    def make_zip(self, path, *names):
+        with zipfile.ZipFile(path, 'w') as package:
+            for name in names:
+                package.writestr(name, b'x')
+        return path
+
+    def test_extract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.extract_zip(self.make_zip(root / 'good.zip', 'tool/bin/run.exe', 'tool/README'), root / 'out')
+            self.assertEqual((root / 'out/tool/bin/run.exe').read_bytes(), b'x')
+            self.assertTrue((root / 'out/tool/README').is_file())
+
+    def test_unsafe_names(self):
+        # A name starting with / is rooted on Windows too, where Path() alone
+        # would not call it absolute and the join would leave the destination.
+        names = ['/escape', '../escape', 'a/../../escape', 'C:escape']
+        if sys.platform != 'win32':
+            # zipfile on Windows turns a backslash into / when it writes or
+            # reads a name, so there the name is a/escape, which is safe.
+            names.append('a\\escape')
+        for name in names:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                with self.assertRaisesRegex(ValueError, 'unsafe ZIP member'):
+                    self.extract_zip(self.make_zip(root / 'bad.zip', name), root / 'out')
+                self.assertFalse((root / 'escape').exists())
+
+    @unittest.skipIf(sys.platform == 'win32', 'creating a symlink needs extra rights on Windows')
+    def test_existing_link_out_of_destination(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'out').mkdir()
+            (root / 'elsewhere').mkdir()
+            (root / 'out/link').symlink_to(root / 'elsewhere', target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'unsafe ZIP member outside'):
+                self.extract_zip(self.make_zip(root / 'bad.zip', 'link/escape'), root / 'out')
+            self.assertFalse((root / 'elsewhere/escape').exists())
 
 
 if __name__ == '__main__':

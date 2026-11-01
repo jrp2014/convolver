@@ -210,13 +210,16 @@ pages; links into them must still resolve. It checks local destinations and
 supported heading/HTML anchors, not external websites or agreement with code.
 See [documentation maintenance](docs/develop/documentation.md#automated-checks) for scope.
 
-Workflows use the latest major release of each action. Dependabot
+Workflows use the latest major release of each GitHub-owned action
+(`actions/*`). Third-party actions are pinned to the full commit SHA of their
+newest release, with the release in a comment, as in
+`hendrikmuhs/ccache-action@<sha> # v1.2.24`, because a tag can be moved to
+other code and a SHA cannot (jrp, 1 November 2026). Dependabot
 (`.github/dependabot.yml`) checks weekly and opens one grouped pull request when
-an action has a new release; review its release notes for changed inputs before
-merging. Where an action's major tag still points at a release for an
-outdated Node.js, use its newest exact release instead, as for `ccache-action`,
-whose `v1` tag pointed at the Node 20 release 1.2.20 on 24 October 2026;
-Dependabot moves exact tags too. Do not keep an action that has no release for the runner's current Node.js:
+an action has a new release, moving major tags, SHAs and their comments; review
+its release notes for changed inputs before merging. Pin a third-party action to
+a release for the runner's current Node.js: `ccache-action`'s `v1` tag pointed
+at the Node 20 release 1.2.20 on 24 October 2026. Do not keep an action that has no release for the runner's current Node.js:
 the release workflow sets up the MSVC developer environment with `vswhere` and
 `vcvarsall.bat` in an inline step, because `ilammy/msvc-dev-cmd` has none.
 
