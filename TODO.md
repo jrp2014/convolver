@@ -627,7 +627,7 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   diagnostics, show the log, bypass. Needed for the first preview. Opened in CI by `editorhost` and pluginval's GUI tests, with an
   accessibility test of names, roles and text; smoke steps in REAPER and
   Audacity, with VoiceOver ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md)).
-  Progress (1 November 2026, PR #NNN): the Audio Unit's window, moved to
+  Progress (1 November 2026, PR #103): the Audio Unit's window, moved to
   `plugins/editor/mac/`, shown through the SDK's `EditorView` for
   `kPlatformTypeNSView`, with settings edited as `beginEdit`, `performEdit`
   and `endEdit` (a drag is one edit), files loaded through VST3-3's message
@@ -994,7 +994,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **VST3-1 — Speaker arrangements, not only channel counts.** 23 October
   2026, PR #42; [channel layouts](docs/develop/plugin-identities.md#channel-layouts).
 - [x] **VST3-3 — Editor messaging between controller and processor.**
-  1 November 2026, PR #NNN: the processor sends the PLUG-9 report with each
+  1 November 2026, PR #103: the processor sends the PLUG-9 report with each
   Status update and when the controller asks (`ConvolverReport`); a
   `ConvolverLoad` message carries a chosen path, which the processor reads
   as `convolver-preset` does (AudioToolbox on macOS) and installs as
@@ -1004,7 +1004,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   (`smtg_target_add_plugin_snapshots`), which need the window;
   [messages](docs/develop/plugin-contract.md#status-and-log).
 - [x] **VST3-4 — Gain, mix and latency parameters.** 1 November 2026, PR
-  #NNN: Gain (0), Mix (1003, `kDryWetMix`) and Latency (1004, not
+  #103: Gain (0), Mix (1003, `kDryWetMix`) and Latency (1004, not
   automatable, `restartComponent(kLatencyChanged)`), saved in host state
   version 3 only when they differ from the defaults; tests in
   `vst3.adapter` and `native.state`. Gain mode (1002) waits with PLUG-10's
