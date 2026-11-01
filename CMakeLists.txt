@@ -258,7 +258,7 @@ if(CONVOLVER_BUILD_NATIVE)
     endif()
     if(CONVOLVER_BUILD_CLI)
         add_executable(convolver_cli portable/main.cpp portable/inspection_cli.cpp
-            portable/dither_advice.cpp)
+            portable/compare_cli.cpp portable/dither_advice.cpp)
         add_dependencies(convolver_cli convolver_build_version)
         target_include_directories(convolver_cli PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
         set_target_properties(convolver_cli PROPERTIES OUTPUT_NAME convolver)
@@ -472,6 +472,9 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME native.inspection_cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/inspection_cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.inspection_cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        add_test(NAME native.compare_cli COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/compare_cli_tests.py" "$<TARGET_FILE:convolver_cli>")
+        set_tests_properties(native.compare_cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
         # PLUG-3: presets for every format, read back by independent decoders.
         add_test(NAME plugins.presets COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/preset_tests.py"

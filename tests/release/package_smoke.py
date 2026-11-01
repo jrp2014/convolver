@@ -24,6 +24,7 @@ def check(root, validator=None, probe=None):
     for name in (
         'VST3/Convolver.vst3',
         'presets/examples.json',
+        'examples/first-use/stereo/filter.vstpreset',
         'docs/use/README.md',
         'docs/use/first-sound-in-a-host.md',
         'docs/use/presets.md',
@@ -34,7 +35,9 @@ def check(root, validator=None, probe=None):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
-    tool, exporter = (staged_tool(root, name) for name in ('convolver-preset', 'convolver-equalizer-apo'))
+    cli, tool, exporter = (
+        staged_tool(root, name) for name in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
+    )
     assert not list((root / 'bin').glob('convolver-vst3-preset*')), 'the old converter name is for source builds only'
     from documentation_examples import check as check_documentation
 
@@ -44,8 +47,39 @@ def check(root, validator=None, probe=None):
     with tempfile.TemporaryDirectory(prefix='convolver-relocation-') as temporary:
         relocated = Path(temporary) / 'Convolver ü with spaces'
         shutil.copytree(root, relocated)
+        cli = relocated / 'bin' / cli.name
         tool = relocated / 'bin' / tool.name
         exporter = relocated / 'bin' / exporter.name
+        # The first-use examples (REL-2): the CLI renders each to its
+        # expected.wav, as --compare confirms, and each shipped preset is the
+        # converter's output for its filter.
+        for name, source in (('mono', 'impulse.wav'), ('stereo', 'filter.cfg'), ('crossover', 'filter.cfg')):
+            folder = relocated / 'examples/first-use' / name
+            assert not (folder / 'README.md').exists() and not (folder.parent / 'README.md').exists()
+            render = folder / 'render ü.wav'
+            subprocess.run(
+                [
+                    str(cli),
+                    '--filter',
+                    str(folder / source),
+                    '--input',
+                    str(folder / 'input.wav'),
+                    '--output',
+                    str(render),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            compared = subprocess.run(
+                [str(cli), '--compare', str(render), str(folder / 'expected.wav')],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert compared.returncode == 0 and 'Match' in compared.stdout, compared.stdout + compared.stderr
+            converted = folder / 'converted ü.vstpreset'
+            subprocess.run([str(tool), str(folder / source), str(converted)], check=True)
+            assert converted.read_bytes() == (folder / 'filter.vstpreset').read_bytes(), f'{name} preset differs'
         for example in examples:
             folder = relocated / 'presets' / example['name']
             output = folder / 'converted ü.vstpreset'

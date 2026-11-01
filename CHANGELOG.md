@@ -12,6 +12,22 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
+  plug-in host's, against the file it should match, sample for sample. It
+  prints the largest difference relative to the expected peak, matches within
+  -80 dB of it or two 16-bit steps, whichever is larger (rounding and 16-bit
+  dither pass), and when the files differ says whether the output is silent,
+  late (a host that did not make up for the plug-in's latency), ends before
+  the filter's tail, is at another level or has its polarity reversed.
+  Exit status 0 match, 1 different or unreadable, 2 invalid usage.
+- Preview packages (PLUG-5, REL-2) ship the `convolver` command-line tool in
+  `bin/`, and the first-use examples in `examples/first-use/` (mono, stereo
+  and the 2→6 crossover: filter, `input.wav`, `expected.wav`) with a
+  `filter.vstpreset` made from each filter. The release tests render each
+  example with the packaged tool and compare it with `expected.wav`.
+- User guide: [check a stereo filter in a host](docs/use/check-a-stereo-filter.md),
+  the stereo journey from download and checksum to a host render checked
+  with `--compare`, saving and reopening, and presets that do not fit (REL-2).
 - VST3: **Gain**, **Mix** and **Latency** settings (VST3-4), with the
   Audio Unit's ranges, defaults and parameter IDs: Gain 0 (−100 to +24 dB),
   Mix 1003 (0 to 100 %, which hosts can show as the plug-in's dry/wet
@@ -117,6 +133,12 @@ Until 1.0 the C++ API may change between minor versions.
   `details` with `headline`, `filter_name`, `filter_note`, `audio`
   (`HostFact`), `settings`, `reference`, `sample_rate` and
   `latency_waits` (pre-1.0 internal API).
+- REL-5, the early macOS walkthrough, ran as a package and command-line
+  check of the stereo journey on a macOS arm64 candidate, assisted for jrp
+  rather than by an independent tester: the checksums,
+  the package contents and the command-line render all matched, with no
+  defect found. By jrp's choice its host steps moved to the REAPER smoke
+  test (HOST-1) and the preview walkthrough (REL-3).
 - The [status page](docs/project/status.md) is checked again against `main`,
   now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
   and the CI runs it relies on, the Audio Unit's Latency setting, window

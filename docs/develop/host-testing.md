@@ -285,7 +285,13 @@ except the Audio Unit build, which runs in a source checkout.
    with Status `Silent: the filter is for 48000 Hz, the host runs at 44100 Hz.`
    and a log line `Started at 44100 Hz, ...` explaining it. Set both back to
    48000 Hz: the echo returns. Copy the log into the report.
-10. The window and settings (macOS, VST3-11). Use a source checkout's
+10. Follow sections 4 to 6 of
+    [check a stereo filter in a host](../use/check-a-stereo-filter.md#4-render-the-example-in-the-host)
+    in a new project: render the stereo example through its preset, save and
+    reopen, and load the presets that do not fit. Record the output of each
+    `convolver --compare` and every place the guide's menu names or results
+    differ from REAPER's.
+11. The window and settings (macOS, VST3-11). Use a source checkout's
     `examples/first-use/stereo/filter.cfg` (48 kHz). In Convolver's window
     click **Choose…**, pick that file: the status reads Playing, the Filter
     row reads `filter.cfg`, and REAPER marks the project changed (an
@@ -296,7 +302,8 @@ except the Audio Unit build, which runs in a source checkout.
     short gap the sound carries on, the window's Latency row reads
     `21.3 ms`, the log has `Latency set to 1024 frames`, and the track stays
     in time with the source. Record where REAPER shows the plug-in's latency
-    (its delay compensation) and whether it reads 1024 samples. Open the disclosure triangle: REAPER's FX window grows to fit.
+    (its delay compensation) and whether it reads 1024 samples. Open the
+    disclosure triangle: REAPER's FX window grows to fit.
     Click **Copy Diagnostics** and paste into the report. Save, quit and
     reopen: Gain, Mix and Latency come back.
 

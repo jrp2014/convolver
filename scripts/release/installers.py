@@ -20,7 +20,16 @@ def destinations(files, system, prefix=Path('/')):
             or any(c in name for c in '\\$"\r\n:')
             or not path.parts
             or path.parts[0]
-            not in ('VST3', 'bin', 'docs', 'presets', 'licenses', 'VERSION.txt', 'artifact-manifest.json')
+            not in (
+                'VST3',
+                'bin',
+                'docs',
+                'examples',
+                'presets',
+                'licenses',
+                'VERSION.txt',
+                'artifact-manifest.json',
+            )
         ):
             raise ValueError('path outside installer ownership: ' + name)
         if path.parts[0] == 'VST3' and (len(path.parts) < 3 or path.parts[1] != 'Convolver.vst3'):

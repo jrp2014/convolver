@@ -118,7 +118,7 @@ can act on it without a separate copy of the rules:
 | Navigation and vocabulary | [Index](../README.md), [using Convolver](../use/README.md), [concepts](../use/concepts.md) | Current entry points; avoid unexplained abbreviations |
 | First successes | [Your first filter](../use/first-filter.md), [your first sound in a host](../use/first-sound-in-a-host.md) | `examples.first_use` runs the first; the release examples check the second |
 | Configuration grammar | [Configuration](../use/configuration.md) | `config_parse.cpp`, `config.cpp`, corpus |
-| CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp`, `dither_advice.cpp` and tests |
+| CLI options, output formats and inspection | [Command-line reference](../use/command-line.md) | `main.cpp`, `inspection_cli.cpp`, `compare_cli.cpp`, `dither_advice.cpp` and tests |
 | What Convolver does not do | [Limits](../use/limits.md) | TODO's documented limitations |
 | Symptoms and fixes | [Troubleshooting](../use/troubleshooting.md) | Diagnostics in `config.cpp`, the tools and the adapters |
 | Other readers of the format, path portability | [Other programs](../use/other-programs.md) | `tests/compatibility/`, `downstream-evidence.json` |
@@ -147,8 +147,11 @@ limits, test counts or TODOs into several places. Preview packages ship every
 page in `docs/use/`; `scripts/release/package_docs.py` turns their links to
 other pages into links to the source repository at the packaged commit, so
 write those pages as usual. Commands marked `<!-- executable-example -->` in
-`docs/use/` must run a bundled tool as `./bin/TOOL INPUT OUTPUT...` from the
-package folder; the release tests run them. `VERSION` is the numeric source of
+`docs/use/` must run a bundled tool from the package folder, as
+`./bin/TOOL INPUT OUTPUT...`, or as
+`./bin/convolver --filter F --input I --output O` or
+`./bin/convolver --compare OUTPUT EXPECTED` (which must find a match); the
+release tests run them in page order (`tests/release/documentation_examples.py`). `VERSION` is the numeric source of
 truth. Version numbers in commands are examples or compatibility requirements,
 not another release metadata source.
 
