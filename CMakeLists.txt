@@ -332,6 +332,9 @@ if(CONVOLVER_BUILD_NATIVE)
         # PLUG-10: gain and mix.
         convolver_native_test(native.host_settings convolver_host_settings_tests
             SOURCES tests/native/host_settings_tests.cpp LIBRARIES Convolver::host)
+        # PLUG-10: the thread that applies the Audio Unit's Latency.
+        convolver_native_test(native.request_worker convolver_request_worker_tests
+            SOURCES tests/native/request_worker_tests.cpp LIBRARIES Convolver::host Threads::Threads)
         # PLUG-9: the editor report and Copy diagnostics.
         convolver_native_test(native.host_report convolver_host_report_tests
             SOURCES tests/native/host_report_tests.cpp LIBRARIES Convolver::host)
