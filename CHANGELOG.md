@@ -12,6 +12,27 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- VST3: **Gain**, **Mix** and **Latency** settings (VST3-4), with the
+  Audio Unit's ranges, defaults and parameter IDs: Gain 0 (−100 to +24 dB),
+  Mix 1003 (0 to 100 %, which hosts can show as the plug-in's dry/wet
+  control through `kDryWetMix`) and Latency 1004 (64 to 4096 frames, not
+  automatable). A new Latency asks the host to restart the plug-in
+  (`restartComponent(kLatencyChanged)`) and plays from then on. The
+  settings are saved in host state version 3, written only when one
+  differs from its default, so projects at the defaults save the same
+  bytes as before and older builds still open them; older builds refuse a
+  version 3 state. The Audio Unit and LV2 read a version 3 state's filter
+  and ignore its settings. The defaults leave the sound unchanged; Gain
+  mode waits with PLUG-10's other deferred parts.
+- VST3: the controller and processor exchange what a window needs
+  (VST3-3). The processor sends the PLUG-9 report with each Status update
+  and a fresh one when the controller asks; the controller builds Copy
+  Diagnostics from it. A `ConvolverLoad` message carries a chosen file's
+  path to the processor, which reads it as `convolver-preset` does (on
+  macOS with AudioToolbox, so the bundle still needs nothing beyond macOS)
+  and installs or refuses it as for a preset; an accepted file marks the
+  project changed (`setDirty`). Other systems refuse the file with a
+  reason until their windows exist.
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
@@ -27,6 +48,10 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Library (VST3-4): `HostState` gains `settings`, an optional
+  `HostSettings` that host state version 3 records (VST3 only), and
+  `HostSettings` is declared before it in `convolver/host.hpp`. Existing
+  code that builds a `HostState` compiles unchanged.
 - Audio Unit window (AU-10): the Gain, Mix and Latency rows and their
   handling moved out of the window's layout code into their own file
   (`plugins/au/setting_rows.mm`), so the window can gain controls without

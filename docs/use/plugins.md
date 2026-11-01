@@ -22,9 +22,9 @@ does not fit. Installing is in [install](install.md); making presets is in
   settings, what plays in plain words, with Copy Diagnostics and Show Log;
   the VST3 and LV2 plug-ins have no window yet.
 - Latency is 256 samples by default, and the host makes up for it. The
-  Audio Unit has [settings](#settings) for the gain, the wet/dry mix and the
-  latency; the VST3 and LV2 plug-ins do not have them yet (their latency
-  stays 256 samples).
+  VST3 plug-in and the Audio Unit have [settings](#settings) for the gain,
+  the wet/dry mix and the latency; the LV2 plug-in does not have them yet
+  (its latency stays 256 samples).
 - A filter that does not fit the host's sample rate or channel counts never
   lets unfiltered audio through (unless you bypass the plug-in or set its
   Mix below 100%): a first filter that does not fit plays silence, and one
@@ -53,7 +53,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | Choose a `.cfg` or IR file directly | No | [Yes](#the-audio-units-window), in its window | [Yes](#lv2-filter-files) |
 | Where a failure is explained | The Status parameter and the [Convolver log](#status-and-the-convolver-log) | The Status parameter and the [Convolver log](#status-and-the-convolver-log), also in the macOS system log | The `status` output and the host's log |
 | Tail reported to the host | Yes | Yes, in seconds | No |
-| [Settings](#settings): gain, mix | Not yet | Yes | Not yet |
+| [Settings](#settings): gain, mix, latency | Yes | Yes | Not yet |
 | Licence | GPL-2.0-or-later | [GPL-3.0-or-later](#audio-unit-licence) | GPL-2.0-or-later |
 
 ## Channels
@@ -174,7 +174,7 @@ example (some hosts show only the status name in the first column):
 | Not checked yet | `Filter loaded: 44100 Hz, 2 in, 2 out; checked when the host starts it.` |
 | Fault | `Fault: output too large, silenced and the filter restarted. Details in the Convolver log.` |
 
-The Audio Unit's text also follows its [settings](#settings) when no filter
+The text also follows the [settings](#settings) when no filter
 is heard. With no filter loaded and Gain or Mix changed, it reads, for
 example, `No filter: audio passes at -20.0 dB (Gain and Mix).`; after a
 failed load with Mix below 100%, `Load failed, only the dry signal plays:
@@ -358,10 +358,10 @@ reload a file yet.
 
 ## Settings
 
-The Audio Unit has three settings, which hosts show with its other
-parameters and Convolver's window shows as sliders and a menu (in GarageBand,
-the window replaces the generic controls). Their defaults play exactly as
-Convolver did before the settings existed.
+The VST3 plug-in and the Audio Unit have three settings, which hosts show
+with their other parameters and the Audio Unit's window shows as sliders and
+a menu (in GarageBand, the window replaces the generic controls). Their
+defaults play exactly as Convolver did before the settings existed.
 
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
@@ -378,19 +378,28 @@ Convolver did before the settings existed.
   time the plug-in starts, and again when it restores saved settings (some
   hosts, GarageBand among them, start the plug-in before restoring the
   project).
-- **Settings and other formats.** The VST3 and LV2 plug-ins have no settings
-  yet, so a filter moved to them from an Audio Unit project or preset plays
-  at 0 dB, fully wet, with a latency of 256 frames. The same project can
-  therefore sound different in another format.
+- **Settings and other formats.** Each format saves its settings its own
+  way, so a filter moved between them (a VST3 preset opened as an Audio
+  Unit, say) keeps the filter but not the settings: it plays at 0 dB, fully
+  wet, with a latency of 256 frames. The LV2 plug-in has no settings yet.
+  The same project can therefore sound different in another format.
+- **VST3 hosts** mark Mix as the plug-in's dry/wet control where they have
+  one. A new Latency asks the host to restart the plug-in, which hosts do
+  at once or when playback stops; until then the old Latency plays. A
+  project saved at the default settings is saved exactly as before the
+  settings existed, so older Convolver builds still open it; one saved with
+  other settings needs a Convolver with these settings, and an older build refuses
+  it as a newer state, plays silence and says so in the log.
 
 ## Latency and tail
 
 Latency is 256 samples by default, whatever the host's buffer size, and the
 plug-in reports it so the host can line the audio up. At 48 kHz that is about 5.3 ms.
-In the Audio Unit the [Latency setting](#settings) chooses it, from 64 to
-4096 samples; VST3 and LV2 always use 256.
+In the VST3 plug-in and the Audio Unit the [Latency setting](#settings)
+chooses it, from 64 to 4096 samples; LV2 always uses 256.
 
-A new Latency plays at once. Changing it during playback leaves a gap in the
+In the Audio Unit a new Latency plays at once; in VST3 it plays when the host
+restarts the plug-in, which Convolver asks it to do at once. Changing it during playback leaves a gap in the
 sound, because Convolver starts again with the new size: the gap lasts the
 new latency plus the filter's own delay, which is short for most room
 correction filters but can be most of a second for a long linear-phase
@@ -402,9 +411,9 @@ it at once, others at the next playback.
 The tail is the time the filter keeps sounding after the input stops: its
 longest response plus any delays. VST3 and the Audio Unit report it (the Audio
 Unit in seconds, as Audio Units do). VST3 counts it at the plug-in's output,
-as Steinberg's own tests measure it, so it adds the 256-sample latency: an
-instance with no filter reports 256 samples, because its output still carries
-the last 256 samples of input after the input stops. After a filter is replaced during
+as Steinberg's own tests measure it, so it adds the latency: an instance
+with no filter reports 256 samples at the default Latency, because its output
+still carries the last 256 samples of input after the input stops. After a filter is replaced during
 playback, the Audio Unit keeps reporting the longest tail used until the host
 restarts it. LV2 cannot report a tail, so hosts that stop processing at the end
 of a region may cut it off: render with a little silence after the audio.

@@ -15,10 +15,16 @@ inline constexpr std::array<std::uint32_t, 4> vst3_processor_class_id{
     @convolver_vst3_processor_words@};
 inline constexpr std::array<std::uint32_t, 4> vst3_controller_class_id{
     @convolver_vst3_controller_words@};
-// Parameter IDs. Hosts keep automation and control mappings by ID; 0 to 2 stay
-// free for the historical VST2 plug-in's parameters (VST3-6).
+// Parameter IDs. Hosts keep automation and control mappings by ID; 1 and 2
+// stay free for the historical VST2 plug-in's parameters (VST3-6).
 inline constexpr std::uint32_t vst3_bypass_parameter_id = @convolver_vst3_bypass_parameter@;
 inline constexpr std::uint32_t vst3_status_parameter_id = @convolver_vst3_status_parameter@;
+// PLUG-10's settings (VST3-4), with the Audio Unit's IDs. Gain shares ID 0
+// with the historical VST2 plug-in's Attenuation, by jrp's decision, with a
+// new range.
+inline constexpr std::uint32_t vst3_gain_parameter_id = @convolver_vst3_gain_parameter@;
+inline constexpr std::uint32_t vst3_mix_parameter_id = @convolver_vst3_mix_parameter@;
+inline constexpr std::uint32_t vst3_latency_parameter_id = @convolver_vst3_latency_parameter@;
 
 // AU component description codes. four_char packs them as Apple's OSType does.
 inline constexpr std::string_view au_type = "@CONVOLVER_ID_AU_TYPE@";

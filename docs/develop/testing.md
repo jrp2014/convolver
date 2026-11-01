@@ -231,7 +231,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   diagnostics text, which keeps only this process's lines for the instance
   from a log written by several.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
-  marker (and that every other state is still written as version 1), state
+  marker (and that every other state is still written as version 1), a
+  version-3 fixture with settings, its round trips with a filter and a
+  failed load, default settings still written as version 1 or 2, and
+  out-of-range settings refused, state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
@@ -524,6 +527,18 @@ deallocation guards, corrupted state, and presets after their source files are
 deleted. The SDK validator loads the actual bundle; separate tests call the
 real processor and controller SDK interfaces. `vst3.harness` runs the PLUG-2
 comparisons; since VST3-7 the adapter lists no known deviations.
+
+`vst3.adapter` also checks the settings (VST3-4): the parameters' order,
+flags, ranges, value text and `kDryWetMix`, Gain and Mix in the audio,
+saving them as host state version 3 and restoring them in a second
+instance, an older state resetting them to their defaults, and a Latency
+choice that is reported, asks the host to restart and delays an impulse by
+exactly the chosen frames, also when restored. And the window's messages
+(VST3-3): the report's fields, a fresh report on request after a Gain
+change, a chosen WAV accepted (the project marked changed, the status
+Playing, the filter named and saved) or refused for its rate, an empty path,
+and a build with no file reader. Where the build has no reader of its own
+(Linux and Windows), the test lends the processor libsndfile.
 
 The SDK validator runs in default and extensive (`-e`) modes. Extensive mode
 pairs 15 speaker arrangements (the adapter must accept or refuse each cleanly)

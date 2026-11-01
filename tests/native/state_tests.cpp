@@ -2,8 +2,10 @@
 #include "convolver/host.hpp"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -68,10 +70,69 @@ int main() {
               // Version 2 without the failed flag is never written.
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 0, 0, 0, 0}),
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 2, 0, 0, 0, 2, 0, 0, 0}),
+              // Version 3 without its settings words.
               std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, 3, 0, 0, 0, 0, 0, 0, 0})})
             rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad))); });
+        // VST3-4: version 3 adds the settings after the flags (gain and mix
+        // as doubles, low word first, then the latency), and is written only
+        // when they differ from the defaults.
+        HostState set;
+        set.bypass = true;
+        set.settings = HostSettings{-6.5, .25, 1024};
+        const auto set_bytes = encode_host_state(set);
+        const auto set_wire = std::to_array<unsigned char>(
+            {0x43, 0x4e, 0x56, 0x53, 3, 0, 0,    0,    2, 0, 0, 0, // Magic, version, bypass.
+             0,    0,    0,    0,    0, 0, 0x1a, 0xc0,             // Gain -6.5 dB.
+             0,    0,    0,    0,    0, 0, 0xd0, 0x3f,             // Mix 0.25.
+             0,    4,    0,    0});                                // Latency 1024.
+        require(std::equal(set_bytes.begin(), set_bytes.end(),
+                           std::as_bytes(std::span(set_wire)).begin(),
+                           std::as_bytes(std::span(set_wire)).end()),
+                "version-3 settings wire encoding");
+        const auto set_back = decode_host_state(set_bytes);
+        require(set_back.bypass && !set_back.failed && !set_back.configuration &&
+                    set_back.settings == set.settings,
+                "version-3 settings decoding");
+        auto set_filter = set;
+        set_filter.configuration = identity.configuration;
+        const auto set_filter_back = decode_host_state(encode_host_state(set_filter));
+        require(set_filter_back.settings == set.settings &&
+                    set_filter_back.configuration->sample_rate == 48000 &&
+                    set_filter_back.configuration->paths[0].impulse == std::vector<float>{1.f},
+                "version-3 settings with a filter");
+        auto set_failed = set;
+        set_failed.failed = true;
+        const auto set_failed_back = decode_host_state(encode_host_state(set_failed));
+        require(set_failed_back.failed && set_failed_back.settings == set.settings,
+                "version-3 settings with a failed load");
+        // Default settings keep the older versions, byte for byte.
+        auto defaults = identity;
+        defaults.settings = HostSettings{};
+        require(encode_host_state(defaults) == encode_host_state(identity),
+                "default settings must keep version 1");
+        auto failed_defaults = failed;
+        failed_defaults.settings = HostSettings{};
+        require(encode_host_state(failed_defaults) == failed_bytes,
+                "default settings must keep version 2");
+        require(!decode_host_state(encode_host_state(identity)).settings,
+                "older states hold no settings");
+        for (const HostSettings bad :
+             {HostSettings{max_gain_db + 1, 1, 256}, HostSettings{0, 1.5, 256},
+              HostSettings{0, 1, 300}, HostSettings{NAN, 1, 256}}) {
+            // Written with the settings in range, then damaged on the wire.
+            auto bytes_bad = set_bytes;
+            const auto patch = [&](std::size_t at, std::uint64_t bits, int words) {
+                for (int b = 0; b < 4 * words; ++b)
+                    bytes_bad[at + static_cast<std::size_t>(b)] =
+                        std::byte{static_cast<unsigned char>(bits >> (8 * b))};
+            };
+            patch(12, std::bit_cast<std::uint64_t>(bad.gain_db), 2);
+            patch(20, std::bit_cast<std::uint64_t>(bad.mix), 2);
+            patch(28, bad.latency, 1);
+            rejects([&] { (void)decode_host_state(bytes_bad); });
+        }
         // PLUG-8: a newer state version is told apart from damaged state.
-        for (const unsigned char format : {3, 0xff}) {
+        for (const unsigned char format : {4, 0xff}) {
             const auto newer =
                 std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, format, 0, 0, 0, 0, 0, 0, 0});
             try {

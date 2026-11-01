@@ -102,4 +102,7 @@ std::string report_text(const HostReport&);
 // the Convolver log (host_log_recent), ready to paste into a report. Reads
 // the log file, so it is built only when asked for, never on the audio thread.
 std::string diagnostics_text(const HostReport&, const std::string& format);
+// The same from report_text() already made, for a format whose window has
+// only the text (the VST3 controller, which the processor sends it).
+std::string diagnostics_text(const std::string& report_text, const std::string& format);
 } // namespace convolver

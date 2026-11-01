@@ -405,7 +405,10 @@ std::string report_text(const HostReport& r) {
 }
 
 std::string diagnostics_text(const HostReport& r, const std::string& format) {
-    auto text = report_text(r) + "\nRecent Convolver log lines for " + format + ":\n";
+    return diagnostics_text(report_text(r), format);
+}
+std::string diagnostics_text(const std::string& report_text, const std::string& format) {
+    auto text = report_text + "\nRecent Convolver log lines for " + format + ":\n";
     const auto recent = host_log_recent(format);
     return text + (recent.empty() ? "(none found)\n" : recent);
 }

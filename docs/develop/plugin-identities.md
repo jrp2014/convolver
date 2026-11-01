@@ -30,16 +30,17 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | VST3 | Processor class ID | `73A81329E6484ADF9DA7D731A8C94201` | Hosts and `.vstpreset` files refer to the plug-in by this |
 | VST3 | Controller class ID | `622AD87C23664CCFB157473FBCD4A6B9` | |
 | VST3 | macOS bundle identifier | `io.github.jrp2014.convolver.vst3` | `CFBundleIdentifier` in `Convolver.vst3` |
-| VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 0 to 2 stay free: they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). |
+| VST3 | Parameter IDs | Bypass `1000`, Status `1001` | Hosts keep automation and control mappings by ID. IDs 1 and 2 stay free: with 0 they were the 2006 VST2 plug-in's Attenuation dB, Partitions and Planning rigour, and a host replacing it with the VST3 maps VST2 parameter *n* to VST3 ID *n* (VST3-6). |
+| VST3 | Parameter IDs | Gain `0`, Mix `1003`, Latency `1004` | The [settings](plugin-contract.md#settings) (VST3-4), the same IDs as the Audio Unit. Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB). Gain mode `1002` is approved for when that setting arrives. |
 | AU | Type, subtype, manufacturer | `aufx`, `Conv`, `CONV` | |
 | AU | macOS bundle identifier | `io.github.jrp2014.convolver.au` | For `Convolver.component` (AU-1) |
 | AU | Parameter ID | Status `1001` (global scope) | The read-only Status (DIAG-1), the same number as in VST3. Bypass is Apple's property, not a parameter. |
-| AU | Parameter IDs | Gain `0`, Mix `1003`, Latency `1004` (global scope) | The [settings](plugin-contract.md#settings) (AU-7). Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB); VST3-4 gives the VST3 parameters the same IDs. Gain mode `1002` is approved for when that setting arrives. |
+| AU | Parameter IDs | Gain `0`, Mix `1003`, Latency `1004` (global scope) | The [settings](plugin-contract.md#settings) (AU-7). Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB); the VST3 parameters have the same IDs. Gain mode `1002` is approved for when that setting arrives. |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
-| All | Host state | magic `CNVS`, versions 1 and 2 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load; everything else is still written as version 1 |
+| All | Host state | magic `CNVS`, versions 1 to 3 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, and version 3 (VST3 only) adds settings that differ from their defaults; everything else is still written as version 1 |
 | AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. |
 | LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). |
@@ -163,8 +164,8 @@ speaker format such as "5.1", because six crossover outputs are not 5.1 speakers
 
 ## Presets without a layout
 
-The current host state (version 1, or version 2 for a saved failed load, which
-records no filter) stores the input and output channel counts and an *output*
+The current host state (version 1, version 2 for a saved failed load, which
+records no filter, or version 3 for VST3 settings) stores the input and output channel counts and an *output*
 channel mask, and no input layout. Hence:
 
 - A version-1 preset, or any filter with no recorded layout, is **unspecified**
@@ -184,10 +185,11 @@ channel mask, and no input layout. Hence:
   arrangement directly (bits 0 to 17); an arrangement using any other VST3
   speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state
-  version (3: version 2 is taken by the failed-load marker of VST3-7). jrp
+  version (4: version 2 is taken by the failed-load marker of VST3-7, and 3
+  by the VST3 settings of VST3-4). jrp
   decided against both for now: layouts
   are checked with a notice only, and VST3 buses stay at 1 to 8 channels;
-  either can be revisited on request. Decoders will keep reading versions 1 and 2, and
+  either can be revisited on request. Decoders will keep reading versions 1 to 3, and
   encoders keep writing version 1 whenever nothing new is recorded, so older
   builds still read those presets.
 
