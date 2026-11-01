@@ -74,9 +74,11 @@ endif()
 # ARC; its classes carry the format and version in their names, so two
 # Convolver builds or formats in one host keep their own windows. No window
 # elsewhere yet (VST3-12, VST3-13). Every target that compiles processor.cpp
-# takes these sources (convolver_vst3_editor below).
+# takes these sources (convolver_vst3_editor below). The .mm files compile as
+# CXX, as the SDK's own .mm files do: enabling OBJCXX here would turn the
+# SDK's .mm files, in a directory added before, into a language that
+# directory has no rules for.
 if(APPLE)
-    enable_language(OBJCXX)
     string(REPLACE "." "_" vst3_class_version "${Convolver_VERSION}")
     set(mac_editor "${PROJECT_SOURCE_DIR}/plugins/editor/mac")
     set(vst3_editor_sources "${CMAKE_CURRENT_SOURCE_DIR}/editor.mm"
@@ -92,15 +94,11 @@ endif()
 function(convolver_vst3_editor target)
     target_sources(${target} PRIVATE ${vst3_editor_sources})
     if(APPLE)
-        set_target_properties(${target} PROPERTIES OBJCXX_STANDARD 20 OBJCXX_EXTENSIONS OFF)
         target_link_libraries(${target} PRIVATE "-framework AppKit")
     endif()
 endfunction()
 smtg_add_vst3plugin(convolver_vst3 PACKAGE_NAME Convolver SOURCES_LIST processor.cpp factory.cpp
     ${vst3_editor_sources})
-if(APPLE)
-    set_target_properties(convolver_vst3 PROPERTIES OBJCXX_STANDARD 20 OBJCXX_EXTENSIONS OFF)
-endif()
 if(CONVOLVER_SDK_STRIP)
     set(CMAKE_STRIP "${convolver_strip}")
 endif()
