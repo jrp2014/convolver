@@ -310,6 +310,29 @@ From the top, the window has:
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
   beside it. Where a sandbox refuses, the explanation says permission was
   denied. A preset always works.
+
+  Under the file name:
+
+  - **Recent** lists the filter files last loaded in a Convolver window, in
+    any host or format (up to ten, newest first, each with its folder's
+    name; hold the pointer over one for its full path), leaving out files
+    that are no longer there. Choosing one loads it as Choose… does;
+    **Clear Menu** empties the list. The list is a small text file,
+    `recent-filters.txt`, in the Convolver log's folder, never in the
+    project. A sandboxed host may refuse to read a file from the list that
+    it allowed through the file dialog; the explanation then says
+    permission was denied, and Choose… works.
+  - **Reload** reads the file again, for example after changing it in DRC,
+    REW or a text editor. It works for a file loaded in the window since the
+    host opened the project: a reopened project saves the filter, not the
+    file, so Reload is dimmed until a file is chosen again.
+  - **Reload when the file changes** (ticked when the window opens) does
+    the same by itself while the window is open, even behind other windows:
+    once a second it checks the file and, for a `.cfg` or list, the files it
+    names, and reloads a second after one has changed, so a file still being
+    written is not read half way. A file that has gone (moved or deleted)
+    is not reloaded; the filter that plays stays. Each reload marks the
+    project changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
   Type a value in the box and press Return (or move to another control) to
   set it exactly; a value beyond the range stops at its end. Option-click a
@@ -360,8 +383,7 @@ with names for VoiceOver, which has not been tried with the window yet, and
 they follow the system's light or dark appearance. The
 window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows the last report until the
-filter is ready. The window has no list of recent files and does not
-reload a file yet.
+filter is ready.
 
 **In VST3** (VST3-11, macOS only so far) the window behaves as above,
 except:

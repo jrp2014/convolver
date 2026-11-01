@@ -577,7 +577,7 @@ bool Processor::load_file(const std::string& path) {
     std::lock_guard lock(control_);
     observe_faults();
     const bool was_failed = filter_.failed();
-    const HostRequest request{HostFilterSource::file, path, 0};
+    HostRequest request{HostFilterSource::file, path, 0};
     try {
         // Before the host has started the plug-in, a list chooses its entry
         // for the rate and channels the host has proposed so far, and the
@@ -594,7 +594,8 @@ bool Processor::load_file(const std::string& path) {
             throw std::runtime_error("no reader");
         }
         FilterFileFailure why;
-        auto next = read_filter_file(path, host, *reader, why);
+        // The files it was read from, so the window can reload it (VST3-11).
+        auto next = read_filter_file(path, host, *reader, why, &request.files);
         if (!next) {
             filter_.reject(why.kind, why.message, request, why.filter());
             throw std::runtime_error("refused");

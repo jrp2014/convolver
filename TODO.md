@@ -377,8 +377,11 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   read and its filter prepared on the host's main thread, so the window
   (and the host) waits for a long filter; the cached report does not help
   there; a worker thread, as LV2 has, is for later.
-  Remaining: recent files and reload (the editor plan's conveniences), the
-  view shared with VST3-11, and these acceptance gates (jrp, 30 October 2026),
+  The view is now shared with VST3-11 and has the editor plan's
+  conveniences, Recent, Reload and reloading when the file changes
+  ([PR #103](https://github.com/jrp2014/convolver/pull/103); checked by
+  `vst3.editor`, not yet tried in GarageBand). Remaining: these acceptance
+  gates (jrp, 30 October 2026),
   each to pass and be recorded, with the GarageBand and macOS versions,
   before AU-6 is done:
   jrp's GarageBand run of `54eac9f` (30 October 2026; GarageBand 10.4.14,
@@ -626,14 +629,15 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `plugins/editor/mac/`, shown through the SDK's `EditorView` for
   `kPlatformTypeNSView`, with settings edited as `beginEdit`, `performEdit`
   and `endEdit` (a drag is one edit), a Bypass checkbox editing the bypass
-  parameter, files loaded through VST3-3's message
+  parameter, files loaded through VST3-3's message (with the Recent menu,
+  Reload and reloading when the file changes, shared with the Audio Unit)
   and the window resizing through `IPlugFrame::resizeView`; checked off
   screen by `vst3.editor` on macOS, and opened by pluginval's editor tests
   on macOS CI ([format notes](docs/develop/plugin-contract.md#format-notes)).
   `editorhost` is not used: it is an interactive program that runs until its
   window is closed, so pluginval's editor tests stand in for it. Remaining:
   the steps in REAPER and Audacity ([host testing](docs/develop/host-testing.md#reaper-vst3)),
-  VoiceOver, recent files and reload, and the meters (with PLUG-10).
+  VoiceOver, and the meters (with PLUG-10).
 - [ ] **VST3-12 — Editor window on Windows.** The same window as a Win32 view
   (`kPlatformTypeHWND`), with `IPlugViewContentScaleSupport` and keyboard
   navigation; checked with NVDA or Narrator.

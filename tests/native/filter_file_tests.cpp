@@ -9,6 +9,7 @@
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
 #include "sound_files.hpp"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -113,6 +114,30 @@ void run(const fs::path& dir) {
     const auto slow = refused(dir / "slow.txt", fast_stereo, HostFailureKind::sample_rate);
     require(has(slow, "the filter is not for the host's 48000 Hz.") && !has(slow, "1 in"),
             "list with no entry at the host's rate: " + slow);
+
+    // VST3-11: an accepted file gives every file it was read from, for the
+    // window's watch; a refused one gives none.
+    {
+        std::ofstream cfg(dir / "stereo.cfg");
+        cfg << "44100 2 2 0\n0 0\n0 0\nmono.wav\n0\n0\n0\nmono.wav\n0\n1\n1\n";
+    }
+    std::vector<std::string> files{"stale"};
+    FilterFileFailure why;
+    require(read_filter_file((dir / "stereo.cfg").string(), stereo, detail::libsndfile_files(), why,
+                             &files)
+                .has_value(),
+            "stereo.cfg refused: " + why.message);
+    const auto named = [&](const std::string& name) {
+        return std::any_of(files.begin(), files.end(),
+                           [&](const std::string& f) { return fs::path(f).filename() == name; });
+    };
+    require(!files.empty() && fs::path(files.front()).filename() == "stereo.cfg" &&
+                named("mono.wav") && !named("stale"),
+            "files read: " + std::to_string(files.size()));
+    require(!read_filter_file((dir / "fast.wav").string(), stereo, detail::libsndfile_files(), why,
+                              &files) &&
+                files.empty(),
+            "a refused file's files");
 
     // The command line keeps its own advice.
     try {

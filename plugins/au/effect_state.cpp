@@ -276,7 +276,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
 // control lock is taken; preparing the filter runs under it, on the host's
 // thread that set the property, as a state restore does.
 OSStatus Effect::load_file(const std::string& path) {
-    const HostRequest request{HostFilterSource::file, path, 0};
+    HostRequest request{HostFilterSource::file, path, 0};
     HostLayout host;
     {
         std::lock_guard lock(control_);
@@ -291,7 +291,8 @@ OSStatus Effect::load_file(const std::string& path) {
 #else
     const auto& reader = detail::audio_toolbox_files();
 #endif
-    auto next = read_filter_file(path, host, reader, why);
+    // The files it was read from, so the window can reload it.
+    auto next = read_filter_file(path, host, reader, why, &request.files);
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());

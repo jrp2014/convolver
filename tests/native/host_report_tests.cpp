@@ -214,9 +214,10 @@ void cases() {
                     contains(text, "Software: Convolver "),
                 name + ": report text");
         const auto fields = report_fields(r);
-        for (const char* key : {"status", "status name", "summary", "title", "explanation",
-                                "headline", "filter name", "filter note", "sample rate",
-                                "latency waits", "audio", "reference", "log path", "log written"}) {
+        for (const char* key :
+             {"status", "status name", "summary", "title", "explanation", "headline", "filter name",
+              "filter note", "filter path", "filter files", "sample rate", "latency waits", "audio",
+              "reference", "log path", "log written"}) {
             bool found = false;
             for (const auto& [k, v] : fields)
                 found = found || k == key;
@@ -304,6 +305,28 @@ void cases() {
             "refused file: " + rr.filter_note);
     require(contains(report_text(rr), "Sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
             "refused report text:\n" + report_text(rr));
+    // VST3-11: the window's Reload and its watch on the files take the
+    // accepted file's path and files, never a refused one's or saved state's.
+    require(rr.filter_path.empty() && rr.filter_files.empty(), "path from saved state");
+    HostFilter chosen(8);
+    HostRequest from_file{HostFilterSource::file, "/filters/room.cfg"};
+    from_file.files = {"/filters/room.cfg", "/filters/left.wav", "/filters/right.wav"};
+    chosen.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {}, from_file);
+    try {
+        chosen.load(
+            HostState{filter(48000, 2)}, stereo, [](const Configuration&) {},
+            HostRequest{HostFilterSource::file, "/filters/room-48k.cfg"});
+    } catch (const std::invalid_argument&) {
+    }
+    const auto rc = host_report(chosen, facts(stereo));
+    require(rc.filter_path == "/filters/room.cfg" && rc.filter_files == from_file.files,
+            "accepted file's path and files: " + rc.filter_path);
+    std::string files;
+    for (const auto& [key, value] : report_fields(rc))
+        if (key == "filter files")
+            files = value;
+    require(files == "/filters/room.cfg\n/filters/left.wav\n/filters/right.wav\n",
+            "filter files field: " + files);
     // A stereo filter the host started on a mono track: not playing.
     HostFilter idle(8);
     idle.load(HostState{filter(44100, 2)}, std::nullopt);

@@ -51,8 +51,13 @@ labels and stack views both lay out with in
 [`view_layout.h`](../../plugins/editor/mac/view_layout.h). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics
 and the settings, change a setting (with `begin` and `end` around a drag
-where the format marks gestures, as VST3's `beginEdit` and `endEdit` do) and
-load a file. Each format compiles these files into its own bundle with
+where the format marks gestures, as VST3's `beginEdit` and `endEdit` do),
+optionally a bypass (VST3's Bypass checkbox), and load a file. Reload and
+reloading when the file changes use the report's `filter path` and
+`filter files` (from `HostRequest::files`, which `read_filter_file()`
+fills); the Recent menu reads and writes the per-user list in
+[`recent_files.hpp`](../../portable/recent_files.hpp), part of
+`Convolver::host`. Each format compiles these files into its own bundle with
 class names of its own, version included (`ConvolverDiagnosticView_<version>`
 in the Audio Unit, `ConvolverVST3View_<version>` in VST3), because Objective-C
 classes share one namespace per process. `scripts/check_repository.py` treats

@@ -5,11 +5,13 @@
 // removed again. Checks that it is the shared Convolver view, that it shows
 // the processor's report, that its settings edit the parameters as the SDK
 // asks (beginEdit, performEdit, endEdit), Bypass too, that a Latency choice reaches the
-// processor and asks the host to restart, that a chosen file loads and
-// marks the project changed, and that a taller view asks the host to resize.
+// processor and asks the host to restart, that a chosen file loads, marks
+// the project changed, joins the Recent menu and is reloaded by hand and
+// when it changes, and that a taller view asks the host to resize.
 #import "diagnostic_view.h"
 #include "processor.hpp"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
+#include "recent_files.hpp"
 #import <AppKit/AppKit.h>
 #include <cmath>
 #include <cstdint>
@@ -173,6 +175,8 @@ void window() {
     ProcessSetup setup{kRealtime, kSample32, 512, 48000};
     require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "activate");
 
+    // The recent files beside this test's log (CMake sets CONVOLVER_LOG).
+    convolver::forget_recent_files();
     require(c.createView("other") == nullptr, "a view for another name");
     IPlugView* view = c.createView(ViewType::kEditor);
     require(view != nullptr, "no editor view");
@@ -271,6 +275,45 @@ void window() {
                 [shown.filterNameField.stringValue isEqualToString:@"room.wav"],
             "after loading: " + text(shown.statusField.stringValue) + ", " +
                 text(shown.filterNameField.stringValue));
+
+    // The file is now first in the Recent menu, and Reload reads it again.
+    [shown updateRecentMenu];
+    require(shown.recentButton.numberOfItems >= 2 &&
+                [shown.recentButton.itemArray[1].title hasPrefix:@"room.wav — "] &&
+                [shown.recentButton.itemArray[1].toolTip isEqualToString:@(file.c_str())],
+            "Recent menu: " + text(shown.recentButton.itemArray.lastObject.title));
+    require(shown.reloadButton.enabled && shown.watchButton.enabled &&
+                shown.watchButton.state == NSControlStateValueOn,
+            "Reload controls");
+    [shown.reloadButton performClick:nil];
+    require(handler.dirty == 2, "Reload did not load the file again");
+
+    // A change to the file reloads it once the change has settled for one
+    // check; a missing file does not.
+    NSString* room = @(file.c_str());
+    NSFileManager* files = [NSFileManager defaultManager];
+    require([files
+                setAttributes:@{NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:60]}
+                 ofItemAtPath:room
+                        error:nil],
+            "touch the file");
+    require(![shown checkForChanges] && [shown checkForChanges] && handler.dirty == 3,
+            "a changed file was not reloaded");
+    require(![shown checkForChanges], "reloaded again without a change");
+    [shown.watchButton performClick:nil]; // Off.
+    require([files
+                setAttributes:@{NSFileModificationDate : [NSDate dateWithTimeIntervalSinceNow:120]}
+                 ofItemAtPath:room
+                        error:nil] &&
+                ![shown checkForChanges] && ![shown checkForChanges],
+            "reloaded with the box unticked");
+    [shown.watchButton performClick:nil]; // On again: the change made while off is not reloaded.
+    std::filesystem::remove(file);
+    require(![shown checkForChanges] && ![shown checkForChanges] && handler.dirty == 3,
+            "a missing file was reloaded");
+    [shown updateRecentMenu];
+    require([shown.recentButton.itemArray[1].title isEqualToString:@"No Recent Filters"],
+            "a missing file in the Recent menu");
     std::filesystem::remove_all(folder);
 
     // Copy Diagnostics puts the report and the log lines on the pasteboard.

@@ -109,6 +109,7 @@ jobs:
             portable/inspection_cli.cpp portable/compare_cli.cpp \
             portable/dither_advice.cpp portable/io.cpp \
             portable/main.cpp portable/fft_fftw.cpp portable/host.cpp portable/host_log.cpp portable/host_report.cpp \
+            portable/recent_files.cpp \
             portable/filter_file.cpp portable/state.cpp \
             portable/presets.cpp portable/preset_main.cpp portable/equalizer_apo.cpp \
             portable/equalizer_apo_main.cpp

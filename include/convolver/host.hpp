@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace convolver {
 // PLUG-10: the settings every adapter offers as host parameters
@@ -136,6 +137,11 @@ struct HostRequest {
     // A failure at activation carries the accepted filter's request, which is
     // 0 for an instance that never loaded one.
     std::uint64_t number = 0;
+    // VST3-11: every file an accepted file's filter was read from (the file
+    // itself, then for a .cfg or list the files it names), as
+    // read_filter_file() gives them, so a window can reload the filter when
+    // one changes. Empty for state and for a refused file.
+    std::vector<std::string> files{};
 };
 struct HostFailure {
     HostFailureKind kind = HostFailureKind::state_unreadable;

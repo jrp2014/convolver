@@ -58,7 +58,15 @@ Until 1.0 the C++ API may change between minor versions.
   through `beginEdit`, `performEdit` and `endEdit` (a slider drag is one
   edit), and the window asks the host to resize it when its folded lines
   open. Checked off screen by `vst3.editor`, and opened by pluginval's
-  editor tests on macOS CI; not yet tried in REAPER or Audacity. Windows and Linux have no window yet (VST3-12, VST3-13).
+  editor tests on macOS CI; not yet tried in REAPER or Audacity. Windows
+  and Linux have no window yet (VST3-12, VST3-13).
+- Convolver's window on macOS (VST3-11, and the Audio Unit's, AU-6):
+  **Recent** lists the last ten filter files loaded in any Convolver window
+  (kept in `recent-filters.txt` beside the Convolver log, never in the
+  project), **Reload** reads the file again, and **Reload when the file
+  changes** (ticked when the window opens) does so by itself while the
+  window is open, a second after the file, or a file a `.cfg` names, has
+  changed. Not yet tried in GarageBand, REAPER or Audacity.
 - Audio Unit: a **Latency** setting (PLUG-10, AU-7), parameter 1004 and a
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
@@ -86,6 +94,10 @@ Until 1.0 the C++ API may change between minor versions.
   class names of their own. The setting rows can now mark the start and end
   of a slider drag for a format that asks (VST3 does); the Audio Unit's
   window behaves as before.
+- Library (VST3-11): `HostRequest` gains `files`, the files an accepted
+  file's filter was read from; the report gains the fields `filter path`
+  and `filter files` for the window's Reload. Code that builds a
+  `HostRequest` compiles unchanged.
 - Library (VST3-4): `HostState` gains `settings`, an optional
   `HostSettings` that host state version 3 records (VST3 only), and
   `HostSettings` is declared before it in `convolver/host.hpp`. Existing
