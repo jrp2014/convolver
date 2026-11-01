@@ -318,8 +318,9 @@ void window() {
     CONVOLVER_DIAGNOSTIC_VIEW* view = (CONVOLVER_DIAGNOSTIC_VIEW*)made;
     // Fitted to its text, whatever size the host offers (jrp's GarageBand
     // run: the first version filled a large window and left it mostly blank).
+    // The bound allows the three setting rows (Gain, Mix, Latency).
     require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 150 &&
-                NSHeight(view.frame) <= 460,
+                NSHeight(view.frame) <= 500,
             "empty window size " + std::to_string(NSWidth(view.frame)) + " x " +
                 std::to_string(NSHeight(view.frame)));
     NSView* offered = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(1270, 1120)];
