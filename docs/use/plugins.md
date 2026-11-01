@@ -17,9 +17,10 @@ does not fit. Installing is in [install](install.md); making presets is in
   and the host saves the filter inside your project. A read-only Status
   parameter says what is playing, and the
   [Convolver log](#status-and-the-convolver-log) says why a filter failed.
-  The Audio Unit also has a small [window](#the-audio-units-window) that
-  shows the status, why it is silent and what to change, with Copy
-  diagnostics and Show log; the VST3 and LV2 plug-ins have no window yet.
+  The Audio Unit also has a [window](#the-audio-units-window) that
+  shows the status, why it is silent and what to change, the filter and
+  settings, what plays in plain words, with Copy Diagnostics and Show Log;
+  the VST3 and LV2 plug-ins have no window yet.
 - Latency is always 256 samples, and the host makes up for it. The Audio
   Unit has [settings](#settings) for the gain and the wet/dry mix; the VST3
   and LV2 plug-ins do not have them yet.
@@ -91,8 +92,8 @@ before any audio plays starts at once; one loaded during playback fades in
 ([replacing a filter](#replacing-a-filter)).
 
 In the Audio Unit you can also choose the `.cfg` file, list or impulse
-response itself, in Convolver's window: **Choose Filter…**, or drop the file
-on the window ([the Audio Unit's window](#the-audio-units-window)). In LV2
+response itself, in Convolver's window: **Choose…** beside Filter, or drop
+the file on the window ([the Audio Unit's window](#the-audio-units-window)). In LV2
 you choose it with the host's file chooser
 ([LV2 filter files](#lv2-filter-files)). Either way the plug-in reads the
 file as `convolver-preset` does, for the rate and channels the host has
@@ -246,37 +247,29 @@ The Audio Unit offers hosts a window of its own (`auval` lists it as a Cocoa
 view). Hosts that show plug-in views open it from the plug-in's slot; if a
 host shows its generic sliders instead, choose the plug-in's own view in the
 plug-in window, where the host offers the choice. GarageBand opens it from
-the plug-in's button in the track's Plug-ins area. The window has:
+the plug-in's button in the track's Plug-ins area. From the top, the window has:
 
 - **A title line** with the Convolver version, the instance (`Audio Unit #2`,
   as in the log) and the program that runs the plug-in, or "the host's
   plug-in process" when the host runs plug-ins in Apple's separate service,
-  as GarageBand does (the Software detail names that process).
+  as GarageBand does (the Software line names that process).
 - **The status** (Playing, No filter, Load failed, Not checked yet or Fault),
-  the same as the Status parameter, written out and coloured.
-- **Gain and Mix** as sliders with their values. A host that shows
-  Convolver's window shows it instead of its generic controls, so the
-  settings are here. Moving a slider changes the setting and tells the
-  host, and the sliders follow changes the host makes (automation, its own
-  controls), except the one you are dragging. The window does not yet mark the start and end of a drag, so a
-  host recording automation from it may record each step separately; not
-  yet tried in GarageBand.
-- **What plays, why, and what to change**, in full, as the log explains it.
-  For example, a stereo preset on a GarageBand mono track reads: "The saved
-  filter does not suit the host, so Convolver plays silence until it does.
-  The filter has 2 inputs and 2 outputs, but the plug-in is set up with 1
-  input and 1 output. Give the plug-in 2 inputs and 2 outputs in the host's
-  track or routing settings, or load a filter made for 1 input and 1 output.
-  Hosts run an effect with one channel on a mono track (GarageBand does):
-  put Convolver on a stereo track instead."
-- **Details** below it: the host's rate, channels and block size; the filter
-  (rate, channels, paths, its longest response, and the request number the
-  log uses); Gain and Mix; latency and tail; the software (version, FFT
-  library, CPU kernels, the Audio Unit SDK, and what reads the filter files);
-  and where the log is.
-- **Choose Filter…** opens the file dialog for a `.cfg` file, a
-  configuration list or a sound file; dropping the file on the window does
-  the same. The Audio Unit reads sound files with macOS's own reader, so
+  the same as the Status parameter, as a symbol, a coloured word, and under
+  them **what plays, why, and what to change**, in full, as the log
+  explains it. For example, a stereo preset on a GarageBand mono track
+  reads: "The saved filter does not suit the host, so Convolver plays
+  silence until it does. The filter has 2 inputs and 2 outputs, but the
+  plug-in is set up with 1 input and 1 output. Give the plug-in 2 inputs and
+  2 outputs in the host's track or routing settings, or load a filter made
+  for 1 input and 1 output. Hosts run an effect with one channel on a mono
+  track (GarageBand does): put Convolver on a stereo track instead." While
+  a filter simply plays, it gives the filter's rate and channels.
+- **Filter:** the name of the file that plays (or "From the saved project or
+  preset" after reopening a project, which saves the filter itself, not the
+  file), a note when the newest file was refused, and **Choose…** beside it.
+  Choose… opens the file dialog for a `.cfg` file, a
+  configuration list or a sound file; dropping the file anywhere on the
+  window does the same. The Audio Unit reads sound files with macOS's own reader, so
   it needs nothing installed beside it: WAV, AIFF, CAF, W64, RF64, FLAC and
   the other formats macOS reads, and headerless `.pcm` or `.raw` filters
   named in a `.cfg`, as the command-line tool reads them. (A `.pcm` or
@@ -290,9 +283,7 @@ the plug-in's button in the track's Plug-ins area. The window has:
   previous filter playing; if no filter was playing, the plug-in stays
   silent, as for a first preset that does not fit. Either way the project
   then saves the outcome: the filter that plays, with the failure noted.
-  The project saves the filter itself, not the file's path: after
-  reopening, the Filter detail says it came from the saved project. An
-  accepted file also becomes the plug-in's current preset, named after the
+  An accepted file also becomes the plug-in's current preset, named after the
   file, so the host can tell the project has changed and asks to save it.
   The
   file is read and the filter prepared before the window responds again,
@@ -305,14 +296,49 @@ the plug-in's button in the track's Plug-ins area. The window has:
   sandbox; in jrp's test (October 2026) it let a `.cfg` read the WAV files
   beside it. Where a sandbox refuses, the explanation says permission was
   denied. A preset always works.
-- **Copy diagnostics** puts all of this, with this instance's recent lines
-  from the Convolver log, on the clipboard as plain text, ready to paste into
-  a report.
-- **Show log** selects the log file in the Finder (in a sandboxed host, the
+- **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
+  Type a value in the box and press Return (or move to another control) to
+  set it exactly; a value beyond the range stops at its end. Option-click a
+  slider to put it back to its default (0 dB, 100% wet), as in Logic. Mix
+  is labelled Dry and Wet at its ends. A host that shows
+  Convolver's window shows it instead of its generic controls, so the
+  settings are here. Moving a slider changes the setting and tells the
+  host, and the sliders follow changes the host makes (automation, its own
+  controls), except the one you are dragging. The window does not yet mark the start and end of a drag, so a
+  host recording automation from it may record each step separately; not
+  yet tried in GarageBand.
+- **Latency**: a menu of block sizes, with the delay it adds at the host's
+  rate beside it, and "from the host's next start" when a new choice waits
+  ([settings](#settings)).
+- **Audio**: what plays, in plain words, with the technical term in
+  brackets. Hold the pointer over a line for what it means.
+
+  | Line | What it says |
+  | --- | --- |
+  | Sample rate | The host's rate, and whether the filter's matches (the filter's own rate when it does not) |
+  | Channels | The host's inputs and outputs, the speakers the filter's outputs are labelled for, and the filter's counts when they do not suit |
+  | Routing | Which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more |
+  | Filter length | The longest filter, in time and in taps |
+  | Added delay | The latency, in time and frames, and the one that waits for the next start |
+  | Ring-out | How long the output goes on after the input stops (the tail) |
+  | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping at the current Mix (or that it cannot clip) |
+  | Host blocks | The largest block the host sends at a time |
+
+  A line that does not match (a filter for another rate, say) is marked with
+  a warning sign and says what differs, in red.
+- **File, software and log**, folded away under a disclosure triangle: the
+  filter file's path and request number (and a refused file's), the software
+  (version, FFT library, CPU kernels, the Audio Unit SDK, and what reads the
+  filter files), and where the log is.
+- **Copy Diagnostics** puts all of this, with the settings and this
+  instance's recent lines from the Convolver log, on the clipboard as plain
+  text, ready to paste into a report.
+- **Show Log** selects the log file in the Finder (in a sandboxed host, the
   copy inside the host's container).
 
 The text can be selected and copied. The controls are standard macOS ones
-with names for VoiceOver, which has not been tried with the window yet. The
+with names for VoiceOver, which has not been tried with the window yet, and
+they follow the system's light or dark appearance. The
 window updates twice a second while it is on screen. While the host restores
 a project or preset on another thread, it shows the last report until the
 filter is ready. The window has no list of recent files and does not

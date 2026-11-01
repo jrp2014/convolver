@@ -63,6 +63,31 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Audio Unit: Convolver's window is redesigned (AU-6, as jrp approved on 1
+  November 2026 from a mockup). The status has a symbol, and what plays, why
+  and what to change sits under it. A form follows: **Filter** with the
+  file's name and **Choose…** beside it; **Gain** and **Mix** with a box
+  for typing the value exactly (a value beyond the range stops at its end)
+  and Option-click on a slider to reset it, Mix labelled Dry and Wet; and
+  **Latency** with the delay it adds. An always-shown **Audio** section
+  gives what plays in plain words, with the technical term in brackets and
+  a tooltip for each line: sample rate, channels and speakers, routing,
+  filter length, added delay, ring-out (the tail), the loudest possible
+  peak and the Gain that rules out clipping (new), and the host's block
+  size; a line that does not match (a filter for another rate) is marked
+  with a warning sign and says what differs. The file path, software and log
+  lines are folded away; Copy Diagnostics and Show Log use title case. The
+  layout uses stack views (auto layout) and still fits its height to the
+  content. Copy Diagnostics uses the same plain labels and adds the
+  settings. Sound unchanged.
+- Library: `worst_case_peak()` (engine.hpp) gives the guaranteed peak
+  bound behind `--gain-db no-clip` without running the convolution, and
+  now clears only the part of its work buffer each output and input use;
+  `HostFilter::filter_peak()` holds it for the accepted filter, found when
+  the filter is accepted. The editor report (`host_report.hpp`) replaces its
+  `details` with `headline`, `filter_name`, `filter_note`, `audio`
+  (`HostFact`), `settings`, `reference`, `sample_rate` and
+  `latency_waits` (pre-1.0 internal API).
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new
   `host_latencies`, default `default_host_latency`, 256), and
   `HostProcessor`'s settings constructor takes the block size from it,

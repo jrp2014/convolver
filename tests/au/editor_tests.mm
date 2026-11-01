@@ -273,8 +273,11 @@ void properties(const PrivateLog& log) {
         require(contains(r[@"explanation"], part), "mono track explanation lacks \"" +
                                                        std::string(part) +
                                                        "\": " + text(r[@"explanation"]));
-    require(contains(r[@"details"], "Host: 44100 Hz, 1 in, 1 out, blocks of up to 512 frames"),
-            "mono track details: " + text(r[@"details"]));
+    require(contains(r[@"audio"], "Channels\t1 in, 1 out\tthe filter has 2 in, 2 out\tproblem\t") &&
+                contains(r[@"audio"], "Host blocks\tup to 512 frames\t"),
+            "mono track Audio facts: " + text(r[@"audio"]));
+    require(contains(r[@"reference"], "Software: Convolver "),
+            "mono track reference: " + text(r[@"reference"]));
     require(r[@"summary"].length > 0, "no summary");
     require([r[@"log path"] isEqualToString:@(log.path().c_str())],
             "log path " + text(r[@"log path"]));
@@ -316,11 +319,13 @@ void window() {
     NSView* made = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(0, 0)];
     require([made isKindOfClass:[CONVOLVER_DIAGNOSTIC_VIEW class]], "no Convolver view");
     CONVOLVER_DIAGNOSTIC_VIEW* view = (CONVOLVER_DIAGNOSTIC_VIEW*)made;
-    // Fitted to its text, whatever size the host offers (jrp's GarageBand
+    // Fitted to its content, whatever size the host offers (jrp's GarageBand
     // run: the first version filled a large window and left it mostly blank).
-    // The bound allows the three setting rows (Gain, Mix, Latency).
-    require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 150 &&
-                NSHeight(view.frame) <= 500,
+    // The bounds allow the form (Filter, Gain, Mix, Latency) and the Audio
+    // facts of an empty unit, and keep the window within a 13-inch screen
+    // with the host's own title bar and controls.
+    require(NSWidth(view.frame) == 560 && NSHeight(view.frame) >= 300 &&
+                NSHeight(view.frame) <= 680,
             "empty window size " + std::to_string(NSWidth(view.frame)) + " x " +
                 std::to_string(NSHeight(view.frame)));
     NSView* offered = [factory uiViewForAudioUnit:unit.get() withSize:NSMakeSize(1270, 1120)];
@@ -343,42 +348,86 @@ void window() {
     const auto r = report(unit);
     require([view.statusField.stringValue isEqualToString:@"Load failed"],
             "window status " + text(view.statusField.stringValue));
-    require(contains(view.explanationView.string, text(r[@"explanation"]).c_str()) &&
-                contains(view.explanationView.string, "put Convolver on a stereo track") &&
-                contains(view.explanationView.string, "Host\t44100 Hz, 1 in, 1 out"),
+    require([view.explanationView.string isEqualToString:r[@"headline"]] &&
+                contains(view.explanationView.string, text(r[@"explanation"]).c_str()) &&
+                contains(view.explanationView.string, "put Convolver on a stereo track"),
             "window text:\n" + text(view.explanationView.string));
+    // The Audio facts in plain words, the mismatch marked in words too.
+    const auto fact = [&](const char* name) -> NSTextField* {
+        for (NSUInteger i = 0; i < view.audioLabels.count; ++i)
+            if ([view.audioLabels[i].stringValue isEqualToString:@(name)])
+                return view.audioValues[i];
+        return nil;
+    };
+    require(view.audioLabels.count >= 6 &&
+                [view.audioLabels[0].stringValue isEqualToString:@"Sample rate"] &&
+                [fact("Sample rate").stringValue hasPrefix:@"44100 Hz"] &&
+                contains(fact("Channels").stringValue, "1 in, 1 out") &&
+                contains(fact("Channels").stringValue, "\u26A0") &&
+                contains(fact("Channels").stringValue, "the filter has 2 in, 2 out") &&
+                fact("Channels").toolTip.length > 0 && fact("Routing") != nil &&
+                fact("Added delay") != nil,
+            "Audio facts: " + text([[view.audioLabels valueForKey:@"stringValue"]
+                                  componentsJoinedByString:@", "]));
+    require([view.filterNameField.stringValue isEqualToString:r[@"filter name"]] &&
+                [view.filterNameField.stringValue
+                    isEqualToString:@"From the saved project or preset"] &&
+                contains(view.filterNoteField.stringValue, "drop"),
+            "Filter row: " + text(view.filterNameField.stringValue) + " / " +
+                text(view.filterNoteField.stringValue));
     require(contains(view.titleField.stringValue, "Audio Unit #"),
             "window title " + text(view.titleField.stringValue));
-    // The buttons sit under the text, at the bottom right, inside the view.
+    // Everything sits inside the view, top to bottom: the explanation, the
+    // Audio facts, and the buttons at the bottom right, the view ending just
+    // under them (the height fits the content). Frames in the view's own
+    // (flipped) coordinates, as the controls sit in stack views.
+    const auto in_view = [&](NSView* v) { return [view convertRect:v.bounds fromView:v]; };
+    const NSRect copy = in_view(view.diagnosticsButton), log_button = in_view(view.logButton),
+                 explained = in_view(view.explanationView.enclosingScrollView),
+                 audio = in_view(view.audioValues.lastObject);
     const auto frames = [&] {
         return "view " + text(NSStringFromRect(view.frame)) + ", text " +
-               text(NSStringFromRect(view.explanationView.enclosingScrollView.frame)) +
-               ", Copy diagnostics " + text(NSStringFromRect(view.diagnosticsButton.frame)) +
-               ", Show log " + text(NSStringFromRect(view.logButton.frame));
+               text(NSStringFromRect(explained)) + ", last fact " + text(NSStringFromRect(audio)) +
+               ", Copy Diagnostics " + text(NSStringFromRect(copy)) + ", Show Log " +
+               text(NSStringFromRect(log_button));
     };
-    const auto bottom = NSMaxY(view.diagnosticsButton.frame);
-    require(view.isFlipped && NSMaxX(view.logButton.frame) <= NSWidth(view.frame) &&
-                NSMinX(view.diagnosticsButton.frame) > NSWidth(view.frame) / 3 &&
-                bottom <= NSHeight(view.frame) && NSHeight(view.frame) - bottom <= 24 &&
-                NSMinY(view.diagnosticsButton.frame) >=
-                    NSMaxY(view.explanationView.enclosingScrollView.frame),
-            "button layout: " + frames());
+    require(view.isFlipped && NSMaxX(log_button) <= NSWidth(view.frame) &&
+                NSMinX(copy) > NSWidth(view.frame) / 3 && NSMaxY(copy) <= NSHeight(view.frame) &&
+                NSHeight(view.frame) - NSMaxY(copy) <= 24 && NSMinY(explained) >= 0 &&
+                NSMinY(audio) > NSMaxY(explained) && NSMinY(copy) > NSMaxY(audio),
+            "layout: " + frames());
+    // The file, software and log lines are folded away, and opening them
+    // makes the window taller by their height, closing returns it.
+    const auto folded = NSHeight(view.frame);
+    require(view.referenceField.hidden && view.referenceButton.state == NSControlStateValueOff,
+            "the reference lines are not folded away");
+    [view showReference:YES];
+    require(!view.referenceField.hidden && NSHeight(view.frame) > folded + 20 &&
+                contains(view.referenceField.stringValue, "Software\tConvolver ") &&
+                contains(view.referenceField.stringValue, "Log\t"),
+            "opened reference: " + std::to_string(NSHeight(view.frame)) + ": " +
+                text(view.referenceField.stringValue));
+    [view showReference:NO];
+    require(NSHeight(view.frame) == folded, "closing the reference lines left the window " +
+                                                std::to_string(NSHeight(view.frame)) + " high");
 
     // Accessibility: named controls (VoiceOver reads the label or title).
     // AppKit supplies the buttons' role itself, and on a CI runner with no
     // accessibility client it need not report one, so only names are checked.
     require([view.statusField.accessibilityLabel isEqualToString:@"Status"], "status label");
-    require([view.diagnosticsButton.title isEqualToString:@"Copy diagnostics"] &&
-                [view.logButton.title isEqualToString:@"Show log"],
+    require([view.diagnosticsButton.title isEqualToString:@"Copy Diagnostics"] &&
+                [view.logButton.title isEqualToString:@"Show Log"],
             "button titles: " + text(view.diagnosticsButton.title) + ", " +
                 text(view.logButton.title));
     require(view.explanationView.accessibilityLabel.length > 0 && !view.explanationView.editable &&
                 view.explanationView.selectable,
             "explanation text");
 
-    // Gain and Mix as sliders (jrp's GarageBand run: a host that shows this
-    // window no longer shows its generic sliders). Moving one sets the
-    // parameter; a change from the host moves the slider.
+    // Gain and Mix as sliders with their values typed beside them (jrp's
+    // GarageBand run: a host that shows this window no longer shows its
+    // generic sliders). Moving one or typing sets the parameter; a change
+    // from the host moves the slider; resetting (Option-click) restores the
+    // default.
     require(view.settingSliders.count == 2 && view.settingMenus.count == 1 &&
                 view.settingValues.count == 3,
             "no setting sliders and menu");
@@ -387,8 +436,10 @@ void window() {
     require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
-    require([view.settingValues[0].stringValue isEqualToString:@"0 dB"] &&
-                [view.settingValues[1].stringValue isEqualToString:@"100% wet"],
+    require([view.settingValues[0].stringValue isEqualToString:@"0"] &&
+                [view.settingValues[1].stringValue isEqualToString:@"100"] &&
+                view.settingValues[0].editable && view.settingValues[1].editable &&
+                [view.settingValues[0].accessibilityLabel isEqualToString:@"Gain"],
             "setting values " + text(view.settingValues[0].stringValue) + ", " +
                 text(view.settingValues[1].stringValue));
     require([gain.accessibilityLabel isEqualToString:@"Gain"], "Gain slider label");
@@ -397,17 +448,42 @@ void window() {
     AudioUnitParameterValue now = 0;
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "Gain value");
-    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12 dB"],
+    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12"] &&
+                [gain.accessibilityValueDescription isEqualToString:@"-12 dB"],
             "the Gain slider did not set Gain: " + std::to_string(now));
+    // Typed, with a minus sign as the window writes it; beyond the range it
+    // stops at the end; text that is not a number changes nothing.
+    view.settingValues[0].stringValue = @"\u22126.5";
+    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "typed Gain");
+    require(now == -6.5f && gain.doubleValue == -6.5, "typed Gain: " + std::to_string(now));
+    view.settingValues[0].stringValue = @"40";
+    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "typed Gain beyond the range");
+    require(now == 24, "typed Gain beyond the range: " + std::to_string(now));
+    view.settingValues[0].stringValue = @"loud";
+    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "typed text");
+    require(now == 24 && [view.settingValues[0].stringValue isEqualToString:@"24"],
+            "typed text changed Gain: " + std::to_string(now));
+    [view resetSetting:0];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "reset Gain");
+    require(now == 0 && gain.doubleValue == 0, "reset Gain: " + std::to_string(now));
+    gain.doubleValue = -12;
+    [gain sendAction:gain.action to:gain.target];
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
           "Mix from the host");
     [view refresh];
-    require(mix.doubleValue == 50 && [view.settingValues[1].stringValue isEqualToString:@"50% wet"],
+    require(mix.doubleValue == 50 && [view.settingValues[1].stringValue isEqualToString:@"50"],
             "the Mix slider did not follow the host");
     require([mix.accessibilityValueDescription isEqualToString:@"50% wet"],
             "Mix slider's VoiceOver value: " + text(mix.accessibilityValueDescription));
-    require(contains(view.explanationView.string, "gain -12 dB, mix 50% wet"),
-            "the details do not show the settings:\n" + text(view.explanationView.string));
+    require(contains(diagnostics(unit), "gain -12 dB, mix 50% wet"),
+            "Copy Diagnostics does not give the settings:\n" + text(diagnostics(unit)));
     // Near an end of the range, the text does not round onto it.
     check(
         AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 99.96f, 0),
@@ -427,7 +503,8 @@ void window() {
     require(latency.numberOfItems == 7 && [latency.itemTitles[0] isEqualToString:@"64 frames"] &&
                 [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 2 &&
-                [latency.accessibilityLabel isEqualToString:@"Latency"],
+                [latency.accessibilityLabel isEqualToString:@"Latency"] &&
+                [view.settingValues[2].stringValue isEqualToString:@"5.8 ms"],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
     [latency selectItemAtIndex:3];
     [latency sendAction:latency.action to:latency.target];
@@ -435,12 +512,16 @@ void window() {
           "Latency value");
     require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
     require(contains(view.explanationView.string, "Latency 512 frames is chosen") &&
-                contains(view.explanationView.string, "512 frames chosen, from the next start"),
-            "the window does not say when Latency applies:\n" + text(view.explanationView.string));
+                [view.settingValues[2].stringValue
+                    isEqualToString:@"11.6 ms, from the host's next start"],
+            "the window does not say when Latency applies:\n" + text(view.explanationView.string) +
+                "\n" + text(view.settingValues[2].stringValue));
     check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
           "Latency from the host");
     [view refresh];
-    require(latency.indexOfSelectedItem == 2 && !contains(view.explanationView.string, "is chosen"),
+    require(latency.indexOfSelectedItem == 2 &&
+                !contains(view.explanationView.string, "is chosen") &&
+                [view.settingValues[2].stringValue isEqualToString:@"5.8 ms"],
             "the Latency menu did not follow the host");
 
     // Copy diagnostics, to a pasteboard of the test's own.
@@ -472,7 +553,7 @@ void window() {
     unit.uninitialize();
 }
 
-// Filter files: the Choose Filter button and the drop registration (the
+// Filter files: the Choose… button and the drop registration (the
 // file dialog and a real drag need a user), then the view's load step both
 // use. A sound file loads through the load property with the step
 // convolver-preset uses, so the saved state is the one that step gives for
@@ -493,9 +574,9 @@ void files() {
     CONVOLVER_DIAGNOSTIC_VIEW* view =
         (CONVOLVER_DIAGNOSTIC_VIEW*)[factory uiViewForAudioUnit:unit.get()
                                                        withSize:NSMakeSize(0, 0)];
-    require(!view.chooseButton.hidden &&
-                [view.chooseButton.title isEqualToString:@"Choose Filter…"],
-            "Choose Filter button: " + text(view.chooseButton.title));
+    require(!view.chooseButton.hidden && [view.chooseButton.title isEqualToString:@"Choose…"] &&
+                [view.chooseButton.accessibilityLabel isEqualToString:@"Choose Filter"],
+            "Choose… button: " + text(view.chooseButton.title));
     require([view.registeredDraggedTypes containsObject:NSPasteboardTypeFileURL],
             "the window takes no dropped files");
 
@@ -513,8 +594,10 @@ void files() {
     require([r[@"status name"] isEqualToString:@"Playing"] &&
                 [view.statusField.stringValue isEqualToString:@"Playing"],
             "after the stereo file: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
-    require(contains(r[@"details"], stereo.c_str()),
-            "the details do not name the file:\n" + text(r[@"details"]));
+    require(contains(r[@"reference"], stereo.c_str()) &&
+                [view.filterNameField.stringValue isEqualToString:@"stereo.wav"],
+            "the window does not name the file:\n" + text(r[@"reference"]) + "\n" +
+                text(view.filterNameField.stringValue));
     require(loaded_path(unit) == stereo.string(), "filter file property " + loaded_path(unit));
     require(encode_host_state(unit.saved()) ==
                 encode_host_state(filter_file_state(stereo, {44100, 2, 2}, unit_reader())),
@@ -526,6 +609,11 @@ void files() {
     require(contains(r[@"explanation"], mono.c_str()) &&
                 contains(r[@"explanation"], "could not be used"),
             "mono file refusal: " + text(r[@"explanation"]));
+    require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
+                [view.filterNoteField.stringValue hasPrefix:@"mono.wav was refused."] &&
+                contains(r[@"reference"], "Refused file: "),
+            "Filter row after a refused file: " + text(view.filterNameField.stringValue) + " / " +
+                text(view.filterNoteField.stringValue));
     // The short summary (Status, Copy diagnostics) gives the refused file's
     // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
     // explanation speaks of Convolver and the host, not command-line options.

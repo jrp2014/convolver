@@ -519,6 +519,18 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   - [ ] The host stays responsive and the audio uninterrupted while a long
     filter loads: not verified. (The file dialog also closes with a
     perceptible delay when the window closes; not measured.)
+
+  Redesign (1 November 2026, at jrp's request, from a mockup he approved):
+  status symbol with the explanation under it, a form (Filter with the
+  file's name and Choose…, Gain and Mix with typed values and Option-click
+  reset, Latency with its time), an Audio section of plain-word facts from
+  the shared report (with the new Loudest peak), and the file, software and
+  log lines folded away; stack views instead of fixed frames. Every word
+  comes from `host_report`, so VST3-11 to VST3-13 can show the same (on
+  Linux the status symbol becomes a glyph and the palette is fixed).
+  `au.editor` checks it on macOS CI. To check in GarageBand with the gates
+  above: the new layout at both appearances, typing a value, Option-click,
+  the disclosure, and VoiceOver reading the Audio facts and typed fields.
 - [ ] **AU-7 — Settings as Audio Unit parameters.** PLUG-10's gain, gain
   mode, mix and latency as global parameters (IDs beside Status 1001 in
   `plugins/identities.json`), latency indexed and not automatable, with

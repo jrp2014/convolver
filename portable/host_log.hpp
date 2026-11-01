@@ -92,6 +92,10 @@ std::string mono_track_hint(const HostFailure&, const HostLayout& host);
 // (settings_words(); PLUG-10).
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
                          const HostSettings* settings = nullptr);
+// PLUG-9: the speakers a channel mask names, in plain words and channel
+// order ("front left, front right"); empty when the mask does not give one
+// known speaker per channel (as speaker_notice() compares them).
+std::string speaker_names(std::uint32_t mask, std::size_t channels);
 // PLUG-9: the host's program name where the platform gives it (empty
 // otherwise), as the log's lines name it.
 std::string host_program_name();

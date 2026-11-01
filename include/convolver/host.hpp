@@ -185,6 +185,10 @@ class HostFilter {
     const std::optional<Configuration>& filter() const noexcept {
         return filter_;
     }
+    // worst_case_peak() of filter(), found when it was accepted; 0 without one.
+    double filter_peak() const noexcept {
+        return peak_;
+    }
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
         return failed_;
@@ -286,6 +290,7 @@ class HostFilter {
     void record(HostFailureKind, std::string why, const HostRequest&, const Configuration*);
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
+    double peak_ = 0;      // filter_peak()
     HostRequest accepted_; // The request that supplied filter_ (or the saved failure).
     std::uint64_t requests_ = 0;
     bool failed_ = false;

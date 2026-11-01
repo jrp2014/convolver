@@ -104,6 +104,15 @@ std::string hex(std::uint32_t n) {
 }
 } // namespace
 
+std::string speaker_names(std::uint32_t mask, std::size_t channels) {
+    if (!names_speakers(mask, channels))
+        return {};
+    std::string names;
+    for (const auto bit : speaker_bits(mask))
+        names += (names.empty() ? "" : ", ") + std::string(speaker_words[bit]);
+    return names;
+}
+
 std::string speaker_notice(const Configuration& c, const HostLayout& host) {
     const auto filter = c.channel_mask, bus = host.output_speakers;
     if (c.output_channels != host.outputs || !names_speakers(filter, c.output_channels) ||
@@ -230,6 +239,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     // configuration, activation checks the speakers.
     std::string notice;
     std::optional<HostFailure> saved_failure;
+    double peak = 0;
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable, "A failed load cannot hold a filter.",
@@ -251,6 +261,10 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                 refuse(m->kind, std::move(m->why), request, carried);
             notice = speaker_notice(*next, *host);
         }
+        // For the window's Loudest peak; on the control side with the rest of
+        // the preparation, so a report never has to compute it.
+        if (next)
+            peak = worst_case_peak(*next);
         if (state.failed) {
             HostFailure f;
             f.kind = HostFailureKind::saved_failure;
@@ -287,6 +301,7 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
                   std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
                   std::is_nothrow_move_assignable_v<std::string>);
     filter_ = std::move(next);
+    peak_ = peak;
     failed_ = state.failed;
     accepted_ = std::move(request);
     load_failure_ = std::move(saved_failure);
