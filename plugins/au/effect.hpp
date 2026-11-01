@@ -31,8 +31,8 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 // AU-7: PLUG-10's settings as global parameters, saved by AUBase::SaveState
 // with ClassInfo and restored by RestoreState (docs/develop/plugin-contract.md#settings):
 // Gain in dB (min_gain_db to max_gain_db), Mix in percent, and Latency, an
-// index into host_latencies that takes effect at the next Initialize. IDs
-// from plugins/identities.json; never change them.
+// index into host_latencies (see apply_latency). IDs from
+// plugins/identities.json; never change them.
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
 inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
@@ -96,7 +96,7 @@ class Effect final : public ausdk::AUBase {
     OSStatus GetParameterValueStrings(AudioUnitScope, AudioUnitParameterID, CFArrayRef*) override;
     // The Status parameter is read-only: a host's write is ignored. Gain, Mix
     // and Latency are stored within their ranges; Render hands Gain and Mix to
-    // the processor, and the next Initialize builds it with the Latency.
+    // the processor, and a new Latency is applied as apply_latency says.
     OSStatus SetParameter(AudioUnitParameterID, AudioUnitScope, AudioUnitElement,
                           AudioUnitParameterValue, UInt32) AUSDK_RTSAFE override;
 
@@ -111,7 +111,7 @@ class Effect final : public ausdk::AUBase {
     }
 
     // In seconds, as Audio Units report them: frames / sample rate. The
-    // latency is the running processor's, or uninitialized the chosen one.
+    // latency is the newest processor's, or uninitialized the chosen one.
     Float64 GetLatency() noexcept AUSDK_RTSAFE override;
     Float64 GetTailTime() noexcept AUSDK_RTSAFE override;
     bool SupportsTail() noexcept AUSDK_RTSAFE override {
@@ -192,18 +192,44 @@ class Effect final : public ausdk::AUBase {
     static constexpr std::chrono::seconds report_fault_interval{10};
     // AU-7: stores a Gain, Mix or Latency value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
-    // PLUG-10: uninitialized, the reported latency follows the chosen one,
-    // and hosts are told when it changes; initialized, the running
-    // processor's stays until the next Initialize.
-    void follow_chosen_latency();
+    // PLUG-10: makes the chosen Latency the one that plays, on a control
+    // thread, never in Render. Uninitialized, the reported latency follows the
+    // chosen one. Initialized, a new processor is built with the chosen block
+    // size and handed to Render, which switches to it at its next call: the
+    // new one starts with no history, so the sound has a short gap. The host
+    // is told of the new latency and tail, and the log says what happened.
+    // SetParameter may run on the render thread, so it calls this only when
+    // uninitialized or on the main thread; otherwise the change waits for the
+    // next control-thread call that applies it (RestoreState, SaveState, the
+    // window's report, Initialize). Never call it with `control_` held. With
+    // `wait` false (the window's report) it does nothing while a load holds
+    // `control_`, and the next report tries again. A Latency that could not
+    // be built is not retried until it is chosen again or the unit restarts.
+    void apply_latency(bool wait = true);
+    // Whether the chosen Latency differs from the one reported and was not
+    // refused (lock-free).
+    bool latency_pending() noexcept;
+    // Under `control_`: makes `next` the processor Render uses, keeping the
+    // previous one until Render has let it go (reclaim()).
+    void install_processor(std::unique_ptr<HostProcessor> next);
+    // Under `control_`: frees retired processors Render no longer uses.
+    void reclaim() noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
+    // The newest processor, which the control side uses. Render uses
+    // `playing_`, which install_processor() sets to it, and marks the one it
+    // is using in `rendering_` for the length of each call; a replaced
+    // processor waits in `retired_` until Render no longer uses it.
     std::unique_ptr<HostProcessor> host_;
+    std::atomic<HostProcessor*> playing_{nullptr};
+    std::atomic<HostProcessor*> rendering_{nullptr};
+    std::vector<std::unique_ptr<HostProcessor>> retired_; // Under control_.
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};
     std::atomic<std::size_t> latency_{default_host_latency}; // In frames; see GetLatency.
+    std::atomic<std::size_t> refused_latency_{0};            // Could not be built; 0 for none.
     // The rate and channels of the current or last initialization, whether
     // it has rendered, and the last initialization that did. Uninitialized,
     // the host's configuration counts as known only while it still matches

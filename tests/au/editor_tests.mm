@@ -421,8 +421,8 @@ void window() {
           "Mix back");
     [view refresh];
 
-    // Latency as a menu of block sizes (PLUG-10). Choosing one while the unit
-    // runs sets the parameter, and the window says it waits for the next start.
+    // Latency as a menu of block sizes (PLUG-10). A choice sets the
+    // parameter and plays at once, and the details show it.
     NSPopUpButton* latency = view.settingMenus[0];
     require(latency.numberOfItems == 7 && [latency.itemTitles[0] isEqualToString:@"64 frames"] &&
                 [latency.itemTitles[6] isEqualToString:@"4096 frames"] &&
@@ -434,13 +434,15 @@ void window() {
     check(AudioUnitGetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, &now),
           "Latency value");
     require(now == 3, "the Latency menu did not set Latency: " + std::to_string(now));
-    require(contains(view.explanationView.string, "Latency 512 frames is chosen") &&
-                contains(view.explanationView.string, "512 frames chosen, from the next start"),
-            "the window does not say when Latency applies:\n" + text(view.explanationView.string));
+    require(contains(view.explanationView.string, "Latency\t512 frames") &&
+                !contains(view.explanationView.string, "is chosen"),
+            "the window does not show the new Latency in use:\n" +
+                text(view.explanationView.string));
     check(AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global, 0, 2, 0),
           "Latency from the host");
     [view refresh];
-    require(latency.indexOfSelectedItem == 2 && !contains(view.explanationView.string, "is chosen"),
+    require(latency.indexOfSelectedItem == 2 &&
+                contains(view.explanationView.string, "Latency\t256 frames"),
             "the Latency menu did not follow the host");
 
     // Copy diagnostics, to a pasteboard of the test's own.

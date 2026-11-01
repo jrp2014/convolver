@@ -368,9 +368,10 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   4096 frames in powers of two, default 256 (jrp). Smaller is less delay and
   more processor load. The settings constructor refuses any other value. It
   cannot change while a processor runs, so a new choice needs a new
-  processor, which each format builds at its own restart point (below), and
-  the host is told the new latency only once the audio has it. Not
-  automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
+  processor, built off the audio thread; it starts with no history, so the
+  sound has a short gap (about the latency, with the filter's tail cut).
+  The host is told the new latency when the new processor is handed over.
+  Not automatable. The [editor plan](../project/plans/2026-10-24-plugin-editor.md#settings)
   keeps the load measurement beside it for later.
 - **Saved form:** each format's own way. The Audio Unit's parameters are
   saved by `AUBase::SaveState` in `ClassInfo` ("data"); VST3 will save them
@@ -385,13 +386,23 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   listed before Status. Values a host writes are stored within their ranges
   (Latency rounded to a whole index), and Render hands Gain and Mix to the
   processor on every call. `Initialize` builds the processor with the chosen
-  Latency and posts the latency and tail notifications. While uninitialized,
-  `kAudioUnitProperty_Latency` reports the chosen Latency, and a change posts
-  the notification at once; while initialized it reports the running
-  processor's, and a new choice waits for the next `Initialize` (the editor
-  plan's first option: rebuilding while rendering would need a lock-free swap
-  of the whole processor). The window's report then says which latency plays
-  and which waits.
+  Latency and posts the latency and tail notifications. A new choice plays
+  at once (jrp, 1 November 2026, after the independent review found that
+  GarageBand starts the unit before it restores a project, so waiting for the
+  next `Initialize` would leave a saved Latency unused): `apply_latency()`
+  builds a processor with the new block size on a control thread and hands
+  it to Render through an atomic pointer; Render marks the processor it uses
+  for the length of each call, and the control side frees a replaced one
+  only once Render no longer marks it (no lock, allocation or wait on the
+  audio thread). Uninitialized, `kAudioUnitProperty_Latency` simply follows
+  the choice. The host is told of the new latency and tail, and the log says
+  what changed. `SetParameter` may run on the render thread, so it applies
+  the change itself only uninitialized or on the main thread; otherwise the
+  next control-thread call does (`RestoreState`, `SaveState`, the window's
+  report, which it reads twice a second, or `Initialize`). Faults the old
+  processor counts after it was replaced are not reported. If the new
+  processor cannot be built, the old one keeps playing and the window says
+  the chosen Latency is not in use yet.
   `RestoreState` reads the parameter values from "data" itself, with bounds
   checks (AUBase's reader has none), and applies them only when the filter is
   accepted; it ignores Status and unknown IDs, keeps settings the state does

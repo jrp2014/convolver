@@ -326,10 +326,9 @@ Shared work, done once for all three formats:
   VST3-4.
   Progress (31 October 2026, PR #95): the Latency choice in `HostSettings`
   and `HostProcessor`, with oracle tests at each of the seven block sizes,
-  and in the Audio Unit (AU-7). A new Latency takes effect at the host's next
-  start of the plug-in ([settings](docs/develop/plugin-contract.md#settings));
-  HOST-1 records what makes each host restart it. Remaining: the Estimate and
-  No clipping gain modes and the meters.
+  and in the Audio Unit (AU-7). A new Latency plays at once, after a short
+  gap ([settings](docs/develop/plugin-contract.md#settings)). Remaining: the
+  Estimate and No clipping gain modes and the meters.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** From the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#settings), as jrp asked:
   only when a plug-in is built with `-DCONVOLVER_FFT_BACKEND=FFTW` (released
@@ -528,7 +527,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   `ClassInfo` ([settings](docs/use/plugins.md#settings)). Progress
   (31 October 2026, PR #95): Latency (1004), with the latency change
   notification and a menu in the window; a choice made while the unit runs
-  waits for the next `Initialize`. Remaining, with PLUG-10's deferred parts:
+  plays at once (a new processor handed to Render). Not yet checked in
+  GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
 
 ## FFmpeg integration
@@ -822,7 +822,7 @@ with compatibility tests; linked IDs point to open work above.
 | Limitation | Current handling / follow-up | Authoritative detail |
 | --- | --- | --- |
 | Plug-in settings (gain, mix, latency) only in the Audio Unit so far; a preset from `convolver-preset` carries the filter only, and a state moved between formats keeps the filter, not the settings | The same project can play at another gain, mix or latency in another format; VST3-4 and LV2-7 add the settings there. | [Settings](docs/use/plugins.md#settings) |
-| A new Audio Unit Latency takes effect only when the host next starts (initializes) the plug-in | The plug-in keeps and reports the latency it started with, and the window says which plays and which waits; switching while running would need a lock-free swap of the whole processor (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
+| Changing the Audio Unit's Latency during playback leaves a short gap and cuts a sounding tail | The new processor starts with no history; a crossfade would need both sizes running at once. Not automatable for this reason (PLUG-10). | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | No IR resampling or automatic channel adaptation for direct sound-file filters | Rate/count mismatches fail; use an explicit configuration. IO-2 covers resampling. | [Configuration](docs/use/configuration.md) |
 | One VST3 input bus and one output bus, each 1–8 channels; no custom editor | Presets and generic host controls; layouts are checked with a notice only; an editor is HOST-2 and VST3-3, host switching VST3-2. | [VST3](docs/use/plugins.md#loading-a-filter) |
 | No promised migration of old VST2 project state | New VST3 identity; define a migration requirement before implementing one (VST3-6). | [VST3](docs/use/plugins.md#identities) |

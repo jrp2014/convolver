@@ -16,10 +16,12 @@ Until 1.0 the C++ API may change between minor versions.
   menu in Convolver's window: 64, 128, 256, 512, 1024, 2048 or 4096 frames,
   default 256 (the old Convolver's partitions setting in modern form, and the
   command line's `--block-size`). Smaller is less delay and more processor
-  load. It is not automatable, is saved with Gain and Mix, and takes effect
-  when the host next starts the plug-in; until then the plug-in keeps, and
-  reports, the latency it started with, and the window says which latency
-  plays and which waits. The log's settings now name the latency. The
+  load. It is not automatable and is saved with Gain and Mix. A new choice
+  plays at once, also when GarageBand restores a project after starting the
+  plug-in: a new processor is built off the audio thread and handed over
+  without locking, with a short gap in the sound, and the host is told the
+  new latency. The log records each change and its settings name the
+  latency. The
   default leaves the sound unchanged; the oracle tests cover gain and mix at
   each of the seven block sizes.
 - Audio Unit: a small window of its own (AU-6, first version), so a user can
@@ -69,7 +71,7 @@ Until 1.0 the C++ API may change between minor versions.
   refusing any other value with `std::invalid_argument`; its separate block
   argument is gone. `settings_words()` adds the latency, and
   `HostReportFacts::latency_frames` is the running latency, so a report
-  explains a chosen one that waits for the next start.
+  explains a chosen one that could not be applied.
 - The version is now 0.6.0, a deliberate minor step for the library changes
   below (jrp, 25 October 2026: old interfaces are not kept while the API
   settles). CMake consumers now request `find_package(Convolver 0.6)`; the

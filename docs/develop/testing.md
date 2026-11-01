@@ -579,8 +579,11 @@ Four CTest tests run when the adapter is built (label `au`):
   Latency (PLUG-10): its parameter info and value names, rounding and
   clamping, the reported latency and its notification when chosen
   uninitialized, an impulse delayed by exactly the chosen frames, a choice
-  made while initialized leaving the reported latency and the audio alone
-  until the next initialization, and saving and restoring it.
+  made while initialized applied at once with its notification and log line,
+  one set on another thread waiting until the report applies it, repeated
+  switches from another thread while rendering (outputs stay finite and
+  bounded; the sanitizer job runs it under ASan and UBSan), and saving and
+  restoring it, also after the unit has started (GarageBand's order).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
@@ -588,8 +591,8 @@ Four CTest tests run when the adapter is built (label `au`):
   window: its size fitted to the text whatever size the host offers, the
   buttons at the bottom right, the Gain and Mix sliders (ranges, a slider
   setting its parameter, a host change moving the slider), the Latency menu
-  (its choices, a choice setting the parameter and the text saying it waits
-  for the next start, a host change moving the menu), its status and
+  (its choices, a choice setting the parameter and the details showing the
+  new latency in use, a host change moving the menu), its status and
   text before and after the fix, Copy diagnostics (onto a
   private pasteboard), the accessibility names (AppKit sets the buttons'
   roles itself and need not report them on a runner), and that a closed

@@ -272,7 +272,9 @@ bypass. With unequal input and output counts there is no dry signal (the
     a control thread: at the next `Initialize`, or when the window or host
     sets it from the main thread, after which the adapter posts the latency
     and tail notifications. AU-7 chooses between the two and records it.
-    (Chosen 31 October 2026: the next `Initialize`, the simpler option;
+    (Chosen 1 November 2026 by jrp: at once, rebuilt on a control thread
+    and handed to Render at its next call, because GarageBand starts the
+    unit before it restores a project;
     [contract](../../develop/plugin-contract.md#settings).)
   - LV2 (LV2-7): `run()` compares the port with the active size and, when it
     differs, calls `schedule_work` once (allocation-free, as filter loads do).
