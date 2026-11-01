@@ -9,9 +9,9 @@ delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 **In short:** the next milestone is end-to-end testing: an independent user
 running an exact preview package from the 0.8 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
-open fixes (done on 31 October 2026), run jrp's host smoke tests (HOST-1), put the CLI
-and the journey presets in the package while writing the user journeys
-(PLUG-5, REL-2), then the independent walkthrough (REL-3).
+open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
+and the user journeys (PLUG-5, REL-2; the CLI and the journey presets are in
+the package), then the independent walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
 blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
 decided. Other open themes are the later LV2 and AU previews, diagnostics
@@ -53,9 +53,9 @@ boundary and C++20 in the core.
 
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
-| 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
+| 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: the VST trademark notice (the `convolver` CLI and the first-use presets are in the package since PR #101). **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.8.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
@@ -942,6 +942,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
 - [x] **DOC-5 — Refresh the status page's evidence.** 1 November 2026,
   PR #99; [status](docs/project/status.md), checked against `main` at 0.8.2.
+- [x] **DOC-6 — One home for progress.** 1 November 2026, PR #105, from
+  jrp's review of `276c7dc`: the status page had drifted (the CLI and
+  journey presets "missing", journeys "not started", the VST3 half
+  "unclaimed"). Checked against 0.8.6; progress detail now lives only in
+  TODO's `Progress` lines, and the status page names what remains and links
+  the items ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89: every

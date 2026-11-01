@@ -146,6 +146,12 @@ Until 1.0 the C++ API may change between minor versions.
   the package contents and the command-line render all matched, with no
   defect found. By jrp's choice its host steps moved to the REAPER smoke
   test (HOST-1) and the preview walkthrough (REL-3).
+- The [status page](docs/project/status.md) is checked against `main` at
+  0.8.6 (DOC-6, from jrp's review of `276c7dc`). It no longer calls the CLI
+  and the journey presets missing, the journeys not started or the VST3 work
+  unclaimed, and it now names only what remains, linking each TODO item;
+  progress detail lives only in TODO's `Progress` lines
+  ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
 - The [status page](docs/project/status.md) is checked again against `main`,
   now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
   and the CI runs it relies on, the Audio Unit's Latency setting, window
