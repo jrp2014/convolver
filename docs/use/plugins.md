@@ -20,9 +20,10 @@ does not fit. Installing is in [install](install.md); making presets is in
   The Audio Unit also has a small [window](#the-audio-units-window) that
   shows the status, why it is silent and what to change, with Copy
   diagnostics and Show log; the VST3 and LV2 plug-ins have no window yet.
-- Latency is always 256 samples, and the host makes up for it. The Audio
-  Unit has [settings](#settings) for the gain and the wet/dry mix; the VST3
-  and LV2 plug-ins do not have them yet.
+- Latency is 256 samples by default, and the host makes up for it. The
+  Audio Unit has [settings](#settings) for the gain, the wet/dry mix and the
+  latency; the VST3 and LV2 plug-ins do not have them yet (their latency
+  stays 256 samples).
 - A filter that does not fit the host's sample rate or channel counts never
   lets unfiltered audio through (unless you bypass the plug-in or set its
   Mix below 100%): a first filter that does not fit plays silence, and one
