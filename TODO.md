@@ -79,11 +79,6 @@ is superseded.
   checker regression tests now run through pre-commit; the separate
   `documentation` CTest protects the historical website. See the
   [check scope](docs/develop/documentation.md#automated-checks).
-- [ ] **DOC-5 — Refresh the status page's evidence.** The
-  [status page](docs/project/status.md) says it was checked against `main`
-  at `a2593e1` (0.6.10), while it describes the 0.8 series. Check it again
-  against the current `main` and update the snapshot and the evidence it
-  cites. Recommended in jrp's review of PR #98 (1 November 2026).
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
@@ -945,6 +940,8 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **DOC-4 — Organise the documentation by reader.** 23 October 2026,
   PRs #47, #51, #52 and #53; [documentation guide](docs/develop/documentation.md),
   [plan](docs/archive/plans/2026-10-23-documentation-by-reader.md).
+- [x] **DOC-5 — Refresh the status page's evidence.** 1 November 2026,
+  PR #99; [status](docs/project/status.md), checked against `main` at 0.8.2.
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89: every
