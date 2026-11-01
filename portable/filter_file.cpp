@@ -9,10 +9,11 @@ namespace convolver {
 HostState filter_file_state(const std::filesystem::path& path,
                             const ConfigurationSelection& selection,
                             const detail::SoundFiles& reader,
-                            std::vector<std::filesystem::path>* raw_filters, bool plugin) {
+                            std::vector<std::filesystem::path>* raw_filters, bool plugin,
+                            bool options) {
     HostState state;
     state.configuration =
-        detail::load_configuration(path, selection, reader, nullptr, raw_filters, plugin);
+        detail::load_configuration(path, selection, reader, nullptr, raw_filters, plugin, options);
     return state;
 }
 

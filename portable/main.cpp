@@ -5,6 +5,7 @@
 #include "dither_advice.hpp"
 #include "file.hpp"
 #include "inspection_cli.hpp"
+#include "sound_files.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -474,42 +475,63 @@ int run(int argc, char** argv) {
             }
         };
         auto writer = open_output();
-
-        constexpr std::size_t chunk = 4096;
-        std::vector<float> in(chunk * engine.input_channels()),
-            out(chunk * engine.output_channels());
-        std::size_t skip = keep ? 0 : engine.latency_frames();
-        auto emit = [&](std::size_t frames) {
-            const auto drop = std::min(skip, frames);
-            skip -= drop;
-            auto samples = std::span<float>(out).subspan(
-                drop * engine.output_channels(), (frames - drop) * engine.output_channels());
-            for (float& v : samples) {
-                v *= gain;
-                if (!std::isfinite(v))
-                    throw std::runtime_error("nonfinite output (input/filter/gain overflow)");
+        // DIAG-1: from here on a failure leaves a partial output, so say so
+        // (output safety in the command-line guide).
+        try {
+            constexpr std::size_t chunk = 4096;
+            const auto channels = engine.output_channels();
+            std::vector<float> in(chunk * engine.input_channels()), out(chunk * channels);
+            std::size_t skip = keep ? 0 : engine.latency_frames();
+            std::uint64_t written = 0; // Output frames so far, for messages.
+            auto emit = [&](std::size_t frames) {
+                const auto drop = std::min(skip, frames);
+                skip -= drop;
+                auto samples =
+                    std::span<float>(out).subspan(drop * channels, (frames - drop) * channels);
+                for (std::size_t i = 0; i < samples.size(); ++i) {
+                    samples[i] *= gain;
+                    if (!std::isfinite(samples[i]))
+                        throw std::runtime_error(
+                            "the output overflowed " +
+                            convolver::detail::sample_position(written + i / channels,
+                                                               i % channels + 1, info.sample_rate) +
+                            ": the sample there is too large for a 32-bit float (infinite, or "
+                            "not a number). The filter's gain, --gain-db or the input's level is "
+                            "too "
+                            "high: lower --gain-db, or use '--gain-db no-clip', which keeps "
+                            "full-scale input within full scale");
+                }
+                written += frames - drop;
+                if (!samples.empty())
+                    writer.write(samples);
+            };
+            bool any = false;
+            while (const auto frames = reader.read(in)) {
+                any = true;
+                engine.process(std::span<const float>(in).first(frames * engine.input_channels()),
+                               out, frames);
+                emit(frames);
             }
-            if (!samples.empty())
-                writer.write(samples);
-        };
-        bool any = false;
-        while (const auto frames = reader.read(in)) {
-            any = true;
-            engine.process(std::span<const float>(in).first(frames * engine.input_channels()), out,
-                           frames);
-            emit(frames);
-        }
-        if (any) {
-            auto remaining = engine.latency_frames() + engine.tail_frames();
-            while (remaining) {
-                const auto n = std::min(chunk, remaining);
-                engine.process({}, out, n);
-                emit(n);
-                remaining -= n;
+            if (any) {
+                auto remaining = engine.latency_frames() + engine.tail_frames();
+                while (remaining) {
+                    const auto n = std::min(chunk, remaining);
+                    engine.process({}, out, n);
+                    emit(n);
+                    remaining -= n;
+                }
             }
+            reader.close();
+            writer.close();
+        } catch (const std::exception& error) {
+            std::cerr << "convolver: " << error.what() << '\n'
+                      << "convolver: "
+                      << (output == "-" ? std::string("the audio written to standard output")
+                                        : output.string())
+                      << " is incomplete: it holds only the audio written before this failure, "
+                         "so do not use it\n";
+            return 1;
         }
-        reader.close();
-        writer.close();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "convolver: " << error.what() << '\n';

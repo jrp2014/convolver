@@ -8,6 +8,7 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <span>
 #include <stdexcept>
@@ -49,9 +50,8 @@ HeaderMarker header_marker(const std::filesystem::path& path) {
         return HeaderMarker::sample_like;
     return HeaderMarker::none;
 }
-void validate_wave(const std::filesystem::path& path) {
-    if (path == "-" || !std::filesystem::is_regular_file(path))
-        return;
+namespace {
+void check_wave(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     std::array<unsigned char, 40> bytes{};
     file.read(reinterpret_cast<char*>(bytes.data()), 12);
@@ -100,6 +100,41 @@ void validate_wave(const std::filesystem::path& path) {
         for (const auto length : data_sizes)
             if (!block_align || length % block_align)
                 throw std::runtime_error("WAV data ends with an incomplete frame");
+}
+} // namespace
+void validate_wave(const std::filesystem::path& path) {
+    if (path == "-" || !std::filesystem::is_regular_file(path))
+        return;
+    try {
+        check_wave(path);
+    } catch (const std::runtime_error& e) {
+        throw std::runtime_error("cannot read audio file " + path.string() + ": " + e.what() +
+                                 " (" + std::string(damaged_file_advice) + ")");
+    }
+}
+std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
+    char seconds[32];
+    std::snprintf(seconds, sizeof seconds, "%.3f",
+                  sample_rate > 0 ? static_cast<double>(frame) / sample_rate : 0.0);
+    return std::string("at ") + seconds + " s (frame " + std::to_string(frame) + "), channel " +
+           std::to_string(channel);
+}
+std::string invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
+                                   std::size_t channel, int sample_rate,
+                                   std::optional<RawEncoding> raw) {
+    const bool stream = path == "-";
+    auto text = std::string(stream ? "cannot read audio from standard input"
+                                   : "cannot read audio file " + path.string()) +
+                ": invalid sample (not a number, or infinite) " +
+                sample_position(frame, channel, sample_rate) + ".";
+    if (raw)
+        return text + " Headerless samples were read as " + raw_encoding_name(*raw) +
+               "; if they are stored in another type, say which (--raw-format for --input, "
+               "--raw-filter-format for a filter). Otherwise the program that wrote them "
+               "produced invalid samples.";
+    return text + " Sound files should hold only finite samples: the file is damaged, or the "
+                  "program that made it wrote invalid samples; export it again from that "
+                  "program.";
 }
 std::size_t raw_sample_bytes(SampleType sample) {
     switch (sample) {

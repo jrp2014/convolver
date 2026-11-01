@@ -208,7 +208,13 @@ each time the host starts the plug-in (with the sample rate, channels and block
 size), and each failure, explained in full with what to change. Each line
 starts with the time, the Convolver version, the format and instance (`VST3 #2`),
 the host program and its process number. Loads and refusals are numbered
-(`Request 3:`), so you can follow a sequence of presets. The first line each
+(`Request 3:`), so you can follow a sequence of presets. The VST3 plug-in
+also logs host settings it cannot use, with the reason: a sample rate that is
+not a whole number of hertz, a block size or sample type it does not take, or
+(once for each instance, as hosts try several) a channel layout with more than
+8 channels or more than one bus. A save that fails is logged in every format,
+since some hosts do not say so: the project or preset saved then does not
+hold the filter. The first line each
 time a host starts Convolver says what is running: the version, the FFT
 library, the CPU kernels, the plug-in SDK it was built with (VST3 and Audio Unit) and the process. When something does not work, send
 this file with your report.
@@ -238,7 +244,8 @@ When the file passes 1 MB it is renamed with `.old` added and a new one is
 started. Setting the environment variable `CONVOLVER_LOG` to a file path
 sends the log there instead; on macOS and Linux, setting it empty turns the file off (the Status text
 still points to the log; on macOS the lines are in the system log). LV2 has
-no file of its own: it writes to the host's log.
+no file of its own: it writes to the host's log, including why it refused to
+start at the host's sample rate and when a save failed.
 
 ### The Audio Unit's window
 

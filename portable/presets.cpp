@@ -389,10 +389,9 @@ void check_writable(Format format, const HostState& state, std::string_view name
     const auto high = static_cast<std::size_t>(identity::max_channels);
     if (c.input_channels < low || c.input_channels > high || c.output_channels < low ||
         c.output_channels > high)
-        throw std::invalid_argument(label + " presets support " + std::to_string(low) + " to " +
-                                    std::to_string(high) +
-                                    " input and output channels; this filter has " +
-                                    channels_text(c.input_channels, c.output_channels));
+        throw ChannelLimit(label + " presets support " + std::to_string(low) + " to " +
+                           std::to_string(high) + " input and output channels; this filter has " +
+                           channels_text(c.input_channels, c.output_channels));
     if (format == Format::lv2 && !lv2_layout(c.input_channels, c.output_channels))
         throw std::invalid_argument(
             "the LV2 plug-in comes in fixed channel layouts (inputs->outputs: " +

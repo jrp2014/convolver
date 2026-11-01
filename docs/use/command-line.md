@@ -284,8 +284,17 @@ Output paths must differ from input, configuration/list files and referenced IRs
 including filesystem aliases. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
 the program starts: never redirect stdout onto an input/configuration/IR file.
-Failures return a nonzero exit code and a diagnostic on stderr. Output may be
-partial after an I/O or numerical failure; writing is not transactional.
+An existing output file is replaced without asking, as command-line tools on
+macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
+write only to new paths. Failures return a nonzero exit code and a diagnostic
+on stderr. Writing is not transactional: after a failure once the output is
+open (an unreadable or invalid input sample, an overflow, a write error), the
+CLI says that the output is incomplete, and the file holds only the audio
+written before the failure. An invalid input sample (not a number, or
+infinite) is reported with its file, time, frame and channel (frames count
+from 0, channels from 1); an overflow with its time, frame and channel in the
+output, and what to lower. For headerless input the message names the sample
+type it was read as, since a wrong `--raw-format` is the usual cause.
 
 ## RAW streams
 

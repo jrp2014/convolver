@@ -6,10 +6,13 @@
 #pragma once
 #include "convolver/io.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace convolver::detail {
@@ -47,12 +50,14 @@ const SoundFiles& audio_toolbox_files();
 
 // load_configuration(), reading filter files with `files`. `plugin`: the
 // selection is a plug-in host's, so a mismatch is explained in its terms
-// (explain_no_match()).
+// (explain_no_match()). `options`: the selection comes from command-line
+// options alone, with no audio (convolver-preset), so the advice is to
+// choose other values.
 Configuration load_configuration(const std::filesystem::path&, const ConfigurationSelection&,
                                  const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths = nullptr,
                                  std::vector<std::filesystem::path>* raw_filters = nullptr,
-                                 bool plugin = false);
+                                 bool plugin = false, bool options = false);
 
 // Shared by the readers.
 // What the first bytes of a file say about it: a container marker no sample
@@ -62,8 +67,27 @@ Configuration load_configuration(const std::filesystem::path&, const Configurati
 enum class HeaderMarker { container, sample_like, none };
 HeaderMarker header_marker(const std::filesystem::path&);
 // Rejects a RIFF/WAVE file whose chunks or data are truncated, which libsndfile
-// would accept with fewer frames. Other files pass unchecked.
+// would accept with fewer frames, naming the file and damaged_file_advice.
+// Other files pass unchecked.
 void validate_wave(const std::filesystem::path&);
+// DIAG-1: what to do about a sound file that cannot be read because of its
+// content, added to the reason by both readers.
+inline constexpr std::string_view damaged_file_advice =
+    "the file is damaged or incomplete, or is not a sound file; export it again from the "
+    "program that made it";
+// A headerless file or stream whose length is not a whole number of frames.
+inline constexpr const char* raw_incomplete_frame =
+    "RAW input ends with an incomplete frame (its length is not a whole number of frames: check "
+    "the channel count and sample type given for it, or whether it was cut short)";
+// Where a sample is, for messages: "at 0.100 s (frame 4800), channel 2".
+// Frames count from 0 and channels from 1.
+std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate);
+// The message for a NaN or infinite sample read from `path` ("-": standard
+// input). `raw`: the file has no header and was read as this sample type, so
+// the type is the likelier cause than damage.
+std::string invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
+                                   std::size_t channel, int sample_rate,
+                                   std::optional<RawEncoding> raw = std::nullopt);
 // Bytes per raw sample; throws std::invalid_argument for pcm8.
 std::size_t raw_sample_bytes(SampleType);
 // One raw sample as float. Integers are scaled by 2^-(bits-1), as libsndfile does.
