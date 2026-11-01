@@ -61,14 +61,11 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
     Globals()->SetParameter(latency_parameter, default_latency_index);
-    latency_thread_ = std::thread([this] { latency_worker(); });
+    latency_worker_.start([this] { apply_latency(); });
 }
 
 Effect::~Effect() {
-    stopping_.store(true);
-    request_latency();
-    if (latency_thread_.joinable())
-        latency_thread_.join();
+    latency_worker_.stop();
 }
 
 HostLayout Effect::layout() {
@@ -253,19 +250,7 @@ void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept
 }
 
 void Effect::request_latency() noexcept {
-    latency_requested_.store(true);
-    latency_requested_.notify_one();
-}
-
-void Effect::latency_worker() noexcept {
-    for (;;) {
-        latency_requested_.wait(false);
-        if (stopping_.load())
-            return;
-        // A choice made while this one is applied wakes the worker again.
-        latency_requested_.store(false);
-        apply_latency();
-    }
+    latency_worker_.request();
 }
 
 void Effect::apply_latency() noexcept {

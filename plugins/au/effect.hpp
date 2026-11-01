@@ -6,6 +6,7 @@
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
+#include "request_worker.hpp"
 #include "view_properties.hpp"
 #include <AudioUnitSDK/AUBase.h>
 #include <array>
@@ -17,7 +18,6 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -197,7 +197,7 @@ class Effect final : public ausdk::AUBase {
     // AU-7: stores a Gain, Mix or Latency value clamped to its range.
     void store(AudioUnitParameterID, AudioUnitParameterValue) noexcept;
     // PLUG-10: a new Latency is applied only by the unit's own worker thread
-    // (latency_worker()), never by the thread that chose it: SetParameter can
+    // (latency_worker_), never by the thread that chose it: SetParameter can
     // arrive on any thread, including an audio thread or inside a render
     // callback, so it only stores the value and wakes the worker (an atomic
     // store and notify, which neither allocates nor waits). RestoreState
@@ -209,7 +209,6 @@ class Effect final : public ausdk::AUBase {
     // tail, from the worker thread, and the log says what happened. A Latency
     // that cannot be built is tried again only when chosen again.
     void request_latency() noexcept;
-    void latency_worker() noexcept;
     void apply_latency() noexcept;
     // Under `control_`: makes `next` (null when uninitializing) the processor
     // Render uses and returns the previous one, for release_processor().
@@ -250,11 +249,8 @@ class Effect final : public ausdk::AUBase {
     std::mutex logging_;
     std::string logged_;    // The last line log() wrote, under logging_.
     const std::string tag_; // "Audio Unit #n": this instance in the Convolver log.
-    // The Latency worker (request_latency()): woken by `latency_requested_`,
-    // stopped by `stopping_` in the destructor. Started last, after every
-    // member it uses.
-    std::atomic<bool> latency_requested_{false};
-    std::atomic<bool> stopping_{false};
-    std::thread latency_thread_;
+    // The Latency worker (request_latency()), stopped in the destructor.
+    // Started at the end of the constructor, after every member it uses.
+    RequestWorker latency_worker_;
 };
 } // namespace convolver::au

@@ -206,6 +206,16 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   refused; the 64-frame ramps sample by sample; clamping; the mix with
   unequal counts; and the log's settings words.
   The audio thread is checked for allocation throughout.
+- `native.request_worker`: the thread that applies the Audio Unit's
+  Latency (`portable/request_worker.hpp`, PLUG-10). A request runs the
+  task; requests while it runs make it run once more; a stop while idle,
+  while the task runs (which it waits for) and at each point the worker
+  passes between waking and running the task, held there until the stop
+  has been asked for, as a destructor asks; and 2000 workers requested and
+  stopped at once. Each case has a 10-second watchdog, so a lost stop
+  fails the test instead of hanging it. With the order jrp found (the stop
+  checked before the request is taken), the case held as the worker wakes
+  hangs and fails.
 - `native.host_report`: the editor report (PLUG-9), one case per state a
   window shows (no filter, before and after the host starts; Gain −20 dB
   with no filter; a stereo filter on a mono track; a wrong rate; a failed
