@@ -100,7 +100,7 @@ std::string Effect::rejection_line() noexcept {
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
-    if (latency_pending()) // A Latency set on another thread (apply_latency).
+    if (latency_pending()) // A Latency set on the render thread (apply_latency).
         apply_latency();
     std::vector<std::byte> bytes;
     std::string faults;

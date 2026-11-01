@@ -18,7 +18,7 @@ its window from [PR #84](https://github.com/jrp2014/convolver/pull/84)
 (merged 31 October 2026); the full smoke test is not yet recorded, the VST3
 hosts (REAPER, Audacity) have not been run, and no independent user has
 followed the instructions. The next milestone is end-to-end testing: an independent user
-installing and using an exact preview package, cut from the 0.7 series.
+installing and using an exact preview package, cut from the 0.8 series.
 [Still blocking it](#what-still-blocks-the-first-preview): jrp's host
 smoke tests, the CLI and journey presets in the package with the journeys
 written, the plug-in settings and windows with the Audio Unit in the
@@ -123,7 +123,7 @@ the preset tool, with the editor's settings and window in both plug-in
 formats (until 25 October 2026 the Audio Unit was to join a later
 preview). LV2 joins a later preview once its own journeys are demonstrated.
 
-The first preview is cut from a 0.7.x tag.
+The first preview is cut from a 0.8.x tag.
 
 | Condition | Source | Item | Status |
 | --- | --- | --- | --- |

@@ -16,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <pthread.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -196,12 +197,13 @@ class Effect final : public ausdk::AUBase {
     // thread, never in Render. Uninitialized, the reported latency follows the
     // chosen one. Initialized, a new processor is built with the chosen block
     // size and handed to Render, which switches to it at its next call: the
-    // new one starts with no history, so the sound has a short gap. The host
-    // is told of the new latency and tail, and the log says what happened.
-    // SetParameter may run on the render thread, so it calls this only when
-    // uninitialized or on the main thread; otherwise the change waits for the
-    // next control-thread call that applies it (RestoreState, SaveState, the
-    // window's report, Initialize). Never call it with `control_` held. With
+    // new one starts with no history, so the sound has a gap (the new latency
+    // plus the filter's own delay). The host is told of the new latency and
+    // tail, and the log says what happened. SetParameter calls this unless it
+    // runs on the thread that last rendered (it could be between renders
+    // there); the change then waits for the next control-thread call that
+    // applies it (RestoreState, SaveState, the window's report, Initialize).
+    // Never call it with `control_` held. With
     // `wait` false (the window's report) it does nothing while a load holds
     // `control_`, and the next report tries again. A Latency that could not
     // be built is not retried until it is chosen again or the unit restarts.
@@ -209,22 +211,21 @@ class Effect final : public ausdk::AUBase {
     // Whether the chosen Latency differs from the one reported and was not
     // refused (lock-free).
     bool latency_pending() noexcept;
-    // Under `control_`: makes `next` the processor Render uses, keeping the
-    // previous one until Render has let it go (reclaim()).
-    void install_processor(std::unique_ptr<HostProcessor> next);
-    // Under `control_`: frees retired processors Render no longer uses.
-    void reclaim() noexcept;
+    // Under `control_`: makes `next` (null when uninitializing) the processor
+    // Render uses, then frees the previous one once Render no longer uses it:
+    // a wait of at most the rest of one render call. Not on the render thread.
+    void install_processor(std::unique_ptr<HostProcessor> next) noexcept;
 
     std::mutex control_;
     HostFilter filter_{max_channels}; // The shared adapter contract's control side.
     // The newest processor, which the control side uses. Render uses
     // `playing_`, which install_processor() sets to it, and marks the one it
-    // is using in `rendering_` for the length of each call; a replaced
-    // processor waits in `retired_` until Render no longer uses it.
+    // is using in `rendering_` for the length of each call, so a replaced
+    // processor is freed only once Render has let it go.
     std::unique_ptr<HostProcessor> host_;
     std::atomic<HostProcessor*> playing_{nullptr};
     std::atomic<HostProcessor*> rendering_{nullptr};
-    std::vector<std::unique_ptr<HostProcessor>> retired_; // Under control_.
+    std::atomic<pthread_t> render_thread_{}; // The thread of the last Render call.
     std::atomic<bool> bypass_{false};
     std::atomic<bool> reset_requested_{false};
     std::atomic<std::size_t> tail_{0};

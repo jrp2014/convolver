@@ -371,14 +371,17 @@ OSStatus Effect::SetParameter(AudioUnitParameterID id, AudioUnitScope scope,
     if (id != gain_parameter && id != mix_parameter && id != latency_parameter)
         return kAudioUnitErr_InvalidParameter;
     AUSDK_RT_UNSAFE_BEGIN("Clamping, then a store into the existing parameter map; a Latency "
-                          "change is applied only uninitialized or on the main thread, never "
-                          "while this thread renders")
+                          "change is applied only on a thread other than the render thread")
     store(id, value);
     if (id == latency_parameter)
         refused_latency_.store(0); // Chosen again: worth another try.
-    // Render never runs on the main thread concurrently with this call: a
-    // host renders there, if at all, between its own calls (offline).
-    if (id == latency_parameter && (!IsInitialized() || pthread_main_np() != 0))
+    // Applied here unless this is the render thread (the parameter is not
+    // real-time, but a host may still send it there between renders). A host
+    // that renders on the main thread does so between its own calls
+    // (offline), so a change made there is applied too.
+    if (id == latency_parameter &&
+        (!IsInitialized() || pthread_main_np() != 0 ||
+         !pthread_equal(pthread_self(), render_thread_.load(std::memory_order_relaxed))))
         apply_latency();
     AUSDK_RT_UNSAFE_END
     return noErr;

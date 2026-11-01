@@ -580,10 +580,13 @@ Four CTest tests run when the adapter is built (label `au`):
   clamping, the reported latency and its notification when chosen
   uninitialized, an impulse delayed by exactly the chosen frames, a choice
   made while initialized applied at once with its notification and log line,
-  one set on another thread waiting until the report applies it, repeated
-  switches from another thread while rendering (outputs stay finite and
-  bounded; the sanitizer job runs it under ASan and UBSan), and saving and
-  restoring it, also after the unit has started (GarageBand's order).
+  also from another thread, one set on the rendering thread waiting until
+  saving the state or the report applies it, repeated switches from another
+  thread while rendering (outputs stay finite and bounded; the sanitizer job
+  runs it under ASan and UBSan, which catch a freed processor only if the
+  timing hits it), and saving and restoring it, also after the unit has
+  started (GarageBand's order). Not covered: a Latency that cannot be built
+  (it needs memory to run out).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is

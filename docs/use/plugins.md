@@ -352,9 +352,11 @@ plug-in reports it so the host can line the audio up. At 48 kHz that is about 5.
 In the Audio Unit the [Latency setting](#settings) chooses it, from 64 to
 4096 samples; VST3 and LV2 always use 256.
 
-A new Latency plays at once. Changing it during playback leaves a short gap
-in the sound (about the new latency), and a filter's tail that was still
-sounding is cut, because Convolver starts again with the new size. The
+A new Latency plays at once. Changing it during playback leaves a gap in the
+sound, because Convolver starts again with the new size: the gap lasts the
+new latency plus the filter's own delay, which is short for most room
+correction filters but can be most of a second for a long linear-phase
+one, and a filter's tail that was still sounding is cut. The
 [Convolver log](#status-and-the-convolver-log) records each change. Hosts
 differ in when they line the audio up again after a latency change: some do
 it at once, others at the next playback.

@@ -764,7 +764,7 @@ std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterVa
 }
 
 // Reads the window's report, as the window does twice a second; this
-// applies a Latency set on another thread (Effect::apply_latency).
+// applies a Latency set on the render thread (Effect::apply_latency).
 void read_report(Unit& unit) {
     CFTypeRef value = nullptr;
     UInt32 size = sizeof value;
@@ -779,10 +779,10 @@ void read_report(Unit& unit) {
 // takes effect at once (jrp, 1 November 2026). Uninitialized, the reported
 // latency follows the choice. Initialized, a new processor with the chosen
 // block size replaces the running one at the next render, and the host is
-// told; set on a thread other than the main one (which may be the render
-// thread), the change waits for a control-thread call such as the window's
-// report. A restored Latency applies even when the host started the unit
-// first, as GarageBand does. Saved with the settings.
+// told; set on the thread that renders, the change waits for a control-thread
+// call such as saving the state or the window's report. A restored Latency
+// applies even when the host started the unit first, as GarageBand does.
+// Saved with the settings.
 void latency_parameter() {
     Unit unit;
     AudioUnitParameterInfo info{};
@@ -853,18 +853,42 @@ void latency_parameter() {
             "a Latency chosen while running was not applied and reported");
     require(impulse_delay(unit) == 64, "the audio is not delayed by the new 64 frames");
 
-    // Set on another thread: it waits (that thread may render), and the
-    // next control-thread call that applies it, here the report, does.
+    // Set on another thread that does not render (a host's IPC thread, say):
+    // applied there at once.
     std::thread([&] { set_parameter(unit, au::latency_parameter, 3); }).join();
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "a Latency set on another thread was not applied");
+    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames again");
+
+    // Set on the thread that renders, between renders: it waits, and the
+    // next control-thread call that applies it does (saving the state, then
+    // the window's report).
+    const auto set_where_rendering = [&](AudioUnitParameterValue index) {
+        OSStatus rendered = noErr, set = noErr;
+        std::thread([&] {
+            Buffers r(2, 2, 512);
+            bool silent = false;
+            rendered = render(unit, r, 512, false, silent);
+            set = AudioUnitSetParameter(unit.get(), au::latency_parameter, kAudioUnitScope_Global,
+                                        0, index, 0);
+        }).join();
+        check(rendered, "render on another thread");
+        check(set, "Latency set on the render thread");
+    };
+    set_where_rendering(0);
+    require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
+            "a Latency set on the render thread was applied there");
+    CFRelease(unit.class_info_now());
     require(unit.seconds(kAudioUnitProperty_Latency) == 64.0 / 48000,
-            "a Latency set on another thread was applied there");
+            "saving the state did not apply the waiting Latency");
+    set_where_rendering(3);
     read_report(unit);
     require(unit.seconds(kAudioUnitProperty_Latency) == 512.0 / 48000,
             "the report did not apply the waiting Latency");
-    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames again");
+    require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames after the report");
 
     // Switched again and again from another thread while this one renders:
-    // Render keeps a processor it uses until it lets it go.
+    // a replaced processor is freed only once Render has let it go.
     std::atomic<bool> done{false};
     std::thread switcher([&] {
         for (int i = 0; !done.load(); ++i) {

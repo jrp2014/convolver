@@ -19,13 +19,18 @@ Until 1.0 the C++ API may change between minor versions.
   load. It is not automatable and is saved with Gain and Mix. A new choice
   plays at once, also when GarageBand restores a project after starting the
   plug-in: a new processor is built off the audio thread and handed over
-  without locking, with a short gap in the sound, and the host is told the
-  new latency. The log records each change and its settings name the
-  latency. The default leaves the sound unchanged; the oracle tests cover
-  gain and mix at each of the seven block sizes.
+  without locking, with a gap in the sound (the new latency plus the
+  filter's own delay), and the host is told the new latency. The log
+  records each change and its settings name the latency. The default
+  leaves the sound unchanged; the oracle tests cover gain and mix at each of
+  the seven block sizes.
 
 ### Changed
 
+- The version is now 0.8.0, the minor step for the library change below
+  (jrp, 1 November 2026: an incompatible API change before 1.0 needs one).
+  CMake consumers now request `find_package(Convolver 0.8)`, the LV2 plug-in
+  reports minor version 8, and the first preview is cut from the 0.8 series.
 - Library (PLUG-10): `HostSettings` gains `latency` (one of the new
   `host_latencies`, default `default_host_latency`, 256), and
   `HostProcessor`'s settings constructor takes the block size from it,
@@ -33,6 +38,11 @@ Until 1.0 the C++ API may change between minor versions.
   argument is gone. `settings_words()` adds the latency, and
   `HostReportFacts::latency_frames` is the running latency, so a report
   explains a chosen one that could not be applied.
+
+## [0.7.0] - 2026-11-01
+
+### Changed
+
 - The version is now 0.7.0, a deliberate minor step at a milestone: the
   Audio Unit's window (AU-6) and the pre-preview fixes (PLUG-12, ROBUST-3)
   are in (jrp, 31 October 2026). The first preview is cut from the 0.7
@@ -921,7 +931,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.6.10...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jrp2014/convolver/compare/v0.6.10...v0.7.0
 [0.6.10]: https://github.com/jrp2014/convolver/compare/v0.5.6...v0.6.10
 [0.5.6]: https://github.com/jrp2014/convolver/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/jrp2014/convolver/compare/v0.5.4...v0.5.5

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <exception>
 #include <span>
+#include <thread>
 #include <vector>
 
 namespace convolver::au {
@@ -160,10 +161,9 @@ void Effect::Cleanup() {
         faults = observe_faults(); // Before the processor that counted them goes.
         if (rendered_.load())
             committed_ = initialized_;
-        // The host does not render while it uninitializes the unit.
-        playing_.store(nullptr);
-        host_.reset();
-        retired_.clear();
+        // The host does not render while it uninitializes the unit; if it
+        // did, this waits for the render call to finish.
+        install_processor(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
         refused_latency_.store(0);
         update_status(); // Read when the host next asks; no notification while it tears down.
@@ -227,21 +227,14 @@ Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
 
-void Effect::install_processor(std::unique_ptr<HostProcessor> next) {
-    reclaim();
-    if (host_)
-        retired_.push_back(std::move(host_)); // May throw before anything changed.
-    host_ = std::move(next);
-    playing_.store(host_.get());
-    reclaim(); // Render may not have started on the previous one.
-}
-
-void Effect::reclaim() noexcept {
+void Effect::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
+    playing_.store(next.get());
     // Render marks its processor in `rendering_` and then checks that it is
-    // still `playing_` (sequentially consistent), so a processor that is no
-    // longer playing and not marked is not used and never will be again.
-    const auto* in_use = rendering_.load();
-    std::erase_if(retired_, [&](const auto& p) { return p.get() != in_use; });
+    // still `playing_` (sequentially consistent), so once the previous one is
+    // no longer marked, Render is not using it and never will again.
+    while (host_ && rendering_.load() == host_.get())
+        std::this_thread::yield();
+    host_ = std::move(next);
 }
 
 void Effect::apply_latency(bool wait) {
@@ -253,7 +246,6 @@ void Effect::apply_latency(bool wait) {
             lock.lock();
         else if (!lock.try_lock())
             return; // A load is running; the window's next report tries again.
-        reclaim();
         const auto chosen = settings().latency;
         if (!host_) {
             changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
@@ -288,6 +280,11 @@ void Effect::apply_latency(bool wait) {
                 problem = true;
                 refused_latency_.store(chosen);
             }
+            // activate() started the fault count again for a new processor;
+            // the old one keeps playing, so count from its totals (already
+            // logged above) rather than logging them all again.
+            if (problem)
+                (void)filter_.observe(host_->faults());
             update_status();
         }
     }
@@ -307,8 +304,9 @@ void Effect::timing_changed() {
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
                         UInt32 frames) noexcept AUSDK_RTSAFE {
     // The processor to use, marked for the length of this call so that the
-    // control side does not free it (reclaim()): marked, then checked to be
+    // control side does not free it (install_processor()): marked, then checked to be
     // still the one playing. Atomic loads and stores only.
+    render_thread_.store(pthread_self(), std::memory_order_relaxed);
     HostProcessor* host = nullptr;
     do {
         host = playing_.load();
