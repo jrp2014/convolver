@@ -52,18 +52,27 @@ endif()
 # Call before any other POST_BUILD step that signs the target (the VST3
 # bundle's codesign), so that signing comes last. SDK_STRIPPED: the target
 # was made with CMAKE_STRIP set to CONVOLVER_SDK_STRIP, which keeps its
-# symbols on Linux already.
+# symbols on Linux already. NAME: the kept file's name without its suffix,
+# when the target's own file name would differ from another's only in case
+# (the CLI, convolver, beside the plug-in, Convolver): macOS and Windows
+# folders ignore case, so one would replace the other.
 function(convolver_keep_symbols target)
-    cmake_parse_arguments(PARSE_ARGV 1 keep "SDK_STRIPPED" "" "")
+    cmake_parse_arguments(PARSE_ARGV 1 keep "SDK_STRIPPED" "NAME" "")
     if(NOT CONVOLVER_DEBUG_SYMBOLS OR (keep_SDK_STRIPPED AND CONVOLVER_SDK_STRIP))
         return()
     endif()
     file(MAKE_DIRECTORY "${CONVOLVER_SYMBOLS_DIR}")
     set(file "$<TARGET_FILE:${target}>")
     set(kept "${CONVOLVER_SYMBOLS_DIR}/$<TARGET_FILE_NAME:${target}>")
+    if(keep_NAME)
+        set(kept "${CONVOLVER_SYMBOLS_DIR}/${keep_NAME}")
+    endif()
     if(MSVC)
         # Multi-configuration generators add the configuration's folder.
         set_target_properties(${target} PROPERTIES PDB_OUTPUT_DIRECTORY "${CONVOLVER_SYMBOLS_DIR}")
+        if(keep_NAME)
+            set_target_properties(${target} PROPERTIES PDB_NAME "${keep_NAME}")
+        endif()
     elseif(APPLE)
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E rm -rf "${kept}.dSYM"

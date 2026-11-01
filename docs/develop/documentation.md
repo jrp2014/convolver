@@ -147,8 +147,11 @@ limits, test counts or TODOs into several places. Preview packages ship every
 page in `docs/use/`; `scripts/release/package_docs.py` turns their links to
 other pages into links to the source repository at the packaged commit, so
 write those pages as usual. Commands marked `<!-- executable-example -->` in
-`docs/use/` must run a bundled tool as `./bin/TOOL INPUT OUTPUT...` from the
-package folder; the release tests run them. `VERSION` is the numeric source of
+`docs/use/` must run a bundled tool from the package folder, as
+`./bin/TOOL INPUT OUTPUT...`, or as
+`./bin/convolver --filter F --input I --output O` or
+`./bin/convolver --compare OUTPUT EXPECTED` (which must find a match); the
+release tests run them in page order (`tests/release/documentation_examples.py`). `VERSION` is the numeric source of
 truth. Version numbers in commands are examples or compatibility requirements,
 not another release metadata source.
 

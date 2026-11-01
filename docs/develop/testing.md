@@ -945,8 +945,11 @@ when either file changes, so Lint runs it on every pull request.
 The read-only candidate workflow builds native preview archives on Windows x64,
 Linux x64 and both macOS architectures. It checks runtime dependency closure,
 source inventories, final ZIP relocation, the packaged guide's executable
-examples (`convolver-preset` and `convolver-equalizer-apo` from a relocated
-copy, never replacing existing outputs) and real SDK validation. Windows also compiles a fixture installer and exercises
+examples (`convolver`, `convolver-preset` and `convolver-equalizer-apo` from a
+relocated copy, never replacing existing outputs), a render of each packaged
+first-use example by the packaged `convolver` that `--compare` must match with
+its `expected.wav`, the shipped first-use presets against the converter's
+output, and real SDK validation. Windows also compiles a fixture installer and exercises
 changed-directory upgrades and locked-file uninstall recovery. The Linux
 candidate is built with networking disabled, from the archive alone, with
 CMake's default generator (Unix Makefiles). Until 27 October 2026 the

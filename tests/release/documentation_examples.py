@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-TOOLS = ('convolver-preset', 'convolver-equalizer-apo')
+TOOLS = ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
 
 
 def check(package):
@@ -38,14 +38,26 @@ def check(package):
         for page, command in examples:
             tokens = shlex.split(command)
             name = tokens[0][len('./bin/') :] if tokens[0].startswith('./bin/') else tokens[0]
-            # Plain INPUT OUTPUT... commands, so the output check below is exact.
-            if name not in TOOLS or len(tokens) < 3 or any(t.startswith('-') for t in tokens[1:]):
-                raise ValueError(f'{page}: examples must run a bundled tool as TOOL INPUT OUTPUT...: {command}')
             tool = root / 'bin' / name
             if not tool.exists():
                 tool = tool.with_suffix('.exe')
+            if name == 'convolver':
+                # convolver --filter F --input I --output O renders O, and
+                # convolver --compare OUTPUT EXPECTED must find a match.
+                options = dict(zip(tokens[1::2], tokens[2::2]))
+                if tokens[1:2] == ['--compare'] and len(tokens) == 4:
+                    outputs = []
+                elif len(tokens) == 7 and set(options) == {'--filter', '--input', '--output'}:
+                    outputs = [options['--output']]
+                else:
+                    raise ValueError(f'{page}: convolver examples render or compare: {command}')
+            # Plain INPUT OUTPUT... commands, so the output check below is exact.
+            elif name not in TOOLS or len(tokens) < 3 or any(t.startswith('-') for t in tokens[1:]):
+                raise ValueError(f'{page}: examples must run a bundled tool as TOOL INPUT OUTPUT...: {command}')
+            else:
+                outputs = tokens[2:]
             subprocess.run([str(tool), *tokens[1:]], cwd=root, check=True)
-            for output in tokens[2:]:
+            for output in outputs:
                 assert (root / output).exists(), f'{page}: {command} did not produce {output}'
             if name == 'convolver-equalizer-apo':
                 assert (root / tokens[2] / 'convolver.txt').is_file(), f'{page}: no convolver.txt'

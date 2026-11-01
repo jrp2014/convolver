@@ -28,16 +28,19 @@ import zlib
 TARGETS = {
     'Linux': (
         ('Convolver.so.debug', 'VST3/Convolver.vst3/Contents/*/Convolver.so'),
+        ('convolver-cli.debug', 'bin/convolver'),
         ('convolver-preset.debug', 'bin/convolver-preset'),
         ('convolver-equalizer-apo.debug', 'bin/convolver-equalizer-apo'),
     ),
     'Darwin': (
         ('Convolver.dSYM', 'VST3/Convolver.vst3/Contents/MacOS/Convolver'),
+        ('convolver-cli.dSYM', 'bin/convolver'),
         ('convolver-preset.dSYM', 'bin/convolver-preset'),
         ('convolver-equalizer-apo.dSYM', 'bin/convolver-equalizer-apo'),
     ),
     'Windows': (
         ('Convolver.pdb', 'VST3/Convolver.vst3/Contents/*/Convolver.vst3'),
+        ('convolver-cli.pdb', 'bin/convolver.exe'),
         ('convolver-preset.pdb', 'bin/convolver-preset.exe'),
         ('convolver-equalizer-apo.pdb', 'bin/convolver-equalizer-apo.exe'),
     ),
