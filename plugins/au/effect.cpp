@@ -61,6 +61,14 @@ Effect::Effect(AudioComponentInstance instance)
     Globals()->SetParameter(mix_parameter,
                             static_cast<AudioUnitParameterValue>(100 * defaults.mix));
     Globals()->SetParameter(latency_parameter, default_latency_index);
+    latency_thread_ = std::thread([this] { latency_worker(); });
+}
+
+Effect::~Effect() {
+    stopping_.store(true);
+    request_latency();
+    if (latency_thread_.joinable())
+        latency_thread_.join();
 }
 
 HostLayout Effect::layout() {
@@ -93,6 +101,7 @@ OSStatus Effect::Initialize() {
     std::string message, faults;
     bool started = false, problem = true;
     HostSettings current;
+    std::unique_ptr<HostProcessor> previous; // None after Cleanup.
     {
         std::lock_guard lock(control_);
         faults = observe_faults(); // Before the processor that counted them goes.
@@ -108,8 +117,7 @@ OSStatus Effect::Initialize() {
             next->reset();
             tail_.store(next->tail_frames());
             latency_.store(next->latency_frames());
-            refused_latency_.store(0);
-            install_processor(std::move(next));
+            previous = install_processor(std::move(next));
             initialized_ = host;
             rendered_.store(false);
             reset_requested_.store(false);
@@ -132,6 +140,7 @@ OSStatus Effect::Initialize() {
         }
         update_status();
     }
+    release_processor(std::move(previous));
     log_faults(faults);
     log(message, problem);
     notify_status();
@@ -156,18 +165,19 @@ std::string Effect::activation_failed(const char* why) noexcept {
 // counting that probe would turn a 48 kHz project's filter into a failed load.
 void Effect::Cleanup() {
     std::string faults;
+    std::unique_ptr<HostProcessor> previous;
     {
         std::lock_guard lock(control_);
         faults = observe_faults(); // Before the processor that counted them goes.
         if (rendered_.load())
             committed_ = initialized_;
-        // The host does not render while it uninitializes the unit; if it
-        // did, this waits for the render call to finish.
-        install_processor(nullptr);
+        previous = install_processor(nullptr);
         latency_.store(settings().latency); // What the next initialization uses.
-        refused_latency_.store(0);
         update_status(); // Read when the host next asks; no notification while it tears down.
     }
+    // The host does not render while it uninitializes the unit; if it did,
+    // this waits for the render call to finish.
+    release_processor(std::move(previous));
     log_faults(faults);
 }
 
@@ -227,72 +237,110 @@ Float64 Effect::GetTailTime() noexcept AUSDK_RTSAFE {
     return rate > 0 ? static_cast<Float64>(tail_.load()) / rate : 0;
 }
 
-void Effect::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
+std::unique_ptr<HostProcessor>
+Effect::install_processor(std::unique_ptr<HostProcessor> next) noexcept {
     playing_.store(next.get());
+    std::swap(host_, next);
+    return next; // The previous processor.
+}
+
+void Effect::release_processor(std::unique_ptr<HostProcessor> previous) noexcept {
     // Render marks its processor in `rendering_` and then checks that it is
     // still `playing_` (sequentially consistent), so once the previous one is
     // no longer marked, Render is not using it and never will again.
-    while (host_ && rendering_.load() == host_.get())
+    while (previous && rendering_.load() == previous.get())
         std::this_thread::yield();
-    host_ = std::move(next);
 }
 
-void Effect::apply_latency(bool wait) {
+void Effect::request_latency() noexcept {
+    latency_requested_.store(true);
+    latency_requested_.notify_one();
+}
+
+void Effect::latency_worker() noexcept {
+    for (;;) {
+        latency_requested_.wait(false);
+        if (stopping_.load())
+            return;
+        // A choice made while this one is applied wakes the worker again.
+        latency_requested_.store(false);
+        apply_latency();
+    }
+}
+
+void Effect::apply_latency() noexcept {
     std::string message, faults;
     bool changed = false, problem = false;
+    std::unique_ptr<HostProcessor> previous;
     {
-        std::unique_lock lock(control_, std::defer_lock);
-        if (wait)
-            lock.lock();
-        else if (!lock.try_lock())
-            return; // A load is running; the window's next report tries again.
-        const auto chosen = settings().latency;
+        std::lock_guard lock(control_);
+        // The settings are read once: what is built and what is reported
+        // both come from this one reading, even if the host changes the
+        // parameter meanwhile (that wakes the worker again).
+        const auto current = settings();
+        const auto chosen = current.latency;
         if (!host_) {
             changed = latency_.exchange(chosen) != chosen; // The next Initialize uses it.
-            refused_latency_.store(0);
         } else if (host_->latency_frames() != chosen && initialized_) {
             const auto before = host_->latency_frames();
             faults = observe_faults(); // Before the processor that counted them goes.
+            std::unique_ptr<HostProcessor> next;
+            std::string why;
             try {
                 // As Initialize builds it; Render switches at its next call.
-                auto next = std::make_unique<HostProcessor>(filter_.activate(*initialized_),
-                                                            GetMaxFramesPerSlice(), settings());
+                next = std::make_unique<HostProcessor>(filter_.activate(*initialized_),
+                                                       GetMaxFramesPerSlice(), current);
                 next->set_bypass(bypass_.load());
                 next->reset();
-                const auto tail = next->tail_frames();
-                install_processor(std::move(next));
-                tail_.store(tail);
-                latency_.store(chosen);
-                refused_latency_.store(0);
-                changed = true;
-                message = "Latency changed from " + std::to_string(before) + " to " +
-                          std::to_string(chosen) +
-                          " frames; the sound paused briefly while the new processor started.";
             } catch (const std::exception& e) {
-                // The previous processor keeps playing at its latency; the
-                // window's report says the chosen one waits.
-                problem = true;
-                refused_latency_.store(chosen);
-                message = "Latency " + std::to_string(chosen) +
-                          " frames could not be applied, so the plug-in keeps " +
-                          std::to_string(before) + " frames: " + e.what();
+                next.reset();
+                try {
+                    why = e.what();
+                } catch (...) {
+                }
             } catch (...) {
-                problem = true;
-                refused_latency_.store(chosen);
+                next.reset();
             }
-            // activate() started the fault count again for a new processor;
-            // the old one keeps playing, so count from its totals (already
-            // logged above) rather than logging them all again.
-            if (problem)
+            if (next) {
+                // Nothing below can fail: the audio and the reported latency
+                // change together, from the processor that now plays.
+                tail_.store(next->tail_frames());
+                latency_.store(next->latency_frames());
+                previous = install_processor(std::move(next));
+                changed = true;
+            } else {
+                // The previous processor keeps playing at its latency, and
+                // the window's report says the chosen one is not in use.
+                // activate() started the fault count again for a new
+                // processor, so count from the old one's totals (already
+                // logged above) rather than logging them all again.
+                problem = true;
                 (void)filter_.observe(host_->faults());
+            }
+            try { // Best effort: out of memory for the message changes nothing else.
+                message = changed ? "Latency changed from " + std::to_string(before) + " to " +
+                                        std::to_string(chosen) +
+                                        " frames; the sound paused briefly while the new "
+                                        "processor started."
+                                  : "Latency " + std::to_string(chosen) +
+                                        " frames could not be applied, so the plug-in keeps " +
+                                        std::to_string(before) + " frames" +
+                                        (why.empty() ? std::string(".") : ": " + why);
+            } catch (...) {
+            }
             update_status();
         }
     }
+    release_processor(std::move(previous));
     log_faults(faults);
     log(message, problem);
-    if (changed)
-        timing_changed();
-    if (!message.empty())
+    if (changed) {
+        try {
+            timing_changed();
+        } catch (...) {
+        }
+    }
+    if (!message.empty() || problem)
         notify_status();
 }
 
@@ -304,9 +352,8 @@ void Effect::timing_changed() {
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,
                         UInt32 frames) noexcept AUSDK_RTSAFE {
     // The processor to use, marked for the length of this call so that the
-    // control side does not free it (install_processor()): marked, then checked to be
+    // control side does not free it (release_processor()): marked, then checked to be
     // still the one playing. Atomic loads and stores only.
-    render_thread_.store(pthread_self(), std::memory_order_relaxed);
     HostProcessor* host = nullptr;
     do {
         host = playing_.load();

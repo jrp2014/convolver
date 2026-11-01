@@ -100,8 +100,6 @@ std::string Effect::rejection_line() noexcept {
 OSStatus Effect::SaveState(CFPropertyListRef* out) {
     if (!out)
         return kAudioUnitErr_InvalidPropertyValue;
-    if (latency_pending()) // A Latency set on the render thread (apply_latency).
-        apply_latency();
     std::vector<std::byte> bytes;
     std::string faults;
     try {
@@ -353,8 +351,7 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     // A restored Latency plays at once. GarageBand starts the unit before it
     // restores a project, so waiting for the next start would leave it unused
     // (the independent review).
-    if (latency_pending())
-        apply_latency();
+    request_latency();
     if (saved) {
         // Hosts and generic views reread the settings.
         AudioUnitEvent event{};

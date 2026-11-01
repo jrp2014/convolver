@@ -579,14 +579,17 @@ Four CTest tests run when the adapter is built (label `au`):
   Latency (PLUG-10): its parameter info and value names, rounding and
   clamping, the reported latency and its notification when chosen
   uninitialized, an impulse delayed by exactly the chosen frames, a choice
-  made while initialized applied at once with its notification and log line,
-  also from another thread, one set on the rendering thread waiting until
-  saving the state or the report applies it, repeated switches from another
-  thread while rendering (outputs stay finite and bounded; the sanitizer job
-  runs it under ASan and UBSan, which catch a freed processor only if the
-  timing hits it), and saving and restoring it, also after the unit has
-  started (GarageBand's order). Not covered: a Latency that cannot be built
-  (it needs memory to run out).
+  made while initialized applied with its notification and log line, one
+  set from a pre-render notification on a new audio thread (no allocation
+  on that thread) and one set from the input callback during a render on
+  the main thread (no deadlock), choices from two threads at once while
+  rendering (afterwards the reported latency is the last choice and the
+  audio has it; the sanitizer job runs it under ASan and UBSan, which catch
+  a freed processor only if the timing hits it), out of memory at each
+  allocation the worker makes for a change (the reported latency always
+  matches the audio, and a change that plays is never logged as failed),
+  and saving and restoring it, also after the unit has started
+  (GarageBand's order).
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is

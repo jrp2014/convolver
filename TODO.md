@@ -357,7 +357,8 @@ LV2 (Linux first; also PipeWire system audio):
   loads the highest (minor, micro) it finds, so 1.0.0 mapped this way would
   lose to an old 0.4.x left in `~/.lv2`. The mapping must keep increasing,
   with minor even and non-zero and micro even for releases. Mapped this way,
-  every 0.8.x build is minor 8, which LV2 reads as a development version.
+  0.8.x builds are minor 8, which LV2 accepts, but every odd patch number
+  is a micro version LV2 reads as a development version.
 - [ ] **LV2-6 — Editor report and UI (optional).** Only if Linux users show a
   need: generic UIs already offer the `filter` file chooser and the status
   port. The report as `patch:Set` atoms on the notify port, prepared in
