@@ -56,7 +56,7 @@ boundary and C++20 in the core.
 | 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
 | 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
 | 3. Alongside step 2 | **PLUG-5** first-preview contents: the `convolver` CLI and presets made from the stereo and 2→6 first-use filters, in the package, and the VST trademark notice. **REL-2:** the three journeys written in `docs/use/` | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
-| Early walkthrough (macOS) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only, as soon as step 3 has its stereo preset and journey | Recorded like REL-3, with its limits stated. It finds installation, documentation, loading and reopening problems while the other windows are still being built; it does not change the first preview's contents (jrp's 25 October decision) and does not replace REL-3. |
+| Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
 | 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.8.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
@@ -107,8 +107,13 @@ is superseded.
   differences marked, and make the
   package contain what they need: presets made from the stereo and 2→6
   filters, the preset tool and the `convolver` CLI, which the first preview
-  ships; the package has no CLI yet (PLUG-5). See
+  ships. See
   [status](docs/project/status.md#user-journeys-for-the-first-preview).
+  Progress (1 November 2026, PR #101): the stereo journey in a host is
+  written ([check a stereo filter in a host](docs/use/check-a-stereo-filter.md)),
+  with `convolver --compare` as its check; the package holds the first-use
+  examples and their presets, and `bin/convolver`. The 2→6 crossover and
+  CLI journeys remain.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   did not write the code or the guides follows the REL-2 journeys from the
   exact preview files (identified by their SHA-256 sums), on their own
@@ -131,21 +136,6 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
-- [ ] **REL-5 — Early limited walkthrough on macOS.** Proposed in jrp's
-  review of `6920a45` (31 October 2026): before the other platforms' windows
-  are finished, someone who did not write the code or the guides follows the
-  stereo room-correction journey (REL-2) on macOS from an exact candidate
-  package (identified by its SHA-256 sums), in one named host, using only the
-  documentation, and the record says plainly what it does not cover (the
-  other journeys, platforms and formats). It looks for installation,
-  documentation, loading and reopening problems early. Where the journey
-  checks output, it does so by command (the host's render compared with
-  `expected.wav`), not by ear or screen, as jrp prefers testing through the
-  CLI where that makes sense. Record it as REL-3 says, and fix what it finds. It needs the stereo preset in the package
-  (PLUG-5) and the stereo journey written (REL-2). It does not change what
-  the first preview holds (jrp's
-  [25 October decision](docs/project/decisions.md), confirmed on 31 October)
-  and does not replace REL-3.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -156,6 +146,9 @@ is superseded.
   First step, before the first preview: jrp's smoke tests in REAPER and
   Audacity on his Mac, from the latest candidate
   ([smoke tests](docs/develop/host-testing.md#smoke-test-in-each-first-host)).
+  The REAPER smoke test also takes over the host steps that REL-5 left out:
+  install, render, save and reopen, and presets that do not fit, in
+  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
   Not yet run.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
@@ -216,9 +209,11 @@ Shared work, done once for all three formats:
   Progress (22 October 2026, PR #38): packages ship `convolver-preset` and
   `convolver-equalizer-apo` with their guides, and `release.stage`,
   `package_smoke.py` and `verify_artifact.py` require and run both.
-  Still needed for the first preview: the `convolver` CLI in the package (run
-  by the same release tests); presets made from the stereo and 2→6 first-use
-  filters, which the REL-2 journeys load; and the VST trademark notice that
+  Progress (1 November 2026, PR #101): packages ship `bin/convolver` and the
+  first-use examples with a preset made from each (stereo and 2→6 included);
+  `release.stage`, `package_smoke.py`, `verify_artifact.py` and the debugging
+  symbols cover the CLI, and the packaged guide's examples run it.
+  Still needed for the first preview: the VST trademark notice that
   Steinberg's usage guidelines ask for (® on first use of "VST", the sentence
   "VST is a registered trademark of Steinberg Media Technologies GmbH." in the
   documentation and packages, and the VST Compatible logo where they require
@@ -992,6 +987,21 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   be saved. `HostFilter::load` refuses a filter whose state would exceed the
   limit before installing it (`too_large`), and `convolver-preset` refuses
   to write one; [host state](docs/develop/plugin-contract.md#host-state).
+- [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
+  PR #101. An assisted check for jrp, not by an independent tester, of the
+  stereo journey's package and command-line steps on the pull request's
+  macOS arm64 candidate
+  ([run 41347884655](https://github.com/jrp2014/convolver/actions/runs/41347884655),
+  version 0.8.3 built from merge commit `773605c`, macOS 27.2, package
+  SHA-256
+  `936cc921e39c046d5bd5aa8073ff15532e3bf5513c46127b08b8b433861821a1`):
+  the hashes matched, the package held every file the guide names, and the
+  command-line render matched `expected.wav` (largest difference -131 dB).
+  No defect found. jrp closed it without the host steps (install, render,
+  save and reopen, presets that do not fit), which moved to HOST-1 and
+  REL-3; nor did it cover the browser's quarantine, the installer, the
+  Audio Unit or other platforms;
+  [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
 - [x] **ROBUST-3 — Silence when memory runs out after a recorded failure.**
   31 October 2026, from jrp's review of `6920a45`: a failed first load
   silences the processor with `HostProcessor::silence()`, which cannot
