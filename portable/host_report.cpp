@@ -87,6 +87,12 @@ std::size_t longest_taps(const Configuration& c) {
     return longest;
 }
 
+// Whose rate a problem note names: the filter that cannot play, or a
+// refused file while the previous filter keeps playing.
+std::string refused_words(const HostFailure& failure) {
+    return failure.silent ? "the filter is for " : "the refused file is for ";
+}
+
 // A time for reading, without brackets: "5.3 ms", "1.37 s"; empty without a rate.
 std::string duration(std::size_t frames, int rate) {
     auto text = seconds(frames, rate);
@@ -95,7 +101,8 @@ std::string duration(std::size_t frames, int rate) {
 
 std::string decibels(double value) {
     char text[32] = {};
-    std::snprintf(text, sizeof text, "%+.1f dB", value);
+    // Anything that rounds to 0.0 reads "+0.0 dB", never "−0.0 dB".
+    std::snprintf(text, sizeof text, "%+.1f dB", std::abs(value) < 0.05 ? 0.0 : value);
     std::string out = text;
     if (out.rfind("-", 0) == 0)
         out.replace(0, 1, "−"); // A minus sign, as the controls write it.
@@ -161,7 +168,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          "The rate the host runs the plug-in at. A filter must be made for the "
                          "same rate: Convolver does not resample."};
     if (failure && failure->kind == HostFailureKind::sample_rate && failure->sample_rate > 0) {
-        sample_rate.note = "the filter is for " + std::to_string(failure->sample_rate) + " Hz";
+        sample_rate.note = refused_words(*failure) + std::to_string(failure->sample_rate) + " Hz";
         sample_rate.problem = true;
     } else if (c) {
         sample_rate.note = host ? "(the filter's rate too)"
@@ -177,7 +184,9 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                       "filter's outputs are labelled for."};
     if (failure && failure->kind == HostFailureKind::channels &&
         (failure->inputs || failure->outputs)) {
-        channels.note = "the filter has " + ports(failure->inputs, failure->outputs);
+        channels.note = (failure->silent ? std::string("the filter has ")
+                                         : std::string("the refused file has ")) +
+                        ports(failure->inputs, failure->outputs);
         channels.problem = true;
     } else if (c) {
         const auto speakers = speaker_names(c->channel_mask, c->output_channels);
@@ -227,25 +236,33 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
 
     audio.push_back({"Ring-out",
                      facts.tail_frames == 0 ? std::string("none")
-                     : rate                 ? duration(facts.tail_frames, rate)
-                                            : frames(facts.tail_frames),
+                     // Under 0.05 ms reads as frames, not "0.0 ms".
+                     : rate && facts.tail_frames * 20000.0 >= rate
+                         ? duration(facts.tail_frames, rate)
+                         : frames(facts.tail_frames),
                      facts.tail_frames ? "after the input stops" : "", false,
                      "How long the output goes on after the input stops (the filter's tail)."});
 
     if (c && filter.filter_peak() > 0) {
-        // Through Mix, the dry share adds at most its own level (inputs and
-        // outputs equal): the bound is m * peak + (1 - m), before Gain.
+        // As HostProcessor::process() applies them: Gain on the filtered
+        // path only, then Mix adds the dry input at 1 - m (inputs and
+        // outputs equal; otherwise Mix is 1). The bound is
+        // m * g * peak + (1 - m), so for any m > 0 the Gain that rules out
+        // clipping is 1 / peak whatever the Mix, and at m = 0 nothing can.
         const double peak = filter.filter_peak();
         const bool equal = c->input_channels == c->output_channels;
-        const double mix = equal ? std::clamp(facts.settings.mix, 0.0, 1.0) : 1.0;
-        const double bound = mix * peak + (1 - mix);
-        const double gain = std::pow(10.0, facts.settings.gain_db / 20);
-        const double safe_db = -20 * std::log10(bound);
+        const double mix = !equal || std::isnan(facts.settings.mix)
+                               ? 1.0
+                               : std::clamp(facts.settings.mix, 0.0, 1.0);
+        const double db = std::isnan(facts.settings.gain_db)
+                              ? 0.0
+                              : std::clamp(facts.settings.gain_db, min_gain_db, max_gain_db);
+        const double bound = mix * std::pow(10.0, db / 20) * peak + (1 - mix);
         audio.push_back(
             {"Loudest peak", decibels(20 * std::log10(peak)),
-             gain * bound <= 1 + 1e-9
+             mix == 0 || bound <= 1 + 1e-9
                  ? "at most, for full-scale input; it cannot clip at this Gain and Mix"
-                 : "at most, for full-scale input; Gain " + decibels(safe_db) +
+                 : "at most, for full-scale input; Gain " + decibels(-20 * std::log10(peak)) +
                        " or lower rules out clipping",
              false,
              "The loudest output any full-scale input could make through the filter. Music is "

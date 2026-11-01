@@ -463,6 +463,12 @@ void window() {
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "typed Gain");
     require(now == -6.5f && gain.doubleValue == -6.5, "typed Gain: " + std::to_string(now));
+    // A decimal comma, as in a German or French locale, and a unit after it.
+    view.settingValues[0].stringValue = @"-3,5 dB";
+    [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
+    check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
+          "typed Gain with a comma");
+    require(now == -3.5f, "typed Gain with a comma: " + std::to_string(now));
     view.settingValues[0].stringValue = @"40";
     [view.settingValues[0] sendAction:view.settingValues[0].action to:view.settingValues[0].target];
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),

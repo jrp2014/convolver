@@ -191,8 +191,10 @@ format.
   loudest peak from `HostFilter::filter_peak()`, host blocks; each with a
   note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
-  `execution_line()` and the log. Every word a window shows comes from
-  here, so the VST3 windows (VST3-11 to VST3-13) show the same.
+  `execution_line()` and the log. Everything a window says about the
+  filter and the audio comes from here, so the VST3 windows (VST3-11 to
+  VST3-13) show the same; the control labels, hints and tooltips are the
+  view's own.
   `report_fields()` gives it as named text values for a format's
   transport, `report_text()` as plain text, and `diagnostics_text()` adds
   this instance's recent log lines (`host_log_recent()`, at most the last

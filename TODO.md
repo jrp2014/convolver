@@ -524,8 +524,9 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   file's name and Choose…, Gain and Mix with typed values and Option-click
   reset, Latency with its time), an Audio section of plain-word facts from
   the shared report (with the new Loudest peak), and the file, software and
-  log lines folded away; stack views instead of fixed frames. Every word
-  comes from `host_report`, so VST3-11 to VST3-13 can show the same (on
+  log lines folded away; stack views instead of fixed frames. What it says
+  about the filter and audio comes from `host_report`, so VST3-11 to
+  VST3-13 can show the same (on
   Linux the status symbol becomes a glyph and the palette is fixed).
   `au.editor` checks it on macOS CI. To check in GarageBand with the gates
   above: the new layout at both appearances, typing a value, Option-click,

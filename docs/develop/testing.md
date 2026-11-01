@@ -215,7 +215,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   their values, notes and help (a refused rate and a mono track's channels
   marked as problems, the Routing of a filter that is not playing, what is
   known before the host starts), the Loudest peak and the Gain that rules
-  out clipping at the current Mix, the headline, the Filter row and
+  out clipping (the same at any Mix above 0; nothing clips at Mix 0), the headline, the Filter row and
   reference lines for a saved and a refused file, and the Latency that
   waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
@@ -603,8 +603,8 @@ Four CTest tests run when the adapter is built (label `au`):
   window: its size fitted to the content whatever size the host offers
   (between 300 and 680 points high), the explanation, the Audio facts and
   the buttons at the bottom right in that order, the view ending just under
-  the buttons, the folded file, software and log lines adding exactly their
-  height when opened, the Audio facts (the mono track's Channels line marked
+  the buttons, the folded file, software and log lines making it taller
+  when opened and closing back to the same height, the Audio facts (the mono track's Channels line marked
   as a problem in words), the Filter row, the Gain and Mix sliders (ranges,
   a slider setting its parameter, a typed value setting it, clamped at the
   range's end, text that is not a number changing nothing, the reset that

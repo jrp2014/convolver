@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <locale.h>
+#include <xlocale.h>
 
 namespace {
 // The usual macOS panel layout (jrp's GarageBand run: the first version
@@ -666,14 +668,20 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     const auto i = static_cast<NSUInteger>(value.tag);
     if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
         return;
-    NSString* typed = [[value.stringValue stringByReplacingOccurrencesOfString:@"−" withString:@"-"]
+    // A decimal comma reads as a point ("-6,5"), whatever the host's locale.
+    NSString* typed = [[[value.stringValue stringByReplacingOccurrencesOfString:@"−"
+                                                                     withString:@"-"]
+        stringByReplacingOccurrencesOfString:@","
+                                  withString:@"."]
         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    // The number at the start; a unit typed after it ("-6 dB") is ignored.
+    // The number at the start, read in the C locale, so a host's LC_NUMERIC
+    // cannot change it; a unit typed after it ("-6 dB") is ignored.
+    static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
     const char* chars = typed.UTF8String;
     char* end = nullptr;
-    double number = chars ? std::strtod(chars, &end) : 0;
+    double number = chars && c_locale ? strtod_l(chars, &end, c_locale) : 0;
     auto* slider = static_cast<NSSlider*>(controls_[i]);
-    if (!chars || end == chars || !std::isfinite(number)) {
+    if (!chars || !c_locale || end == chars || !std::isfinite(number)) {
         NSBeep();
         value.stringValue = [self number:slider.doubleValue of:settings_[i]];
         return;

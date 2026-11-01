@@ -238,9 +238,10 @@ void cases() {
     check(fact(r, "Routing"), "In 1 → Out 1, In 2 → Out 2", "");
     check(fact(r, "Filter length"), "0.1 ms", "(3 taps)");
     check(fact(r, "Added delay"), "5.8 ms", "(256 frames, reported to the host)");
-    check(fact(r, "Ring-out"), "0.0 ms", "after the input stops");
-    // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. At Gain
-    // -6 dB and Mix 25%, .25 * 1.75 + .75 = 1.19 is below 2 (+6 dB).
+    check(fact(r, "Ring-out"), "2 frames", "after the input stops");
+    // The identity paths have peak 1.75 (1 + .5 + .25): +4.9 dB. Gain
+    // scales only the filtered path, which Mix then adds to the dry input:
+    // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
     check(fact(r, "Loudest peak"), "+4.9 dB",
           "at most, for full-scale input; it cannot clip at this Gain and Mix");
     check(fact(r, "Host blocks"), "up to 512 frames", "(11.6 ms) per call");
@@ -250,6 +251,17 @@ void cases() {
     require(fact(loud, "Loudest peak").note ==
                 "at most, for full-scale input; Gain −4.9 dB or lower rules out clipping",
             "loudest peak at 0 dB: " + fact(loud, "Loudest peak").note);
+    // The Gain that rules out clipping does not depend on Mix (above 0):
+    // at Mix 50% and Gain -3 dB, .5 * .708 * 1.75 + .5 = 1.12 can clip, and
+    // at Mix 25% it still takes -4.9 dB. At Mix 0 nothing can clip.
+    for (const HostSettings s : {HostSettings{-3, .5}, HostSettings{0, .25}})
+        require(fact(host_report(f, facts(stereo, s)), "Loudest peak").note ==
+                    "at most, for full-scale input; Gain −4.9 dB or lower rules out clipping",
+                "loudest peak at gain " + std::to_string(s.gain_db) + ", mix " +
+                    std::to_string(s.mix));
+    require(fact(host_report(f, facts(stereo, {24, 0})), "Loudest peak").note ==
+                "at most, for full-scale input; it cannot clip at this Gain and Mix",
+            "loudest peak at mix 0");
     require(r.filter_name == "From the saved project or preset" && r.filter_note.empty(),
             "filter row: " + r.filter_name + " / " + r.filter_note);
     require(reference(r, "Filter file") == "a saved project or preset, request 1",
@@ -273,7 +285,8 @@ void cases() {
     require(unstarted.filter_name == "None" && unstarted.headline == unstarted.explanation,
             "empty filter row");
 
-    // A refused file: the problem shows in the fact, the file in the row.
+    // A refused file while the previous filter plays: the problem shows in
+    // the fact, naming the refused file, and the file in the row.
     HostFilter refused(8);
     refused.load(HostState{filter(44100, 2)}, stereo, [](const Configuration&) {});
     try {
@@ -284,12 +297,12 @@ void cases() {
     }
     const auto rr = host_report(refused, facts(stereo));
     require(fact(rr, "Sample rate").problem &&
-                fact(rr, "Sample rate").note == "the filter is for 48000 Hz",
+                fact(rr, "Sample rate").note == "the refused file is for 48000 Hz",
             "refused rate: " + fact(rr, "Sample rate").note);
     require(rr.filter_note == "room-48k.cfg was refused." &&
                 reference(rr, "Refused file") == "/filters/room-48k.cfg, request 2",
             "refused file: " + rr.filter_note);
-    require(contains(report_text(rr), "Sample rate: 44100 Hz; the filter is for 48000 Hz\n"),
+    require(contains(report_text(rr), "Sample rate: 44100 Hz; the refused file is for 48000 Hz\n"),
             "refused report text:\n" + report_text(rr));
     // A stereo filter the host started on a mono track: not playing.
     HostFilter idle(8);

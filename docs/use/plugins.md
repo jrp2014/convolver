@@ -321,7 +321,7 @@ the plug-in's button in the track's Plug-ins area. From the top, the window has:
   | Filter length | The longest filter, in time and in taps |
   | Added delay | The latency, in time and frames, and a chosen one not in use yet |
   | Ring-out | How long the output goes on after the input stops (the tail) |
-  | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping at the current Mix (or that it cannot clip) |
+  | Loudest peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it cannot clip at the current Gain and Mix) |
   | Host blocks | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
