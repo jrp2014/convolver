@@ -839,7 +839,7 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   typing, choosing) moved from `plugins/au/diagnostic_view.mm` (959 lines,
   now about 630) to `plugins/au/setting_rows.mm`, with the shared layout
   helpers in `plugins/au/view_layout.h`. Behaviour unchanged; `au.editor`
-  unchanged.
+  unchanged. See the [implementation map](docs/develop/architecture.md).
 - [x] **AU-9 — Simplify the macOS plug-in code.** 31 October 2026, PR #93,
   jrp's request: behaviour-preserving simplifications of the AudioToolbox
   reader, the window and the adapter's property calls, one commit each,

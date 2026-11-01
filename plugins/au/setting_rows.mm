@@ -4,6 +4,7 @@
 #import "view_layout.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib> // Before xlocale.h, which declares strtod_l only after it.
 #include <locale.h>
 #include <xlocale.h>
 

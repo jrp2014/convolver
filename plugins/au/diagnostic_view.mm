@@ -369,6 +369,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)dealloc {
     [timer_ invalidate];
     [panel_ cancel:nil];
+    // Release the rows before NSView releases their controls, so nothing a
+    // control does while it goes reaches them (their target is weak).
+    settings_ = nil;
 }
 
 // Forgets a pending Choose… request and closes its dialog.
