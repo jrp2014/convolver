@@ -492,6 +492,12 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
+- [ ] **AU-11 — Separate file watching from the window.** From jrp's review
+  of `276c7dc` (1 November 2026): the macOS window shared by the Audio Unit
+  and VST3, `plugins/editor/mac/diagnostic_view.mm`, is 860 lines again.
+  Move watching filter files and coordinating reloads to their own file, as
+  AU-10 moved the setting rows, behaviour unchanged, before the window
+  gains more controls.
 
 ## FFmpeg integration
 
@@ -649,6 +655,22 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
+- [ ] **VST3-14 — Separate the controller from the processor's file.**
+  From jrp's review of `276c7dc` (1 November 2026):
+  `plugins/vst3/processor.cpp` (1,041 lines) holds both the processor and
+  the controller. Move `Controller` to its own file, behaviour unchanged,
+  before the VST3 window gains more controls (as AU-10 did for the window).
+- [ ] **VST3-15 — Test the messages through a host's proxy.** From jrp's
+  review of `276c7dc`: the tests connect the controller and processor
+  directly, and `Controller::load_file` takes `sendMessage()` returning
+  `kResultOk` to mean the processor accepted the filter. The SDK lets a host
+  put a proxy between the components
+  ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html)),
+  which may deliver later or report success on its own. Add tests that
+  connect through a forwarding proxy and a deferring one, and make the
+  window's load result not depend on direct delivery if they fail. A
+  compatibility assumption to check, not a seen host failure; do it before
+  extending the messages.
 
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
