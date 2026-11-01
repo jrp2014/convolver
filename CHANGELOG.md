@@ -21,6 +21,22 @@ Until 1.0 the C++ API may change between minor versions.
   which LV2 treats as a development version until jrp decides the mapping
   (LV2-5). Nothing else changes: the library, plug-ins and their saved state
   are as in 0.6.10.
+- Clearer failure messages everywhere (DIAG-1, from jrp's choices on
+  31 October 2026). The CLI names the file, time, frame and channel of an
+  invalid input sample (not a number, or infinite) and says to export the file
+  again; an overflow names its time, frame and channel and says to lower
+  `--gain-db` or use `no-clip`; and after any failure once the output is open
+  it says the output is incomplete. Damaged, truncated or unrecognised sound
+  files, incomplete RAW frames and binary files given as a filter now say what
+  to do, in all three tools and in the Audio Unit. `convolver-preset` starts
+  its messages with its name, names a file that is not a VST3 preset, points
+  to the CLI for filters over 8 channels, describes a list that matches
+  nothing in terms of the options given, and accepts options after the file
+  names, `--help` included (an option written there without a value used to
+  be taken as an output name). The VST3 plug-in logs a sample rate, block size, sample type
+  or (once per instance) channel layout it refuses, LV2 logs why it refused
+  to start, and all three formats log a failed save. Each message has a test.
+  The CLI still replaces an existing output, now documented as deliberate.
 
 ## [0.6.10] - 2026-10-31
 

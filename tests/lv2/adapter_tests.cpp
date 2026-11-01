@@ -14,6 +14,7 @@
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
 #include "host.hpp"
+#include "host_log.hpp"
 #include "plugin.hpp"
 #include <algorithm>
 #include <array>
@@ -296,10 +297,20 @@ void instantiation(host::World& world) {
     const auto* p = world.plugin(2, 2);
     host::Features no_map;
     no_map.map = false;
-    check(!host::Plugin(world, p, 48000, no_map).instantiated(), "refuses to run without urid:map");
-    for (const double rate : {0., -48000., 44100.5, 1e9, std::nan("")})
-        check(!host::Plugin(world, p, rate).instantiated(),
-              "refuses a sample rate of " + std::to_string(rate));
+    {
+        // DIAG-1: each refusal says why in the host's log.
+        host::Plugin refused(world, p, 48000, no_map);
+        check(!refused.instantiated() &&
+                  refused.log.contains("", "Convolver: Refused to start an instance at 48000 Hz: "
+                                           "the host does not provide the urid:map feature"),
+              "refuses to run without urid:map, and says why");
+    }
+    for (const double rate : {0., -48000., 44100.5, 1e9, std::nan("")}) {
+        host::Plugin refused(world, p, rate);
+        check(!refused.instantiated() &&
+                  refused.log.contains(LV2_LOG__Error, "the sample rate must be a whole number"),
+              "refuses a sample rate of " + std::to_string(rate) + ", and says why");
+    }
     host::Features plain;
     plain.log = false;
     check(host::Plugin(world, p, 44100, plain).instantiated(), "runs without log:log or options");
@@ -319,6 +330,12 @@ void status_and_log(host::World& world, const Fixture& f) {
           label + "empty: status no filter");
     check(p->save().properties == 1 && !decode_host_state(p->save().bytes).configuration,
           label + "empty: saves one property with no filter");
+    // DIAG-1: a save the host refuses is logged, as hosts may not report it.
+    p->store_fails = true;
+    check(p->save().status != LV2_STATE_SUCCESS &&
+              p->log.contains(LV2_LOG__Error, convolver::save_failure_message),
+          label + "failed save is logged");
+    p->store_fails = false;
 
     check(p->restore(state_of(wrong_rate(a)), chunk(world)) != LV2_STATE_SUCCESS,
           label + "first load at the wrong rate is rejected");

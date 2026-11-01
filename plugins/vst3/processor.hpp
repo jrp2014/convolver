@@ -124,7 +124,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // The rate and buses of the last activation. The host's configuration counts
     // as known only while it still matches: setupProcessing alone is not binding.
     std::optional<HostLayout> activated_;
-    std::string logged_;                                 // The last line log() queued.
+    bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
+    std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
     const std::string tag_; // "VST3 #n": this instance in the Convolver log.
 };

@@ -143,13 +143,15 @@ struct SelectionCandidate {
 // A self-contained explanation of why no candidate matches `wanted`, naming each
 // difference and what to change. `subject` says where the wanted properties came
 // from, for example "the input audio". `list` is true when `filter` is a list.
-// `plugin`: `wanted` is a plug-in host's rate and channels, so the advice
-// names the host's settings and loading the file in Convolver, not
-// command-line options.
+// `who` chose `wanted`, which decides the advice: the audio to be filtered
+// (the CLI: convert the audio), a plug-in host (the host's settings and
+// loading the file in Convolver, not command-line options), or options alone
+// (convolver-preset: choose other values).
+enum class Chooser { audio, host, options };
 std::string explain_no_match(const std::filesystem::path& filter, bool list,
                              const std::vector<SelectionCandidate>& candidates,
                              const ConfigurationSelection& wanted, std::string_view subject,
-                             bool plugin = false);
+                             Chooser who = Chooser::audio);
 // What load_configuration() throws when no filter in the file matches the
 // selection: the explanation, and what it was worked out from, so a plug-in
 // can say which rate or channels the file was made for.

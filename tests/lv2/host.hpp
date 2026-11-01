@@ -161,6 +161,9 @@ class Plugin {
         std::vector<Property> all;
     };
     Saved save();
+    // save() with a store function that refuses every property, as a host
+    // out of space would.
+    bool store_fails = false;
     void set_state_folder(const std::filesystem::path& folder) {
         state_folder_ = folder;
     }

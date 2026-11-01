@@ -1,4 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Archived plan — completed.** Moved on 1 November 2026 from `docs/project/plans/2026-10-24-diagnostics-by-surface.md`. jrp decided the proposals on 31 October 2026 ([decisions](../../project/decisions.md#diagnostics)), and [PR #96](https://github.com/jrp2014/convolver/pull/96) implemented proposals 1 to 6 and 8; proposal 7, what named hosts show, is HOST-1 and AU-4 in [TODO](../../../TODO.md). Current behaviour: [command line](../../use/command-line.md), [presets](../../use/presets.md) and [plug-ins](../../use/plugins.md#status-and-the-convolver-log). The tables below record what each surface did on 24 October 2026 and were not updated; for current behaviour read the guides, not this plan.
+
 # Diagnostics by surface
 
 Status: review and proposals, dated 24 October 2026, written against `main` at

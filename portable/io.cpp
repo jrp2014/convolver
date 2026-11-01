@@ -9,7 +9,9 @@
 #include <climits>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <mutex>
@@ -149,7 +151,7 @@ void validate_raw_stdin(std::size_t frame_bytes) {
 #endif
     if (position < 0 || status.st_size < position ||
         static_cast<std::uint64_t>(status.st_size - position) % frame_bytes)
-        throw std::runtime_error("RAW input ends with an incomplete frame");
+        throw std::runtime_error(detail::raw_incomplete_frame);
 }
 SNDFILE* open(const std::filesystem::path& path, int mode, SF_INFO& info) {
     if (path == "-") {
@@ -188,8 +190,20 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
                        const std::string& action) {
     const std::lock_guard lock(opening());
     SNDFILE* file = open(path, mode, info);
-    if (!file)
-        throw error(action + " " + path.string(), nullptr);
+    if (!file) {
+        auto failure = std::string(error(action + " " + path.string(), nullptr).what());
+        // DIAG-1: when libsndfile read the file and refused its content, say
+        // what to do. sf_error() gives libsndfile's own detailed codes, which
+        // include the public ones: a system error (missing file, no
+        // permission) explains itself, and an encoding it lacks is not damage.
+        if (mode == SFM_READ) {
+            const int code = sf_error(nullptr);
+            if (code != SF_ERR_NO_ERROR && code != SF_ERR_SYSTEM &&
+                code != SF_ERR_UNSUPPORTED_ENCODING)
+                failure += " (" + std::string(detail::damaged_file_advice) + ")";
+        }
+        throw std::runtime_error(failure);
+    }
     return file;
 }
 struct Handle {
@@ -467,10 +481,13 @@ struct AudioReader::Impl {
     RawEncoding encoding;
     std::size_t sample_bytes = 4;
     std::vector<std::byte> bytes;
+    std::filesystem::path path;
+    std::uint64_t position = 0; // Frames read so far, for messages.
 };
 AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpec> raw,
                          RawEncoding encoding)
     : impl_(std::make_unique<Impl>()) {
+    impl_->path = path;
     SF_INFO sf{};
     if (raw) {
         impl_->raw = true;
@@ -489,7 +506,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
             validate_raw_stdin(frame_bytes);
         if (path != "-" && std::filesystem::is_regular_file(path) &&
             std::filesystem::file_size(path) % frame_bytes)
-            throw std::runtime_error("RAW input ends with an incomplete frame");
+            throw std::runtime_error(detail::raw_incomplete_frame);
     } else
         detail::validate_wave(path);
 #ifdef _WIN32
@@ -594,7 +611,7 @@ std::size_t AudioReader::read(std::span<float> data) {
         }
         const auto frame_bytes = static_cast<sf_count_t>(width * impl_->info.channels);
         if (bytes % frame_bytes)
-            throw std::runtime_error("RAW input ends with an incomplete frame");
+            throw std::runtime_error(detail::raw_incomplete_frame);
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / width; ++i)
             data[i] = detail::decode_raw(buffer + i * width, impl_->encoding);
         got = bytes / frame_bytes;
@@ -603,9 +620,14 @@ std::size_t AudioReader::read(std::span<float> data) {
     }
     if (got < 0 || (file && sf_error(file)))
         throw error("audio read failed", file);
-    for (std::size_t i = 0; i < static_cast<std::size_t>(got) * impl_->info.channels; ++i)
+    const auto channels = impl_->info.channels;
+    for (std::size_t i = 0; i < static_cast<std::size_t>(got) * channels; ++i)
         if (!std::isfinite(data[i]))
-            throw std::runtime_error("nonfinite audio sample");
+            throw std::runtime_error(detail::invalid_sample_message(
+                impl_->path, impl_->position + i / channels, i % channels + 1,
+                impl_->info.sample_rate,
+                impl_->raw ? std::optional(impl_->encoding) : std::nullopt));
+    impl_->position += static_cast<std::uint64_t>(got);
     return static_cast<std::size_t>(got);
 }
 void AudioReader::close() {

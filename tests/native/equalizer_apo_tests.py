@@ -593,6 +593,12 @@ def test_refusals(work):
     result = run(broken / 'missing.cfg', work / 'never', ok=False)
     assert 'not-there.wav' in result.stderr, result.stderr
     assert not (work / 'never').exists()
+    # DIAG-1: a damaged IR is named, with what to do about it.
+    (broken / 'cut.wav').write_bytes(b'RIFF\xff\0\0\0WAVEfmt ')
+    write_cfg(broken / 'cut.cfg', '48000 1 1 0\n0\n0\ncut.wav\n0\n0\n0\n')
+    result = run(broken / 'cut.cfg', work / 'never', ok=False)
+    assert 'cut.wav' in result.stderr and 'export it again' in result.stderr, result.stderr
+    assert not (work / 'never').exists()
 
     usage = run('--help')
     assert 'Include:' in usage.stdout

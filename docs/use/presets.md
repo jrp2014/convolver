@@ -46,7 +46,8 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   many outputs as inputs, input *c* to output *c*), a `.cfg`, or a configuration
   list. Relative paths in a `.cfg` are read from the `.cfg`'s folder, as always.
 - **Lists:** `--sample-rate HZ`, `--input-channels N` and `--output-channels N`,
-  before the file names, choose the first matching entry, as the CLI does.
+  before or after the file names, choose the first matching entry, as the CLI
+  does.
   Without them the first entry is used. Choose the entry that matches your
   host's sample rate and channel counts.
 - **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
