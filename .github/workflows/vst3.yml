@@ -146,7 +146,7 @@ jobs:
       # save it (docs/develop/testing.md#compiler-cache).
       - name: Compiler cache
         if: runner.os != 'Windows'
-        uses: hendrikmuhs/ccache-action@v1.2.24
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d  # v1.2.24
         with:
           key: vst3-${{ matrix.os }}-${{ matrix.fft }}
           max-size: 1G

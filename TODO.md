@@ -926,6 +926,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   names as POSIX paths (so `/name` is refused on Windows too) and checks each
   resolved path stays under the destination, as `sources.extract` does for
   source archives; tested in `release.source`.
+- [x] **CI-21 — Pin third-party actions to a commit SHA.** 1 November 2026,
+  jrp's choice after a Skylos scan: `hendrikmuhs/ccache-action` is pinned to
+  v1.2.24's commit with the release in a comment, and Dependabot still moves
+  it to each new release; GitHub's own actions keep major tags;
+  [GitHub Actions versions](CONTRIBUTING.md#lint-checks).
 - [x] **DIAG-1 — Review how diagnostics reach the user.** Status parameter
   and Convolver log (23 October 2026, PR #57), processing faults and run
   identity (PR #68), symbol checks (PR #72), fault state after reloads (PR
