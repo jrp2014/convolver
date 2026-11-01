@@ -234,14 +234,17 @@ HostReport Effect::report() {
         // A load holds the lock while it prepares a filter, which can take a
         // while: the window then gets the last report at once rather than
         // waiting, and rereads when the load notifies (TODO AU-6).
+        // Only a load gets the cached report: the Latency worker and
+        // parameter changes hold the lock briefly, and a read after a load
+        // finished must not get the report from before it.
         std::unique_lock lock(control_, std::try_to_lock);
         if (!lock.owns_lock()) {
-            {
+            if (loading_.load()) {
                 std::lock_guard cached(report_cache_lock_);
                 if (report_cache_)
                     return *report_cache_;
             }
-            lock.lock(); // Nothing read yet: wait this once.
+            lock.lock(); // Nothing read yet, or not a load: wait.
         }
         r = report_locked(faults);
         // Stored under control_, so a slower reader cannot replace a newer copy.

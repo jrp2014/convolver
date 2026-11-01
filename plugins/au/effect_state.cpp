@@ -185,6 +185,18 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     std::string message, faults;
     {
         std::lock_guard lock(control_);
+        // Cleared before the lock is released (declared after it).
+        struct Loading {
+            std::atomic<bool>& flag;
+            explicit Loading(std::atomic<bool>& f) noexcept : flag(f) {
+                flag.store(true);
+            }
+            ~Loading() {
+                flag.store(false);
+            }
+            Loading(const Loading&) = delete;
+            Loading& operator=(const Loading&) = delete;
+        } loading(loading_);
         if (const auto hook = load_started_for_tests)
             hook();
         faults = observe_faults(); // Explained under the filter that played; a load clears them.

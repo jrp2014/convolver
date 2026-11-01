@@ -55,6 +55,13 @@ Until 1.0 the C++ API may change between minor versions.
   leaves the sound unchanged; the oracle tests cover gain and mix at each of
   the seven block sizes.
 
+### Fixed
+
+- Audio Unit window: a report read just after a load could show the state
+  from before it, when the Latency worker happened to hold the unit's lock
+  at that moment; only a load in progress now gives the window its last
+  report. Seen as an intermittent `au.editor` failure in the sanitizer job.
+
 ### Changed
 
 - The macOS window's files moved from `plugins/au/` to `plugins/editor/mac/`

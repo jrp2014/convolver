@@ -244,6 +244,9 @@ class Effect final : public ausdk::AUBase {
     std::chrono::steady_clock::time_point
         report_faults_at_{}; // Last report_locked() look; under control_.
     // AU-6: the last report read, for a read while a load holds `control_`.
+    // `loading_` is set while install() holds it; other holders (the Latency
+    // worker, a parameter change) are brief, so a read waits for them.
+    std::atomic<bool> loading_{false};
     std::mutex report_cache_lock_;
     std::optional<HostReport> report_cache_; // Under report_cache_lock_.
     std::mutex logging_;
