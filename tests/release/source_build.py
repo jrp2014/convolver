@@ -40,7 +40,8 @@ def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license
         subprocess.run(configure, check=True)
         subprocess.run([cmake, '--build', str(build), '--config', 'Release', *parallel(jobs)], check=True)
         ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
-        # As in the candidate build, the unshipped CMake package's consumers are left to native CI.
+        # As in the candidate build, the unshipped CMake package's consumers and
+        # the watchdog's debugger check are left to native CI.
         command = [
             ctest,
             '--test-dir',
@@ -50,7 +51,7 @@ def run(source, sdk, prefix, backend, cmake, *, exclude_validator=False, license
             '--output-on-failure',
             *parallel(jobs),
             '-LE',
-            'consumer',
+            'consumer|debugger',
         ]
         if exclude_validator:
             print('SDK bundle validator explicitly excluded; this is NOT release evidence.', flush=True)

@@ -48,6 +48,7 @@ jobs:
     # A fixed image label. GitHub still updates its Xcode and macOS point
     # releases, so the versions are logged for each run.
     runs-on: macos-15
+    timeout-minutes: 30
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
@@ -117,10 +118,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
           path: test-evidence
           retention-days: 14
           if-no-files-found: ignore
+      # CI-22: a pass on re-run says so, so the earlier failure stays visible.
+      - name: Note a pass on re-run
+        if: success() && github.run_attempt != '1'
+        uses: ./.github/actions/note-retry
 
   # CONVOLVER_SANITIZERS=ON compiles the adapter, AudioUnitSDK and the AU
   # tests with ASan and UBSan (jrp's review of 0.5.5: they were only linked
@@ -133,6 +138,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.build == 'true'
     runs-on: macos-15
+    timeout-minutes: 30
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
@@ -173,7 +179,11 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
           path: test-evidence
           retention-days: 14
           if-no-files-found: ignore
+      # CI-22: a pass on re-run says so, so the earlier failure stays visible.
+      - name: Note a pass on re-run
+        if: success() && github.run_attempt != '1'
+        uses: ./.github/actions/note-retry

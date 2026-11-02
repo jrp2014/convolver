@@ -1,0 +1,27 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Note a pass on re-run
+description: >-
+  For a job that passes on a re-run (attempt 2 or later), records in the job
+  summary and as a warning that it is a re-run, with a link to the earlier
+  attempt, so a pass after a failure reads as "passed on retry, cause
+  unresolved" rather than plain green
+  (CI-22, docs/develop/testing.md#intermittent-failures).
+runs:
+  using: composite
+  steps:
+    - name: Note the earlier attempt
+      shell: bash
+      run: |
+        earlier=$((GITHUB_RUN_ATTEMPT - 1))
+        url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$earlier"
+        docs=https://github.com/jrp2014/convolver/blob/main/docs/develop/testing.md#intermittent-failures
+        message="Passed on attempt $GITHUB_RUN_ATTEMPT, a re-run. If an earlier attempt failed"
+        message+=" and that is not explained, its cause is unresolved: see $url"
+        echo "::warning title=Passed on retry::$message"
+        {
+          echo "### Passed on retry, cause unresolved"
+          echo
+          echo "This job passed on attempt $GITHUB_RUN_ATTEMPT. [Attempt $earlier]($url) shows how the run went before."
+          echo "A pass on re-run does not explain a failure ([intermittent failures]($docs))."
+        } >> "$GITHUB_STEP_SUMMARY"

@@ -64,6 +64,7 @@ jobs:
             fft: AUTO
             tests: -LE 'repository|consumer'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       # Builds and tests use every CPU the runner has.
@@ -96,6 +97,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path $cache | Out-Null
           "VCPKG_DEFAULT_BINARY_CACHE=$cache" >> $env:GITHUB_ENV
           "VCPKG_BINARY_SOURCES=clear;default,readwrite" >> $env:GITHUB_ENV
+          # CI-22: as it exits, vcpkg's metrics upload copies vcpkg.exe with
+          # no sharing, so a parallel build's app-local DLL step (z-applocal)
+          # sometimes cannot start it: "being used by another process", exit
+          # 32 (microsoft/vcpkg-tool#2163, fixed upstream 28 October 2026).
+          "VCPKG_DISABLE_METRICS=1" >> $env:GITHUB_ENV
           $revision = git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
           if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the vcpkg revision' }
           "revision=$revision" >> $env:GITHUB_OUTPUT
@@ -258,7 +264,11 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}
+          name: test-evidence-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
           path: test-evidence
           retention-days: 14
           if-no-files-found: ignore
+      # CI-22: a pass on re-run says so, so the earlier failure stays visible.
+      - name: Note a pass on re-run
+        if: success() && github.run_attempt != '1'
+        uses: ./.github/actions/note-retry

@@ -42,6 +42,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.package == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -90,6 +91,7 @@ jobs:
           - os: macos-15-intel
             platform: macos-x86_64
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     env:
       CANDIDATE_PLATFORM: ${{ matrix.platform }}
     steps:
@@ -143,8 +145,11 @@ jobs:
       # CI-10: the Linux candidate is built with networking disabled (a new
       # network namespace, back as the runner user), as anyone building the
       # corresponding source would, so no second offline build is needed.
+      # An outer limit, so a test that CTest cannot end does not hold the
+      # runner for GitHub's default of six hours (CI-22).
       - name: Build and verify Unix candidate
         if: runner.os != 'Windows'
+        timeout-minutes: 40
         run: |
           command=(python scripts/release/candidate.py
             --archive build/source/Convolver-source.tar.gz
@@ -158,6 +163,7 @@ jobs:
           fi
       - name: Build and verify Windows candidate
         if: runner.os == 'Windows'
+        timeout-minutes: 40
         run: >-
           python scripts/release/candidate.py
           --archive build/source/Convolver-source.tar.gz
@@ -190,6 +196,7 @@ jobs:
   collect:
     needs: candidates
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
