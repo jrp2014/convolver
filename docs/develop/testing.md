@@ -200,8 +200,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   before any audio, the ramp while audio plays, and which publications it
   covers); allocation failure at every step of `HostFilter::load`, checking
   that what plays is what is saved; and the saved-state limit (PLUG-12): the
-  size counted without encoding matches the encoding, a filter exactly at
-  64 MiB loads, saves and reads back, and one sample more is refused,
+  size counted without encoding matches the encoding, a filter that leaves
+  exactly the settings' room (PLUG-13) loads, saves with and without
+  settings and reads back, a state that already holds settings is accepted
+  at that limit and refused one sample over, and one sample more is refused,
   keeping the previous filter's saved bytes, or failing an empty instance's
   first load. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
@@ -549,7 +551,9 @@ saving them as host state version 3 and restoring them in a second
 instance, an older state resetting them to their defaults, 0 dB from a host that
 keeps normalized values as float, and a Latency choice that asks the host
 to restart, is reported once the host has, and delays an impulse by exactly
-the chosen frames, also when restored. And the window's messages
+the chosen frames, also when restored; and a filter at the saved-state
+limit (PLUG-13) that is restored, given Gain −6 dB, saved and restored in a
+second instance, with one sample more refused. And the window's messages
 (VST3-3): the report's fields, a fresh report on request after a Gain
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status

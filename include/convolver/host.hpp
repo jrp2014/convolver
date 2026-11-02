@@ -57,6 +57,10 @@ struct HostState {
     std::optional<HostSettings> settings = std::nullopt;
 };
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
+// PLUG-13: the room a filter's state keeps free for the settings, more than
+// version 3's 20 bytes so that settings added later (such as PLUG-10's gain
+// mode) fit without changing which filters are accepted.
+inline constexpr std::size_t host_settings_room_bytes = 256;
 // Throws std::length_error when the encoding would exceed max_host_state_bytes
 // (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
@@ -67,7 +71,10 @@ std::size_t encoded_host_state_size(const HostState&) noexcept;
 // PLUG-12: why this state is too large to save, in full sentences saying what
 // to change, or empty when it fits. HostFilter::load refuses such a filter
 // before accepting it, so a plug-in never plays a filter it cannot save, and
-// convolver-preset refuses to write it.
+// convolver-preset refuses to write it. PLUG-13: a filter fits only with
+// host_settings_room_bytes to spare, counted in place of any settings the
+// state holds, so changing a VST3 setting never makes an accepted filter
+// unsaveable.
 std::string host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.

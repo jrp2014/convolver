@@ -235,6 +235,12 @@ add one line under it per merged pull request:
   2→6 and the lifecycle cases remain.
 ```
 
+These lines are the one home for an item's progress. The
+[status page](../project/status.md) gives only each feature's level and
+each milestone condition's status in a sentence, names what remains and
+links the item; when an item changes, update both in the same pull request
+rather than retelling the progress there (DOC-6).
+
 When the item is complete, move lasting behaviour into the owning guide and
 any owner's decision into the [decisions log](../project/decisions.md). Then
 replace the item with one ticked line in TODO's [done](../../TODO.md#done) list:
