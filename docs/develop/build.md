@@ -231,6 +231,10 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
+If a parallel build fails now and then with "being used by another process"
+in vcpkg's app-local DLL step, set `VCPKG_DISABLE_METRICS=1` (an older vcpkg
+bug; see [intermittent failures](testing.md#intermittent-failures)).
+
 With a Visual Studio generator, executables are in `Release/` below the build
 folder. Plug-in builds on Windows use static libraries with the dynamic MSVC
 runtime ([VST3](#vst3)). Use a fresh build folder when changing triplets.

@@ -8,11 +8,13 @@ to them. Unless the build deliberately chose FFTW, it must not import FFTW
 either. Exit code 77 means the platform's symbol tool was not found (skipped).
 """
 
+import os
 import platform
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 FFTW = re.compile(r'\b_?fftwf?_\w+')
 
@@ -21,6 +23,28 @@ def run(command):
     return subprocess.run(
         command, check=True, text=True, errors='replace', stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     ).stdout
+
+
+def dumpbin():
+    """dumpbin from PATH, or else from the newest Visual Studio C++ tools.
+
+    CTest runs outside a developer prompt in CI, so dumpbin is rarely on PATH
+    there (CI-23); vswhere, which every Visual Studio installs, finds it.
+    """
+    if found := shutil.which('dumpbin'):
+        return found
+    vswhere = Path(os.environ.get('PROGRAMFILES(X86)', r'C:\Program Files (x86)'))
+    vswhere = vswhere / 'Microsoft Visual Studio/Installer/vswhere.exe'
+    if not vswhere.is_file():
+        return None
+    pattern = r'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe'
+    command = [str(vswhere), '-latest', '-products', '*', '-find', pattern]
+    try:
+        output = subprocess.run(command, check=False, text=True, capture_output=True).stdout
+    except OSError:  # vswhere could not start: no tool, so skipped.
+        return None
+    found = sorted(line.strip() for line in output.splitlines() if line.strip())
+    return found[-1] if found else None
 
 
 def symbols(binary):
@@ -39,10 +63,11 @@ def symbols(binary):
         imported = run(['nm', '-u', binary])
         libraries = [line.split()[0] for line in run(['otool', '-L', binary]).splitlines()[1:] if line.strip()]
     elif system == 'Windows':
-        if not shutil.which('dumpbin'):
+        tool = dumpbin()
+        if not tool:
             return None
-        exported = run(['dumpbin', '/nologo', '/exports', binary])
-        imported = run(['dumpbin', '/nologo', '/imports', binary])
+        exported = run([tool, '/nologo', '/exports', binary])
+        imported = run([tool, '/nologo', '/imports', binary])
         libraries = re.findall(r'^\s+([\w.\-]+\.dll)\s*$', imported, re.MULTILINE | re.IGNORECASE)
     else:
         return None

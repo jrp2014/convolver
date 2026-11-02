@@ -766,6 +766,33 @@ load-performance work for now; that is not a qualification of either.
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
 
+- [ ] **CI-24 — Find why `native.request_worker` timed out on Windows.**
+  In the Ooura build on PR #102 (1 November 2026), while two package
+  consumer builds ran beside it, and again in the Ooura build on PR #105,
+  beside `native.kernel_divergence` and `native.host_lifecycle`; the main
+  and core-only builds' tests passed in about 0.5 s earlier in each job. A
+  stall on a busy runner and a lost wake looked alike in the old report.
+  CI-22's watchdog now reports what each thread was doing, with their
+  stacks: when it fires again, read that and fix the cause, in the worker
+  or in the test's scheduling. Do not raise the limit
+  or replace the worker before then (jrp, 1 November 2026). See
+  [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [ ] **CI-25 — Find why the watchdog check hung on the macOS arm64
+  candidate.** On PR #104 (1 November 2026) `native.request_worker.watchdog`
+  started on `macos-15` and never finished, past its CTest timeout of 120 s,
+  until the run was cancelled after 18 minutes; it passed on the same image
+  in the Audio Unit job. The supervisor then killed lldb but not the
+  `debugserver` that holds the test; it now kills both, and the candidates
+  leave the check out. `native.request_worker` still runs in the
+  candidates, where a real stall takes the same lldb path, bounded only by
+  the step's 40 minutes. The Watchdog stacks check then caught a stall on
+  `macos-26`, consistent with lldb's attach stopping the test (SIGSTOP)
+  and nothing resuming it; the supervisor now sends SIGCONT however the
+  debugger ends, until `debugserver` has detached. Left open: why CTest's 120 s timeout did not end the
+  stopped test on the candidate. Read the
+  [Watchdog stacks check](docs/develop/testing.md#watchdog-stacks-check)
+  runs; if a run overruns, its process listing says what held the test.
+
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
@@ -905,6 +932,22 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   PR #88: the latest stable ruff in pre-commit and lint CI, with every stable
   rule but a few listed in `ruff.toml`;
   [Python formatting and lint](CONTRIBUTING.md#python-formatting-and-lint).
+- [x] **CI-22 — Make intermittent CI failures fixable.** 1 November 2026,
+  after jrp lost time re-running jobs (his five points): Windows jobs turn
+  off vcpkg's metrics, whose copy of `vcpkg.exe` the evidence shows blocked
+  parallel app-local DLL steps ([vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163));
+  `native.request_worker`'s watchdog reports a timeout with where each
+  thread was and their stacks; waits are by the clock; the package consumer
+  builds count two CPUs in CTest; failed tests stay in each attempt's job
+  summary and evidence; `au.editor` reads the report after a load until it
+  shows; `au.adapter` no longer changes `CONVOLVER_LOG` while a worker
+  reads it; the build and test jobs have time limits. No automatic re-runs;
+  CI-24 and CI-25 continue;
+  [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-23 — Run `vst3.fft_symbols` on Windows.** 1 November 2026: CTest
+  runs outside a developer prompt, so `dumpbin` was not on PATH and the test
+  always skipped there; it now finds `dumpbin` through `vswhere`;
+  [VST3 tests](docs/develop/testing.md#plug-in-format-tests).
 - [x] **CI-19 — Build the Apple silicon candidate on `macos-15`.** 31 October
   2026: GitHub retires the `macos-14` image on 2 November 2026, and its
   brownouts on 30 October cancelled the candidate job before it ran (PRs #84

@@ -1,0 +1,60 @@
+---
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: Watchdog stacks check
+
+# The request_worker watchdog's check attaches the platform's debugger to
+# itself (CI-22). On the macos-15 arm64 candidate of #104 it ran past its
+# CTest timeout and CTest could not end it (CI-25). This runs the check 50
+# times on each image under an outside supervisor
+# (scripts/ci_watchdog_probe.py), which reports and ends any run that
+# overruns, and 50 more that end the debugger while it attaches, which must
+# leave the test free to exit (docs/develop/testing.md#watchdog-stacks-check).
+'on':
+  pull_request:
+    paths:
+      - .github/workflows/watchdog.yml
+      - portable/request_worker.hpp
+      - scripts/ci_watchdog_probe.py
+      - tests/native/request_worker_tests.cpp
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs on each image
+        default: '50'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15 is the image of the arm64 candidate that overran;
+        # macos-15-intel and macos-latest passed there, as did Linux with gdb.
+        os: [macos-15, macos-15-intel, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gdb
+      # Only the header-only worker and its test: no other dependency. The
+      # candidates' flags (CMake Release with Clang, plus their -g).
+      - name: Build the request_worker test
+        run: >-
+          clang++ -std=c++20 -O3 -DNDEBUG -g -Iportable -pthread
+          tests/native/request_worker_tests.cpp -o build-request-worker-tests
+      - name: Run the watchdog check under supervision
+        timeout-minutes: 25
+        env:
+          RUNS: ${{ github.event.inputs.runs || '50' }}
+        run: >-
+          python3 scripts/ci_watchdog_probe.py ./build-request-worker-tests
+          --runs "$RUNS" --early-kills "$RUNS" --deadline 90

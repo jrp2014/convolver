@@ -170,6 +170,39 @@ Until 1.0 the C++ API may change between minor versions.
   passed the name check and could be written at the root of the drive, and a
   link already in the destination could lead a file outside it. Found in a
   Skylos scan (1 November 2026). Packages are unchanged.
+- Continuous integration (CI-22): intermittent failures leave evidence and
+  two causes are removed. Windows jobs set `VCPKG_DISABLE_METRICS=1`: an
+  exiting vcpkg copied `vcpkg.exe` for its metrics upload with no sharing,
+  which matches the "being used by another process" (exit 32) failures of
+  parallel app-local DLL steps
+  ([vcpkg-tool#2163](https://github.com/microsoft/vcpkg-tool/issues/2163)).
+  `native.request_worker`'s watchdog still allows 10 s, now without
+  progress rather than in all, and reports a timeout with the workers done,
+  where the test's thread and the current worker were, and every thread's
+  stack from cdb, gdb or lldb (the Linux jobs install gdb; cdb reads only
+  local symbols);
+  `native.request_worker.watchdog` passes only when that report comes with
+  the stacks; the test is resumed (SIGCONT) however the debugger ends,
+  until nothing traces it, since a stop from lldb's attach could outlast
+  the debugger; a debugger that overruns is killed with its process group
+  and, on macOS, lldb's `debugserver`; the package candidates leave that
+  check out; and the build and test jobs have time limits, after the check
+  ran on past CTest's timeout on the macOS arm64 candidate. Its waits are
+  timed by the clock. The package consumer tests
+  count two CPUs each in CTest (`PROCESSORS 2`). A failed test job lists its
+  failures with the run attempt in its summary, its evidence artifact's
+  name carries the attempt, and a job that passes on a re-run says "Passed
+  on retry" with a link to the earlier attempt. `au.adapter` sets
+  `CONVOLVER_LOG` once instead of per case, which raced with the Latency
+  worker's read of it (ASan). `au.editor` reads the report
+  after a held load until it says Playing, as the Latency worker the restore
+  wakes may hold the lock a moment. The cause of the one Windows `request_worker`
+  timeout is still open (CI-24). See
+  [intermittent failures](docs/develop/testing.md#intermittent-failures).
+  Tests and CI only: no change to the plug-ins, the CLI or the sound.
+- Continuous integration (CI-23): `vst3.fft_symbols` now runs on Windows
+  instead of always skipping, finding `dumpbin` through `vswhere` when it
+  is not on PATH.
 
 ## [0.7.1] - 2026-11-01
 
