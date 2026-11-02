@@ -1285,6 +1285,7 @@ workflow. Anything else in the same pull request runs everything.
 | `plugins/vst3/`, `tests/vst3/` | VST3 and the [candidates](#plug-in-candidate-checks), which build and package the VST3 plug-in |
 | `plugins/au/`, `tests/au/` | Audio Unit |
 | `plugins/lv2/`, `tests/lv2/` | LV2 |
+| `plugins/editor/mac/` (the macOS window, CI-26) | VST3, Audio Unit and the candidates: only those builds compile it, and their `editor_tests.mm` test it |
 | `.github/workflows/NAME.yml` | that workflow |
 
 The shared parts are not a format's files: the PLUG-2 harness in

@@ -967,6 +967,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-26 — Run only VST3, Audio Unit and the candidates for window
+  changes.** 2 November 2026, from jrp's review of `276c7dc`: a pull
+  request that changes only the shared macOS window (`plugins/editor/mac/`)
+  no longer runs the native, LV2 and fuzz workflows; any shared code in the
+  same pull request still runs everything;
+  [one plug-in format](docs/develop/testing.md#pull-requests-for-one-plug-in-format).
 - [x] **CI-23 — Run `vst3.fft_symbols` on Windows.** 1 November 2026: CTest
   runs outside a developer prompt, so `dumpbin` was not on PATH and the test
   always skipped there; it now finds `dumpbin` through `vswhere`;

@@ -162,6 +162,11 @@ Until 1.0 the C++ API may change between minor versions.
   `hendrikmuhs/ccache-action`, is pinned to the commit of its v1.2.24 release
   instead of the tag, so a moved tag cannot run other code in CI. Dependabot
   still proposes each new release. GitHub's own actions keep their major tags.
+- Continuous integration (CI-26): a pull request that changes only the macOS
+  window that VST3 and the Audio Unit share (`plugins/editor/mac/`) runs Lint,
+  the VST3, Audio Unit and candidate workflows, and skips the native, LV2
+  and fuzz builds, as a change to one format's own files does (CI-13).
+  Anything else in the same pull request still runs everything.
 
 ### Fixed
 
