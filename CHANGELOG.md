@@ -146,6 +146,13 @@ Until 1.0 the C++ API may change between minor versions.
   the package contents and the command-line render all matched, with no
   defect found. By jrp's choice its host steps moved to the REAPER smoke
   test (HOST-1) and the preview walkthrough (REL-3).
+- The [status page](docs/project/status.md) is checked against `main` at
+  0.8.6 (DOC-6, from jrp's review of `276c7dc`). It no longer calls the CLI
+  and the journey presets missing, the journeys not started or the VST3 work
+  unclaimed, and it now names only what remains, linking each TODO item;
+  progress detail lives only in TODO's `Progress` lines
+  ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
+  TODO gains VST3-14, VST3-15 and AU-11 from the same review.
 - The [status page](docs/project/status.md) is checked again against `main`,
   now at 0.8.2 (DOC-5, from jrp's review of PR #98). It names the commit
   and the CI runs it relies on, the Audio Unit's Latency setting, window
@@ -158,6 +165,17 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (PLUG-13): a filter that filled the saved state at default
+  settings could no longer be saved once a VST3 setting changed (jrp's review
+  of `276c7dc`: Gain to −6 dB, then `getState()` failed), because settings
+  add 20 bytes. The size check now keeps 256 bytes free for the settings
+  whether or not they are in use (`host_settings_room_bytes`, room for
+  settings added later too), so what loads still saves after any setting
+  changes. The largest accepted filter is 64 samples shorter in every
+  format, still just under 16,777,216 samples; `convolver-preset` refuses
+  the same filters, and a state saved by an earlier build within 256 bytes
+  of the limit is refused when restored, with the size explanation (no
+  release has published such a state).
 - Audio Unit window: a report read just after a load could show the state
   from before it, when the Latency worker happened to hold the unit's lock
   at that moment. The window's last report is now forgotten whenever what

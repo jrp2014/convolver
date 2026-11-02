@@ -178,11 +178,14 @@ int main() {
                             .find("failed to load") != std::string::npos,
                     "a saved failed load is converted");
         // PLUG-12: one sample more than 64 MiB of saved state holds. With its
-        // two delays, this mono filter takes 19 words besides its samples.
+        // two delays, this mono filter takes 19 words besides its samples,
+        // and PLUG-13 keeps room for the settings free.
         HostState oversized = routed(1, 1);
-        oversized.configuration->paths.front().impulse.assign(max_host_state_bytes / 4 - 18, 0.0F);
-        require(encoded_host_state_size(oversized) == max_host_state_bytes + 4,
-                "oversized state is one word over");
+        oversized.configuration->paths.front().impulse.assign(
+            (max_host_state_bytes - host_settings_room_bytes) / 4 - 18, 0.0F);
+        require(encoded_host_state_size(oversized) ==
+                    max_host_state_bytes - host_settings_room_bytes + 4,
+                "oversized state is not one word into the settings' room");
         for (auto format : {Format::vst3, Format::au, Format::lv2})
             require(rejects([&] { presets::check_writable(format, oversized, "x"); }, "oversized")
                             .find("too large to save") != std::string::npos,

@@ -98,6 +98,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 25 October 2026 | Gain's range is −100 to +24 dB, linear in decibels, default 0 dB. The settings' parameter IDs are the same in VST3 and the Audio Unit: Gain 0, Gain mode 1002 (Set, Estimate, No clipping), Mix 1003, Latency 1004 (64 to 4096 frames, default 256, not automatable) | [Adapter contract](../develop/plugin-contract.md#settings) |
 | 25 October 2026 | Keep the first version of the settings simple: Gain and Mix only, Audio Unit first for GarageBand; the gain modes, the Latency choice and the meters wait | [TODO PLUG-10](../../TODO.md) |
 | 25 October 2026 | The editor's settings are saved in each format's own way for now (VST3 host state version 3 only when a setting is not at its default; Audio Unit and LV2 parameters and ports), and `convolver-preset` gains no setting options yet. Where settings can then diverge between formats and hosts is documented | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#settings) |
+| 2 November 2026 | Saved state keeps a fixed 256 bytes free for the settings in every format and in `convolver-preset`, whether or not settings are in use, so a filter that loads still saves after any setting changes, including settings added later (PLUG-13). Restored states are checked the same way; one saved by an earlier build within 256 bytes of 64 MiB is refused (none was published) | [Adapter contract](../develop/plugin-contract.md#host-state) |
 
 ## Configuration and sound
 
