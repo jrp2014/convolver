@@ -167,6 +167,13 @@ Until 1.0 the C++ API may change between minor versions.
   the VST3, Audio Unit and candidate workflows, and skips the native, LV2
   and fuzz builds, as a change to one format's own files does (CI-13).
   Anything else in the same pull request still runs everything.
+- Continuous integration (CI-27, from jrp's review of `f2dc691`): the Audio
+  Unit adapter test writes its Convolver log to its own file in the build
+  folder from the start, rather than a private file copied there at exit, so
+  the log survives a sanitizer abort, crash or forced end. CI evidence now
+  includes every plug-in test log (the window test's was missing) and the
+  `.old` file each rotates to. `au.log_evidence` checks collection after an
+  abort and a kill.
 
 ### Fixed
 

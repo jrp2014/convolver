@@ -140,6 +140,12 @@ if(CONVOLVER_BUILD_TESTS)
         "${PROJECT_SOURCE_DIR}/plugins/identities.json" "$<TARGET_BUNDLE_DIR:convolver_au>" "${PROJECT_VERSION}"
         ${au_bundle_libraries})
     set_tests_properties(au.adapter au.bundle PROPERTIES LABELS "au;real-libraries" TIMEOUT 180)
+    # CI-27: the adapter test's log, and the file it rotated to, reach the CI
+    # evidence after the test aborts or is killed.
+    add_test(NAME au.log_evidence COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
+        "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/au/log_evidence_tests.py"
+        "$<TARGET_FILE:convolver_au_tests>")
+    set_tests_properties(au.log_evidence PROPERTIES LABELS "au;real-libraries" TIMEOUT 120)
     set(au_test_targets convolver_au convolver_au_tests)
     # PLUG-2: the shared harness, against the oracle and the CLI renders that
     # examples.first_use leaves behind.
@@ -192,8 +198,11 @@ if(CONVOLVER_BUILD_TESTS)
         add_dependencies(convolver_au_suite convolver_cli)
     endif()
     # DIAG-1: tests write the Convolver log in the build folder, never the user's.
-    set_property(TEST au.adapter au.bundle APPEND PROPERTY ENVIRONMENT
+    # au.adapter reads what its own log gained, so it has a file of its own (CI-27).
+    set_property(TEST au.bundle APPEND PROPERTY ENVIRONMENT
         "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")
+    set_property(TEST au.adapter APPEND PROPERTY ENVIRONMENT
+        "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-adapter-tests.log")
     if(TEST au.harness)
         set_property(TEST au.harness APPEND PROPERTY ENVIRONMENT
             "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")

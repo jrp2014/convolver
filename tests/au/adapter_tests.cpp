@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -20,7 +21,6 @@
 #include <mutex>
 #include <new>
 #include <optional>
-#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -619,13 +619,14 @@ void render_requires_initialization() {
             "rendered without initialization");
 }
 
-// The Convolver log, a file of this process's own (CTest's is shared with
-// the other AU tests). main() sets CONVOLVER_LOG once, before any unit
-// exists: a setenv while a unit's Latency worker reads the variable is a
-// data race, which ASan caught when a test changed it per case (CI-22).
-// At exit the file is appended to the log CTest names, kept as evidence.
+// The Convolver log, a file of this test's own in the build folder, named by
+// CTest (au.bundle and au.harness share another). main() sets
+// CONVOLVER_LOG at most once, before any unit exists: a setenv while a
+// unit's Latency worker reads the variable is a data race, which ASan caught
+// when a test changed it per case (CI-22). The file is never copied or
+// removed, so it and the ".old" file host_log rotates it to are evidence
+// even after a crash, a sanitizer abort or a forced end (CI-27).
 std::filesystem::path process_log;
-std::optional<std::string> ctest_log;
 
 // What the Convolver log gained while this object exists.
 class PrivateLog {
@@ -669,24 +670,31 @@ class PrivateLog {
 };
 
 void use_process_log() {
-    process_log = std::filesystem::temp_directory_path() /
-                  ("convolver-au-adapter-" + std::to_string(std::random_device{}()) + ".log");
-    if (const char* configured = std::getenv("CONVOLVER_LOG"))
-        ctest_log = configured;
+    if (const char* configured = std::getenv("CONVOLVER_LOG"); configured && *configured) {
+        process_log = configured;
+        return;
+    }
+    // Run by hand: the same name, in the current folder (CTest's is the build folder).
+    process_log = std::filesystem::absolute("convolver-adapter-tests.log");
     setenv("CONVOLVER_LOG", process_log.c_str(), 1);
 }
 
-void keep_process_log() {
-    if (ctest_log) {
-        std::ifstream in(process_log, std::ios::binary);
-        std::ofstream out(*ctest_log, std::ios::binary | std::ios::app);
-        out << in.rdbuf();
-    }
-    std::error_code ignored;
-    std::filesystem::remove(process_log, ignored);
-    auto old = process_log;
-    old += ".old";
-    std::filesystem::remove(old, ignored);
+// CI-27: tests/au/log_evidence_tests.py runs this to check that the log
+// survives an abrupt end. One load writes a line (each line is written and
+// closed at once), then the process ends without any of its own clean-up:
+// "abort" as a sanitizer report or failed assertion does, "kill" as a
+// forced end does.
+int log_then_end(const std::string& how) {
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.load(state_of(stereo(48000))), "load");
+    std::cout << "logged\n" << std::flush;
+    if (how == "abort")
+        std::abort();
+    if (how == "kill")
+        raise(SIGKILL);
+    std::cerr << "unknown end: " << how << '\n';
+    return 2;
 }
 } // namespace
 
@@ -1319,8 +1327,10 @@ void status_parameter() {
     unit.uninitialize();
 }
 
-int main() {
+int main(int argc, char** argv) {
     use_process_log();
+    if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
+        return log_then_end(argv[2]);
     try {
         channel_capabilities();
         timing_in_seconds();
@@ -1337,12 +1347,10 @@ int main() {
         latency_parameter();
         settings_in_diagnostics();
         std::cout << "Audio Unit adapter checks passed\n";
-        keep_process_log();
         return 0;
     } catch (const std::exception& e) {
         counting = false;
         std::cerr << e.what() << '\n';
-        keep_process_log();
         return 1;
     }
 }

@@ -694,6 +694,12 @@ Four CTest tests run when the adapter is built (label `au`):
   matches the audio, and a change that plays is never logged as failed),
   and saving and restoring it, also after the unit has started
   (GarageBand's order).
+- `au.log_evidence`: the adapter test's Convolver log, which it keeps in
+  the build folder (`convolver-adapter-tests.log`), reaches the
+  [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
+  sanitizer report does, and after it is killed (CI-27). Each run starts
+  with a log past 1 MiB, so the line it writes rotates the earlier text to
+  `.old`, and both files must be collected.
 - `au.editor`: the window (AU-6). The report and diagnostics properties
   (types, read-only, change notifications) for a stereo preset on a mono
   track (and a preset restored again and again, whose identical failure is
@@ -1064,11 +1070,19 @@ made: CTest's full output (`Testing/Temporary/LastTest.log`, which holds every
 test's output, including sanitizer reports and the failing operation
 sequences of the [lifecycle tests](#lifecycle-sequences-plug-7)), the JUnit
 report every `ctest` run writes (`--output-junit junit.xml`), the plug-in
-tests' Convolver logs, `CMakeCache.txt`, and `identity.txt` (commit, runner
+tests' Convolver logs (`convolver-*tests.log`, with the `.old` file each
+rotates to past 1 MiB), `CMakeCache.txt`, and `identity.txt` (commit, runner
 image, compiler and build type). The candidate workflow keeps its own
 `diagnostics-<platform>` artifact and the
 [debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
 its findings.
+
+Tests write their Convolver log straight to its file in the build folder,
+named by CTest, and never move or delete it, so a crash, a sanitizer abort
+or a timeout that kills the test leaves the log for the collector; a test
+that copied its log at exit would lose it then (CI-27, from jrp's review of
+`f2dc691`). `au.log_evidence` checks this for the Audio Unit adapter test,
+and `tests/ci_evidence_tests.py` (in pre-commit) what the collector takes.
 
 ## Intermittent failures
 
@@ -1115,8 +1129,9 @@ October to 1 November, with their re-run attempts):
   with `getenv` on a unit's Latency worker while the test's private-log
   helper changed the variable with `setenv` for the next case. The test
   now sets the variable once, before any unit exists, and each case reads
-  what the log gained while it ran; at exit the log is appended to the one
-  CTest names.
+  what the log gained while it ran. The log is the file CTest names in the
+  build folder, its own since CI-27 (it was a private file copied at exit,
+  which an abort lost).
 - `native.request_worker.watchdog`, the macOS arm64 candidate on
   `macos-15` (PR #104, 1 November 2026): it started and never finished,
   though its CTest timeout is 120 seconds, and the job's build-and-test step

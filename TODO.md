@@ -967,6 +967,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-27 — Keep the Audio Unit adapter test's log after a crash.** 2
+  November 2026, from jrp's review of `f2dc691`: the test kept its Convolver
+  log in a private temporary file and copied it to the build folder only on
+  a normal exit, so a sanitizer abort, crash or forced end lost it, and the
+  rotated `.old` file was deleted. The log is now its own file in the build
+  folder from the start, never copied or deleted; the evidence collector
+  takes every test log and its `.old` file; `au.log_evidence` checks both
+  after an abort and a kill;
+  [evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
 - [x] **CI-26 — Run only VST3, Audio Unit and the candidates for window
   changes.** 2 November 2026, from jrp's review of `276c7dc`: a pull
   request that changes only the shared macOS window (`plugins/editor/mac/`)

@@ -96,6 +96,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: ci-evidence-tests
+        name: CI evidence collection (logs and rotated logs)
+        entry: python tests/ci_evidence_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/ci_evidence\.py|tests/ci_evidence_tests\.py)$
       - id: fuzz-scheduler-tests
         name: Fuzz campaign scheduler failure paths
         entry: python tests/fuzz/scheduler_tests.py

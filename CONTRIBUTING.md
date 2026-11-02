@@ -197,6 +197,7 @@ python3 scripts/check_repository.py
 python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
 python3 tests/ci_scope_tests.py
+python3 tests/ci_evidence_tests.py
 python3 tests/clang_tidy_tests.py
 python3 tests/fuzz/scheduler_tests.py
 ```
