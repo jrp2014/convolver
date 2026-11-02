@@ -47,7 +47,12 @@ def end_abruptly(test, how, folder):
     child = subprocess.Popen(
         [test, '--end-abruptly', how], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
-    out, err = child.communicate(timeout=60)
+    try:
+        out, err = child.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        out, err = child.communicate()
+        raise AssertionError(f'{how}: the test did not end within 60 s\n{out}{err}') from None
     expected = {'abort': -signal.SIGABRT, 'kill': -signal.SIGKILL}[how]
     check(
         'logged' in out and child.returncode != 0,

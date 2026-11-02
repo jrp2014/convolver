@@ -619,65 +619,9 @@ void render_requires_initialization() {
             "rendered without initialization");
 }
 
-// The Convolver log, a file of this test's own in the build folder, named by
-// CTest (au.bundle and au.harness share another). main() sets
-// CONVOLVER_LOG at most once, before any unit exists: a setenv while a
-// unit's Latency worker reads the variable is a data race, which ASan caught
-// when a test changed it per case (CI-22). The file is never copied or
-// removed, so it and the ".old" file host_log rotates it to are evidence
-// even after a crash, a sanitizer abort or a forced end (CI-27).
+// The Convolver log, a file of this test's own in the build folder (au.bundle
+// and au.harness share another), set once in main() (CI-22, CI-27).
 std::filesystem::path process_log;
-
-// What the Convolver log gained while this object exists.
-class PrivateLog {
-  public:
-    PrivateLog() : start_(size_now()) {}
-    // If the log passed 1 MiB meanwhile, host_log moved it to ".old" and
-    // began a new one: then the rest of the old one and all of the new.
-    std::string text() const {
-        auto all = read(process_log);
-        if (all.size() < start_ || rotated()) {
-            auto old = process_log;
-            old += ".old";
-            const auto before = read(old);
-            all = (start_ < before.size() ? before.substr(start_) : std::string()) + all;
-            return all;
-        }
-        return all.substr(start_);
-    }
-
-  private:
-    static std::string read(const std::filesystem::path& path) {
-        std::ifstream in(path, std::ios::binary);
-        return std::string(std::istreambuf_iterator<char>(in), {});
-    }
-    static std::filesystem::file_time_type old_time() {
-        auto old = process_log;
-        old += ".old";
-        std::error_code missing;
-        return std::filesystem::last_write_time(old, missing);
-    }
-    bool rotated() const {
-        return old_time() != old_time_;
-    }
-    static std::size_t size_now() {
-        std::error_code missing;
-        const auto size = std::filesystem::file_size(process_log, missing);
-        return missing ? 0 : static_cast<std::size_t>(size);
-    }
-    std::size_t start_;
-    std::filesystem::file_time_type old_time_ = old_time();
-};
-
-void use_process_log() {
-    if (const char* configured = std::getenv("CONVOLVER_LOG"); configured && *configured) {
-        process_log = configured;
-        return;
-    }
-    // Run by hand: the same name, in the current folder (CTest's is the build folder).
-    process_log = std::filesystem::absolute("convolver-adapter-tests.log");
-    setenv("CONVOLVER_LOG", process_log.c_str(), 1);
-}
 
 // CI-27: tests/au/log_evidence_tests.py runs this to check that the log
 // survives an abrupt end. One load writes a line (each line is written and
@@ -771,7 +715,7 @@ void settings_parameters() {
     Unit copy;
     check(copy.configure(48000, 2, 2, 512), "copy formats");
     {
-        PrivateLog log;
+        const au_test::LogSince log(process_log);
         check(copy.restore(saved), "restore with settings");
         require(log.text().find("Restored settings: gain -6 dB, mix 50% wet, latency 256 "
                                 "frames.") != std::string::npos,
@@ -916,7 +860,7 @@ void latency_parameter() {
     // log says so.
     seen.clear();
     {
-        PrivateLog log;
+        const au_test::LogSince log(process_log);
         set_parameter(unit, au::latency_parameter, 0);
         require(eventually([&] {
                     return log.text().find("Latency changed from 512 to 64 frames") !=
@@ -1043,7 +987,7 @@ void latency_parameter() {
         const auto before = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
         const AudioUnitParameterValue target = before == 256 ? 0 : 2;
         const long frames = target == 0 ? 64 : 256;
-        PrivateLog log;
+        const au_test::LogSince log(process_log);
         fail_countdown = k;
         set_parameter(unit, au::latency_parameter, target);
         // Done when the change is logged, or when an allocation failed. The
@@ -1128,7 +1072,7 @@ void settings_in_diagnostics() {
         return text.find(part) != std::string::npos;
     };
     {
-        PrivateLog log;
+        const au_test::LogSince log(process_log);
         Unit unit;
         check(unit.configure(48000, 2, 2, 512), "gain status formats");
         set_parameter(unit, au::gain_parameter, -20);
@@ -1148,7 +1092,7 @@ void settings_in_diagnostics() {
                 "Status after Gain returned to 0 dB: " + status_text(unit));
         unit.uninitialize();
     }
-    PrivateLog log;
+    const au_test::LogSince log(process_log);
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "mix status formats");
     set_parameter(unit, au::mix_parameter, 50);
@@ -1179,7 +1123,7 @@ void status_parameter() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
     };
-    const PrivateLog log;
+    const au_test::LogSince log(process_log);
     const auto log_text = [&] { return log.text(); };
     Unit unit;
     const auto au = unit.get();
@@ -1328,7 +1272,7 @@ void status_parameter() {
 }
 
 int main(int argc, char** argv) {
-    use_process_log();
+    process_log = au_test::use_test_log("convolver-adapter-tests.log");
     if (argc == 3 && std::string(argv[1]) == "--end-abruptly")
         return log_then_end(argv[2]);
     try {

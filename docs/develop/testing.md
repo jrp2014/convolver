@@ -664,7 +664,7 @@ compatibility with every DAW; see [host testing](host-testing.md).
 
 ### Audio Unit tests
 
-Four CTest tests run when the adapter is built (label `au`):
+Five CTest tests run when the adapter is built (label `au`):
 
 - `au.harness`: the PLUG-2 comparisons through the Audio Unit API, with
   filters loaded as `.aupreset` dictionaries and latency and tail converted
@@ -694,8 +694,8 @@ Four CTest tests run when the adapter is built (label `au`):
   matches the audio, and a change that plays is never logged as failed),
   and saving and restoring it, also after the unit has started
   (GarageBand's order).
-- `au.log_evidence`: the adapter test's Convolver log, which it keeps in
-  the build folder (`convolver-adapter-tests.log`), reaches the
+- `au.log_evidence`: the adapter test's Convolver log, the file CTest
+  names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a
   sanitizer report does, and after it is killed (CI-27). Each run starts
   with a log past 1 MiB, so the line it writes rotates the earlier text to
@@ -1077,12 +1077,17 @@ image, compiler and build type). The candidate workflow keeps its own
 [debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
 its findings.
 
-Tests write their Convolver log straight to its file in the build folder,
-named by CTest, and never move or delete it, so a crash, a sanitizer abort
-or a timeout that kills the test leaves the log for the collector; a test
-that copied its log at exit would lose it then (CI-27, from jrp's review of
-`f2dc691`). `au.log_evidence` checks this for the Audio Unit adapter test,
-and `tests/ci_evidence_tests.py` (in pre-commit) what the collector takes.
+A test's Convolver log should be the file CTest names in the build folder
+(`convolver-*tests.log`), written there from the start and never moved or
+deleted, so a crash, a sanitizer abort or a timeout that kills the test
+leaves it for the collector; a test that copied its log at exit would lose
+it then (CI-27, from jrp's review of `f2dc691`). The Audio Unit adapter and
+window tests work this way, set `CONVOLVER_LOG` only when run by hand
+without it, and read what each case added from an offset
+(`LogSince` in `tests/au/au_host.hpp`). `vst3.adapter`'s Status and log
+case still uses a temporary log of its own (CI-28). `au.log_evidence`
+checks the adapter test's log after an abort and a kill, and
+`tests/ci_evidence_tests.py` (in pre-commit) what the collector takes.
 
 ## Intermittent failures
 
@@ -1131,7 +1136,7 @@ October to 1 November, with their re-run attempts):
   now sets the variable once, before any unit exists, and each case reads
   what the log gained while it ran. The log is the file CTest names in the
   build folder, its own since CI-27 (it was a private file copied at exit,
-  which an abort lost).
+  which an abort lost; `au.editor`'s was a private file deleted at exit).
 - `native.request_worker.watchdog`, the macOS arm64 candidate on
   `macos-15` (PR #104, 1 November 2026): it started and never finished,
   though its CTest timeout is 120 seconds, and the job's build-and-test step

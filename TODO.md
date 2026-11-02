@@ -816,6 +816,16 @@ load-performance work for now; that is not a qualification of either.
   [Watchdog stacks check](docs/develop/testing.md#watchdog-stacks-check)
   runs; if a run overruns, its process listing says what held the test.
 
+- [ ] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
+  evidence.** Found in CI-27's review (2 November 2026): `status_and_log`
+  in `tests/vst3/adapter_tests.cpp` points `CONVOLVER_LOG` at a temporary
+  file for the case, with `setenv` while the processor exists, and deletes
+  it afterwards, so a crash in that case loses its log, as `au.adapter`'s
+  did. Give `vst3.adapter` a log of its own in the build folder, set once,
+  read from an offset as the Audio Unit tests do (CI-27); check on Windows,
+  where the variable is wide. See
+  [evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
+
 ## Documented limitations
 
 This inventory gathers constraints stated across the guides. Some are deliberate
@@ -971,10 +981,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   November 2026, from jrp's review of `f2dc691`: the test kept its Convolver
   log in a private temporary file and copied it to the build folder only on
   a normal exit, so a sanitizer abort, crash or forced end lost it, and the
-  rotated `.old` file was deleted. The log is now its own file in the build
-  folder from the start, never copied or deleted; the evidence collector
-  takes every test log and its `.old` file; `au.log_evidence` checks both
-  after an abort and a kill;
+  rotated `.old` file was deleted (`au.editor` deleted its private log).
+  Both now log to their own file in the build folder from the start, never
+  copied or deleted; the evidence collector takes every test log and its
+  `.old` file; `au.log_evidence` checks both after an abort and a kill;
   [evidence from failed CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs).
 - [x] **CI-26 — Run only VST3, Audio Unit and the candidates for window
   changes.** 2 November 2026, from jrp's review of `276c7dc`: a pull
