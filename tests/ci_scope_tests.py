@@ -65,6 +65,10 @@ class Classification(unittest.TestCase):
             'tests/vst3/preset_format_tests.cpp': 'format:vst3',
             'tests/vst3/fft_symbols.py': 'code',
             'plugins/lv2/plugin.cpp': 'format:lv2',
+            'plugins/editor/mac/diagnostic_view.mm': 'format:editor',
+            'plugins/editor/mac/view_layout.h': 'format:editor',
+            # Only the macOS window is the VST3 and Audio Unit builds' alone.
+            'plugins/editor/windows/view.cpp': 'code',
             'plugins/identities.json': 'code',
             'plugins/audio_guard.hpp': 'code',
             'tests/plugins/fixtures.py': 'code',
@@ -96,6 +100,13 @@ class Classification(unittest.TestCase):
         # The candidates build and package the VST3 plug-in.
         self.assertEqual(runs(['plugins/vst3/processor.cpp']), {'vst3', 'release'})
         self.assertEqual(runs(['plugins/au/effect.hpp', 'plugins/lv2/plugin.cpp']), {'au', 'lv2'})
+        # The macOS window, which both the VST3 plug-in and the Audio Unit show (CI-26).
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm']), {'vst3', 'au', 'release'})
+        self.assertEqual(
+            runs(['plugins/editor/mac/setting_rows.mm', 'tests/au/editor_tests.mm']), {'vst3', 'au', 'release'}
+        )
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'plugins/identities.json']), everything)
+        self.assertEqual(runs(['plugins/editor/mac/setting_rows.mm', 'portable/request_worker.hpp']), everything)
         self.assertEqual(runs(['plugins/au/effect.hpp', 'docs/use/plugins.md']), {'au', 'release'})
         self.assertEqual(runs(['.github/workflows/fuzz.yml']), {'fuzz'})
         self.assertEqual(runs(['.github/workflows/lint.yml']), set())
@@ -190,6 +201,17 @@ FORMAT_REFERENCES = {
         'CMakeLists.txt': 'adds plugins/au only with CONVOLVER_BUILD_AU',
         'tests/plugins/lifecycle.hpp': 'a comment',
     },
+    'editor': {
+        'plugins/vst3/CMakeLists.txt': 'compiles the window on macOS; editor changes run VST3',
+        'plugins/vst3/editor.hpp': 'a comment',
+        'plugins/vst3/editor.mm': 'shows the window; VST3 code',
+        'tests/vst3/editor_tests.mm': 'tests the window; VST3 code',
+        'plugins/au/CMakeLists.txt': 'compiles the window; editor changes run the Audio Unit',
+        'plugins/au/view_factory.mm': 'shows the window; Audio Unit code',
+        'tests/au/editor_tests.mm': 'tests the window; Audio Unit code',
+        'scripts/check_repository.py': 'a comment',
+        'tests/repository_checks_tests.py': 'made-up paths in its own test repository',
+    },
     'lv2': {
         'CMakeLists.txt': 'adds plugins/lv2 only with CONVOLVER_BUILD_LV2',
         'tests/repository_checks_tests.py': 'made-up paths in its own test repository',
@@ -221,10 +243,15 @@ class FormatIsolation(unittest.TestCase):
         for name, folders in ci_scope.FORMATS.items():
             # A relative path such as parents[1] / 'vst3/x.py' counts too; a
             # URL path such as github.com/lv2/lv2 does not.
-            pattern = re.compile(
-                r'(?:plugins|tests)/' + name + r'\b|(?<![\w./-])' + name + r'/'
-                r'|CONVOLVER_BUILD_' + name.upper() + r'\b'
+            pattern = (
+                r'(?:plugins|tests)/' + name + r'\b|(?<![\w./-])' + name + r'/|CONVOLVER_BUILD_' + name.upper() + r'\b'
             )
+            # The window's users include its headers by bare name, through
+            # an include directory, so its file names count too.
+            if name == 'editor':
+                names = sorted(path.name for folder in folders for path in (ROOT / folder).iterdir())
+                pattern += r'|\b(?:' + '|'.join(map(re.escape, names)) + r')\b'
+            pattern = re.compile(pattern)
             own = (*folders, f'.github/workflows/{name}.yml')
             found = set()
             for path, contents in files:

@@ -25,7 +25,6 @@
 #include <fstream>
 #include <future>
 #include <iostream>
-#include <iterator>
 #include <limits>
 #include <random>
 #include <stdexcept>
@@ -90,10 +89,6 @@ std::size_t count(const std::string& text, const std::string& part) {
     for (auto at = text.find(part); at != std::string::npos; at = text.find(part, at + 1))
         ++n;
     return n;
-}
-std::string read_file(const std::string& path) {
-    std::ifstream in(path);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 // A 16-bit WAV with an impulse of one half on every channel.
@@ -172,28 +167,6 @@ OSStatus choose(Unit& unit, const std::string& path) {
                                 sizeof value);
 }
 
-// The Convolver log goes to a file of this process's own while it exists.
-class PrivateLog {
-  public:
-    PrivateLog()
-        : path_(std::filesystem::temp_directory_path() /
-                ("convolver-au-editor-" + std::to_string(std::random_device{}()) + ".log")) {
-        setenv("CONVOLVER_LOG", path_.c_str(), 1);
-    }
-    PrivateLog(const PrivateLog&) = delete;
-    PrivateLog& operator=(const PrivateLog&) = delete;
-    ~PrivateLog() {
-        std::error_code ignored;
-        std::filesystem::remove(path_, ignored);
-    }
-    std::string path() const {
-        return path_.string();
-    }
-
-  private:
-    std::filesystem::path path_;
-};
-
 std::atomic<int> report_changes{0};
 void report_changed(void*, AudioUnit, AudioUnitPropertyID id, AudioUnitScope, AudioUnitElement) {
     if (id == au::report_property)
@@ -220,7 +193,7 @@ std::string present_preset(Unit& unit) {
 
 // The properties: types, read-only, notifications, and what they say for a
 // stereo preset on a mono track.
-void properties(const PrivateLog& log) {
+void properties(const au_test::LogSince& log) {
     Unit unit;
     for (const auto id : {au::report_property, au::diagnostics_property}) {
         UInt32 size = 0;
@@ -295,13 +268,13 @@ void properties(const PrivateLog& log) {
     // A refused load while the saved filter is kept: "Filter not loaded; the
     // previous filter is kept. …".
     const char* refused = "Filter not loaded";
-    const auto before_repeats = count(read_file(log.path()), refused);
+    const auto before_repeats = count(log.text(), refused);
     for (int i = 0; i < 4; ++i)
         static_cast<void>(unit.load(state_of(identity(44100, 2))));
     // Exactly one: the first repeat follows the start line, whose text
     // differs, and the rest repeat it.
-    require(count(read_file(log.path()), refused) == before_repeats + 1,
-            "repeated identical failures logged:\n" + read_file(log.path()));
+    require(count(log.text(), refused) == before_repeats + 1,
+            "repeated identical failures logged:\n" + log.text());
     AudioUnitRemovePropertyListenerWithUserData(unit.get(), au::report_property, report_changed,
                                                 nullptr);
     unit.uninitialize();
@@ -870,7 +843,7 @@ AudioUnitParameterValue status_value(Unit& unit) {
 }
 // Faults Render counts: the report explains them and keeps Render's Fault,
 // and an open window polling it logs them once, not on every read.
-void faults(const PrivateLog& log) {
+void faults(const au_test::LogSince& log) {
     Unit unit;
     check(unit.load(state_of(identity(44100, 2))), "stereo preset");
     check(unit.configure(44100, 2, 2, 512), "stereo formats");
@@ -892,7 +865,7 @@ void faults(const PrivateLog& log) {
     require([r[@"status name"] isEqualToString:@"Fault"] && contains(r[@"explanation"], logged),
             "fault report: " + text(r[@"status name"]) + ": " + text(r[@"explanation"]));
     require(status_value(unit) == fault, "reading the report cleared Fault");
-    require(count(read_file(log.path()), logged) == 1, "fault not logged once");
+    require(count(log.text(), logged) == 1, "fault not logged once");
     // Faults that go on, read as an open window does.
     for (int i = 0; i < 6; ++i) {
         render();
@@ -900,9 +873,8 @@ void faults(const PrivateLog& log) {
     }
     require([r[@"status name"] isEqualToString:@"Fault"] && status_value(unit) == fault,
             "Fault lost while faults go on");
-    require(count(read_file(log.path()), logged) == 1,
-            "polling logged the faults again: " +
-                std::to_string(count(read_file(log.path()), logged)));
+    require(count(log.text(), logged) == 1,
+            "polling logged the faults again: " + std::to_string(count(log.text(), logged)));
     unit.uninitialize();
 }
 } // namespace
@@ -911,7 +883,8 @@ int main() {
     @autoreleasepool {
         try {
             [NSApplication sharedApplication];
-            PrivateLog log;
+            // CI-27: the log CTest names, set once, kept as evidence.
+            const au_test::LogSince log(au_test::use_test_log("convolver-editor-tests.log"));
             properties(log);
             window();
             files();

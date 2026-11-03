@@ -15,6 +15,9 @@ changed file is one of these kinds:
   need the candidate workflow, which runs the packaged guide's examples.
 - one plug-in format's own files (CI-13): its adapter and its tests. These
   need that format's workflow, and the VST3 ones the candidate workflow too.
+  The macOS window that VST3 and the Audio Unit share (plugins/editor/mac/)
+  counts as a format of its own here, needing both formats' workflows and
+  the candidates (CI-26).
 - one workflow file: that workflow alone.
 - everything else, including documentation that a build test reads or runs.
   Every workflow runs.
@@ -56,17 +59,21 @@ FORMATS = {
     'vst3': ('plugins/vst3/', 'tests/vst3/'),
     'au': ('plugins/au/', 'tests/au/'),
     'lv2': ('plugins/lv2/', 'tests/lv2/'),
+    # The macOS window: only the VST3 and Audio Unit builds compile it, and
+    # their tests (tests/vst3/editor_tests.mm, tests/au/editor_tests.mm) test it.
+    'editor': ('plugins/editor/mac/',),
 }
 # Files in a format's folders that other builds use too: they count as code.
 SHARED = (
     'tests/vst3/fft_symbols.py',  # The LV2 tests run it on the LV2 bundle.
 )
 # The workflows that build each format: the candidates build and package only
-# the VST3 plug-in (scripts/release/candidate.py).
+# the VST3 plug-in (scripts/release/candidate.py), with the window on macOS.
 FORMAT_WORKFLOWS = {
     'vst3': {'vst3', 'release'},
     'au': {'au'},
     'lv2': {'lv2'},
+    'editor': {'vst3', 'au', 'release'},
 }
 # Workflows gated by this script, named by their file in .github/workflows/.
 WORKFLOWS = ('regression', 'fuzz', 'vst3', 'au', 'lv2', 'release')
@@ -179,7 +186,7 @@ def main(argv=None):
         )
     elif workflows is not None:
         lines.append(
-            "Only one plug-in format's or one workflow's own files changed (CI-13); "
+            'Only plug-in or workflow files changed (CI-13, CI-26); '
             'these workflows build and test: ' + ', '.join(sorted(workflows)) + '.'
         )
         if args.workflow:

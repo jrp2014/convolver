@@ -16,11 +16,15 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace convolver::au_test {
 inline void check(OSStatus status, const std::string& what) {
@@ -254,5 +258,62 @@ class Unit {
     UInt32 frames_ = 0;
     bool silent_input_ = false;
     Float64 sample_time_ = 0;
+};
+// The Convolver log of a test process (CI-27): the file CTest names in the
+// build folder, or `name` in the current folder when run by hand. Called once
+// in main(), before any unit exists: a setenv while a unit's Latency worker
+// reads the variable is a data race, which ASan caught when a test changed it
+// per case (CI-22). The file is never copied or removed, so it and the ".old"
+// file host_log rotates it to past 1 MiB are evidence even after a crash, a
+// sanitizer abort or a forced end.
+inline std::filesystem::path use_test_log(const char* name) {
+    if (const char* configured = std::getenv("CONVOLVER_LOG"); configured && *configured)
+        return configured;
+    const auto path = std::filesystem::absolute(name);
+    setenv("CONVOLVER_LOG", path.c_str(), 1);
+    return path;
+}
+
+// What a log gained while this object exists: earlier runs' lines stay in
+// the file. If host_log moved it to ".old" meanwhile and began a new one, the
+// rest of the old one and all of the new.
+class LogSince {
+  public:
+    explicit LogSince(std::filesystem::path path)
+        : path_(std::move(path)), start_(size_now()), old_time_(old_time()) {}
+    std::string text() const {
+        auto all = read(path_);
+        if (all.size() < start_ || old_time() != old_time_) {
+            const auto before = read(old());
+            return (start_ < before.size() ? before.substr(start_) : std::string()) + all;
+        }
+        return all.substr(start_);
+    }
+    const std::filesystem::path& path() const {
+        return path_;
+    }
+
+  private:
+    static std::string read(const std::filesystem::path& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    }
+    std::filesystem::path old() const {
+        auto old = path_;
+        old += ".old";
+        return old;
+    }
+    std::filesystem::file_time_type old_time() const {
+        std::error_code missing;
+        return std::filesystem::last_write_time(old(), missing);
+    }
+    std::size_t size_now() const {
+        std::error_code missing;
+        const auto size = std::filesystem::file_size(path_, missing);
+        return missing ? 0 : static_cast<std::size_t>(size);
+    }
+    std::filesystem::path path_;
+    std::size_t start_;
+    std::filesystem::file_time_type old_time_;
 };
 } // namespace convolver::au_test

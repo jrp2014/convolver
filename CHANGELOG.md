@@ -162,6 +162,18 @@ Until 1.0 the C++ API may change between minor versions.
   `hendrikmuhs/ccache-action`, is pinned to the commit of its v1.2.24 release
   instead of the tag, so a moved tag cannot run other code in CI. Dependabot
   still proposes each new release. GitHub's own actions keep their major tags.
+- Continuous integration (CI-26): a pull request that changes only the macOS
+  window that VST3 and the Audio Unit share (`plugins/editor/mac/`) runs Lint,
+  the VST3, Audio Unit and candidate workflows, and skips the native, LV2
+  and fuzz builds, as a change to one format's own files does (CI-13).
+  Anything else in the same pull request still runs everything.
+- Continuous integration (CI-27, from jrp's review of `f2dc691`): the Audio
+  Unit adapter and window tests write their Convolver logs to files in the
+  build folder from the start, rather than private files copied there or
+  deleted at exit, so the logs survive a sanitizer abort, crash or forced
+  end. CI evidence now includes the window test's log, which was missing,
+  and the `.old` file each test log rotates to. `au.log_evidence` checks
+  collection after an abort and a kill.
 
 ### Fixed
 

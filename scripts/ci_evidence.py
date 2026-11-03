@@ -8,8 +8,9 @@ build folder given, this copies CTest's full output (Testing/Temporary/
 LastTest*.log, which holds every test's output, sanitizer reports and the
 lifecycle tests' failing operation sequences included), the JUnit report
 (junit.xml, written by ctest --output-junit), the Convolver logs the plug-in
-tests write (convolver-tests.log) and CMakeCache.txt (compiler, flags and
-options). identity.txt records the commit, runner image and compiler.
+tests write (convolver-tests.log, convolver-adapter-tests.log and the like,
+with the ".old" file each rotates to past 1 MiB; CI-27) and CMakeCache.txt
+(compiler, flags and options). identity.txt records the commit, runner image and compiler.
 
 The failed tests of each folder (LastTestsFailed.log), or that another step
 failed, also go to the job's summary with the run attempt, so they stay
@@ -45,7 +46,13 @@ def cache_value(cache, name):
 
 def collect(build, out):
     copied = []
-    patterns = ['Testing/Temporary/LastTest*.log', 'junit.xml', 'CMakeCache.txt', '**/convolver-tests.log']
+    patterns = [
+        'Testing/Temporary/LastTest*.log',
+        'junit.xml',
+        'CMakeCache.txt',
+        '**/convolver-*tests.log',
+        '**/convolver-*tests.log.old',
+    ]
     for pattern in patterns:
         for found in sorted(build.glob(pattern)):
             if not found.is_file():
