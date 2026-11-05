@@ -1104,8 +1104,8 @@ void settings_in_diagnostics() {
     // Started again, the start line says the dry half plays.
     unit.uninitialize();
     check(unit.initialize(), "mix status restart");
-    require(contains(log.text(), "With Mix at 50% wet, though, the dry signal still plays instead "
-                                 "of silence: the input at -6.0 dB."),
+    require(contains(log.text(),
+                     "With Mix at 50% wet, only the dry signal plays: the input at -6.0 dB."),
             "start line after a refused first load at Mix 50%: " + log.text());
     // At Mix 100% it is silent again, and Status says so.
     set_parameter(unit, au::mix_parameter, 100);
