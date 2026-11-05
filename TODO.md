@@ -875,13 +875,6 @@ request with a DSP change.
   keep the per-job summaries. Suggested in jrp's review of 0.5.2; no coverage
   may be lost. See
   [supporting libraries](docs/develop/build.md#supporting-libraries).
-- [ ] **CI-8 — Keep evidence from advisory failures.** Test jobs keep their
-  evidence (JUnit results, logs) only when a job fails, but advisory checks
-  (the pluginval pre-release, the newest upstream lilv) report problems as
-  warnings and leave the job green, so their evidence is not kept. Upload it
-  when an advisory step reports a problem as well. Suggested in jrp's review
-  of 0.5.2. See
-  [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep
   representative oracle and allocation checks as everyday gates, and run
@@ -1017,6 +1010,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-8 — Keep evidence from advisory failures.** 5 November 2026,
+  from jrp's review of 0.5.2: when the newest pluginval pre-release reports
+  problems, or the LV2 tests fail against the newest upstream lilv, the job
+  keeps CTest's output as an `advisory-evidence-…` artifact, although it
+  stays green ([evidence from CI runs](docs/develop/testing.md#evidence-from-failed-ci-runs)).
 - [x] **CI-9 — Shorter CI jobs, no test dropped.** 25 October 2026, PR #85,
   from jrp's CI analysis: the Linux VST3 jobs and the Audio Unit sanitizer job
   build only what their tests run, long tests carry a CTest `COST` so they

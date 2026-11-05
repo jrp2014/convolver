@@ -274,6 +274,12 @@ Until 1.0 the C++ API may change between minor versions.
   since the Latency setting arrived; the page now says so. In
   `HostProcessor` the 64-frame ramps and the crossfade are named constants;
   the sound is unchanged.
+- Continuous integration (CI-8): the advisory checks (the newest pluginval
+  pre-release in the VST3 jobs, the newest upstream lilv in the LV2
+  workflow) keep CTest's output as an `advisory-evidence-…` artifact when
+  they report a problem, as failed jobs keep theirs; the job still passes.
+  `scripts/ci_evidence.py --advisory` collects it and lists the tests in the
+  job summary as an advisory problem.
 - Continuous integration (CI-29): static analysis runs LLVM's
   `run-clang-tidy.py`, installed with clang-tidy, in place of
   `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The

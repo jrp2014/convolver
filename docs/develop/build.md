@@ -528,6 +528,10 @@ exception below).
   headers, runs the same LV2 tests against them and reports any failure,
   including a failed download or build, as a warning.
 
+When an advisory run's tests report a problem, the job keeps their evidence,
+as a failed job does, in an artifact named `advisory-evidence-…` (CI-8;
+[evidence from CI runs](testing.md#evidence-from-failed-ci-runs)).
+
 ### When a new release breaks the build
 
 Because builds follow upstream, a new release can turn CI red with no change

@@ -1097,6 +1097,16 @@ image, compiler and build type). The candidate workflow keeps its own
 [debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
 its findings.
 
+Advisory checks warn instead of failing, so their jobs pass. When the newest
+pluginval pre-release reports problems (`vst3.pluginval` or the acceptance
+test) or the LV2 tests fail against the newest upstream lilv, the same
+collector runs with `--advisory` and the job keeps an artifact named
+`advisory-evidence-<job>-…-attempt-<n>` for 14 days (the VST3 jobs keep a
+folder for each pluginval run that reported problems; CI-8, from jrp's
+review of 0.5.2). The job summary lists the
+tests under "Advisory problem on attempt n". Failed downloads and builds in
+those checks leave no test output; their step log is the evidence.
+
 A test's Convolver log should be the file CTest names in the build folder
 (`convolver-*tests.log`), written there from the start and never moved or
 deleted, so a crash, a sanitizer abort or a timeout that kills the test

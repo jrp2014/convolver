@@ -206,6 +206,15 @@ jobs:
             echo "::warning title=pluginval pre-release::$1"
             echo "**Warning:** $1" >> "$GITHUB_STEP_SUMMARY"
           }
+          # CI-8: the job stays green, so keep what a run that reports
+          # problems left behind (CTest's log of it), for the step below.
+          kept=0
+          keep_evidence() {
+            kept=$((kept + 1))
+            python scripts/ci_evidence.py --advisory "advisory-evidence/$kept-$1" build-vst3 ||
+              echo "::warning::Could not collect the advisory run's evidence."
+            echo 'ADVISORY_EVIDENCE=true' >> "$GITHUB_ENV"
+          }
           give_up() {
             if [ "$required" = true ]; then
               echo "::error title=pluginval pre-release::$1 The acceptance test needs it (pluginval 2)."
@@ -246,6 +255,7 @@ jobs:
           else
             message="pluginval $version (pre-release) reports problems that $PLUGINVAL_VERSION does not;"
             advise "$message see the log of this step. The formal result is $PLUGINVAL_VERSION's."
+            keep_evidence validation
           fi
           if [ "$required" = true ]; then
             # A skip (exit code 77) would pass silently, so it is refused.
@@ -258,7 +268,16 @@ jobs:
           elif [ "${version%%.*}" -ge 2 ] && ! ctest --test-dir build-vst3 -C Release --output-on-failure \
             --no-tests=error -R '^vst3\.pluginval\.acceptance$'; then
             advise "The acceptance test fails with pluginval $version (pre-release); see the log of this step."
+            keep_evidence acceptance
           fi
+      - name: Keep advisory evidence
+        if: always() && env.ADVISORY_EVIDENCE == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: advisory-evidence-${{ github.job }}-${{ strategy.job-index }}-attempt-${{ github.run_attempt }}
+          path: advisory-evidence
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Explain a failure that may come from a new upstream release
         if: failure()
         shell: bash
