@@ -289,7 +289,8 @@ std::vector<float> quiet_noise(std::size_t channel, std::size_t frames) {
 std::vector<Workload> workloads(const Options& o) {
     std::vector<Workload> list;
     // jrp, 5 November 2026: 100 ms feels instant; 250 ms is where Apple's
-    // tools count an application as hung. The 120 s filter is reported only.
+    // tools count an application as hung. The 120 s filter's hold is
+    // reported only; its callbacks are judged.
     for (const double s : {1.0, 10.0, 30.0})
         list.push_back({std::to_string(static_cast<int>(s)) + " s",
                         {48000, 2, 2},
@@ -523,7 +524,17 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
         char line[96];
         std::snprintf(line, sizeof line, "  %-5s %-14s %s", result.runs[i].workload.c_str(),
                       result.runs[i].entry.c_str(), describe(v));
-        std::cout << line << " (" << (j - i) << (j - i == 1 ? " run)\n" : " runs)\n");
+        std::cout << line << " (" << (j - i) << (j - i == 1 ? " run" : " runs");
+        if (v == Verdict::passed && j - i > 1) {
+            // Which run met each limit, as they can differ.
+            const auto a = result.runs.begin() + static_cast<std::ptrdiff_t>(i),
+                       b = result.runs.begin() + static_cast<std::ptrdiff_t>(j);
+            for (const auto& [name, limit] :
+                 {std::pair{"hold", &Run::hold}, std::pair{"callbacks", &Run::callbacks}})
+                if (const int k = met_on(a, b, limit))
+                    std::cout << "; " << name << " met on run " << k;
+        }
+        std::cout << ")\n";
         for (auto k = i; k < j; ++k)
             if (result.runs[k].verdict != Verdict::passed &&
                 result.runs[k].verdict != Verdict::reported_only)
@@ -582,12 +593,29 @@ Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_
                : any(Verdict::not_qualified) ? Verdict::not_qualified
                                              : Verdict::reported_only;
     };
-    return combine(across(&Run::hold), across(&Run::callbacks));
+    const auto v = combine(across(&Run::hold), across(&Run::callbacks));
+    // Limits met in different runs pass only if one run broke neither: a
+    // hold over the limit in one run and late callbacks after an on-time
+    // baseline in the other is two failures, not a pass.
+    const auto broke = [](const Run& r) {
+        return r.hold == Verdict::failed || r.callbacks == Verdict::failed;
+    };
+    if (v == Verdict::passed && std::all_of(first, last, broke))
+        return Verdict::failed;
+    return v;
+}
+
+int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,
+           Verdict Run::* limit) {
+    const auto k =
+        std::find_if(first, last, [&](const Run& r) { return r.*limit == Verdict::passed; });
+    return k == last ? 0 : k->attempt;
 }
 
 int exit_code(const Result& r) {
     if (r.errors || r.failed)
         return 1;
-    return r.not_qualified ? not_qualified_exit : 0;
+    // Nothing judged (every entry reported only, or none ran) is not a pass.
+    return r.not_qualified || r.passed == 0 ? not_qualified_exit : 0;
 }
 } // namespace convolver::plugin_test::load_timing

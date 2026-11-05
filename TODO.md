@@ -1286,11 +1286,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; an
   entry no limit applies to is reported only, not passed; the summary keeps
   every run that did not pass and counts passes after a run that did not;
-  across reruns the hold and the callbacks are judged separately.
-  `native.load_timing_harness`
-  drives the harness with a mock adapter: slow loads fail, with late
-  callbacks too (the review's reproduction), late callbacks with a late
-  baseline do not qualify, a refused load fails;
+  across reruns the hold and the callbacks are judged separately, but an
+  entry passes only if one run broke neither, and the summary names the run
+  that met each; a test where nothing was judged (every entry reported only)
+  is skipped, not passed. `native.load_timing_harness` checks the verdict
+  rules on made-up runs, and drives the harness with a mock adapter: slow
+  loads fail, with late callbacks too (the review's reproduction); a load
+  slow on the first run only meets the hold limit later, with that run kept;
+  late callbacks with a late baseline do not qualify; a load no limit
+  applies to is reported only; a refused load fails;
   [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-11 — Quiet noise as the load-timing input.** 5 November 2026,
   from jrp's review of `59ac8e0` (0.10.0): the input generator subtracted

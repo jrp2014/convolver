@@ -312,7 +312,9 @@ Until 1.0 the C++ API may change between minor versions.
   no limit applies to (LV2's `restore()`) is "reported only" rather than
   passed. The summary lists every run that did not pass, also when a later
   run did, and counts entries that passed only after a run that did not.
-  Across reruns the hold and the callbacks are judged separately.
+  Across reruns the hold and the callbacks are judged separately, but an
+  entry passes only if one run broke neither, and the summary names the run
+  that met each. A test in which nothing was judged is skipped, not passed.
   `native.load_timing_harness` checks these verdicts with a mock adapter.
   Tests only: no change to the plug-ins or the sound.
 - Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests

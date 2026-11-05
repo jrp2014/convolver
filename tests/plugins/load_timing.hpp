@@ -20,7 +20,7 @@
 //   load, a replacement or a reset runs on another thread (not where the
 //   host holds back audio: LV2's restore() and its reset);
 // - a load holds the host's thread at most 100 ms with filters up to 10 s,
-//   and 250 ms with 30 s; the 120 s filter is reported only.
+//   and 250 ms with 30 s; the 120 s filter's hold is reported only.
 // Each run of an entry (one entry point with one filter) is judged
 // (PERF-10, jrp's review of 59ac8e0):
 // - failed: a load was refused, a callback failed or the wrong filter was
@@ -33,10 +33,12 @@
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
-// machine can stall one run; each limit is then met if one run met it (see
-// verdict()), and the summary keeps every run that did not pass. The test exits 1 if an entry
-// failed, not_qualified_exit (CTest reports it as skipped) if one did not qualify, and 0 only when
-// every entry passed or was reported only.
+// machine can stall one run; each limit is then met if one run met it, as
+// long as one run broke neither (see verdict()), and the summary keeps every
+// run that did not pass. The test exits 1 if an entry failed,
+// not_qualified_exit (CTest reports it as skipped) if one did not qualify or
+// none was judged, and 0 only when an entry passed and every other passed or
+// was reported only.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -150,9 +152,16 @@ struct Result {
 // An entry's verdict from its runs: failed if a run had an error; otherwise
 // each limit is met if one run met it, else failed if one run failed it,
 // else not qualified if one could not judge it, else does not apply; and
-// the two combine as for a run. So a run whose hold stalled once, followed
-// by runs within it, meets the hold limit.
+// the two combine as for a run. A pass also needs one run that broke
+// neither limit: a run whose hold stalled once, followed by one within it
+// whose callbacks could not be judged, passes on the first run's callbacks;
+// a stalled hold in one run and late callbacks after an on-time baseline in
+// the other fail.
 Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
+// The attempt that first met `limit` (&Run::hold or &Run::callbacks) among
+// an entry's runs, or 0 if none did.
+int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,
+           Verdict Run::* limit);
 
 // Runs every entry point on every workload with `driver` (the format's
 // lifecycle driver), prints one line per phase and a summary that keeps every
@@ -163,7 +172,8 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
 // CTest's SKIP_RETURN_CODE for the timing tests: nothing failed, but not
 // every entry qualified, so the test is reported as skipped, not passed.
 constexpr int not_qualified_exit = 77;
-// 1 if there were errors or an entry failed, not_qualified_exit if an entry
-// did not qualify, otherwise 0.
+// 1 if there were errors or an entry failed; not_qualified_exit if an entry
+// did not qualify, or none passed (every one reported only, or none ran);
+// otherwise 0.
 int exit_code(const Result&);
 } // namespace convolver::plugin_test::load_timing

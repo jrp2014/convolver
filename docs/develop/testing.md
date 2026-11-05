@@ -568,7 +568,7 @@ Each run of an entry (one entry point with one filter) gets a verdict
 | --- | --- |
 | Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits after an on-time baseline |
 | Not qualified | Callbacks broke their limits, but the baseline before them was already late, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
-| Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset |
+| Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset (the 120 s filter's hold is reported only, but its callbacks are judged, so its entries are not) |
 | Passed | None of these |
 
 An entry that did not pass runs again, up to three times, because a shared
@@ -577,28 +577,35 @@ filter once held the host's thread for about 265 ms, where the run before
 took 55 ms). Across an entry's runs each limit is judged on its own: it is
 met if one run met it, failed if none met it and one failed it, and
 otherwise not qualified (or does not apply). The entry then fails if a limit
-failed or a run had an error, is not qualified if a limit was, and passes
-otherwise. So a hold that stalled once and stayed within the limit on the
-next run is met, while that run's late callbacks after a late baseline
-still leave the entry not qualified (the macOS VST3 job on 5 November 2026:
-281.6 ms on the first run, 25 to 39 ms on the next two). A summary at the
-end lists every entry with every run that did not pass, so the failed
-attempts stay in the evidence, and its last line counts the entries that
-passed only after a run that did not. The test passes only when
-every entry passed or was reported only; it fails if one failed, and exits
-77 when one was not qualified, which CTest reports as skipped
+failed or a run had an error, is not qualified if a limit was, is reported
+only if neither limit applies, and passes otherwise; but a pass also needs
+one run that broke neither limit, so a stalled hold in one run and late
+callbacks after an on-time baseline in another fail. A hold that stalled
+once and stayed within the limit on the next run is met, while that run's
+late callbacks after a late baseline still leave the entry not qualified
+(the macOS VST3 job on 5 November 2026: 281.6 ms on the first run, 25 to
+39 ms on the next two). A summary at the end lists every entry with every
+run that did not pass, so the failed attempts stay in the evidence; for an
+entry that passed after more than one run it names the run that met each
+limit; and its last line counts the entries that passed only after a run
+that did not. The test passes only when an entry passed and every other
+passed or was reported only; it fails if one failed, and exits 77 when one
+was not qualified or none was judged, which CTest reports as skipped
 (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the
 three tests as skipped.
 
 `native.load_timing_harness` tests the harness itself with a mock adapter
-whose loads and callbacks take as long as each case says: a loader that holds
+whose loads and callbacks take as long as each case says, after checking the
+verdict rules on made-up runs (a stalled hold then late callbacks fails; an
+error after a pass fails; nothing judged is skipped): a loader that holds
 the thread for 400 ms fails on all three runs, also when every callback,
 the baseline's included, is late (the review's reproduction, which the first
-version passed); one slow only on its first run passes on a later run, with
-the failed run kept and counted; late callbacks with a late baseline are not
+version passed); one slow only on its first run meets the hold limit on the
+next, with the failed run kept; late callbacks with a late baseline are not
 qualified; late callbacks only while loading never pass; a build that does
 not enforce the limits never passes; a load no limit applies to is reported
-only, however slow; a refused load fails at once. A quick adapter's
+only, however slow, and the test is then skipped; a refused load fails at
+once. A quick adapter's
 callbacks are not checked there, since they depend on the machine. It also checks the input
 the audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the
 first version wrapped its negative half to about 1.8e15).

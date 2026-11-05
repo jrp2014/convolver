@@ -13,9 +13,12 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace timing = convolver::plugin_test::load_timing;
 namespace lc = convolver::plugin_test::lifecycle;
@@ -45,6 +48,83 @@ void input_is_quiet_noise() {
               "the input is finite");
     }
     check(a != b, "the channels differ");
+}
+
+// PERF-10: an entry's verdict from made-up runs, without timing anything.
+// Each run is {hold, callbacks}, or an error.
+using V = timing::Verdict;
+timing::Run made(V hold, V callbacks, int attempt, bool error = false) {
+    timing::Run r;
+    r.attempt = attempt;
+    r.hold = hold;
+    r.callbacks = callbacks;
+    r.error = error;
+    r.verdict = error ? V::failed : timing::combine(hold, callbacks);
+    return r;
+}
+
+void verdict_table() {
+    const auto P = V::passed, F = V::failed, N = V::not_qualified, R = V::reported_only;
+    check(timing::combine(P, P) == P && timing::combine(F, P) == F && timing::combine(P, F) == F &&
+              timing::combine(F, N) == F && timing::combine(N, P) == N &&
+              timing::combine(R, R) == R && timing::combine(R, P) == P &&
+              timing::combine(P, R) == P && timing::combine(R, N) == N &&
+              timing::combine(R, F) == F,
+          "combine");
+    struct Row {
+        const char* name;
+        std::vector<std::pair<V, V>> runs;
+        V expected;
+        int hold_met, callbacks_met;
+        int error_on = 0; // The attempt with an error, if any.
+    };
+    const std::vector<Row> rows{
+        {"one clean run", {{P, P}}, P, 1, 1},
+        {"stalled hold, then clean", {{F, P}, {P, P}}, P, 2, 1},
+        // macOS VST3, 5 November 2026: the later runs cannot judge callbacks,
+        // the first met them, and the second broke no limit.
+        {"stalled hold, then unjudged callbacks", {{F, P}, {P, N}}, P, 2, 1},
+        {"stalled hold, every baseline late", {{F, N}, {P, N}, {P, N}}, N, 2, 0},
+        // Each run broke a limit with evidence: not a pass.
+        {"stalled hold, then late callbacks", {{F, P}, {P, F}}, F, 2, 1},
+        {"late callbacks, then stalled hold, then both", {{P, F}, {F, P}, {P, F}}, F, 1, 2},
+        {"slow loader", {{F, P}, {F, P}, {F, P}}, F, 0, 1},
+        {"unjudged throughout", {{N, N}, {N, N}, {N, N}}, N, 0, 0},
+        {"no limit applies", {{R, R}}, R, 0, 0},
+        {"hold not limited, callbacks met", {{R, P}}, P, 0, 1},
+        {"hold not limited, callbacks unjudged", {{R, N}, {R, N}, {R, N}}, N, 0, 0},
+        {"error after a pass", {{P, P}, {P, P}}, F, 1, 1, 2},
+        {"limits not enforced", {{N, N}}, N, 0, 0},
+    };
+    for (const auto& row : rows) {
+        std::vector<timing::Run> runs;
+        for (const auto& [hold, callbacks] : row.runs) {
+            const int attempt = static_cast<int>(runs.size()) + 1;
+            runs.push_back(made(hold, callbacks, attempt, attempt == row.error_on));
+        }
+        const auto v = timing::verdict(runs.begin(), runs.end());
+        check(v == row.expected, std::string("verdict, ") + row.name + ": " + timing::describe(v));
+        check(timing::met_on(runs.begin(), runs.end(), &timing::Run::hold) == row.hold_met &&
+                  timing::met_on(runs.begin(), runs.end(), &timing::Run::callbacks) ==
+                      row.callbacks_met,
+              std::string("met on, ") + row.name);
+    }
+    // Exit codes: a pass needs something judged.
+    const auto exit = [](std::size_t passed, std::size_t failed, std::size_t not_qualified,
+                         std::size_t reported_only, std::size_t errors) {
+        timing::Result r;
+        r.passed = passed;
+        r.failed = failed;
+        r.not_qualified = not_qualified;
+        r.reported_only = reported_only;
+        r.errors = errors;
+        return timing::exit_code(r);
+    };
+    check(exit(3, 0, 0, 1, 0) == 0 && exit(3, 1, 1, 0, 0) == 1 && exit(3, 0, 0, 0, 1) == 1 &&
+              exit(3, 0, 1, 0, 0) == timing::not_qualified_exit &&
+              exit(0, 0, 0, 2, 0) == timing::not_qualified_exit &&
+              exit(0, 0, 0, 0, 0) == timing::not_qualified_exit,
+          "exit codes");
 }
 
 // An adapter that keeps the state it is given, taking `load` to accept it,
@@ -144,7 +224,7 @@ timing::Result run(const Case& c) {
     const std::vector<timing::Workload> list{{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}};
     const std::vector<timing::Entry> entries{
         {"state", [&](const timing::Filter& f, timing::Audio&) {
-             return timing::Outcome{mock.restore(f.state)};
+             return timing::Outcome{mock.restore(f.state), std::nullopt};
          }}};
     auto r = timing::run(mock, entries, list, o);
     std::filesystem::remove_all(o.work_directory);
@@ -244,16 +324,18 @@ void verdicts() {
         o.enforce = true;
         o.reset_holds_audio = true;
         std::cout << "\ncase: reported only\n";
-        const auto r = timing::run(mock,
-                                   {{"held back",
-                                     [&](const timing::Filter& f, timing::Audio&) {
-                                         return timing::Outcome{mock.restore(f.state)};
-                                     },
-                                     true, false}},
-                                   {{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}}, o);
+        const auto r =
+            timing::run(mock,
+                        {{"held back",
+                          [&](const timing::Filter& f, timing::Audio&) {
+                              return timing::Outcome{mock.restore(f.state), std::nullopt};
+                          },
+                          true, false}},
+                        {{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}}, o);
         std::filesystem::remove_all(o.work_directory);
+        // Nothing was judged, so the test is skipped rather than passed.
         check(r.reported_only == 1 && r.passed == 0 && r.runs.size() == 1 &&
-                  timing::exit_code(r) == 0,
+                  timing::exit_code(r) == timing::not_qualified_exit,
               "reported only: " + text(r));
     }
     {
@@ -268,6 +350,7 @@ void verdicts() {
 int main() {
     try {
         input_is_quiet_noise();
+        verdict_table();
         verdicts();
     } catch (const std::exception& e) {
         std::cout << "FAILED: " << e.what() << '\n';
