@@ -597,13 +597,14 @@ int run_inspection(int argc, char** argv) {
                 validate = option == "--validate";
                 path = utf8_path(value());
             } else if (option == "--sample-rate")
-                options.expected_rate = static_cast<int>(count(value(), 768000, "--sample-rate"));
+                options.expected_rate =
+                    static_cast<int>(count(value(), max_sample_rate, "--sample-rate"));
             else if (option == "--input-channels")
-                options.expected_inputs = count(value(), 256, "--input-channels");
+                options.expected_inputs = count(value(), max_channel_count, "--input-channels");
             else if (option == "--output-channels")
-                options.expected_outputs = count(value(), 256, "--output-channels");
+                options.expected_outputs = count(value(), max_channel_count, "--output-channels");
             else if (option == "--block-size")
-                options.block_frames = count(value(), 1u << 20, "--block-size");
+                options.block_frames = count(value(), max_block_frames, "--block-size");
             else if (option == "--all-configurations")
                 options.all_configurations = true;
             else if (option == "--syntax-only")

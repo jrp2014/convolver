@@ -8,6 +8,7 @@
 // become floats by the same exact scaling; tests/native/audio_toolbox_tests.cpp
 // compares the two readers on every format both read.
 #include "config_parse.hpp"
+#include "convolver/engine.hpp"
 #include "sound_files.hpp"
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -26,9 +27,10 @@
 namespace convolver::detail {
 namespace {
 void validate(AudioInfo info) {
-    if (info.sample_rate <= 0 || info.sample_rate > 768000 || info.channels == 0 ||
-        info.channels > 256)
-        throw std::invalid_argument("audio rate must be 1..768000 Hz and channels 1..256");
+    if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
+        info.channels > max_channel_count)
+        throw std::invalid_argument("audio rate must be 1.." + std::to_string(max_sample_rate) +
+                                    " Hz and channels 1.." + std::to_string(max_channel_count));
 }
 constexpr auto sandbox_hint = "a sandboxed host, such as GarageBand, lets a plug-in read only "
                               "the files chosen in its window";
@@ -122,10 +124,10 @@ class ToolboxFile final : public SoundFile {
                 file_.ref, kExtAudioFileProperty_FileDataFormat, &size, &format))
             throw std::runtime_error(opening + explain(status));
         const double rate = format.mSampleRate;
-        if (!(rate >= 1 && rate <= 768000) || rate != std::floor(rate))
-            throw std::runtime_error("unsupported audio input " + path.string() + ": the rate, " +
-                                     std::to_string(rate) +
-                                     " Hz, is not a whole number of hertz from 1 to 768000");
+        if (!(rate >= 1 && rate <= max_sample_rate) || rate != std::floor(rate))
+            throw std::runtime_error(
+                "unsupported audio input " + path.string() + ": the rate, " + std::to_string(rate) +
+                " Hz, is not a whole number of hertz from 1 to " + std::to_string(max_sample_rate));
         info_ = {static_cast<int>(rate), format.mChannelsPerFrame};
         try {
             validate(info_);

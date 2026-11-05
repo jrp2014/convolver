@@ -265,6 +265,7 @@ source and records exactly which releases it used.
 | `CONVOLVER_BUILD_FUZZERS` | OFF | Clang libFuzzer targets; requires I/O |
 | `CONVOLVER_BUILD_BENCHMARKS` | OFF | Build `convolver_benchmark`, and `convolver_callback_benchmark` when the I/O adapter is built |
 | `CONVOLVER_AVX2_KERNELS` | ON when targeting x86-64 | Also compile the multiply-accumulate kernels for AVX2 with FMA and use them on CPUs that have both; output then differs from the baseline kernels by float rounding only, below -120 dBFS ([measurements](fft-backends.md#compiler-flags-and-avx2-kernels)) |
+| `CMAKE_OSX_DEPLOYMENT_TARGET` | 14.0 on macOS, unless `MACOSX_DEPLOYMENT_TARGET` is set | The oldest macOS the binaries run on, the same for every target and the packages ([candidates](releasing.md#candidates)); set it on the first configure, as CMake reads it before `project()` |
 | `BUILD_TESTING` | ON at top level | Master test switch |
 | `CONVOLVER_BUILD_TESTS` | ON at top level; OFF as a subproject | Convolver test targets, subject to `BUILD_TESTING` |
 | `CONVOLVER_PACKAGE_TESTS` | ON | Installed, relocated and source-tree C++ consumer tests |
@@ -355,7 +356,7 @@ disable system security checks.
 
 ### Audio Unit
 
-Needs macOS 11 or later, CMake 3.20+, Xcode's command-line tools (C++23, which
+Needs CMake 3.20+, Xcode's command-line tools (C++23, which
 AudioUnitSDK has needed since 1.4.0) and the newest AudioUnitSDK release. Fetch
 and unpack it, then configure with it:
 
@@ -568,7 +569,7 @@ ctest --preset release-vst3
 cmake --install build/presets/release-vst3 --config Release --prefix stage --component PluginDistribution
 ```
 
-On macOS add `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`. Use `$PWD` in PowerShell or
+Use `$PWD` in PowerShell or
 absolute paths in cmd. `--latest` takes the newest release of each library
 and `--fetch` explicitly permits downloading them; `--lock FILE` instead
 builds the releases a lock file or source manifest records, and without

@@ -149,7 +149,10 @@ is superseded.
   The REAPER smoke test also takes over the host steps that REL-5 left out:
   install, render, save and reopen, and presets that do not fit, in
   [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
-  Not yet run.
+  In each host, also check that the VST3 Status text follows a change
+  without side effects: the controller asks the host to reread every
+  parameter (`restartComponent(kParamValuesChanged)`, which the SDK meant
+  for program changes) whenever the status changes. Not yet run.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -279,6 +282,17 @@ Shared work, done once for all three formats:
   Silicon, least for long filters; short filters at small blocks may gain
   more, so measure them on x86-64 first) and the longer loads. Saved with PLUG-10's settings only when Measured; not
   automatable.
+  If FFTW-built plug-ins go ahead, FFTW 3.3.5's
+  `fftwf_make_planner_thread_safe` is FFTW's answer for plug-ins in one
+  process that cannot share a lock (its manual calls it a last resort).
+- [ ] **PLUG-17 — Ramps measured in time rather than frames (jrp decides).**
+  From the project review of 5 November 2026: `HostProcessor`'s gain, mix,
+  bypass and mute ramps last 64 frames and a replacement's crossfade 256
+  frames at every sample rate (PLUG-16 named them), so at 48 kHz they take
+  1.3 ms and 5.3 ms, and at 384 kHz 0.17 ms and 0.67 ms. Fixed times would
+  make the higher rates as smooth as 48 kHz, but they change the sound at
+  every rate except the one chosen, so jrp decides; the review recommends
+  keeping frames for the first preview.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -493,6 +507,15 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
+- [ ] **AU-12 — Wake the Latency work with a dispatch source.** From the
+  project review of 5 November 2026: `portable/request_worker.hpp`, a thread
+  of our own that only the Audio Unit uses, applies a new Latency. libdispatch
+  has the same coalescing wake-up: a `DISPATCH_SOURCE_TYPE_DATA_OR` source on
+  a serial queue, which `dispatch_source_merge_data` wakes with an atomic OR.
+  Apple documents the merge as atomic but not as safe on an audio thread, so
+  jrp decides whether to try it; if `au.adapter`'s allocation counts and the
+  macOS jobs then pass, the worker, its tests, the watchdog workflow and
+  `scripts/ci_watchdog_probe.py` go, and CI-24 and CI-25 close.
 
 ## FFmpeg integration
 
@@ -577,6 +600,13 @@ means a patched FFmpeg build with `--enable-gpl`.
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
+- [ ] **IO-9 — Shortest float text from the standard library.** From the
+  project review of 5 November 2026: `equalizer_apo.cpp` and
+  `inspection_cli.cpp` search for the shortest text that reads back as the
+  same float with `snprintf` and `strtof`, because macOS before 13.3 lacks
+  floating-point `std::to_chars`. Builds for macOS 14 (PLUG-15) have it.
+  Waits for jrp: using it means Convolver can no longer be built for macOS
+  11 to 13.2 from source.
 - [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
   endpoints with floating-point rounding, integer quantization, dither and noise
   shaping. The current filter bound assumes input magnitude at most 1 and does
@@ -718,6 +748,22 @@ so the preset file path is not needed).
   across realistic routing and callback sizes, before further substantial
   DSP changes; those results decide whether more complex partitioning is
   justified.
+- [ ] **PERF-7 — One input check on the plug-in audio path.** From the
+  project review of 5 November 2026, after PERF-3: each `HostProcessor`
+  call copies planar host buffers into an interleaved buffer and replaces
+  non-finite input, then `Engine::process` checks the spans for overlap,
+  scans the input again and transposes it through its delay lines, and the
+  output goes back the same way inside a `try` block. A private planar,
+  `noexcept` entry point for `HostProcessor` would drop the second scan, two
+  transposes and the `try`; the public `Engine::process` keeps its checks.
+  The output must stay bit-identical.
+- [ ] **PERF-8 — Split spectra straight from the FFT.** From the project
+  review of 5 November 2026, after PERF-3: the engine stores spectra split
+  (real parts, then imaginary), but the backends hand them over interleaved
+  and the `deinterleave` and `interleave` kernels convert them, although
+  vDSP's real FFT already works in split form and FFTW can read and write
+  split arrays through its guru interface. Measure the saving, and keep
+  within the kernel divergence gates.
 
 ### Loading responsiveness
 
@@ -951,6 +997,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   reads it; the build and test jobs have time limits. No automatic re-runs;
   CI-24 and CI-25 continue;
   [intermittent failures](docs/develop/testing.md#intermittent-failures).
+- [x] **CI-29 — Use LLVM's parallel clang-tidy runner.** 5 November 2026,
+  PR #108, from the project review of that day: CI runs `run-clang-tidy.py`,
+  which the clang-tidy package installs, in place of our
+  `scripts/clang_tidy.py` and its tests;
+  [lint checks](CONTRIBUTING.md#formatting-and-analysis).
 - [x] **CI-28 — Keep `vst3.adapter`'s Status and log case's log as
   evidence.** 5 November 2026, from CI-27's review: the case pointed
   `CONVOLVER_LOG` at a temporary file with `setenv` while the processor
@@ -1028,6 +1079,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   macOS build, the command-line tools included, uses Accelerate unless built
   with `-DCONVOLVER_FFT_BACKEND=FFTW`;
   [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses).
+- [x] **FFT-4 — Remove the finished vDSP experiment.** 5 November 2026, PR #108,
+  from the project review of that day: `portable/kernels_vdsp.cpp` and the
+  `CONVOLVER_EXPERIMENT_VDSP_MAC` option are gone with the experiment's two
+  scripts; its timing program stays as `convolver_kernel_benchmark`; the
+  [24 October results](docs/archive/reviews/2026-10-24-apple-vdsp.md) stay
+  archived; the code can be rebuilt from `v0.8.10` (`f5ecb12`) or earlier.
 - [x] **IO-3 — More output containers.** 23 October 2026, PR #60;
   [output formats](docs/use/command-line.md#output-formats).
 - [x] **IO-4 — Raw filters and raw sample types.** 24 October 2026, PR #60;
@@ -1078,6 +1135,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   size check keeps 256 bytes free for the settings whether or not they are
   in use;
   [host state](docs/develop/plugin-contract.md#host-state).
+- [x] **PLUG-15 — One macOS deployment target.** 5 November 2026, PR #108,
+  from the project review of that day: the top-level `CMakeLists.txt` sets
+  `CMAKE_OSX_DEPLOYMENT_TARGET` to 14.0 before `project()`, as CMake asks,
+  in place of the VST3 and Audio Unit folders forcing 11.0 after it, so
+  every Mac build targets what the packages do;
+  [build options](docs/develop/build.md#build-options).
+- [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
+  from the project review of that day: `HostProcessor`'s 64-frame setting,
+  bypass and mute ramps and its 256-frame crossfade are named constants in
+  `portable/host.cpp`, with the same values, and the plug-in contract says a
+  replacement plays for one Latency block before the crossfade, as it has
+  since PLUG-10; [contract](docs/develop/plugin-contract.md).
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's
@@ -1104,6 +1173,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **ROBUST-6 — State the shared limits once.** 5 November 2026, PR #108,
+  from the project review of that day: the sample-rate, channel, block and
+  impulse limits are `constexpr` values in `convolver/engine.hpp`, used by
+  the engine, readers, saved state, tools and adapters in place of literals
+  in fifteen files, with the same messages;
+  [resource limits](docs/develop/library.md#resource-limits).
 - [x] **VST3-15 — Test the messages through a host's proxy.** 5 November
   2026, from jrp's review of `276c7dc`: `vst3.adapter` connects the
   components through a forwarding proxy and a deferring one

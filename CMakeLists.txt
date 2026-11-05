@@ -1,5 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 cmake_minimum_required(VERSION 3.20)
+# PLUG-15: every Mac build targets the macOS the packages are built for, unless
+# the command line or MACOSX_DEPLOYMENT_TARGET says otherwise. CMake reads it
+# before the first project() (its CMAKE_OSX_DEPLOYMENT_TARGET documentation).
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND
+   NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Oldest macOS the binaries run on")
+endif()
 include(cmake/ConvolverVersion.cmake)
 project(Convolver VERSION ${CONVOLVER_VERSION} LANGUAGES CXX)
 
@@ -185,16 +192,6 @@ if(CONVOLVER_BUILD_NATIVE)
         set_source_files_properties(portable/kernels.cpp PROPERTIES COMPILE_OPTIONS "${contract_options}")
         set_source_files_properties(portable/kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "${avx2_options}")
     endif()
-    # Experimental only: compare vDSP arithmetic with the existing split kernels.
-    option(CONVOLVER_EXPERIMENT_VDSP_MAC "Benchmark vDSP complex accumulation (Apple only)" OFF)
-    if(CONVOLVER_EXPERIMENT_VDSP_MAC)
-        if(NOT APPLE)
-            message(FATAL_ERROR "The vDSP MAC experiment requires Apple Accelerate.")
-        endif()
-        target_sources(convolver_core PRIVATE portable/kernels_vdsp.cpp)
-        target_compile_definitions(convolver_core PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
-        target_link_libraries(convolver_core PRIVATE "-framework Accelerate")
-    endif()
     add_library(convolver_host STATIC portable/host.cpp portable/host_log.cpp portable/host_report.cpp
         portable/recent_files.cpp portable/state.cpp)
     add_library(Convolver::host ALIAS convolver_host)
@@ -288,10 +285,10 @@ if(CONVOLVER_BUILD_NATIVE)
         add_executable(convolver_benchmark tests/native/benchmark.cpp)
         target_include_directories(convolver_benchmark PRIVATE portable)
         target_link_libraries(convolver_benchmark PRIVATE convolver_core)
-        add_executable(convolver_mac_benchmark tests/native/benchmarks/vdsp_mac.cpp)
-        target_include_directories(convolver_mac_benchmark PRIVATE portable)
-        target_link_libraries(convolver_mac_benchmark PRIVATE convolver_core)
-        list(APPEND native_targets convolver_benchmark convolver_mac_benchmark)
+        add_executable(convolver_kernel_benchmark tests/native/benchmarks/kernels.cpp)
+        target_include_directories(convolver_kernel_benchmark PRIVATE portable)
+        target_link_libraries(convolver_kernel_benchmark PRIVATE convolver_core)
+        list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark)
         if(CONVOLVER_BUILD_IO)
             # Startup, reset, replacement and loading at a host callback size (PERF-5).
             add_executable(convolver_callback_benchmark tests/native/callback_benchmark.cpp)
@@ -322,9 +319,6 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.engine convolver_engine_tests
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
-        if(CONVOLVER_EXPERIMENT_VDSP_MAC)
-            target_compile_definitions(convolver_engine_tests PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
-        endif()
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.host convolver_host_tests

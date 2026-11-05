@@ -34,9 +34,6 @@ if(CONVOLVER_SANITIZERS AND CONVOLVER_VST3_RUNTIME_VALIDATION)
     set(CONVOLVER_VST3_RUNTIME_VALIDATION OFF)
 endif()
 set(SMTG_CREATE_MODULE_INFO ${CONVOLVER_VST3_RUNTIME_VALIDATION} CACHE BOOL "" FORCE)
-if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "macOS deployment target" FORCE)
-endif()
 # SDK 3.8.1 assumes non-Xcode Unix generators are single-configuration.
 # A generator expression prevents CMake appending a second config directory and
 # keeps SDK resource/signing paths aligned with the actual bundle for Ninja Multi-Config.

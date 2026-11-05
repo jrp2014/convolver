@@ -34,9 +34,10 @@
 namespace convolver {
 namespace {
 void validate(AudioInfo info) {
-    if (info.sample_rate <= 0 || info.sample_rate > 768000 || info.channels == 0 ||
-        info.channels > 256)
-        throw std::invalid_argument("audio rate must be 1..768000 Hz and channels 1..256");
+    if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
+        info.channels > max_channel_count)
+        throw std::invalid_argument("audio rate must be 1.." + std::to_string(max_sample_rate) +
+                                    " Hz and channels 1.." + std::to_string(max_channel_count));
 }
 std::runtime_error error(const std::string& action, SNDFILE* file) {
     return std::runtime_error(action + ": " + sf_strerror(file));
@@ -372,8 +373,9 @@ std::vector<double> shaping_coefficients(NoiseShaping shaping) {
 } // namespace
 Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions options)
     : channels_(channels), bits_(bits), options_(options), state_(options.seed) {
-    if (channels == 0 || channels > 256)
-        throw std::invalid_argument("quantizer channels must be 1..256");
+    if (channels == 0 || channels > max_channel_count)
+        throw std::invalid_argument("quantizer channels must be 1.." +
+                                    std::to_string(max_channel_count));
     if (bits < 8 || bits > 32)
         throw std::invalid_argument("quantizer bits must be 8..32");
     switch (options.dither) {

@@ -223,14 +223,14 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
     if (flags & 1) {
         Configuration c;
         auto rate = r.word();
-        if (rate > 768000)
+        if (rate > static_cast<std::uint32_t>(max_sample_rate))
             throw std::invalid_argument("invalid sample rate");
         c.sample_rate = static_cast<int>(rate);
         c.input_channels = r.word();
         c.output_channels = r.word();
         c.channel_mask = r.word();
         for (auto* delays : {&c.input_delays, &c.output_delays}) {
-            auto n = r.count(256);
+            auto n = r.count(max_channel_count);
             delays->reserve(n);
             while (n--)
                 delays->push_back(r.word());

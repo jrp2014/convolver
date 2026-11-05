@@ -12,7 +12,6 @@
 namespace convolver {
 namespace {
 // Bound both dimensions and total prepared storage before any large allocation.
-constexpr std::size_t max_channels = 256, max_block = 1U << 20, max_samples = 1U << 26;
 constexpr std::size_t max_paths = 4096, max_routes = 4096, max_storage = 1U << 28;
 std::size_t checked_add(std::size_t a, std::size_t b) {
     if (b > std::numeric_limits<std::size_t>::max() - a)
@@ -45,13 +44,16 @@ std::size_t delay_at(const std::vector<std::size_t>& delays, std::size_t channel
 // Shared by validation, tail queries, analysis and Engine construction so the
 // accounting formulas exist once. No FFT planning or spectral allocation here.
 ConfigurationAnalysis validate(const Configuration& c, std::size_t b) {
-    if (!b || b > max_block)
-        throw std::invalid_argument("block frames must be between 1 and 1048576");
-    if (c.sample_rate <= 0 || c.sample_rate > 768000)
-        throw std::invalid_argument("sample rate must be between 1 and 768000");
-    if (!c.input_channels || !c.output_channels || c.input_channels > max_channels ||
-        c.output_channels > max_channels)
-        throw std::invalid_argument("channel count must be between 1 and 256");
+    if (!b || b > max_block_frames)
+        throw std::invalid_argument("block frames must be between 1 and " +
+                                    std::to_string(max_block_frames));
+    if (c.sample_rate <= 0 || c.sample_rate > max_sample_rate)
+        throw std::invalid_argument("sample rate must be between 1 and " +
+                                    std::to_string(max_sample_rate));
+    if (!c.input_channels || !c.output_channels || c.input_channels > max_channel_count ||
+        c.output_channels > max_channel_count)
+        throw std::invalid_argument("channel count must be between 1 and " +
+                                    std::to_string(max_channel_count));
     if ((!c.input_delays.empty() && c.input_delays.size() != c.input_channels) ||
         (!c.output_delays.empty() && c.output_delays.size() != c.output_channels))
         throw std::invalid_argument("delay count must match channel count");
@@ -70,8 +72,9 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t b) {
         const auto d = channel < c.input_channels
                            ? delay_at(c.input_delays, channel)
                            : delay_at(c.output_delays, channel - c.input_channels);
-        if (d > max_samples)
-            throw std::length_error("delay exceeds 67108864 frames");
+        if (d > max_engine_delay_frames)
+            throw std::length_error("delay exceeds " + std::to_string(max_engine_delay_frames) +
+                                    " frames");
         account(d + 1);
     }
     ConfigurationAnalysis result;
@@ -79,8 +82,9 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t b) {
     result.fft_frames = n;
     result.partitions_per_path.reserve(c.paths.size());
     for (const auto& p : c.paths) {
-        if (p.impulse.empty() || p.impulse.size() > max_samples)
-            throw std::invalid_argument("impulse length must be between 1 and 67108864");
+        if (p.impulse.empty() || p.impulse.size() > max_impulse_frames)
+            throw std::invalid_argument("impulse length must be between 1 and " +
+                                        std::to_string(max_impulse_frames));
         if (!std::all_of(p.impulse.begin(), p.impulse.end(),
                          [](float v) { return std::isfinite(v); }))
             throw std::invalid_argument("impulse contains nonfinite samples");
@@ -261,8 +265,9 @@ void tune_fft(std::size_t b, FftPlanning planning) {
     tune_fft(b, FftOptions{planning, false, 0});
 }
 void tune_fft(std::size_t b, FftOptions options) {
-    if (b == 0 || b > (1u << 20))
-        throw std::invalid_argument("FFT block size must be between 1 and 1048576");
+    if (b == 0 || b > max_block_frames)
+        throw std::invalid_argument("FFT block size must be between 1 and " +
+                                    std::to_string(max_block_frames));
     if (options.planning == FftPlanning::estimate || options.wisdom_only)
         throw std::invalid_argument(
             "FFT tuning requires measure, patient or exhaustive planning, without wisdom-only");

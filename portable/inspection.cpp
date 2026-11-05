@@ -475,13 +475,14 @@ class Inspector {
 
 InspectionReport inspect_configuration(const std::filesystem::path& path,
                                        const InspectionOptions& options) {
-    if (options.expected_rate < 0 || options.expected_rate > 768000 ||
-        options.expected_inputs > 256 || options.expected_outputs > 256)
+    if (options.expected_rate < 0 || options.expected_rate > max_sample_rate ||
+        options.expected_inputs > max_channel_count || options.expected_outputs > max_channel_count)
         throw std::invalid_argument("expected audio properties out of range");
     if (options.raw_filter_encoding.sample == SampleType::pcm8)
         throw std::invalid_argument("raw filters have no 8-bit sample type");
-    if (!options.block_frames || options.block_frames > (1u << 20))
-        throw std::invalid_argument("block frames must be between 1 and 1048576");
+    if (!options.block_frames || options.block_frames > max_block_frames)
+        throw std::invalid_argument("block frames must be between 1 and " +
+                                    std::to_string(max_block_frames));
     if (options.all_configurations &&
         (options.expected_rate || options.expected_inputs || options.expected_outputs))
         throw std::invalid_argument(

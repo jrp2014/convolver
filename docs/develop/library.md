@@ -138,6 +138,10 @@ samples to 64 Mi (a file named by several paths counts once per path, although
 it is decoded once), and each delay to 16 Mi frames. Invalid dimensions, arithmetic
 overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected by
 the CLI's output check; library callers choose their own output policy.
+`convolver/engine.hpp` names the shared ones (`max_sample_rate`,
+`max_channel_count`, `max_block_frames`, `max_impulse_frames` and
+`max_engine_delay_frames`), which the readers, the tools and the plug-ins
+check too; saved state checks the sample rate and channel limits.
 
 ### FFT plans and wisdom
 

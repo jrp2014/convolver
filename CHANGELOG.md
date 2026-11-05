@@ -80,6 +80,12 @@ Until 1.0 the C++ API may change between minor versions.
   records each change and its settings name the latency. The default
   leaves the sound unchanged; the oracle tests cover gain and mix at each of
   the seven block sizes.
+- Library (ROBUST-6): `convolver/engine.hpp` names the limits every part of
+  Convolver checks: `max_sample_rate` (768000), `max_channel_count` (256),
+  `max_block_frames` (2^20), `max_impulse_frames` and `max_engine_delay_frames`
+  (2^26). The engine, the sound-file and configuration readers, saved state,
+  the tools and the plug-ins use them in place of their own copies of the
+  numbers; the limits and messages are unchanged.
 
 ### Changed
 
@@ -190,6 +196,28 @@ Until 1.0 the C++ API may change between minor versions.
   case reads what it added from there, rather than switching to a temporary file for that case and
   deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
   tests share the log helper (`tests/plugins/test_log.hpp`).
+- Build (PLUG-15): a new macOS build directory targets macOS 14.0 unless the
+  first configure sets `CMAKE_OSX_DEPLOYMENT_TARGET` or
+  `MACOSX_DEPLOYMENT_TARGET` says otherwise, the same for every target and
+  the preview packages; an existing directory keeps the target in its cache.
+  The VST3 and Audio Unit folders used to force 11.0 for their own targets
+  after `project()`, so a developer's plug-in build targeted another macOS
+  than the packages and the core it links.
+- Build (FFT-4): the Apple vDSP kernel experiment
+  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp` and its two
+  scripts) is removed; its timing program is now `convolver_kernel_benchmark`.
+  It was off by default and its 24 October results kept the existing
+  kernels; no build that ships changes.
+- Plug-in contract (PLUG-16): a replacement filter plays for one Latency
+  block, not always 256 samples, before its 256-sample crossfade, as it has
+  since the Latency setting arrived; the page now says so. In
+  `HostProcessor` the 64-frame ramps and the crossfade are named constants;
+  the sound is unchanged.
+- Continuous integration (CI-29): static analysis runs LLVM's
+  `run-clang-tidy.py`, installed with clang-tidy, in place of
+  `scripts/clang_tidy.py` (removed with its tests and pre-commit hook). The
+  checks and the file list are unchanged; a listed file the build does not
+  compile is now skipped rather than reported.
 
 ### Fixed
 

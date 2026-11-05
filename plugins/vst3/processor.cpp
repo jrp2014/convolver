@@ -211,10 +211,14 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         if (active_)
             why = "the host changed them while the plug-in was active.";
         else if (!std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
-                 setup.sampleRate > 768000 || std::floor(setup.sampleRate) != setup.sampleRate)
-            why = "the sample rate must be a whole number of hertz from 1 to 768000 Hz.";
-        else if (setup.maxSamplesPerBlock < 1 || setup.maxSamplesPerBlock > (1 << 20))
-            why = "the largest block must be 1 to 1048576 samples.";
+                 setup.sampleRate > max_sample_rate ||
+                 std::floor(setup.sampleRate) != setup.sampleRate)
+            why = "the sample rate must be a whole number of hertz from 1 to " +
+                  std::to_string(max_sample_rate) + " Hz.";
+        else if (setup.maxSamplesPerBlock < 1 ||
+                 static_cast<std::size_t>(setup.maxSamplesPerBlock) > max_block_frames)
+            why =
+                "the largest block must be 1 to " + std::to_string(max_block_frames) + " samples.";
         else if (canProcessSampleSize(setup.symbolicSampleSize) != kResultOk)
             why = "samples must be 32-bit or 64-bit floating point.";
         if (!why.empty()) {

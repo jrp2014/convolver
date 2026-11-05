@@ -376,9 +376,12 @@ and non-uniform partitioning remain open as **PERF-2** in
 [TODO](../../TODO.md#fft-libraries-and-performance).
 
 The [24 October M5 Max vDSP experiment](../archive/reviews/2026-10-24-apple-vdsp.md)
-compares these kernels with Accelerate complex multiply-add without changing
+compared these kernels with Accelerate complex multiply-add without changing
 layout. It found no substantial whole-engine gain and exceeded existing
-numerical-divergence limits; the current kernels remain the default.
+numerical-divergence limits, so the current kernels stayed. After 0.8.10 the
+vDSP kernels and their scripts were removed (FFT-4); the timing program stays
+as `convolver_kernel_benchmark`
+([`kernels.cpp`](../../tests/native/benchmarks/kernels.cpp)).
 
 ### Shared forward transforms
 

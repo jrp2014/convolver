@@ -258,8 +258,9 @@ int run(int argc, char** argv) {
             } else if (option == "--output-channels") {
                 audio_options = true;
                 output_channels = count(value());
-                if (output_channels > 256)
-                    throw std::invalid_argument("--output-channels must be 1..256");
+                if (output_channels > convolver::max_channel_count)
+                    throw std::invalid_argument("--output-channels must be 1.." +
+                                                std::to_string(convolver::max_channel_count));
             } else if (option == "--block-size")
                 block = count(value());
             else if (option == "--keep-latency") {
@@ -269,7 +270,8 @@ int run(int argc, char** argv) {
                 audio_options = true;
                 const auto rate = count(value());
                 const auto channels = count(value());
-                if (rate > 768000 || channels > 256)
+                if (rate > static_cast<std::size_t>(convolver::max_sample_rate) ||
+                    channels > convolver::max_channel_count)
                     throw std::invalid_argument("RAW metadata exceeds supported limits");
                 raw = convolver::RawSpec{static_cast<int>(rate), channels};
             } else if (option == "--raw-format") {

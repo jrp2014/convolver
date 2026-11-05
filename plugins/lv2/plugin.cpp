@@ -269,7 +269,8 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         return refuse("the host asked for a plug-in this library does not hold.");
     if (!map)
         return refuse("the host does not provide the urid:map feature, which Convolver needs.");
-    if (!std::isfinite(rate) || rate < 1 || rate > 768000 || std::floor(rate) != rate)
+    static_assert(max_sample_rate == 768000, "the message below names the limit");
+    if (!std::isfinite(rate) || rate < 1 || rate > max_sample_rate || std::floor(rate) != rate)
         return refuse("the sample rate must be a whole number of hertz from 1 to 768000 Hz.");
     try {
         auto p = std::make_unique<Instance>();

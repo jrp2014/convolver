@@ -2,6 +2,7 @@
 // Legacy configuration text grammar with physical source locations. This file has
 // no filesystem or audio decoder access; config.cpp resolves references.
 #include "config_parse.hpp"
+#include "convolver/engine.hpp"
 #include <algorithm>
 #include <cctype>
 #include <charconv>
@@ -241,9 +242,9 @@ ParsedDocument parse_configuration_text(std::string_view text,
     for (const auto& t : header)
         cfg.header_tokens.push_back(t.text);
     cfg.header_line = h.number;
-    cfg.sample_rate = static_cast<int>(p.integer(h, header[0], 768000));
-    cfg.input_channels = p.integer(h, header[1], 256);
-    cfg.output_channels = p.integer(h, header[2], 256);
+    cfg.sample_rate = static_cast<int>(p.integer(h, header[0], max_sample_rate));
+    cfg.input_channels = p.integer(h, header[1], max_channel_count);
+    cfg.output_channels = p.integer(h, header[2], max_channel_count);
     cfg.channel_mask = static_cast<std::uint32_t>(p.integer(h, header[3], 0xffffffffu, 16));
     if (!cfg.sample_rate || !cfg.input_channels || !cfg.output_channels)
         p.fail(h.number, h.column, "zero rate or channel count");

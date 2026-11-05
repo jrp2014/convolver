@@ -693,8 +693,9 @@ Configuration load_configuration(const std::filesystem::path& path,
                                  bool options, std::vector<std::filesystem::path>* chosen_paths) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
-    if (selection.sample_rate < 0 || selection.sample_rate > 768000 ||
-        selection.input_channels > 256 || selection.output_channels > 256)
+    if (selection.sample_rate < 0 || selection.sample_rate > max_sample_rate ||
+        selection.input_channels > max_channel_count ||
+        selection.output_channels > max_channel_count)
         throw std::invalid_argument("expected audio properties out of range");
     if (selection.raw_filter_encoding.sample == SampleType::pcm8)
         throw std::invalid_argument("raw filters have no 8-bit sample type");
