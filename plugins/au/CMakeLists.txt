@@ -177,12 +177,13 @@ if(CONVOLVER_BUILD_TESTS)
     add_test(NAME au.lifecycle COMMAND convolver_au_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
     # COST: the longest tests start first under ctest --parallel (CI-9).
     set_tests_properties(au.lifecycle PROPERTIES LABELS "au;real-libraries;plug7" TIMEOUT 600 COST 25)
-    # The loading-responsiveness timings (TODO.md): measurement only.
+    # The loading-responsiveness timings (TODO.md).
     add_test(NAME au.load_timing COMMAND convolver_au_lifecycle --load-timing
         "${PROJECT_BINARY_DIR}/au-load-timing")
-    # Alone, so that other tests do not take its machine (RUN_SERIAL).
+    # Alone, so that other tests do not take its machine (RUN_SERIAL);
+    # skipped, not passed, when an entry did not qualify (PERF-10).
     set_tests_properties(au.load_timing PROPERTIES LABELS "au;real-libraries;timing" TIMEOUT 600
-        RUN_SERIAL TRUE)
+        RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
     list(APPEND au_test_targets convolver_au_lifecycle)
     foreach(target IN ITEMS convolver_au_tests convolver_au_harness convolver_au_lifecycle
             convolver_au_editor_tests)

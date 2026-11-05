@@ -837,8 +837,24 @@ baselines were late, by 3 to 57 ms with callbacks taking under 1 ms, so the
 callback checks there were inconclusive: in practice only Linux CI enforces
 them. On `1290b81` the Windows runner held the host's thread for about
 265 ms with the 30 s filter (a clean baseline, then late callbacks during
-the load), so an entry over the limits now runs up to three times and the
-last run counts.
+the load), so an entry that does not pass now runs up to three times.
+
+jrp's review of `59ac8e0` (0.10.0) found that a late baseline made every
+violation inconclusive, the hold included, and that inconclusive counted
+as a pass: a mock adapter taking over 400 ms a load passed. PERF-10 judges
+the hold whatever the audio thread saw, reports a run whose callbacks
+cannot be judged as not qualified (CTest: skipped) rather than passed, and
+keeps every failed run in the summary; so a test that passes on a CI runner
+is a qualifying measurement, and one skipped there needs a quieter machine.
+The same review found the input was not the intended quiet noise (PERF-11).
+Measured again with the corrected input (same cloud VM and build, 5
+November 2026), the figures above hold: VST3 `setState` 4 to 6 ms with
+1 s, 47 to 60 ms with 10 s, 238 to 254 ms with 30 s (one run of three over
+250 ms, the next under) and 644 to 700 ms with 120 s; the window's file
+4 to 7, 34 to 38, 227 to 234 and 546 to 556 ms; LV2's worker 3 to 4, 37 to
+47 and 203 to 229 ms, its `restore()` holding back `run()` for 4, 39 and
+256 to 264 ms. No VST3 callback was late. Loading time does not depend on
+the input, which only the callbacks play.
 
 ### Keeping `host.cpp` manageable
 
@@ -1257,6 +1273,33 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   caller was held and how late callbacks were, failing above jrp's limits
   in optimised builds ([loading responsiveness](#loading-responsiveness));
   [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-10 — The load-timing gate cannot pass unqualified.** 5 November
+  2026, from jrp's review of `59ac8e0` (0.10.0): each run of an entry is
+  passed, failed or not qualified; the host thread's hold is judged whatever
+  the audio thread saw; a run is not qualified only when callbacks broke the
+  limits with a late baseline (half a second before the phases and another
+  after them), or the build does not enforce them; the test exits 77
+  (CTest: skipped) rather than 0 when an entry did not qualify; an entry no
+  limit applies to is reported only, not passed; the summary keeps every
+  run that did not pass and counts passes after a run that did not; an
+  entry passes only if one run met both limits (jrp's review of `cc2ebde`:
+  limits met in different runs are not qualified, or failed when every run
+  broke one), and the summary names the run that met each limit for an
+  entry that did not pass; a test where nothing was judged (every entry
+  reported only) is skipped, not passed. `native.load_timing_harness` checks the verdict
+  rules on made-up runs, and drives the harness with a mock adapter: slow
+  loads fail, with late callbacks too (the review's reproduction); a load
+  slow on the first run only meets the hold limit later, with that run kept;
+  late callbacks with a late baseline do not qualify; a load no limit
+  applies to is reported only; a refused load fails;
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-11 — Quiet noise as the load-timing input.** 5 November 2026,
+  from jrp's review of `59ac8e0` (0.10.0): the input generator subtracted
+  in unsigned arithmetic, so the negative half became about 1.8e15 (measured
+  range 0.0002 to 1.84e15). It now subtracts in signed arithmetic, and
+  `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
+  signs occur; it failed with the old generator. The loading timings were
+  measured again with it ([loading responsiveness](#loading-responsiveness)).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

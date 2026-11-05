@@ -11,8 +11,9 @@
 // held (the host's thread for state and window loads, the worker for LV2's
 // worker), and the audio callbacks meanwhile: how many there were, the
 // longest, and how many finished after their deadline (the start of the
-// next period) and by how much. A baseline with nothing loading comes first,
-// so scheduling noise on the machine is visible.
+// next period) and by how much. Half a second with nothing loading comes
+// before the phases and another after them (the baselines), so scheduling
+// noise on the machine is visible.
 //
 // The limits (jrp, 5 November 2026), enforced only in an optimised build
 // without sanitizers, where timings mean something:
@@ -20,13 +21,23 @@
 //   load, a replacement or a reset runs on another thread (not where the
 //   host holds back audio: LV2's restore() and its reset);
 // - a load holds the host's thread at most 100 ms with filters up to 10 s,
-//   and 250 ms with 30 s; the 120 s filter is reported only.
-// A phase is inconclusive, not failed, when the baseline before it already
-// had late callbacks: the machine was busy. An entry with a phase over the
-// limits runs again, up to three times, and only the last run counts, as a
-// shared machine can stall one run without a late baseline. In every build the run also
-// fails when a load is refused, a callback reports an error or throws, or
-// the instance does not then save the second filter.
+//   and 250 ms with 30 s; the 120 s filter's hold is reported only.
+// Each run of an entry (one entry point with one filter) is judged
+// (PERF-10, jrp's review of 59ac8e0):
+// - failed: a load was refused, a callback failed or the wrong filter was
+//   saved (in any build, and not run again); the host's thread was held
+//   over the limit, whatever the audio thread saw; or callbacks broke the
+//   limits while both baselines were on time;
+// - not qualified: callbacks broke the limits, but a baseline was late too
+//   (a busy machine), so the run shows nothing either way;
+//   and every run in a build that does not enforce the limits;
+// - reported only: no limit applies to any of its phases;
+// - passed: none of these.
+// An entry that did not pass runs again, up to three times, as a shared
+// machine can stall one run. It passes only if one run passed, meeting both
+// limits (see verdict()), and the summary keeps every run that did not. The test exits 1 if an
+// entry failed, not_qualified_exit (CTest reports it as skipped) if one did not qualify or none was
+// judged, and 0 only when an entry passed and every other passed or was reported only.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -86,22 +97,82 @@ struct Workload {
     std::optional<std::chrono::duration<double>> held_limit; // For the host's thread.
 };
 
+// True in an optimised build without sanitizers, the only build whose
+// timings mean something.
+bool optimised_build();
+
 struct Options {
     std::filesystem::path work_directory; // For the filter files.
     bool long_filters = false;            // Adds the 120 s filter jrp ran in GarageBand.
     // The format's reset stops audio (LV2's deactivate and activate), so its
     // callbacks have no limit.
     bool reset_holds_audio = false;
+    // Judge by the limits; otherwise every run is "not qualified" and only
+    // reports what would exceed them.
+    bool enforce = optimised_build();
+    int attempts = 3; // Runs of an entry, until one passes (when enforced).
 };
+
+// The input the audio thread plays: noise from -0.1 to 0.1 on every channel,
+// different for each.
+std::vector<float> quiet_noise(std::size_t channel, std::size_t frames);
 
 // The workloads until PERF-3 defines the supported ones: stereo at 48 kHz in
 // 512-frame callbacks, filters of 1, 10 and 30 seconds (and 120 with
 // long_filters).
 std::vector<Workload> workloads(const Options&);
 
+// PERF-10: what one run of an entry with one workload showed. "Not qualified"
+// is not a pass: the run could not show that the limits hold.
+// "Reported only": no limit applies to any of the run's phases (LV2's
+// restore(), for which the host stops audio; the worker's own time), so it
+// neither passes nor fails.
+enum class Verdict { passed, failed, not_qualified, reported_only };
+const char* describe(Verdict);
+struct Run {
+    std::string workload, entry;
+    int attempt = 1;
+    Verdict verdict = Verdict::passed; // combine(hold, callbacks), or failed on an error.
+    std::string why;                   // What was over the limits, or could not be judged.
+    // Each limit on its own: the hold of the host's thread, and the callbacks.
+    Verdict hold = Verdict::reported_only, callbacks = Verdict::reported_only;
+    bool error = false; // A refused load, a failed callback or the wrong filter saved.
+};
+// A run's verdict from its two limits: failed if either failed, else not
+// qualified if either was, else reported only if neither applied, else passed.
+Verdict combine(Verdict hold, Verdict callbacks);
+struct Result {
+    std::size_t errors = 0; // Refused loads, failed callbacks, a wrong filter saved.
+    std::vector<Run> runs;  // Every run, those repeated included, in order.
+    // Entries (one workload, one entry point) by their verdict().
+    std::size_t passed = 0, failed = 0, not_qualified = 0, reported_only = 0;
+    std::size_t passed_after_failure = 0; // Of `passed`: an earlier run did not pass.
+};
+// An entry's verdict from its runs (jrp, review of cc2ebde: one complete
+// qualifying run): failed if a run had an error; passed if one run passed;
+// failed if a limit was broken with evidence in one run and met in none, or
+// if every run broke a limit; reported only if no limit applied to any run;
+// otherwise not qualified. So a run whose hold stalled, followed by one
+// within the hold whose callbacks could not be judged, is not qualified,
+// although each limit was met in some run.
+Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
+// The attempt that first met `limit` (&Run::hold or &Run::callbacks) among
+// an entry's runs, or 0 if none did: the summary gives it for an entry that
+// did not pass.
+int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,
+           Verdict Run::* limit);
+
 // Runs every entry point on every workload with `driver` (the format's
-// lifecycle driver), prints one line per phase, and returns the number of
-// errors: refused loads, failed callbacks and a wrong filter saved
-// afterwards, and, in an optimised build, phases over the limits.
-std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, const Options&);
+// lifecycle driver), prints one line per phase and a summary that keeps every
+// run that did not pass.
+Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
+           const std::vector<Workload>& workloads, const Options&);
+
+// CTest's SKIP_RETURN_CODE for the timing tests: nothing failed, but not
+// every entry qualified, so the test is reported as skipped, not passed.
+constexpr int not_qualified_exit = 77;
+// 1 if there were errors or an entry failed; not_qualified_exit if an entry
+// did not qualify, or none passed (every one reported only, or none ran);
+// otherwise 0.
+int exit_code(const Result&);
 } // namespace convolver::plugin_test::load_timing
