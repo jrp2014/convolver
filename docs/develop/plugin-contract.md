@@ -89,6 +89,13 @@ before they set the sample rate and channel layout (VST3 `setState` before
   as the saved state, so opening a project at the wrong sample rate and then
   correcting the rate brings the filter back, and saving the project does not
   lose it.
+- VST3 keeps a host rate that is not a whole number of hertz exactly
+  (`HostLayout::fractional_rate`, set by `set_host_rate()`; VST3-9). No
+  filter suits it, so activation plays silence and records a sample-rate
+  failure naming both rates (`host_rate_text()`), keeping the filter for
+  when the host returns to its rate; a file chosen meanwhile is refused the
+  same way. Only a rate within 1e-12 of whole hertz, relative to the rate,
+  counts as whole: rounding, not a different rate.
 - LV2 knows the sample rate at instantiation and its ports are fixed, so its
   configuration is always known and both kinds of check run in `restore()`.
 - VST3 counts its configuration as known once the plug-in has been activated
@@ -274,7 +281,8 @@ format.
   [user guide](../use/plugins.md#status-and-the-convolver-log); tests point
   `CONVOLVER_LOG` into the build folder. Host requests the plug-in refuses
   are logged with the reason, as the host only gets an error code: VST3's
-  `setupProcessing` (rate, block size, sample size) and `setBusArrangements`
+  `setupProcessing` (a rate that is not finite or outside 1 to 768000 Hz,
+  block size, sample size) and `setBusArrangements`
   (only an instance's first refused layout, as hosts probe one after another),
   and LV2's `instantiate` (through the host's `log:log`, on standard error
   without it). A failed save (`getState`, `SaveState`, LV2 `save` when the

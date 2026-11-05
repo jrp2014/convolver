@@ -8,6 +8,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <stdexcept>
@@ -210,11 +211,12 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         std::string why;
         if (active_)
             why = "the host changed them while the plug-in was active.";
+        // VST3-9: a rate that is not a whole number of hertz (a pull-down
+        // rate) is accepted; no filter suits it, so the plug-in plays
+        // silence and says why, keeping its filter for a matching rate.
         else if (!std::isfinite(setup.sampleRate) || setup.sampleRate < 1 ||
-                 setup.sampleRate > max_sample_rate ||
-                 std::floor(setup.sampleRate) != setup.sampleRate)
-            why = "the sample rate must be a whole number of hertz from 1 to " +
-                  std::to_string(max_sample_rate) + " Hz.";
+                 setup.sampleRate > max_sample_rate)
+            why = "the sample rate must be from 1 to " + std::to_string(max_sample_rate) + " Hz.";
         else if (setup.maxSamplesPerBlock < 1 ||
                  static_cast<std::size_t>(setup.maxSamplesPerBlock) > max_block_frames)
             why =
@@ -223,9 +225,12 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
             why = "samples must be 32-bit or 64-bit floating point.";
         if (!why.empty()) {
             try {
-                char rate[32];
-                std::snprintf(rate, sizeof rate, "%.6g", setup.sampleRate);
-                log(std::string("Refused the host's processing settings (") + rate +
+                // Every digit the rate needs (VST3-9): 768000.4 Hz is not 768000 Hz.
+                std::array<char, 32> rate{};
+                const auto [end, error] =
+                    std::to_chars(rate.data(), rate.data() + rate.size(), setup.sampleRate);
+                log(std::string("Refused the host's processing settings (") +
+                    std::string(rate.data(), error == std::errc() ? end : rate.data()) +
                     " Hz, blocks of up to " + std::to_string(setup.maxSamplesPerBlock) +
                     " samples): " + why +
                     " The host may report the plug-in as unusable, or offer other settings.");
@@ -241,9 +246,10 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
     return result;
 }
 HostLayout Processor::layout() const {
-    return {static_cast<int>(processSetup.sampleRate), static_cast<std::size_t>(inputs_),
-            static_cast<std::size_t>(outputs_), wav_speakers(input_arrangement_),
-            wav_speakers(output_arrangement_)};
+    HostLayout host{0, static_cast<std::size_t>(inputs_), static_cast<std::size_t>(outputs_),
+                    wav_speakers(input_arrangement_), wav_speakers(output_arrangement_)};
+    set_host_rate(host, processSetup.sampleRate); // VST3-9: kept exactly, never truncated.
+    return host;
 }
 // The host's configuration is known once the plug-in has been activated with
 // it, and stays known while the rate and buses are unchanged. setupProcessing
@@ -253,8 +259,8 @@ HostLayout Processor::layout() const {
 // adapter contract's "state that arrives before the host is configured").
 std::optional<HostLayout> Processor::known_layout() const {
     const auto now = layout();
-    if (!activated_ || activated_->sample_rate != now.sample_rate ||
-        activated_->inputs != now.inputs || activated_->outputs != now.outputs)
+    if (!activated_ || !same_rate(*activated_, now) || activated_->inputs != now.inputs ||
+        activated_->outputs != now.outputs)
         return std::nullopt;
     return now;
 }

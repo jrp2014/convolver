@@ -469,6 +469,15 @@ if(CONVOLVER_BUILD_TESTS)
         add_test(NAME native.compare_cli COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/compare_cli_tests.py" "$<TARGET_FILE:convolver_cli>")
         set_tests_properties(native.compare_cli PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        # FFMPEG-1: the guide's FFmpeg pipe, where FFmpeg is installed.
+        find_program(CONVOLVER_FFMPEG ffmpeg)
+        find_program(CONVOLVER_FFPROBE ffprobe)
+        if(CONVOLVER_FFMPEG AND CONVOLVER_FFPROBE)
+            add_test(NAME native.ffmpeg_pipe COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/native/ffmpeg_pipe_tests.py" "$<TARGET_FILE:convolver_cli>"
+                "${CONVOLVER_FFMPEG}" "${CONVOLVER_FFPROBE}")
+            set_tests_properties(native.ffmpeg_pipe PROPERTIES LABELS "native;real-libraries;cli" TIMEOUT 120)
+        endif()
         # PLUG-3: presets for every format, read back by independent decoders.
         add_test(NAME plugins.presets COMMAND "${CMAKE_COMMAND}" -E env "PYTHONDONTWRITEBYTECODE=1"
             "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/plugins/preset_tests.py"

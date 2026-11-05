@@ -9,9 +9,11 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
+#include "host_report.hpp"
 #include "sound_files.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -65,6 +67,77 @@ void run(const fs::path& dir) {
             "channel counts: " + channels);
     const auto rate = refused(dir / "fast.wav", stereo, HostFailureKind::sample_rate);
     require(has(rate, "the filter is for 48000 Hz, the host runs at 44100 Hz."), "rate: " + rate);
+
+    // VST3-9: a host rate that is not whole hertz is kept exactly, and no
+    // filter suits it, not even one for its whole part.
+    HostLayout pulled{0, 2, 2};
+    set_host_rate(pulled, 48000 / 1.001);
+    require(pulled.sample_rate == 47952 && pulled.fractional_rate == 48000 / 1.001 &&
+                host_rate_text(pulled) == "47952.04795 Hz",
+            "a fractional rate not kept exactly");
+    HostLayout rounded{0, 2, 2};
+    set_host_rate(rounded, std::nextafter(48000.0, 49000.0));
+    require(rounded.sample_rate == 48000 && rounded.fractional_rate == 0 &&
+                host_rate_text(rounded) == "48000 Hz" && !same_rate(rounded, pulled),
+            "floating-point rounding of 48000 Hz not taken as 48000 Hz");
+    HostLayout nearby{0, 2, 2};
+    set_host_rate(nearby, 48000.001);
+    require(nearby.sample_rate == 48000 && nearby.fractional_rate == 48000.001 &&
+                !same_rate(nearby, rounded),
+            "48000.001 Hz taken as 48000 Hz");
+    // Closer than ten digits show, but not rounding: never shown as 48000 Hz.
+    HostLayout closest{0, 2, 2};
+    set_host_rate(closest, 48000.000001);
+    require(closest.fractional_rate != 0 && host_rate_text(closest) == "48000.000001 Hz",
+            "a rate just above 48000 Hz shown as 48000 Hz: " + host_rate_text(closest));
+    // The window's Sample rate fact shows the exact rate.
+    {
+        HostFilter empty;
+        HostReportFacts facts;
+        facts.host = pulled;
+        const auto report = host_report(empty, facts);
+        require(std::any_of(report.audio.begin(), report.audio.end(),
+                            [](const HostFact& f) {
+                                return f.label == "Sample rate" && f.value == "47952.04795 Hz";
+                            }),
+                "the report's Sample rate fact is not the exact rate");
+    }
+    {
+        FilterFileFailure why;
+        require(!read_filter_file((dir / "fast.wav").string(), pulled, detail::libsndfile_files(),
+                                  why) &&
+                    why.kind == HostFailureKind::sample_rate &&
+                    has(why.message.problem,
+                        "the filter is for 48000 Hz, and the host runs at 47952.04795 Hz") &&
+                    why.message.fix == "Set the host's project or audio device to 48000 Hz.",
+                "a file at a fractional rate not refused with both rates");
+        // A filter for the rate's whole part is refused when the file is
+        // read, so it cannot slip in before the host is known (when a load
+        // is not checked against the host).
+        impulse(dir / "whole part.wav", 47952, 2);
+        require(!read_filter_file((dir / "whole part.wav").string(), pulled,
+                                  detail::libsndfile_files(), why) &&
+                    why.kind == HostFailureKind::sample_rate && why.filter() &&
+                    why.filter()->sample_rate == 47952 &&
+                    has(why.message.problem,
+                        "the filter is for 47952 Hz, and the host runs at 47952.04795 Hz"),
+                "a filter for the whole part accepted at a fractional rate");
+        HostFilter filter;
+        filter.reject(why.kind, why.message, {HostFilterSource::file, "whole part.wav", 0},
+                      why.filter());
+        const auto line = host_status(filter, pulled).text;
+        std::cout << "whole part.wav: " << line << '\n';
+        require(has(line, "the filter is for 47952 Hz, the host runs at 47952.04795 Hz."),
+                "status: " + line);
+        // Its channels do not fit either: still a rate refusal, as no
+        // filter fits the rate.
+        impulse(dir / "whole part mono.wav", 47952, 1);
+        require(!read_filter_file((dir / "whole part mono.wav").string(), pulled,
+                                  detail::libsndfile_files(), why) &&
+                    why.kind == HostFailureKind::sample_rate &&
+                    why.message.fix == "Set the host's project or audio device to 47952 Hz.",
+                "a mono filter for the whole part not refused for its rate");
+    }
 
     // The full explanation speaks to someone in a host, not at a command
     // line (jrp's GarageBand run: it said to omit --output-channels).

@@ -140,6 +140,17 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and silent output, a -6 dB level and reversed polarity; finds swapped
   channels different with no simpler cause; refuses another rate or channel
   count; exit codes 0/1/2.
+- `native.ffmpeg_pipe`: the [FFmpeg pipe](../use/command-line.md#with-ffmpeg)
+  as the guide writes it, with its 2-in/6-out change, on a short film made
+  by FFmpeg (test-pattern video, a tone, then the crossover example's input
+  as a second audio track): `-map 0:a:1` chooses the second track; the
+  result has the video copied and six channels at 48 kHz, every frame of
+  the expected output with the filter's tail, and matches it within 1e-6
+  after FLAC's 24 bits; audio that starts 0.5 s into the film starts at
+  time zero afterwards, as the guide warns (FFMPEG-1). The video packets'
+  checksums are unchanged. Registered only when CMake finds `ffmpeg` and
+  `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
+  which fails if the test is missing.
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -1097,6 +1108,16 @@ image, compiler and build type). The candidate workflow keeps its own
 [debugging symbols](releasing.md#debugging-symbols); the fuzz workflow keeps
 its findings.
 
+Advisory checks warn instead of failing, so their jobs pass. When the newest
+pluginval pre-release reports problems (`vst3.pluginval` or the acceptance
+test) or the LV2 tests fail against the newest upstream lilv, the same
+collector runs with `--advisory` and the job keeps an artifact named
+`advisory-evidence-<job>-…-attempt-<n>` for 14 days (the VST3 jobs keep a
+folder for each pluginval run that reported problems; CI-8, from jrp's
+review of 0.5.2). The job summary lists the
+tests under "Advisory problem on attempt n". Failed downloads and builds in
+those checks leave no test output; their step log is the evidence.
+
 A test's Convolver log should be the file CTest names in the build folder
 (`convolver-*tests.log`), written there from the start and never moved or
 deleted, so a crash, a sanitizer abort or a timeout that kills the test
@@ -1267,7 +1288,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so
