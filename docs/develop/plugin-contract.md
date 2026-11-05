@@ -505,15 +505,16 @@ counts, and a recorded output speaker mask only ever gives a notice.
 The host owns the audio device, clock and scheduling. Each callback supplies
 the next section of one continuous stream; convolution history persists
 between callbacks, and processing produces one output frame per input frame
-after the reported latency (256 samples, independent of the callback length).
+after the reported latency (the Latency setting's block, 256 samples by
+default, independent of the callback length).
 
 Filters are prepared outside processing and transferred through a bounded
 single-producer/single-consumer pointer handoff. A filter that arrives before
 any audio has been processed since activation or reset is installed directly.
 A reset (the host stopping and restarting processing) also ends a crossfade in
 progress, so the newer filter plays at once, and a filter published before
-audio resumes is installed directly. Later, a replacement runs for 256 samples
-to fill its latency, then crossfades for 256 samples. It starts with fresh
+audio resumes is installed directly. Later, a replacement runs for one Latency
+block to fill its latency, then crossfades for 256 samples. It starts with fresh
 input history: it cannot reconstruct audio that preceded loading. Old engines
 are retired on the control thread. Pending changes coalesce to the newest; at
 most one transition and one pending replacement are retained, with up to two

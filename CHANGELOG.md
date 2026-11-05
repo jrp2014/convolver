@@ -206,6 +206,11 @@ Until 1.0 the C++ API may change between minor versions.
   (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp`) is removed.
   It was off by default and its 24 October results kept the existing
   kernels; no build that ships changes.
+- Plug-in contract (PLUG-16): a replacement filter plays for one Latency
+  block, not always 256 samples, before its 256-sample crossfade, as it has
+  since the Latency setting arrived; the page now says so. In
+  `HostProcessor` the 64-frame ramps and the crossfade are named constants;
+  the sound is unchanged.
 
 ### Fixed
 

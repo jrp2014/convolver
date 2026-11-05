@@ -1127,6 +1127,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in place of the VST3 and Audio Unit folders forcing 11.0 after it, so
   every Mac build targets what the packages do;
   [build options](docs/develop/build.md#build-options).
+- [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
+  from the project review of that day: `HostProcessor`'s 64-frame setting,
+  bypass and mute ramps and its 256-frame crossfade are named constants in
+  `portable/host.cpp`, with the same values, and the plug-in contract says a
+  replacement plays for one Latency block before the crossfade, as it has
+  since PLUG-10; [contract](docs/develop/plugin-contract.md).
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's

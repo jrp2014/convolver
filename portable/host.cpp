@@ -587,6 +587,14 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     return line;
 }
 
+// PLUG-16: the lengths of HostProcessor's transitions, in frames at any
+// sample rate. Gain, mix, bypass and mute ramp linearly over setting_ramp; a
+// replacement, after playing for the Latency block, fades in over crossfade.
+namespace {
+constexpr std::size_t setting_ramp = 64;
+constexpr std::size_t crossfade = 256;
+constexpr float setting_ramp_step = 1.f / setting_ramp;
+} // namespace
 struct HostProcessor::Impl {
     struct Prepared {
         Engine engine;
@@ -624,7 +632,7 @@ struct HostProcessor::Impl {
     std::vector<float> input, wet, old_wet, dry;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     // PLUG-10: the gain and mix the adapter set (audio thread), and the values
-    // playing, which ramp to them over 64 frames.
+    // playing, which ramp to them over setting_ramp frames.
     double set_db = 0;
     std::size_t gain_ramp = 0, mix_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
@@ -666,18 +674,17 @@ struct HostProcessor::Impl {
     float target_mix() const noexcept {
         return inputs == outputs ? mix_setting : 1.f;
     }
-    // Audio thread, at the start of a call: a new gain or mix starts a
-    // 64-frame ramp.
+    // Audio thread, at the start of a call: a new gain or mix starts a ramp.
     void retarget() noexcept {
         if (set_gain != gain_target) {
             gain_target = set_gain;
-            gain_step = (gain_target - gain) / 64;
-            gain_ramp = 64;
+            gain_step = (gain_target - gain) / setting_ramp;
+            gain_ramp = setting_ramp;
         }
         if (const auto t = target_mix(); t != mix_target) {
             mix_target = t;
-            mix_step = (t - mix) / 64;
-            mix_ramp = 64;
+            mix_step = (t - mix) / setting_ramp;
+            mix_ramp = setting_ramp;
         }
     }
     ~Impl() {
@@ -828,11 +835,12 @@ struct HostProcessor::Impl {
                     --warm;
                     blend = 0;
                 } else {
-                    fade = std::min<std::size_t>(256, fade + 1);
-                    blend = static_cast<float>(fade) / 256;
+                    fade = std::min(crossfade, fade + 1);
+                    blend = static_cast<float>(fade) / crossfade;
                 }
             }
-            dry_mix = std::clamp(dry_mix + (bypass ? 1.f / 64 : -1.f / 64), 0.f, 1.f);
+            dry_mix =
+                std::clamp(dry_mix + (bypass ? setting_ramp_step : -setting_ramp_step), 0.f, 1.f);
             if (gain_ramp && --gain_ramp)
                 gain += gain_step;
             else
@@ -842,9 +850,9 @@ struct HostProcessor::Impl {
             else
                 mix = mix_target;
             if (muted)
-                level = std::max(0.f, level - 1.f / 64);
+                level = std::max(0.f, level - setting_ramp_step);
             if (previous_muted)
-                previous_level = std::max(0.f, previous_level - 1.f / 64);
+                previous_level = std::max(0.f, previous_level - setting_ramp_step);
             for (std::size_t c = 0; c < outputs; ++c) {
                 // Bypass passes input c to output c when the counts are equal. With
                 // unequal counts it plays silence on every output (owner's decision,
@@ -877,7 +885,7 @@ struct HostProcessor::Impl {
             count(output_overflow);
             reset();
         }
-        if (previous && !warm && fade == 256) {
+        if (previous && !warm && fade == crossfade) {
             retire(previous);
             previous = nullptr;
             previous_level = 1;
