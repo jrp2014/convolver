@@ -172,9 +172,11 @@ detail.
    Linux (VST3-12, VST3-13); the gain modes, computed gains and meters
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run and component in
    the package (AU-3, AU-5); the remaining checks under AU-6 and VST3-11; and
-   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate.
-5. **jrp's decisions:** who the REL-3 tester is, and the wording of the VST
-   trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
+   the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
+   whose timing test now runs (PERF-9) and needs its limits.
+5. **jrp's decisions:** who the REL-3 tester is, the wording of the VST
+   trademark notice (PLUG-5), and the two limits of the loading gate (how
+   long a load may hold the host's thread, and how late a callback may be). The LV2 version mapping (LV2-5) is needed only
    before LV2 joins a preview.
 
 jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set

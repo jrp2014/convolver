@@ -802,6 +802,19 @@ every adapter meets it. If one does not, preparation moves to a worker, with
 the adapter (as LV2 does) owning request order, overtaken requests,
 publication and shutdown.
 
+PERF-9 (done, PR #111) built that test on interim workloads; it measures and
+reports, and fails only on errors. What remains: jrp's two limits, then the
+test fails above them, and the PERF-3 workloads in place of the interim ones.
+First optimised-build figures (Linux cloud VM, 4 cores, clang Release with
+Ooura, 5 November 2026; stereo 48 kHz, 512-frame callbacks): VST3 `setState`
+held the host's thread for 4 ms with a 1 s filter, 43 to 61 ms with 10 s,
+about 235 ms with 30 s and about 600 ms with 120 s, the window's file about
+the same; no callback was late. LV2's worker took the same time off the
+audio thread, with no late callbacks; LV2's `restore()` held back `run()`
+for as long (about 260 ms with 30 s), and its reset (deactivate, activate)
+for about 200 ms, as the specification has the host stop audio for both.
+The Audio Unit's figures come from macOS CI.
+
 ### Keeping `host.cpp` manageable
 
 Guidance, not an item (external review of `91fcf1f`, 0.8.13, 5 November
@@ -1171,6 +1184,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **PERF-6 — Decode each filter file once per load.** 24 October 2026,
   PR #70: same errors and limits;
   [startup, reset and loading](docs/develop/fft-backends.md#startup-reset-and-filter-loading).
+- [x] **PERF-9 — Load timing test.** 5 November 2026, PR #111, from the
+  external review of `91fcf1f` (0.8.13), on jrp's go-ahead: `vst3.load_timing`,
+  `au.load_timing` and `lv2.load_timing` time each format's load entry points
+  while another thread renders at the host's pace, and report how long the
+  caller was held and how late callbacks were. Measurement only until jrp
+  sets the limits ([loading responsiveness](#loading-responsiveness));
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

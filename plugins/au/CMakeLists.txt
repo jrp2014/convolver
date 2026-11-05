@@ -171,11 +171,16 @@ if(CONVOLVER_BUILD_TESTS)
     list(APPEND au_test_targets convolver_au_editor_tests)
     # PLUG-7: lifecycle sequences against the reference model.
     add_executable(convolver_au_lifecycle "${PROJECT_SOURCE_DIR}/tests/au/lifecycle_tests.cpp"
-        "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp" "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
+        "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp" "${PROJECT_SOURCE_DIR}/tests/plugins/load_timing.cpp"
+        "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp")
     target_link_libraries(convolver_au_lifecycle PRIVATE convolver_au_adapter convolver_presets)
     add_test(NAME au.lifecycle COMMAND convolver_au_lifecycle ${CONVOLVER_LIFECYCLE_LENGTH})
     # COST: the longest tests start first under ctest --parallel (CI-9).
     set_tests_properties(au.lifecycle PROPERTIES LABELS "au;real-libraries;plug7" TIMEOUT 600 COST 25)
+    # The loading-responsiveness timings (TODO.md): measurement only.
+    add_test(NAME au.load_timing COMMAND convolver_au_lifecycle --load-timing
+        "${PROJECT_BINARY_DIR}/au-load-timing")
+    set_tests_properties(au.load_timing PROPERTIES LABELS "au;real-libraries;timing" TIMEOUT 600 COST 60)
     list(APPEND au_test_targets convolver_au_lifecycle)
     foreach(target IN ITEMS convolver_au_tests convolver_au_harness convolver_au_lifecycle
             convolver_au_editor_tests)

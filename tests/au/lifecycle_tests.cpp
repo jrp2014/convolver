@@ -6,6 +6,8 @@
 #include "au/au_host.hpp"
 #include "plugins/audio_guard.hpp"
 #include "plugins/lifecycle.hpp"
+#include "plugins/load_timing.hpp"
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -16,6 +18,7 @@ using namespace convolver;
 namespace lc = convolver::plugin_test::lifecycle;
 namespace guard = convolver::plugin_test::audio_guard;
 namespace host = convolver::au_test;
+namespace timing = convolver::plugin_test::load_timing;
 
 namespace {
 class AudioUnitDriver final : public lc::Driver {
@@ -155,14 +158,45 @@ class AudioUnitDriver final : public lc::Driver {
     std::size_t max_block() const override {
         return 512;
     }
+    // The window's Choose Filter: the file's path set on load_property, on
+    // the calling thread. True if the unit accepted the file.
+    bool load_file(const std::string& path) {
+        const auto value = CFStringCreateWithBytes(
+            nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
+            kCFStringEncodingUTF8, false);
+        host::check(value ? noErr : -1, "file path string");
+        const auto status = AudioUnitSetProperty(unit_->get(), au::load_property,
+                                                 kAudioUnitScope_Global, 0, &value, sizeof value);
+        CFRelease(value);
+        return status == noErr;
+    }
 
   private:
     std::unique_ptr<host::Unit> unit_;
 };
+
+// The loading-responsiveness timings (tests/plugins/load_timing.hpp): the
+// host's RestoreState (ClassInfo) and the window's file, each on the
+// host's thread while the unit renders.
+int load_timing(int argc, char** argv) {
+    timing::Options options;
+    options.work_directory = argc > 2 ? argv[2] : "au-load-timing";
+    options.long_filters = argc > 3 && std::strcmp(argv[3], "--long") == 0;
+    AudioUnitDriver driver;
+    const std::vector<timing::Entry> entries{
+        {"RestoreState", [&](const timing::Filter& f,
+                             timing::Audio&) { return timing::Outcome{driver.restore(f.state)}; }},
+        {"load property", [&](const timing::Filter& f, timing::Audio&) {
+             return timing::Outcome{driver.load_file(f.file.string())};
+         }}};
+    return timing::run(driver, entries, options) ? 1 : 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
     try {
+        if (argc > 1 && std::strcmp(argv[1], "--load-timing") == 0)
+            return load_timing(argc, argv);
         lc::Options options;
         if (argc > 1)
             options.length = std::stoul(argv[1]);

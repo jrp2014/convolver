@@ -247,6 +247,7 @@ if(CONVOLVER_BUILD_IO)
             # PLUG-7: lifecycle sequences against the reference model.
             add_executable(convolver_vst3_lifecycle "${PROJECT_SOURCE_DIR}/tests/vst3/lifecycle_tests.cpp"
                 "${PROJECT_SOURCE_DIR}/tests/plugins/lifecycle.cpp"
+                "${PROJECT_SOURCE_DIR}/tests/plugins/load_timing.cpp"
                 "${PROJECT_SOURCE_DIR}/tests/plugins/audio_guard.cpp" ${vst3_adapter_sources}
                 "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
             target_include_directories(convolver_vst3_lifecycle PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -261,6 +262,16 @@ if(CONVOLVER_BUILD_IO)
             # COST: about 100 s on Windows CI, so ctest --parallel starts it first (CI-9).
             set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300
                 COST 100)
+            # The loading-responsiveness timings (TODO.md): measurement only.
+            # The window's file needs a reader, as in convolver_vst3_tests.
+            if(TARGET convolver_io)
+                target_link_libraries(convolver_vst3_lifecycle PRIVATE convolver_io)
+                target_compile_definitions(convolver_vst3_lifecycle PRIVATE CONVOLVER_VST3_TESTS_IO=1)
+            endif()
+            add_test(NAME vst3.load_timing COMMAND convolver_vst3_lifecycle --load-timing
+                "${PROJECT_BINARY_DIR}/vst3-load-timing")
+            set_tests_properties(vst3.load_timing PROPERTIES LABELS "vst3;real-libraries;timing"
+                TIMEOUT 600 COST 60)
             add_dependencies(check convolver_vst3_lifecycle)
         endif()
         add_dependencies(check convolver_vst3_preset)

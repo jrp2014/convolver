@@ -12,6 +12,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
+  time each plug-in format's own load entry points (VST3 `setState` and the
+  window's file, the Audio Unit's `RestoreState` and load property, LV2's
+  `restore()` and worker) with filters of 1 to 30 seconds while another
+  thread renders at the host's pace, and report how long the caller was held
+  and how late audio callbacks were. Measurement only, until jrp sets the
+  limits of the loading-responsiveness gate. Tests only: no change to the
+  plug-ins or the sound.
+
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
   prints the largest difference relative to the expected peak, matches within
