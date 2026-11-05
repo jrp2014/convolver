@@ -149,7 +149,10 @@ is superseded.
   The REAPER smoke test also takes over the host steps that REL-5 left out:
   install, render, save and reopen, and presets that do not fit, in
   [check a stereo filter in a host](docs/use/check-a-stereo-filter.md).
-  Not yet run.
+  In each host, also check that the VST3 Status text follows a change
+  without side effects: the controller asks the host to reread every
+  parameter (`restartComponent(kParamValuesChanged)`, which the SDK meant
+  for program changes) whenever the status changes. Not yet run.
 - [ ] **HOST-2 — Additional formats and UI.** CLAP only on request: every
   CLAP host found also loads VST3. An editor for all formats at once,
   now requested (progress below). Write adapters against the
@@ -279,6 +282,9 @@ Shared work, done once for all three formats:
   Silicon, least for long filters; short filters at small blocks may gain
   more, so measure them on x86-64 first) and the longer loads. Saved with PLUG-10's settings only when Measured; not
   automatable.
+  If FFTW-built plug-ins go ahead, FFTW 3.3.5's
+  `fftwf_make_planner_thread_safe` is FFTW's answer for plug-ins in one
+  process that cannot share a lock (its manual calls it a last resort).
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -493,6 +499,15 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
+- [ ] **AU-12 — Wake the Latency work with a dispatch source.** From the
+  project review of 5 November 2026: `portable/request_worker.hpp`, a thread
+  of our own that only the Audio Unit uses, applies a new Latency. libdispatch
+  has the same coalescing wake-up: a `DISPATCH_SOURCE_TYPE_DATA_OR` source on
+  a serial queue, which `dispatch_source_merge_data` wakes with an atomic OR.
+  Apple documents the merge as atomic but not as safe on an audio thread, so
+  jrp decides whether to try it; if `au.adapter`'s allocation counts and the
+  macOS jobs then pass, the worker, its tests, the watchdog workflow and
+  `scripts/ci_watchdog_probe.py` go, and CI-24 and CI-25 close.
 
 ## FFmpeg integration
 
@@ -577,6 +592,13 @@ means a patched FFmpeg build with `--enable-gpl`.
   with tests for gain, delay, length and reported metadata; retain mismatch errors
   by default. Compare [libsamplerate](https://libsndfile.github.io/libsamplerate/)
   and other suitable implementations before choosing a dependency.
+- [ ] **IO-9 — Shortest float text from the standard library.** From the
+  project review of 5 November 2026: `equalizer_apo.cpp` and
+  `inspection_cli.cpp` search for the shortest text that reads back as the
+  same float with `snprintf` and `strtof`, because macOS before 13.3 lacks
+  floating-point `std::to_chars`. Builds for macOS 14 (PLUG-15) have it.
+  Waits for jrp: using it means Convolver can no longer be built for macOS
+  11 to 13.2 from source.
 - [ ] **GAIN-1 — Define no-clip headroom precisely.** Test the exact full-scale
   endpoints with floating-point rounding, integer quantization, dither and noise
   shaping. The current filter bound assumes input magnitude at most 1 and does
@@ -718,6 +740,22 @@ so the preset file path is not needed).
   across realistic routing and callback sizes, before further substantial
   DSP changes; those results decide whether more complex partitioning is
   justified.
+- [ ] **PERF-7 — One input check on the plug-in audio path.** From the
+  project review of 5 November 2026, after PERF-3: each `HostProcessor`
+  call copies planar host buffers into an interleaved buffer and replaces
+  non-finite input, then `Engine::process` checks the spans for overlap,
+  scans the input again and transposes it through its delay lines, and the
+  output goes back the same way inside a `try` block. A private planar,
+  `noexcept` entry point for `HostProcessor` would drop the second scan, two
+  transposes and the `try`; the public `Engine::process` keeps its checks.
+  The output must stay bit-identical.
+- [ ] **PERF-8 — Split spectra straight from the FFT.** From the project
+  review of 5 November 2026, after PERF-3: the engine stores spectra split
+  (real parts, then imaginary), but the backends hand them over interleaved
+  and the `deinterleave` and `interleave` kernels convert them, although
+  vDSP's real FFT already works in split form and FFTW can read and write
+  split arrays through its guru interface. Measure the saving, and keep
+  within the kernel divergence gates.
 
 ### Loading responsiveness
 
