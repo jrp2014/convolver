@@ -62,6 +62,11 @@ struct TestFailure {
 // does not wait for it. Null in the component; set it only while no unit
 // is loading.
 inline void (*load_started_for_tests)() noexcept = nullptr;
+// For the tests only (AU-13): when 1, 2 or 3, creating the Latency work's
+// semaphore, serial queue or dispatch source fails as if out of memory, so
+// au.adapter can check that the unit then fails to open cleanly. 0 in the
+// component.
+inline int latency_queue_failure_for_tests = 0;
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract

@@ -898,6 +898,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   worker's tests, the watchdog workflow and `scripts/ci_watchdog_probe.py`
   went with it ([archived](docs/archive/reviews/2026-11-05-request-worker.md));
   [Audio Unit settings](docs/develop/plugin-contract.md).
+- [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
+  2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
+  review: AU-12 created the dispatch source before the semaphore, so if the
+  semaphore could not be created an inactive source was released, which
+  `dispatch_activate`'s documentation calls undefined. The semaphore and
+  queue are now created first and the source last, and an activated source
+  is released only after it is cancelled. `au.adapter` makes each creation
+  fail in turn (`latency_queue_failure_for_tests`) and closes units while
+  Latency work is queued or running; it runs on macOS CI only.
 - [x] **AU-11 — Separate file watching from the window.** 5 November 2026,
   from jrp's review of `276c7dc`: following the playing filter's files and
   deciding when a change is due to reload moved from

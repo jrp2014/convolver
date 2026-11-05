@@ -269,6 +269,11 @@ Until 1.0 the C++ API may change between minor versions.
   rates (176.4 kHz, for example). At 48 kHz and 96 kHz the output is
   unchanged sample for sample; elsewhere it differs only by float rounding
   during the 1.33 ms ramp.
+- Audio Unit (AU-13, from the same review): if the Latency work's
+  semaphore could not be created when a unit opened, the unit released a
+  dispatch source that had never been activated, which Apple documents as
+  undefined. The source is now created last, so a failure there leaves
+  nothing to undo, and opening the unit fails cleanly.
 - Tests (CI-30): `native.engine` replaces `operator new` with the array and
   sized `operator delete` too, from one shared file, so GCC's
   AddressSanitizer build runs the oracle tests instead of stopping on
