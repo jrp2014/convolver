@@ -98,11 +98,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
-- The version is now 0.9.0, the milestone step before jrp's host smoke tests
-  (HOST-1) and the first preview, which is now cut from the 0.9 series
-  (jrp, 5 November 2026). CMake consumers request
-  `find_package(Convolver 0.9)`. The LV2 plug-in reports minor version 9,
-  which LV2 reads as a development version; LV2 is not in the first preview.
+- The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
+  library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
+  request `find_package(Convolver 0.10)`, and the first preview is cut from
+  the 0.10 series. The LV2 plug-in reports minor version 10, which LV2
+  accepts as a release.
+- 0.9.0 was the milestone step before jrp's host smoke tests (HOST-1), from
+  which the first preview was first to be cut (jrp, 5 November 2026). Its
+  CMake consumers request `find_package(Convolver 0.9)`, and its LV2 plug-in
+  reports minor version 9, which LV2 reads as a development version.
 - Plug-in contract (PLUG-19, from jrp's simplification review of 5 November
   2026): a setting transition (bypass, mute, gain, mix) may end one frame
   after its ramp's last frame, which is inaudible (about 5.7 µs at
