@@ -400,9 +400,9 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                             note;
                     for (const auto& v : noisy) {
                         unqualified.push_back(std::string(phase) + ": " + v +
-                                              " (the baseline was late too)");
+                                              " (a baseline was late too)");
                         note += (note.empty() ? "" : "; ") + std::string("not judged, ") + v +
-                                " with the baseline late too";
+                                " with a baseline late too";
                     }
                     return note;
                 };
@@ -414,14 +414,22 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                     const auto settle = Seconds(0.3); // Beyond any crossfade.
                     audio.wait_for(settle);
                     audio.take();
-                    audio.wait_for(Seconds(0.25));
+                    // A baseline with nothing loading before the phases and
+                    // another after them: late callbacks in either mean the
+                    // machine was busy, so late callbacks in the phases show
+                    // nothing either way (one short baseline on Windows CI was
+                    // once on time by chance, between two that were not).
+                    const auto baseline = Seconds(0.5);
+                    audio.wait_for(baseline);
                     const auto idle = audio.take();
-                    busy = idle.late != 0;
-                    report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
-                           busy ? "note: the machine was busy, so late callbacks in this run are "
-                                  "not judged"
-                                : "");
                     result.errors += idle.failed;
+                    struct Phase {
+                        const char* name;
+                        std::optional<Seconds> held;
+                        Callbacks seen;
+                        bool ok, audio_held;
+                    };
+                    std::vector<Phase> phases;
                     for (const auto* f : {&x, &y}) {
                         Outcome outcome;
                         Seconds held{0};
@@ -438,17 +446,31 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                         audio.wait_for(settle);
                         const auto seen = audio.take();
                         const bool ok = outcome.accepted && seen.failed == 0;
-                        const char* phase = f == &x ? "first load" : "replacement";
-                        report(format, w, e.name, phase, held, seen, ok,
-                               judge(phase, held, seen, e.audio_waits));
+                        phases.push_back({f == &x ? "first load" : "replacement", held, seen, ok,
+                                          e.audio_waits});
                         result.errors += ok ? 0 : 1;
                     }
                     audio.before_next([&] { driver.reset(); });
                     audio.wait_for(settle);
                     const auto reset = audio.take();
-                    report(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0,
-                           judge("reset", std::nullopt, reset, o.reset_holds_audio));
+                    phases.push_back(
+                        {"reset", std::nullopt, reset, reset.failed == 0, o.reset_holds_audio});
                     result.errors += reset.failed;
+                    audio.wait_for(baseline);
+                    const auto idle_after = audio.take();
+                    result.errors += idle_after.failed;
+                    busy = idle.late != 0 || idle_after.late != 0;
+                    const char* busy_note =
+                        busy ? "note: the machine was busy, so late callbacks in this run are "
+                               "not judged"
+                             : "";
+                    report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
+                           idle.late ? busy_note : "");
+                    for (const auto& ph : phases)
+                        report(format, w, e.name, ph.name, ph.held, ph.seen, ph.ok,
+                               judge(ph.name, ph.held, ph.seen, ph.audio_held));
+                    report(format, w, e.name, "idle after", std::nullopt, idle_after,
+                           idle_after.failed == 0, idle_after.late && !idle.late ? busy_note : "");
                     // The filter that plays is the replacement, as saved.
                     const auto saved = driver.saved();
                     if (!saved.configuration || saved.configuration->paths.at(0).impulse !=

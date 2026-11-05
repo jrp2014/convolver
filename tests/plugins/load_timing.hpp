@@ -11,8 +11,9 @@
 // held (the host's thread for state and window loads, the worker for LV2's
 // worker), and the audio callbacks meanwhile: how many there were, the
 // longest, and how many finished after their deadline (the start of the
-// next period) and by how much. A baseline with nothing loading comes first,
-// so scheduling noise on the machine is visible.
+// next period) and by how much. Half a second with nothing loading comes
+// before the phases and another after them (the baselines), so scheduling
+// noise on the machine is visible.
 //
 // The limits (jrp, 5 November 2026), enforced only in an optimised build
 // without sanitizers, where timings mean something:
@@ -26,9 +27,9 @@
 // - failed: a load was refused, a callback failed or the wrong filter was
 //   saved (in any build, and not run again); the host's thread was held
 //   over the limit, whatever the audio thread saw; or callbacks broke the
-//   limits after an on-time baseline;
-// - not qualified: callbacks broke the limits, but the baseline before them
-//   was already late (a busy machine), so the run shows nothing either way;
+//   limits while both baselines were on time;
+// - not qualified: callbacks broke the limits, but a baseline was late too
+//   (a busy machine), so the run shows nothing either way;
 //   and every run in a build that does not enforce the limits;
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.

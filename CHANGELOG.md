@@ -306,8 +306,9 @@ Until 1.0 the C++ API may change between minor versions.
   passed when they could not judge a run: a late baseline made every
   violation, an over-long load included, "inconclusive", which counted as
   a pass. The hold of the host's thread is now judged whatever the audio
-  thread saw; a run whose late callbacks follow a late baseline, or that ran
-  in a build that does not enforce the limits, is "not qualified", and the
+  thread saw; a run whose late callbacks come with a late baseline (half a
+  second idle before the phases and another after them), or that ran in a
+  build that does not enforce the limits, is "not qualified", and the
   test then exits 77, which CTest reports as skipped, not passed. An entry
   no limit applies to (LV2's `restore()`) is "reported only" rather than
   passed. The summary lists every run that did not pass, also when a later

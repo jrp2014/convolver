@@ -1282,15 +1282,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   2026, from jrp's review of `59ac8e0` (0.10.0): each run of an entry is
   passed, failed or not qualified; the host thread's hold is judged whatever
   the audio thread saw; a run is not qualified only when callbacks broke the
-  limits after a late baseline, or the build does not enforce them; the test
-  exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; an
-  entry no limit applies to is reported only, not passed; the summary keeps
-  every run that did not pass and counts passes after a run that did not;
-  an entry passes only if one run met both limits (jrp's review of
-  `cc2ebde`: limits met in different runs are not qualified, or failed when
-  every run broke one), and the summary names the run that met each limit
-  for an entry that did not pass; a test where nothing was judged (every entry reported only)
-  is skipped, not passed. `native.load_timing_harness` checks the verdict
+  limits with a late baseline (half a second before the phases and another
+  after them), or the build does not enforce them; the test exits 77
+  (CTest: skipped) rather than 0 when an entry did not qualify; an entry no
+  limit applies to is reported only, not passed; the summary keeps every
+  run that did not pass and counts passes after a run that did not; an
+  entry passes only if one run met both limits (jrp's review of `cc2ebde`:
+  limits met in different runs are not qualified, or failed when every run
+  broke one), and the summary names the run that met each limit for an
+  entry that did not pass; a test where nothing was judged (every entry
+  reported only) is skipped, not passed. `native.load_timing_harness` checks the verdict
   rules on made-up runs, and drives the harness with a mock adapter: slow
   loads fail, with late callbacks too (the review's reproduction); a load
   slow on the first run only meets the hold limit later, with that run kept;

@@ -538,8 +538,11 @@ each format's lifecycle driver: a thread calls `process` every 512 frames of
 real time at 48 kHz, as an audio device would, while the test thread loads a
 stereo filter of 1, 10 and 30 seconds into an empty instance, replaces it with
 another as long, and then resets processing from the audio thread. A callback
-is late when it finishes after the next one was due. A baseline with nothing
-loading shows the machine's own scheduling noise.
+is late when it finishes after the next one was due. Half a second with
+nothing loading before the phases and another after them (the baselines)
+show the machine's own scheduling noise; one would not do, since on Windows
+CI on 5 November 2026 a quarter-second baseline was once on time by chance
+on a runner where every other phase had two or three late callbacks.
 
 | Test | Entry points timed |
 | --- | --- |
@@ -566,8 +569,8 @@ Each run of an entry (one entry point with one filter) gets a verdict
 
 | Verdict | When |
 | --- | --- |
-| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits after an on-time baseline |
-| Not qualified | Callbacks broke their limits, but the baseline before them was already late, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
+| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits while both baselines were on time |
+| Not qualified | Callbacks broke their limits, but a baseline was late too, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
 | Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset (the 120 s filter's hold is reported only, but its callbacks are judged, so its entries are not) |
 | Passed | None of these |
 
@@ -582,7 +585,7 @@ late callbacks after an on-time baseline in another); it is reported only
 if no limit applied; and it is otherwise not qualified. So limits met in
 different runs do not add up to a pass: a hold that stalled on the first
 run and stayed within the limit on the next, whose callbacks could not be
-judged after a late baseline, leaves the entry not qualified (the macOS
+judged because a baseline was late, leaves the entry not qualified (the macOS
 VST3 job on 5 November 2026: 281.6 ms on the first run, 25 to 39 ms on the
 next two). A summary at the end lists every entry with every run that did
 not pass, so the failed attempts stay in the evidence; for an entry that
