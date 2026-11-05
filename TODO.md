@@ -1066,8 +1066,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
 - [x] **IO-9 — Shortest float text from the standard library.** 5 November
   2026, PR #109, from the project review of that day, on jrp's "Do io-9":
   the Equalizer APO exporter formats gains with `std::to_chars` instead of
-  trying 1 to 160 decimal places with `snprintf` and `strtof`; the text is
-  the same (compared for 600,000 floats). The inspection report keeps its
+  trying 1 to 160 decimal places with `snprintf` and `strtof`. Compared for
+  every positive finite float with libstdc++ and libc++, the text is the
+  same except for ±2^-96 (about −578 dB), which `to_chars` writes with one
+  digit fewer; both texts read back as the same float. The inspection report keeps its
   9-step `%g` search: `std::to_chars`' general format switches to exponents
   at another point than `%g`, so using it would change that report. The
   exporter now needs macOS 13.3 or later to build;

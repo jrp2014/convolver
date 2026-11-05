@@ -614,7 +614,8 @@ preview packages need macOS 14. CI builds and tests nothing older, so
 everything below is untested. To build for an older macOS:
 
 - Set `-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>` on the first configure of a
-  new build folder (an existing folder keeps its cached target).
+  new build folder: the compiler and library checks made on a folder's
+  first configure are not repeated when the target changes.
 - Use libraries built for that version too. Homebrew's are built for the
   Mac they are installed on, so build libsndfile (and FFTW, if used) with
   the same deployment target; `scripts/release/build_dependencies.py` does
@@ -629,7 +630,8 @@ everything below is untested. To build for an older macOS:
   plug-ins only, without the command-line tools), or restore the
   `snprintf` and `strtof` search that `number()` in
   `portable/equalizer_apo.cpp` used before IO-9 (PR #109), for example
-  behind `__MAC_OS_X_VERSION_MIN_REQUIRED < 130300`. Its output is the same.
+  behind `__MAC_OS_X_VERSION_MIN_REQUIRED < 130300`. Both read back as
+  the same numbers; the text differs only for ±2^-96.
 - **Before macOS 11** nothing has been built: until PLUG-15 the VST3 and
   Audio Unit targets were built for 11.0, so that was the oldest target any
   build used.

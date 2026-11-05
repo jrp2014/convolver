@@ -233,8 +233,9 @@ Until 1.0 the C++ API may change between minor versions.
   pass as before); at 44.1 kHz the ramps are 59 and 235 frames, and at
   96 kHz 128 and 512, so fades no longer get shorter as the rate rises.
 - Command line (IO-9): `convolver-equalizer-apo` formats gains with
-  `std::to_chars` instead of a search with `snprintf` and `strtof`; its
-  output is unchanged. Building it now needs macOS 13.3 or later (the
+  `std::to_chars` instead of a search with `snprintf` and `strtof`. Every
+  gain reads back as the same number; the text is the same for every float
+  but ±2^-96 (about −578 dB), which now takes one digit fewer. Building it now needs macOS 13.3 or later (the
   default target is 14.0); the build guide says what building for an older
   macOS would need.
 
