@@ -174,6 +174,13 @@ Until 1.0 the C++ API may change between minor versions.
   end. CI evidence now includes the window test's log, which was missing,
   and the `.old` file each test log rotates to. `au.log_evidence` checks
   collection after an abort and a kill.
+- Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
+  `vst3.preset`, which runs the same tests, write their Convolver logs to
+  files of their own in the build folder (`convolver-adapter-tests.log`,
+  `convolver-preset-tests.log`), set once at start, and the Status and log
+  case reads what it added from there, rather than switching to a temporary file for that case and
+  deleting it, so a crash in the case keeps its log. The Audio Unit and VST3
+  tests share the log helper (`tests/plugins/test_log.hpp`).
 
 ### Fixed
 

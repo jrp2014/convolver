@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "../plugins/test_log.hpp"
 #include "host_log.hpp"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
@@ -730,28 +731,8 @@ void failure_records() {
     p.setActive(false);
     p.terminate();
 }
-// CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
-// since temporary folders may hold characters outside the ANSI code page.
-std::optional<std::filesystem::path> log_variable() {
-#ifdef _WIN32
-    if (const wchar_t* value = _wgetenv(L"CONVOLVER_LOG"))
-        return std::filesystem::path(value);
-#else
-    if (const char* value = std::getenv("CONVOLVER_LOG"))
-        return std::filesystem::path(value);
-#endif
-    return std::nullopt;
-}
-void set_log_variable(const std::optional<std::filesystem::path>& value) {
-#ifdef _WIN32
-    _wputenv_s(L"CONVOLVER_LOG", value ? value->wstring().c_str() : L""); // Empty removes it.
-#else
-    if (value)
-        setenv("CONVOLVER_LOG", value->c_str(), 1);
-    else
-        unsetenv("CONVOLVER_LOG");
-#endif
-}
+// This process's Convolver log, chosen once in main() (CI-28).
+std::filesystem::path process_log;
 // A file name of this process's own, so that concurrent runs never share it.
 std::filesystem::path private_temp(const char* name) {
     return std::filesystem::temp_directory_path() /
@@ -763,13 +744,10 @@ void status_and_log() {
     const auto contains = [](const std::string& text, const char* part) {
         return text.find(part) != std::string::npos;
     };
-    const auto log_path = private_temp("convolver-vst3-status") += ".log";
-    const auto earlier = log_variable(); // Restored below.
-    set_log_variable(log_path);
-    const auto log_text = [&] {
-        std::ifstream in(log_path, std::ios::binary);
-        return std::string(std::istreambuf_iterator<char>(in), {});
-    };
+    // CI-28: the process's own log (main), read from where it ended, so a
+    // crash here keeps what the case logged.
+    const convolver::test_log::LogSince log(process_log);
+    const auto log_text = [&] { return log.text(); };
     HostApplication context;
     Processor p;
     Controller c;
@@ -1065,8 +1043,6 @@ void status_and_log() {
     c.disconnect(&p);
     p.terminate();
     c.terminate();
-    set_log_variable(earlier);
-    std::filesystem::remove(log_path);
 }
 // VST3-8: the reported tail is measured at the output, as Steinberg's tail
 // test does: the last input sample's last tap arrives at sample tail - 1 after
@@ -1819,16 +1795,8 @@ int wmain(int argc, wchar_t** argv) {
 #else
 int main(int argc, char** argv) {
 #endif
-    // CTest sets CONVOLVER_LOG; run by hand, keep test lines out of the user's log.
-    const auto own_log = private_temp("convolver-vst3-tests") += ".log";
-    if (!log_variable())
-        set_log_variable(own_log);
-    struct Remove {
-        std::filesystem::path path;
-        ~Remove() {
-            std::error_code ignored;
-            std::filesystem::remove(path, ignored);
-        }
-    } remove{own_log};
+    // CI-28: the log CTest names in the build folder, set once before any
+    // instance exists and never removed, so it is evidence after a crash.
+    process_log = convolver::test_log::use_test_log("convolver-adapter-tests.log");
     return run(argc == 2 ? std::filesystem::path(argv[1]) : std::filesystem::path{});
 }

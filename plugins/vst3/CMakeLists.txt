@@ -320,7 +320,19 @@ if(APPLE)
 endif()
 
 # DIAG-1: tests write the Convolver log in the build folder, never the user's.
+# vst3.adapter and vst3.preset run the adapter tests, which read what their
+# log gained and that no other process wrote to it meanwhile, so each has a
+# file of its own (CI-28).
 get_property(convolver_vst3_tests_here DIRECTORY PROPERTY TESTS)
+foreach(test_and_log IN ITEMS "vst3.adapter;adapter" "vst3.preset;preset")
+    list(GET test_and_log 0 own_log_test)
+    list(GET test_and_log 1 own_log_name)
+    if(TEST ${own_log_test})
+        list(REMOVE_ITEM convolver_vst3_tests_here ${own_log_test})
+        set_property(TEST ${own_log_test} APPEND PROPERTY ENVIRONMENT
+            "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-${own_log_name}-tests.log")
+    endif()
+endforeach()
 if(convolver_vst3_tests_here)
     set_property(TEST ${convolver_vst3_tests_here} APPEND PROPERTY ENVIRONMENT
         "CONVOLVER_LOG=${CMAKE_CURRENT_BINARY_DIR}/convolver-tests.log")

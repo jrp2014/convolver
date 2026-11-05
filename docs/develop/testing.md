@@ -1082,10 +1082,9 @@ A test's Convolver log should be the file CTest names in the build folder
 deleted, so a crash, a sanitizer abort or a timeout that kills the test
 leaves it for the collector; a test that copied its log at exit would lose
 it then (CI-27, from jrp's review of `f2dc691`). The Audio Unit adapter and
-window tests work this way, set `CONVOLVER_LOG` only when run by hand
-without it, and read what each case added from an offset
-(`LogSince` in `tests/au/au_host.hpp`). `vst3.adapter`'s Status and log
-case still uses a temporary log of its own (CI-28). `au.log_evidence`
+window tests and `vst3.adapter` work this way (CI-28), set `CONVOLVER_LOG`
+once, only when run by hand without it, and read what each case added from
+an offset (`LogSince` in `tests/plugins/test_log.hpp`). `au.log_evidence`
 checks the adapter test's log after an abort and a kill, and
 `tests/ci_evidence_tests.py` (in pre-commit) what the collector takes.
 
