@@ -1054,8 +1054,8 @@ void shared_filter_files(const fs::path& dir) {
                                         "three.wav\n1\n0\n0\n"
                                         "three.wav\n3\n0\n1\n");
     const auto range = message(dir / "shared-range.cfg");
-    require(range.find("shared-range.cfg:9:1: filter channel 3 out of range (the IR file has 3 "
-                       "channels") != std::string::npos,
+    require(range.find("shared-range.cfg:9:1: filter channel 3 out of range\nCause: The IR file "
+                       "has 3 channels") != std::string::npos,
             "shared file: a later out-of-range channel is located at its path");
 #ifndef _WIN32
     // A named pipe can be read only once, so it shows whether the loader opens
@@ -1406,13 +1406,13 @@ void run(const fs::path& dir) {
         const auto chained = message(dir / "outer.txt");
         require(contains(chained, "broken.cfg:4:1: filter 'missing-ir.wav'") &&
                     contains(chained, "inner.txt:2; included from ") &&
-                    chained.ends_with("outer.txt:2"),
+                    chained.substr(0, chained.find('\n')).ends_with("outer.txt:2"),
                 "nested list failures carry the include chain");
 #ifndef _WIN32
         text_file(dir / "drive.cfg", "48000 1 1 0\n0\n0\nD:\\filters\\irs\\ir ü.wav\n0\n0\n0\n");
         const auto drive = message(dir / "drive.cfg");
         require(contains(drive, "drive.cfg:4:1: Windows drive/rooted paths") &&
-                    contains(drive, "a file exists at 'irs/ir ü.wav'"),
+                    contains(drive, "Fix: A file exists at 'irs/ir ü.wav'"),
                 "nonportable path diagnostics name the line and an existing replacement");
 #endif
         // Overwrite protection sees every visited text file and referenced IR, including

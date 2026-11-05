@@ -2,6 +2,7 @@
 // convolver-preset (PLUG-3): one filter, presets for every plug-in format.
 // Built with CONVOLVER_VST3_PRESET_ALIAS it is convolver-vst3-preset, which
 // keeps its original arguments, messages and output for existing scripts.
+#include "advice.hpp"
 #include "convolver/io.hpp"
 #include "filter_file.hpp"
 #include "presets.hpp"
@@ -17,6 +18,10 @@
 
 namespace {
 namespace fs = std::filesystem;
+using convolver::detail::advice_problem;
+using convolver::detail::advice_text;
+using convolver::detail::cli_error;
+using convolver::detail::parse_advice;
 using convolver::presets::Format;
 
 #ifdef CONVOLVER_VST3_PRESET_ALIAS
@@ -84,7 +89,14 @@ std::vector<std::byte> read_file(const fs::path& path) {
         throw std::runtime_error(utf8(path) + " is too large to be a Convolver preset");
     std::ifstream file(path, std::ios::binary);
     if (!file)
-        throw std::runtime_error("cannot open " + utf8(path));
+        throw std::runtime_error(advice_text(
+            {"cannot open " + utf8(path),
+             fs::exists(path, error) ? "The file is there, but this program may not read it."
+                                     : "There is no file at that path.",
+             fs::exists(path, error) ? "Check the file's permissions."
+                                     : "Check the name and folder (letter case counts on Linux "
+                                       "and on case-sensitive macOS volumes).",
+             {}}));
     std::vector<char> text((std::istreambuf_iterator<char>(file)),
                            std::istreambuf_iterator<char>());
     if (text.size() > limit)
@@ -106,25 +118,33 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             }
             auto format = convolver::presets::format_for(output);
             if (!format)
-                throw std::invalid_argument(
-                    utf8(output) +
-                    ": choose the preset format by the name's ending: .vstpreset (VST3), "
-                    ".aupreset (AU) or .preset.lv2 (an LV2 preset folder)");
+                throw std::invalid_argument(advice_text(
+                    {utf8(output) + ": the preset format is not known from this name",
+                     "convolver-preset chooses the format by the name's ending.",
+                     "End the name with .vstpreset (VST3), .aupreset (AU) or .preset.lv2 (an LV2 "
+                     "preset folder).",
+                     {}}));
             formats.push_back(*format);
         }
         convolver::HostState state;
         if (!alias && convolver::presets::format_for(input) == Format::vst3) {
             if (selected)
-                throw std::invalid_argument(
-                    "a .vstpreset already holds one filter; --sample-rate, --input-channels "
-                    "and --output-channels choose from configuration lists only");
+                throw std::invalid_argument(advice_text(
+                    {"--sample-rate, --input-channels and --output-channels cannot choose from a "
+                     ".vstpreset",
+                     "A .vstpreset already holds one filter; these options choose an entry from "
+                     "a configuration list.",
+                     "Leave out those options, or make the preset from the configuration list.",
+                     {}}));
             try {
                 state = convolver::presets::read_vst3_preset(read_file(input));
             } catch (const std::invalid_argument& e) {
-                throw std::invalid_argument(
-                    utf8(input) + ": " + e.what() +
-                    ". Convert a .vstpreset that a VST3 host saved from Convolver, or make the "
-                    "preset from the filter itself (an IR, .cfg or configuration list)");
+                throw std::invalid_argument(advice_text(
+                    {utf8(input) + ": " + advice_problem(e.what()),
+                     "Only a .vstpreset that holds a Convolver filter can be converted.",
+                     "Convert a .vstpreset that a VST3 host saved from Convolver, or make the "
+                     "preset from the filter itself (an IR, .cfg or configuration list).",
+                     {}}));
             }
         } else {
             std::vector<fs::path> raw_filters;
@@ -160,15 +180,20 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             } catch (const convolver::presets::ChannelLimit& e) {
                 if (alias)
                     throw;
-                throw std::invalid_argument(std::string(e.what()) +
-                                            ". Use the command-line tool, convolver, for "
-                                            "filters with more channels");
+                throw std::invalid_argument(advice_text(
+                    {advice_problem(e.what()),
+                     "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
+                     "Use the command-line tool, convolver, for filters with more channels.",
+                     {}}));
             }
             std::error_code error;
             if (!alias && fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
-                throw std::invalid_argument(utf8(outputs[i]) +
-                                            " already exists; presets are only written to new "
-                                            "paths, so choose another name or remove it first");
+                throw std::invalid_argument(
+                    advice_text({utf8(outputs[i]) + " already exists",
+                                 "convolver-preset writes only to new paths, so it never "
+                                 "replaces a preset.",
+                                 "Choose another name, or remove the old preset first.",
+                                 {}}));
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
@@ -176,8 +201,16 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             } catch (const std::exception& e) {
                 if (alias)
                     throw;
-                throw std::runtime_error(utf8(outputs[i]) + ": " + e.what() +
-                                         ". Check that its folder exists and is writable.");
+                std::error_code error;
+                throw std::runtime_error(advice_text(
+                    {utf8(outputs[i]) + ": " + advice_problem(e.what()),
+                     fs::is_directory(outputs[i].parent_path().empty() ? fs::path(".")
+                                                                       : outputs[i].parent_path(),
+                                      error)
+                         ? "Its folder exists, but this program could not write there."
+                         : "Its folder does not exist.",
+                     "Check that the folder exists and is writable, or choose another place.",
+                     {}}));
             }
             created.push_back(outputs[i]);
         }
@@ -204,9 +237,15 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             std::error_code error;
             fs::remove_all(path, error);
         }
-        std::cerr << program << e.what() << '\n';
-        if (!created.empty())
-            std::cerr << program << "No presets were kept from this run.\n";
+        if (alias) {
+            std::cerr << e.what() << '\n';
+        } else {
+            auto advice = parse_advice(e.what());
+            if (!created.empty())
+                advice.note += std::string(advice.note.empty() ? "" : " ") +
+                               "No presets were kept from this run.";
+            std::cerr << cli_error("convolver-preset", advice_text(advice));
+        }
         return 1;
     }
 }
@@ -237,8 +276,20 @@ template <class Char> int run(int argc, Char** argv) {
                 break;
             const bool known = option == "--sample-rate" || option == "--input-channels" ||
                                option == "--output-channels" || option == "--name";
-            std::cerr << program
-                      << (known ? option + " needs a value" : "Invalid option: " + option) << '\n'
+            std::cerr << cli_error(
+                             "convolver-preset",
+                             known ? advice_text({option + " needs a value",
+                                                  {},
+                                                  "Write the value after it, such as " + option +
+                                                      (option == "--name"          ? " \"Room\""
+                                                       : option == "--sample-rate" ? " 48000"
+                                                                                   : " 2") +
+                                                      ".",
+                                                  {}})
+                                   : advice_text({"invalid option: " + option,
+                                                  {},
+                                                  "Use one of the options listed below.",
+                                                  {}}))
                       << text;
             return 2;
         }
@@ -259,12 +310,28 @@ template <class Char> int run(int argc, Char** argv) {
                 name.clear();
             }
             if (name.empty()) {
-                std::cerr << program << "--name needs a name in Unicode text\n" << text;
+                std::cerr << cli_error("convolver-preset",
+                                       advice_text({"--name needs a name in Unicode text",
+                                                    {},
+                                                    "Write the preset's name after --name.",
+                                                    {}}))
+                          << text;
                 return 2;
             }
             continue;
         } else {
-            std::cerr << program << "Invalid option or value: " << option << '\n' << text;
+            if (alias) {
+                std::cerr << "Invalid option or value: " << option << '\n' << text;
+                return 2;
+            }
+            std::cerr << cli_error(
+                             "convolver-preset",
+                             advice_text({"invalid option or value: " + option + " " + value_text,
+                                          {},
+                                          "Use an option listed below, with a whole number "
+                                          "of at least 1 as its value.",
+                                          {}}))
+                      << text;
             return 2;
         }
         selected = true;

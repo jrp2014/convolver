@@ -80,8 +80,9 @@ inline constexpr std::string_view damaged_file_advice =
     "program that made it";
 // A headerless file or stream whose length is not a whole number of frames.
 inline constexpr const char* raw_incomplete_frame =
-    "RAW input ends with an incomplete frame (its length is not a whole number of frames: check "
-    "the channel count and sample type given for it, or whether it was cut short)";
+    "RAW input ends with an incomplete frame\n"
+    "Cause: Its length is not a whole number of frames.\n"
+    "Fix: Check the channel count and sample type given for it, or whether it was cut short.";
 // Where a sample is, for messages: "at 0.100 s (frame 4800), channel 2".
 // Frames count from 0 and channels from 1.
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate);

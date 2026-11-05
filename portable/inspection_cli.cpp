@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "inspection_cli.hpp"
+#include "advice.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
 #include <array>
@@ -348,12 +349,20 @@ std::string location(const SourcePosition& p) {
         s += ':' + std::to_string(p.line) + (p.column ? ':' + std::to_string(p.column) : "");
     return s + ": ";
 }
+// DIAG-2: the problem line carries the location, code and list chain; the
+// message's Cause, Fix and Note lines follow it, indented (advice.hpp).
 void print_diagnostics(const InspectionReport& r) {
     for (const auto& d : r.diagnostics) {
+        const auto newline = d.message.find('\n');
         std::cerr << "convolver: " << severity(d.severity) << ": " << location(d.location)
-                  << d.message << " [" << d.code << ']';
+                  << d.message.substr(0, newline) << " [" << d.code << ']';
         for (auto it = d.include_chain.rbegin(); it != d.include_chain.rend(); ++it)
             std::cerr << "; included from " << text(it->file) << ':' << it->line;
+        for (auto at = newline; at != std::string::npos;) {
+            const auto next = d.message.find('\n', at + 1);
+            std::cerr << "\n  " << d.message.substr(at + 1, next - at - 1);
+            at = next;
+        }
         std::cerr << '\n';
     }
 }
@@ -641,7 +650,7 @@ int run_inspection(int argc, char** argv) {
         if (path.empty() || path == "-")
             throw Usage("--inspect and --validate need a configuration file path");
     } catch (const Usage& e) {
-        std::cerr << "convolver: " << e.what() << '\n' << usage;
+        std::cerr << detail::cli_error("convolver", e.what()) << usage;
         return 2;
     }
     try {
@@ -658,7 +667,7 @@ int run_inspection(int argc, char** argv) {
             throw std::runtime_error("cannot write report");
         return passes(report, warnings_as_errors) ? 0 : 1;
     } catch (const std::exception& e) {
-        std::cerr << "convolver: " << e.what() << '\n';
+        std::cerr << detail::cli_error("convolver", e.what());
         return 1;
     }
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Parser-only tests: physical locations, original tokens and effective values.
+#include "advice.hpp"
 #include "config_parse.hpp"
 #include <cmath>
 #include <iostream>
@@ -29,6 +30,30 @@ void located(std::string_view text, std::size_t line, std::size_t column, const 
 
 int main() {
     try {
+        {
+            // DIAG-2: the shared message shape: problem, then labelled lines; continuation
+            // lines stay with their part.
+            const Advice advice{"route channel out of range: 2", "The header declares 1 channel.",
+                                "Use channel 0.\n    0\n    0", "Letter case counts."};
+            const auto text = advice_text(advice);
+            require(text == "route channel out of range: 2\nCause: The header declares 1 "
+                            "channel.\nFix: Use channel 0.\n    0\n    0\nNote: Letter case "
+                            "counts.",
+                    "advice text");
+            const auto parsed = parse_advice(text);
+            require(parsed.problem == advice.problem && parsed.cause == advice.cause &&
+                        parsed.fix == advice.fix && parsed.note == advice.note,
+                    "advice round trip");
+            require(advice_problem(text) == advice.problem, "advice problem");
+            require(advice_line(text) == "route channel out of range: 2 Cause: The header "
+                                         "declares 1 channel. Fix: Use channel 0. / 0 / 0 "
+                                         "Note: Letter case counts.",
+                    "advice on one log line");
+            require(cli_error("convolver", "a\nFix: b") == "convolver: error: a\n  Fix: b\n",
+                    "command-line error shape");
+            require(advice_text({"only a problem", {}, {}, {}}) == "only a problem",
+                    "empty parts are left out");
+        }
         const std::string text = "\xef\xbb\xbf// generated\r\n\r\n48000 2 3 3f // header\r\n"
                                  "0.04 1\r\n0 .02 0\r\n\r\n// path\r\n  ir ü.wav  \r\n1\r\n"
                                  "-0 1.25 1\r\n0 -2.5\r\n";
@@ -85,10 +110,13 @@ int main() {
         located("48000 1 1 0 x\n0\n0\nir.wav\n0\n0\n0\n", 1, 1, "header field count");
         located("44100 2 2 0\nD:\\media\\center.pcm\n0\n0.0\n0.0\n", 2, 1,
                 "pre-3.0 configuration without delay lines");
-        require(std::string(rejected("44100 2 2 0\nir.wav\n0\n0\n0\n").what())
-                        .find("pre-3.0 configuration without delay lines: insert a line of 2 "
-                              "zeros") != std::string::npos,
-                "pre-3.0 diagnostic says what to add");
+        {
+            const std::string what = rejected("44100 2 2 0\nir.wav\n0\n0\n0\n").what();
+            require(what.find("\nCause: This looks like a configuration from before Convolver "
+                              "3.0") != std::string::npos &&
+                        what.find("\nFix: Insert a line of 2 zeros") != std::string::npos,
+                    "pre-3.0 diagnostic says what to add");
+        }
         // A malformed delay is reported as one, not as a pre-3.0 file.
         for (const auto* delay : {"0,5", "nan", "x"}) {
             const std::string what =
@@ -98,10 +126,12 @@ int main() {
                     "malformed delays are not called pre-3.0");
         }
         require(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").code() == "syntax", "code");
+        // DIAG-2: the location and problem, then the cause and the fix.
         require(std::string(rejected("48000 1 1 0\n0\n0\nir.wav\n0\n2\n0\n").what()) ==
-                    "invalid configuration: t.cfg:6:1: route channel out of range: 2 (1 "
-                    "channel declared in the header, numbered from 0, so the channel must be 0; "
-                    "a route's integer part is the channel and its fractional part the gain)",
+                    "t.cfg:6:1: route channel out of range: 2\n"
+                    "Cause: The header declares 1 channel, numbered from 0. A route's whole part "
+                    "is the channel and its fraction the gain (1.5 is channel 1 at gain 0.5).\n"
+                    "Fix: Use channel 0, or raise the channel count on the header line.",
                 "message format");
         for (const auto bad : {std::string_view(""), std::string_view("// only\n\n"),
                                std::string_view("48\0", 3), std::string_view("a\x01")})
@@ -112,8 +142,9 @@ int main() {
         chained.included_from({"outer.txt", 4, 1});
         require(chained.include_chain().front().file == "outer.txt" &&
                     std::string(chained.what())
-                        .ends_with("; included from inner.txt:2; included from outer.txt:4"),
-                "include chain is reported innermost first");
+                        .starts_with("t.cfg:6:1: route channel out of range: 2; included from "
+                                     "inner.txt:2; included from outer.txt:4\nCause: "),
+                "include chain is reported innermost first, on the problem line");
         std::cout << "configuration parser tests passed\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

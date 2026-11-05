@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Loader orchestration: list traversal and selection, reference resolution and IR
 // decoding. Text grammar lives in config_parse.cpp.
+#include "advice.hpp"
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include <algorithm>
@@ -20,13 +21,25 @@ void check_ir_channel(std::size_t selected, std::size_t channels, const SourceLo
     if (selected >= channels)
         throw ConfigurationError(
             "ir-channel", where,
-            "filter channel " + std::to_string(selected) + " out of range (the IR file has " +
-                std::to_string(channels) + (channels == 1 ? " channel" : " channels") +
-                ", numbered from 0, so use " +
-                (channels == 1 ? std::string("0") : "0 to " + std::to_string(channels - 1)) + ")");
+            advice_text(
+                {"filter channel " + std::to_string(selected) + " out of range",
+                 "The IR file has " + std::to_string(channels) +
+                     (channels == 1 ? " channel" : " channels") + ", numbered from 0.",
+                 "Use " +
+                     (channels == 1 ? std::string("IR channel 0")
+                                    : "an IR channel from 0 to " + std::to_string(channels - 1)) +
+                     ", or name an IR file with more channels.",
+                 {}}));
 }
 [[noreturn]] void decoded_limit(const SourceLocation& where) {
-    throw ConfigurationError("limit", where, "decoded impulse data exceeds 64 Mi samples");
+    throw ConfigurationError(
+        "limit", where,
+        advice_text({"decoded impulse data exceeds 64 Mi samples",
+                     "Convolver holds every IR sample in memory and accepts at most 64 Mi "
+                     "(67108864) samples in one configuration, counting a file once for every "
+                     "path that names it.",
+                     "Use shorter IRs (trim their silent tails), or fewer channels per file.",
+                     {}}));
 }
 // Decodes a whole file into the channels whose target is set (one target per
 // file channel) and returns its frame count. Every decoded sample counts
@@ -57,8 +70,22 @@ std::size_t read_channels(SoundFile& reader, const std::vector<std::vector<float
     }
     reader.close();
     if (total == 0)
-        throw ConfigurationError("empty-ir", where, "empty impulse response");
+        throw ConfigurationError("empty-ir", where,
+                                 advice_text({"empty impulse response",
+                                              "The IR file holds no samples.",
+                                              "Export the IR again from the program that made it.",
+                                              {}}));
     return total;
+}
+// DIAG-2: a reader's message about one filter file, under the file's name as
+// the configuration spells it, with `note` added to its note.
+std::string about_filter(const std::string& prefix, const std::string& message,
+                         const std::string& note = {}) {
+    auto a = parse_advice(message);
+    a.problem = prefix + a.problem;
+    if (!note.empty())
+        a.note += (a.note.empty() ? "" : " ") + note;
+    return advice_text(a);
 }
 std::filesystem::path utf8_path(const std::string& text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
@@ -102,11 +129,26 @@ std::string existing_suffix(const std::filesystem::path& owner, std::string name
 std::string read_configuration_text(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file)
-        throw ConfigurationError("unreadable", {path, 0, 0}, "cannot read " + utf8_string(path));
+        throw ConfigurationError(
+            "unreadable", {path, 0, 0},
+            advice_text({"cannot read this file",
+                         std::filesystem::exists(path)
+                             ? "The file is there, but this program may not read it."
+                             : "There is no file at that path.",
+                         std::filesystem::exists(path)
+                             ? "Check the file's permissions."
+                             : "Check the name and folder (letter case counts on Linux and on "
+                               "case-sensitive macOS volumes).",
+                         {}}));
     std::string text(max_text_bytes + 1, '\0');
     file.read(text.data(), static_cast<std::streamsize>(text.size()));
     if (file.bad())
-        throw ConfigurationError("unreadable", {path, 0, 0}, "read failed: " + utf8_string(path));
+        throw ConfigurationError(
+            "unreadable", {path, 0, 0},
+            advice_text({"reading this file failed",
+                         "The system reported an error part way through the file.",
+                         "Copy the file to a local disk and try again.",
+                         {}}));
     text.resize(static_cast<std::size_t>(file.gcount()));
     return text;
 }
@@ -122,17 +164,20 @@ std::filesystem::path resolve_reference(const std::filesystem::path& owner,
         const auto kind = drive_letter(name)         ? "drive-letter"
                           : name.starts_with("\\\\") ? "UNC network"
                                                      : "backslash-rooted";
-        std::string why = std::string("Windows drive/rooted paths must be changed to relative "
-                                      "paths on this platform: ") +
-                          name + " is a " + kind + " path with no meaning here; ";
+        Advice why{"Windows drive/rooted paths must be changed to relative paths on this "
+                   "platform: " +
+                       name,
+                   name + " is a " + kind + " path, which has no meaning on macOS or Linux.",
+                   {},
+                   "Convolver never translates paths; relative paths work on every system."};
         const auto suggestion = existing_suffix(owner, name, exists);
         if (!suggestion.empty())
-            why += "a file exists at '" + suggestion +
-                   "' beside this configuration; change the reference to that";
+            why.fix = "A file exists at '" + suggestion +
+                      "' beside this configuration: change the reference to that.";
         else
-            why += "copy the file into or beside this configuration's folder and give its path "
-                   "relative to this configuration (for example irs/filter.wav)";
-        throw ConfigurationError("nonportable-path", ref.location, why);
+            why.fix = "Copy the file into or beside this configuration's folder and give its "
+                      "path relative to this configuration (for example irs/filter.wav).";
+        throw ConfigurationError("nonportable-path", ref.location, advice_text(why));
     }
 #endif
     auto normalized = name;
@@ -192,17 +237,21 @@ std::string joined(const std::vector<std::string>& parts, const char* separator)
         text += (text.empty() ? "" : separator) + p;
     return text;
 }
-std::string resample_hint(int wanted, const std::string& available, bool list, Chooser who) {
-    return "Convolver never resamples. " +
-           std::string(list ? "Add an entry for " : "Use a filter made for ") + hertz(wanted) +
+// The fix for a rate no filter has, and the note that says why.
+std::string resample_fix(int wanted, const std::string& available, bool list, Chooser who) {
+    return std::string(list ? "Add an entry for " : "Use a filter made for ") + hertz(wanted) +
            " (with IRs recorded or designed at that rate), or " +
            (who == Chooser::host      ? "set the host's project or audio device to " + available
             : who == Chooser::options ? "choose " + available + " with --sample-rate"
                                       : "convert the audio to " + available + " first") +
-           "." +
+           ".";
+}
+std::string resample_note(bool list) {
+    return std::string("Convolver never resamples, so a filter only fits audio at the rate it "
+                       "was made for.") +
            (list ? ""
                  : " A configuration list can hold one configuration per sample rate and "
-                   "pick the matching one automatically.");
+                   "picks the matching one automatically.");
 }
 // A ready-to-use configuration applying a mono IR to every channel.
 std::string mono_example(const SelectionCandidate& c, std::size_t n) {
@@ -220,15 +269,22 @@ std::string mono_example(const SelectionCandidate& c, std::size_t n) {
                 std::to_string(i) + '\n' + std::to_string(i) + '\n';
     return text;
 }
+// Each line on a line of its own, indented, after a newline (advice.hpp's
+// continued lines).
 std::string indented(const std::string& text) {
     std::string result;
     std::size_t start = 0;
     while (start < text.size()) {
         const auto end = std::min(text.find('\n', start), text.size());
-        result += "    " + text.substr(start, end - start) + '\n';
+        result += "\n    " + text.substr(start, end - start);
         start = end + 1;
     }
     return result;
+}
+// Adds a sentence to an advice part.
+void append(std::string& part, const std::string& sentence) {
+    if (!sentence.empty())
+        part += (part.empty() ? "" : " ") + sentence;
 }
 // `who` chose the wanted properties (explain_no_match()). For a plug-in host
 // the advice names the host's settings, not command-line options. It names no
@@ -238,72 +294,90 @@ std::string explain_one(const std::filesystem::path& filter, const SelectionCand
     const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     const auto diffs = differences(c, w);
-    std::string text;
+    Advice a;
+    a.problem = name + " cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
+                "): " + joined(diffs, "; ");
     if (c.sound_file)
-        text = name + " is a sound-file filter (" + hertz(c.sample_rate) + ", " +
-               channels(c.input_channels) +
-               "). A sound file used directly as the filter applies its first channel to the "
-               "first input channel, its second to the second, and so on, so it needs audio "
-               "with exactly " +
-               channels(c.input_channels) + " at " + hertz(c.sample_rate) + ".";
+        a.cause = name + " is a sound-file filter (" + hertz(c.sample_rate) + ", " +
+                  channels(c.input_channels) +
+                  "). A sound file used directly as the filter applies its first channel to the "
+                  "first input channel, its second to the second, and so on, so it needs audio "
+                  "with exactly " +
+                  channels(c.input_channels) + " at " + hertz(c.sample_rate) + ".";
     else
-        text = name + " is a configuration for " + hertz(c.sample_rate) + " audio with " +
-               channels(c.input_channels, "input ") + " and " +
-               channels(c.output_channels, "output ") +
-               " (the first three numbers on its first non-comment line).";
-    text += " It cannot be used with " + std::string(subject) + " (" + wanted_text(w) +
-            "): " + joined(diffs, "; ") + ".";
-    if (w.sample_rate && w.sample_rate != c.sample_rate)
-        text += "\n" + resample_hint(w.sample_rate, hertz(c.sample_rate), false, who);
+        a.cause = name + " is a configuration for " + hertz(c.sample_rate) + " audio with " +
+                  channels(c.input_channels, "input ") + " and " +
+                  channels(c.output_channels, "output ") +
+                  " (the first three numbers on its first non-comment line).";
+    std::string example;
+    if (w.sample_rate && w.sample_rate != c.sample_rate) {
+        append(a.fix, resample_fix(w.sample_rate, hertz(c.sample_rate), false, who));
+        a.note = resample_note(false);
+    }
     if (w.input_channels && w.input_channels != c.input_channels) {
-        if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8)
-            text += "\nTo apply this mono IR to all " + std::to_string(w.input_channels) +
-                    " channels, save a configuration such as the following beside " +
-                    utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
-                    (plugin                    ? "load it in Convolver"
-                     : who == Chooser::options ? "make the preset from it"
-                                               : "pass it as the filter") +
-                    " instead:\n" + indented(mono_example(c, w.input_channels)) +
-                    "Lines starting with // are comments and can be kept or removed.";
-        else if (c.sound_file)
-            text += "\nUse an IR file with one channel per input channel (" +
-                    std::to_string(w.input_channels) +
-                    "), or a configuration (.cfg) file that says which IR channel filters which "
-                    "input and where the result goes.";
-        else if (who == Chooser::options)
-            text += "\n--input-channels asked for " + channels(w.input_channels, "input ") +
-                    ". Use a configuration with that input count (its second header number), "
-                    "or omit --input-channels.";
-        else
-            text += "\nThe audio must have exactly as many channels as the configuration's "
-                    "input count. Use a configuration written for " +
-                    channels(w.input_channels, "input ") +
-                    ", or a configuration list containing one for each channel layout you use.";
+        if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8) {
+            append(a.fix, "To apply this mono IR to all " + std::to_string(w.input_channels) +
+                              " channels, save a configuration such as the following beside " +
+                              utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
+                              (plugin                    ? "load it in Convolver"
+                               : who == Chooser::options ? "make the preset from it"
+                                                         : "pass it as the filter") +
+                              " instead:");
+            example = indented(mono_example(c, w.input_channels));
+            append(a.note, "Lines starting with // are comments and can be kept or removed.");
+        } else if (c.sound_file) {
+            append(a.fix, "Use an IR file with one channel per input channel (" +
+                              std::to_string(w.input_channels) +
+                              "), or a configuration (.cfg) file that says which IR channel "
+                              "filters which input and where the result goes.");
+        } else if (who == Chooser::options) {
+            append(a.fix, "--input-channels asked for " + channels(w.input_channels, "input ") +
+                              ". Use a configuration with that input count (its second header "
+                              "number), or omit --input-channels.");
+        } else {
+            append(a.cause, "The audio must have exactly as many channels as the "
+                            "configuration's input count.");
+            append(a.fix, "Use a configuration written for " +
+                              channels(w.input_channels, "input ") +
+                              ", or a configuration list containing one for each channel layout "
+                              "you use.");
+        }
     }
     // A host always sets both counts: for a sound file whose input advice
-    // already covers equal counts, the output paragraph would only repeat it.
+    // already covers equal counts, the output advice would only repeat it.
     const bool covered = c.sound_file && w.input_channels != c.input_channels &&
                          w.input_channels == w.output_channels;
-    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered)
-        text += "\nThe host gives the plug-in " + channels(w.output_channels, "output ") + ". " +
-                (c.sound_file ? "A sound-file filter always has as many outputs as inputs: use "
-                                "a configuration (.cfg) file to produce a different number, or "
-                                "give the plug-in as many outputs as inputs in the host's track "
-                                "or routing settings."
-                              : "Use a configuration with that output count (its third header "
-                                "number), or give the plug-in " +
-                                    channels(c.output_channels, "output ") +
-                                    " in the host's track or routing settings.");
-    else if (w.output_channels && w.output_channels != c.output_channels && !plugin)
-        text += c.sound_file
-                    ? "\n--output-channels asked for " + channels(w.output_channels, "output ") +
-                          ", but a sound-file filter always has as many outputs as inputs. "
-                          "Use a configuration (.cfg) file to produce a different number of "
-                          "outputs, or omit --output-channels."
-                    : "\n--output-channels asked for " + channels(w.output_channels, "output ") +
-                          ". Use a configuration with that output count (its third header "
-                          "number), or omit --output-channels.";
-    return text;
+    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered) {
+        append(a.cause,
+               "The host gives the plug-in " + channels(w.output_channels, "output ") + ".");
+        append(a.fix, c.sound_file
+                          ? "A sound-file filter always has as many outputs as inputs: use a "
+                            "configuration (.cfg) file to produce a different number, or give the "
+                            "plug-in as many outputs as inputs in the host's track or routing "
+                            "settings."
+                          : "Use a configuration with that output count (its third header "
+                            "number), or give the plug-in " +
+                                channels(c.output_channels, "output ") +
+                                " in the host's track or routing settings.");
+    } else if (w.output_channels && w.output_channels != c.output_channels && !plugin) {
+        append(a.cause, "--output-channels asked for " + channels(w.output_channels, "output ") +
+                            (c.sound_file ? ", but a sound-file filter always has as many "
+                                            "outputs as inputs."
+                                          : "."));
+        append(a.fix, c.sound_file
+                          ? "Use a configuration (.cfg) file to produce a different number of "
+                            "outputs, or omit --output-channels."
+                          : "Use a configuration with that output count (its third header "
+                            "number), or omit --output-channels.");
+    }
+    // The example goes on from the fix that introduces it, before the note.
+    if (!example.empty()) {
+        auto text = advice_text({a.problem, a.cause, a.fix, {}}) + example;
+        if (!a.note.empty())
+            text += "\n" + std::string(advice_labels[2]) + a.note;
+        return text;
+    }
+    return advice_text(a);
 }
 } // namespace
 
@@ -316,25 +390,32 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
     const bool plugin = who == Chooser::host;
     const auto name = utf8_string(filter);
     if (candidates.empty())
-        return "the configuration list " + name + " names no sound file or configuration.";
+        return advice_text(
+            {"the configuration list " + name + " names no sound file or configuration",
+             "Every line of a list names a configuration or sound file to choose "
+             "from, and this one names none.",
+             "Add a line for each filter, one per sample rate or channel layout.",
+             {}});
     std::string criteria = "sample rate and input channel count";
     if (w.output_channels)
         criteria = "sample rate, input channel count and output channel count";
-    std::string text =
+    Advice a;
+    a.problem =
         (candidates.size() == 1
              ? std::string("the only filter in the configuration list ") + name + " does not match "
              : "none of the " + std::to_string(candidates.size()) +
                    " filters in the configuration list " + name + " matches ") +
-        std::string(subject) + " (" + wanted_text(w) + "). A list uses the first entry whose " +
-        criteria + " equal these. Entries checked, in order:";
+        std::string(subject) + " (" + wanted_text(w) + ")";
+    a.cause = "A list uses the first entry whose " + criteria +
+              " equal these. Entries checked, in order:";
     constexpr std::size_t shown = 10;
     for (std::size_t i = 0; i < candidates.size() && i < shown; ++i) {
         const auto& c = candidates[i];
-        text += "\n  " + utf8_string(c.path) + " (" + candidate_text(c) +
-                "): " + joined(differences(c, w), "; ");
+        a.cause += "\n  " + utf8_string(c.path) + " (" + candidate_text(c) +
+                   "): " + joined(differences(c, w), "; ");
     }
     if (candidates.size() > shown)
-        text += "\n  ... and " + std::to_string(candidates.size() - shown) + " more";
+        a.cause += "\n  ... and " + std::to_string(candidates.size() - shown) + " more";
     const auto any = [&](auto predicate) {
         return std::any_of(candidates.begin(), candidates.end(), predicate);
     };
@@ -347,13 +428,14 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
         std::string available;
         for (std::size_t i = 0; i < rates.size(); ++i)
             available += (i == 0 ? "" : i + 1 == rates.size() ? " or " : ", ") + hertz(rates[i]);
-        text += "\nNo entry is for " + hertz(w.sample_rate) + ". " +
-                resample_hint(w.sample_rate, available, true, who);
+        a.fix = "No entry is for " + hertz(w.sample_rate) + ". " +
+                resample_fix(w.sample_rate, available, true, who);
+        a.note = resample_note(true);
     } else if (w.input_channels && !any([&](const SelectionCandidate& c) {
                    return matches(c.sample_rate, c.input_channels, c.output_channels,
                                   {w.sample_rate, w.input_channels, 0});
                })) {
-        text += "\nNo entry takes " + channels(w.input_channels, "input ") +
+        a.fix = "No entry takes " + channels(w.input_channels, "input ") +
                 (w.sample_rate ? " at " + hertz(w.sample_rate) : std::string()) +
                 ". Add one to the list, or " +
                 (plugin ? "give the plug-in as many inputs as an entry takes in the host's "
@@ -361,14 +443,16 @@ std::string explain_no_match(const std::filesystem::path& filter, bool list,
                  : who == Chooser::options ? "choose an entry's input count with --input-channels."
                                            : "use audio with a channel count an entry accepts.");
     } else if (w.output_channels) {
-        text += "\nEntries exist for the sample rate and input channels, but none produces " +
+        a.fix = "Entries exist for the sample rate and input channels, but none produces " +
                 channels(w.output_channels, "output ") + ". Add one to the list, or " +
                 (plugin ? "give the plug-in an entry's output count in the host's track or "
                           "routing settings."
                         : "omit --output-channels to take the first entry that matches the "
                           "input.");
+    } else {
+        a.fix = "Add an entry that matches, or choose the entry you want directly.";
     }
-    return text;
+    return advice_text(a);
 }
 
 Configuration configuration_graph(const ParsedConfiguration& parsed) {
@@ -458,9 +542,9 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         // was read as a sound file, so the user knows why.
         const std::string read_as_sound =
             !raw && raw_filter_name(resolved)
-                ? " (the name ends like a raw filter's, but the content starts like a sound "
-                  "file, so Convolver read it as one; if it is headerless samples that happen "
-                  "to look like a header, convert it to WAV, for example with SoX)"
+                ? "The name ends like a raw filter's, but the content starts like a sound file, "
+                  "so Convolver read it as one; if it is headerless samples that happen to look "
+                  "like a header, convert it to WAV, for example with SoX."
                 : "";
         try {
             ir = raw ? reader.open_raw(resolved, RawSpec{cfg.sample_rate, 1}, raw_encoding)
@@ -468,36 +552,55 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
         } catch (const std::exception& e) {
             std::error_code ec; // On failure absolute() returns an empty path.
             if (raw && std::filesystem::is_regular_file(resolved, ec))
-                throw ConfigurationError("damaged-asset", path.ir.location,
-                                         "raw filter '" + path.ir.spelling + "': " + e.what() +
-                                             " (raw filters are read as mono " +
-                                             raw_encoding_name(raw_encoding) + ")");
+                throw ConfigurationError(
+                    "damaged-asset", path.ir.location,
+                    about_filter("raw filter '" + path.ir.spelling + "': ", e.what(),
+                                 "Raw filters are read as mono " + raw_encoding_name(raw_encoding) +
+                                     "; --raw-filter-format chooses another sample type."));
             // The file is there but the reader cannot read it (a codec its
             // build lacks, for example): the path hint below would mislead. The code
             // stays missing-asset on purpose: codes are stable, and
             // tests/compatibility/cases.json relies on this mapping.
             if (!raw && std::filesystem::is_regular_file(resolved, ec))
-                throw ConfigurationError("missing-asset", path.ir.location,
-                                         "filter '" + path.ir.spelling + "': " + e.what() +
-                                             read_as_sound);
+                throw ConfigurationError(
+                    "missing-asset", path.ir.location,
+                    about_filter("filter '" + path.ir.spelling + "': ", e.what(), read_as_sound));
             // Includes a bare "-": standard input cannot be a filter.
+            if (path.ir.spelling == "-")
+                throw ConfigurationError(
+                    "missing-asset", path.ir.location,
+                    advice_text({"filter '-': standard input cannot be a filter",
+                                 "A configuration names each IR by its file name.",
+                                 "Write the IR file's name, relative to the configuration's "
+                                 "folder.",
+                                 {}}));
+            const auto owner = utf8_string(doc.source.filename());
             throw ConfigurationError(
                 "missing-asset", path.ir.location,
-                "filter '" + path.ir.spelling + "': " + e.what() + " (looked for " +
-                    utf8_string(std::filesystem::absolute(resolved, ec)) +
-                    "; IR file names are relative to the folder containing the configuration, "
-                    "and letter case must match on case-sensitive file systems)");
+                advice_text({"filter '" + path.ir.spelling + "': IR file not found",
+                             "There is no file at " +
+                                 utf8_string(std::filesystem::absolute(resolved, ec)) +
+                                 ". IR file names are relative to the folder that holds " +
+                                 (owner.empty() ? std::string("the configuration") : owner) + ".",
+                             "Correct the name on line " + std::to_string(path.ir.location.line) +
+                                 ", or put the IR file in that folder.",
+                             "Letter case counts on Linux and on case-sensitive macOS volumes."}));
         }
         const auto info = ir->info();
         if (info.sample_rate != cfg.sample_rate)
-            throw ConfigurationError("rate-mismatch", path.ir.location,
-                                     "filter sample rate differs from configuration (" +
-                                         std::to_string(info.sample_rate) + " Hz file, " +
-                                         std::to_string(cfg.sample_rate) +
-                                         " Hz configuration). Every IR a configuration names "
-                                         "must have the sample rate on its first line; "
-                                         "Convolver never resamples IRs" +
-                                         read_as_sound);
+            throw ConfigurationError(
+                "rate-mismatch", path.ir.location,
+                advice_text({"filter sample rate differs from configuration (" +
+                                 std::to_string(info.sample_rate) + " Hz file, " +
+                                 std::to_string(cfg.sample_rate) + " Hz configuration)",
+                             "Every IR a configuration names must have the sample rate on its "
+                             "first line.",
+                             "Use an IR made at " + std::to_string(cfg.sample_rate) +
+                                 " Hz, or change the configuration's first number to " +
+                                 std::to_string(info.sample_rate) +
+                                 " if every IR it names is at that rate.",
+                             "Convolver never resamples IRs." +
+                                 (read_as_sound.empty() ? "" : " " + read_as_sound)}));
         check_ir_channel(path.ir_channel, info.channels, path.channel_location);
         // Decode every channel that this and later paths name, so the file is
         // read once. A later path naming a channel the file lacks fails when
@@ -519,7 +622,7 @@ std::vector<DecodedIr> decode_impulses(const ParsedDocument& doc, Configuration&
             throw;
         } catch (const std::runtime_error& e) {
             throw ConfigurationError("damaged-asset", path.ir.location,
-                                     "filter '" + path.ir.spelling + "': " + e.what());
+                                     about_filter("filter '" + path.ir.spelling + "': ", e.what()));
         }
         result.push_back({resolved, info, file.frames,
                           raw ? std::optional<RawEncoding>(raw_encoding) : std::nullopt});
@@ -609,14 +712,25 @@ std::filesystem::path Resolver::canonical(const std::filesystem::path& path,
 
 bool Resolver::visit(const std::filesystem::path& path) {
     if (++visits_ > max_list_visits || active_.size() >= max_list_depth)
-        throw ConfigurationError("limit", {path, 0, 0},
-                                 "configuration list nesting/entry limit exceeded");
+        throw ConfigurationError(
+            "limit", {path, 0, 0},
+            advice_text({"configuration list nesting/entry limit exceeded",
+                         "Convolver follows at most " + std::to_string(max_list_depth) +
+                             " levels of lists inside lists, and at most " +
+                             std::to_string(max_list_visits) + " entries in all.",
+                         "Flatten the lists, or split them into fewer entries.",
+                         {}}));
     const auto resolved = canonical(path, {path, 0, 0});
     sources_.push_back(resolved);
     chosen_sources_.push_back(resolved);
     if (!active_.insert(resolved).second)
-        throw ConfigurationError("cycle", {path, 0, 0},
-                                 "configuration list cycle: " + utf8_string(path));
+        throw ConfigurationError(
+            "cycle", {path, 0, 0},
+            advice_text({"configuration list cycle: " + utf8_string(path),
+                         "A list names itself, directly or through another list, so choosing an "
+                         "entry would never end.",
+                         "Remove the entry that leads back to this list.",
+                         {}}));
     struct Pop {
         std::set<std::filesystem::path>& active;
         std::filesystem::path path;
@@ -628,8 +742,13 @@ bool Resolver::visit(const std::filesystem::path& path) {
         return visitor_({path, chain_, nullptr, audio.get()});
     const auto text = files_.read_text(path);
     if (text.size() > max_total_text_bytes - text_bytes_)
-        throw ConfigurationError("limit", {path, 0, 0},
-                                 "configuration text read for one operation exceeds 16 MiB");
+        throw ConfigurationError(
+            "limit", {path, 0, 0},
+            advice_text({"configuration text read for one operation exceeds 16 MiB",
+                         "The lists and configurations reached from this file add up to more "
+                         "text than Convolver reads in one go.",
+                         "Point at the configuration you need directly, or split the lists.",
+                         {}}));
     text_bytes_ += text.size();
     const auto doc = parse_configuration_text(text, path);
     if (doc.kind == ParsedDocument::Kind::configuration) {

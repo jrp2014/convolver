@@ -248,7 +248,7 @@ def main():
         result = run(CROSSOVER / 'filter.cfg', root / 'filter.txt', ok=False)
         assert '.aupreset' in result.stderr, result.stderr
         result = run('--sample-rate', 48000, root / names[0], root / 'b.aupreset', ok=False)
-        assert 'configuration lists' in result.stderr, result.stderr
+        assert 'choose an entry from' in result.stderr and 'configuration list' in result.stderr, result.stderr
         result = run('--name', 'a\tb', CROSSOVER / 'filter.cfg', root / 'c.aupreset', ok=False)
         assert 'control characters' in result.stderr, result.stderr
         foreign = bytearray((root / names[0]).read_bytes())
@@ -303,8 +303,8 @@ def message_tests(root):
             ['--input-channels asked for 3 input channels', 'omit --input-channels'],
         ),
         ((cfg, root / 'g.vstpreset', '--sample-rate'), ['--sample-rate needs a value']),
-        ((cfg, root / 'g.vstpreset', '--bogus'), ['Invalid option: --bogus']),
-        (('--bogus', 1, cfg, root / 'g.vstpreset'), ['Invalid option or value: --bogus']),
+        ((cfg, root / 'g.vstpreset', '--bogus'), ['error: invalid option: --bogus']),
+        (('--bogus', 1, cfg, root / 'g.vstpreset'), ['error: invalid option or value: --bogus 1']),
     )
     for args, texts in cases:
         message = run(*args, ok=False).stderr

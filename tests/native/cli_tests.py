@@ -130,13 +130,13 @@ def failure_message_tests(d):
         (
             ['--filter', stereo_ir, '--input', nan_input, '--output', out],
             None,
-            [str(nan_input), 'at 0.000 s (frame 1), channel 2', 'export it again'],
+            [str(nan_input), 'at 0.000 s (frame 1), channel 2', 'Export it again'],
             True,
         ),
         (
             ['--filter', ir, '--input', loud, '--output', out, '--gain-db', '12'],
             None,
-            ['output overflowed at 0.000 s (frame 0), channel 1', 'lower --gain-db', 'no-clip'],
+            ['output overflowed at 0.000 s (frame 0), channel 1', 'Lower --gain-db', 'no-clip'],
             True,
         ),
         (
@@ -145,12 +145,12 @@ def failure_message_tests(d):
             ['from standard input', 'frame 1', 'read as f32le'],
             True,
         ),
-        (['--filter', ir, '--input', garbage, '--output', out], None, [str(garbage), 'export it again'], False),
-        (['--filter', ir, '--input', bad_fmt, '--output', out], None, [str(bad_fmt), 'export it again'], False),
+        (['--filter', ir, '--input', garbage, '--output', out], None, [str(garbage), 'Export it again'], False),
+        (['--filter', ir, '--input', bad_fmt, '--output', out], None, [str(bad_fmt), 'Export it again'], False),
         (
             ['--filter', nan_ir, '--input', good, '--output', out],
             None,
-            ['cannot read audio file', 'frame 1), channel 1', 'export it again'],
+            ['cannot read audio file', 'frame 1), channel 1', 'Export it again'],
             False,
         ),
         (
@@ -162,19 +162,19 @@ def failure_message_tests(d):
         (
             ['--filter', ir, '--input', truncated, '--output', out],
             None,
-            [str(truncated), 'RIFF/WAVE', 'export it again'],
+            [str(truncated), 'RIFF/WAVE', 'Export it again'],
             False,
         ),
         (
             ['--filter', damaged_cfg, '--input', good, '--output', out],
             None,
-            ['msg-truncated.wav', 'export it again'],
+            ['msg-truncated.wav', 'Export it again'],
             False,
         ),
         (
             ['--filter', binary, '--input', good, '--output', out],
             None,
-            ['neither a configuration', 'export it again'],
+            ['neither a configuration', 'export it again from the program'],
             False,
         ),
         (['--filter', ir, *raw_args], b'\0\0\0', ['incomplete frame', 'channel count and sample type'], True),
@@ -184,6 +184,9 @@ def failure_message_tests(d):
         message = p.stderr.decode()
         for text in texts:
             assert text in message, (args, text, message)
+        # DIAG-2: the problem on the first line, then indented labelled lines with a fix.
+        assert message.startswith('convolver: error: '), message
+        assert '\n  Fix: ' in message, message
         shown = 'standard output' if args[args.index('--output') + 1] == '-' else str(out)
         assert ('is incomplete' in message and shown in message) == incomplete, (args, message)
     # The CLI replaces an existing output, as command-line tools usually do.
