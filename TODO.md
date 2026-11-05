@@ -138,14 +138,6 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
-- [ ] **REL-6 — Responsiveness qualification before a release.** From
-  jrp's review of `db54160`: CI's timing tests run on shared runners and
-  show "not qualified" when they cannot judge; that is not qualification.
-  Write the procedure: on a named machine (jrp's Mac first, through the
-  command line), with the candidate binaries, run the load-timing tests
-  cold and `--warm` on the declared workloads, keep every run's records,
-  and require the existing limits; a skipped or not-qualified entry stays
-  visibly unqualified in the release evidence.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -761,11 +753,19 @@ so the preset file path is not needed).
   history took 25 to 43 ms; with flush-to-zero and denormals-are-zero set on
   the audio thread, 6 to 7 ms. Neither the engine nor the plug-ins set
   them; most hosts do on their audio threads, but not all, and a reverb tail
-  fading to silence reaches the same numbers. Waiting for jrp's decision:
-  the plug-ins and the CLI set both for each process call and restore the
-  caller's mode (as JUCE does), or this stays a documented limitation. The
-  change affects only values below about 1e-38; the oracle tests must still
-  pass. Arm64 has a flush-to-zero mode (FPCR) too.
+  fading to silence reaches the same numbers. jrp decided (5 November 2026)
+  that Convolver flushes them itself, in its own pull request: one small
+  RAII helper sets flush-to-zero (and denormals-are-zero on x86-64; FPCR on
+  Apple Silicon) for each processing call and restores the caller's mode,
+  covering `Engine::process` (the CLI) and the whole `HostProcessor` call
+  (conversion, gain and mixing too). Tests: restoration on normal return,
+  early return, exceptions, nested scopes and a caller that already
+  flushes; the oracle tests with the worst error reported; subnormal input
+  and a decaying tail; the `--warm` runs with the incoming mode on and off.
+  Document that subnormal results are flushed (no promise of IEEE gradual
+  underflow). With flushing, the 30 s filter's 6 to 7 ms still exceeds half
+  the 10.7 ms period on that VM: the fix does not qualify that workload
+  there, and the limit stays.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** From jrp's
   review of `db54160`: the load-timing records give a load's whole hold;
   split it into reading and decoding, validation, FFT preparation,
@@ -1504,6 +1504,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `portable/host.cpp`, with the same values, and the plug-in contract says a
   replacement plays for one Latency block before the crossfade, as it has
   since PLUG-10; [contract](docs/develop/plugin-contract.md).
+- [x] **REL-6 — Responsiveness qualification before a release.** 5
+  November 2026, from jrp's review of `db54160`: CI's timing tests run on
+  shared runners and report "not qualified" when they cannot judge, which
+  is not qualification. The
+  [procedure](docs/develop/releasing.md#responsiveness-qualification): on a
+  named machine (jrp's Mac first, through the command line), build the
+  candidate's tag with the SDKs its source manifest records, optimised and
+  without sanitizers; run the timing tests cold and `--warm`; the release
+  qualifies only if every entry passed (or no limit applied), with the
+  existing limits; every run's records are kept and the release notes state
+  the result either way. Not yet carried out: the first preview's run is
+  part of its publication.
 - [x] **REL-5 — Early limited walkthrough on macOS.** 1 November 2026,
   PR #101. An assisted check for jrp, not by an independent tester, of the
   stereo journey's package and command-line steps on the pull request's

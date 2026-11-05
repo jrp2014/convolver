@@ -18,6 +18,7 @@ publishing, jrp tells the people who already use the `.cfg` format where to
 find it.
 
 Contents: [candidates](#candidates) ·
+[responsiveness qualification](#responsiveness-qualification) ·
 [publishing an unsigned preview](#publishing-an-unsigned-preview) ·
 [after publishing](#after-publishing-make-it-findable) ·
 [production gates](#production-gates) ·
@@ -86,6 +87,64 @@ where each dependency comes from is in
 [`release-policy.json`](../../packaging/release-policy.json), and how builds
 choose and record releases in [build from source](build.md#supporting-libraries).
 
+## Responsiveness qualification
+
+CI's timing tests run on shared runners. When they cannot judge (a late
+baseline, a thread that woke late) they report "not qualified", and CTest
+shows the test as skipped. A green CI run therefore does not show that
+loading a filter leaves the host responsive. Before a release, jrp (or
+whoever he names) qualifies it on a named machine (REL-6 in
+[TODO](../../TODO.md), from jrp's review of `db54160`):
+
+1. **The machine.** Record its model, processor, memory and OS version.
+   Run on mains power with Low Power Mode off and nothing else open. The
+   first named machine is jrp's MacBook Pro, through the command line.
+2. **The source.** Check out the candidate's tag. Fetch the SDKs the
+   candidate used from its `source-manifest.json` (in the candidate's
+   source bundle; [repeating a recorded build](build.md#supporting-libraries)).
+   If the manifest has no `audiounitsdk` entry (candidates without the Audio
+   Unit), fetch that one with `--latest` and record its version. The timing tests
+   build each adapter from that source into their own executables, as the
+   candidate did, rather than loading the packaged files; the
+   [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) covers
+   those files.
+3. **The build.** Optimised, without sanitizers: in any other build the
+   tests only report. On macOS:
+
+   ```sh
+   python3 scripts/release/sources.py --lock source-manifest.json --fetch \
+     --cache build/downloads --destination build/sources \
+     vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk audiounitsdk
+   cmake -S . -B build-qualify -DCMAKE_BUILD_TYPE=Release \
+     -DCONVOLVER_BUILD_VST3=ON -DCONVOLVER_VST3_SDK="$PWD/build/sources/vst3sdk" \
+     -DCONVOLVER_BUILD_AU=ON -DCONVOLVER_AU_SDK="$PWD/build/sources/AudioUnitSDK"
+   cmake --build build-qualify --parallel
+   ```
+
+4. **The runs.** First from an empty instance, then from a full history
+   (`--warm`, which takes some minutes with the 30 s filter):
+
+   ```sh
+   ctest --test-dir build-qualify -L timing --output-on-failure
+   build-qualify/plugins/vst3/convolver_vst3_lifecycle --load-timing qualify-vst3-warm --warm
+   build-qualify/plugins/au/convolver_au_lifecycle --load-timing qualify-au-warm --warm
+   ```
+
+5. **The verdict.** The limits are those in
+   [load timing](testing.md#load-timing-perf-9) and are not relaxed here. The
+   release qualifies only if every entry in every run printed "passed" or
+   "reported only". An entry that failed, or was "not qualified", means the
+   release is not qualified on that machine. That stays true even if a
+   rerun passes: each test already gives an entry up to three runs and keeps
+   every one. The "warm first" and "warm second" phases are shown, not
+   judged.
+6. **The evidence.** Keep every `*-load-timing.json` file (each names the
+   version, build, compiler, FFT backend and machine), the printed tables
+   and the machine record, with the candidate's run link, in the project's
+   release evidence. State the result in the pre-release notes:
+   "Responsiveness qualified on" and the machine or "Responsiveness not
+   qualified", with the entries that did not pass.
+
 ## Publishing an unsigned preview
 
 Signing is not needed for a preview. Publication is a manual step owned by
@@ -103,7 +162,9 @@ jrp, and has not been done yet:
    preview, the independent walkthrough (REL-3 in [TODO](../../TODO.md)) uses
    these same files before they are uploaded.
 3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
-   at least one host.
+   at least one host, and the
+   [responsiveness qualification](#responsiveness-qualification) on a named
+   machine; the release notes give its result either way.
 4. Create a GitHub pre-release on that tag titled "Convolver X.Y.Z (unsigned
    developer preview)". Put the SHA-256 sums, the run link and download and
    installation instructions (pointing to

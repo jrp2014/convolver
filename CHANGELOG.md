@@ -144,6 +144,11 @@ Until 1.0 the C++ API may change between minor versions.
   machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
   Audio Unit Release jobs keep them as an artifact. Tests only: no change to
   the plug-ins or the sound.
+- Releasing (REL-6, from jrp's review of `db54160`): a responsiveness
+  qualification before each release, on a named machine with the
+  candidate's source and an optimised build, cold and `--warm`; the release
+  notes state whether it qualified
+  ([releasing](docs/develop/releasing.md#responsiveness-qualification)).
 - Tests (PERF-14, from jrp's review of `db54160`): the load-timing tests
   take `--warm`, which fills the filter's input history faster than real
   time before the replacement and the reset, so they start from a long
