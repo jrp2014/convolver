@@ -149,6 +149,7 @@ class AudioUnitDriver final : public lc::Driver {
         f.kind = static_cast<HostFailureKind>(t.kind);
         f.request.number = t.request;
         f.silent = t.silent != 0;
+        f.message = t.message; // Empty while memory ran out for it (ROBUST-7).
         return f;
     }
     std::size_t max_block() const override {
