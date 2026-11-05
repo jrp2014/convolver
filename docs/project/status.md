@@ -173,11 +173,10 @@ detail.
    (PLUG-9, PLUG-10, AU-7); the Audio Unit's pluginval run and component in
    the package (AU-3, AU-5); the remaining checks under AU-6 and VST3-11; and
    the [loading responsiveness](../../TODO.md#loading-responsiveness) gate,
-   whose timing test now runs with jrp's limits (PERF-9); a 30 s filter
-   holds the host's thread close to its 250 ms limit.
-5. **jrp's decisions:** who the REL-3 tester is, the wording of the VST
-   trademark notice (PLUG-5), and, if the 30 s case exceeds its limit on
-   some platform, background loading (VST3-5) or a higher limit. The LV2 version mapping (LV2-5) is needed only
+   whose timing test now runs with jrp's limits (PERF-9); on CI a 30 s
+   filter holds the host's thread 28 to 154 ms, within its 250 ms limit.
+5. **jrp's decisions:** who the REL-3 tester is and the wording of the VST
+   trademark notice (PLUG-5). The LV2 version mapping (LV2-5) is needed only
    before LV2 joins a preview.
 
 jrp's review of `276c7dc` (1 November 2026): qualify this fixed feature set

@@ -274,8 +274,7 @@ void report(const std::string& format, const Workload& w, const std::string& ent
     if (!c.error.empty())
         std::cout << "      a callback threw: " << c.error << '\n';
     if (!over.empty())
-        std::cout << "      " << (enforced ? "OVER THE LIMIT: " : "over the limit: ") << over
-                  << '\n';
+        std::cout << "      " << over << '\n';
     std::cout << std::flush;
 }
 } // namespace
@@ -343,8 +342,11 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                     ++inconclusive;
                     return "inconclusive, the baseline was late too: " + why;
                 }
-                over_limits += why.empty() ? 0 : 1;
-                return why;
+                if (why.empty())
+                    return why;
+                ++over_limits;
+                return (enforced ? "OVER THE LIMIT: " : "over the limit (not enforced here): ") +
+                       why;
             };
             driver.create(w.host, true);
             if (!driver.start())
@@ -358,7 +360,8 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                 const auto idle = audio.take();
                 busy = idle.late != 0;
                 report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
-                       busy ? "the machine was busy: the other phases are inconclusive" : "");
+                       busy ? "note: the machine was busy, so this entry's phases are inconclusive"
+                            : "");
                 errors += idle.failed;
                 for (const auto* f : {&x, &y}) {
                     Outcome outcome;
