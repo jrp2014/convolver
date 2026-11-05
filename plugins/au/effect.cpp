@@ -11,6 +11,7 @@
 #include <cmath>
 #include <dispatch/dispatch.h>
 #include <exception>
+#include <new>
 #include <span>
 #include <thread>
 #include <vector>
@@ -58,6 +59,10 @@ bool same(const HostLayout& a, const HostLayout& b) {
 // once a run in progress has finished, which the destructor waits for.
 struct Effect::LatencyQueue {
     explicit LatencyQueue(Effect& e) : effect(e) {
+        if (!queue || !source || !ended) { // dispatch_*_create returns NULL on failure.
+            release();
+            throw std::bad_alloc();
+        }
         dispatch_set_context(source, this);
         dispatch_source_set_event_handler_f(
             source, [](void* self) { static_cast<LatencyQueue*>(self)->effect.apply_latency(); });
@@ -71,12 +76,18 @@ struct Effect::LatencyQueue {
     ~LatencyQueue() {
         dispatch_source_cancel(source);
         dispatch_semaphore_wait(ended, DISPATCH_TIME_FOREVER);
-        dispatch_release(source);
-        dispatch_release(queue);
-        dispatch_release(ended);
+        release();
     }
     void request() noexcept {
         dispatch_source_merge_data(source, 1);
+    }
+    void release() noexcept {
+        if (source)
+            dispatch_release(source);
+        if (queue)
+            dispatch_release(queue);
+        if (ended)
+            dispatch_release(ended);
     }
 
     Effect& effect;

@@ -845,8 +845,10 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `DISPATCH_SOURCE_TYPE_DATA_OR` source, in place of
   `portable/request_worker.hpp`, a thread of our own. Apple does not
   document `dispatch_source_merge_data` as real-time safe; it is an atomic
-  OR and a lock-free wake-up that does not allocate, and `au.adapter`
-  counts no allocation on an audio thread that sets the Latency. The
+  OR, then a wake-up that may make a system call to ask for a thread, and
+  the open-source libdispatch neither allocates nor takes a user-space lock
+  there (`au.adapter` counts only C++ allocations, so it cannot see one
+  inside libdispatch). The
   worker's tests, the watchdog workflow and `scripts/ci_watchdog_probe.py`
   went with it ([archived](docs/archive/reviews/2026-11-05-request-worker.md));
   [Audio Unit settings](docs/develop/plugin-contract.md).

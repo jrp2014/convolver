@@ -450,9 +450,11 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   thread, including an audio thread, a pre-render notification or the input
   callback inside Render, so it stores the value and wakes the queue
   through a `DISPATCH_SOURCE_TYPE_DATA_OR` source (AU-12).
-  `dispatch_source_merge_data` is an atomic OR and a lock-free wake-up that
-  does not allocate, though Apple does not document it as real-time safe;
-  wakes that arrive before the work runs coalesce into one run.
+  `dispatch_source_merge_data` is an atomic OR, then a wake-up that may
+  make a system call to ask for a thread; the open-source libdispatch
+  neither allocates nor takes a user-space lock there, but Apple does not
+  document it as real-time safe. Wakes that arrive before the work runs
+  coalesce into one run.
   `RestoreState` wakes it too. The work reads the settings once, builds a
   processor with the new block size and hands it to Render through an
   atomic pointer, and the reported latency is the installed processor's.

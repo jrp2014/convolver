@@ -199,10 +199,11 @@ class Effect final : public ausdk::AUBase {
     // (latency_queue_), never by the thread that chose it: SetParameter can
     // arrive on any thread, including an audio thread or inside a render
     // callback, so it only stores the value and wakes the queue (AU-12:
-    // dispatch_source_merge_data, an atomic OR and a lock-free wake-up that
-    // does not allocate; Apple does not call it real-time safe, which jrp
-    // accepted). RestoreState wakes it too. Uninitialized, the work makes the
-    // reported latency follow the choice. Initialized, it builds a processor with the chosen
+    // dispatch_source_merge_data: an atomic OR, then a wake-up that may make a
+    // system call to ask for a thread; the open-source libdispatch neither
+    // allocates nor takes a user-space lock there. Apple does not call it
+    // real-time safe, which jrp accepted). RestoreState wakes it too. Uninitialized, the work makes
+    // the reported latency follow the choice. Initialized, it builds a processor with the chosen
     // block size and hands it to Render, which switches at its next call: the
     // new one starts with no history, so the sound has a gap (the new latency
     // plus the filter's own delay). The host is told of the new latency and
