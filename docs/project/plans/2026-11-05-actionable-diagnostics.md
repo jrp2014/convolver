@@ -2,8 +2,9 @@
 # Actionable diagnostics: problem, cause, fix
 
 Status: proposal for jrp, 5 November 2026, written against `main` at `1467571`
-(0.8.11). It serves DIAG-2 in [TODO](../../../TODO.md). Nothing in it is
-implemented yet. It keeps DIAG-1's choices
+(0.8.11). It serves DIAG-2 in [TODO](../../../TODO.md). jrp chose both recommended
+options on 5 November 2026 ("Structure plus fix buttons";
+[decisions](../decisions.md#diagnostics)); implementation is in progress. It keeps DIAG-1's choices
 ([decisions](../decisions.md#diagnostics)): messages still explain generously,
 and the CLI still replaces an existing output.
 
@@ -139,11 +140,37 @@ log.").
 
 ## The plug-in window
 
-- The explanation area shows the problem in bold, then the cause, then
-  **Fix:** and **Note:** with their labels in bold, as separate paragraphs,
-  with the system's fonts and colours (secondary colour for the note), so
-  VoiceOver reads them in order and dark mode works.
-- One action button under the fix when the window can carry the fix out:
+jrp asked on 5 November 2026 for the window's layout to follow grounded
+interface guidelines and be easy to absorb. Both formats show the same
+AppKit window on macOS, so Apple's Human Interface Guidelines govern it;
+the VST3 and Audio Unit documentation say nothing about message layout,
+beyond the rule every plug-in follows that its window must never block the
+host (so no alert or sheet for a message). A
+[mock-up of four states](https://claude.ai/artifact/KupDZnWEm1XTgykta5JEG9)
+(a refused file, a Convolver bug, no filter yet, playing) shows the result.
+
+| Guideline (HIG page) | What the window does |
+| --- | --- |
+| Put the most important information first, top and leading ("Layout", "Writing") | The status and the problem stay at the top; the form follows |
+| Show an error close to the problem and say what to do, not only what is wrong ("Writing") | The fix sits directly under the problem, as an instruction ("Choose a filter made for 48000 Hz…") |
+| A title says what happened, the context and why, in at most two lines; informative text only if it adds value ("Alerts") | The problem is one bold sentence naming the file and both values; the cause and note appear only when they add something, and never while the filter simply plays |
+| Align elements to scan them; indentation shows hierarchy ("Layout") | Cause, Fix and Note are right-aligned labels in the same 64-point column as the form's Filter, Gain and Latency labels, so the message reads as part of the same form |
+| Give a next step and a button on an empty screen ("Writing") | No filter: Fix says what to load, with Choose Filter… under it |
+| Button titles are short verbs in title case; avoid OK; not the default button unless it is the expected response ("Alerts") | Choose Filter…, Copy Diagnostics; an ordinary push button, so Return still goes to the host |
+| Integrate status feedback near what it describes; use alerts only for critical, actionable news ("Feedback", "Alerts") | Status stays passive and inline; nothing pops up |
+| Make feedback accessible: not colour alone ("Feedback") | Symbol, coloured word and text together; VoiceOver reads status, problem, Cause, Fix, button, Note in order |
+| Use the caution symbol sparingly ("Alerts") | The triangle only for Fault; Load failed keeps its stop sign, Playing its tick |
+| Avoid controls and critical information at the bottom of a macOS window ("Layout", macOS) | Bypass moves to the top right, beside the title line; Copy Diagnostics and Show Log move up onto the row of the folded File, software and log section they belong with, so nothing sits on the bottom edge |
+| Hide details until relevant; one disclosure control per view ("Disclosure controls") | The file, software and log lines stay folded behind the one triangle |
+
+- **Message area**, from the top: the title line (small, secondary) with
+  Bypass at its trailing end (VST3 only); the status symbol and word; the
+  problem in semibold, then what plays now in regular text ("The previous
+  filter, room-48k.cfg, keeps playing."); then the labelled rows Cause,
+  **Fix** (its label in bold, being the part to act on) with the action
+  button under the fix text, and Note in the small secondary font. While a
+  filter plays normally there are no rows: just "48000 Hz, 2 in, 2 out."
+- **One action button** under the fix when the window can carry the fix out:
 
   | Situation | Button |
   | --- | --- |
@@ -151,12 +178,10 @@ log.").
   | A processing failure (a Convolver bug) | Copy Diagnostics |
   | Anything else (rate set in the host, mono track, overflow, log not writable) | None: the fix says where to change it |
 
-  This follows Apple's guidance to put a fix next to the message that needs
-  it and name the button with a verb (Human Interface Guidelines, "Alerts"
-  and "Feedback"), without an alert sheet: a plug-in window must not block
-  the host. Choose… and Copy Diagnostics stay where they are as well.
-- The Audio facts, the Filter row's "was refused" note and the folded
-  reference lines do not change.
+- **Unchanged:** the form (Filter, Recent, Reload, Gain, Mix, Latency), the
+  Audio facts, the Filter row's "was refused" note and the folded reference
+  lines. The window keeps its width (560 points) and grows with the message,
+  as now.
 
 ## How it is built
 
@@ -196,3 +221,6 @@ log.").
    today's one-paragraph form.
 2. Add the window's one action button (Choose Filter… or Copy Diagnostics)
    beside the fix (recommended), or keep the existing buttons only.
+
+Answered on 5 November 2026: both recommended options ("Structure plus fix
+buttons").
