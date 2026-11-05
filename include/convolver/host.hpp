@@ -225,7 +225,8 @@ std::string fault_message(const HostFaultReport&);
 class HostFilter {
   public:
     // `max_channels` is the format's channel bound, a check on the state itself.
-    explicit HostFilter(std::size_t max_channels = 256) : max_channels_(max_channels) {}
+    explicit HostFilter(std::size_t max_channels = max_channel_count)
+        : max_channels_(max_channels) {}
     // The accepted filter, which a host saves. Absent for an empty instance and
     // after a failed initial load.
     const std::optional<Configuration>& filter() const noexcept {

@@ -140,8 +140,8 @@ overflow and nonfinite inputs/IRs/gains are rejected. DSP overflow is detected b
 the CLI's output check; library callers choose their own output policy.
 `convolver/engine.hpp` names the shared ones (`max_sample_rate`,
 `max_channel_count`, `max_block_frames`, `max_impulse_frames` and
-`max_engine_delay_frames`), which the readers, saved state, the tools and the
-plug-ins check too.
+`max_engine_delay_frames`), which the readers, the tools and the plug-ins
+check too; saved state checks the sample rate and channel limits.
 
 ### FFT plans and wisdom
 
