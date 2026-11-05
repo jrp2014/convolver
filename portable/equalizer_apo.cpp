@@ -2,8 +2,9 @@
 #include "equalizer_apo.hpp"
 #include <algorithm>
 #include <array>
-#include <cstdio>
-#include <cstdlib>
+#include <charconv>
+#include <cmath>
+#include <cstddef>
 #include <map>
 #include <stdexcept>
 #include <string_view>
@@ -26,20 +27,21 @@
 //   "Preamp: -1000 dB" multiplies by 1e-50, which is 0 as a 32-bit float.
 namespace convolver::equalizer_apo {
 namespace {
-// Shortest fixed-notation text that reads back as the same float. (Not
-// std::to_chars: macOS before 13.3 lacks it for floating point.) The program
-// never changes the C locale, so the decimal mark is '.'.
+// Shortest fixed-notation text that reads back as the same float, with at
+// least one digit after the '.' (IO-9: std::to_chars, which needs macOS
+// 13.3 or later; it ignores the locale).
 std::string number(float value) {
-    std::array<char, 256> buffer{};
-    for (int digits = 1; digits <= 160; ++digits) {
-        const auto length =
-            std::snprintf(buffer.data(), buffer.size(), "%.*f", digits, static_cast<double>(value));
-        if (length <= 0 || static_cast<std::size_t>(length) >= buffer.size())
-            break;
-        if (std::strtof(buffer.data(), nullptr) == value)
-            return {buffer.data(), static_cast<std::size_t>(length)};
-    }
-    throw std::runtime_error("cannot format a gain for Equalizer APO");
+    if (std::isnan(value))
+        throw std::runtime_error("cannot format a gain for Equalizer APO");
+    std::array<char, 64> buffer{};
+    const auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                                            std::chars_format::fixed);
+    if (error != std::errc{})
+        throw std::runtime_error("cannot format a gain for Equalizer APO");
+    std::string text(buffer.data(), end);
+    if (std::isfinite(value) && text.find('.') == std::string::npos)
+        text += ".0";
+    return text;
 }
 std::string term(float gain, const std::string& channel) {
     return gain == 1.0F ? channel : number(gain) + '*' + channel;

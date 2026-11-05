@@ -25,7 +25,7 @@
 
 namespace {
 // Allocations are counted only on a thread that sets `counting`, so the
-// unit's own worker thread (a Latency change) is not counted with a render.
+// unit's own Latency queue (a Latency change) is not counted with a render.
 thread_local bool counting = false;
 std::atomic<std::size_t> allocations{0};
 // When positive, the allocation that brings it to 0 fails, on any thread
@@ -193,8 +193,8 @@ void channel_capabilities() {
     require(b.output_silent(), "an empty 2 to 6 instance is not silent");
 }
 
-// Counts property notifications, which may arrive on the unit's worker
-// thread (a Latency change).
+// Counts property notifications, which may arrive on the unit's Latency
+// queue (a Latency change).
 struct Notifications {
     std::mutex lock;
     std::map<AudioUnitPropertyID, int> counts;
@@ -789,7 +789,7 @@ std::string value_name(Unit& unit, AudioUnitParameterID id, AudioUnitParameterVa
 // takes effect at once (jrp, 1 November 2026). Uninitialized, the reported
 // latency follows the choice. Initialized, a new processor with the chosen
 // block size replaces the running one at the next render, and the host is
-// told. Whatever thread sets it, the unit's own worker thread applies it. A
+// told. Whatever thread sets it, the unit's own Latency queue applies it. A
 // restored Latency applies even when the host started the unit first, as
 // GarageBand does. Saved with the settings.
 void latency_parameter() {
@@ -841,7 +841,7 @@ void latency_parameter() {
     const auto reports = [](Unit& u, double frames) {
         return eventually([&] { return u.seconds(kAudioUnitProperty_Latency) == frames / 48000; });
     };
-    // The unit's worker applies a choice: uninitialized, the reported latency
+    // The unit's Latency queue applies a choice: uninitialized, the reported latency
     // follows it, and the host is told once.
     seen.clear();
     set_parameter(unit, au::latency_parameter, 3);
@@ -873,7 +873,7 @@ void latency_parameter() {
 
     // Set from a pre-render callback on a new audio thread (john's review of
     // 1e0b045 found 63 allocations there): the render allocates nothing on
-    // that thread, and the worker applies the change.
+    // that thread, and the Latency queue applies the change.
     struct PreRender {
         AudioUnit unit;
         AudioUnitParameterValue index;
@@ -910,7 +910,7 @@ void latency_parameter() {
 
     // Set from the input callback while this (the main) thread renders
     // (john's review found a deadlock there): the render finishes, and the
-    // worker applies the change.
+    // Latency queue applies the change.
     OSStatus set_inside = noErr;
     unit.while_pulling = [&] {
         set_inside = AudioUnitSetParameter(unit.get(), au::latency_parameter,
@@ -973,7 +973,7 @@ void latency_parameter() {
             "after concurrent choices the audio is not delayed by the reported " +
                 std::to_string(last) + " frames");
 
-    // Out of memory at each allocation the worker makes for a change: the
+    // Out of memory at each allocation the Latency work makes for a change: the
     // reported latency is always the one the audio has, and a change is
     // never logged as failed once it plays (john's review: a failure while
     // formatting the log line reported a successful change as failed).
@@ -989,7 +989,7 @@ void latency_parameter() {
         fail_countdown = k;
         set_parameter(unit, au::latency_parameter, target);
         // Done when the change is logged, or when an allocation failed. The
-        // worker changes what plays only while it holds the unit's lock,
+        // Latency work changes what plays only while it holds the unit's lock,
         // which saving the state waits for.
         eventually([&] {
             return fail_countdown.load() == 0 ||

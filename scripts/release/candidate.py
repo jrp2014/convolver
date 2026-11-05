@@ -136,8 +136,6 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     ctest = str(Path(cmake).with_name('ctest')) if Path(cmake).is_absolute() else 'ctest'
     # The CMake development package is not shipped: its consumers run in the native
     # workflow (docs/develop/testing.md#which-configurations-run-which-tests).
-    # The watchdog's debugger check tests CI's tools, not the package, and runs
-    # there too: on the macos-15 arm64 candidate it ran on past CTest's timeout (CI-22).
     run(
         [
             ctest,
@@ -148,7 +146,7 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
             '--output-on-failure',
             *parallel(jobs),
             '-LE',
-            'consumer|debugger',
+            'consumer',
         ]
     )
     stage = work / 'stage'

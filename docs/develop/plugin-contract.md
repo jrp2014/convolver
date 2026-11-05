@@ -22,8 +22,8 @@ and are maintained here.
   sample rate and channels as soon as the host has settled them.
 - Every failure keeps a structured reason on the control side, for the host's
   log, LV2's status port and, later, a status display in the other formats.
-- Bypass ramps over 64 samples to the input delayed by the latency, or to
-  silence when the counts differ.
+- Bypass ramps over 1.33 ms (64 samples at 48 kHz) to the input delayed by
+  the latency, or to silence when the counts differ.
 - Gain and mix are host parameters whose defaults keep the sound unchanged
   ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
@@ -364,13 +364,13 @@ separate processes, so each carries values, never pointers:
   the restored configuration. There is no warm-up or crossfade, so output
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for one Latency block and crossfades for 256 frames, as described under
+  fresh history, warms up for one Latency block and crossfades for 5.33 ms, as described under
   [replacement and threads](#replacement-and-threads).
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
 ## Bypass
 
-Bypass ramps over 64 samples to the dry signal and back, with the dry path
+Bypass ramps over 1.33 ms to the dry signal and back, with the dry path
 delayed by the reported latency so wet and dry line up. Wet processing carries
 on during bypass, so switching back does not lose history.
 
@@ -408,7 +408,12 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
   the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
-  ramps linearly over 64 frames. The latency is fixed for a processor's life.
+  ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
+  replacement crossfade last a fixed time at every sample rate (PLUG-17):
+  64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. Bypass and mute step by the
+  reciprocal of that length, so at a few rates (11.025, 16, 176.4, 352.8
+  and 705.6 kHz) float rounding makes them a frame longer. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
@@ -446,18 +451,24 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   at once ([decisions](../project/decisions.md#plug-in-behaviour): GarageBand
   starts the unit before it restores a project, so waiting for the next
   `Initialize` would leave a saved Latency unused). Only the unit's own
-  worker thread applies a choice: `SetParameter` may arrive on any thread,
-  including an audio thread, a pre-render notification or the input
-  callback inside Render, so it stores the value and wakes the worker with
-  an atomic store and notify (no allocation, lock or wait); `RestoreState`
-  wakes it too. The worker reads the settings once, builds a processor with
-  the new block size and hands it to Render through an atomic pointer, and
-  the reported latency is the installed processor's. Render marks the
-  processor it uses for the length of each call, and the worker frees the
-  replaced one, without holding the control lock, as soon as Render no
-  longer marks it, waiting at most for the rest of one render call.
-  Uninitialized, `kAudioUnitProperty_Latency` simply follows the choice. The
-  host is told of the new latency and tail from the worker thread, and the
+  serial dispatch queue applies a choice: `SetParameter` may arrive on any
+  thread, including an audio thread, a pre-render notification or the input
+  callback inside Render, so it stores the value and wakes the queue
+  through a `DISPATCH_SOURCE_TYPE_DATA_OR` source (AU-12).
+  `dispatch_source_merge_data` is an atomic OR, then a wake-up that may
+  make a system call to ask for a thread; the open-source libdispatch
+  neither allocates nor takes a user-space lock there, but Apple does not
+  document it as real-time safe. Wakes that arrive before the work runs
+  coalesce into one run.
+  `RestoreState` wakes it too. The work reads the settings once, builds a
+  processor with the new block size and hands it to Render through an
+  atomic pointer, and the reported latency is the installed processor's.
+  Render marks the processor it uses for the length of each call, and the
+  work frees the replaced one, without holding the control lock, as soon as
+  Render no longer marks it, waiting at most for the rest of one render
+  call. Destroying the unit cancels the source and waits for work already
+  running. Uninitialized, `kAudioUnitProperty_Latency` simply follows the
+  choice. The host is told of the new latency and tail from the queue, and the
   log says what changed; the log line is best effort, so running out of
   memory while writing it does not undo or misreport a change. The new
   processor starts the fault count again, so the window's fault totals
@@ -517,7 +528,7 @@ any audio has been processed since activation or reset is installed directly.
 A reset (the host stopping and restarting processing) also ends a crossfade in
 progress, so the newer filter plays at once, and a filter published before
 audio resumes is installed directly. Later, a replacement runs for one Latency
-block to fill its latency, then crossfades for 256 samples. It starts with fresh
+block to fill its latency, then crossfades for 5.33 ms. It starts with fresh
 input history: it cannot reconstruct audio that preceded loading. Old engines
 are retired on the control thread. Pending changes coalesce to the newest; at
 most one transition and one pending replacement are retained, with up to two
@@ -537,10 +548,9 @@ everything it keeps (messages, the speaker notice) before calling the install
 callback, and nothing after the callback publishes can throw, so running out
 of memory never leaves one filter playing while another is saved. One audio
 thread calls process, reset, set_bypass and mute, and reads publications.
-`mute()` is for a failure
-found on the audio thread itself: the current filter ramps to silence over 64
-samples (or is silent from the first sample, when nothing has been processed
-since construction or reset) and stays silent until a filter published after
+`mute()` is for a failure found on the audio thread itself: the current
+filter ramps to silence over 1.33 ms, 64 frames at 48 kHz (or is silent from
+the first sample, when nothing has been processed since construction or reset) and stays silent until a filter published after
 the mute takes over and fades in from silence; one published before it but
 not yet picked up by the audio thread is silenced too. Bypass still passes the
 dry signal. `silence()` is the same mute requested from the control side, for

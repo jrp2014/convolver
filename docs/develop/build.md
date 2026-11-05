@@ -606,6 +606,36 @@ and standalone adapter tests enabled, but cannot produce release qualification.
 Use CI for actual bundle loading. Do not repeatedly retry a rejected local
 bundle, and do not disable system security checks.
 
+## Building for macOS before 14
+
+Every Mac build targets macOS 14.0 unless the first configure sets
+`CMAKE_OSX_DEPLOYMENT_TARGET` ([build options](#build-options)), and the
+preview packages need macOS 14. CI builds and tests nothing older, so
+everything below is untested. To build for an older macOS:
+
+- Set `-DCMAKE_OSX_DEPLOYMENT_TARGET=<version>` on the first configure of a
+  new build folder: the compiler and library checks made on a folder's
+  first configure are not repeated when the target changes.
+- Use libraries built for that version too. Homebrew's are built for the
+  Mac they are installed on, so build libsndfile (and FFTW, if used) with
+  the same deployment target; `scripts/release/build_dependencies.py` does
+  this for 14.0 (its `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0` line).
+- Use an Xcode whose compiler supports C++20, and C++23 for the Audio Unit.
+  A newer Xcode on a newer Mac can build for an older target.
+- **Before macOS 13.3** the Equalizer APO exporter (`convolver-equalizer-apo`,
+  built with the command-line tools) does not compile. It formats gains with
+  floating-point `std::to_chars` (IO-9), which Apple's C++ library provides
+  only from macOS 13.3, so the compiler reports `to_chars` as unavailable.
+  Either configure with `-DCONVOLVER_BUILD_CLI=OFF` (the library and
+  plug-ins only, without the command-line tools), or restore the
+  `snprintf` and `strtof` search that `number()` in
+  `portable/equalizer_apo.cpp` used before IO-9 (PR #109), for example
+  behind `__MAC_OS_X_VERSION_MIN_REQUIRED < 130300`. Both read back as
+  the same numbers; the text differs only for ±2^-96.
+- **Before macOS 11** nothing has been built: until PLUG-15 the VST3 and
+  Audio Unit targets were built for 11.0, so that was the oldest target any
+  build used.
+
 ## When a build fails
 
 | Message or symptom | Cause and fix |

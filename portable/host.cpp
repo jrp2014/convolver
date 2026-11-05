@@ -672,13 +672,27 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
     return line;
 }
 
-// PLUG-16: the lengths of HostProcessor's transitions, in frames at any
-// sample rate. Gain, mix, bypass and mute ramp linearly over setting_ramp; a
-// replacement, after playing for the Latency block, fades in over crossfade.
+// PLUG-17: HostProcessor's transitions last the same time at every sample
+// rate. Gain, mix, bypass and mute ramp linearly for 64 frames' worth at
+// 48 kHz (1.33 ms), and a replacement, after playing for the Latency block,
+// fades in for 256 frames' worth (5.33 ms), so 48 kHz plays exactly as the
+// fixed frame counts did (PLUG-16).
 namespace {
-constexpr std::size_t setting_ramp = 64;
-constexpr std::size_t crossfade = 256;
-constexpr float setting_ramp_step = 1.f / setting_ramp;
+constexpr int reference_rate = 48000;
+constexpr std::size_t setting_ramp_at_reference = 64;
+constexpr std::size_t crossfade_at_reference = 256;
+// Frames at `rate` lasting as long as `frames` at the reference rate, to the
+// nearest frame and at least 1.
+constexpr std::size_t frames_at(int rate, std::size_t frames) noexcept {
+    if (rate <= 0)
+        return frames; // The engine refuses the rate anyway.
+    const auto scaled = (static_cast<std::uint64_t>(rate) * frames + reference_rate / 2) /
+                        static_cast<std::uint64_t>(reference_rate);
+    return std::max<std::size_t>(1, static_cast<std::size_t>(scaled));
+}
+static_assert(frames_at(48000, 64) == 64 && frames_at(48000, 256) == 256);
+static_assert(frames_at(44100, 64) == 59 && frames_at(96000, 256) == 512);
+static_assert(frames_at(8000, 64) == 11 && frames_at(768000, 256) == 4096);
 } // namespace
 struct HostProcessor::Impl {
     struct Prepared {
@@ -692,6 +706,10 @@ struct HostProcessor::Impl {
     static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
     const int rate;
     const std::size_t inputs, outputs, maximum, block;
+    // PLUG-17: the ramps' and the crossfade's lengths at this rate.
+    const std::size_t setting_ramp = frames_at(rate, setting_ramp_at_reference);
+    const std::size_t crossfade = frames_at(rate, crossfade_at_reference);
+    const float setting_ramp_step = 1.f / static_cast<float>(setting_ramp);
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
