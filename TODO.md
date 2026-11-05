@@ -1195,6 +1195,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   96 kHz and above as at 48 kHz, which plays exactly as before;
   `native.host_settings` checks the lengths at 44.1, 48 and 96 kHz;
   [contract](docs/develop/plugin-contract.md#settings).
+- [x] **PLUG-18 — Exact bypass and mute ramp endpoints.** 5 November 2026,
+  PR #111, from the external review of `91fcf1f` (0.8.13): PLUG-17's bypass
+  and mute ramps summed a float step, so at 176.4 kHz they left about
+  2.4e-6 of unit input for one frame after their 235 frames. They now count
+  frames and reach exactly 0 or 1 on the last frame, also when reversed;
+  `native.host_settings` checks 8 kHz to 768 kHz;
+  [settings](docs/develop/plugin-contract.md#settings).
 - [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
   from the project review of that day: `HostProcessor`'s 64-frame setting,
   bypass and mute ramps and its 256-frame crossfade are named constants in

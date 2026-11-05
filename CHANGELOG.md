@@ -263,6 +263,12 @@ Until 1.0 the C++ API may change between minor versions.
   its first load is refused; the log and window then say memory ran out if
   the reason itself could not be kept. An accepted filter still keeps
   playing when a replacement fails.
+- Plug-ins (PLUG-18, from the same review): bypass and mute now end exactly
+  at the dry signal or silence on their last frame. Since PLUG-17 they
+  could leave about 2.4e-6 of the signal (-112 dB) for one frame at some
+  rates (176.4 kHz, for example). At 48 kHz and 96 kHz the output is
+  unchanged sample for sample; elsewhere it differs only by float rounding
+  during the 1.33 ms ramp.
 - Tests (CI-30): `native.engine` replaces `operator new` with the array and
   sized `operator delete` too, from one shared file, so GCC's
   AddressSanitizer build runs the oracle tests instead of stopping on

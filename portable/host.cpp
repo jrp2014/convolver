@@ -738,7 +738,6 @@ struct HostProcessor::Impl {
     // PLUG-17: the ramps' and the crossfade's lengths at this rate.
     const std::size_t setting_ramp = frames_at(rate, setting_ramp_at_reference);
     const std::size_t crossfade = frames_at(rate, crossfade_at_reference);
-    const float setting_ramp_step = 1.f / static_cast<float>(setting_ramp);
     Prepared* current = nullptr;
     Prepared* previous = nullptr;
     std::atomic<Prepared*> pending{nullptr}, retired{nullptr};
@@ -769,11 +768,18 @@ struct HostProcessor::Impl {
     std::size_t gain_ramp = 0, mix_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
     float mix_setting = 1, mix = 1, mix_target = 1, mix_step = 0;
-    float dry_mix = 0;
+    // Bypass and mute ramp by whole frames, counted out of setting_ramp, so
+    // they end exactly at 0 and 1 at every rate (PLUG-18): a float step
+    // summed setting_ramp times can miss by about 1e-6.
+    // The dry signal's share: setting_ramp under bypass, 0 otherwise.
+    std::size_t dry_frames = 0;
     // mute(): the current filter's level ramps to 0; the level of the filter
-    // being faded out keeps ramping if it was muted. Exactly 1 otherwise, so
-    // an unmuted filter's output is unchanged.
-    float level = 1, previous_level = 1;
+    // being faded out keeps ramping if it was muted. Exactly setting_ramp
+    // (level 1) otherwise, so an unmuted filter's output is unchanged.
+    std::size_t level_frames = setting_ramp, previous_level_frames = setting_ramp;
+    float share(std::size_t frames) const noexcept {
+        return static_cast<float>(frames) / static_cast<float>(setting_ramp);
+    }
     bool muted = false, previous_muted = false;
     // Publications up to this number were made before mute(): adopting one
     // keeps the silence. Only a filter published after it ends the silence.
@@ -871,14 +877,14 @@ struct HostProcessor::Impl {
             previous = nullptr;
         }
         current->engine.reset();
-        level = muted ? 0.f : 1.f;
-        previous_level = 1;
+        level_frames = muted ? 0 : setting_ramp;
+        previous_level_frames = setting_ramp;
         previous_muted = false;
         std::fill(dry.begin(), dry.end(), 0.f);
         dry_position = 0;
         warm = 0;
         fade = 0;
-        dry_mix = bypass ? 1.f : 0.f;
+        dry_frames = bypass ? setting_ramp : 0;
         // The stream starts again: the settings apply at once, without ramps.
         gain = gain_target = set_gain;
         mix = mix_target = target_mix();
@@ -895,7 +901,7 @@ struct HostProcessor::Impl {
         muted = true;
         muted_through = std::max(muted_through, through);
         if (!started)
-            level = 0;
+            level_frames = 0;
     }
     template <class T>
     bool process(std::span<const T* const> in, std::span<T* const> out,
@@ -914,7 +920,7 @@ struct HostProcessor::Impl {
             if (auto next = pending.exchange(nullptr, std::memory_order_acq_rel)) {
                 if (started) {
                     previous = current;
-                    previous_level = level;
+                    previous_level_frames = level_frames;
                     previous_muted = muted;
                     warm = block;
                     fade = 0;
@@ -929,7 +935,7 @@ struct HostProcessor::Impl {
                 // published filter takes over; PLUG-7 found the adoption of an
                 // earlier publication lifting it).
                 muted = muted && next->number <= muted_through;
-                level = muted ? 0.f : 1.f;
+                level_frames = muted ? 0 : setting_ramp;
             }
         }
         retarget();
@@ -971,8 +977,10 @@ struct HostProcessor::Impl {
                     blend = static_cast<float>(fade) / crossfade;
                 }
             }
-            dry_mix =
-                std::clamp(dry_mix + (bypass ? setting_ramp_step : -setting_ramp_step), 0.f, 1.f);
+            if (bypass && dry_frames < setting_ramp)
+                ++dry_frames;
+            else if (!bypass && dry_frames)
+                --dry_frames;
             if (gain_ramp && --gain_ramp)
                 gain += gain_step;
             else
@@ -981,10 +989,12 @@ struct HostProcessor::Impl {
                 mix += mix_step;
             else
                 mix = mix_target;
-            if (muted)
-                level = std::max(0.f, level - setting_ramp_step);
-            if (previous_muted)
-                previous_level = std::max(0.f, previous_level - setting_ramp_step);
+            if (muted && level_frames)
+                --level_frames;
+            if (previous_muted && previous_level_frames)
+                --previous_level_frames;
+            const float dry_mix = share(dry_frames), level = share(level_frames),
+                        previous_level = share(previous_level_frames);
             for (std::size_t c = 0; c < outputs; ++c) {
                 // Bypass passes input c to output c when the counts are equal. With
                 // unequal counts it plays silence on every output (owner's decision,
@@ -1020,7 +1030,7 @@ struct HostProcessor::Impl {
         if (previous && !warm && fade == crossfade) {
             retire(previous);
             previous = nullptr;
-            previous_level = 1;
+            previous_level_frames = setting_ramp;
             previous_muted = false;
         }
         return true;
