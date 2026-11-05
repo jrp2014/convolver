@@ -202,6 +202,10 @@ Until 1.0 the C++ API may change between minor versions.
   and Audio Unit folders used to force 11.0 for their own targets after
   `project()`, so a developer's plug-in build targeted another macOS than
   the packages and the core it links.
+- Build (FFT-4): the Apple vDSP kernel experiment
+  (`CONVOLVER_EXPERIMENT_VDSP_MAC`, `portable/kernels_vdsp.cpp`) is removed.
+  It was off by default and its 24 October results kept the existing
+  kernels; no build that ships changes.
 
 ### Fixed
 

@@ -1066,6 +1066,11 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   macOS build, the command-line tools included, uses Accelerate unless built
   with `-DCONVOLVER_FFT_BACKEND=FFTW`;
   [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses).
+- [x] **FFT-4 — Remove the finished vDSP experiment.** 5 November 2026, PR #108,
+  from the project review of that day: `portable/kernels_vdsp.cpp` and the
+  `CONVOLVER_EXPERIMENT_VDSP_MAC` option are gone; the
+  [24 October results](docs/archive/reviews/2026-10-24-apple-vdsp.md) stay
+  archived; the code can be rebuilt from `f3299e0` (0.8.10) or earlier.
 - [x] **IO-3 — More output containers.** 23 October 2026, PR #60;
   [output formats](docs/use/command-line.md#output-formats).
 - [x] **IO-4 — Raw filters and raw sample types.** 24 October 2026, PR #60;

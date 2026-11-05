@@ -192,16 +192,6 @@ if(CONVOLVER_BUILD_NATIVE)
         set_source_files_properties(portable/kernels.cpp PROPERTIES COMPILE_OPTIONS "${contract_options}")
         set_source_files_properties(portable/kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "${avx2_options}")
     endif()
-    # Experimental only: compare vDSP arithmetic with the existing split kernels.
-    option(CONVOLVER_EXPERIMENT_VDSP_MAC "Benchmark vDSP complex accumulation (Apple only)" OFF)
-    if(CONVOLVER_EXPERIMENT_VDSP_MAC)
-        if(NOT APPLE)
-            message(FATAL_ERROR "The vDSP MAC experiment requires Apple Accelerate.")
-        endif()
-        target_sources(convolver_core PRIVATE portable/kernels_vdsp.cpp)
-        target_compile_definitions(convolver_core PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
-        target_link_libraries(convolver_core PRIVATE "-framework Accelerate")
-    endif()
     add_library(convolver_host STATIC portable/host.cpp portable/host_log.cpp portable/host_report.cpp
         portable/recent_files.cpp portable/state.cpp)
     add_library(Convolver::host ALIAS convolver_host)
@@ -329,9 +319,6 @@ if(CONVOLVER_BUILD_NATIVE)
             SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.engine convolver_engine_tests
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
-        if(CONVOLVER_EXPERIMENT_VDSP_MAC)
-            target_compile_definitions(convolver_engine_tests PRIVATE CONVOLVER_EXPERIMENT_VDSP_MAC)
-        endif()
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         convolver_native_test(native.host convolver_host_tests
