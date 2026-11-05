@@ -136,6 +136,12 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
+- [ ] **DIAG-2 — Actionable diagnostics.** From jrp's request of 5 November
+  2026: messages that state the problem, its cause and the fix plainly, with
+  troubleshooting context for environment and design limits, and an inline
+  fix button in the plug-in window where one applies, without losing DIAG-1's
+  explanations. [Plan](docs/project/plans/2026-11-05-actionable-diagnostics.md)
+  with jrp's decisions.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
