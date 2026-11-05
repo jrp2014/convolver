@@ -241,7 +241,8 @@ Shared work, done once for all three formats:
   installer package for `/Library/Audio/Plug-Ins/Components`, its debugging
   symbols, notices and SDK source, checked by `release.stage`,
   `verify_artifact.py`, `symbols.py` and, after installing the `.pkg` on the
-  CI runner, `auval -strict` on the installed component
+  CI runner, `auval -strict` on the installed component; all of these first
+  passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224) (`cdb99d6`)
   ([what a package holds](docs/develop/releasing.md#what-a-package-holds)).
   Still needed for the first preview, all outside the pipeline: HOST-1 and
   AU-4 from one exact candidate, REL-3's walkthrough of its files, and jrp's
@@ -376,7 +377,8 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   changes it, with `Convolver-au.dSYM`, the AudioUnitSDK notice and source,
   and its own installer package (receipt `io.github.jrp2014.convolver.pkg.au`);
   the install guide covers the Components folder and quarantine removal. CI
-  installs the `.pkg` and runs `auval -strict` on the installed component.
+  installs the `.pkg` and runs `auval -strict` on the installed component;
+  first passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224) (`cdb99d6`), window listed.
   Remaining for the preview: AU-4's GarageBand smoke test from that
   candidate; then the production gate.
 - [ ] **AU-6 — Editor window.** Custom properties (IDs from 64000) for the
