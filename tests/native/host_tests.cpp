@@ -953,8 +953,11 @@ void allocation_failures() {
                 std::string(c.name) + " with " + std::to_string(limit) + " allocations: ";
             require(audible == saved_sound(f), (what + "what plays is not what is saved").c_str());
             if (!done)
-                require(audible == before && f.filter().has_value() == c.before.has_value(),
-                        (what + "a rejected load changed the previous state").c_str());
+                require(audible == before && f.filter().has_value() == c.before.has_value() &&
+                            f.failed() == !c.before,
+                        (what + "a rejected load changed the previous state, or a refused "
+                                "first load did not fail the instance (ROBUST-7)")
+                            .c_str());
         }
     }
     // The notice is kept with the filter it describes.
@@ -962,6 +965,59 @@ void allocation_failures() {
     f.load(HostState{filter(2)}, host, [](const Configuration&) {});
     require(!f.notice().empty(), "speaker notice not kept");
 }
+// ROBUST-7: a failure is first recorded without allocating, so a failed first
+// load fails the instance (silence, saved as failed) however early memory
+// runs out. reject() then keeps its kind, request number and message without
+// the path; load() refused before even its message could be built keeps a
+// record without one, which failure_message() explains. An accepted filter
+// is kept, and the instance does not fail.
+void unrecorded_failures() {
+    const HostLayout host{48000, 2, 2};
+    const Configuration stereo{48000, 2, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+    const std::function<void(const Configuration&)> install = [](const Configuration&) {};
+    for (const bool kept : {false, true}) {
+        const std::string label = kept ? " over an accepted filter" : " as a first load";
+        HostFilter f(8);
+        if (kept)
+            f.load(HostState{stereo}, host, install);
+        std::string why = "the filter file could not be read, and this sentence is long";
+        HostRequest request{HostFilterSource::file, "/a/folder/with/a/long/name/filter.wav", 0};
+        const auto expected = why;
+        allocations_left = 0;
+        f.reject(HostFailureKind::filter_file, std::move(why), std::move(request));
+        allocations_left = -1;
+        const auto& r = f.failure();
+        require(f.failed() == !kept && f.filter().has_value() == kept && r &&
+                    r->kind == HostFailureKind::filter_file && r->silent == !kept &&
+                    r->request.source == HostFilterSource::file && r->request.number > 0 &&
+                    r->request.path.empty() && r->message == expected,
+                ("reject() with no memory" + label).c_str());
+
+        HostFilter g(8);
+        if (kept)
+            g.load(HostState{stereo}, host, install);
+        Configuration nine{48000, 9, 9, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
+        HostState refused{std::move(nine)};
+        bool threw = false;
+        allocations_left = 0;
+        try {
+            g.load(std::move(refused), host, install);
+        } catch (...) {
+            threw = true;
+        }
+        allocations_left = -1;
+        const auto& q = g.failure();
+        require(threw && g.failed() == !kept && g.filter().has_value() == kept && q &&
+                    q->kind == HostFailureKind::preparation && q->silent == !kept &&
+                    q->message.empty() &&
+                    failure_message(*q).find("memory ran out") != std::string::npos,
+                ("load() refused with no memory" + label).c_str());
+        const auto status = host_status(g, host);
+        require(status.status == HostStatus::load_failed,
+                ("status after load() refused with no memory" + label).c_str());
+    }
+}
+
 // PLUG-12: a filter is accepted only if its saved state fits. Loading a
 // filter one sample over the limit is refused before anything is installed,
 // keeping the previous filter and what it saves byte for byte (or, for an
@@ -1614,6 +1670,7 @@ int main() {
         muting();
         control_silence();
         allocation_failures();
+        unrecorded_failures();
         saved_state_limit();
         status_lines();
         processing_faults();

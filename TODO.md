@@ -1215,6 +1215,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   allocate or fail, in VST3, the Audio Unit and LV2; lifecycle sequence
   `state-malformed-starved`;
   [replacement and threads](docs/develop/plugin-contract.md#replacement-and-threads).
+- [x] **ROBUST-7 — A failed first load fails however early memory runs
+  out.** 5 November 2026, PR #111, from the external review of `91fcf1f`
+  (0.8.13), which reproduced it: `HostFilter::record` copied the request
+  before marking the instance failed, so with allocations failing a refused
+  first load left `failed()` false and the adapters let the input through.
+  The failure is now marked first without allocating
+  (`HostFilter::fail_request()`), with a record of its kind and request
+  number; `reject()` never throws; VST3, the Audio Unit and LV2 also mark it
+  when memory runs out building the message; an accepted filter is kept.
+  Lifecycle sequences now require it after every starved attempt
+  (`native.host` `unrecorded_failures` too);
+  [status and log](docs/develop/plugin-contract.md#status-and-log).
 - [x] **ROBUST-4 — Low-memory quantizer and non-finite gain estimates.**
   24 October 2026, PR #72, from jrp's review of 0.4.43: `Quantizer` allocates
   in its constructor, so out of memory reaches the caller, and

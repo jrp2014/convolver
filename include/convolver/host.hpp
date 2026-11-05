@@ -286,27 +286,38 @@ class HostFilter {
     // recorded or changed (a newer request has arrived). Without `host`, well-formed state is
     // accepted and checked at activation. On rejection this records the error, keeps the accepted
     // filter (a failed initial load if there was none) and throws std::invalid_argument with an
-    // explanation. A transaction: everything kept is built before `install` is called and nothing
-    // after it throws, so `install` must publish as its last step (prepare, which may throw, then
-    // publish, which cannot). What plays is then always what is saved, even when memory runs out.
-    // `request` says where the state came from (numbered if 0).
-    // `counting`: the processor that plays (if any). An accepted load clears
-    // its fault baseline (HostProcessor::clear_faults()) and observes from the
-    // same snapshot, so faults shown afterwards are only the new filter's.
+    // explanation, or std::bad_alloc when memory runs out even for that; failed() is set before
+    // anything is allocated for the record (ROBUST-7). A transaction: everything kept is built
+    // before `install` is called and nothing after it throws, so `install` must publish as its last
+    // step (prepare, which may throw, then publish, which cannot). What plays is then always what
+    // is saved, even when memory runs out. `request` says where the state came from (numbered if
+    // 0). `counting`: the processor that plays (if any). An accepted load clears its fault baseline
+    // (HostProcessor::clear_faults()) and observes from the same snapshot, so faults shown
+    // afterwards are only the new filter's.
     void load(HostState, const std::optional<HostLayout>& host,
               const std::function<void(const Configuration&)>& install = {},
               HostRequest request = {}, HostProcessor* counting = nullptr);
     // A load that failed before decoding (malformed state, unreadable file):
-    // recorded as load() records a rejection. Does not throw.
+    // recorded as load() records a rejection. Does not throw: if memory runs
+    // out, the record keeps the kind and the request's number and source
+    // without its path (ROBUST-7).
     // `carried`, when given, is the filter the request held (a readable file
     // made for another rate or other channels): the failure keeps its rate
     // and counts for the short status text. Its paths are not used.
     void reject(HostFailureKind, std::string why, HostRequest request = {},
-                const Configuration* carried = nullptr);
+                const Configuration* carried = nullptr) noexcept;
     // The same, as unreadable state.
-    void reject(std::string why) {
+    void reject(std::string why) noexcept {
         reject(HostFailureKind::state_unreadable, std::move(why));
     }
+    // ROBUST-7: a request failed, recorded or not. Without an accepted filter
+    // the instance now fails (failed()): it plays silence, and saved state
+    // records the failure. Allocates nothing, so it cannot fail. reject() and
+    // a refused load() do this before they record anything; an adapter also
+    // calls it when a request fails before its failure can be recorded (memory
+    // ran out building the message), and then mutes as for any failed first
+    // load. failure() may then be missing, or describe an earlier request.
+    void fail_request() noexcept;
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back.
@@ -335,6 +346,8 @@ class HostFilter {
     [[noreturn]] void refuse(HostFailureKind, std::string why, const HostRequest&,
                              const Configuration*);
     void record(HostFailureKind, std::string why, const HostRequest&, const Configuration*);
+    HostFailure& record_unexplained(HostFailureKind, const HostRequest&,
+                                    const Configuration*) noexcept;
     std::size_t max_channels_;
     std::optional<Configuration> filter_;
     double peak_ = 0;      // filter_peak()

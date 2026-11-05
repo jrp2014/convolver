@@ -572,7 +572,9 @@ void Processor::install(HostState next, const HostRequest& request, bool restore
 }
 void Processor::refused(bool was_failed) noexcept {
     // A failed first load plays silence rather than the unfiltered input,
-    // without allocating: memory may have run out (ROBUST-3).
+    // without allocating: memory may have run out (ROBUST-3), maybe before
+    // the failure could be recorded (ROBUST-7).
+    filter_.fail_request();
     if (host_ && filter_.failed() && !was_failed)
         host_->silence();
     if (!host_ && filter_.failed())

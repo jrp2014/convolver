@@ -136,6 +136,15 @@ std::string preparation_message(const std::string& what) {
          {}});
 }
 
+const std::string& failure_message(const HostFailure& f) {
+    static const std::string unrecorded =
+        advice_text({"the load failed, and memory ran out before Convolver could record why",
+                     "Memory had run out.",
+                     "Close other projects or programs, then load the filter again.",
+                     {}});
+    return f.message.empty() ? unrecorded : f.message;
+}
+
 std::string state_read_message(const std::exception& e) {
     auto a = detail::parse_advice(e.what());
     a.problem = "the saved state could not be read: " + a.problem;
@@ -213,23 +222,38 @@ HostRequest HostFilter::numbered(HostRequest request) {
     return request;
 }
 
-void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
-                        const Configuration* carried) {
-    // Build everything first, so running out of memory changes nothing.
-    HostFailure f;
+void HostFilter::fail_request() noexcept {
+    if (!filter_)
+        failed_ = true;
+}
+
+HostFailure& HostFilter::record_unexplained(HostFailureKind kind, const HostRequest& request,
+                                            const Configuration* carried) noexcept {
+    // ROBUST-7: what needs no memory, so that running out afterwards still
+    // leaves the request failed: an instance with no filter fails (plays
+    // silence, saves the failure), and the record names the request and the
+    // kind of failure, without the message or the file's path.
+    fail_request();
+    HostFailure& f = load_failure_.emplace(); // Empty strings: nothing allocated.
     f.kind = kind;
-    f.request = request;
+    f.request.source = request.source;
+    f.request.number = request.number;
     if (carried) {
         f.sample_rate = carried->sample_rate;
         f.inputs = carried->input_channels;
         f.outputs = carried->output_channels;
     }
     f.silent = !filter_;
+    return f;
+}
+
+void HostFilter::record(HostFailureKind kind, std::string why, const HostRequest& request,
+                        const Configuration* carried) {
+    auto& f = record_unexplained(kind, request, carried);
     // DIAG-2: what failed, why and what to do; what plays instead follows
     // from `silent` (failure_consequence() in host_log.hpp).
     f.message = std::move(why);
-    failed_ = f.silent;
-    load_failure_ = std::move(f);
+    f.request = request; // May run out of memory; the record above stands.
 }
 
 namespace {
@@ -346,7 +370,9 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     } catch (const SupersededRequest&) {
         throw;
     } catch (...) {
-        // Out of memory building a message, or a non-standard exception.
+        // Out of memory building a message, or a non-standard exception:
+        // recorded first without a message, in case that fails too (ROBUST-7).
+        record_unexplained(HostFailureKind::preparation, request, carried);
         refuse(HostFailureKind::preparation, preparation_message({}), request, carried);
     }
     // The commit, which cannot throw.
@@ -378,8 +404,11 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
 }
 
 void HostFilter::reject(HostFailureKind kind, std::string why, HostRequest request,
-                        const Configuration* carried) {
-    record(kind, std::move(why), numbered(std::move(request)), carried);
+                        const Configuration* carried) noexcept {
+    try {
+        record(kind, std::move(why), numbered(std::move(request)), carried);
+    } catch (...) { // Out of memory for the path: recorded without it (ROBUST-7).
+    }
 }
 
 Configuration HostFilter::activate(const HostLayout& host) {

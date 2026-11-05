@@ -303,7 +303,12 @@ format.
   empty instance's first load fails, every adapter silences the processor
   that plays with `HostProcessor::silence()` (ROBUST-3) rather than
   `activate()`, which would restart the fault count; it neither allocates
-  nor fails, so the silence holds even when memory has run out. The audio
+  nor fails, so the silence holds even when memory has run out. Reaching it
+  cannot fail either (ROBUST-7): `HostFilter` marks the instance failed
+  (`fail_request()`) before it allocates anything for the record, which
+  keeps the kind and request number even without the message or path, and
+  each adapter's handler for a request that throws calls `fail_request()`
+  too, for memory that ran out while the message was built. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends

@@ -255,6 +255,14 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Plug-ins (ROBUST-7, from an external review of `91fcf1f`): when memory ran
+  out while a refused first load was being recorded, VST3, the Audio Unit
+  and LV2 could go on passing the unfiltered input, and saved state did not
+  record the failure. The failure is now marked before anything is
+  allocated, so the instance plays silence and saves the failure whenever
+  its first load is refused; the log and window then say memory ran out if
+  the reason itself could not be kept. An accepted filter still keeps
+  playing when a replacement fails.
 - VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
   proxy between the plug-in's two halves and delivers their messages later,
   a new Latency asked the host to restart before the processor had it, so

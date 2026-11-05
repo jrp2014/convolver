@@ -160,12 +160,28 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
 }
 
 // An empty instance that fails its first load plays silence, not identity,
-// without allocating: memory may have run out (ROBUST-3).
+// without allocating: memory may have run out (ROBUST-3), maybe before the
+// failure could be recorded (ROBUST-7).
 void Effect::silence_failed_first_load(bool was_failed) noexcept {
+    filter_.fail_request();
     if (host_ && filter_.failed() && !was_failed)
         host_->silence();
     if (!host_ && filter_.failed())
         tail_.store(0);
+}
+
+// ROBUST-7: a request that failed before its failure could be recorded
+// (memory ran out building the message) still fails a first load.
+void Effect::fail_unrecorded() noexcept {
+    try {
+        {
+            std::lock_guard lock(control_);
+            silence_failed_first_load(filter_.failed());
+            update_status();
+        }
+        notify_status();
+    } catch (...) { // The lock could not be taken.
+    }
 }
 
 void Effect::reject(HostFailureKind kind, const std::string& why, const HostRequest& request,
@@ -315,54 +331,16 @@ OSStatus Effect::load_file(const std::string& path) {
 }
 
 OSStatus Effect::RestoreState(CFPropertyListRef plist) {
-    if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
-        reject(HostFailureKind::state_unreadable,
-               detail::advice_text({"the saved state is not an Audio Unit preset dictionary",
-                                    {},
-                                    "Load the filter again, then save the project.",
-                                    {}}));
-        return kAudioUnitErr_InvalidPropertyValue;
-    }
-    const auto dict = static_cast<CFDictionaryRef>(plist);
     HostState next;
-    try {
-        if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
-            throw std::invalid_argument(why);
-        const auto value = CFDictionaryGetValue(dict, state_key());
-        if (!value || CFGetTypeID(value) != CFDataGetTypeID())
-            throw std::invalid_argument(detail::advice_text(
-                {"the preset holds no Convolver filter (it has no convolver-state entry)",
-                 {},
-                 "Make the preset with convolver-preset, or save it from Convolver in the host.",
-                 {}}));
-        const auto data = static_cast<CFDataRef>(value);
-        const auto size = static_cast<std::size_t>(CFDataGetLength(data));
-        if (size > max_host_state_bytes)
-            throw std::invalid_argument("the saved filter is larger than the 64 MiB limit");
-        next = decode_host_state(
-            std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
-    } catch (const NewerHostState& e) {
-        reject(HostFailureKind::state_newer, state_read_message(e));
-        return kAudioUnitErr_InvalidPropertyValue;
-    } catch (const std::exception& e) {
-        reject(HostFailureKind::state_unreadable, state_read_message(e));
-        return kAudioUnitErr_InvalidPropertyValue;
-    }
-
-    // AU-7: the settings as saved with the state, applied if the state is
-    // accepted. A preset from convolver-preset has none, and settings it does
-    // not hold keep their values.
     std::optional<SavedSettings> saved;
     bool settings_unreadable = false;
-    if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
-        data && CFGetTypeID(data) == CFDataGetTypeID()) {
-        try {
-            saved = saved_parameters(static_cast<CFDataRef>(data));
-        } catch (...) { // Out of memory: the settings are left as they are.
-        }
-        settings_unreadable = !saved;
+    try {
+        if (!read_state(plist, next, saved, settings_unreadable))
+            return kAudioUnitErr_InvalidPropertyValue;
+    } catch (...) { // Out of memory for the failure's message (ROBUST-7).
+        fail_unrecorded();
+        return kAudioUnitErr_InvalidPropertyValue;
     }
-
     const bool accepted =
         install(std::move(next), {}, saved ? &*saved : nullptr, settings_unreadable);
     if (!accepted)
@@ -383,11 +361,63 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     // The preset name and element names, as AUBase restores them. Its "data"
     // (parameter values) is left out: the settings were read above with bounds
     // checks, and AUBase reads that blob without them.
+    const auto dict = static_cast<CFDictionaryRef>(plist);
     const cf_owned<CFMutableDictionaryRef> copy(CFDictionaryCreateMutableCopy(nullptr, 0, dict));
     if (!copy)
         return noErr;
     CFDictionaryRemoveValue(copy.get(), CFSTR(kAUPresetDataKey));
     static_cast<void>(AUBase::RestoreState(copy.get()));
     return noErr;
+}
+
+// RestoreState's checks and decoding, before anything changes. Returns false
+// after recording why the state was refused.
+bool Effect::read_state(CFPropertyListRef plist, HostState& next,
+                        std::optional<SavedSettings>& saved, bool& settings_unreadable) {
+    if (!plist || CFGetTypeID(plist) != CFDictionaryGetTypeID()) {
+        reject(HostFailureKind::state_unreadable,
+               detail::advice_text({"the saved state is not an Audio Unit preset dictionary",
+                                    {},
+                                    "Load the filter again, then save the project.",
+                                    {}}));
+        return false;
+    }
+    const auto dict = static_cast<CFDictionaryRef>(plist);
+    try {
+        if (auto why = foreign(dict, GetComponentDescription()); !why.empty())
+            throw std::invalid_argument(why);
+        const auto value = CFDictionaryGetValue(dict, state_key());
+        if (!value || CFGetTypeID(value) != CFDataGetTypeID())
+            throw std::invalid_argument(detail::advice_text(
+                {"the preset holds no Convolver filter (it has no convolver-state entry)",
+                 {},
+                 "Make the preset with convolver-preset, or save it from Convolver in the host.",
+                 {}}));
+        const auto data = static_cast<CFDataRef>(value);
+        const auto size = static_cast<std::size_t>(CFDataGetLength(data));
+        if (size > max_host_state_bytes)
+            throw std::invalid_argument("the saved filter is larger than the 64 MiB limit");
+        next = decode_host_state(
+            std::span(reinterpret_cast<const std::byte*>(CFDataGetBytePtr(data)), size));
+    } catch (const NewerHostState& e) {
+        reject(HostFailureKind::state_newer, state_read_message(e));
+        return false;
+    } catch (const std::exception& e) {
+        reject(HostFailureKind::state_unreadable, state_read_message(e));
+        return false;
+    }
+
+    // AU-7: the settings as saved with the state, applied if the state is
+    // accepted. A preset from convolver-preset has none, and settings it does
+    // not hold keep their values.
+    if (const auto data = CFDictionaryGetValue(dict, CFSTR(kAUPresetDataKey));
+        data && CFGetTypeID(data) == CFDataGetTypeID()) {
+        try {
+            saved = saved_parameters(static_cast<CFDataRef>(data));
+        } catch (...) { // Out of memory: the settings are left as they are.
+        }
+        settings_unreadable = !saved;
+    }
+    return true;
 }
 } // namespace convolver::au

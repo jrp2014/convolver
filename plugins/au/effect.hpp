@@ -151,10 +151,11 @@ class Effect final : public ausdk::AUBase {
     // counted before it (observe_faults()) and the refusal, and notifies.
     void reject(HostFailureKind, const std::string& why, const HostRequest& = {},
                 const Configuration* carried = nullptr);
-    // Under `control_`, after a request failed: if it was the first load to
-    // fail (`was_failed` is filter_.failed() from before it), the unit plays
-    // silence rather than the unfiltered input; uninitialized, a failed
-    // filter's tail is 0.
+    // Under `control_`, after a request failed: marks it failed
+    // (HostFilter::fail_request(), in case it could not be recorded); if it
+    // was the first load to fail (`was_failed` is filter_.failed() from
+    // before it), the unit plays silence rather than the unfiltered input;
+    // uninitialized, a failed filter's tail is 0.
     void silence_failed_first_load(bool was_failed) noexcept;
     // The settings as a saved state holds them.
     using SavedSettings = std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue>>;
@@ -165,6 +166,14 @@ class Effect final : public ausdk::AUBase {
                  bool settings_unreadable);
     // AU-6: a filter file chosen in the window (load_property).
     OSStatus load_file(const std::string& path);
+    // RestoreState's checks and decoding, before anything changes: false
+    // after recording why the state was refused (reject()).
+    bool read_state(CFPropertyListRef, HostState& next, std::optional<SavedSettings>& saved,
+                    bool& settings_unreadable);
+    // ROBUST-7: a request that failed before its failure could be recorded
+    // (memory ran out building the message) still fails a first load, as
+    // silence_failed_first_load() says; then notifies. Takes `control_`.
+    void fail_unrecorded() noexcept;
     // Records an initialization that could not build the processor (PLUG-8);
     // returns the message to log. Called under `control_`.
     std::string activation_failed(const char* why) noexcept;

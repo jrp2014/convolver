@@ -166,7 +166,7 @@ std::string rejected_line(const HostFilter& filter, bool started) {
                                        "not play): "
             : started                ? "Not loaded; the previous filter keeps playing: "
                                      : "Not loaded; the previous filter is kept: ") +
-           detail::advice_line(r->message);
+           detail::advice_line(failure_message(*r));
 }
 
 std::string setting_text(double value, double low, double high) {
@@ -234,7 +234,7 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
     };
     if (const auto& f = filter.failure(); f && f->silent)
         return failure_consequence(*f, &host, used) + " " +
-               detail::as_sentence(detail::advice_line(f->message));
+               detail::as_sentence(detail::advice_line(failure_message(*f)));
     if (const auto& c = filter.filter()) {
         auto line = "Playing " + filter_words(*c) + ".";
         if (!filter.notice().empty())
