@@ -224,6 +224,20 @@ template <class Done> bool eventually(Done done) {
     return done();
 }
 
+// AU-14: waits until a run of the Latency work that saw every request made so
+// far has finished, logged and told the host: a completion witness rather
+// than a sleep. The 10 s deadline only catches a deadlock.
+bool latency_settled() {
+    const auto target = au::latency_requests_for_tests.load();
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (au::latency_done_for_tests.load() < target) {
+        if (std::chrono::steady_clock::now() > until)
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return true;
+}
+
 void timing_in_seconds() {
     Unit unit;
     Notifications seen;
@@ -849,7 +863,8 @@ void latency_parameter() {
             "no notification for a new Latency");
     require(reports(unit, 512), "uninitialized latency is not the chosen 512 frames");
     set_parameter(unit, au::latency_parameter, 3);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // The work for that choice has finished, so a notification would have come.
+    require(latency_settled(), "the Latency work for an unchanged choice did not finish");
     require(seen.of(kAudioUnitProperty_Latency) == 1, "a notification without a change");
     check(unit.initialize(), "initialization at 512 frames");
     require(impulse_delay(unit) == 512, "the audio is not delayed by 512 frames");
@@ -997,7 +1012,10 @@ void latency_parameter() {
         });
         completed = fail_countdown.exchange(0) > 0; // No allocation failed.
         CFRelease(unit.class_info_now());
-        std::this_thread::sleep_for(std::chrono::milliseconds(20)); // For its log line.
+        // The work logs after releasing the lock that saving waits for, so
+        // wait for the run itself to finish before reading the log.
+        require(latency_settled(),
+                "allocation failure " + std::to_string(k) + ": the Latency work did not finish");
         const auto reported = std::lround(unit.seconds(kAudioUnitProperty_Latency) * 48000);
         require(reported == before || reported == frames, "allocation failure " +
                                                               std::to_string(k) + ": reported " +

@@ -131,6 +131,11 @@ Until 1.0 the C++ API may change between minor versions.
   failed. `native.load_timing_harness` tests the verdicts on made-up records
   instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
   no change to the plug-ins or the sound.
+- Tests (AU-14, from jrp's review of `db54160`): `au.adapter` waits for the
+  Audio Unit's Latency work to finish, through a completion witness, instead
+  of sleeping 100 ms and 20 ms before checking its notification and log
+  line. The component counts Latency requests with a lock-free increment
+  for this; no change to the sound.
 - Tests (PERF-13, from jrp's review of `db54160`): each load-timing test
   writes every callback's record, each phase's summary and each run's
   verdict, with the Convolver version, build, compiler, FFT backend and

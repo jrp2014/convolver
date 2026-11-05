@@ -788,7 +788,15 @@ Five CTest tests run when the adapter is built (label `au`):
   allocation the worker makes for a change (the reported latency always
   matches the audio, and a change that plays is never logged as failed),
   and saving and restoring it, also after the unit has started
-  (GarageBand's order).
+  (GarageBand's order). Where a check needs the Latency work to have
+  finished (no second notification for an unchanged choice; the log line
+  after an allocation failure), it waits for a completion witness rather
+  than a fixed time (AU-14, from jrp's review of `db54160`): every request
+  takes a number, and each run of the work, once it has logged and told
+  the host, records the number it had seen when it began
+  (`latency_requests_for_tests` and `latency_done_for_tests` in
+  `plugins/au/effect.hpp`; a lock-free increment per request in the
+  component). The wait's 10 s deadline only catches a deadlock.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a

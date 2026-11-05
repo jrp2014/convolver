@@ -67,6 +67,17 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 // au.adapter can check that the unit then fails to open cleanly. 0 in the
 // component.
 inline int latency_queue_failure_for_tests = 0;
+// For the tests only (AU-14, from jrp's review of db54160): a witness that
+// the Latency work has finished, in place of a sleep. Each request
+// (request_latency()) takes the next number; each run of the work, once it
+// has finished (logged, the host told), raises latency_done_for_tests to
+// the number it had seen when it began. A test that reads
+// latency_requests_for_tests after its change and waits until
+// latency_done_for_tests reaches it knows that a run that saw the change has
+// finished. Shared by every unit in the process; a lock-free atomic
+// increment is all a request adds, on any thread.
+inline std::atomic<std::uint64_t> latency_requests_for_tests{0};
+inline std::atomic<std::uint64_t> latency_done_for_tests{0};
 
 // One input bus and one output bus, 1 to 8 channels each (counts may differ),
 // following the shared adapter contract
