@@ -791,17 +791,20 @@ Five CTest tests run when the adapter is built (label `au`):
   (GarageBand's order). Where a check needs the Latency work to have
   finished (no second notification for an unchanged choice; the log line
   after an allocation failure), it waits for a completion witness rather
-  than a fixed time (AU-14, from jrp's review of `db54160`): every request
-  takes a number, and each run of the work, once it has logged and told
-  the host, records the number it had seen when it began
-  (`latency_requests_for_tests` and `latency_done_for_tests` in
-  `plugins/au/effect.hpp`; a lock-free increment per request in the
-  component). The wait's 10 s deadline only catches a deadlock. Closing the
-  unit is also tested at chosen stages (PLUG-20): a run of the Latency work
-  is held at its start through `latency_started_for_tests`, alone and with
-  another change queued behind it, while another thread closes the unit;
-  closing must finish once the run is released, and a 60 s watchdog names
-  the stage that did not.
+  than a fixed time (AU-14, from jrp's reviews of `db54160` and `5f47ecb`):
+  each unit numbers its requests, and each run of its work, once it has
+  logged and told the host, reports the number it had seen when it began,
+  with the unit (`latency_progress_for_tests` in `plugins/au/effect.hpp`;
+  a lock-free increment per request in the component). The test waits for
+  the unit it changed; a second unit's finished work does not count, which
+  a two-unit case checks with the first unit's run held. The wait's 10 s
+  deadline only catches a deadlock. Closing the unit is also tested at
+  chosen stages (PLUG-20): a run of the Latency work is held at its start
+  through `latency_started_for_tests`, alone and with another change queued
+  behind it, while another thread closes the unit; the run is released only
+  once closing has cancelled the work and is about to wait for it
+  (`latency_closing_for_tests`), so closing must wait and the queued run
+  never starts. A 60 s watchdog names a step that does not finish.
 - `au.log_evidence`: the adapter test's Convolver log, the file CTest
   names in the build folder (`convolver-adapter-tests.log`), reaches the
   [CI evidence](#evidence-from-failed-ci-runs) after the test aborts, as a

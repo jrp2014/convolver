@@ -965,12 +965,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   2026, from jrp's review of `db54160`: `au.adapter` slept 100 ms to show
   that an unchanged Latency choice sent no second notification, and 20 ms
   "for its log line" after an allocation failure, although the work logs
-  after releasing the lock the test had waited for. Each request now takes
-  a number and each finished run (logged, the host told) records the number
-  it had seen when it began; the test waits until a run that saw its
-  change has finished, with a 10 s deadline that only catches a deadlock.
-  The component's only addition is a lock-free increment per request. It
-  runs on macOS CI only.
+  after releasing the lock the test had waited for. Each unit now numbers
+  its requests, and each finished run (logged, the host told) reports the
+  number it had seen when it began, with the unit; the test waits until a
+  run of the unit it changed that saw its change has finished, with a 10 s
+  deadline that only catches a deadlock. The first version counted for the
+  whole process, so one unit's finished work satisfied another's check
+  (jrp's review of `5f47ecb`, reproduced with two units); a two-unit case
+  now checks this. The component's only addition is a lock-free increment
+  per request and a null test hook. It runs on macOS CI only.
 - [x] **AU-13 — Safe partial construction of the Latency work.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13), a source
   review: AU-12 created the dispatch source before the semaphore, so if the
