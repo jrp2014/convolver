@@ -861,14 +861,6 @@ request with a DSP change.
 
 ## Developer tooling
 
-- [ ] **CI-7 — Resolve shared SDKs once per workflow.** Each matrix job of the
-  VST3, LV2, Audio Unit and candidate workflows resolves the newest releases
-  itself (CI-6), so jobs of one run can in principle build against different
-  releases, and every job repeats the lookups and downloads. Resolve once in a
-  first job, pass its lock file to the matrix jobs (`sources.py --lock`), and
-  keep the per-job summaries. Suggested in jrp's review of 0.5.2; no coverage
-  may be lost. See
-  [supporting libraries](docs/develop/build.md#supporting-libraries).
 - [ ] **CI-32 — Run the most extreme numerical cases less often, once they
   cost.** From jrp's simplification review of 5 November 2026: keep
   representative oracle and allocation checks as everyday gates, and run
@@ -1004,6 +996,15 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   tests use full releases; newer pre-releases (pluginval 2.0 beta) and
   upstream lilv run as advisory checks;
   [supporting libraries](docs/develop/build.md#supporting-libraries).
+- [x] **CI-7 — Resolve shared SDKs once per workflow.** 5 November 2026,
+  from jrp's review of 0.5.2: the VST3 and Audio Unit workflows resolve
+  their SDK in a first `sdk` job, whose lock file every build job of the run
+  fetches with `sources.py --lock`; each job's summary still lists the
+  release. LV2's formal jobs need no shared SDK (one job fetches the lv2
+  headers; the rest use Ubuntu's packages), and the candidates already share
+  their `sources` job's corresponding source. Per-OS tools (pluginval,
+  lv2lint) are still resolved per job
+  ([supporting libraries](docs/develop/build.md#supporting-libraries)).
 - [x] **CI-8 — Keep evidence from advisory failures.** 5 November 2026,
   from jrp's review of 0.5.2: when the newest pluginval pre-release reports
   problems, or the LV2 tests fail against the newest upstream lilv, the job

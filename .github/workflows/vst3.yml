@@ -33,9 +33,34 @@ jobs:
           fetch-depth: 2
       - id: scope
         run: python3 scripts/ci_scope.py --workflow vst3 --github-output "$GITHUB_OUTPUT"
-  vst3:
+  # CI-7: the newest SDK release is resolved once per run, here, and every
+  # job below builds exactly that release from this lock file, so the jobs
+  # of one run cannot build against different releases.
+  sdk:
     needs: scope
     if: needs.scope.outputs.build == 'true'
+    name: Newest VST3 SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve and record it
+        run: |
+          mkdir -p "$RUNNER_TEMP/lock"
+          python3 scripts/release/resolve.py dependencies --cache "$RUNNER_TEMP/downloads" \
+            --lock "$RUNNER_TEMP/lock/vst3-sdk-lock.json" \
+            vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vst3-sdk-lock
+          path: ${{ runner.temp }}/lock/vst3-sdk-lock.json
+          if-no-files-found: error
+      - name: Explain a failure that may come from a new upstream release
+        if: failure()
+        run: python3 scripts/release/resolve.py explain-failure
+  vst3:
+    # Skipped with the sdk job when the scope job finds nothing to build.
+    needs: sdk
     name: vst3 (${{ matrix.os }}, ${{ matrix.fft }})
     strategy:
       fail-fast: false
@@ -72,13 +97,18 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      # CI-6: the newest SDK release and its four submodules, recorded in the
-      # job summary (version, tag, commits and archive checksums).
+      - uses: actions/download-artifact@v8
+        with:
+          name: vst3-sdk-lock
+          path: ${{ runner.temp }}/lock
+      # CI-6: the newest SDK release and its four submodules (resolved once
+      # by the sdk job, CI-7), recorded in the job summary (version, tag,
+      # commits and archive checksums).
       - name: Newest VST3 SDK
         id: sdk
         shell: bash
         run: >-
-          python scripts/release/sources.py --latest --fetch
+          python scripts/release/sources.py --lock "$RUNNER_TEMP/lock/vst3-sdk-lock.json" --fetch
           --cache "$RUNNER_TEMP/downloads" --destination "$RUNNER_TEMP/sources"
           --github-output "$GITHUB_OUTPUT"
           vst3sdk vst3-base vst3-cmake vst3-pluginterfaces vst3-public-sdk

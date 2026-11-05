@@ -283,6 +283,11 @@ Until 1.0 the C++ API may change between minor versions.
   since the Latency setting arrived; the page now says so. In
   `HostProcessor` the 64-frame ramps and the crossfade are named constants;
   the sound is unchanged.
+- Continuous integration (CI-7): the VST3 and Audio Unit workflows resolve
+  the newest SDK release once per run, in a first `sdk` job that uploads a
+  lock file, and every build job of the run builds exactly that release
+  (`sources.py --lock`), so one run can no longer mix two releases. Each
+  job's summary still lists what it built with.
 - Continuous integration (CI-8): the advisory checks (the newest pluginval
   pre-release in the VST3 jobs, the newest upstream lilv in the LV2
   workflow) keep CTest's output as an `advisory-evidence-…` artifact when
