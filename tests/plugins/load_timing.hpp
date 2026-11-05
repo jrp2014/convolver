@@ -94,6 +94,10 @@ struct Options {
     bool reset_holds_audio = false;
 };
 
+// The input the audio thread plays: noise from -0.1 to 0.1 on every channel,
+// different for each.
+std::vector<float> quiet_noise(std::size_t channel, std::size_t frames);
+
 // The workloads until PERF-3 defines the supported ones: stereo at 48 kHz in
 // 512-frame callbacks, filters of 1, 10 and 30 seconds (and 120 with
 // long_filters).

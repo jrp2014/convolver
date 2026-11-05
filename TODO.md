@@ -1262,6 +1262,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   caller was held and how late callbacks were, failing above jrp's limits
   in optimised builds ([loading responsiveness](#loading-responsiveness));
   [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-11 — Quiet noise as the load-timing input.** 5 November 2026,
+  from jrp's review of `59ac8e0` (0.10.0): the input generator subtracted
+  in unsigned arithmetic, so the negative half became about 1.8e15 (measured
+  range 0.0002 to 1.84e15). It now subtracts in signed arithmetic, and
+  `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
+  signs occur; it failed with the old generator. The loading timings were
+  measured again with it ([loading responsiveness](#loading-responsiveness)).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

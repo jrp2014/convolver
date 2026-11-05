@@ -302,6 +302,12 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests
+  played input whose negative half wrapped round in unsigned arithmetic to
+  about 1.8e15, instead of quiet noise from -0.1 to 0.1. The generator now
+  subtracts in signed arithmetic, and `native.load_timing_harness` checks
+  the input's range and sign. Tests only: no change to the plug-ins or the
+  sound.
 - Plug-ins (ROBUST-7, from an external review of `91fcf1f`): when memory ran
   out while a refused first load was being recorded, VST3, the Audio Unit
   and LV2 could go on passing the unfiltered input, and saved state did not

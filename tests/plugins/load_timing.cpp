@@ -151,8 +151,7 @@ class Renderer final : public Audio {
           in_(w.host.inputs, std::vector<float>(w.block)),
           out_(w.host.outputs, std::vector<float>(w.block)), block_(w.block) {
         for (std::size_t c = 0; c < in_.size(); ++c)
-            for (std::size_t t = 0; t < block_; ++t) // Quiet noise, as a host plays.
-                in_[c][t] = static_cast<float>(((t * 7919 + c * 104729) % 2001) - 1000) * 1e-4f;
+            in_[c] = quiet_noise(c, block_); // As a host plays.
         for (auto& v : in_)
             ins_.push_back(v.data());
         for (auto& v : out_)
@@ -280,6 +279,17 @@ void report(const std::string& format, const Workload& w, const std::string& ent
     std::cout << std::flush;
 }
 } // namespace
+
+std::vector<float> quiet_noise(std::size_t channel, std::size_t frames) {
+    std::vector<float> v(frames);
+    for (std::size_t t = 0; t < frames; ++t) {
+        // Signed before subtracting: unsigned arithmetic would wrap the
+        // negative half to about 1.8e15.
+        const auto step = static_cast<long long>((t * 7919 + channel * 104729) % 2001);
+        v[t] = static_cast<float>(step - 1000) * 1e-4f;
+    }
+    return v;
+}
 
 std::vector<Workload> workloads(const Options& o) {
     std::vector<Workload> list;
