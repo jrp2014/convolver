@@ -241,8 +241,8 @@ class Renderer final : public Audio {
     std::thread thread_;
 };
 
-void print(const std::string& format, const Workload& w, const std::string& entry,
-           const char* phase, std::optional<Seconds> held, const Callbacks& c, bool ok) {
+void report(const std::string& format, const Workload& w, const std::string& entry,
+            const char* phase, std::optional<Seconds> held, const Callbacks& c, bool ok) {
     char time[32] = "-", line[256];
     if (held)
         std::snprintf(time, sizeof time, "%.1f", ms(*held));
@@ -297,7 +297,7 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                 audio.take();
                 audio.wait_for(Seconds(0.25));
                 const auto idle = audio.take();
-                print(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0);
+                report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0);
                 errors += idle.failed;
                 for (const auto* f : {&x, &y}) {
                     Outcome outcome;
@@ -311,14 +311,14 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                     audio.wait_for(settle);
                     const auto seen = audio.take();
                     const bool ok = outcome.accepted && seen.failed == 0;
-                    print(format, w, e.name, f == &x ? "first load" : "replacement", held, seen,
-                          ok);
+                    report(format, w, e.name, f == &x ? "first load" : "replacement", held, seen,
+                           ok);
                     errors += ok ? 0 : 1;
                 }
                 audio.before_next([&] { driver.reset(); });
                 audio.wait_for(settle);
                 const auto reset = audio.take();
-                print(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0);
+                report(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0);
                 errors += reset.failed;
                 // The filter that plays is the replacement, as saved.
                 const auto saved = driver.saved();
