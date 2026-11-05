@@ -8,6 +8,7 @@
 #include "../plugins/load_timing.hpp"
 #include "convolver/host.hpp"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -447,8 +448,10 @@ class Mock final : public lc::Driver {
                  std::size_t frames) override {
         for (std::size_t c = 0; c < out.size(); ++c)
             std::copy_n(in[c % in.size()], frames, out[c]);
+        ++calls;
         return true;
     }
+    std::atomic<std::size_t> calls{0};
     void set_bypass(bool) override {}
     void reset() override {}
     bool reopen(const lc::Host&, bool, bool) override {
@@ -475,13 +478,16 @@ std::filesystem::path scratch() {
             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 }
 
-timing::Result run(Mock& mock, int attempts, Ms limit = 100ms) {
+timing::Result run(Mock& mock, int attempts, Ms limit = 100ms, bool warm = false) {
     timing::Options o;
     o.work_directory = scratch();
     o.enforce = true;
     o.attempts = attempts;
-    // A short filter: the mock does not prepare it.
-    const std::vector<timing::Workload> list{{"tiny", {48000, 2, 2}, 0.01, 512, limit}};
+    o.warm = warm;
+    // A short filter: the mock does not prepare it (half a second when warm,
+    // so that a fill is 49 callbacks).
+    const std::vector<timing::Workload> list{
+        {"tiny", {48000, 2, 2}, warm ? 0.5 : 0.01, 512, limit}};
     const std::vector<timing::Entry> entries{
         {"state", [&](const timing::Filter& f, timing::Audio&) {
              return timing::Outcome{mock.restore(f.state), std::nullopt};
@@ -525,6 +531,25 @@ void integration() {
         const auto r = run(mock, 3);
         check(r.errors > 0 && r.failed == 1 && r.runs.size() == 1 && timing::exit_code(r) == 1,
               "refused load: " + text(r.runs.at(0)));
+    }
+    {
+        // PERF-14: warm phases are filled faster than real time, shown and
+        // not judged.
+        Mock mock;
+        const auto r = run(mock, 1, 100ms, true);
+        std::string names;
+        bool reported_only_warm = true;
+        for (const auto& p : r.records.at(0).phases) {
+            names += (names.empty() ? "" : ", ") + p.name;
+            reported_only_warm = reported_only_warm && p.reported == (p.name.rfind("warm", 0) == 0);
+        }
+        check(names == "baseline, first load, warm first, replacement, warm second, reset, idle "
+                       "after" &&
+                  reported_only_warm && r.runs.at(0).verdict == timing::Verdict::passed,
+              "warm phases: " + names + "; " + text(r.runs.at(0)));
+        // Two fills of 49 callbacks, plus the paced ones (about 3.5 s of them).
+        check(mock.calls.load() >= 2 * 49 + 250,
+              "warm phases: " + std::to_string(mock.calls.load()) + " callbacks");
     }
 }
 } // namespace

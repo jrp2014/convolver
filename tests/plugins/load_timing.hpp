@@ -7,7 +7,13 @@
 // For each workload (a long stereo filter) and entry point it measures three
 // phases on a running instance: a first load into an empty instance, a
 // replacement of that filter by another as long, and a reset of processing
-// while the second plays. Each phase reports how long the calling thread was
+// while the second plays. With Options::warm, the replacement and the reset
+// start from a full input history (PERF-14): the renderer first plays the filter's length of
+// audio as fast as it can, as if it had been playing for that long (the
+// engine only processes the parts of a filter that have heard input), and
+// half a second of each filter playing at that full cost is shown before it
+// is replaced or reset ("warm first", "warm second"), but not judged: no
+// limit for it has been decided. Each phase reports how long the calling thread was
 // held (the host's thread for state and window loads, the worker for LV2's
 // worker), and the audio callbacks meanwhile, each recorded (PERF-12): when
 // it was due, when the thread woke for it, when it entered and left the
@@ -116,6 +122,9 @@ bool optimised_build();
 struct Options {
     std::filesystem::path work_directory; // For the filter files.
     bool long_filters = false;            // Adds the 120 s filter jrp ran in GarageBand.
+    // PERF-14: the replacement and the reset start from a full input history
+    // (slow to fill, so not in CI; REL-6's qualification runs use it).
+    bool warm = false;
     // The format's reset stops audio (LV2's deactivate and activate), so its
     // callbacks have no limit.
     bool reset_holds_audio = false;
@@ -124,6 +133,10 @@ struct Options {
     bool enforce = optimised_build();
     int attempts = 3; // Runs of an entry, until one passes (when enforced).
 };
+
+// Sets long_filters and warm from "--long" and "--warm" among argv[first]
+// onwards, as the formats' load-timing commands take them.
+void read_flags(Options&, int argc, char** argv, int first);
 
 // The input the audio thread plays: noise from -0.1 to 0.1 on every channel,
 // different for each.
@@ -165,13 +178,17 @@ struct Callbacks {
 Callbacks summarise(const std::vector<CallbackRecord>&, double period);
 
 // One phase of a run: the baselines with nothing loading (before the phases
-// and after them), a first load, a replacement and a reset.
+// and after them), a first load, a replacement and a reset, each filter
+// playing at full history before the last two (reported only).
 struct Phase {
     std::string name;
     bool baseline = false;      // Nothing loads: shows scheduling noise.
     std::optional<double> held; // Seconds the calling thread was held, for a load.
     bool accepted = true;       // The load was accepted.
     bool audio_held = false;    // The host held audio back: callbacks reported only.
+    // Nothing loads and no limit applies: shown, never judged (PERF-14's
+    // full history, until a limit for playing a long filter is decided).
+    bool reported = false;
     std::vector<CallbackRecord> callbacks;
     std::size_t dropped = 0; // Callbacks beyond what the renderer could record.
     std::string error;       // The first exception a callback threw.

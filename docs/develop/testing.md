@@ -575,7 +575,12 @@ tell apart (jrp's review of `5f47ecb`), so the note says so and the
 callback is judged. A phase
 lasts a third of a second after its load, so callbacks
 do not reach a long filter's steady cost, which grows as input history fills
-(PERF-5); that cost is PERF-3's to measure.
+(PERF-5). With `--warm` (PERF-14) the renderer first plays the filter's
+length of audio as fast as it can, before the replacement and again before
+the reset, so both start from a full history, and half a second of each
+filter playing at that cost is shown ("warm first", "warm second") but not
+judged, since no limit for steady playing has been decided. Filling takes
+minutes with the 30 s filter, so CI does not use it.
 
 The limits (jrp, 5 November 2026): while a load, a replacement or a reset
 runs on another thread, no callback may be late or take more than half its
@@ -657,7 +662,8 @@ workflows print the tables in a "Load timings" step; LV2's run only in its
 sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with
 `--load-timing DIRECTORY --long` (LV2: `BUNDLE DIRECTORY --load-timing --long`)
-to add the 120-second filter jrp loaded in GarageBand.
+to add the 120-second filter jrp loaded in GarageBand, and `--warm` (after
+or instead of `--long`) for the full-history runs above.
 
 ## Plug-in format tests
 

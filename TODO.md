@@ -138,6 +138,14 @@ is superseded.
   preview, and the SourceForge project summary now points here (24 October
   2026); the old SourceForge website stays as it is. Remaining, at each
   preview: the steps after publishing.
+- [ ] **REL-6 — Responsiveness qualification before a release.** From
+  jrp's review of `db54160`: CI's timing tests run on shared runners and
+  show "not qualified" when they cannot judge; that is not qualification.
+  Write the procedure: on a named machine (jrp's Mac first, through the
+  command line), with the candidate binaries, run the load-timing tests
+  cold and `--warm` on the declared workloads, keep every run's records,
+  and require the existing limits; a skipped or not-qualified entry stays
+  visibly unqualified in the release evidence.
 - [ ] **HOST-1 — Named host matrix.** Record versions and results for Windows/macOS
   hosts: scan, load, preset/state restore, silence/tails, seek, variable callbacks,
   bypass, filter changes, multiple instances and unequal channel counts. SDK
@@ -742,7 +750,44 @@ so the preset file path is not needed).
   configurations and several prepared engines coexist, and callback
   percentiles and maxima during replacement and reset; publish the
   supported workloads with those percentiles and maxima, and decide from
-  them whether PERF-2, PERF-7 or PERF-8 is worth doing.
+  them whether PERF-2, PERF-7 or PERF-8 is worth doing. PERF-14 lets the
+  load-timing tests start the replacement and the reset from a full history
+  (`--warm`); still to do here: 6- and 8-channel routing, 96 kHz, peak
+  memory and enough observations for tail percentiles.
+- [ ] **PERF-15 — Denormal numbers while processing.** Found by PERF-14 (5
+  November 2026): the load-timing tests' 30 s filter decays below the
+  smallest normal float, and on the Linux cloud VM (clang Release, Ooura,
+  stereo 48 kHz, 512-frame callbacks, 10.7 ms apart) each callback at full
+  history took 25 to 43 ms; with flush-to-zero and denormals-are-zero set on
+  the audio thread, 6 to 7 ms. Neither the engine nor the plug-ins set
+  them; most hosts do on their audio threads, but not all, and a reverb tail
+  fading to silence reaches the same numbers. Waiting for jrp's decision:
+  the plug-ins and the CLI set both for each process call and restore the
+  caller's mode (as JUCE does), or this stays a documented limitation. The
+  change affects only values below about 1e-38; the oracle tests must still
+  pass. Arm64 has a flush-to-zero mode (FPCR) too.
+- [ ] **PERF-16 — Loading stages timed inside the plug-in.** From jrp's
+  review of `db54160`: the load-timing records give a load's whole hold;
+  split it into reading and decoding, validation, FFT preparation,
+  publication and notification, recorded outside the audio path (no
+  logging, allocation or locks there) and written with the PERF-13 records.
+  A failed run should name the stage that did not progress.
+- [ ] **PERF-17 — Platform audio scheduling in the measurement host.** From
+  the same review: the load-timing renderer is an ordinary thread that
+  sleeps and yields, unlike a host's audio callback. For final deadline
+  measurements, a small platform layer in the test host only (Apple audio
+  workgroups on macOS, MMCSS on Windows), never priority changes inside the
+  plug-in. The portable renderer stays for concurrency tests.
+- [ ] **PERF-18 — Performance regressions measured apart from CI.** From
+  the same review: correctness, ordering, audio output and allocation and
+  locking contracts block every pull request; performance regressions are
+  measured on optimised builds by base and head runs interleaved on one
+  machine, with a sampling policy fixed in advance and every result kept,
+  as an explicit report rather than "retry until one passes"; responsiveness
+  is qualified before a release (REL-6). Background preparation (VST3-5,
+  and the Audio Unit's equivalent) only if qualified measurements show
+  loading pauses, keeping coherent state restoration, request order,
+  cancellation, the previous filter and shutdown ownership.
 - [ ] **PERF-7 — One input check on the plug-in audio path.** From the
   project review of 5 November 2026, after PERF-3: each `HostProcessor`
   call copies planar host buffers into an interleaved buffer and replaces
@@ -863,6 +908,20 @@ November 2026), the figures above hold: VST3 `setState` 4 to 6 ms with
 47 and 203 to 229 ms, its `restore()` holding back `run()` for 4, 39 and
 256 to 264 ms. No VST3 callback was late. Loading time does not depend on
 the input, which only the callbacks play.
+
+jrp's review of `db54160` (5 November 2026) separates correctness tests,
+performance measurement and release qualification: PERF-12 and PERF-13 (records
+and verdicts), AU-14 and PLUG-20 (completion witnesses and staged
+teardown), PERF-14 (warm workloads), REL-6 (the qualification procedure),
+and the open PERF-15 to PERF-18. The 100 ms and 250 ms limits and the
+callback limits stay. With `--warm` (PERF-14, same cloud VM and build), the
+10 s filter at full history took about 3 ms a callback and the 30 s filter
+25 to 43 ms, every callback late, so its replacement and reset failed on
+callbacks while the hold (167 to 192 ms) met its limit; with flush-to-zero
+on the audio thread, 6 to 7 ms and no late callback (PERF-15). The
+archived request worker's Windows timeout
+([archived](docs/archive/reviews/2026-11-05-request-worker.md)) was never
+explained; AU-12 removed that worker, which is not a diagnosis.
 
 ### Keeping `host.cpp` manageable
 
@@ -1337,6 +1396,17 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   mixed results across runs) and keeps only a few short real-thread runs:
   about 9 s instead of 40 to 60;
   [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-14 — Load timing from a full history.** 5 November 2026,
+  from jrp's review of `db54160`: a newly loaded long filter is cheap
+  because the engine processes only the parts that have heard input, so the
+  timing tests measured startup, not a long filter's sustained cost. With
+  `--warm`, the renderer plays the filter's length of audio unpaced before
+  the replacement and before the reset, and shows half a second of each
+  filter at full history ("warm first", "warm second", reported only: no
+  limit for steady playing is decided). Opt-in because filling takes
+  minutes with the 30 s filter; CI keeps the cold runs, and REL-6 runs it.
+  `native.load_timing_harness` checks the phases with a mock. It found
+  PERF-15 at once; [loading responsiveness](#loading-responsiveness).
 - [x] **PLUG-20 — Teardown tested at chosen stages.** 5 November 2026,
   from jrp's review of `db54160` ("test shutdown at explicit stages rather
   than hoping repeated runs encounter the troublesome interleaving"):

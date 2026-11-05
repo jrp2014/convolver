@@ -144,6 +144,12 @@ Until 1.0 the C++ API may change between minor versions.
   machine, to `FORMAT-load-timing.json` in its work folder; the VST3 and
   Audio Unit Release jobs keep them as an artifact. Tests only: no change to
   the plug-ins or the sound.
+- Tests (PERF-14, from jrp's review of `db54160`): the load-timing tests
+  take `--warm`, which fills the filter's input history faster than real
+  time before the replacement and the reset, so they start from a long
+  filter's full cost, and shows half a second of each filter at that cost
+  (reported only). Not in CI (filling takes minutes). Tests only; no change
+  to the sound.
 - Tests (PLUG-20, from jrp's review of `db54160`): teardown is tested at
   chosen stages instead of by repetition. `lv2.adapter` holds the worker's
   `work()` after reading the file, after preparation and after its last

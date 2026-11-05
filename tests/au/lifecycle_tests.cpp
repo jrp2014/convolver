@@ -184,7 +184,7 @@ class AudioUnitDriver final : public lc::Driver {
 int load_timing(int argc, char** argv) {
     timing::Options options;
     options.work_directory = argc > 2 ? argv[2] : "au-load-timing";
-    options.long_filters = argc > 3 && std::strcmp(argv[3], "--long") == 0;
+    timing::read_flags(options, argc, argv, 3);
     AudioUnitDriver driver;
     const std::vector<timing::Entry> entries{
         {"RestoreState", [&](const timing::Filter& f,

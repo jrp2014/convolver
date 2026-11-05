@@ -228,7 +228,7 @@ class Vst3 final : public lc::Driver {
 int load_timing(int argc, char** argv) {
     timing::Options options;
     options.work_directory = argc > 2 ? argv[2] : "vst3-load-timing";
-    options.long_filters = argc > 3 && std::strcmp(argv[3], "--long") == 0;
+    timing::read_flags(options, argc, argv, 3);
     Vst3 driver;
     std::vector<timing::Entry> entries{{"setState", [&](const timing::Filter& f, timing::Audio&) {
                                             return timing::Outcome{driver.restore(f.state)};

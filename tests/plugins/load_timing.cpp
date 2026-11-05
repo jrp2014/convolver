@@ -209,6 +209,14 @@ class Renderer final : public Audio {
     void wait_for(Seconds s) {
         wait_callbacks(static_cast<std::size_t>(std::ceil(s / period_)));
     }
+    // PERF-14: plays `n` callbacks back to back, unpaced and not timed, to
+    // fill the filter's input history faster than real time, then goes back
+    // to the host's pace. A callback that fails is recorded in the next phase.
+    void fill(std::size_t n) {
+        std::unique_lock lock(mutex_);
+        fill_ = n;
+        changed_.wait(lock, [&] { return fill_ == 0; });
+    }
 
   private:
     // About 11 minutes of 512-frame callbacks at 48 kHz: far more than a phase.
@@ -218,9 +226,51 @@ class Renderer final : public Audio {
         return Seconds(t - start_).count();
     }
 
+    // One unpaced callback of fill(); false once there are none to play.
+    bool fill_one() {
+        {
+            std::lock_guard lock(mutex_);
+            if (fill_ == 0)
+                return false;
+        }
+        bool ok = true;
+        std::string error;
+        {
+            std::lock_guard gate(gate_);
+            try {
+                ok = driver_.process(ins_, outs_, block_);
+            } catch (const std::exception& e) {
+                ok = false;
+                error = e.what();
+            } catch (...) {
+                ok = false;
+                error = "an exception that is not a std::exception";
+            }
+        }
+        {
+            std::lock_guard lock(mutex_);
+            if (!ok) { // Untimed: recorded as on time, so it counts only as a failure.
+                const auto t = at(Clock::now());
+                if (used_ < records_.size())
+                    records_[used_++] = {t, t, t, t, -1, false};
+                else
+                    ++dropped_;
+                if (error_.empty())
+                    error_ = std::move(error);
+            }
+            --fill_;
+        }
+        changed_.notify_all();
+        return true;
+    }
+
     void loop() {
         auto due = Clock::now();
         while (!stop_) {
+            if (fill_one()) {
+                due = Clock::now(); // The host's pace starts again after the fill.
+                continue;
+            }
             // Sleeps until just before the callback is due and waits out the
             // rest: some timers (Windows) wake a millisecond or more late,
             // which would show as late callbacks the plug-in did not cause.
@@ -288,7 +338,7 @@ class Renderer final : public Audio {
     std::mutex mutex_, gate_;
     std::condition_variable changed_;
     const std::function<void()>* task_ = nullptr;
-    std::size_t done_ = 0, task_callback_ = 0;
+    std::size_t done_ = 0, task_callback_ = 0, fill_ = 0;
     std::atomic<bool> stop_{false};
     std::thread thread_;
 };
@@ -300,7 +350,7 @@ void report(const std::string& format, const Workload& w, const std::string& ent
         std::snprintf(time, sizeof time, "%.1f", *p.held * 1000);
     const bool ok = p.accepted && c.failed == 0 && p.dropped == 0;
     std::snprintf(line, sizeof line,
-                  "%-5s %-5s %-14s %-11s %8s %9zu %5zu %6zu %8.2f %8.2f %8.2f%s\n", format.c_str(),
+                  "%-5s %-5s %-14s %-12s %8s %9zu %5zu %6zu %8.2f %8.2f %8.2f%s\n", format.c_str(),
                   w.name.c_str(), entry.c_str(), p.name.c_str(), time, c.count, c.late,
                   c.late_scheduling, c.worst_late * 1000, c.worst_wake * 1000,
                   c.longest_call * 1000, ok ? "" : "  REFUSED OR FAILED");
@@ -357,6 +407,14 @@ std::vector<Workload> workloads(const Options& o) {
     if (o.long_filters)
         list.push_back({"120 s", {48000, 2, 2}, 120, 512, std::nullopt});
     return list;
+}
+
+void read_flags(Options& o, int argc, char** argv, int first) {
+    for (int i = first; i < argc; ++i) {
+        const std::string flag = argv[i];
+        o.long_filters = o.long_filters || flag == "--long";
+        o.warm = o.warm || flag == "--warm";
+    }
 }
 
 bool optimised_build() {
@@ -434,6 +492,14 @@ Judged judge(const RunRecord& rec, const Limits& l) {
             j.notes.push_back(
                 c.late ? "note: late callbacks here, so this run's timing could not be qualified"
                        : "");
+            continue;
+        }
+        if (p.reported) {
+            const auto shown = callbacks_text(c.late, c.slow);
+            j.notes.push_back(shown.empty() ? ""
+                                            : "reported only (no limit for playing at full "
+                                              "history): " +
+                                                  shown);
             continue;
         }
         std::vector<std::string> over, noisy;
@@ -624,6 +690,7 @@ void write_records(std::ostream& out, const std::string& format, const Result& r
                 << ", \"held\": " << (p.held ? number(*p.held) : std::string("null"))
                 << ", \"accepted\": " << (p.accepted ? "true" : "false")
                 << ", \"audio_held\": " << (p.audio_held ? "true" : "false")
+                << ", \"reported\": " << (p.reported ? "true" : "false")
                 << ", \"dropped\": " << p.dropped << ", \"error\": " << quoted(p.error)
                 << ",\n       \"summary\": {\"count\": " << c.count << ", \"failed\": " << c.failed
                 << ", \"late\": " << c.late << ", \"late_scheduling\": " << c.late_scheduling
@@ -662,7 +729,7 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                  "ms past the next deadline at worst; wake: the latest start, "
                  "ms after due; call: ms of the longest call into the plug-in\n";
     char header[256];
-    std::snprintf(header, sizeof header, "%-5s %-5s %-14s %-11s %8s %9s %5s %6s %8s %8s %8s\n", "",
+    std::snprintf(header, sizeof header, "%-5s %-5s %-14s %-12s %8s %9s %5s %6s %8s %8s %8s\n", "",
                   "filt.", "entry", "phase", "held ms", "callbacks", "late", "sched.", "worst",
                   "wake", "call");
     std::cout << header;
@@ -711,7 +778,24 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                     audio.take();
                     audio.wait_for(baseline);
                     rec.phases.push_back(phase("baseline", true, audio.take()));
+                    // PERF-14: the filter's whole length of input, played
+                    // unpaced, so that the engine processes all of it (it
+                    // skips the parts that have not heard input yet).
+                    const auto history = static_cast<std::size_t>(std::ceil(
+                                             w.seconds * w.host.sample_rate / double(w.block))) +
+                                         2;
+                    // Each filter played at full history, before it is
+                    // replaced or reset: shown, not judged.
+                    const auto warm = [&](const char* name) {
+                        audio.fill(history);
+                        audio.wait_for(baseline);
+                        auto p = phase(name, false, audio.take());
+                        p.reported = true;
+                        rec.phases.push_back(std::move(p));
+                    };
                     for (const auto* f : {&x, &y}) {
+                        if (f == &y && o.warm)
+                            warm("warm first");
                         Outcome outcome;
                         Seconds held{0};
                         const auto timed = [&] {
@@ -731,6 +815,8 @@ Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
                         p.audio_held = e.audio_waits;
                         rec.phases.push_back(std::move(p));
                     }
+                    if (o.warm)
+                        warm("warm second");
                     audio.before_next([&] { driver.reset(); });
                     audio.wait_for(settle);
                     auto reset = phase("reset", false, audio.take());

@@ -282,10 +282,10 @@ class Lv2 final : public lc::Driver {
 // The loading-responsiveness timings (tests/plugins/load_timing.hpp): state
 // restored while the host holds back run() (restore() is not thread-safe),
 // and a file chosen on the filter parameter, loaded by the worker.
-int load_timing(host::World& world, const fs::path& work, bool long_filters) {
+int load_timing(host::World& world, const fs::path& work, int argc, char** argv) {
     timing::Options options;
     options.work_directory = work;
-    options.long_filters = long_filters;
+    timing::read_flags(options, argc, argv, 4);
     options.reset_holds_audio = true; // Deactivate and activate.
     Lv2 driver(world, host::Worker::deferred);
     // Neither holds the host's own thread while audio plays: the host stops
@@ -305,15 +305,16 @@ int load_timing(host::World& world, const fs::path& work, bool long_filters) {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::cerr << "usage: " << argv[0]
-                  << " BUNDLE_DIRECTORY WORK_DIRECTORY [LENGTH | --load-timing [--long]]\n";
+        std::cerr
+            << "usage: " << argv[0]
+            << " BUNDLE_DIRECTORY WORK_DIRECTORY [LENGTH | --load-timing [--long] [--warm]]\n";
         return 2;
     }
     try {
         host::World world(argv[1]);
         const fs::path work = argv[2];
         if (argc > 3 && std::strcmp(argv[3], "--load-timing") == 0)
-            return load_timing(world, work, argc > 4 && std::strcmp(argv[4], "--long") == 0);
+            return load_timing(world, work, argc, argv);
         lc::Options options;
         options.length = argc > 3 ? std::stoul(argv[3]) : 3;
         // Found by these sequences: a refused first load right after an empty
