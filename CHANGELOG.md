@@ -12,6 +12,15 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
+  [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
+  it, on a short film with two audio tracks: the second track is chosen,
+  the 2-in/6-out crossover's six channels keep every frame and the filter's
+  tail and match the expected output after FLAC, the video is copied, and
+  audio that started late starts at time zero, as the guide warns. It runs
+  where CMake finds `ffmpeg` and `ffprobe`; the Linux g++ Release CI job
+  installs them.
+
 - Tests (PERF-9): `vst3.load_timing`, `au.load_timing` and `lv2.load_timing`
   time each plug-in format's own load entry points (VST3 `setState` and the
   window's file, the Audio Unit's `RestoreState` and load property, LV2's

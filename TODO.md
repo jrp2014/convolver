@@ -61,7 +61,7 @@ boundary and C++20 in the core.
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
-| Supporting, cheap | **VST3-9**, **FFMPEG-1**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Supporting, cheap | **VST3-9**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -516,7 +516,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 ## FFmpeg integration
 
 Parked: maintaining a patched FFmpeg source tree adds
-uncomfortable coupling. FFMPEG-1 is still worth doing. If this is revisited,
+uncomfortable coupling. The pipe is tested (FFMPEG-1, done). If this is revisited,
 prefer the pipe, a filter accepted upstream, or upstream state support in
 FFmpeg's generic `lv2` filter (it cannot pass a file path today), which would let
 the LV2 plug-in serve FFmpeg.
@@ -525,12 +525,6 @@ Design and evidence: [FFmpeg filter plan](docs/project/plans/2026-10-21-ffmpeg-f
 (21 October 2026). FFmpeg cannot load filters at run time, so a built-in filter
 means a patched FFmpeg build with `--enable-gpl`.
 
-- [ ] **FFMPEG-1 — Test the pipe workflow.** The
-  [FFmpeg pipe example](docs/use/command-line.md#with-ffmpeg) is documented and was
-  originally run by hand for one stereo audio/video pair. Add a CI test when
-  `ffmpeg` is installed, covering explicit track selection, 2-in/6-out routing,
-  frame counts/tails and timestamp offsets. The revised commands are not new
-  end-to-end validation evidence.
 - [ ] **FFMPEG-2 — C API.** A C99 header over `HostProcessor` and the
   configuration loader, a `Convolver::c` target and `convolver.pc`, with C-only
   tests and the same output as `Engine`. First add tested host FFT-option
@@ -1205,6 +1199,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   "unclaimed"). Checked against 0.8.6; progress detail now lives only in
   TODO's `Progress` lines, and the status page names what remains and links
   the items ([recording progress](docs/develop/workflow.md#recording-progress-in-todo)).
+- [x] **FFMPEG-1 — Test the pipe workflow.** 5 November 2026:
+  `native.ffmpeg_pipe` runs the guide's FFmpeg pipe on a film FFmpeg makes,
+  checking track selection, 2-in/6-out routing, the frame count with the
+  tail, and the start time of late audio, wherever FFmpeg is installed (the
+  native g++ Release job on Linux CI);
+  [tests](docs/develop/testing.md#native-production-tests).
 - [x] **FFT-1 — Check that we have the latest Ooura version.** 21 October 2026;
   [provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026).
 - [x] **FFT-3 — Accelerate by default on macOS.** 30 October 2026, PR #89: every

@@ -140,6 +140,16 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   and silent output, a -6 dB level and reversed polarity; finds swapped
   channels different with no simpler cause; refuses another rate or channel
   count; exit codes 0/1/2.
+- `native.ffmpeg_pipe`: the [FFmpeg pipe](../use/command-line.md#with-ffmpeg)
+  as the guide writes it, with its 2-in/6-out change, on a short film made
+  by FFmpeg (test-pattern video, a tone, then the crossover example's input
+  as a second audio track): `-map 0:a:1` chooses the second track; the
+  result has the video copied and six channels at 48 kHz, every frame of
+  the expected output with the filter's tail, and matches it within 1e-6
+  after FLAC's 24 bits; audio that starts 0.5 s into the film starts at
+  time zero afterwards, as the guide warns (FFMPEG-1). Registered only
+  when CMake finds `ffmpeg` and `ffprobe`; CI installs FFmpeg in the
+  native g++ Release job on Linux.
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
