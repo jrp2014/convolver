@@ -178,6 +178,11 @@ Until 1.0 the C++ API may change between minor versions.
   controller moved from `plugins/vst3/processor.cpp` to its own file,
   `plugins/vst3/controller.cpp`, unchanged, before the window gains more
   controls.
+- macOS window (AU-11, from jrp's review of `276c7dc`): Reload When the File
+  Changes, following the playing filter's files, moved from the window's
+  layout (`plugins/editor/mac/diagnostic_view.mm`) to its own file
+  (`plugins/editor/mac/file_watch.mm`), unchanged, before the window gains
+  more controls.
 - Continuous integration (CI-28, from CI-27's review): `vst3.adapter` and
   `vst3.preset`, which runs the same tests, write their Convolver logs to
   files of their own in the build folder (`convolver-adapter-tests.log`,

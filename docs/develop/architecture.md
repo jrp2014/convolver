@@ -46,7 +46,9 @@ from [`plugins/editor/mac/`](../../plugins/editor/mac/): the view and its
 layout in [`diagnostic_view.mm`](../../plugins/editor/mac/diagnostic_view.mm),
 its Gain, Mix and Latency rows and what the user does with them (dragging,
 reset, typing, choosing; AU-10) in
-[`setting_rows.mm`](../../plugins/editor/mac/setting_rows.mm), and the fonts,
+[`setting_rows.mm`](../../plugins/editor/mac/setting_rows.mm), following the
+playing filter's files for Reload When the File Changes (AU-11) in
+[`file_watch.mm`](../../plugins/editor/mac/file_watch.mm), and the fonts,
 labels and stack views both lay out with in
 [`view_layout.h`](../../plugins/editor/mac/view_layout.h). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics

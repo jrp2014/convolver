@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #import "diagnostic_view.h"
+#import "file_watch.h"
 #include "recent_files.hpp"
 #import "view_layout.h"
 #include <cmath>
@@ -159,14 +160,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSUInteger choosing_,
         requests_;       // The pending Choose… request (0: none), the last number.
     NSOpenPanel* panel_; // Its dialog, while one is open.
-    // Reload: the playing filter's file, the files it was read from (the
-    // report's text and as a list) and their times and sizes when it was
-    // loaded; a change waiting to settle; timer ticks, for the checks.
-    NSString* filterPath_;
-    NSString* watchedText_;
-    NSArray<NSString*>* watched_;
-    NSDictionary<NSString*, id>* stamps_;
-    NSDictionary<NSString*, id>* changed_;
+    // Reload: the playing filter's file and the files it was read from
+    // (file_watch.h); timer ticks, for the checks.
+    FileWatch watch_;
     unsigned ticks_;
 }
 
@@ -570,10 +566,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                      latencyWaits:[field(report, @"latency waits") isEqualToString:@"yes"]];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
-    [self watchFiles:report ? field(report, @"filter files") : @""];
-    filterPath_ = report ? field(report, @"filter path") : @"";
-    _reloadButton.enabled = filterPath_.length > 0;
-    _watchButton.enabled = filterPath_.length > 0;
+    watch_.follow(report ? field(report, @"filter path") : @"",
+                  report ? field(report, @"filter files") : @"");
+    _reloadButton.enabled = watch_.path().length > 0;
+    _watchButton.enabled = watch_.path().length > 0;
     if (loader_)
         note = note.length ? [note stringByAppendingString:@" Or drop a file on this window."]
                            : @"Or drop a .cfg or sound file on this window.";
@@ -591,73 +587,30 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self fit];
 }
 
-// Starts watching the files a newly loaded filter was read from (one per
-// line), with their times and sizes as they are now.
-- (void)watchFiles:(NSString*)lines {
-    if ([lines isEqualToString:watchedText_])
-        return;
-    watchedText_ = lines;
-    NSMutableArray<NSString*>* files = [NSMutableArray array];
-    for (NSString* line in [lines componentsSeparatedByString:@"\n"])
-        if (line.length)
-            [files addObject:line];
-    watched_ = files;
-    stamps_ = [self stamps];
-    changed_ = nil;
-}
-
-// Each watched file's modification time and size, or NSNull when it is not
-// there.
-- (NSDictionary<NSString*, id>*)stamps {
-    NSMutableDictionary<NSString*, id>* now = [NSMutableDictionary dictionary];
-    NSFileManager* files = [NSFileManager defaultManager];
-    for (NSString* path in watched_) {
-        NSDictionary<NSFileAttributeKey, id>* attributes = [files attributesOfItemAtPath:path
-                                                                                   error:nil];
-        NSDate* modified = attributes.fileModificationDate;
-        now[path] = modified ? @[ modified, @(attributes.fileSize) ] : [NSNull null];
-    }
-    return now;
-}
-
 - (BOOL)checkForChanges {
-    if (!loader_ || _watchButton.state != NSControlStateValueOn || filterPath_.length == 0 ||
-        watched_.count == 0)
+    if (!loader_ || _watchButton.state != NSControlStateValueOn || !watch_.due())
         return NO;
-    NSDictionary<NSString*, id>* now = [self stamps];
-    if ([now isEqualToDictionary:stamps_]) {
-        changed_ = nil;
-        return NO;
-    }
-    if (![now isEqualToDictionary:changed_]) {
-        changed_ = now; // Changed: reload once it has stayed so for one check.
-        return NO;
-    }
-    stamps_ = now;
-    changed_ = nil;
-    if ([now.allValues containsObject:[NSNull null]])
-        return NO; // Moved or deleted: the filter that plays stays.
     // The host may have replaced the filter (a preset, an undo) while the
     // window was covered and not reading the report: reload only the file
     // that still plays.
-    NSString* path = filterPath_;
-    NSString* files = watchedText_;
+    NSString* path = watch_.path();
+    NSString* files = watch_.files();
     [self refresh];
-    if (![filterPath_ isEqualToString:path] || ![watchedText_ isEqualToString:files])
+    if (![watch_.path() isEqualToString:path] || ![watch_.files() isEqualToString:files])
         return NO;
-    [self loadFile:filterPath_];
+    [self loadFile:path];
     return YES;
 }
 
 - (void)watchToggled:(NSButton*)button {
     static_cast<void>(button);
-    stamps_ = [self stamps]; // Changes made while it was off are not reloaded.
-    changed_ = nil;
+    watch_.settle(); // Changes made while it was off are not reloaded.
 }
 
 - (void)reloadFilter:(id)sender {
     static_cast<void>(sender);
-    if (filterPath_.length == 0 || ![self loadFile:filterPath_])
+    NSString* path = watch_.path();
+    if (path.length == 0 || ![self loadFile:path])
         NSBeep();
 }
 
@@ -752,10 +705,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     if (accepted && path.UTF8String)
         convolver::remember_recent_file(path.UTF8String);
     [self refresh]; // The report says what plays now, and why a refused file was refused.
-    if (accepted) {
-        stamps_ = [self stamps]; // What was read is what plays: nothing to reload.
-        changed_ = nil;
-    }
+    if (accepted)
+        watch_.settle(); // What was read is what plays: nothing to reload.
     return accepted;
 }
 

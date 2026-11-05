@@ -493,12 +493,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   plays at once (a new processor handed to Render). Not yet checked in
   GarageBand (AU-4's step 10). Remaining, with PLUG-10's deferred parts:
   Gain mode (1002).
-- [ ] **AU-11 — Separate file watching from the window.** From jrp's review
-  of `276c7dc` (1 November 2026): the macOS window shared by the Audio Unit
-  and VST3, `plugins/editor/mac/diagnostic_view.mm`, is 860 lines again.
-  Move watching filter files and coordinating reloads to their own file, as
-  AU-10 moved the setting rows, behaviour unchanged, before the window
-  gains more controls.
 
 ## FFmpeg integration
 
@@ -862,6 +856,13 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   made one function each and Core Foundation values owned by `cf_owned`; no
   behaviour changes (CHANGELOG has the one out-of-memory exception);
   [implementation map](docs/develop/architecture.md).
+- [x] **AU-11 — Separate file watching from the window.** 5 November 2026,
+  from jrp's review of `276c7dc`: following the playing filter's files and
+  deciding when a change is due to reload moved from
+  `plugins/editor/mac/diagnostic_view.mm` (now 811 lines) to
+  `plugins/editor/mac/file_watch.mm`, a C++ class, so it needs no versioned
+  Objective-C name; behaviour unchanged, checked by `vst3.editor` and
+  `au.editor` on macOS; [shared macOS window](docs/develop/architecture.md#the-shared-macos-window).
 - [x] **AU-10 — Separate the window's setting editing from its layout.**
   1 November 2026, PR #100, from jrp's review of PR #98: the Gain, Mix and
   Latency rows and everything the user does with them (dragging, reset,
