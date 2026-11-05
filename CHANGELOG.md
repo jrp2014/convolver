@@ -80,6 +80,12 @@ Until 1.0 the C++ API may change between minor versions.
   records each change and its settings name the latency. The default
   leaves the sound unchanged; the oracle tests cover gain and mix at each of
   the seven block sizes.
+- Library (ROBUST-6): `convolver/engine.hpp` names the limits every part of
+  Convolver checks: `max_sample_rate` (768000), `max_channel_count` (256),
+  `max_block_frames` (2^20), `max_impulse_frames` and `max_engine_delay_frames`
+  (2^26). The engine, the sound-file and configuration readers, saved state,
+  the tools and the plug-ins use them in place of their own copies of the
+  numbers; the limits and messages are unchanged.
 
 ### Changed
 

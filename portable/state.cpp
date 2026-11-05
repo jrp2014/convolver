@@ -223,7 +223,7 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
     if (flags & 1) {
         Configuration c;
         auto rate = r.word();
-        if (rate > 768000)
+        if (rate > static_cast<std::uint32_t>(max_sample_rate))
             throw std::invalid_argument("invalid sample rate");
         c.sample_rate = static_cast<int>(rate);
         c.input_channels = r.word();

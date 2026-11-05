@@ -244,11 +244,13 @@ template <class Char> int run(int argc, Char** argv) {
         }
         auto value_text = ascii(argv[++i]);
         unsigned long value = 0;
-        if (option == "--sample-rate" && positive(value_text, 768000, value))
+        if (option == "--sample-rate" && positive(value_text, convolver::max_sample_rate, value))
             selection.sample_rate = static_cast<int>(value);
-        else if (option == "--input-channels" && positive(value_text, 256, value))
+        else if (option == "--input-channels" &&
+                 positive(value_text, convolver::max_channel_count, value))
             selection.input_channels = value;
-        else if (option == "--output-channels" && positive(value_text, 256, value))
+        else if (option == "--output-channels" &&
+                 positive(value_text, convolver::max_channel_count, value))
             selection.output_channels = value;
         else if (!alias && option == "--name") {
             try {

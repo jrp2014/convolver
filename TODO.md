@@ -1148,6 +1148,12 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **ROBUST-6 — State the shared limits once.** 5 November 2026, PR #108,
+  from the project review of that day: the sample-rate, channel, block and
+  impulse limits are `constexpr` values in `convolver/engine.hpp`, used by
+  the engine, readers, saved state, tools and adapters in place of literals
+  in fifteen files, with the same messages;
+  [resource limits](docs/develop/library.md#resource-limits).
 - [x] **VST3-15 — Test the messages through a host's proxy.** 5 November
   2026, from jrp's review of `276c7dc`: `vst3.adapter` connects the
   components through a forwarding proxy and a deferring one

@@ -197,7 +197,7 @@ bool Effect::ValidFormat(AudioUnitScope scope, AudioUnitElement element,
     return AUBase::ValidFormat(scope, element, format) &&
            format.mChannelsPerFrame >= static_cast<UInt32>(identity::min_channels) &&
            format.mChannelsPerFrame <= max_channels && std::isfinite(rate) && rate >= 1 &&
-           rate <= 768000 && std::floor(rate) == rate;
+           rate <= max_sample_rate && std::floor(rate) == rate;
 }
 
 OSStatus Effect::ChangeStreamFormat(AudioUnitScope scope, AudioUnitElement element,

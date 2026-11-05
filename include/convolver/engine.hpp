@@ -9,6 +9,15 @@
 #include <vector>
 
 namespace convolver {
+// ROBUST-6: the limits every part of Convolver checks (the engine, the
+// configuration and sound-file readers, saved state, the command-line tools
+// and the plug-ins' host side), so what one accepts the others accept too.
+inline constexpr int max_sample_rate = 768000;
+inline constexpr std::size_t max_channel_count = 256;
+inline constexpr std::size_t max_block_frames = std::size_t(1) << 20;
+inline constexpr std::size_t max_impulse_frames = std::size_t(1) << 26;
+// Each channel's delay in a Configuration; .cfg files allow less (2^24 frames).
+inline constexpr std::size_t max_engine_delay_frames = std::size_t(1) << 26;
 struct Route {
     std::size_t channel;
     float gain = 1;

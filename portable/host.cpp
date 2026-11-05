@@ -647,8 +647,9 @@ struct HostProcessor::Impl {
          const HostSettings& settings = {})
         : rate(c.sample_rate), inputs(c.input_channels), outputs(c.output_channels),
           maximum(maximum_), block(block_) {
-        if (!inputs || !outputs || inputs > 256 || outputs > 256 || !maximum ||
-            maximum > (1U << 20) || std::max(inputs, outputs) * maximum > (1U << 24))
+        if (!inputs || !outputs || inputs > max_channel_count || outputs > max_channel_count ||
+            !maximum || maximum > max_block_frames ||
+            std::max(inputs, outputs) * maximum > (1U << 24))
             throw std::invalid_argument("invalid host channel count or callback capacity");
         auto prepared = std::make_unique<Prepared>(c, block);
         input.resize(inputs * maximum);
