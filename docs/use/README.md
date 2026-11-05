@@ -52,7 +52,7 @@ To build Convolver yourself, see [build from source](../develop/build.md).
 
 ## Tools in a preview package
 
-A preview package holds the VST3 plug-in, three tools in `bin/`, example presets
+A preview package holds the VST3 plug-in, on macOS the Audio Unit too, three tools in `bin/`, example presets
 in `presets/`, the [first-use examples](first-filter.md#2-filter-the-examples)
 with presets made from them in `examples/first-use/`, these pages in
 `docs/use/` and licence notices in `licenses/`.

@@ -161,6 +161,17 @@ jobs:
           else
             "${command[@]}"
           fi
+      # PLUG-5, AU-5: install the macOS package on this disposable runner,
+      # check where each file lands, the signatures and the installed Audio
+      # Unit (au.bundle's checks and auval -strict), then uninstall. An
+      # automated package check, not clean-install qualification.
+      - name: Install the macOS package and validate the installed Audio Unit
+        if: runner.os == 'macOS'
+        timeout-minutes: 15
+        run: >-
+          python tests/release/macos_installer.py
+          --installer build/assets/*-unsigned.pkg
+          --archive "build/assets/Convolver-$(cat VERSION)-preview-$CANDIDATE_PLATFORM.zip"
       - name: Build and verify Windows candidate
         if: runner.os == 'Windows'
         timeout-minutes: 40

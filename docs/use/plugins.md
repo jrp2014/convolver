@@ -47,7 +47,7 @@ Contents: [formats](#formats) · [channels](#channels) ·
 | | VST3 | Audio Unit (AU) | LV2 |
 | --- | --- | --- | --- |
 | Systems | Windows, macOS, Linux | macOS | Linux |
-| How to get it | Preview package, or build | Build from source | Build from source |
+| How to get it | Preview package, or build | Preview package (macOS), or build | Build from source |
 | Channel counts | Any pairing of 1 to 8 in and out | Any pairing of 1 to 8 in and out | [Fixed layouts](#lv2-channel-layouts) |
 | Preset file | `.vstpreset` | `.aupreset` | A `NAME.preset.lv2` folder |
 | Libraries it needs on macOS | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | None beyond macOS: Accelerate for the FFT, AudioToolbox to read the files chosen in its window | Not on macOS |
@@ -621,7 +621,8 @@ License 2.0. That licence is compatible with version 3 of the GPL but not
 version 2, so the Audio Unit as a whole is distributed under GPL-3.0-or-later.
 Convolver's own source code and every other build stay GPL-2.0-or-later. The
 bundle's `Contents/Resources/licenses/` folder holds the notice, GPL version 3
-and the AudioUnitSDK licence.
+and the AudioUnitSDK licence; macOS preview packages also hold them in
+`licenses/` (`Convolver-AU.txt`, `GPL-3.0.txt`, `audiounitsdk.txt`).
 
 <!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
 

@@ -204,6 +204,7 @@ FORMAT_REFERENCES = {
         'cmake/ConvolverPluginPackaging.cmake': 'packages the Audio Unit on macOS, in the candidates',
         'scripts/release/candidate.py': 'the candidates, which Audio Unit changes run',
         'tests/release/package_smoke.py': "runs au.bundle's checks on the package, in the candidates",
+        'tests/release/macos_installer.py': "runs au.bundle's checks on the installed component, in the candidates",
         'tests/plugins/lifecycle.hpp': 'a comment',
     },
     'editor': {
