@@ -231,7 +231,9 @@ template <class Done> bool eventually(Done done) {
 // them (au::latency_progress_for_tests, set in main()). Fixed slots and a
 // mutex, so that a report from a render callback never allocates; a slot is
 // started afresh by a unit's first request, as a new unit may reuse a closed
-// one's address.
+// one's address. A new unit takes a settled slot; if every slot has work
+// outstanding, one is reused and progress_lost makes every wait fail, so a
+// lost record can never read as settled.
 struct LatencyProgress {
     AudioComponentInstance unit = nullptr;
     std::uint64_t requested = 0, done = 0;
@@ -239,21 +241,33 @@ struct LatencyProgress {
 std::mutex progress_mutex;
 std::array<LatencyProgress, 64> progress{};
 std::size_t next_slot = 0;
+bool progress_lost = false;
 LatencyProgress* progress_of(AudioComponentInstance unit) { // Under progress_mutex.
     for (auto& p : progress)
         if (p.unit == unit)
             return &p;
     return nullptr;
 }
+LatencyProgress& free_slot() { // Under progress_mutex.
+    for (std::size_t i = 0; i < progress.size(); ++i) {
+        auto& p = progress[(next_slot + i) % progress.size()];
+        if (p.done >= p.requested) {
+            next_slot = (next_slot + i + 1) % progress.size();
+            return p;
+        }
+    }
+    progress_lost = true;
+    auto& p = progress[next_slot];
+    next_slot = (next_slot + 1) % progress.size();
+    return p;
+}
 void record_progress(AudioComponentInstance unit, std::uint64_t requested,
                      std::uint64_t done) noexcept {
     std::lock_guard lock(progress_mutex);
     auto* p = progress_of(unit);
     if (!p || requested == 1) {
-        if (!p) {
-            p = &progress[next_slot];
-            next_slot = (next_slot + 1) % progress.size();
-        }
+        if (!p)
+            p = &free_slot();
         *p = {unit, 0, 0};
     }
     p->requested = std::max(p->requested, requested);
@@ -266,6 +280,8 @@ bool latency_settled(const Unit& unit,
                      std::chrono::milliseconds deadline = std::chrono::seconds(10)) {
     const auto done = [&] {
         std::lock_guard lock(progress_mutex);
+        require(!progress_lost, "more units had Latency work outstanding than there are "
+                                "progress slots; enlarge them");
         const auto* p = progress_of(unit.get());
         return !p || p->done >= p->requested;
     };

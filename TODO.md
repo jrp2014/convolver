@@ -787,8 +787,9 @@ so the preset file path is not needed).
   history took 25 to 43 ms; with flush-to-zero and denormals-are-zero set on
   the audio thread, 6 to 7 ms. Neither the engine nor the plug-ins set
   them; most hosts do on their audio threads, but not all, and a reverb tail
-  fading to silence reaches the same numbers. jrp decided (5 November 2026)
-  that Convolver flushes them itself, in its own pull request: one small
+  fading to silence reaches the same numbers. jrp decided
+  ([decision](docs/project/decisions.md#configuration-and-sound)) that
+  Convolver flushes them itself, in its own pull request: one small
   RAII helper sets flush-to-zero (and denormals-are-zero on x86-64; FPCR on
   Apple Silicon) for each processing call and restores the caller's mode,
   covering `Engine::process` (the CLI) and the whole `HostProcessor` call

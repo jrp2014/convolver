@@ -627,7 +627,9 @@ three tests as skipped.
 `judge()` gives a run's verdict from its records alone, so the rules are
 checked on made-up records, as jrp's review of `db54160` listed them: a
 deadline missed by a fast callback that woke late (not qualified), a slow
-callback (failed) and one as slow with little CPU time (not qualified), a
+callback (failed) and one as slow with little CPU time (failed, its note
+saying the records cannot tell blocked from descheduled), a callback blocked
+past the next deadline (failed), a
 loader over its limit (failed, also with every callback and both baselines
 late: the reproduction from the review of `59ac8e0`), a late baseline before
 or after (not qualified), functional errors (failed in every build), no limit
@@ -636,8 +638,10 @@ does not enforce the limits. The timing summaries (late, missed deadlines,
 whose time) and the rules across runs (`verdict()`, exit codes) are checked
 the same way. A few runs with real threads and a mock adapter then check
 that the renderer's records reach the verdict: a quick adapter records
-every phase, a 60 ms load over a 20 ms limit fails on both of two runs, and
-a refused load fails at once. It takes about nine seconds, where the first
+every phase, each callback's times in order (due, wake, entry, return) and
+its CPU time within the call; a 60 ms load over a 20 ms limit fails on both
+of two runs; a refused load fails at once; and with `--warm` the two warm
+phases appear, filled faster than real time and reported only. It takes about nine seconds, where the first
 version, which slept and spun, took 40 to 60. It also checks the input the
 audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the first
 version wrapped its negative half to about 1.8e15).

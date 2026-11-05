@@ -1292,8 +1292,9 @@ void worker_loads(host::World& world, const fs::path& work) {
     }
     // Closing at each stage: A held, B queued behind it; the host deactivates,
     // the held work is released, and the instance is destroyed (its worker
-    // stops and drops B, A's answer is never delivered, then cleanup()). The
-    // sanitizer build checks that nothing is used after it is freed or leaks.
+    // stops, A's answer is never delivered, and B is dropped or finishes
+    // before cleanup()). The sanitizer build checks that nothing is used after
+    // it is freed or leaks.
     for (const auto& [point, name] : points) {
         const std::string label = std::string("closed with A held at ") + name + ": ";
         auto p = with_original();

@@ -70,6 +70,8 @@ enum class WorkerPoint : int {
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.
+    // deactivate() reads it without the lock (deactivate_waits), so set it
+    // before the instance is used and leave it.
     void (*set_pause)(void* instance, void* context, void (*pause)(void*, WorkerPoint));
 };
 } // namespace convolver::lv2

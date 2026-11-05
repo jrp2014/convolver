@@ -510,8 +510,19 @@ void integration() {
                         return false;
             return !r.records.empty();
         };
+        // Each callback's times in order, and its CPU time (where measured)
+        // within the call, allowing for the clock reads around it.
+        const auto records_consistent = [&] {
+            for (const auto& rec : r.records)
+                for (const auto& p : rec.phases)
+                    for (const auto& c : p.callbacks)
+                        if (!(c.due <= c.woke && c.woke <= c.entered && c.entered <= c.returned) ||
+                            (c.cpu != -1 && (c.cpu < 0 || c.cpu > c.returned - c.entered + 0.002)))
+                            return false;
+            return true;
+        };
         check(r.errors == 0 && r.runs.size() == 1 && r.records.size() == 1 &&
-                  r.records[0].phases.size() == 5 && every_phase_heard() &&
+                  r.records[0].phases.size() == 5 && every_phase_heard() && records_consistent() &&
                   r.runs[0].hold == timing::Verdict::passed,
               "quick adapter: " + text(r.runs.at(0)));
     }

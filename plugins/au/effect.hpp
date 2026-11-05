@@ -76,15 +76,15 @@ inline int latency_queue_failure_for_tests = 0;
 // began (`requested` 0), on the work's queue. A test that waits until a
 // unit's `done` reaches the `requested` of its change knows that a run of
 // that unit's work that saw the change has finished. Null in the component;
-// set it only while no unit is open.
+// change it only while no unit's Latency work is running.
 inline void (*latency_progress_for_tests)(AudioComponentInstance unit, std::uint64_t requested,
                                           std::uint64_t done) noexcept = nullptr;
 // For the tests only (PLUG-21): when set, each run of a unit's Latency work
 // calls it first, on the work's queue, so that au.adapter can hold a run;
 // and closing a unit calls the second once it has cancelled the work and
 // before it waits for a run in progress, so that the test releases a held
-// run only after closing has reached that point. Null in the component; set
-// them only while no unit is open.
+// run only after closing has reached that point. Null in the component;
+// change them only while no unit's Latency work is running.
 inline void (*latency_started_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 inline void (*latency_closing_for_tests)(AudioComponentInstance unit) noexcept = nullptr;
 
