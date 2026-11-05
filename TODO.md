@@ -754,7 +754,10 @@ so the preset file path is not needed).
   output goes back the same way inside a `try` block. A private planar,
   `noexcept` entry point for `HostProcessor` would drop the second scan, two
   transposes and the `try`; the public `Engine::process` keeps its checks.
-  The output must stay bit-identical.
+  The output must stay bit-identical. jrp's simplification review of the same
+  day agrees, measurement first: remove such redundant work (as GAIN-2 did
+  for `--gain-db no-clip`) before any new planar engine or more elaborate
+  partitioning.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** From the project
   review of 5 November 2026, after PERF-3: the engine stores spectra split
   (real parts, then imaginary), but the backends hand them over interleaved
@@ -762,6 +765,22 @@ so the preset file path is not needed).
   vDSP's real FFT already works in split form and FFTW can read and write
   split arrays through its guru interface. Measure the saving, and keep
   within the kernel divergence gates.
+
+### Kernel rounding
+
+Guidance, not an item (jrp's simplification review, 5 November 2026):
+[`kernels.inc`](portable/kernels.inc) controls rounding closely. It turns
+implicit contraction off, writes each fused multiply-add explicitly, keeps
+the accumulation a separate rounding and makes the vector loop and the
+scalar remainder compute each bin the same way. Some of that guards
+differences far below audibility. The AVX2 kernels have measured benefits
+(PERF-4), so they stay. When these kernels next change (PERF-8, say), try
+whether ordinary compiler-generated arithmetic removes special handling
+while keeping within the oracle tolerance, `native.kernel_divergence`'s
+limits and the performance targets. Require identical rounding only where
+there is a concrete compatibility or reproducibility need. Routing, gain,
+delay and scaling stay exact. Nothing changes until then, because
+loosening rules without a kernel change saves no code.
 
 ### Loading responsiveness
 
@@ -847,6 +866,21 @@ request with a DSP change.
   when an advisory step reports a problem as well. Suggested in jrp's review
   of 0.5.2. See
   [pre-releases and newer upstream versions](docs/develop/build.md#pre-releases-and-newer-upstream-versions).
+- [ ] **CI-32 — Run the most extreme numerical cases less often, once they
+  cost.** From jrp's simplification review of 5 November 2026: keep
+  representative oracle and allocation checks as everyday gates, and run
+  the largest and most extreme cases (`native.kernel_divergence`'s 128k to
+  512k filters and its noise near 1e-35, where much of the arithmetic is
+  subnormal) in scheduled or DSP-focused runs, keeping their evidence. Not
+  done yet, because today they cost little. On 5 November 2026 (Linux
+  x86-64, Clang 18, a cloud build container), the test took 17.6 s under
+  Debug with sanitizers, which already skips the long filters; the
+  near-1e-35 case was about 5 s of that. In Release it took 10.5 s for all
+  nine workloads, about 9 s of them the long filters. Under
+  `ctest --parallel 4` the whole run took 55 s, with `native.fft_planning`
+  alone taking 35 s, so moving them would shorten no job. Take
+  it up when one of them sets a job's or a contributor's run time. A DSP-focused
+  run would then need a `dsp` answer from `scripts/ci_scope.py`.
 
 ## Documented limitations
 
