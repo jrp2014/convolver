@@ -104,6 +104,7 @@ Contents: [direction](#direction) · [releases](#releases) ·
 | 25 October 2026 | Keep the first version of the settings simple: Gain and Mix only, Audio Unit first for GarageBand; the gain modes, the Latency choice and the meters wait | [TODO PLUG-10](../../TODO.md) |
 | 25 October 2026 | The editor's settings are saved in each format's own way for now (VST3 host state version 3 only when a setting is not at its default; Audio Unit and LV2 parameters and ports), and `convolver-preset` gains no setting options yet. Where settings can then diverge between formats and hosts is documented | [Plug-in editor plan](plans/2026-10-24-plugin-editor.md#settings) |
 | 2 November 2026 | Saved state keeps a fixed 256 bytes free for the settings in every format and in `convolver-preset`, whether or not settings are in use, so a filter that loads still saves after any setting changes, including settings added later (PLUG-13). Restored states are checked the same way; one saved by an earlier build within 256 bytes of 64 MiB is refused (none was published) | [Adapter contract](../develop/plugin-contract.md#host-state) |
+| 5 November 2026 | The Audio Unit's macOS installer receipt `io.github.jrp2014.convolver.pkg.au`, beside `….pkg.vst3` and `….pkg.tools` (approved on the decision card, PLUG-5 and AU-5) | [Plug-in identities](../develop/plugin-identities.md) |
 
 ## Configuration and sound
 

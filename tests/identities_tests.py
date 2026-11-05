@@ -49,7 +49,7 @@ FROZEN = {
     ('lv2', 'bundle'): 'convolver.lv2',
     ('macos_installer', 'vst3_package_id'): 'io.github.jrp2014.convolver.pkg.vst3',
     ('macos_installer', 'tools_package_id'): 'io.github.jrp2014.convolver.pkg.tools',
-    # The Audio Unit's installer receipt (PLUG-5, AU-5), proposed 5 November 2026.
+    # The Audio Unit's installer receipt (PLUG-5, AU-5), approved by jrp 5 November 2026.
     ('macos_installer', 'au_package_id'): 'io.github.jrp2014.convolver.pkg.au',
     ('windows_installer', 'registry_key'): 'Software\\Convolver',
     ('windows_installer', 'uninstall_key'): 'Convolver',
