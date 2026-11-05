@@ -372,6 +372,10 @@ void HostFilter::load(HostState state, const std::optional<HostLayout>& host,
     } catch (...) {
         // Out of memory building a message, or a non-standard exception:
         // recorded first without a message, in case that fails too (ROBUST-7).
+        // A record refuse() made for this request stands: only copying its
+        // message into the exception, or its path, ran out.
+        if (load_failure_ && load_failure_->request.number == request.number)
+            throw;
         record_unexplained(HostFailureKind::preparation, request, carried);
         refuse(HostFailureKind::preparation, preparation_message({}), request, carried);
     }

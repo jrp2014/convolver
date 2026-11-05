@@ -303,12 +303,17 @@ format.
   empty instance's first load fails, every adapter silences the processor
   that plays with `HostProcessor::silence()` (ROBUST-3) rather than
   `activate()`, which would restart the fault count; it neither allocates
-  nor fails, so the silence holds even when memory has run out. Reaching it
-  cannot fail either (ROBUST-7): `HostFilter` marks the instance failed
-  (`fail_request()`) before it allocates anything for the record, which
-  keeps the kind and request number even without the message or path, and
-  each adapter's handler for a request that throws calls `fail_request()`
-  too, for memory that ran out while the message was built. The audio
+  nor fails, so the silence holds even when memory has run out. A first
+  load that runs out of memory before its failure is recorded still fails
+  (ROBUST-7): `HostFilter` marks the instance failed (`fail_request()`)
+  before it allocates anything for the record, which then keeps the kind
+  and request number but may lack the message (`failure_message()` gives
+  general advice instead) or the path. The adapters call `fail_request()`
+  for a request that throws before `HostFilter` records it: VST3 in
+  `refused()`, the Audio Unit in `fail_unrecorded()`, and LV2 in
+  `restore()`, `work()` and `record_dropped()`. The allocation-starvation
+  lifecycle tests cover restored state on all three formats; the
+  file-loading paths are checked by review only. The audio
   thread shows a new fault at once without logging: VST3 writes Fault to the
   Status parameter as an output parameter change, and when the host passes it
   to the controller (`setParamNormalized`), the controller sends

@@ -214,27 +214,32 @@ struct Instance {
     }
     // Records a request run() could not hand to the worker, unless a newer
     // one has been recorded since. Control side, under the lock.
-    void record_dropped() {
+    void record_dropped() noexcept {
         const auto d = dropped.exchange(0, std::memory_order_acq_rel);
         const auto generation = d >> 1;
         if (!d || generation <= handled)
             return;
         handled = generation;
         const bool was_failed = filter.failed();
-        filter.reject(HostFailureKind::filter_file,
-                      (d & 1) != 0
-                          ? detail::advice_text(
-                                {"this host gives Convolver no worker thread, so it cannot load "
-                                 "a filter file",
-                                 "Loading a filter file needs the LV2 worker extension.",
-                                 "Load a preset or a saved session instead, or use a host that "
-                                 "supports the worker.",
-                                 {}})
-                          : detail::advice_text({"the host could not start loading the filter file",
-                                                 "Its worker queue was full.",
-                                                 "Choose the file again.",
-                                                 {}}),
-                      {HostFilterSource::file, "", generation});
+        try { // The message needs memory: a first load fails all the same (ROBUST-7).
+            filter.reject(
+                HostFailureKind::filter_file,
+                (d & 1) != 0
+                    ? detail::advice_text(
+                          {"this host gives Convolver no worker thread, so it cannot load "
+                           "a filter file",
+                           "Loading a filter file needs the LV2 worker extension.",
+                           "Load a preset or a saved session instead, or use a host that "
+                           "supports the worker.",
+                           {}})
+                    : detail::advice_text({"the host could not start loading the filter file",
+                                           "Its worker queue was full.",
+                                           "Choose the file again.",
+                                           {}}),
+                {HostFilterSource::file, "", generation});
+        } catch (...) {
+            filter.fail_request();
+        }
         silence_failed_first_load(was_failed);
         update_status();
         log_rejection();

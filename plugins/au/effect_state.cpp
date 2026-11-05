@@ -176,6 +176,9 @@ void Effect::fail_unrecorded() noexcept {
     try {
         {
             std::lock_guard lock(control_);
+            // Read now, not before the request: whatever set failed() under
+            // the lock (a recorded refusal) silenced the unit in the same
+            // locked section, so failed() says whether that is still to do.
             silence_failed_first_load(filter_.failed());
             update_status();
         }
