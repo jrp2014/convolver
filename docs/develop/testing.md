@@ -549,8 +549,11 @@ each format's lifecycle driver: a thread calls `process` every 512 frames of
 real time at 48 kHz, as an audio device would, while the test thread loads a
 stereo filter of 1, 10 and 30 seconds into an empty instance, replaces it with
 another as long, and then resets processing from the audio thread. A callback
-is late when it finishes after the next one was due. A baseline with nothing
-loading shows the machine's own scheduling noise.
+is late when it finishes after the next one was due. Half a second with
+nothing loading before the phases and another after them (the baselines)
+show the machine's own scheduling noise; one would not do, since on Windows
+CI on 5 November 2026 a quarter-second baseline was once on time by chance
+on a runner where every other phase had two or three late callbacks.
 
 | Test | Entry points timed |
 | --- | --- |
@@ -564,25 +567,70 @@ the longest, counting time a callback was held back (LV2's `restore()`). A phase
 do not reach a long filter's steady cost, which grows as input history fills
 (PERF-5); that cost is PERF-3's to measure.
 
-The limits (jrp, 5 November 2026) hold only in an optimised build without
-sanitizers, the only build whose timings mean something; other builds print
-what would exceed them. While a load, a replacement or a reset runs on
-another thread, no callback may be late or take more than half its period
-(5.3 ms here); where the host stops audio (LV2's `restore()` and its reset)
-the callbacks are reported only. A load may hold the host's thread at most
-100 ms with filters up to 10 s and 250 ms with 30 s (100 ms feels instant;
-250 ms is where Apple's tools count an application as hung); the 120 s
-filter and LV2's worker are reported only. A phase whose baseline already
-had late callbacks is inconclusive rather than failed: the machine was busy.
-A shared CI runner can also stall a single run without a late baseline (on
-Windows CI the 30 s filter once held the host's thread for about 265 ms,
-where the run before took 55 ms), so in an optimised build an entry with a
-phase over the limits runs again, up to three times, and only the last run
-counts; a slow adapter is over the limits every time.
-In every build the run also fails when a load is refused, the instance does
-not then save the second filter, or a callback reports an error or throws.
+The limits (jrp, 5 November 2026): while a load, a replacement or a reset
+runs on another thread, no callback may be late or take more than half its
+period (5.3 ms here); where the host stops audio (LV2's `restore()` and its
+reset) the callbacks are reported only. A load may hold the host's thread at
+most 100 ms with filters up to 10 s and 250 ms with 30 s (100 ms feels
+instant; 250 ms is where Apple's tools count an application as hung); the
+120 s filter and LV2's worker are reported only.
+
+Each run of an entry (one entry point with one filter) gets a verdict
+(PERF-10, from jrp's review of `59ac8e0`):
+
+| Verdict | When |
+| --- | --- |
+| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits while both baselines were on time |
+| Not qualified | Callbacks broke their limits, but a baseline was late too, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
+| Reported only | No limit applies to any of its phases: LV2's `restore()`, for which the host stops audio, and its reset (the 120 s filter's hold is reported only, but its callbacks are judged, so its entries are not) |
+| Passed | None of these |
+
+An entry that did not pass runs again, up to three times, because a shared
+CI runner can stall one run without a late baseline (on Windows CI the 30 s
+filter once held the host's thread for about 265 ms, where the run before
+took 55 ms). The entry passes only if one run passed: one complete
+qualifying run that met both limits (jrp's review of `cc2ebde`). Otherwise
+it fails if a run had an error, if a limit was broken with evidence in one
+run and met in none, or if every run broke a limit (a stalled hold in one,
+late callbacks after an on-time baseline in another); it is reported only
+if no limit applied; and it is otherwise not qualified. So limits met in
+different runs do not add up to a pass: a hold that stalled on the first
+run and stayed within the limit on the next, whose callbacks could not be
+judged because a baseline was late, leaves the entry not qualified (the macOS
+VST3 job on 5 November 2026: 281.6 ms on the first run, 25 to 39 ms on the
+next two). A summary at the end lists every entry with every run that did
+not pass, so the failed attempts stay in the evidence; for an entry that
+did not pass after more than one run it names the run that met each limit;
+and its last line counts the entries that passed only after a run that did
+not. The test passes only when an entry passed and every other
+passed or was reported only; it fails if one failed, and exits 77 when one
+was not qualified or none was judged, which CTest reports as skipped
+(`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs show the
+three tests as skipped.
+
+`native.load_timing_harness` tests the harness itself with a mock adapter
+whose loads and callbacks take as long as each case says, after checking the
+verdict rules on made-up runs (a stalled hold then unjudged callbacks is not
+qualified; a stalled hold then late callbacks fails; an error after a pass
+fails; nothing judged is skipped): a loader that holds
+the thread for 400 ms fails on all three runs, also when every callback,
+the baseline's included, is late (the review's reproduction, which the first
+version passed); one slow only on its first run meets the hold limit on the
+next, with the failed run kept; late callbacks with a late baseline are not
+qualified; late callbacks only while loading never pass; a build that does
+not enforce the limits never passes; a load no limit applies to is reported
+only, however slow, and the test is then skipped; a refused load fails at
+once. A quick adapter's
+callbacks are not checked there, since they depend on the machine. It also checks the input
+the audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the
+first version wrapped its negative half to about 1.8e15).
+
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
-ran. The Release jobs of the VST3 and Audio Unit
+ran, and the last gives the overall result. The plug-in candidates leave
+them out (`-LE timing` in `candidate.py`), because they run the other tests
+alongside: on 5 November 2026 the macOS x86-64 candidate, with the runner
+that busy, held the host's thread for about 267 ms with the 10 s filter on
+all three runs. The Release jobs of the VST3 and Audio Unit
 workflows print the tables in a "Load timings" step; LV2's run only in its
 sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with

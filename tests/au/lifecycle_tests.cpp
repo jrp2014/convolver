@@ -192,7 +192,7 @@ int load_timing(int argc, char** argv) {
         {"load property", [&](const timing::Filter& f, timing::Audio&) {
              return timing::Outcome{driver.load_file(f.file.string())};
          }}};
-    return timing::run(driver, entries, options) ? 1 : 0;
+    return timing::exit_code(timing::run(driver, entries, timing::workloads(options), options));
 }
 } // namespace
 

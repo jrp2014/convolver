@@ -40,11 +40,6 @@ constexpr const char* build = nullptr;
 #else
 constexpr const char* build = "debug";
 #endif
-// The limits hold only where timings mean something: an optimised build
-// without sanitizers.
-constexpr bool enforced = build == nullptr;
-// Runs of an entry before a phase over the limits counts.
-constexpr int attempts = 3;
 
 Seconds period(const Workload& w) {
     return Seconds(static_cast<double>(w.block) / w.host.sample_rate);
@@ -151,8 +146,7 @@ class Renderer final : public Audio {
           in_(w.host.inputs, std::vector<float>(w.block)),
           out_(w.host.outputs, std::vector<float>(w.block)), block_(w.block) {
         for (std::size_t c = 0; c < in_.size(); ++c)
-            for (std::size_t t = 0; t < block_; ++t) // Quiet noise, as a host plays.
-                in_[c][t] = static_cast<float>(((t * 7919 + c * 104729) % 2001) - 1000) * 1e-4f;
+            in_[c] = quiet_noise(c, block_); // As a host plays.
         for (auto& v : in_)
             ins_.push_back(v.data());
         for (auto& v : out_)
@@ -281,10 +275,22 @@ void report(const std::string& format, const Workload& w, const std::string& ent
 }
 } // namespace
 
+std::vector<float> quiet_noise(std::size_t channel, std::size_t frames) {
+    std::vector<float> v(frames);
+    for (std::size_t t = 0; t < frames; ++t) {
+        // Signed before subtracting: unsigned arithmetic would wrap the
+        // negative half to about 1.8e15.
+        const auto step = static_cast<long long>((t * 7919 + channel * 104729) % 2001);
+        v[t] = static_cast<float>(step - 1000) * 1e-4f;
+    }
+    return v;
+}
+
 std::vector<Workload> workloads(const Options& o) {
     std::vector<Workload> list;
     // jrp, 5 November 2026: 100 ms feels instant; 250 ms is where Apple's
-    // tools count an application as hung. The 120 s filter is reported only.
+    // tools count an application as hung. The 120 s filter's hold is
+    // reported only; its callbacks are judged.
     for (const double s : {1.0, 10.0, 30.0})
         list.push_back({std::to_string(static_cast<int>(s)) + " s",
                         {48000, 2, 2},
@@ -296,13 +302,32 @@ std::vector<Workload> workloads(const Options& o) {
     return list;
 }
 
-std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, const Options& o) {
+bool optimised_build() {
+    return build == nullptr;
+}
+
+const char* describe(Verdict v) {
+    switch (v) {
+    case Verdict::passed:
+        return "passed";
+    case Verdict::failed:
+        return "FAILED";
+    case Verdict::not_qualified:
+        return "not qualified";
+    case Verdict::reported_only:
+        return "reported only";
+    }
+    return "?";
+}
+
+Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
+           const std::vector<Workload>& list, const Options& o) {
     const auto format = driver.format().name;
-    std::size_t errors = 0, over_limits = 0, inconclusive = 0;
+    Result result;
     std::cout << format << " load timing ("
-              << (enforced ? "optimised build: limits enforced"
-                           : std::string(build) +
-                                 " build: timings not representative, limits reported only")
+              << (o.enforce ? std::string(build ? build : "optimised") + " build: limits enforced"
+                            : std::string(build ? build : "optimised") +
+                                  " build: timings not representative, limits reported only")
               << ")\n"
               << "held: ms the calling thread was held; late: callbacks that finished after the "
                  "next was due, worst by how many ms; longest: ms of the longest callback\n";
@@ -312,7 +337,7 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                   "longest ms");
     std::cout << header;
     fs::create_directories(o.work_directory);
-    for (const auto& w : workloads(o)) {
+    for (const auto& w : list) {
         Filter x, y;
         x.name = "x";
         y.name = "y";
@@ -325,36 +350,61 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
             f->file = write_file(o.work_directory, format + "-" + f->name, f->configuration);
         }
         for (const auto& e : entries)
-            // A shared machine can stall any one run, so an optimised build
-            // runs an entry again when a phase is over the limits, and judges
-            // the last run: a slow adapter is over every time.
+            // A shared machine can stall any one run, so an entry that did not
+            // pass runs again, up to o.attempts times. Every run is kept.
             for (int attempt = 1;; ++attempt) {
-                bool busy = false; // The baseline was late: the machine was busy.
-                std::size_t over_here = 0, inconclusive_here = 0;
-                // What exceeds jrp's limits, or nothing.
-                const auto over = [&](std::optional<Seconds> held, const Callbacks& c,
-                                      bool audio_held) {
-                    std::string why;
-                    const auto add = [&](const std::string& s) {
-                        why += (why.empty() ? "" : "; ") + s;
-                    };
-                    if (held && e.host_thread && w.held_limit && *held > *w.held_limit)
-                        add("held the host's thread over " +
-                            std::to_string(std::lround(ms(*w.held_limit))) + " ms");
-                    if (!audio_held && c.late)
-                        add("late callbacks");
-                    if (!audio_held && c.longest > period(w) / 2)
-                        add("a callback took over half its period");
-                    if (!why.empty() && busy) {
-                        ++inconclusive_here;
-                        return "inconclusive, the baseline was late too: " + why;
+                Run r{w.name, e.name, attempt, Verdict::passed, {}};
+                const auto errors_before = result.errors;
+                // Held back by a busy machine before anything loaded: late
+                // callbacks while loading then say nothing about the plug-in.
+                bool busy = false;
+                // Each limit applied to some phase; each was exceeded.
+                bool hold_judged = false, callbacks_judged = false;
+                bool hold_over = false, callbacks_over = false;
+                std::vector<std::string> failed, unqualified;
+                // Judges one phase by jrp's limits; returns the note for its line.
+                const auto judge = [&](const char* phase, std::optional<Seconds> held,
+                                       const Callbacks& c, bool audio_held) {
+                    std::vector<std::string> over, noisy;
+                    // The hold is the plug-in's own time on the caller's
+                    // thread, judged whatever the audio thread saw.
+                    const bool hold_limited = held && e.host_thread && w.held_limit;
+                    hold_judged = hold_judged || hold_limited;
+                    callbacks_judged = callbacks_judged || !audio_held;
+                    if (hold_limited && *held > *w.held_limit) {
+                        hold_over = true;
+                        char text[96];
+                        std::snprintf(text, sizeof text,
+                                      "held the host's thread %.1f ms, over %.0f ms", ms(*held),
+                                      ms(*w.held_limit));
+                        over.emplace_back(text);
                     }
-                    if (why.empty())
-                        return why;
-                    ++over_here;
-                    return (enforced ? "OVER THE LIMIT: "
-                                     : "over the limit (not enforced here): ") +
-                           why;
+                    std::string callbacks;
+                    if (!audio_held && c.late)
+                        callbacks = std::to_string(c.late) +
+                                    (c.late == 1 ? " late callback" : " late callbacks");
+                    if (!audio_held && c.longest > period(w) / 2)
+                        callbacks += (callbacks.empty() ? "" : ", ") +
+                                     std::string("a callback took over half its period");
+                    if (!callbacks.empty())
+                        (busy ? noisy : over).push_back(callbacks);
+                    callbacks_over = callbacks_over || (!callbacks.empty() && !busy);
+                    std::string note;
+                    for (const auto& v : over) {
+                        failed.push_back(std::string(phase) + ": " + v);
+                        note += (note.empty() ? "" : "; ") + v;
+                    }
+                    if (!note.empty())
+                        note =
+                            (o.enforce ? "OVER THE LIMIT: " : "over the limit (not enforced): ") +
+                            note;
+                    for (const auto& v : noisy) {
+                        unqualified.push_back(std::string(phase) + ": " + v +
+                                              " (a baseline was late too)");
+                        note += (note.empty() ? "" : "; ") + std::string("not judged, ") + v +
+                                " with a baseline late too";
+                    }
+                    return note;
                 };
                 driver.create(w.host, true);
                 if (!driver.start())
@@ -364,14 +414,22 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                     const auto settle = Seconds(0.3); // Beyond any crossfade.
                     audio.wait_for(settle);
                     audio.take();
-                    audio.wait_for(Seconds(0.25));
+                    // A baseline with nothing loading before the phases and
+                    // another after them: late callbacks in either mean the
+                    // machine was busy, so late callbacks in the phases show
+                    // nothing either way (one short baseline on Windows CI was
+                    // once on time by chance, between two that were not).
+                    const auto baseline = Seconds(0.5);
+                    audio.wait_for(baseline);
                     const auto idle = audio.take();
-                    busy = idle.late != 0;
-                    report(
-                        format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
-                        busy ? "note: the machine was busy, so this entry's phases are inconclusive"
-                             : "");
-                    errors += idle.failed;
+                    result.errors += idle.failed;
+                    struct Phase {
+                        const char* name;
+                        std::optional<Seconds> held;
+                        Callbacks seen;
+                        bool ok, audio_held;
+                    };
+                    std::vector<Phase> phases;
                     for (const auto* f : {&x, &y}) {
                         Outcome outcome;
                         Seconds held{0};
@@ -388,35 +446,87 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
                         audio.wait_for(settle);
                         const auto seen = audio.take();
                         const bool ok = outcome.accepted && seen.failed == 0;
-                        report(format, w, e.name, f == &x ? "first load" : "replacement", held,
-                               seen, ok, over(held, seen, e.audio_waits));
-                        errors += ok ? 0 : 1;
+                        phases.push_back({f == &x ? "first load" : "replacement", held, seen, ok,
+                                          e.audio_waits});
+                        result.errors += ok ? 0 : 1;
                     }
                     audio.before_next([&] { driver.reset(); });
                     audio.wait_for(settle);
                     const auto reset = audio.take();
-                    report(format, w, e.name, "reset", std::nullopt, reset, reset.failed == 0,
-                           over(std::nullopt, reset, o.reset_holds_audio));
-                    errors += reset.failed;
+                    phases.push_back(
+                        {"reset", std::nullopt, reset, reset.failed == 0, o.reset_holds_audio});
+                    result.errors += reset.failed;
+                    audio.wait_for(baseline);
+                    const auto idle_after = audio.take();
+                    result.errors += idle_after.failed;
+                    busy = idle.late != 0 || idle_after.late != 0;
+                    const char* busy_note =
+                        busy ? "note: the machine was busy, so late callbacks in this run are "
+                               "not judged"
+                             : "";
+                    report(format, w, e.name, "baseline", std::nullopt, idle, idle.failed == 0,
+                           idle.late ? busy_note : "");
+                    for (const auto& ph : phases)
+                        report(format, w, e.name, ph.name, ph.held, ph.seen, ph.ok,
+                               judge(ph.name, ph.held, ph.seen, ph.audio_held));
+                    report(format, w, e.name, "idle after", std::nullopt, idle_after,
+                           idle_after.failed == 0, idle_after.late && !idle.late ? busy_note : "");
                     // The filter that plays is the replacement, as saved.
                     const auto saved = driver.saved();
                     if (!saved.configuration || saved.configuration->paths.at(0).impulse !=
                                                     y.configuration.paths[0].impulse) {
                         std::cout << format << ": after " << e.name
                                   << " the instance does not save " << w.name << " filter y\n";
-                        ++errors;
+                        ++result.errors;
                     }
                 }
                 driver.stop();
                 driver.destroy();
-                if (enforced && over_here != 0 && attempt < attempts) {
-                    std::cout << "      " << e.name << " with the " << w.name
-                              << " filter was over the limits on run " << attempt << " of "
-                              << attempts << "; running it again\n";
+                const auto join = [](const std::vector<std::string>& v) {
+                    std::string text;
+                    for (const auto& s : v)
+                        text += (text.empty() ? "" : "; ") + s;
+                    return text;
+                };
+                // Each limit separately: the hold of the host's thread, then
+                // the callbacks.
+                r.hold = !hold_judged ? Verdict::reported_only
+                         : hold_over  ? Verdict::failed
+                                      : Verdict::passed;
+                r.callbacks = !callbacks_judged      ? Verdict::reported_only
+                              : callbacks_over       ? Verdict::failed
+                              : !unqualified.empty() ? Verdict::not_qualified
+                                                     : Verdict::passed;
+                r.error = result.errors != errors_before;
+                if (r.error) {
+                    // A defect, not timing: judged in every build, never rerun.
+                    r.verdict = Verdict::failed;
+                    r.why = std::to_string(result.errors - errors_before) +
+                            " errors (a refused load, a failed callback or the wrong filter "
+                            "saved)";
+                } else if (!o.enforce) {
+                    r.verdict = r.hold = r.callbacks = Verdict::not_qualified;
+                    r.why = "limits not enforced in this build";
+                    if (!failed.empty())
+                        r.why += "; would fail: " + join(failed);
+                } else {
+                    r.verdict = combine(r.hold, r.callbacks);
+                    r.why = join(failed);
+                    if (!unqualified.empty())
+                        r.why += (r.why.empty() ? "" : "; ") + std::string("not judged: ") +
+                                 join(unqualified);
+                }
+                result.runs.push_back(r);
+                // The entry so far: run again while it has not passed.
+                const auto so_far = verdict(result.runs.end() - attempt, result.runs.end());
+                if (o.enforce && !r.error &&
+                    (so_far == Verdict::failed || so_far == Verdict::not_qualified) &&
+                    attempt < o.attempts) {
+                    std::cout << "      run " << attempt << " of " << o.attempts << " "
+                              << describe(r.verdict) << "; running " << e.name << " with the "
+                              << w.name << " filter again\n";
                     continue;
                 }
-                over_limits += over_here;
-                inconclusive += inconclusive_here;
                 break;
             }
         fs::remove(x.file);
@@ -424,9 +534,118 @@ std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, co
         fs::remove(fs::path(x.file).replace_extension(".wav"));
         fs::remove(fs::path(y.file).replace_extension(".wav"));
     }
-    std::cout << format << " load timing: " << errors << " errors, " << over_limits
-              << " phases over the limits" << (enforced ? "" : " (not enforced in this build)")
-              << ", " << inconclusive << " inconclusive\n";
-    return errors + (enforced ? over_limits : 0);
+    // One line for each entry and filter, with every run that did not pass.
+    std::cout << format << " load timing summary\n";
+    for (std::size_t i = 0; i < result.runs.size();) {
+        auto j = i;
+        while (j < result.runs.size() && result.runs[j].workload == result.runs[i].workload &&
+               result.runs[j].entry == result.runs[i].entry)
+            ++j;
+        const auto v = verdict(result.runs.begin() + static_cast<std::ptrdiff_t>(i),
+                               result.runs.begin() + static_cast<std::ptrdiff_t>(j));
+        char line[96];
+        std::snprintf(line, sizeof line, "  %-5s %-14s %s", result.runs[i].workload.c_str(),
+                      result.runs[i].entry.c_str(), describe(v));
+        std::cout << line << " (" << (j - i) << (j - i == 1 ? " run" : " runs");
+        if (v != Verdict::passed && j - i > 1) {
+            // Which run met each limit, when no run met both.
+            const auto a = result.runs.begin() + static_cast<std::ptrdiff_t>(i),
+                       b = result.runs.begin() + static_cast<std::ptrdiff_t>(j);
+            for (const auto& [name, limit] :
+                 {std::pair{"hold", &Run::hold}, std::pair{"callbacks", &Run::callbacks}})
+                if (const int k = met_on(a, b, limit))
+                    std::cout << "; " << name << " met on run " << k;
+        }
+        std::cout << ")\n";
+        for (auto k = i; k < j; ++k)
+            if (result.runs[k].verdict != Verdict::passed &&
+                result.runs[k].verdict != Verdict::reported_only)
+                std::cout << "        run " << result.runs[k].attempt << " "
+                          << describe(result.runs[k].verdict) << ": " << result.runs[k].why << '\n';
+        switch (v) {
+        case Verdict::passed:
+            ++result.passed;
+            if (j - i > 1)
+                ++result.passed_after_failure; // Runs stop at the first pass.
+            break;
+        case Verdict::failed:
+            ++result.failed;
+            break;
+        case Verdict::not_qualified:
+            ++result.not_qualified;
+            break;
+        case Verdict::reported_only:
+            ++result.reported_only;
+            break;
+        }
+        i = j;
+    }
+    const char* overall = result.errors || result.failed ? "FAILED"
+                          : result.not_qualified         ? "NOT QUALIFIED"
+                          : result.passed == 0           ? "REPORTED ONLY"
+                                                         : "PASSED";
+    std::cout << format << " load timing: " << overall << " (" << result.passed << " passed";
+    if (result.passed_after_failure)
+        std::cout << ", " << result.passed_after_failure << " of them after a run that did not";
+    std::cout << "; " << result.failed << " failed, " << result.not_qualified << " not qualified, "
+              << result.reported_only << " reported only; " << result.errors << " errors)\n";
+    return result;
+}
+
+Verdict combine(Verdict hold, Verdict callbacks) {
+    if (hold == Verdict::failed || callbacks == Verdict::failed)
+        return Verdict::failed;
+    if (hold == Verdict::not_qualified || callbacks == Verdict::not_qualified)
+        return Verdict::not_qualified;
+    if (hold == Verdict::reported_only && callbacks == Verdict::reported_only)
+        return Verdict::reported_only;
+    return Verdict::passed;
+}
+
+Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last) {
+    if (std::any_of(first, last, [](const Run& r) { return r.error; }))
+        return Verdict::failed;
+    // A pass needs one complete qualifying run: one that met both limits
+    // (or met one where the other does not apply).
+    if (std::any_of(first, last, [](const Run& r) { return r.verdict == Verdict::passed; }))
+        return Verdict::passed;
+    // Otherwise each limit across the runs: met if one run met it.
+    const auto across = [&](Verdict Run::* limit) {
+        const auto any = [&](Verdict v) {
+            return std::any_of(first, last, [&](const Run& r) { return r.*limit == v; });
+        };
+        return any(Verdict::passed)          ? Verdict::passed
+               : any(Verdict::failed)        ? Verdict::failed
+               : any(Verdict::not_qualified) ? Verdict::not_qualified
+                                             : Verdict::reported_only;
+    };
+    const auto hold = across(&Run::hold), callbacks = across(&Run::callbacks);
+    // Failed: a limit that no run met and one run broke with evidence, or
+    // every run broke one (a stalled hold in one, late callbacks after an
+    // on-time baseline in the other).
+    const auto broke = [](const Run& r) {
+        return r.hold == Verdict::failed || r.callbacks == Verdict::failed;
+    };
+    if (hold == Verdict::failed || callbacks == Verdict::failed || std::all_of(first, last, broke))
+        return Verdict::failed;
+    if (hold == Verdict::reported_only && callbacks == Verdict::reported_only)
+        return Verdict::reported_only;
+    // Each limit met in some run, or one could not be judged, but no run
+    // met both: not qualified.
+    return Verdict::not_qualified;
+}
+
+int met_on(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last,
+           Verdict Run::* limit) {
+    const auto k =
+        std::find_if(first, last, [&](const Run& r) { return r.*limit == Verdict::passed; });
+    return k == last ? 0 : k->attempt;
+}
+
+int exit_code(const Result& r) {
+    if (r.errors || r.failed)
+        return 1;
+    // Nothing judged (every entry reported only, or none ran) is not a pass.
+    return r.not_qualified || r.passed == 0 ? not_qualified_exit : 0;
 }
 } // namespace convolver::plugin_test::load_timing

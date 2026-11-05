@@ -262,7 +262,7 @@ if(CONVOLVER_BUILD_IO)
             # COST: about 100 s on Windows CI, so ctest --parallel starts it first (CI-9).
             set_tests_properties(vst3.lifecycle PROPERTIES LABELS "vst3;real-libraries;plug7" TIMEOUT 300
                 COST 100)
-            # The loading-responsiveness timings (TODO.md): measurement only.
+            # The loading-responsiveness timings (TODO.md).
             # The window's file needs a reader, as in convolver_vst3_tests.
             if(TARGET convolver_io)
                 target_link_libraries(convolver_vst3_lifecycle PRIVATE convolver_io)
@@ -270,9 +270,10 @@ if(CONVOLVER_BUILD_IO)
             endif()
             add_test(NAME vst3.load_timing COMMAND convolver_vst3_lifecycle --load-timing
                 "${PROJECT_BINARY_DIR}/vst3-load-timing")
-            # Alone, so that other tests do not take its machine (RUN_SERIAL).
+            # Alone, so that other tests do not take its machine (RUN_SERIAL);
+            # skipped, not passed, when an entry did not qualify (PERF-10).
             set_tests_properties(vst3.load_timing PROPERTIES LABELS "vst3;real-libraries;timing"
-                TIMEOUT 600 RUN_SERIAL TRUE)
+                TIMEOUT 600 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
             add_dependencies(check convolver_vst3_lifecycle)
         endif()
         add_dependencies(check convolver_vst3_preset)

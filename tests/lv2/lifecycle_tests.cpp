@@ -300,7 +300,7 @@ int load_timing(host::World& world, const fs::path& work, bool long_filters) {
                                                   return driver.request_file(f.file, audio);
                                               },
                                               false, false}};
-    return timing::run(driver, entries, options) ? 1 : 0;
+    return timing::exit_code(timing::run(driver, entries, timing::workloads(options), options));
 }
 
 int main(int argc, char** argv) {
