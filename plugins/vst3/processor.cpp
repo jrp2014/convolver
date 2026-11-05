@@ -714,7 +714,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     int32 position = 0;
     if (d.inputParameterChanges) {
         // VST3-4: Gain and Mix take the last value of the block, as the
-        // SDK's examples do; HostProcessor ramps each change over 64 frames.
+        // SDK's examples do; HostProcessor ramps each change over 1.33 ms.
         // Latency is not read here: the controller sends it as a message.
         for (int32 i = 0; i < d.inputParameterChanges->getParameterCount(); ++i) {
             auto* queue = d.inputParameterChanges->getParameterData(i);

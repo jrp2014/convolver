@@ -69,7 +69,7 @@ inline void (*load_started_for_tests)() noexcept = nullptr;
 //
 // Derived from AUBase rather than AUEffectBase on purpose: AUEffectBase's
 // bypass copies input to output, skipping Convolver's latency-aligned dry
-// path and 64-sample ramp, and does not handle unequal channel counts. Here
+// path and 1.33 ms ramp, and does not handle unequal channel counts. Here
 // the bypass property only stores a flag; Render applies it through
 // HostProcessor::set_bypass.
 //

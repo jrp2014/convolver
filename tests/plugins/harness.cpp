@@ -302,12 +302,14 @@ void restore_after_activation(const Context& x) {
 }
 
 // Live replacement: the new filter starts with fresh history, the old one plays
-// on for 256 frames, then a 256-frame linear crossfade. Two loads before the
+// on for 256 frames, then a linear crossfade of 5.33 ms (256 frames at 48 kHz,
+// to the nearest frame at other rates; PLUG-17). Two loads before the
 // next callback coalesce: only the newest is heard.
 void live_replacement(const Context& x) {
     const auto& a = x.c();
     const auto b = replacement(a);
     const std::size_t at = 1200, no = a.output_channels;
+    const std::size_t fade = (static_cast<std::size_t>(a.sample_rate) * 256 + 24000) / 48000;
     auto s = x.start(&a);
     auto out = s.render(x.f.input, 0, at);
     require(x.adapter.load({"superseded", {}, shortened(a)}), "first replacement rejected");
@@ -324,7 +326,8 @@ void live_replacement(const Context& x) {
     for (std::size_t t = 0; t < frames; ++t) {
         double blend = 0;
         if (t >= at + 256)
-            blend = static_cast<float>(std::min<std::size_t>(t - at - 255, 256)) / 256;
+            blend = static_cast<float>(std::min<std::size_t>(t - at - 255, fade)) /
+                    static_cast<float>(fade);
         for (std::size_t c = 0; c < no; ++c) {
             const auto i = t * no + c;
             const double o = i < old_wet.size() ? old_wet[i] : 0, n = new_wet[i];

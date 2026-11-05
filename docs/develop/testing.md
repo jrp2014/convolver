@@ -195,7 +195,7 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   bypass/reset, concurrent and queued filter replacements, with a callback heap guard;
   the shared adapter contract's `HostFilter`, including the failure record
   (PLUG-8): its kind, request number and silence for each failure, kept across
-  activations until a later request succeeds; `mute()` (its 64-frame ramp,
+  activations until a later request succeeds; `mute()` (its 1.33 ms ramp,
   bypass, reset, a crossfade, and a replacement fading in from silence);
   `silence()` (ROBUST-3: no allocation, exact silence from the first frame
   before any audio, the ramp while audio plays, and which publications it
@@ -394,13 +394,13 @@ for. Both run the same engine, so the CLI alone could hide a shared defect.
 | `restore-after-activation` | A filter loaded after activation but before audio is installed directly, without a crossfade |
 | `restore-before-setup` | State restored before the host negotiates rate and layout (VST3, AU) is installed directly at activation; skipped for formats that always know their configuration first (LV2) |
 | `restore-before-setup-mismatch` | Well-formed state for another rate, restored before setup, is kept as the saved state; activation plays exact silence; correcting the rate brings the filter back |
-| `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 256-frame linear crossfade; two loads before the next callback coalesce to the newest |
+| `live-replacement` | A replacement starts with fresh history; the old filter plays on for 256 frames, then a 5.33 ms linear crossfade (256 frames at 48 kHz, the fixtures' rate); two loads before the next callback coalesce to the newest |
 | `tail-after-replacement` | Replacing long with short keeps reporting the long tail; reactivation reports the short tail exactly and plays the short filter afresh; replacing short with long raises it again |
 | `failed-replacement` | A filter at the wrong rate, input count or output count is rejected while active; the running filter plays on uninterrupted and stays the saved state |
 | `failed-replacement-inactive` | The same while inactive: rejected at once, and reactivation plays the last valid filter |
 | `failed-initial-load` | A first filter that cannot be used is rejected, nothing is saved, and the instance plays exact silence, never its input; a valid filter loads afterwards |
 | `empty-instance` | Nothing loaded: identity for equal counts, exact silence for unequal counts |
-| `bypass` | A 64-sample ramp to the input delayed by 256 frames (input *c* to output *c*), and back. With unequal counts the ramp goes to silence on every output instead |
+| `bypass` | A 1.33 ms ramp (64 frames at 48 kHz) to the input delayed by 256 frames (input *c* to output *c*), and back. With unequal counts the ramp goes to silence on every output instead |
 | `reset` | Exact silence after a reset, then the filter plays as if fresh |
 | `silence-flags` | Input flagged silent does not cut the tail short; outputs flagged silent are silent |
 | `nonfinite-input` | NaN and infinite input samples count as silence; output stays finite |

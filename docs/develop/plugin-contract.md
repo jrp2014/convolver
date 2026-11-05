@@ -408,7 +408,9 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
   replacement crossfade last a fixed time at every sample rate (PLUG-17):
   64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
-  512 at 96 kHz and 59 and 235 at 44.1 kHz. The latency is fixed for a processor's life.
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. Bypass and mute step by the
+  reciprocal of that length, so at a few rates (11.025, 16, 176.4, 352.8
+  and 705.6 kHz) float rounding makes them a frame longer. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
@@ -543,10 +545,9 @@ everything it keeps (messages, the speaker notice) before calling the install
 callback, and nothing after the callback publishes can throw, so running out
 of memory never leaves one filter playing while another is saved. One audio
 thread calls process, reset, set_bypass and mute, and reads publications.
-`mute()` is for a failure
-found on the audio thread itself: the current filter ramps to silence over 64
-samples (or is silent from the first sample, when nothing has been processed
-since construction or reset) and stays silent until a filter published after
+`mute()` is for a failure found on the audio thread itself: the current
+filter ramps to silence over 1.33 ms, 64 frames at 48 kHz (or is silent from
+the first sample, when nothing has been processed since construction or reset) and stays silent until a filter published after
 the mute takes over and fades in from silence; one published before it but
 not yet picked up by the audio thread is silenced too. Bypass still passes the
 dry signal. `silence()` is the same mute requested from the control side, for

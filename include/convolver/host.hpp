@@ -396,7 +396,7 @@ class HostProcessor {
     // Prepare off-thread; latest pending state wins. A filter that is published
     // before any frame has been processed since construction or reset is
     // installed directly; otherwise the new filter warms up for one block and
-    // crossfades over 256 frames. reset() ends a transition in progress (the
+    // crossfades over 5.33 ms (256 frames at 48 kHz). reset() ends a transition in progress (the
     // newer filter plays at once), so a filter published before audio resumes
     // is installed directly.
     void replace(const Configuration&);
@@ -451,7 +451,7 @@ class HostProcessor {
     // filter: one published before this call stays silent, one published
     // after it takes over. With no audio since construction or reset, that
     // next call is silent from its first frame; otherwise the filter ramps to
-    // silence over 64 frames. A call already running when this one is made
+    // silence over 1.33 ms (64 frames at 48 kHz). A call already running when this one is made
     // may still play a filter it adopted.
     void silence() noexcept;
     // Audio thread: how many filters replace() and publish() have handed
