@@ -20,8 +20,8 @@ Until 1.0 the C++ API may change between minor versions.
   and how late audio callbacks were. In optimised builds they fail above
   jrp's limits for the loading-responsiveness gate: no late callback, and
   the host's thread held at most 100 ms with filters up to 10 s and 250 ms
-  with 30 s; an entry over them runs up to three times, and the last run
-  counts. Tests only: no change to the plug-ins or the sound.
+  with 30 s; an entry that does not pass runs up to three times (how runs
+  are judged: PERF-10, under Fixed). Tests only: no change to the plug-ins or the sound.
 
 - `convolver --compare OUTPUT EXPECTED` (REL-5) checks a render, such as a
   plug-in host's, against the file it should match, sample for sample. It
@@ -302,6 +302,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- Tests (PERF-10, from jrp's review of `59ac8e0`): the load-timing tests
+  passed when they could not judge a run: a late baseline made every
+  violation, an over-long load included, "inconclusive", which counted as
+  a pass. The hold of the host's thread is now judged whatever the audio
+  thread saw; a run whose late callbacks follow a late baseline, or that ran
+  in a build that does not enforce the limits, is "not qualified", and the
+  test then exits 77, which CTest reports as skipped, not passed. The
+  summary lists every run that did not pass, also when a later run did.
+  `native.load_timing_harness` checks these verdicts with a mock adapter.
+  Tests only: no change to the plug-ins or the sound.
 - Tests (PERF-11, from jrp's review of `59ac8e0`): the load-timing tests
   played input whose negative half wrapped round in unsigned arithmetic to
   about 1.8e15, instead of quiet noise from -0.1 to 0.1. The generator now

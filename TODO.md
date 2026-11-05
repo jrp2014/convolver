@@ -848,8 +848,24 @@ baselines were late, by 3 to 57 ms with callbacks taking under 1 ms, so the
 callback checks there were inconclusive: in practice only Linux CI enforces
 them. On `1290b81` the Windows runner held the host's thread for about
 265 ms with the 30 s filter (a clean baseline, then late callbacks during
-the load), so an entry over the limits now runs up to three times and the
-last run counts.
+the load), so an entry that does not pass now runs up to three times.
+
+jrp's review of `59ac8e0` (0.10.0) found that a late baseline made every
+violation inconclusive, the hold included, and that inconclusive counted
+as a pass: a mock adapter taking over 400 ms a load passed. PERF-10 judges
+the hold whatever the audio thread saw, reports a run whose callbacks
+cannot be judged as not qualified (CTest: skipped) rather than passed, and
+keeps every failed run in the summary; so a test that passes on a CI runner
+is a qualifying measurement, and one skipped there needs a quieter machine.
+The same review found the input was not the intended quiet noise (PERF-11).
+Measured again with the corrected input (same cloud VM and build, 5
+November 2026), the figures above hold: VST3 `setState` 4 to 6 ms with
+1 s, 47 to 60 ms with 10 s, 238 to 254 ms with 30 s (one run of three over
+250 ms, the next under) and 644 to 700 ms with 120 s; the window's file
+4 to 7, 34 to 38, 227 to 234 and 546 to 556 ms; LV2's worker 3 to 4, 37 to
+47 and 203 to 229 ms, its `restore()` holding back `run()` for 4, 39 and
+256 to 264 ms. No VST3 callback was late. Loading time does not depend on
+the input, which only the callbacks play.
 
 ### Keeping `host.cpp` manageable
 
@@ -1261,6 +1277,17 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   while another thread renders at the host's pace, and report how long the
   caller was held and how late callbacks were, failing above jrp's limits
   in optimised builds ([loading responsiveness](#loading-responsiveness));
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
+- [x] **PERF-10 — The load-timing gate cannot pass unqualified.** 5 November
+  2026, from jrp's review of `59ac8e0` (0.10.0): each run of an entry is
+  passed, failed or not qualified; the host thread's hold is judged whatever
+  the audio thread saw; a run is not qualified only when callbacks broke the
+  limits after a late baseline, or the build does not enforce them; the test
+  exits 77 (CTest: skipped) rather than 0 when an entry did not qualify; the
+  summary keeps every run that did not pass. `native.load_timing_harness`
+  drives the harness with a mock adapter: slow loads fail, with late
+  callbacks too (the review's reproduction), late callbacks with a late
+  baseline do not qualify, a refused load fails;
   [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **PERF-11 — Quiet noise as the load-timing input.** 5 November 2026,
   from jrp's review of `59ac8e0` (0.10.0): the input generator subtracted

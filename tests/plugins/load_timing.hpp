@@ -21,12 +21,21 @@
 //   host holds back audio: LV2's restore() and its reset);
 // - a load holds the host's thread at most 100 ms with filters up to 10 s,
 //   and 250 ms with 30 s; the 120 s filter is reported only.
-// A phase is inconclusive, not failed, when the baseline before it already
-// had late callbacks: the machine was busy. An entry with a phase over the
-// limits runs again, up to three times, and only the last run counts, as a
-// shared machine can stall one run without a late baseline. In every build the run also
-// fails when a load is refused, a callback reports an error or throws, or
-// the instance does not then save the second filter.
+// Each run of an entry (one entry point with one filter) is judged
+// (PERF-10, jrp's review of 59ac8e0):
+// - failed: a load was refused, a callback failed or the wrong filter was
+//   saved (in any build, and not run again); the host's thread was held
+//   over the limit, whatever the audio thread saw; or callbacks broke the
+//   limits after an on-time baseline;
+// - not qualified: callbacks broke the limits, but the baseline before them
+//   was already late (a busy machine), so the run shows nothing either way;
+//   and every run in a build that does not enforce the limits;
+// - passed: neither.
+// An entry that did not pass runs again, up to three times, as a shared
+// machine can stall one run; it passes if a run passed, and the summary
+// keeps every run that did not. The test exits 1 if an entry failed,
+// not_qualified_exit (CTest reports it as skipped) if one did not qualify,
+// and 0 only when every entry passed.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -86,12 +95,20 @@ struct Workload {
     std::optional<std::chrono::duration<double>> held_limit; // For the host's thread.
 };
 
+// True in an optimised build without sanitizers, the only build whose
+// timings mean something.
+bool optimised_build();
+
 struct Options {
     std::filesystem::path work_directory; // For the filter files.
     bool long_filters = false;            // Adds the 120 s filter jrp ran in GarageBand.
     // The format's reset stops audio (LV2's deactivate and activate), so its
     // callbacks have no limit.
     bool reset_holds_audio = false;
+    // Judge by the limits; otherwise every run is "not qualified" and only
+    // reports what would exceed them.
+    bool enforce = optimised_build();
+    int attempts = 3; // Runs of an entry, until one passes (when enforced).
 };
 
 // The input the audio thread plays: noise from -0.1 to 0.1 on every channel,
@@ -103,9 +120,36 @@ std::vector<float> quiet_noise(std::size_t channel, std::size_t frames);
 // long_filters).
 std::vector<Workload> workloads(const Options&);
 
+// PERF-10: what one run of an entry with one workload showed. "Not qualified"
+// is not a pass: the run could not show that the limits hold.
+enum class Verdict { passed, failed, not_qualified };
+const char* describe(Verdict);
+struct Run {
+    std::string workload, entry;
+    int attempt = 1;
+    Verdict verdict = Verdict::passed;
+    std::string why; // What was over the limits, or could not be judged.
+};
+struct Result {
+    std::size_t errors = 0; // Refused loads, failed callbacks, a wrong filter saved.
+    std::vector<Run> runs;  // Every run, those repeated included, in order.
+    // Entries (one workload, one entry point) by their verdict().
+    std::size_t passed = 0, failed = 0, not_qualified = 0;
+};
+// An entry's verdict from its runs: passed if one run passed, else failed if
+// one failed, else not qualified.
+Verdict verdict(std::vector<Run>::const_iterator first, std::vector<Run>::const_iterator last);
+
 // Runs every entry point on every workload with `driver` (the format's
-// lifecycle driver), prints one line per phase, and returns the number of
-// errors: refused loads, failed callbacks and a wrong filter saved
-// afterwards, and, in an optimised build, phases over the limits.
-std::size_t run(lifecycle::Driver& driver, const std::vector<Entry>& entries, const Options&);
+// lifecycle driver), prints one line per phase and a summary that keeps every
+// run that did not pass.
+Result run(lifecycle::Driver& driver, const std::vector<Entry>& entries,
+           const std::vector<Workload>& workloads, const Options&);
+
+// CTest's SKIP_RETURN_CODE for the timing tests: nothing failed, but not
+// every entry qualified, so the test is reported as skipped, not passed.
+constexpr int not_qualified_exit = 77;
+// 1 if there were errors or an entry failed, not_qualified_exit if an entry
+// did not qualify, otherwise 0.
+int exit_code(const Result&);
 } // namespace convolver::plugin_test::load_timing

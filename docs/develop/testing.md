@@ -553,25 +553,46 @@ the longest, counting time a callback was held back (LV2's `restore()`). A phase
 do not reach a long filter's steady cost, which grows as input history fills
 (PERF-5); that cost is PERF-3's to measure.
 
-The limits (jrp, 5 November 2026) hold only in an optimised build without
-sanitizers, the only build whose timings mean something; other builds print
-what would exceed them. While a load, a replacement or a reset runs on
-another thread, no callback may be late or take more than half its period
-(5.3 ms here); where the host stops audio (LV2's `restore()` and its reset)
-the callbacks are reported only. A load may hold the host's thread at most
-100 ms with filters up to 10 s and 250 ms with 30 s (100 ms feels instant;
-250 ms is where Apple's tools count an application as hung); the 120 s
-filter and LV2's worker are reported only. A phase whose baseline already
-had late callbacks is inconclusive rather than failed: the machine was busy.
-A shared CI runner can also stall a single run without a late baseline (on
-Windows CI the 30 s filter once held the host's thread for about 265 ms,
-where the run before took 55 ms), so in an optimised build an entry with a
-phase over the limits runs again, up to three times, and only the last run
-counts; a slow adapter is over the limits every time.
-In every build the run also fails when a load is refused, the instance does
-not then save the second filter, or a callback reports an error or throws.
+The limits (jrp, 5 November 2026): while a load, a replacement or a reset
+runs on another thread, no callback may be late or take more than half its
+period (5.3 ms here); where the host stops audio (LV2's `restore()` and its
+reset) the callbacks are reported only. A load may hold the host's thread at
+most 100 ms with filters up to 10 s and 250 ms with 30 s (100 ms feels
+instant; 250 ms is where Apple's tools count an application as hung); the
+120 s filter and LV2's worker are reported only.
+
+Each run of an entry (one entry point with one filter) gets a verdict
+(PERF-10, from jrp's review of `59ac8e0`):
+
+| Verdict | When |
+| --- | --- |
+| Failed | A load was refused, a callback failed or threw, or the instance did not then save the second filter (in every build, and not run again); or the host's thread was held over its limit, whatever the audio thread saw; or callbacks broke their limits after an on-time baseline |
+| Not qualified | Callbacks broke their limits, but the baseline before them was already late, so the machine was busy and the run shows nothing either way; and every run in a build that does not enforce the limits (anything but an optimised build without sanitizers, which only prints what would exceed them) |
+| Passed | Neither |
+
+An entry that did not pass runs again, up to three times, because a shared
+CI runner can stall one run without a late baseline (on Windows CI the 30 s
+filter once held the host's thread for about 265 ms, where the run before
+took 55 ms). The entry passes if a run passed, fails if none passed and one
+failed, and otherwise is not qualified. A summary at the end lists every
+entry with every run that did not pass, so the failed attempts stay in the
+evidence. The test passes only when every entry passed; it fails if one
+failed, and exits 77 when one was not qualified, which CTest reports as
+skipped (`SKIP_RETURN_CODE`), never as passed. So sanitizer and debug jobs
+show the three tests as skipped.
+
+`native.load_timing_harness` tests the harness itself with a mock adapter
+whose loads and callbacks take as long as each case says: a loader that holds
+the thread for 400 ms fails on all three runs, also when every callback,
+the baseline's included, is late (the review's reproduction, which the first
+version passed); late callbacks with a late baseline are not qualified; late
+callbacks only while loading never pass; a build that does not enforce the
+limits never passes; a refused load fails at once. It also checks the input
+the audio thread plays: noise from -0.1 to 0.1 of both signs (PERF-11; the
+first version wrapped its negative half to about 1.8e15).
+
 CTest runs the three alone (`RUN_SERIAL`); the first line says which build
-ran. The Release jobs of the VST3 and Audio Unit
+ran, and the last gives the overall result. The Release jobs of the VST3 and Audio Unit
 workflows print the tables in a "Load timings" step; LV2's run only in its
 sanitizer job. The
 `timing` label selects the three tests. Run a lifecycle executable with
