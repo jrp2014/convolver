@@ -227,6 +227,11 @@ Until 1.0 the C++ API may change between minor versions.
   check), `.github/workflows/watchdog.yml` and `scripts/ci_watchdog_probe.py`
   are removed, the Linux CI jobs no longer install gdb, and CI-24 and CI-25
   close without a cause; their evidence is archived.
+- Plug-ins (PLUG-17): the Gain, Mix, bypass and mute ramps last 1.33 ms and
+  a replacement filter's crossfade 5.33 ms at every sample rate, rather
+  than 64 and 256 frames. At 48 kHz the sound is unchanged (the oracle tests
+  pass as before); at 44.1 kHz the ramps are 59 and 235 frames, and at
+  96 kHz 128 and 512, so fades no longer get shorter as the rate rises.
 
 ### Fixed
 

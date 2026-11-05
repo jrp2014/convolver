@@ -285,14 +285,6 @@ Shared work, done once for all three formats:
   If FFTW-built plug-ins go ahead, FFTW 3.3.5's
   `fftwf_make_planner_thread_safe` is FFTW's answer for plug-ins in one
   process that cannot share a lock (its manual calls it a last resort).
-- [ ] **PLUG-17 — Ramps measured in time rather than frames (jrp decides).**
-  From the project review of 5 November 2026: `HostProcessor`'s gain, mix,
-  bypass and mute ramps last 64 frames and a replacement's crossfade 256
-  frames at every sample rate (PLUG-16 named them), so at 48 kHz they take
-  1.3 ms and 5.3 ms, and at 384 kHz 0.17 ms and 0.67 ms. Fixed times would
-  make the higher rates as smooth as 48 kHz, but they change the sound at
-  every rate except the one chosen, so jrp decides; the review recommends
-  keeping frames for the first preview.
 
 LV2 (Linux first; also PipeWire system audio):
 
@@ -1124,6 +1116,14 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in place of the VST3 and Audio Unit folders forcing 11.0 after it, so
   every Mac build targets what the packages do;
   [build options](docs/develop/build.md#build-options).
+- [x] **PLUG-17 — Ramps measured in time rather than frames.** 5 November
+  2026, PR #109: jrp chose "whichever is easier to use, for the final
+  user". `HostProcessor`'s gain, mix, bypass and mute ramps last 1.33 ms and
+  a replacement's crossfade 5.33 ms at every sample rate (64 and 256 frames
+  at 48 kHz, to the nearest frame elsewhere), so they are as smooth at
+  96 kHz and above as at 48 kHz, which plays exactly as before;
+  `native.host_settings` checks the lengths at 44.1, 48 and 96 kHz;
+  [contract](docs/develop/plugin-contract.md#settings).
 - [x] **PLUG-16 — Name the transition lengths.** 5 November 2026, PR #108,
   from the project review of that day: `HostProcessor`'s 64-frame setting,
   bypass and mute ramps and its 256-frame crossfade are named constants in

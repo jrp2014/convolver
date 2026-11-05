@@ -215,7 +215,9 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   frame against the oracle at each latency the plug-ins offer (blocks of 64
   to 4096 frames) and callbacks of 1 to 4096, printing the worst error
   relative to the output peak; each offered latency used and any other
-  refused; the 64-frame ramps sample by sample; clamping; the mix with
+  refused; the 64-frame ramps sample by sample at 48 kHz, and that the
+  ramps, bypass and the crossfade last the same time at 44.1, 48 and 96 kHz
+  (PLUG-17); clamping; the mix with
   unequal counts; and the log's settings words.
   The audio thread is checked for allocation throughout.
 - `native.host_report`: the editor report (PLUG-9), one case per state a

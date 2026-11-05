@@ -22,8 +22,8 @@ and are maintained here.
   sample rate and channels as soon as the host has settled them.
 - Every failure keeps a structured reason on the control side, for the host's
   log, LV2's status port and, later, a status display in the other formats.
-- Bypass ramps over 64 samples to the input delayed by the latency, or to
-  silence when the counts differ.
+- Bypass ramps over 1.33 ms (64 samples at 48 kHz) to the input delayed by
+  the latency, or to silence when the counts differ.
 - Gain and mix are host parameters whose defaults keep the sound unchanged
   ([settings](#settings)); the Audio Unit has them first.
 - Nothing on the audio thread allocates, locks or does I/O; filters are
@@ -361,13 +361,13 @@ separate processes, so each carries values, never pointers:
   the restored configuration. There is no warm-up or crossfade, so output
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for one Latency block and crossfades for 256 frames, as described under
+  fresh history, warms up for one Latency block and crossfades for 5.33 ms, as described under
   [replacement and threads](#replacement-and-threads).
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
 ## Bypass
 
-Bypass ramps over 64 samples to the dry signal and back, with the dry path
+Bypass ramps over 1.33 ms to the dry signal and back, with the dry path
 delayed by the reported latency so wet and dry line up. Wet processing carries
 on during bypass, so switching back does not lose history.
 
@@ -405,7 +405,10 @@ the plan's Gain modes and meters follow later ([TODO PLUG-10](../../TODO.md)).
   [`host.hpp`](../../include/convolver/host.hpp), and `settings_words()` for
   the log. `HostProcessor` takes the settings at construction; `set_gain_db()` and
   `set_mix()` are audio-thread calls like `set_bypass()`, and each change
-  ramps linearly over 64 frames. The latency is fixed for a processor's life.
+  ramps linearly over 1.33 ms. The ramps (also bypass and mute) and the
+  replacement crossfade last a fixed time at every sample rate (PLUG-17):
+  64 and 256 frames at 48 kHz, to the nearest frame elsewhere, so 128 and
+  512 at 96 kHz and 59 and 235 at 44.1 kHz. The latency is fixed for a processor's life.
 - **Gain** applies to the filtered signal, after convolution and before the
   mix; the dry path stays the untouched input. Range −100 to +24 dB, linear
   in decibels (jrp). During a replacement both filters play at the same gain.
@@ -518,7 +521,7 @@ any audio has been processed since activation or reset is installed directly.
 A reset (the host stopping and restarting processing) also ends a crossfade in
 progress, so the newer filter plays at once, and a filter published before
 audio resumes is installed directly. Later, a replacement runs for one Latency
-block to fill its latency, then crossfades for 256 samples. It starts with fresh
+block to fill its latency, then crossfades for 5.33 ms. It starts with fresh
 input history: it cannot reconstruct audio that preceded loading. Old engines
 are retired on the control thread. Pending changes coalesce to the newest; at
 most one transition and one pending replacement are retained, with up to two

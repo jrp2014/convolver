@@ -426,10 +426,10 @@ class HostProcessor {
     void set_bypass(bool) noexcept;
     // PLUG-10, audio thread, like set_bypass: the gain in decibels (clamped
     // to min_gain_db..max_gain_db) and the mix (0 to 1, ignored for unequal
-    // counts). Each change ramps over 64 frames.
+    // counts). Each change ramps over 1.33 ms (64 frames at 48 kHz, PLUG-17).
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
-    // Audio thread: the current filter ramps to silence over 64 frames (or is
+    // Audio thread: the current filter ramps to silence over 1.33 ms (or is
     // silent at once, before any audio since construction or reset) and
     // stays silent until a filter published after this call takes over,
     // which then fades in from silence as any replacement does; one published
