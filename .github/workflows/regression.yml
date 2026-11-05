@@ -102,6 +102,12 @@ jobs:
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure --output-junit junit.xml ${{ matrix.full_tests }}
+      # FFMPEG-1: CMake registers native.ffmpeg_pipe only where it finds
+      # FFmpeg, so the job that installs it checks that the test exists.
+      - name: The FFmpeg pipe test is registered
+        if: contains(matrix.packages, 'ffmpeg')
+        run: >-
+          ctest --test-dir build -N -R '^native\.ffmpeg_pipe$' | grep -q 'Total Tests: 1$'
       # Formatting is checked by the lint workflow (pre-commit), not here.
       - name: Portable static analysis
         if: runner.os == 'Linux' && matrix.cxx == 'clang++'

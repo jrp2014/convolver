@@ -279,7 +279,7 @@ jobs:
             "-DCONVOLVER_PLUGINVAL_ARGS=$arguments" ||
             give_up "Cannot configure the tests with pluginval $version; see the log of this step."
           if ctest --test-dir build-vst3 -C Release --output-on-failure --no-tests=error \
-            -R '^vst3\.pluginval$'; then
+            -R '^vst3\.pluginval$' --output-junit advisory-junit.xml; then
             echo "pluginval $version (pre-release): validation passes, as with $PLUGINVAL_VERSION." \
               >> "$GITHUB_STEP_SUMMARY"
           else
@@ -296,7 +296,7 @@ jobs:
               exit 1
             fi
           elif [ "${version%%.*}" -ge 2 ] && ! ctest --test-dir build-vst3 -C Release --output-on-failure \
-            --no-tests=error -R '^vst3\.pluginval\.acceptance$'; then
+            --no-tests=error -R '^vst3\.pluginval\.acceptance$' --output-junit advisory-junit.xml; then
             advise "The acceptance test fails with pluginval $version (pre-release); see the log of this step."
             keep_evidence acceptance
           fi

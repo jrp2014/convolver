@@ -68,6 +68,15 @@ class Summary(unittest.TestCase):
         self.assertIn('`vst3.pluginval`', text)
         self.assertNotIn('Failed', text)
 
+    def test_advisory_junit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            build = Path(folder) / 'build'
+            build.mkdir()
+            (build / 'junit.xml').write_text('formal')
+            (build / 'advisory-junit.xml').write_text('advisory')
+            copied = ci_evidence.collect(build, Path(folder) / 'out', advisory=True)
+            self.assertEqual(copied, ['advisory-junit.xml'])
+
 
 if __name__ == '__main__':
     sys.exit(unittest.main())

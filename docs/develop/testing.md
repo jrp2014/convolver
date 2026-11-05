@@ -147,9 +147,10 @@ build compiles it, and the adapter code it holds, with ASan and UBSan.
   result has the video copied and six channels at 48 kHz, every frame of
   the expected output with the filter's tail, and matches it within 1e-6
   after FLAC's 24 bits; audio that starts 0.5 s into the film starts at
-  time zero afterwards, as the guide warns (FFMPEG-1). Registered only
-  when CMake finds `ffmpeg` and `ffprobe`; CI installs FFmpeg in the
-  native g++ Release job on Linux.
+  time zero afterwards, as the guide warns (FFMPEG-1). The video packets'
+  checksums are unchanged. Registered only when CMake finds `ffmpeg` and
+  `ffprobe`; CI installs FFmpeg in the native g++ Release job on Linux,
+  which fails if the test is missing.
 - `compatibility.corpus`: [generated configuration fixtures](../../tests/compatibility/README.md)
   rendered at block sizes 1, 3, 17 and 256 in both latency modes against an
   independent direct-convolution reference, then inspected to check the reported
@@ -1287,7 +1288,7 @@ another job runs only its own format's tests. The CTest labels select them.
 | --- | --- | --- |
 | `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build, Audio Unit (Release Accelerate, Xcode on `macos-15`), VST3 on macOS (Release Accelerate, the newer Xcode on `macos-latest`), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (the same compiler, flags and image as native g++ Release with FFTW and with Ooura) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so

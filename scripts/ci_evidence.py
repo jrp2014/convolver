@@ -21,8 +21,9 @@ Usage: ci_evidence.py [--advisory] OUTPUT BUILD [BUILD ...]. Missing folders
 and files are skipped, so the step can run whichever stage failed.
 
 --advisory is for a check that warns rather than fails, such as the newest
-pluginval pre-release (CI-8): the evidence is collected the same way, but the
-summary calls it an advisory problem, since the job still passes.
+pluginval pre-release (CI-8): the evidence is collected the same way (with
+the advisory run's advisory-junit.xml in place of junit.xml), but the summary
+calls it an advisory problem, since the check only warns.
 """
 
 import os
@@ -48,11 +49,12 @@ def cache_value(cache, name):
     return ''
 
 
-def collect(build, out):
+def collect(build, out, *, advisory=False):
     copied = []
     patterns = [
         'Testing/Temporary/LastTest*.log',
-        'junit.xml',
+        # An advisory run's own JUnit report; the formal run's passed.
+        'advisory-junit.xml' if advisory else 'junit.xml',
         'CMakeCache.txt',
         '**/convolver-*tests.log',
         '**/convolver-*tests.log.old',
@@ -93,7 +95,7 @@ def summarize(failures, *, advisory=False):
             else 'No CTest failures recorded: another step failed (see the job log).'
         )
     if advisory:
-        lines += ['', 'The job still passes, as an advisory check only warns; its evidence is kept.', '']
+        lines += ['', 'This check only warns; its evidence is kept.', '']
     else:
         lines += [
             '',
@@ -138,7 +140,7 @@ def main(argv):
         if not build.is_dir():
             identity.append(f'{name}: not built')
             continue
-        copied = collect(build, output / build.name)
+        copied = collect(build, output / build.name, advisory=advisory)
         cache = build / 'CMakeCache.txt'
         if cache.is_file():
             compiler = cache_value(cache, 'CMAKE_CXX_COMPILER')
