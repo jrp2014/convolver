@@ -38,7 +38,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | AU | Parameter IDs | Gain `0`, Mix `1003`, Latency `1004` (global scope) | The [settings](plugin-contract.md#settings) (AU-7). Gain takes ID 0, the 2006 VST2 Attenuation's, with a new range (−100 to +24 dB); the VST3 parameters have the same IDs. Gain mode `1002` is approved for when that setting arrives. |
 | LV2 | URI base | `https://github.com/jrp2014/convolver/lv2#` | Plug-in URIs add a [fixed layout](#channel-layouts)'s id; state keys and the filter parameter use the same base |
 | LV2 | Bundle | `convolver.lv2` | |
-| macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
+| macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.au`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
 | All | Host state | magic `CNVS`, versions 1 to 3 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, and version 3 (VST3 only) adds settings that differ from their defaults; everything else is still written as version 1 |
 | AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). |

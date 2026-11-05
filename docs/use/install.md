@@ -9,18 +9,24 @@ package or from your own build. Afterwards, follow
 
 - Copy the whole plug-in bundle (a folder, not just the file inside it) into a
   folder your host scans, then ask the host to rescan.
-- Preview packages contain the VST3 plug-in for Windows, macOS and Linux. The
-  Audio Unit (macOS) and LV2 (Linux) plug-ins are built from source for now.
+- Preview packages contain the VST® 3 plug-in for Windows, macOS and Linux,
+  and on macOS the Audio Unit too. The LV2 plug-in (Linux) is built from
+  source for now.
 - Previews are not signed. On macOS, clear the download quarantine for the
-  Convolver bundle only; on Windows, an installer shows a SmartScreen warning.
+  Convolver bundles only; on Windows, an installer shows a SmartScreen warning.
 
 ## What a preview package contains
 
-`VST3/Convolver.vst3`, the tools in `bin/` (`convolver`, `convolver-preset`
+`VST3/Convolver.vst3`, on macOS the Audio Unit `Components/Convolver.component`,
+the tools in `bin/` (`convolver`, `convolver-preset`
 and `convolver-equalizer-apo`), example presets in `presets/`, the first-use
 examples with presets made from them in `examples/first-use/`, these pages in
 `docs/use/` (start with `docs/use/README.md`) and licence notices in `licenses/`. Check the package's
 SHA-256 checksum against the one published with it before going further.
+
+The Audio Unit is licensed as a whole under GPL-3.0-or-later, because it is
+built with Apple's AudioUnitSDK (Apache-2.0); everything else is
+GPL-2.0-or-later ([Audio Unit licence](plugins.md#audio-unit-licence)).
 
 Windows needs the Microsoft Visual C++ 2015–2022 x64 runtime. The plug-in has
 its own FFT code and needs no other library.
@@ -70,6 +76,7 @@ code-signing certificate.
 
   ```sh
   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Convolver.vst3
+  xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Convolver.component
   ```
 
   Do the same for the tools if you use them (`xattr -dr com.apple.quarantine bin`
@@ -86,9 +93,12 @@ Preview installers are also made for Windows and macOS; they have not yet been
 tried on clean computers. The Windows installer puts the plug-in in the
 all-users VST3 folder and the tools in the Convolver folder you choose;
 upgrading removes the previous version's files first. The macOS package
-installs into `/Library/Audio/Plug-Ins/VST3` and
-`/Library/Application Support/Convolver`, which holds `uninstall.sh`. Run that
-script with administrator rights only to remove Convolver.
+installs into `/Library/Audio/Plug-Ins/VST3`,
+`/Library/Audio/Plug-Ins/Components` (the Audio Unit) and
+`/Library/Application Support/Convolver`, which holds `uninstall.sh`; its
+**Customize** button lets you leave out the VST3 plug-in, the Audio Unit or the
+tools. Run `uninstall.sh` with administrator rights only to remove Convolver.
+After installing, refresh the Audio Unit list as above.
 
 ## Replace or remove
 
@@ -105,3 +115,11 @@ The host lists Convolver among its effects. If it does not, read the host's
 scan log and see [troubleshooting](troubleshooting.md#the-host-does-not-list-convolver).
 
 To build the plug-ins yourself, see [build from source](../develop/build.md#plug-ins).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

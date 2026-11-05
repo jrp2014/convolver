@@ -8,7 +8,7 @@ does not measure your room or design them. It runs on macOS, Linux and Windows
 as:
 
 - a **command-line tool** that filters WAV files or raw audio streams;
-- **plug-ins** for audio programs: VST3 (Windows, macOS, Linux), Audio Unit
+- **plug-ins** for audio programs: VST® 3 (Windows, macOS, Linux), Audio Unit
   (macOS) and LV2 (Linux), each with up to 8 input and 8 output channels;
 - an **Equalizer APO export**, for filtering everything Windows plays;
 - a **C++20 library** you can build into your own program.
@@ -87,3 +87,11 @@ see [COPYING](COPYING). The Audio Unit is distributed under version 3 or later
 ([why](docs/use/plugins.md#audio-unit-licence)). If you distribute a modified
 plug-in build, first give it its own identities
 ([how](docs/develop/plugin-identities.md#if-you-distribute-a-modified-build)).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="docs/use/images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

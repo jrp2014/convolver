@@ -6,14 +6,19 @@
   <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
   <choices-outline>
     <line choice="vst3"/>
+    <line choice="au"/>
     <line choice="tools"/>
   </choices-outline>
-  <choice id="vst3" title="Convolver VST3" description="Install the plug-in for all users.">
+  <choice id="vst3" title="Convolver VST® 3 plug-in" description="Install the VST 3 plug-in for all users, in /Library/Audio/Plug-Ins/VST3. VST is a registered trademark of Steinberg Media Technologies GmbH.">
     <pkg-ref id="io.github.jrp2014.convolver.pkg.vst3"/>
   </choice>
-  <choice id="tools" title="Command-line tools, examples and guides" description="Install tools and documentation in Application Support.">
+  <choice id="au" title="Convolver Audio Unit" description="Install the Audio Unit for all users, in /Library/Audio/Plug-Ins/Components.">
+    <pkg-ref id="io.github.jrp2014.convolver.pkg.au"/>
+  </choice>
+  <choice id="tools" title="Command-line tools, examples and guides" description="Install tools and documentation in /Library/Application Support/Convolver.">
     <pkg-ref id="io.github.jrp2014.convolver.pkg.tools"/>
   </choice>
   <pkg-ref id="io.github.jrp2014.convolver.pkg.vst3">Convolver-vst3.pkg</pkg-ref>
+  <pkg-ref id="io.github.jrp2014.convolver.pkg.au">Convolver-au.pkg</pkg-ref>
   <pkg-ref id="io.github.jrp2014.convolver.pkg.tools">Convolver-tools.pkg</pkg-ref>
 </installer-gui-script>

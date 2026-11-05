@@ -270,6 +270,15 @@ is used but never defined.
   every adapter under `plugins/` has tests under `tests/` and is named in
   [how the plug-ins behave](../use/plugins.md).
 
+`scripts/trademarks.py` also runs in pre-commit and lint CI (PLUG-5): the
+README and every user guide that mentions VST must write its first mention
+as "VST®" and end with the VST trademark block (Steinberg's unmodified logo
+and the approved wording from `packaging/trademarks/vst.json`), and the macOS
+installer's text must carry the mark and the notice. Run
+`python3 scripts/trademarks.py --fix` after adding a page that mentions VST;
+it writes the block but leaves the ® for you
+([trademarks](../../packaging/trademarks/README.md)).
+
 `scripts/check_format.py` finds the C++ sources to format, so a new adapter
 folder is covered without editing a file list. pre-commit runs it with the latest stable packaged
 clang-format and lint CI fails on any formatting difference, so run

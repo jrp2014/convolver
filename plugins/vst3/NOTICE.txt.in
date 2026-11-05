@@ -1,0 +1,18 @@
+Convolver VST® 3 plug-in
+
+Copyright (C) 2005-2026 jrp and the Convolver contributors
+https://github.com/jrp2014/convolver
+
+@CONVOLVER_VST_SUPPORT@
+@CONVOLVER_VST_NOTICE@
+
+Convolver is licensed under the GNU General Public License version 2 or (at
+your option) any later version (GPL-2.0-or-later). This plug-in is built with
+Steinberg's VST 3 SDK, which is licensed under the MIT licence. Preview
+packages hold both licences in licenses/ (Convolver.txt and vst3sdk.txt). The
+corresponding source is at the address above, including the exact VST 3 SDK
+release this plug-in was built with (packaging/release-policy.json).
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.

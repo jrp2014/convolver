@@ -5,7 +5,9 @@ The package mirrors the repository's docs/ layout, so a link between two
 shipped pages stays relative. A link to anything the package does not contain
 (another guide, TODO.md, an example folder) becomes a link to the same path in
 the source repository at the packaged source revision (its commit, or the
-version tag when the commit is unknown).
+version tag when the commit is unknown). An image (the VST Compatible logo)
+must be in a folder the package ships, so the guides show it offline: a link to
+the repository would show nothing.
 """
 
 import argparse
@@ -14,7 +16,19 @@ import re
 from pathlib import Path, PurePosixPath
 
 LINK = re.compile(r'\]\(([^)\s]+)\)')
+IMAGE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)\)|<img\s[^>]*?src="([^"]+)"')
 DEFAULT_REPOSITORY = 'https://github.com/jrp2014/convolver'
+
+
+def images(text, page):
+    """Repository-relative paths of the images a page shows."""
+    found = []
+    for match in IMAGE.finditer(text):
+        target = match.group(1) or match.group(2)
+        if '://' in target:
+            raise ValueError(f'{page}: image from the network, which an offline package cannot show: {target}')
+        found.append(posixpath.normpath(posixpath.join(posixpath.dirname(page), target.partition('#')[0])))
+    return found
 
 
 def rewrite(text, page, shipped, base, shipped_dirs=()):
@@ -32,6 +46,12 @@ def rewrite(text, page, shipped, base, shipped_dirs=()):
             return match.group(0)
         return f']({base}/{resolved}{hash_}{anchor})'
 
+    for resolved in images(text, page):
+        if not any(resolved.startswith(d.rstrip('/') + '/') for d in shipped_dirs):
+            raise ValueError(
+                f'{page}: image {resolved} is not in a folder the package ships '
+                f'(--packaged-dir: {", ".join(shipped_dirs) or "none"})'
+            )
     return LINK.sub(replace, text)
 
 
@@ -42,6 +62,9 @@ def package(source, pages, packaged_dirs, output, version, revision=None, reposi
     shipped = set(pages)
     for page in pages:
         text = (source / page).read_text(encoding='utf-8')
+        for image in images(text, page):
+            if not (source / image).is_file():
+                raise ValueError(f'{page}: image {image} does not exist')
         lines = text.split('\n')
         heading = next(i for i, line in enumerate(lines) if line.startswith('# '))
         note = (

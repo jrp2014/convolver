@@ -55,6 +55,7 @@ class GateTests(unittest.TestCase):
                 {
                     'id': platform['id'],
                     'artifact': name,
+                    'formats': platform['formats'],
                     'source_commit': 'a' * 40,
                     'source': 'source.tar.gz',
                     'notices': True,
@@ -112,6 +113,13 @@ class GateTests(unittest.TestCase):
 
     def test_complete_fixture(self):
         self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_missing_audio_unit(self):
+        # AU-5: a macOS candidate that left the Audio Unit out is incomplete.
+        record = next(r for r in self.candidate['platforms'] if r['id'] == 'macos-arm64')
+        record['formats'] = ['vst3']
+        with self.assertRaisesRegex(ValueError, 'formats'):
+            self.gate.check(self.candidate, self.policy, self.root)
 
     def test_changed_hash(self):
         (self.root / self.candidate['platforms'][0]['artifact']).write_bytes(b'changed')

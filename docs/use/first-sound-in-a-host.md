@@ -11,7 +11,7 @@ should hear it quieter, with a hollow tone), then the `repeat` preset (you
 should hear each sound again a quarter of a second later). Save and reopen the
 project to check that the filter is kept.
 
-You need a plug-in host that loads VST3: a DAW such as REAPER, an audio
+You need a plug-in host that loads VST® 3: a DAW such as REAPER, an audio
 editor such as Audacity (version 4 or later), or a plug-in rack such as Carla.
 GarageBand and Logic load only Audio Units, which preview packages do not
 contain yet ([install](install.md)).
@@ -77,3 +77,11 @@ choosing an entry from a list, and the Audio Unit and LV2 preset formats.
 [How the plug-ins behave](plugins.md) has the details. To check a real
 filter's output exactly, render it in the host and compare the result by
 command: [check a stereo filter in a host](check-a-stereo-filter.md).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

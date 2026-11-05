@@ -10,8 +10,9 @@ delivered is described in the guides and the [CHANGELOG](CHANGELOG.md).
 running an exact preview package from the 0.10 series. The
 [order of work](#execution-priorities) gets there in four steps: finish the
 open fixes (done), run jrp's host smoke tests (HOST-1), finish the package
-and the user journeys (PLUG-5, REL-2; the CLI and the journey presets are in
-the package), then the independent walkthrough (REL-3).
+and the user journeys (PLUG-5, REL-2; the CLI, the journey presets, the Audio
+Unit and the VST trademark notice are in the package), then the independent
+walkthrough (REL-3).
 [Status](docs/project/status.md) shows what users can run now and what still
 blocks the preview, and [decisions](docs/project/decisions.md) what jrp has
 decided. Other open themes are the later LV2 and AU previews, diagnostics
@@ -54,10 +55,10 @@ boundary and C++20 in the core.
 | Order | Work | Exit criterion / dependency |
 | --- | --- | --- |
 | 1. Finish the open fixes (done) | **DIAG-1** fault state after reloads and Load failed before Fault ([PR #73](https://github.com/jrp2014/convolver/pull/73)); from jrp's review of `6920a45` (31 October 2026), **PLUG-12** (a filter that loads but cannot be saved) and **ROBUST-3** (silence after a failed first load that cannot run out of memory); from his review of `276c7dc` (1 November 2026), **PLUG-13** (room for the settings in saved state, [PR #105](https://github.com/jrp2014/convolver/pull/105)) | DIAG-1 done: merged on 25 October 2026 (`7ed7e38`), and the "Plug-in distribution candidates" run on that commit passed ([run](https://github.com/jrp2014/convolver/actions/runs/40145929436)). PLUG-12 and ROBUST-3 done: merged on 31 October 2026 ([PR #91](https://github.com/jrp2014/convolver/pull/91), `7542576`), each with a test of the sequence that failed. |
-| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, Audio Unit built from source until AU-5 packages it) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
-| 3. Alongside step 2 | **PLUG-5** first-preview contents: the VST trademark notice (the `convolver` CLI and the first-use presets are in the package since PR #101). **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
+| 2. Host smoke tests | **HOST-1** (REAPER and Audacity, VST3), on jrp's Mac, from the latest candidate; **AU-4** (GarageBand, the Audio Unit from the same candidate, which holds it since PR #115) at the same sitting | Each [smoke test](docs/develop/host-testing.md#smoke-test-in-each-first-host) recorded with the package SHA-256, host and macOS versions, and every finding fixed or listed. HOST-1 and AU-4 both gate the first preview, which holds the Audio Unit too. Needs no CLI in the package, so it can start now that step 1 is merged. Its notes (where each host shows the Status parameter and presets) feed REL-2. |
+| 3. Alongside step 2 | **PLUG-5** first-preview contents: in the candidates since PR #115 (the Audio Unit on macOS, the VST trademark notice; the `convolver` CLI and the first-use presets since PR #101); what remains is qualifying one exact candidate (HOST-1, AU-4, REL-3) and jrp's publication. **REL-2:** the 2→6 crossover and CLI journeys written in `docs/use/` (the stereo journey is written) | The package holds everything the journeys use, and the release tests run it; each journey step states its expected result and how to check the output. |
 | Early walkthrough (macOS) (done) | **REL-5**: an explicitly limited walkthrough of an exact candidate on macOS, the stereo journey only | Done on 1 November 2026 as a package and command-line check only, by jrp's choice ([done](#done)); its host steps moved to HOST-1's REAPER smoke test and REL-3. It did not change the first preview's contents and does not replace REL-3. |
-| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
+| 4. Settings, windows and the Audio Unit | The **HOST-2** editor, which jrp wants in the first preview with the Audio Unit: **PLUG-9** and **PLUG-10**, then **VST3-3**, **VST3-4**, **AU-7** and the first half of **AU-6**, then the windows **VST3-11** (macOS, shared with the Audio Unit in **AU-6**), **VST3-12** (Windows) and **VST3-13** (Linux, VSTGUI stop-gap); and the Audio Unit's own path into the package, **AU-3** (validation), **AU-4** (guide and hosts) and **AU-5** (the component in the preview, in the macOS candidates since PR #115) | The [editor plan's phases](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), each merged with its tests; the REL-2 journeys and the host smoke tests include the window. **Acceptance gate:** loading a long filter from a window or a preset, on the supported workloads (PERF-3), causes no noticeable pause in the host's interface or audio, measured by automated tests rather than by hand; if it does, background preparation comes first ([loading responsiveness](#loading-responsiveness)). PLUG-9 and PLUG-10 can start alongside steps 2 and 3. |
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
@@ -82,7 +83,8 @@ is superseded.
 - [ ] **REL-1 — Qualify downloadable plug-ins.** The candidate workflow
   builds unsigned packages with pinned dependencies, corresponding source,
   staging, installers, artifact verification and promotion gates
-  ([releasing](docs/develop/releasing.md)); PLUG-5 extends it to LV2 and AU.
+  ([releasing](docs/develop/releasing.md)); PLUG-5 extends it to the Audio
+  Unit (done for the preview, PR #115) and LV2 (a later preview).
   Still open, for the production gate: verified minimum OS and CPU versions,
   dependency closure, the final licence and corresponding-source review,
   signing and notarization, installation on clean machines, and immutable
@@ -228,13 +230,26 @@ Shared work, done once for all three formats:
   first-use examples with a preset made from each (stereo and 2→6 included);
   `release.stage`, `package_smoke.py`, `verify_artifact.py` and the debugging
   symbols cover the CLI, and the packaged guide's examples run it.
-  Still needed for the first preview: the VST trademark notice that
-  Steinberg's usage guidelines ask for (® on first use of "VST", the sentence
-  "VST is a registered trademark of Steinberg Media Technologies GmbH." in the
-  documentation and packages, and the VST Compatible logo where they require
-  it; [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md)), with
-  wording jrp approves; and the Audio Unit component (AU-5), which is in the
-  first preview. LV2 joins a later preview.
+  Progress (5 November 2026, PR #115): the VST trademark notice in the
+  wording jrp approved (® on the first mention of VST, "Convolver supports
+  VST® 3." and "VST is a registered trademark of Steinberg Media Technologies
+  GmbH."), with Steinberg's unmodified VST Compatible logo, in the README,
+  every packaged guide that mentions VST, the VST3 bundle's `NOTICE.txt` and
+  the macOS installer, from one source checked in pre-commit
+  ([trademarks](packaging/trademarks/README.md)); and the Audio Unit in both
+  macOS candidates (AU-5): `Components/Convolver.component`, a third
+  installer package for `/Library/Audio/Plug-Ins/Components`, its debugging
+  symbols, notices and SDK source, checked by `release.stage`,
+  `verify_artifact.py`, `symbols.py` and, after installing the `.pkg` on the
+  CI runner, `auval -strict` on the installed component; all of these first
+  passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224) (`cdb99d6`)
+  ([what a package holds](docs/develop/releasing.md#what-a-package-holds)).
+  Still needed for the first preview, all outside the pipeline: HOST-1 and
+  AU-4 from one exact candidate, REL-3's walkthrough of its files, and jrp's
+  publication. The logo in the window (an About box) is follow-up work,
+  PLUG-20, not needed for the preview. Later: LV2 in
+  a later preview (LV2-5), and Developer ID signing, notarization and
+  Authenticode at the production gate (REL-1).
 - [ ] **PLUG-9 — Editor report and loading from a file.** Phase 1 of the
   [editor plan](docs/project/plans/2026-10-24-plugin-editor.md#phases-and-todo-items), needing no window: a
   report value in `Convolver::host` built on the control side (status, full
@@ -300,6 +315,16 @@ Shared work, done once for all three formats:
 
 LV2 (Linux first; also PipeWire system audio):
 
+- [ ] **PLUG-20 — The VST logo in the window (optional).** Steinberg's usage
+  guidelines say the VST Compatible logo *should* appear in an About box or
+  equivalent; where there is no room, the attribution notice is enough.
+  Convolver's window has no About box, so the preview carries the notice in
+  the VST3 bundle's credits (`NOTICE.txt`) and the macOS installer text, and
+  the logo in every packaged guide (PLUG-5,
+  [trademarks](packaging/trademarks/README.md)). jrp, 5 November 2026: keep
+  it as follow-up work after the preview. Done when the macOS window (shared
+  by VST3 and the Audio Unit) shows the logo and notice somewhere a user can
+  find them, without crowding the settings, and its tests cover it.
 - [ ] **LV2-3 — Layouts and validation.** Plug-in URIs for the PLUG-4 layouts;
   `lv2lint` and pluginval in CI.
   Progress (22 October 2026, PR #43): the eight discrete URIs and `lv2lint` in
@@ -356,6 +381,15 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 - [ ] **AU-5 — Release.** In the first preview. Unsigned preview component under PLUG-5 (ad-hoc
   signed, documented quarantine removal). Developer ID signing and
   notarization follow at the production gate.
+  Progress (5 November 2026, PR #115): both macOS candidates hold
+  `Components/Convolver.component`, ad-hoc signed after the last step that
+  changes it, with `Convolver-au.dSYM`, the AudioUnitSDK notice and source,
+  and its own installer package (receipt `io.github.jrp2014.convolver.pkg.au`);
+  the install guide covers the Components folder and quarantine removal. CI
+  installs the `.pkg` and runs `auval -strict` on the installed component;
+  first passed on both Macs in candidates [run 42108659224](https://github.com/jrp2014/convolver/actions/runs/42108659224) (`cdb99d6`), window listed.
+  Remaining for the preview: AU-4's GarageBand smoke test from that
+  candidate; then the production gate.
 - [ ] **AU-6 — Editor window.** Custom properties (IDs from 64000) for the
   PLUG-9 report and a load request, with property-change events and a
   `ClassInfo` change after a load; then a Cocoa view factory

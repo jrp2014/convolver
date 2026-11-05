@@ -109,6 +109,24 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'artifact'):
             self.contract.validate_policy(policy, ROOT)
 
+    def test_platform_formats(self):
+        # Platform 0 is Windows, platform 1 macOS: no Audio Unit off macOS, VST3 always.
+        self.assertEqual([p['os'] for p in self.policy['platforms'][:2]], ['Windows', 'Darwin'])
+        for platform, formats in ((0, ['au', 'vst3']), (1, ['au']), (1, None), (1, ['vst3', 'clap'])):
+            policy = copy.deepcopy(self.policy)
+            policy['platforms'][platform]['formats'] = formats
+            with self.subTest(platform=platform, formats=formats), self.assertRaisesRegex(
+                ValueError, 'formats|Audio Unit'
+            ):
+                self.contract.validate_policy(policy, ROOT)
+
+    def test_system_formats(self):
+        # A corresponding-source rebuild makes what the candidates ship.
+        self.assertEqual(self.contract.system_formats(self.policy, 'Darwin'), ['vst3', 'au'])
+        self.assertEqual(self.contract.system_formats(self.policy, 'Linux'), ['vst3'])
+        with self.assertRaisesRegex(ValueError, 'no packages'):
+            self.contract.system_formats(self.policy, 'FreeBSD')
+
     def test_tested_without_evidence(self):
         policy = copy.deepcopy(self.policy)
         policy['platforms'][0]['status'] = 'tested'

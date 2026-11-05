@@ -12,7 +12,7 @@ preset from an IR or `.cfg` with `convolver-preset` and load it in your host.
 - The plug-ins have no editor. You choose a filter by loading a **preset**, and
   `convolver-preset` makes one from an impulse response (IR), a
   [`.cfg`](configuration.md) or a configuration list.
-- The name you give the new file picks the format: `room.vstpreset` (VST3),
+- The name you give the new file picks the format: `room.vstpreset` (VST® 3),
   `room.aupreset` (Audio Unit) or `room.preset.lv2` (an LV2 preset folder).
   Name several to make them all at once:
   `convolver-preset room.cfg room.vstpreset room.aupreset room.preset.lv2`.
@@ -169,3 +169,11 @@ give the same explanations as `convolver`; see
 
 What a preset file contains is described for developers in the
 [plug-in adapter contract](../develop/plugin-contract.md#preset-files).
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->

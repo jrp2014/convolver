@@ -264,6 +264,18 @@ class SymbolTests(unittest.TestCase):
         dwarf.write_bytes(macho(b'\x03' * 16))  # convolver-preset's UUID, third in TARGETS
         self.fails('Darwin', 'no debugging information')
 
+    def test_darwin_audio_unit(self):
+        # AU-5: both plug-ins' executables are called Convolver, so the VST3
+        # plug-in's symbols must not pass for the Audio Unit's.
+        self.darwin()
+        found = symbols.check(self.kept, self.stage, 'Darwin')
+        self.assertIn('Mach-O UUID', found['Convolver-au.dSYM'])
+        shutil.rmtree(self.kept / 'Convolver-au.dSYM')
+        shutil.copytree(self.kept / 'Convolver.dSYM', self.kept / 'Convolver-au.dSYM')
+        self.fails('Darwin', 'Convolver-au.dSYM', 'another build')
+        shutil.rmtree(self.stage / 'Components')
+        self.fails('Darwin', 'Components/Convolver.component/Contents/MacOS/Convolver', 'found 0')
+
     def test_darwin_universal(self):
         self.darwin()
         a, b = b'\x0a' * 16, b'\x0b' * 16
@@ -355,7 +367,7 @@ class SymbolTests(unittest.TestCase):
 
     @unittest.skipUnless(platform.system() == 'Darwin' and shutil.which('dsymutil'), 'needs dsymutil')
     def test_real_macho(self):
-        for (name, pattern), value in zip(symbols.TARGETS['Darwin'], (1, 2, 3, 4)):
+        for value, (name, pattern) in enumerate(symbols.TARGETS['Darwin'], 1):
             binary = self.stage / pattern
             binary.parent.mkdir(parents=True, exist_ok=True)
             self.kept.mkdir(exist_ok=True)

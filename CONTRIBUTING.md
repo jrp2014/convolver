@@ -184,7 +184,7 @@ The local hooks also check maintained Markdown links and the repository rules
 guidance, licence lines and the top-level layout), and run both checkers'
 regression tests on every invocation. A further hook checks the
 [permanent plug-in identities](docs/develop/plugin-identities.md#changing-the-registry),
-another tests which files let a pull request
+another the [VST trademark wording](packaging/trademarks/README.md), another tests which files let a pull request
 [skip the builds](docs/develop/testing.md#documentation-only-pull-requests),
 and another, whenever
 `scripts/fuzz_campaigns.sh` or its test changes, the
@@ -198,6 +198,8 @@ python3 tests/documentation_links_tests.py
 python3 scripts/check_repository.py
 python3 tests/repository_checks_tests.py
 python3 tests/identities_tests.py
+python3 scripts/trademarks.py
+python3 tests/trademarks_tests.py
 python3 tests/ci_scope_tests.py
 python3 tests/ci_evidence_tests.py
 python3 tests/fuzz/scheduler_tests.py

@@ -98,6 +98,13 @@ def validate_policy(policy, source=None):
             raise ValueError('invalid support status')
         if platform['status'] == 'tested' and not platform.get('evidence'):
             raise ValueError('tested platform requires evidence')
+        # What each platform's package ships (PLUG-5): VST3 everywhere, the
+        # Audio Unit only on macOS; LV2 joins a later preview.
+        formats = platform.get('formats')
+        if not isinstance(formats, list) or 'vst3' not in formats or not set(formats) <= PLUGIN_FORMATS:
+            raise ValueError(f'{name}: formats must list the plug-in formats shipped, VST3 included')
+        if 'au' in formats and platform.get('os') != 'Darwin':
+            raise ValueError(f'{name}: only macOS packages can hold the Audio Unit')
 
 
 def _validate_source(name, rule, *, archive=True):
@@ -178,3 +185,13 @@ def with_records(policy, records):
 
 def platform_policy(policy, identifier):
     return next(p for p in policy['platforms'] if p['id'] == identifier)
+
+
+def system_formats(policy, system):
+    """The plug-in formats the policy ships for an operating system (for example
+    VST3 and the Audio Unit on Darwin), so a rebuild of the corresponding source
+    makes the same plug-ins as the candidate."""
+    formats = {f for p in policy['platforms'] if p['os'] == system for f in p['formats']}
+    if not formats:
+        raise ValueError(f'the release policy ships no packages for {system}')
+    return sorted(formats, key=lambda f: (f != 'vst3', f))

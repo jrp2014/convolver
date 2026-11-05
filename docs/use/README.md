@@ -45,14 +45,14 @@ and the plug-ins have not yet been tested in named DAWs. The
 | [Troubleshooting](troubleshooting.md) | How-to | Symptoms, causes and fixes |
 | [Command-line reference](command-line.md) | Reference | Every option of `convolver` |
 | [Configuration files](configuration.md) | Reference | The `.cfg` and list formats |
-| [How the plug-ins behave](plugins.md) | Reference | Channels, latency, bypass, loading and failures, for VST3, Audio Unit and LV2 |
+| [How the plug-ins behave](plugins.md) | Reference | Channels, latency, bypass, loading and failures, for VST® 3, Audio Unit and LV2 |
 | [Limits](limits.md) | Reference | What Convolver does not do |
 
 To build Convolver yourself, see [build from source](../develop/build.md).
 
 ## Tools in a preview package
 
-A preview package holds the VST3 plug-in, three tools in `bin/`, example presets
+A preview package holds the VST3 plug-in, on macOS the Audio Unit too, three tools in `bin/`, example presets
 in `presets/`, the [first-use examples](first-filter.md#2-filter-the-examples)
 with presets made from them in `examples/first-use/`, these pages in
 `docs/use/` and licence notices in `licenses/`.
@@ -96,3 +96,11 @@ so you can make the export on a Mac and copy the folder to Windows
 ```sh
 ./bin/convolver-equalizer-apo presets/echo-48000-stereo/filter.cfg room
 ```
+
+<!-- VST trademark notice: written by scripts/trademarks.py from packaging/trademarks/vst.json -->
+
+<img src="images/VST_Compatible_Logo_Steinberg.png" alt="VST Compatible logo" width="120">
+
+Convolver supports VST® 3. VST is a registered trademark of Steinberg Media Technologies GmbH.
+
+<!-- End of the VST trademark notice -->
