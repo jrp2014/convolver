@@ -366,7 +366,7 @@ HostReport Processor::report_locked() const {
         facts.file_reader = "macOS AudioToolbox";
     return host_report(filter_, facts);
 }
-void Processor::send_status() noexcept {
+void Processor::send_status(const StatusAnswer& answer) noexcept {
     try {
         HostStatusLine line;
         std::string fields, text;
@@ -391,6 +391,12 @@ void Processor::send_status() noexcept {
         attributes->setBinary("report", fields.data(), static_cast<uint32>(fields.size()));
         attributes->setBinary("report text", text.data(), static_cast<uint32>(text.size()));
         attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
+        if (answer.load_request) {
+            attributes->setInt("load request", answer.load_request);
+            attributes->setInt("accepted", answer.accepted ? 1 : 0);
+        }
+        if (answer.latency_request)
+            attributes->setInt("latency request", answer.latency_request);
         sendMessage(message);
     } catch (...) { // Out of memory: the controller keeps the previous status.
     }
@@ -411,12 +417,14 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         if (!attributes || attributes->getInt("frames", frames) != kResultOk ||
             std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
             return kInvalidArgument;
+        int64 request = 0;
+        attributes->getInt("request", request);
         {
             std::lock_guard lock(control_);
             choose_latency(static_cast<std::size_t>(frames));
         }
         write_log();
-        send_status();
+        send_status({.latency_request = request});
         return kResultOk;
     }
     if (id == load_message) {
@@ -425,13 +433,15 @@ tresult PLUGIN_API Processor::notify(IMessage* message) {
         auto* attributes = message->getAttributes();
         if (!attributes || attributes->getBinary("path", data, size) != kResultOk || !size || !data)
             return kInvalidArgument;
+        int64 request = 0;
+        attributes->getInt("request", request);
         bool accepted = false;
         try {
             accepted = load_file(std::string(static_cast<const char*>(data), size));
         } catch (...) { // Out of memory for the path: nothing changed.
         }
         write_log();
-        send_status();
+        send_status({.load_request = request, .accepted = accepted});
         return accepted ? kResultOk : kResultFalse;
     }
     if (id == report_message) {

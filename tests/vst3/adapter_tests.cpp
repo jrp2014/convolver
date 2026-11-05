@@ -12,8 +12,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <deque>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -50,6 +52,8 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
     }
     tresult PLUGIN_API restartComponent(int32 flags) override {
         restarts.push_back(flags);
+        if (on_restart)
+            on_restart(flags);
         return kResultOk;
     }
     tresult PLUGIN_API setDirty(TBool state) override {
@@ -91,6 +95,7 @@ class Handler final : public IComponentHandler, public IComponentHandler2 {
             restarts.begin(), restarts.end(), [](int32 f) { return (f & kLatencyChanged) != 0; }));
     }
     std::vector<int32> restarts;
+    std::function<void(int32)> on_restart; // What a host does when asked to restart.
     int dirty = 0;
 };
 void edge_cases() {
@@ -1610,6 +1615,178 @@ void report_and_files() {
     c.terminate();
     p.terminate();
 }
+// VST3-15: what a host may put between the components
+// (IConnectionPoint): a proxy that passes each message on at once and
+// returns the receiver's answer, as the SDK's ConnectionProxy does, or one
+// that keeps the messages, answers kResultOk itself and delivers them later,
+// as a host that runs the two components apart might.
+class Proxy final : public IConnectionPoint {
+  public:
+    Proxy(IConnectionPoint& to, bool defer) : to_(to), defer_(defer) {}
+    tresult PLUGIN_API connect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API disconnect(IConnectionPoint*) override {
+        return kResultOk;
+    }
+    tresult PLUGIN_API notify(IMessage* message) override {
+        if (!defer_)
+            return to_.notify(message);
+        kept_.emplace_back(message); // Holds a reference until delivered.
+        return kResultOk;
+    }
+    // Delivers the oldest message kept, if any.
+    bool deliver_one() {
+        if (kept_.empty())
+            return false;
+        const auto message = kept_.front();
+        kept_.pop_front();
+        to_.notify(message);
+        return true;
+    }
+    // Delivers the messages kept so far, in order. Returns how many.
+    std::size_t deliver() {
+        std::size_t n = 0;
+        while (!kept_.empty()) {
+            const auto message = kept_.front();
+            kept_.pop_front();
+            to_.notify(message);
+            ++n;
+        }
+        return n;
+    }
+    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override {
+        QUERY_INTERFACE(iid, obj, FUnknown::iid, IConnectionPoint)
+        QUERY_INTERFACE(iid, obj, IConnectionPoint::iid, IConnectionPoint)
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    uint32 PLUGIN_API addRef() override {
+        return 1;
+    }
+    uint32 PLUGIN_API release() override {
+        return 1;
+    }
+
+  private:
+    IConnectionPoint& to_;
+    const bool defer_;
+    std::deque<IPtr<IMessage>> kept_;
+};
+// The report, a chosen file and a new Latency through each proxy: whether a
+// file was accepted, the project marked changed and the host asked to
+// restart must not depend on the message arriving during sendMessage().
+void messages_through_proxies() {
+    const auto field = [](const std::vector<std::pair<std::string, std::string>>& report,
+                          const char* name) {
+        for (const auto& [key, value] : report)
+            if (key == name)
+                return value;
+        return std::string("(missing)");
+    };
+    const auto folder = private_temp("convolver-vst3-proxies");
+    std::filesystem::create_directories(folder);
+    const auto good = folder / "room.wav", wrong = folder / "other rate.wav";
+    write_wav(good, 48000, 1, 8);
+    write_wav(wrong, 44100, 1, 8);
+    for (const bool defer : {false, true}) {
+        const std::string how = defer ? " (deferring proxy)" : " (forwarding proxy)";
+        const auto check = [&](bool v, const char* what) {
+            if (!v)
+                throw std::runtime_error(what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "proxy initialize");
+        Proxy to_controller(c, defer), to_processor(p, defer);
+        check(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+              "proxy connect");
+        // What the host's message loop does later; nothing for a forwarding proxy.
+        const auto deliver = [&] {
+            while (to_controller.deliver() + to_processor.deliver() > 0) {
+            }
+        };
+        // The window asks twice a second, so a late answer shows at the next ask.
+        const auto report = [&] {
+            c.report();
+            deliver();
+            return c.report();
+        };
+        deliver();
+        check(field(report(), "status name") == "No filter", "proxy report");
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "proxy buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        check(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+              "proxy activate");
+        check(field(report(), "sample rate") == "48000", "proxy report after activation");
+        // A new Latency: the host reads it when asked to restart, so it must
+        // be asked only once the processor has it.
+        std::vector<std::size_t> latency_at_restart;
+        handler.on_restart = [&](int32 flags) {
+            if (flags & kLatencyChanged)
+                latency_at_restart.push_back(p.settings().latency);
+        };
+        check(c.setParamNormalized(latency_id, normalized_latency(1024)) == kResultOk,
+              "proxy Latency");
+        deliver();
+        check(latency_at_restart == std::vector<std::size_t>{1024},
+              "host asked to restart before the processor had the new Latency");
+        if (defer) {
+            // Changed three times before the processor hears: only the
+            // last choice's answer asks for the restart, so the host never
+            // restarts at a Latency that is about to change.
+            latency_at_restart.clear();
+            check(c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk &&
+                      c.setParamNormalized(latency_id, normalized_latency(2048)) == kResultOk &&
+                      c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk,
+                  "proxy Latency three times");
+            to_processor.deliver_one(); // The first 512 arrives; its answer comes back.
+            to_controller.deliver();
+            check(latency_at_restart.empty() && p.settings().latency == 512,
+                  "host asked to restart while a later Latency was on its way");
+            deliver();
+            check(latency_at_restart == std::vector<std::size_t>{512},
+                  "host not asked to restart for the last Latency");
+        }
+        handler.on_restart = nullptr;
+#if defined(__APPLE__) || defined(CONVOLVER_VST3_TESTS_IO)
+        const auto* reader = convolver::vst3::test_file_reader;
+#if defined(CONVOLVER_VST3_TESTS_IO) && !defined(__APPLE__)
+        convolver::vst3::test_file_reader = &convolver::detail::libsndfile_files();
+#endif
+        // Accepted: the project is marked changed once, when the answer arrives.
+        check(c.load_file(good.string()), "proxy file not loaded");
+        deliver();
+        auto shown = report();
+        check(handler.dirty == 1 && field(shown, "filter name") == "room.wav",
+              "proxy file not playing, or the project not marked changed");
+        // Refused: never marked changed. A forwarding proxy brings the
+        // refusal at once; a deferring one later, in the report.
+        const bool refused_result = c.load_file(wrong.string());
+        deliver();
+        shown = report();
+        check(defer || !refused_result, "a refused file reported as accepted");
+        check(handler.dirty == 1, "a refused file marked the project changed");
+        check(field(shown, "filter name") == "room.wav" && !field(shown, "filter note").empty(),
+              "refused file not explained in the report");
+        convolver::vst3::test_file_reader = reader;
+#endif
+        p.setActive(false);
+        p.disconnect(&to_controller);
+        c.disconnect(&to_processor);
+        deliver();
+        c.terminate();
+        p.terminate();
+    }
+    std::filesystem::remove_all(folder);
+}
 // PLUG-13 (jrp's review of 276c7dc): a filter that fills the saved state at
 // default settings loaded and saved, and after Gain changed to -6 dB
 // getState() failed. Load, change a setting, save and restore, at the limit.
@@ -1698,6 +1875,7 @@ int run(const std::filesystem::path& preset_path) {
         controller_conversions();
         settings_parameters();
         report_and_files();
+        messages_through_proxies();
         settings_at_state_limit();
         tail_measured_at_output();
         output_silence_flags();

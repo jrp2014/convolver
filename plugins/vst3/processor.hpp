@@ -52,10 +52,23 @@ constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
 // always ship together: not a stable interface.
 // The controller asks for a fresh report with a report_message while the
 // window is open (Gain and Mix change in process(), which sends nothing),
-// and has a filter file loaded with a load_message ("path": UTF-8 bytes);
-// the processor answers kResultOk if it accepted the file, and sends the
-// report either way.
+// and has a filter file loaded with a load_message ("path": UTF-8 bytes;
+// "request": a number); the processor answers kResultOk if it accepted the
+// file, and sends the report either way.
+// VST3-15: a host may put a proxy between the components that delivers a
+// message after sendMessage() returns and answers kResultOk itself
+// (IConnectionPoint), so the controller acts on the processor's answers in
+// its status_message (StatusAnswer), not on sendMessage()'s result.
 inline constexpr const char* report_message = "ConvolverReport";
+// What the status_message that follows a request says about it: "load
+// request" (the load_message's number) and "accepted" (1 or 0), or
+// "latency request" (the latency_message's number, whose frames the
+// processor now has).
+struct StatusAnswer {
+    Steinberg::int64 load_request = 0;
+    bool accepted = false;
+    Steinberg::int64 latency_request = 0;
+};
 inline constexpr const char* load_message = "ConvolverLoad";
 // The report's name and value pairs as the messages carry them, and back.
 std::string encode_report(const std::vector<std::pair<std::string, std::string>>&);
@@ -76,7 +89,8 @@ inline constexpr const char* faults_message = "ConvolverFaults";
 // processor reads them from process()'s parameter changes, as Bypass.
 // Latency is a list of host_latencies, not automatable: the controller
 // passes a new choice to the processor in a latency_message ("frames", an
-// integer), then asks the host to restart the component
+// integer; "request", a number) and, once the processor's answer says it
+// has it (StatusAnswer), asks the host to restart the component
 // (kLatencyChanged); the processor reports it from getLatencySamples() and
 // builds its processor with it at the next activation. All three are saved
 // in the component state (host state version 3 when not at the defaults).
@@ -166,9 +180,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     void signal_faults(Steinberg::Vst::ProcessData&) noexcept;
     Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
                                Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
-    // Sends status() to the controller; outside control_, as the controller
-    // may call back into the host.
-    void send_status() noexcept;
+    // Sends status() to the controller, with the answer to its request if
+    // any; outside control_, as the controller may call back into the host.
+    void send_status(const StatusAnswer& answer = StatusAnswer{}) noexcept;
     HostStatusLine status_locked() const;
     Steinberg::tresult load_state(Steinberg::IBStream*);
     Steinberg::tresult activate(Steinberg::TBool);
@@ -275,10 +289,12 @@ class Controller final : public Steinberg::Vst::EditController,
     // Copy diagnostics: the report's text and this instance's recent log
     // lines. Reads the log file: on the window's thread only.
     std::string diagnostics();
-    // Has the processor load the filter file at `path` (UTF-8); true if it
-    // accepted it. An accepted file changes the component state without a
+    // Has the processor load the filter file at `path` (UTF-8); false if it
+    // refused it. An accepted file changes the component state without a
     // parameter change, so the host is told the project changed
-    // (IComponentHandler2::setDirty).
+    // (IComponentHandler2::setDirty) when the processor's answer says so.
+    // A host that delivers the message later (VST3-15) brings the answer
+    // after this returns true: the report then says what plays.
     bool load_file(const std::string& path);
     // IParameterFunctionName: Mix is the kDryWetMix parameter.
     Steinberg::tresult PLUGIN_API getParameterIDFromFunctionName(Steinberg::Vst::UnitID,
@@ -292,7 +308,9 @@ class Controller final : public Steinberg::Vst::EditController,
     REFCOUNT_METHODS(EditController)
 
   private:
-    // Sends `frames` to the processor and asks the host to restart.
+    // Sends `frames` to the processor; the host is asked to restart when the
+    // processor answers that it has them (notify), since the host reads the
+    // latency during the restart.
     void latency_chosen(std::size_t frames);
     // The host may restore state (and so send the status) on another thread
     // than the one reading parameter text.
@@ -301,5 +319,12 @@ class Controller final : public Steinberg::Vst::EditController,
     int status_value_ = static_cast<int>(HostStatus::no_filter); // The status the text is for.
     std::vector<std::pair<std::string, std::string>> report_;    // VST3-3, under status_lock_.
     std::string report_text_, format_;                           // Under status_lock_.
+    // VST3-15, under status_lock_: the last load_message's number, the last
+    // one answered and whether it was accepted; the last latency_message's
+    // number, and whether its answer is still to come.
+    Steinberg::int64 load_requests_ = 0, load_answered_ = 0;
+    bool load_accepted_ = false;
+    Steinberg::int64 latency_requests_ = 0;
+    bool latency_waiting_ = false;
 };
 } // namespace convolver::vst3

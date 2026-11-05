@@ -73,6 +73,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         status >= static_cast<int64>(status_names.size()) ||
         attributes->getBinary("text", data, size) != kResultOk || (size && !data))
         return kInvalidArgument;
+    // VST3-15: the answer to a request, when the message follows one.
+    int64 load_request = 0, load_accepted = 0, latency_request = 0;
+    attributes->getInt("load request", load_request);
+    attributes->getInt("accepted", load_accepted);
+    attributes->getInt("latency request", latency_request);
     std::string text, report_text, format;
     std::vector<std::pair<std::string, std::string>> report;
     try {
@@ -96,9 +101,19 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     auto* parameter = getParameterObject(status_id);
     if (!parameter) // Not initialized, or terminated: nothing to show it on.
         return kResultFalse;
-    bool changed = false;
+    bool changed = false, restart = false;
     {
         std::lock_guard lock(status_lock_);
+        if (load_request) {
+            load_answered_ = load_request;
+            load_accepted_ = load_accepted != 0;
+        }
+        // The Latency sent last: an earlier one's answer asks for nothing,
+        // as the processor has later choices still to come.
+        if (latency_waiting_ && latency_request == latency_requests_) {
+            latency_waiting_ = false;
+            restart = true;
+        }
         changed = status_text_ != text || status_value_ != static_cast<int>(status);
         status_text_.swap(text);
         status_value_ = static_cast<int>(status);
@@ -110,28 +125,43 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     }
     // A window asks for the report twice a second; only a new status line
     // is news for the host.
-    if (!changed)
-        return kResultOk;
-    EditController::setParamNormalized(status_id,
-                                       parameter->toNormalized(static_cast<ParamValue>(status)));
-    // Ask the host to read the parameters again (the status is not edited
-    // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (componentHandler)
-        componentHandler->restartComponent(kParamValuesChanged);
+    if (changed) {
+        EditController::setParamNormalized(
+            status_id, parameter->toNormalized(static_cast<ParamValue>(status)));
+        // Ask the host to read the parameters again (the status is not edited
+        // by the user, so performEdit does not apply). Hosts may ignore this.
+        if (componentHandler)
+            componentHandler->restartComponent(kParamValuesChanged);
+    }
+    // The component state now holds the file's filter: the host saves it
+    // only if it knows the project changed.
+    if (load_request && load_accepted)
+        setDirty(true); // IComponentHandler2, where the host offers it.
+    // The SDK's way to report a new latency: the host deactivates the
+    // component, reads getLatencySamples() and activates it again. Last,
+    // after this message's Status: with a direct connection this runs inside
+    // Processor::notify, and a host that restarts at once sends newer
+    // status messages from setActive.
+    if (restart && componentHandler)
+        componentHandler->restartComponent(kLatencyChanged);
     return kResultOk;
 }
 void Controller::latency_chosen(std::size_t frames) {
+    int64 request = 0;
+    {
+        std::lock_guard lock(status_lock_);
+        request = ++latency_requests_;
+        latency_waiting_ = true;
+    }
+    // The processor's answer asks the host to restart (notify).
     if (auto message = owned(allocateMessage())) {
         message->setMessageID(latency_message);
         if (auto* attributes = message->getAttributes()) {
             attributes->setInt("frames", static_cast<int64>(frames));
+            attributes->setInt("request", request);
             sendMessage(message);
         }
     }
-    // The SDK's way to report a new latency: the host deactivates the
-    // component, reads getLatencySamples() and activates it again.
-    if (componentHandler)
-        componentHandler->restartComponent(kLatencyChanged);
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
     if (id == latency_id) {
@@ -249,16 +279,23 @@ bool Controller::load_file(const std::string& path) {
     if (!message || path.empty())
         return false;
     message->setMessageID(load_message);
+    int64 request = 0;
+    {
+        std::lock_guard lock(status_lock_);
+        request = ++load_requests_;
+    }
     auto* attributes = message->getAttributes();
     if (!attributes ||
-        attributes->setBinary("path", path.data(), static_cast<uint32>(path.size())) != kResultOk)
+        attributes->setBinary("path", path.data(), static_cast<uint32>(path.size())) != kResultOk ||
+        attributes->setInt("request", request) != kResultOk)
         return false;
-    const bool accepted = sendMessage(message) == kResultOk;
-    // The component state now holds the file's filter: the host saves it
-    // only if it knows the project changed.
-    if (accepted)
-        setDirty(true); // IComponentHandler2, where the host offers it.
-    return accepted;
+    if (sendMessage(message) != kResultOk)
+        return false; // Refused, or not delivered.
+    // A direct connection or a forwarding proxy has brought the answer
+    // (notify, which marks the project changed); a deferring one brings it
+    // later.
+    std::lock_guard lock(status_lock_);
+    return load_answered_ != request || load_accepted_;
 }
 tresult PLUGIN_API Controller::getParameterIDFromFunctionName(UnitID unit, FIDString name,
                                                               ParamID& id) {

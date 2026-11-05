@@ -193,6 +193,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Fixed
 
+- VST3 (VST3-15, from jrp's review of `276c7dc`): with a host that puts a
+  proxy between the plug-in's two halves and delivers their messages later,
+  a new Latency asked the host to restart before the processor had it, so
+  the old latency stayed in use, and a filter file refused in the window
+  still marked the project changed. The controller now waits for the
+  processor's answer: the restart is asked for once the processor has the
+  Latency, and only an accepted file marks the project changed. Hosts that
+  connect the halves directly, or forward messages at once, behave as
+  before. Not seen in a host; found by new tests that connect through such
+  proxies.
 - Plug-ins (PLUG-13): a filter that filled the saved state at default
   settings could no longer be saved once a VST3 setting changed (jrp's review
   of `276c7dc`: Gain to −6 dB, then `getState()` failed), because settings

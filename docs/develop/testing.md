@@ -594,7 +594,11 @@ second instance, with one sample more refused. And the window's messages
 change, no request for the host to reread the parameters while the
 Status line stays the same, a chosen WAV accepted (the project marked changed, the status
 Playing, the filter named and saved) or refused for its rate, an empty path,
-and a build with no file reader. Where the build has no reader of its own
+and a build with no file reader. The messages also go through a forwarding
+proxy and a deferring one, as a host may connect the components (VST3-15):
+the report, a new Latency (the host asked to restart only once the processor
+has it, and after three quick changes only for the last) and a chosen file accepted and refused (the project marked changed
+only for the accepted one). Where the build has no reader of its own
 (Linux and Windows), the test lends the processor libsndfile.
 
 On macOS `vst3.editor` opens the window (VST3-11) as a host does:

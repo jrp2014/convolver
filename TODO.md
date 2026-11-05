@@ -650,18 +650,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   `xvfb-run`. Not reachable by screen readers, which the guide says. A native
   X11 view can replace it later if Linux users need one
   ([editor plan](docs/project/plans/2026-10-24-plugin-editor.md#framework-choice)). Needed for the first preview.
-- [ ] **VST3-15 — Test the messages through a host's proxy.** From jrp's
-  review of `276c7dc`: the tests connect the controller and processor
-  directly, and `Controller::load_file` takes `sendMessage()` returning
-  `kResultOk` to mean the processor accepted the filter. The SDK lets a host
-  put a proxy between the components
-  ([`IConnectionPoint`](https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IConnectionPoint.html)),
-  which may deliver later or report success on its own. Add tests that
-  connect through a forwarding proxy and a deferring one, and make the
-  window's load result not depend on direct delivery if they fail. A
-  compatibility assumption to check, not a seen host failure; do it before
-  extending the messages.
-
 Not relevant to a convolver unless the product changes: MIDI and note
 interfaces (`IMidiMapping2`, `IMidiLearn2`, note expression, MIDI 2.0
 articulations), `ITransportControl`, `IPrefetchableSupport`,
@@ -1116,6 +1104,18 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   in its constructor, so out of memory reaches the caller, and
   `estimate_attenuation` refuses a non-finite noise response; tests in
   `native.io` and `native.engine`; [gain](docs/use/command-line.md#gain-and-attenuation).
+- [x] **VST3-15 — Test the messages through a host's proxy.** 5 November
+  2026, from jrp's review of `276c7dc`: `vst3.adapter` connects the
+  components through a forwarding proxy and a deferring one
+  (`IConnectionPoint`). The deferring one showed two assumptions of direct
+  delivery: the host was asked to restart for a new Latency before the
+  processor had it, and a refused file marked the project changed. The
+  processor's `ConvolverStatus` now answers each load and Latency by its
+  request number, and the controller acts on those answers (a restart only
+  for the last Latency chosen) rather than on
+  `sendMessage()`'s result; a deferred load returns before its answer and
+  the report shows it;
+  [messages](docs/develop/plugin-contract.md#status-and-log).
 - [x] **VST3-14 — Separate the controller from the processor's file.**
   5 November 2026, from jrp's review of `276c7dc`: `Controller` moved from
   `plugins/vst3/processor.cpp` (then 1,041 lines, about 780 after) to
