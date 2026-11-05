@@ -12,6 +12,19 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Added
 
+- VST3 (VST3-9): host rates that are not a whole number of hertz, such as a
+  pull-down 48000 ÷ 1.001 ≈ 47952.04795 Hz, are accepted rather than refused
+  by `setupProcessing` (which made hosts report the plug-in unusable). They
+  are matched strictly, as jrp decided: no filter suits such a rate, so the
+  plug-in plays silence (bypass still plays the input), keeps its filter,
+  and Status and the log give both rates; it plays the filter again when the
+  host returns to its rate. Only floating-point rounding of a whole rate
+  (within 1e-12 of it) counts as that rate. Nothing is resampled.
+- C++ API (VST3-9): `HostLayout::fractional_rate` (the host's exact rate
+  when it is not whole hertz, else 0), `set_host_rate()`, `host_rate_text()`
+  and `same_rate()` in `convolver/host.hpp`. Added, so existing code
+  compiles unchanged.
+
 - Tests (FFMPEG-1): `native.ffmpeg_pipe` runs the
   [FFmpeg pipe](docs/use/command-line.md#with-ffmpeg) as the guide writes
   it, on a short film with two audio tracks: the second track is chosen,

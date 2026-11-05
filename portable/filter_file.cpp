@@ -4,6 +4,7 @@
 #include "config_parse.hpp"
 #include <algorithm>
 #include <exception>
+#include <string>
 #include <utility>
 
 namespace convolver {
@@ -59,10 +60,11 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
         // a rate refusal only when no entry has the host's rate.
         const auto& checked = *e.candidates;
         if (!checked.empty())
-            failure.kind = std::any_of(checked.begin(), checked.end(),
-                                       [&](const detail::SelectionCandidate& c) {
-                                           return c.sample_rate == host.sample_rate;
-                                       })
+            failure.kind = host.fractional_rate == 0 &&
+                                   std::any_of(checked.begin(), checked.end(),
+                                               [&](const detail::SelectionCandidate& c) {
+                                                   return c.sample_rate == host.sample_rate;
+                                               })
                                ? HostFailureKind::channels
                                : HostFailureKind::sample_rate;
         // Only a single filter's rate and counts describe "the filter"; a
@@ -75,6 +77,21 @@ std::optional<HostState> read_filter_file(const std::string& path, const HostLay
             failure.carried = std::move(only);
         }
         failure.message = refusal(path, e.what());
+        // VST3-9: the selection looked for the whole part of a fractional
+        // rate, which no filter can match; say so instead.
+        if (host.fractional_rate != 0 && !checked.empty()) {
+            const auto made = failure.carried ? std::to_string(failure.carried->sample_rate) + " Hz"
+                                              : std::string("a rate the filter was made for");
+            const auto runs = host_rate_text(host);
+            failure.message = {
+                path + (failure.carried
+                            ? ": the filter is for " + made + ", and the host runs at " + runs
+                            : ": no filter in the list is for the host's " + runs),
+                "Convolver never resamples, and filters are made for a whole "
+                "number of hertz, so none plays at the host's rate.",
+                "Set the host's project or audio device to " + made + ".",
+                {}};
+        }
     } catch (const std::exception& e) {
         failure.message = refusal(path, e.what());
     }

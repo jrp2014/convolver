@@ -125,6 +125,15 @@ could not save. Shorten the impulse responses (the end of a long one is
 usually near silence), or use the [command-line renderer](command-line.md),
 which reads filters of up to 67,108,864 samples.
 
+**Rates that are not a whole number of hertz.** Some hosts run video
+projects at a pull-down rate, such as 48000 ÷ 1.001 (about 47952.048 Hz). The
+VST3 plug-in accepts such a rate but plays silence, as for any filter made for
+another rate, since filters are made for a whole number of hertz and
+Convolver never resamples. Status and the log give both rates. The filter
+stays loaded, and plays again when the host returns to its rate. Only a
+difference far smaller than any real rate change, the rounding of a whole
+rate, counts as that rate.
+
 Convolver never falls back to unfiltered audio when a filter fails: a room
 correction or crossover that quietly plays unfiltered audio can be worse than
 an obvious failure, and could send full-range audio to a tweeter.
@@ -221,8 +230,8 @@ Request 2: Not loaded; the previous filter keeps playing: the filter is for 4410
 ```
 
 The VST3 plug-in
-also logs host settings it cannot use, with the reason: a sample rate that is
-not a whole number of hertz, a block size or sample type it does not take, or
+also logs host settings it cannot use, with the reason: a sample rate outside
+1 to 768000 Hz, a block size or sample type it does not take, or
 (once for each instance, as hosts try several) a channel layout with more than
 8 channels or more than one bus. A save that fails is logged in every format,
 since some hosts do not say so: the project or preset saved then does not

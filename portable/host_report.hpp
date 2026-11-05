@@ -82,7 +82,8 @@ struct HostReport {
     // The settings in words (settings_words()), for the text report; the
     // window shows them as its controls.
     std::string settings;
-    // For the window's Latency row: the host's rate (0 before it starts),
+    // For the window's Latency row: the host's rate (0 before it starts;
+    // the whole part of a rate that is not whole hertz, VST3-9),
     // and whether the chosen Latency is not in use yet (latency_waits()).
     int sample_rate = 0;
     bool latency_waits = false;

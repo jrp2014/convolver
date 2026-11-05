@@ -94,7 +94,22 @@ struct HostLayout {
     int sample_rate = 0;
     std::size_t inputs = 0, outputs = 0;
     std::uint32_t input_speakers = 0, output_speakers = 0;
+    // VST3-9: the host's rate when it is not a whole number of hertz (a
+    // pull-down rate such as 48000/1.001), else 0; sample_rate then holds
+    // its whole part. Filters are made for whole hertz, so none suits it.
+    double fractional_rate = 0;
 };
+
+// Sets a layout's rate from a host's rate in hertz (finite and positive):
+// whole hertz in sample_rate, or the whole part there and the rate itself in
+// fractional_rate. Strict: only a rate within a millionth of a millionth of
+// whole hertz, floating-point rounding rather than another rate, counts as
+// whole.
+void set_host_rate(HostLayout&, double hertz) noexcept;
+// The host's rate for messages: "48000 Hz", or "47952.04795 Hz".
+std::string host_rate_text(const HostLayout&);
+// The same rate: equal whole parts and equal fractional rates.
+bool same_rate(const HostLayout&, const HostLayout&) noexcept;
 
 // Advisory check of the speakers a filter's outputs are labelled for (its
 // channel mask) against the host's output speakers. Empty when they agree, or

@@ -740,6 +740,140 @@ void failure_records() {
 // This process's Convolver log, chosen once in main() (CI-28).
 std::filesystem::path process_log;
 // A file name of this process's own, so that concurrent runs never share it.
+// VST3-9: a host rate that is not a whole number of hertz (48000/1.001, a
+// pull-down rate) is accepted, and matched strictly: no filter suits it, so
+// the plug-in keeps its filter, plays silence (bypass still plays the input),
+// names both rates, and plays the filter again when the host returns to its
+// rate. Only floating-point rounding of a whole rate counts as that rate.
+void fractional_rates() {
+    const convolver::test_log::LogSince log(process_log);
+    const auto logged = [&](const std::string& part) {
+        return log.text().find(part) != std::string::npos;
+    };
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "fractional initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "fractional buses");
+    p.activateBus(kAudio, kInput, 0, true);
+    p.activateBus(kAudio, kOutput, 0, true);
+    // Rates that are not finite, or outside 1 to 768000 Hz, are refused.
+    const std::array<double, 6> invalid{std::numeric_limits<double>::quiet_NaN(),
+                                        std::numeric_limits<double>::infinity(),
+                                        -48000.0,
+                                        0.0,
+                                        0.999,
+                                        convolver::max_sample_rate + 0.5};
+    for (const double rate : invalid) {
+        ProcessSetup bad{kRealtime, kSample32, 512, rate};
+        require(p.setupProcessing(bad) == kInvalidArgument, "an invalid rate accepted");
+    }
+    // A project opening at a pull-down rate: the state arrives first.
+    convolver::HostState saved;
+    saved.configuration = convolver::Configuration{
+        48000, 2, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}, {{1}, {{1, 1}}, {{1, 1}}}}};
+    MemoryStream state;
+    require(write_state(&state, saved), "encode fractional-rate state");
+    state.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&state) == kResultOk, "state before setup refused");
+    const double pulldown = 48000 / 1.001;
+    ProcessSetup setup{kRealtime, kSample32, 512, pulldown};
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "a fractional rate refused");
+    auto f = p.failure();
+    require(f && f->kind == convolver::HostFailureKind::sample_rate && f->silent &&
+                f->message.problem ==
+                    "the saved filter is for 48000 Hz, and the host runs at 47952.04795 Hz" &&
+                f->message.fix == "Set the host's project or audio device to 48000 Hz." &&
+                f->message.cause.find("whole number of hertz") != std::string::npos,
+            "fractional rate mismatch not explained with both rates");
+    require(logged("Started at 47952.04795 Hz, 2 in, 2 out"), "fractional rate not logged");
+    // Silence, and bypass still plays the input (delayed by the latency).
+    p.setProcessing(true);
+    std::array<float, 512> left{}, right{}, out_left{}, out_right{};
+    left.fill(1);
+    right.fill(-1);
+    float* ins[] = {left.data(), right.data()};
+    float* outs[] = {out_left.data(), out_right.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 2;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    const auto play = [&](int calls, std::optional<bool> bypass = {}) {
+        ParameterChanges changes;
+        int32 index = 0;
+        if (bypass)
+            changes.addParameterData(bypass_id, index)->addPoint(0, *bypass ? 1 : 0, index);
+        d.inputParameterChanges = &changes;
+        for (int k = 0; k < calls; ++k) {
+            require(p.process(d) == kResultOk, "fractional-rate process");
+            d.inputParameterChanges = nullptr;
+        }
+    };
+    // Exactly, for silence; within float rounding, for a filtered signal.
+    const auto all = [&](float l, float r) {
+        const auto near = [](float value) {
+            return [value](float x) { return value == 0 ? x == 0 : std::abs(x - value) <= 1e-5f; };
+        };
+        return std::all_of(out_left.begin(), out_left.end(), near(l)) &&
+               std::all_of(out_right.begin(), out_right.end(), near(r));
+    };
+    play(2);
+    require(all(0, 0), "a fractional rate played the filter");
+    play(3, true);
+    require(all(1, -1), "bypass at a fractional rate does not play the input");
+    play(1, false);
+    play(2);
+    require(all(0, 0), "not silent again after bypass");
+    MemoryStream kept;
+    require(p.getState(&kept) == kResultOk, "save at a fractional rate");
+    kept.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(read_state(&kept).configuration->sample_rate == 48000,
+            "the filter was not kept at a fractional rate");
+    // A replacement at the fractional rate is refused, the filter kept.
+    MemoryStream again;
+    write_state(&again, saved);
+    again.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&again) == kResultFalse && p.failure() &&
+                p.failure()->message.problem.find("runs at 47952.04795 Hz") != std::string::npos,
+            "a replacement accepted at a fractional rate");
+    p.setProcessing(false);
+    require(p.setActive(false) == kResultOk, "fractional deactivate");
+    // Another fractional rate is a change of rate too.
+    setup.sampleRate = 44100 / 1.001;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.failure() &&
+                p.failure()->message.problem.find("runs at 44055.94406 Hz") != std::string::npos,
+            "a second fractional rate not explained");
+    require(p.setActive(false) == kResultOk, "second fractional deactivate");
+    // Back at the filter's rate, give or take floating-point rounding: the
+    // filter plays again.
+    setup.sampleRate = std::nextafter(48000.0, 49000.0);
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+            "the filter's rate refused");
+    f = p.failure();
+    require(!f || !f->silent, "the filter's rate did not bring the filter back");
+    require(logged("Started at 48000 Hz, 2 in, 2 out"), "a rounded rate not logged as 48000 Hz");
+    p.setProcessing(true);
+    play(2);
+    require(all(1, -1), "the filter does not play at its rate again");
+    p.setProcessing(false);
+    require(p.setActive(false) == kResultOk, "recovered deactivate");
+    // A rate a thousandth of a hertz away is another rate.
+    setup.sampleRate = 48000.001;
+    require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                p.failure() && p.failure()->silent &&
+                p.failure()->message.problem.find("runs at 48000.001 Hz") != std::string::npos,
+            "a nearby rate treated as the filter's");
+    p.setActive(false);
+    p.terminate();
+}
 std::filesystem::path private_temp(const char* name) {
     return std::filesystem::temp_directory_path() /
            (std::string(name) + "-" + std::to_string(std::random_device{}()));
@@ -809,11 +943,11 @@ void status_and_log() {
                                  "output channels; Convolver takes 1 to 8 of each.") &&
                 count(log_text(), "Refused the host's channel layout") == 1,
             "refused layout not logged once");
-    ProcessSetup odd{kRealtime, kSample32, 64, 44100.5};
+    ProcessSetup odd{kRealtime, kSample32, 64, 0.5};
     require(p.setupProcessing(odd) == kInvalidArgument &&
-                contains(log_text(), "Refused the host's processing settings (44100.5 Hz, "
-                                     "blocks of up to 64 samples): the sample rate must be a "
-                                     "whole number"),
+                contains(log_text(), "Refused the host's processing settings (0.5 Hz, "
+                                     "blocks of up to 64 samples): the sample rate must be "
+                                     "from 1 to 768000 Hz."),
             "refused rate not logged");
     require(p.getState(nullptr) == kResultFalse &&
                 contains(log_text(), convolver::save_failure_message),
@@ -1875,6 +2009,7 @@ void controller_conversions() {
 int run(const std::filesystem::path& preset_path) {
     try {
         edge_cases();
+        fractional_rates();
         controller_conversions();
         settings_parameters();
         report_and_files();

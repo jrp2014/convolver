@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -34,9 +35,16 @@ struct Mismatch {
 // "the saved filter" when the host starts one that was accepted before.
 std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
                                  const std::string& filter = "the filter") {
-    if (c.sample_rate != host.sample_rate) {
-        const auto made = std::to_string(c.sample_rate) + " Hz",
-                   runs = std::to_string(host.sample_rate) + " Hz";
+    if (c.sample_rate != host.sample_rate || host.fractional_rate != 0) {
+        const auto made = std::to_string(c.sample_rate) + " Hz", runs = host_rate_text(host);
+        if (host.fractional_rate != 0) // VST3-9: no filter can be made for it.
+            return Mismatch{
+                HostFailureKind::sample_rate,
+                {filter + " is for " + made + ", and the host runs at " + runs,
+                 "Convolver never resamples, and filters are made for a whole number of hertz, "
+                 "so none plays at the host's rate.",
+                 "Set the host's project or audio device to " + made + ".",
+                 {}}};
         return Mismatch{
             HostFailureKind::sample_rate,
             {filter + " is for " + made + ", and the host runs at " + runs,
@@ -187,6 +195,31 @@ Advice speaker_notice(const Configuration& c, const HostLayout& host) {
             "the end of the .cfg's first line to 0, then load the .cfg again (or make the preset "
             "again from it) and save the project.",
         "The filter plays as loaded either way."};
+}
+
+void set_host_rate(HostLayout& host, double hertz) noexcept {
+    const double whole = std::round(hertz);
+    if (std::abs(hertz - whole) <= 1e-12 * hertz) {
+        host.sample_rate = static_cast<int>(whole);
+        host.fractional_rate = 0;
+    } else {
+        host.sample_rate = static_cast<int>(std::floor(hertz));
+        host.fractional_rate = hertz;
+    }
+}
+
+std::string host_rate_text(const HostLayout& host) {
+    if (host.fractional_rate == 0)
+        return std::to_string(host.sample_rate) + " Hz";
+    // Ten significant digits: 47952.04795 for 48000/1.001.
+    std::array<char, 32> text{};
+    const auto [end, error] = std::to_chars(text.data(), text.data() + text.size(),
+                                            host.fractional_rate, std::chars_format::general, 10);
+    return std::string(text.data(), error == std::errc() ? end : text.data()) + " Hz";
+}
+
+bool same_rate(const HostLayout& a, const HostLayout& b) noexcept {
+    return a.sample_rate == b.sample_rate && a.fractional_rate == b.fractional_rate;
 }
 
 Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
@@ -603,11 +636,10 @@ std::string short_reason(const HostFailure& f, const std::optional<HostLayout>& 
         return "the preset was saved by a newer Convolver.";
     case HostFailureKind::sample_rate:
         if (f.sample_rate <= 0) // Not recorded: say only what is known.
-            return host ? "the filter is not for the host's " + std::to_string(host->sample_rate) +
-                              " Hz."
+            return host ? "the filter is not for the host's " + host_rate_text(*host) + "."
                         : "the filter is for another rate.";
         return "the filter is for " + std::to_string(f.sample_rate) + " Hz" +
-               (host ? ", the host runs at " + std::to_string(host->sample_rate) + " Hz." : ".");
+               (host ? ", the host runs at " + host_rate_text(*host) + "." : ".");
     case HostFailureKind::channels:
         if (f.inputs == 0 && f.outputs == 0) // Not recorded (jrp's GarageBand run).
             return host ? "the filter does not suit the plug-in's " +

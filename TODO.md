@@ -61,7 +61,7 @@ boundary and C++20 in the core.
 | 5. The milestone | A candidate from a 0.10.x tag; **REL-3**, the independent walkthrough of its exact files; fixes for what the tester finds | Recorded walkthrough. jrp then publishes the unsigned preview ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)), with **COMPAT-1**'s capture and **REL-4**'s steps after publishing. |
 | 6. Later previews | **LV2-3** to **LV2-5**, with the editor's **LV2-7**, **REL-1** for all formats; **COMPAT-1** at each publication | Each format's REL-2 journeys demonstrated before it joins a preview. Each preview repeats the REL-2 journeys; from the second, the COMPAT-1 upgrade tests too. Developer ID signing, notarization and Authenticode remain the later production gate. |
 | Before further substantial DSP changes, and any optimisation | **PERF-3:** resource budgets | Callback tail latency, peak memory and preparation time while loading, replacing and resetting, across realistic routing and callback sizes, define the supported workloads (jrp's review of `6920a45`: keep the core architecture and finish this first). PERF-2, FFT-2 and VST3-5, and any more complex partitioning, start only if PERF-3 shows a need; the loading-responsiveness gate uses its workloads. |
-| Supporting, cheap | **VST3-9**, **PERF-1**, **HOST-4** | VST3-9 affects only hosts running at a pull-down rate such as 47952 Hz, which the journeys do not use. It does not block the first preview; it moves up if a tester meets it. HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
+| Supporting, cheap | **PERF-1**, **HOST-4** | HOST-4's remaining check needs a Windows computer. PERF-1 reruns the room-correction benchmarks on Apple Silicon and Windows. |
 | Parked | **FFMPEG-2 to FFMPEG-5**, **HOST-3** | Revisit only by an owner decision. |
 | Optional editor work | **PLUG-11** (FFT planning in FFTW-built plug-ins), **LV2-6** (an LV2 window, only if Linux users ask) | Not needed for any preview. |
 | On request or measured need | **HOST-2** (CLAP), **VST3-2**, **VST3-5**, **VST3-6**, **FFT-2**, **PERF-2**, **CFG-2** | Define the user need or measured bottleneck and acceptance tests first. CFG-2 waits for CFG-1. |
@@ -626,11 +626,6 @@ below are candidates; adopt each only with adapter, validator and pluginval test
   defined (see limitations), declare the VST2 ID `'Conv'` in `moduleinfo.json`'s
   `Compatibility` section or `IPluginCompatibility`, and map old parameters with
   `IRemapParamID`. Old VST2 chunk state would still need a converter.
-- [ ] **VST3-9 — Non-integer host rates.** `setupProcessing` refuses a rate that
-  is not a whole number (for example a 0.1% pull-down rate), so the host reports
-  a failed plug-in. Accept any finite rate in range and play silence with the
-  reason (DIAG-1's status), as for any rate mismatch. jrp to decide whether a
-  small tolerance counts as a match.
 - [ ] **VST3-11 — Editor window on macOS.** An AppKit view behind `IPlugView`
   (`kPlatformTypeNSView`), shared with AU-6: status and full messages,
   active configuration, choose and reload a filter (with drag and drop,
@@ -1420,6 +1415,16 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   [VST3 API audit](docs/review-2026-10/vst3-api-audit-2026-10-23.md): tail
   includes the latency, input silence flags not trusted, Bypass text converts
   back, controller state calls succeed; [adapter contract](docs/develop/plugin-contract.md).
+- [x] **VST3-9 — Non-integer host rates.** 5 November 2026, on jrp's
+  decision of that day: `setupProcessing` accepts any finite rate from 1 to
+  768000 Hz, such as 48000 ÷ 1.001 ≈ 47952.04795 Hz (47952 Hz itself was
+  always accepted). The rate is kept exactly (`HostLayout::fractional_rate`)
+  and matched strictly: no filter suits a fractional rate, so the plug-in
+  plays silence (bypass still plays the input), keeps its filter, names both
+  rates, and plays the filter again at its rate; only floating-point
+  rounding of a whole rate counts as that rate. Checked by `vst3.adapter`
+  (`fractional_rates`) and `native.filter_file`;
+  [when a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit).
 - [x] **VST3-10 — Mark silent output.** 24 October 2026, PR #70: an output
   channel is flagged silent exactly when a call left it all zero, so a tail
   that is still sounding is never flagged; [format notes](docs/develop/plugin-contract.md#format-notes).
