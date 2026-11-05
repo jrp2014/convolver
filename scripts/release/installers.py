@@ -10,7 +10,10 @@ from pathlib import Path, PurePosixPath
 from contract import load_policy
 
 
-def destinations(files, system, prefix=Path('/')):
+def destinations(files, system, prefix='/'):
+    # macOS targets are POSIX paths on every host, so a Windows runner's tests
+    # see the same paths as the Mac that builds the package.
+    root = PurePosixPath(Path(prefix).as_posix())
     result = {}
     for name in files:
         path = PurePosixPath(name)
@@ -45,9 +48,9 @@ def destinations(files, system, prefix=Path('/')):
             target = base + '\\' + name.replace('/', '\\')
         elif system == 'Darwin':
             base = (
-                prefix / 'Library/Audio/Plug-Ins'
+                root / 'Library/Audio/Plug-Ins'
                 if path.parts[0] in ('VST3', 'Components')
-                else prefix / 'Library/Application Support/Convolver'
+                else root / 'Library/Application Support/Convolver'
             )
             target = str(base / name)
         else:
@@ -67,7 +70,7 @@ def write_uninstaller(mapping, output):
     # Do not remove shared system parent directories.
     directories = set()
     for path in mapping.values():
-        parent = Path(path).parent
+        parent = PurePosixPath(path).parent
         while parent.name and (
             parent.name == 'Convolver'
             or 'Convolver' in parent.parts
@@ -78,7 +81,7 @@ def write_uninstaller(mapping, output):
             parent = parent.parent
     lines += [
         'rmdir -- ' + shlex.quote(path) + ' 2>/dev/null || :'
-        for path in sorted(directories, key=lambda p: (-len(Path(p).parts), p))
+        for path in sorted(directories, key=lambda p: (-len(PurePosixPath(p).parts), p))
     ]
     output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
     output.chmod(0o755)
