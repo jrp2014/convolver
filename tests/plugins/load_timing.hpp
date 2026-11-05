@@ -9,11 +9,13 @@
 // replacement of that filter by another as long, and a reset of processing
 // while the second plays. Each phase reports how long the calling thread was
 // held (the host's thread for state and window loads, the worker for LV2's
-// worker), and the audio callbacks meanwhile: how many there were, the
-// longest, and how many finished after their deadline (the start of the
-// next period) and by how much. Half a second with nothing loading comes
+// worker), and the audio callbacks meanwhile, each recorded (PERF-12): when
+// it was due, when the thread woke for it, when it entered and left the
+// plug-in, and the thread's CPU time in the call where the platform gives
+// it. A callback is late when it finishes after the next was due, and slow
+// when its call takes over half its period. Half a second with nothing loading comes
 // before the phases and another after them (the baselines), so scheduling
-// noise on the machine is visible.
+// noise is visible.
 //
 // The limits (jrp, 5 November 2026), enforced only in an optimised build
 // without sanitizers, where timings mean something:
@@ -27,17 +29,24 @@
 // - failed: a load was refused, a callback failed or the wrong filter was
 //   saved (in any build, and not run again); the host's thread was held
 //   over the limit, whatever the audio thread saw; or callbacks broke the
-//   limits while both baselines were on time;
+//   limits by the plug-in's own time while both baselines were on time;
 // - not qualified: callbacks broke the limits, but a baseline was late too
-//   (a busy machine), so the run shows nothing either way;
-//   and every run in a build that does not enforce the limits;
+//   (the trailing one plays a loaded filter, so this is uncertainty, not
+//   proof of a busy machine): timing could not be qualified; or only
+//   because the audio thread woke late (started on time, the callback would
+//   have finished on time) or was descheduled (slow with little CPU time),
+//   which these measurements cannot pin on the plug-in; and every run in a build that does not
+//   enforce the limits;
 // - reported only: no limit applies to any of its phases;
 // - passed: none of these.
 // An entry that did not pass runs again, up to three times, as a shared
 // machine can stall one run. It passes only if one run passed, meeting both
-// limits (see verdict()), and the summary keeps every run that did not. The test exits 1 if an
-// entry failed, not_qualified_exit (CTest reports it as skipped) if one did not qualify or none was
-// judged, and 0 only when an entry passed and every other passed or was reported only.
+// limits (see verdict()), and the summary keeps every run that did not. The
+// test exits 1 if an entry failed, not_qualified_exit (CTest reports it as
+// skipped) if one did not qualify or none was judged, and 0 only when an
+// entry passed and every other passed or was reported only. judge() gives a
+// run's verdict from its records alone, so the rules are tested without
+// timing anything.
 #pragma once
 #include "lifecycle.hpp"
 #include <chrono>
@@ -122,6 +131,55 @@ std::vector<float> quiet_noise(std::size_t channel, std::size_t frames);
 // long_filters).
 std::vector<Workload> workloads(const Options&);
 
+// PERF-12: one audio callback as the renderer timed it, in seconds from the
+// start of the run. The schedule restarts after a late callback, as a device
+// that dropped a buffer carries on.
+struct CallbackRecord {
+    double due = 0;      // When the host's device asked for it.
+    double woke = 0;     // When the audio thread started it.
+    double entered = 0;  // When the plug-in was called, after any hold-back.
+    double returned = 0; // When the plug-in returned.
+    double cpu = -1;     // The thread's CPU time in the call; -1 where not measured.
+    bool ok = true;      // The call succeeded and did not throw.
+};
+
+// What the audio thread saw in one phase, from its records. A callback is
+// late when it returns after the next one was due, and slow when the call
+// takes more than half its period. Some are not the plug-in's own time: late although it would have
+// been on time had it started on time (the thread woke late), or slow while the thread had little
+// CPU time (it was descheduled).
+struct Callbacks {
+    std::size_t count = 0, failed = 0;
+    std::size_t late = 0, late_scheduling = 0; // Of late: woke late or descheduled.
+    std::size_t slow = 0, slow_scheduling = 0; // Of slow: descheduled.
+    std::size_t missed = 0;                    // Deadlines that passed while a late callback ran.
+    double worst_late = 0;                     // Seconds past the next deadline, at worst.
+    double worst_wake = 0;                     // Seconds from due to the start, at worst.
+    double longest = 0;      // Seconds from start to return (any hold-back included).
+    double longest_call = 0; // Seconds in the plug-in.
+};
+Callbacks summarise(const std::vector<CallbackRecord>&, double period);
+
+// One phase of a run: the baselines with nothing loading (before the phases
+// and after them), a first load, a replacement and a reset.
+struct Phase {
+    std::string name;
+    bool baseline = false;      // Nothing loads: shows scheduling noise.
+    std::optional<double> held; // Seconds the calling thread was held, for a load.
+    bool accepted = true;       // The load was accepted.
+    bool audio_held = false;    // The host held audio back: callbacks reported only.
+    std::vector<CallbackRecord> callbacks;
+    std::size_t dropped = 0; // Callbacks beyond what the renderer could record.
+    std::string error;       // The first exception a callback threw.
+};
+// Everything one run of an entry recorded, for its verdict and its report.
+struct RunRecord {
+    std::string workload, entry;
+    int attempt = 1;
+    std::vector<Phase> phases;
+    bool saved = true; // The instance then saved the replacement.
+};
+
 // PERF-10: what one run of an entry with one workload showed. "Not qualified"
 // is not a pass: the run could not show that the limits hold.
 // "Reported only": no limit applies to any of the run's phases (LV2's
@@ -137,13 +195,35 @@ struct Run {
     // Each limit on its own: the hold of the host's thread, and the callbacks.
     Verdict hold = Verdict::reported_only, callbacks = Verdict::reported_only;
     bool error = false; // A refused load, a failed callback or the wrong filter saved.
+    std::size_t errors = 0;
 };
 // A run's verdict from its two limits: failed if either failed, else not
 // qualified if either was, else reported only if neither applied, else passed.
 Verdict combine(Verdict hold, Verdict callbacks);
+
+// The limits a run is judged by.
+struct Limits {
+    double period = 0;          // Seconds between callbacks.
+    std::optional<double> held; // For the host's thread; none: reported only.
+    bool host_thread = true;    // The entry runs on the host's thread.
+    bool enforce = true;        // Otherwise every run is not qualified.
+};
+// PERF-12: a run's verdict from its records alone, without timing anything
+// (see Run): errors fail it; a hold over the limit fails it whatever the
+// audio thread saw; late or slow callbacks that are the plug-in's fail it
+// while both baselines were on time, and are not judged otherwise; late or
+// slow callbacks that are not the plug-in's own time are not judged. `notes` has a line
+// for each phase, empty where there is nothing to say.
+struct Judged {
+    Run run;
+    std::vector<std::string> notes;
+};
+Judged judge(const RunRecord&, const Limits&);
+
 struct Result {
-    std::size_t errors = 0; // Refused loads, failed callbacks, a wrong filter saved.
-    std::vector<Run> runs;  // Every run, those repeated included, in order.
+    std::size_t errors = 0;         // Refused loads, failed callbacks, a wrong filter saved.
+    std::vector<Run> runs;          // Every run, those repeated included, in order.
+    std::vector<RunRecord> records; // What each of those runs recorded.
     // Entries (one workload, one entry point) by their verdict().
     std::size_t passed = 0, failed = 0, not_qualified = 0, reported_only = 0;
     std::size_t passed_after_failure = 0; // Of `passed`: an earlier run did not pass.

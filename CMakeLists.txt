@@ -338,12 +338,11 @@ if(CONVOLVER_BUILD_NATIVE)
                 tests/plugins/audio_guard.cpp
             LIBRARIES Convolver::host ${CMAKE_DL_LIBS}
             ARGS ${CONVOLVER_LIFECYCLE_LENGTH})
-        # PERF-10 and PERF-11: the load-timing harness, with a mock adapter.
+        # PERF-10 to PERF-12: the load-timing harness, on made-up records and
+        # briefly with a mock adapter (about 9 s of real time).
         convolver_native_test(native.load_timing_harness convolver_load_timing_harness_tests
             SOURCES tests/native/load_timing_harness_tests.cpp tests/plugins/load_timing.cpp
             LIBRARIES Convolver::host Threads::Threads)
-        # About 45 s of real time, longer on a busy runner.
-        set_tests_properties(native.load_timing_harness PROPERTIES TIMEOUT 300)
         convolver_native_test(native.state convolver_state_tests
             SOURCES tests/native/state_tests.cpp LIBRARIES Convolver::host)
         convolver_native_test(native.presets convolver_preset_tests

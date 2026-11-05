@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// The load-timing harness itself (tests/plugins/load_timing.hpp), with a mock
-// adapter whose loads and callbacks take as long as each case says: the
-// input it plays (PERF-11), and that it never reports a pass it did not
-// measure (PERF-10). The delays are far beyond the limits, so the verdicts
-// hold in sanitizer builds and on busy machines; where a busy machine can
-// turn a failure into "not qualified", the case accepts either, never a pass.
+// The load-timing harness itself (tests/plugins/load_timing.hpp): the input
+// it plays (PERF-11); its verdict rules and timing summaries on made-up
+// records, without timing anything (PERF-12, from jrp's review of db54160);
+// and, briefly with real threads and a mock adapter, that the renderer's
+// records reach those verdicts. It never reports a pass it did not measure
+// (PERF-10).
 #include "../plugins/load_timing.hpp"
 #include "convolver/host.hpp"
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -131,13 +130,236 @@ void verdict_table() {
           "exit codes");
 }
 
-// An adapter that keeps the state it is given, taking `load` to accept it,
-// and `callback` for every callback (or only while a load runs).
+// PERF-12: runs made of records, judged without timing anything. The period
+// is 10 ms and the hold limit 100 ms, as for a 10 s filter.
+constexpr double period = 0.01;
+constexpr double hold_limit = 0.1;
+
+// `n` callbacks, each due a period after the last (or when a late one
+// returned), waking `wake` late and spending `call` in the plug-in, with
+// `cpu` of CPU time (-1: not measured).
+std::vector<timing::CallbackRecord> steady(std::size_t n, double wake = 0, double call = 0.0005,
+                                           double cpu = -1) {
+    std::vector<timing::CallbackRecord> v;
+    double due = 0;
+    for (std::size_t k = 0; k < n; ++k) {
+        const double woke = due + wake, returned = woke + call;
+        v.push_back({due, woke, woke, returned, cpu, true});
+        due = std::max(due + period, returned);
+    }
+    return v;
+}
+
+// A run's records: baselines of 50 callbacks before and after, two loads
+// each holding the caller `held` with `loading` callbacks, and a reset.
+struct Spec {
+    double held = 0.005;
+    std::vector<timing::CallbackRecord> before = steady(50), loading = steady(30),
+                                        after = steady(50);
+    bool accepted = true, saved = true, audio_held = false;
+    std::size_t dropped = 0;
+};
+
+timing::RunRecord record(const Spec& s) {
+    timing::RunRecord r{"10 s", "state", 1, {}, s.saved};
+    const auto phase = [](const char* name, bool baseline,
+                          std::vector<timing::CallbackRecord> callbacks) {
+        timing::Phase p;
+        p.name = name;
+        p.baseline = baseline;
+        p.callbacks = std::move(callbacks);
+        return p;
+    };
+    r.phases.push_back(phase("baseline", true, s.before));
+    for (const char* name : {"first load", "replacement"}) {
+        auto p = phase(name, false, s.loading);
+        p.held = s.held;
+        p.accepted = s.accepted;
+        p.audio_held = s.audio_held;
+        p.dropped = s.dropped;
+        r.phases.push_back(std::move(p));
+    }
+    auto reset = phase("reset", false, steady(30));
+    reset.audio_held = s.audio_held; // As LV2 deactivates and activates.
+    r.phases.push_back(std::move(reset));
+    r.phases.push_back(phase("idle after", true, s.after));
+    return r;
+}
+
+timing::Run judged(const Spec& s, bool enforce = true, bool host_thread = true,
+                   std::optional<double> limit = hold_limit) {
+    return timing::judge(record(s), {period, limit, host_thread, enforce}).run;
+}
+
+std::string text(const timing::Run& r) {
+    return std::string(timing::describe(r.verdict)) + " (hold " + timing::describe(r.hold) +
+           ", callbacks " + timing::describe(r.callbacks) + ", " + std::to_string(r.errors) +
+           " errors): " + r.why;
+}
+
+bool says(const timing::Run& r, const char* what) {
+    return r.why.find(what) != std::string::npos;
+}
+
+// The timings each callback gives: how late, how many deadlines missed, and
+// whose time it was.
+void summaries() {
+    using R = timing::CallbackRecord;
+    const std::vector<R> v{
+        {0.00, 0.000, 0.000, 0.0005, -1, true},    // On time.
+        {0.01, 0.010, 0.010, 0.0450, -1, true},    // The plug-in's: late by 25 ms, 3 deadlines.
+        {0.05, 0.062, 0.062, 0.0625, -1, true},    // Woke 12 ms late, fast: scheduling.
+        {0.07, 0.070, 0.070, 0.0760, -1, true},    // Slow: 6 ms of a 10 ms period.
+        {0.08, 0.080, 0.080, 0.0860, 0.001, true}, // As long, 1 ms of CPU: descheduled.
+        {0.09, 0.090, 0.090, 0.0905, -1, false},   // Failed.
+    };
+    const auto c = timing::summarise(v, period);
+    const auto near = [](double a, double b) { return std::abs(a - b) < 1e-9; };
+    check(c.count == 6 && c.failed == 1, "summary: count and failures");
+    check(c.late == 2 && c.late_scheduling == 1, "summary: two late, one of them scheduling");
+    check(c.missed == 3 + 1, "summary: deadlines missed " + std::to_string(c.missed));
+    check(c.slow == 3 && c.slow_scheduling == 1, "summary: three slow (" + std::to_string(c.slow) +
+                                                     "), one descheduled (" +
+                                                     std::to_string(c.slow_scheduling) + ")");
+    check(near(c.worst_late, 0.025) && near(c.worst_wake, 0.012) && near(c.longest, 0.035) &&
+              near(c.longest_call, 0.035),
+          "summary: worst late, wake, longest");
+    check(timing::summarise({}, period).count == 0, "summary: no callbacks");
+}
+
+// What each kind of run is judged, as jrp's review of db54160 lists them.
+void records() {
+    {
+        const auto r = judged({});
+        check(r.verdict == timing::Verdict::passed && r.hold == timing::Verdict::passed &&
+                  r.callbacks == timing::Verdict::passed,
+              "clean run: " + text(r));
+    }
+    {
+        // Deadline missed, callback fast: the thread woke late.
+        Spec s;
+        s.loading = steady(30, 0.012);
+        const auto r = judged(s);
+        check(r.verdict == timing::Verdict::not_qualified && r.hold == timing::Verdict::passed &&
+                  says(r, "woke late or was descheduled"),
+              "late wake, fast callback: " + text(r));
+    }
+    {
+        // The callback itself slow: over half its period.
+        Spec s;
+        s.loading = steady(30, 0, 0.006);
+        const auto r = judged(s);
+        check(r.verdict == timing::Verdict::failed && r.callbacks == timing::Verdict::failed &&
+                  says(r, "over half its period"),
+              "slow callback: " + text(r));
+    }
+    {
+        // As long, with little CPU time: descheduled, not the plug-in's.
+        Spec s;
+        s.loading = steady(30, 0, 0.006, 0.001);
+        const auto r = judged(s);
+        check(r.verdict == timing::Verdict::not_qualified, "descheduled callback: " + text(r));
+    }
+    {
+        // Late by its own time: started on time, it still ends past the next deadline.
+        Spec s;
+        s.loading = steady(30, 0, 0.012);
+        const auto r = judged(s);
+        check(r.verdict == timing::Verdict::failed && says(r, "late callback"),
+              "late by its own time: " + text(r));
+    }
+    {
+        // Loader over its budget fails, whatever the audio thread saw: also
+        // with both baselines late and every callback late (the review of
+        // 59ac8e0's reproduction).
+        Spec s;
+        s.held = 0.4;
+        auto r = judged(s);
+        check(r.verdict == timing::Verdict::failed && r.hold == timing::Verdict::failed &&
+                  says(r, "held the host's thread 400.0 ms, over 100 ms"),
+              "slow loader: " + text(r));
+        s.before = s.after = s.loading = steady(50, 0, 0.012);
+        r = judged(s);
+        check(r.verdict == timing::Verdict::failed && r.hold == timing::Verdict::failed &&
+                  r.callbacks == timing::Verdict::not_qualified,
+              "slow loader, every callback late: " + text(r));
+    }
+    {
+        // Baseline unsuitable, before or after: the plug-in's slow callbacks
+        // are not judged.
+        for (const bool late_before : {true, false}) {
+            Spec s;
+            (late_before ? s.before : s.after) = steady(50, 0.012);
+            s.loading = steady(30, 0, 0.006);
+            const auto r = judged(s);
+            check(r.verdict == timing::Verdict::not_qualified && says(r, "a baseline was late"),
+                  std::string("late baseline ") + (late_before ? "before" : "after") + ": " +
+                      text(r));
+        }
+    }
+    {
+        // Functional errors fail in every build, and say how many.
+        Spec refused;
+        refused.accepted = false;
+        Spec failing;
+        failing.loading[3].ok = false;
+        Spec wrong;
+        wrong.saved = false;
+        Spec dropped;
+        dropped.dropped = 5;
+        for (const auto* s : {&refused, &failing, &wrong, &dropped})
+            for (const bool enforce : {true, false}) {
+                const auto r = judged(*s, enforce);
+                check(r.error && r.errors > 0 && r.verdict == timing::Verdict::failed &&
+                          says(r, "errors"),
+                      "error: " + text(r));
+            }
+    }
+    {
+        // The host holds audio back and the work is off its thread: no limit
+        // applies, however slow.
+        Spec s;
+        s.held = 0.4;
+        s.audio_held = true;
+        s.loading = steady(30, 0, 0.3);
+        const auto r = judged(s, true, false);
+        check(r.verdict == timing::Verdict::reported_only, "nothing limited: " + text(r));
+    }
+    {
+        // No hold limit (the 120 s filter): the callbacks are still judged.
+        Spec s;
+        s.held = 0.7;
+        auto r = judged(s, true, true, std::nullopt);
+        check(r.verdict == timing::Verdict::passed && r.hold == timing::Verdict::reported_only,
+              "120 s, clean: " + text(r));
+        s.loading = steady(30, 0, 0.006);
+        r = judged(s, true, true, std::nullopt);
+        check(r.verdict == timing::Verdict::failed, "120 s, slow callbacks: " + text(r));
+    }
+    {
+        // A build that does not enforce the limits: not qualified, saying
+        // what would fail.
+        Spec s;
+        s.held = 0.4;
+        const auto r = judged(s, false);
+        check(r.verdict == timing::Verdict::not_qualified && !r.error && says(r, "would fail"),
+              "not enforced: " + text(r));
+    }
+    {
+        // A note for each phase, and only where there is something to say.
+        Spec s;
+        s.held = 0.4;
+        const auto j = timing::judge(record(s), {period, hold_limit, true, true});
+        check(j.notes.size() == 5 && j.notes[0].empty() && j.notes[3].empty() &&
+                  j.notes[1].find("OVER THE LIMIT") != std::string::npos,
+              "notes per phase");
+    }
+}
+
+// An adapter that keeps the state it is given, taking `load` to accept it.
 class Mock final : public lc::Driver {
   public:
-    Ms load{0}, callback{0};
-    bool slow_only_while_loading = false;
-    int slow_loads = -1; // How many loads take `load`: all, if negative.
+    Ms load{0};
     bool refuse = false;
 
     lc::Format format() const override {
@@ -151,12 +373,7 @@ class Mock final : public lc::Driver {
     void configure(const lc::Host&) override {}
     void destroy() override {}
     bool restore(std::span<const std::byte> state) override {
-        loading_ = true;
-        if (slow_loads != 0)
-            std::this_thread::sleep_for(load);
-        if (slow_loads > 0)
-            --slow_loads;
-        loading_ = false;
+        std::this_thread::sleep_for(load);
         if (refuse)
             return false;
         saved_ = convolver::decode_host_state(state);
@@ -168,13 +385,6 @@ class Mock final : public lc::Driver {
     void stop() override {}
     bool process(std::span<const float* const> in, std::span<float* const> out,
                  std::size_t frames) override {
-        // Spins rather than sleeps: a sleep can take many times longer
-        // (175 ms for 25 ms on a macOS runner), which only slows the test.
-        if (callback.count() && (!slow_only_while_loading || loading_)) {
-            const auto until = std::chrono::steady_clock::now() + callback;
-            while (std::chrono::steady_clock::now() < until) {
-            }
-        }
         for (std::size_t c = 0; c < out.size(); ++c)
             std::copy_n(in[c % in.size()], frames, out[c]);
         return true;
@@ -196,7 +406,6 @@ class Mock final : public lc::Driver {
 
   private:
     convolver::HostState saved_;
-    std::atomic<bool> loading_{false};
 };
 
 // A folder of its own, so that builds testing at once do not share one.
@@ -206,26 +415,13 @@ std::filesystem::path scratch() {
             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 }
 
-struct Case {
-    const char* name;
-    Ms load, callback;
-    bool slow_only_while_loading = false, refuse = false, enforce = true;
-    int slow_loads = -1;
-};
-
-timing::Result run(const Case& c) {
-    std::cout << "\ncase: " << c.name << '\n';
-    Mock mock;
-    mock.load = c.load;
-    mock.callback = c.callback;
-    mock.slow_only_while_loading = c.slow_only_while_loading;
-    mock.refuse = c.refuse;
-    mock.slow_loads = c.slow_loads;
+timing::Result run(Mock& mock, int attempts, Ms limit = 100ms) {
     timing::Options o;
     o.work_directory = scratch();
-    o.enforce = c.enforce;
-    // A short filter: the mock does not prepare it, and a 100 ms limit.
-    const std::vector<timing::Workload> list{{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}};
+    o.enforce = true;
+    o.attempts = attempts;
+    // A short filter: the mock does not prepare it.
+    const std::vector<timing::Workload> list{{"tiny", {48000, 2, 2}, 0.01, 512, limit}};
     const std::vector<timing::Entry> entries{
         {"state", [&](const timing::Filter& f, timing::Audio&) {
              return timing::Outcome{mock.restore(f.state), std::nullopt};
@@ -235,118 +431,40 @@ timing::Result run(const Case& c) {
     return r;
 }
 
-std::string text(const timing::Result& r) {
-    return std::to_string(r.passed) + " passed, " + std::to_string(r.failed) + " failed, " +
-           std::to_string(r.not_qualified) + " not qualified, " + std::to_string(r.reported_only) +
-           " reported only, " + std::to_string(r.errors) + " errors, exit " +
-           std::to_string(timing::exit_code(r));
-}
-
-// PERF-10: the harness judges what it measured, and says so.
-void verdicts() {
+// A little with real threads: the renderer's records reach the verdict.
+// The delays are far beyond the limit, so the verdicts hold on any machine.
+void integration() {
     {
-        // A quick adapter never fails on its hold. Its callbacks are the
-        // machine's: one stalled run after another, other tests running
-        // alongside, can fail them, so they are not checked here.
-        const auto r = run({"quick loads and callbacks", 0ms, 0ms});
-        check(r.errors == 0 && std::none_of(r.runs.begin(), r.runs.end(),
-                                            [](const timing::Run& run) {
-                                                return run.why.find("held the host's thread") !=
-                                                       std::string::npos;
-                                            }),
-              "quick adapter: " + text(r));
-    }
-    {
-        // A loader over the limit fails on every run, each one kept.
-        const auto r = run({"slow loader", 400ms, 0ms});
-        check(r.failed == 1 && timing::exit_code(r) == 1, "slow loader: " + text(r));
-        check(r.runs.size() == 3 && std::all_of(r.runs.begin(), r.runs.end(),
-                                                [](const timing::Run& run) {
-                                                    return run.verdict == timing::Verdict::failed;
-                                                }),
-              "slow loader: three failed runs kept");
-        check(!r.runs.empty() && r.runs[0].why.find("held the host's thread") != std::string::npos,
-              "slow loader: the run says the host's thread was held");
-    }
-    {
-        // Slow only on the first run (its two loads): run 1 fails and is kept;
-        // the next is not held (its callbacks are the machine's).
-        const auto r = run({"slow on the first run only", 400ms, 0ms, false, false, true, 2});
-        check(r.runs.size() >= 2 && r.runs[0].hold == timing::Verdict::failed &&
-                  r.runs[1].hold == timing::Verdict::passed &&
-                  (r.passed == 0 || r.passed_after_failure == 1),
-              "slow on the first run only: " + text(r));
-    }
-    {
-        // As on a busy macOS runner: the hold stalled on the first run only,
-        // and every callback is late, the baseline's too. The hold limit is
-        // met by the later runs, the callbacks cannot be judged: not
-        // qualified, not failed.
-        const auto r = run({"slow once, every callback late", 400ms, 12ms, false, false, true, 1});
-        check(r.not_qualified == 1 && r.failed == 0 && r.runs.size() == 3 &&
-                  r.runs[0].hold == timing::Verdict::failed &&
-                  r.runs[1].hold == timing::Verdict::passed &&
-                  timing::exit_code(r) == timing::not_qualified_exit,
-              "slow once with late callbacks: " + text(r));
-    }
-    {
-        // The review's reproduction: a slow loader with every callback late,
-        // the baseline included, still fails on the hold.
-        const auto r = run({"slow loader, every callback late", 400ms, 12ms});
-        check(r.failed == 1 && timing::exit_code(r) == 1,
-              "slow loader with late callbacks: " + text(r));
-    }
-    {
-        // Late callbacks with a late baseline show nothing: not qualified,
-        // and the test is skipped rather than passed.
-        const auto r = run({"every callback late, quick loader", 0ms, 12ms});
-        check(r.not_qualified == 1 && r.passed == 0 && r.failed == 0 &&
-                  timing::exit_code(r) == timing::not_qualified_exit,
-              "late callbacks throughout: " + text(r));
-    }
-    {
-        // Callbacks late only while loading fail (or, on a busy machine, do
-        // not qualify); they never pass.
-        const auto r = run({"callbacks late while loading", 50ms, 12ms, true});
-        check(r.passed == 0 && timing::exit_code(r) != 0,
-              "callbacks late while loading: " + text(r));
-    }
-    {
-        // A build that does not enforce the limits never reports a pass.
-        const auto r = run({"slow loader, limits not enforced", 400ms, 0ms, false, false, false});
-        check(r.not_qualified == 1 && r.runs.size() == 1 &&
-                  timing::exit_code(r) == timing::not_qualified_exit,
-              "limits not enforced: " + text(r));
-    }
-    {
-        // An entry no limit applies to (the host stops audio for the load,
-        // which is not on its thread) is reported only, however slow.
         Mock mock;
-        mock.load = 400ms;
-        timing::Options o;
-        o.work_directory = scratch();
-        o.enforce = true;
-        o.reset_holds_audio = true;
-        std::cout << "\ncase: reported only\n";
-        const auto r =
-            timing::run(mock,
-                        {{"held back",
-                          [&](const timing::Filter& f, timing::Audio&) {
-                              return timing::Outcome{mock.restore(f.state), std::nullopt};
-                          },
-                          true, false}},
-                        {{"tiny", {48000, 2, 2}, 0.01, 512, 100ms}}, o);
-        std::filesystem::remove_all(o.work_directory);
-        // Nothing was judged, so the test is skipped rather than passed.
-        check(r.reported_only == 1 && r.passed == 0 && r.runs.size() == 1 &&
-                  timing::exit_code(r) == timing::not_qualified_exit,
-              "reported only: " + text(r));
+        const auto r = run(mock, 1);
+        const auto every_phase_heard = [&] {
+            for (const auto& rec : r.records)
+                for (const auto& p : rec.phases)
+                    if (p.callbacks.empty())
+                        return false;
+            return !r.records.empty();
+        };
+        check(r.errors == 0 && r.runs.size() == 1 && r.records.size() == 1 &&
+                  r.records[0].phases.size() == 5 && every_phase_heard() &&
+                  r.runs[0].hold == timing::Verdict::passed,
+              "quick adapter: " + text(r.runs.at(0)));
     }
     {
-        // A refused load is an error in any build.
-        const auto r = run({"refused load", 0ms, 0ms, false, true});
+        // Over its limit on each of two runs: both kept, the entry fails.
+        Mock mock;
+        mock.load = 60ms;
+        const auto r = run(mock, 2, 20ms);
+        check(r.failed == 1 && r.runs.size() == 2 && timing::exit_code(r) == 1 &&
+                  r.runs[0].hold == timing::Verdict::failed &&
+                  r.runs[1].hold == timing::Verdict::failed,
+              "slow loader: " + text(r.runs.at(0)));
+    }
+    {
+        Mock mock;
+        mock.refuse = true;
+        const auto r = run(mock, 3);
         check(r.errors > 0 && r.failed == 1 && r.runs.size() == 1 && timing::exit_code(r) == 1,
-              "refused load: " + text(r));
+              "refused load: " + text(r.runs.at(0)));
     }
 }
 } // namespace
@@ -355,7 +473,9 @@ int main() {
     try {
         input_is_quiet_noise();
         verdict_table();
-        verdicts();
+        summaries();
+        records();
+        integration();
     } catch (const std::exception& e) {
         std::cout << "FAILED: " << e.what() << '\n';
         return 1;

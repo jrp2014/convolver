@@ -1300,6 +1300,19 @@ described on the linked page and in the [CHANGELOG](CHANGELOG.md).
   `native.load_timing_harness` checks the range (-0.1 to 0.1) and that both
   signs occur; it failed with the old generator. The loading timings were
   measured again with it ([loading responsiveness](#loading-responsiveness)).
+- [x] **PERF-12 — Load-timing verdicts from records, tested without
+  timing.** 5 November 2026, from jrp's review of `db54160`: the renderer
+  records each callback (due, wake, entry into and return from the plug-in,
+  and the thread's CPU time where the platform gives it), and a pure
+  `judge()` gives a run's verdict from those records. A callback that missed
+  its deadline only because the thread woke late, or that was slow with
+  little CPU time (descheduled), is not the plug-in's own time: not judged, so the run is
+  not qualified rather than failed. `native.load_timing_harness` checks the
+  rules on made-up records (deadline missed with a fast callback, slow
+  callback, loader over budget, unsuitable baseline, functional errors,
+  mixed results across runs) and keeps only a few short real-thread runs:
+  about 9 s instead of 40 to 60;
+  [load timing](docs/develop/testing.md#load-timing-perf-9).
 - [x] **GAIN-2 — No noise simulation for `--gain-db no-clip`.** 5 November
   2026, PR #111, from the external review of `91fcf1f` (0.8.13): no-clip
   ran the whole noise estimate to use only the bound it also returns. It

@@ -122,6 +122,16 @@ Until 1.0 the C++ API may change between minor versions.
 
 ### Changed
 
+- Tests (PERF-12, from jrp's review of `db54160`): the load-timing tests
+  record each audio callback (when it was due, when the thread woke, when
+  the plug-in was entered and returned, and the thread's CPU time where the
+  platform gives it) and print the latest wake and the longest call into the
+  plug-in. A callback late only because its thread woke late, or slow while
+  descheduled, is not judged and leaves the run not qualified rather than
+  failed. `native.load_timing_harness` tests the verdicts on made-up records
+  instead of sleeping, in about 9 seconds rather than 40 to 60. Tests only:
+  no change to the plug-ins or the sound.
+
 - The version is now 0.10.0 (jrp, 5 November 2026), the minor step for the
   library changes in DIAG-3 and DIAG-4 below, after 0.9.0. CMake consumers
   request `find_package(Convolver 0.10)`, and the first preview is cut from
