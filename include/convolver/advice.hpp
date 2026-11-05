@@ -15,7 +15,9 @@ namespace convolver {
 // the same parts as text, one labelled line each ("Cause: ", "Fix: ",
 // "Note: ") after the problem.
 struct Advice {
-    std::string problem, cause, fix, note;
+    // The empty initializers let `Advice{"problem"}` name only the problem
+    // without a missing-field warning.
+    std::string problem{}, cause{}, fix{}, note{};
     bool empty() const noexcept {
         return problem.empty() && cause.empty() && fix.empty() && note.empty();
     }
