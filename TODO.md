@@ -285,6 +285,14 @@ Shared work, done once for all three formats:
   If FFTW-built plug-ins go ahead, FFTW 3.3.5's
   `fftwf_make_planner_thread_safe` is FFTW's answer for plug-ins in one
   process that cannot share a lock (its manual calls it a last resort).
+- [ ] **PLUG-17 — Ramps measured in time rather than frames (jrp decides).**
+  From the project review of 5 November 2026: `HostProcessor`'s gain, mix,
+  bypass and mute ramps last 64 frames and a replacement's crossfade 256
+  frames at every sample rate (PLUG-16 named them), so at 48 kHz they take
+  1.3 ms and 5.3 ms, and at 384 kHz 0.17 ms and 0.67 ms. Fixed times would
+  make the higher rates as smooth as 48 kHz, but they change the sound at
+  every rate except the one chosen, so jrp decides; the review recommends
+  keeping frames for the first preview.
 
 LV2 (Linux first; also PipeWire system audio):
 

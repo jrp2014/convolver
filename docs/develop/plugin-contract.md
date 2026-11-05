@@ -361,7 +361,7 @@ separate processes, so each carries values, never pointers:
   the restored configuration. There is no warm-up or crossfade, so output
   matches the filter from the first block (after the reported latency).
 - **Live replacement** uses `HostProcessor::replace`: the new filter starts with
-  fresh history, warms up for 256 frames and crossfades for 256 frames, as described under
+  fresh history, warms up for one Latency block and crossfades for 256 frames, as described under
   [replacement and threads](#replacement-and-threads).
 - Pending replacements coalesce to the newest, as `HostProcessor` already does.
 
